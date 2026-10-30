@@ -1,0 +1,12 @@
+# batch 028 area=godot/client/features/devices md=godot-client-features-devices--part3.md lines=2610
+godot/client/features/devices/rear_panel.gd
+godot/client/features/devices/replication_format.gd
+godot/client/features/devices/sender_picker.gd
+godot/client/features/devices/server_controls.gd
+godot/client/features/devices/server_flow.gd
+godot/client/features/devices/server_page_model.gd
+godot/client/features/devices/snapshot_dialogs.gd
+godot/client/features/devices/snapshot_flow.gd
+godot/client/features/devices/snapshot_model.gd
+godot/client/features/devices/stream_record_model.gd
+godot/client/features/devices/vcam_audio_model.gd

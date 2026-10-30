@@ -1,0 +1,7 @@
+# batch 043 area=godot/client/video md=godot-client-video.md lines=680
+godot/client/video/shm_native.gd
+godot/client/video/shm_reader.gd
+godot/client/video/shm_texture.gd
+godot/client/video/surface_holders.gd
+godot/client/video/video_feed.gd
+godot/client/video/video_surfaces.gd

@@ -1,0 +1,15 @@
+# batch 081 area=src/engine md=src-engine--part3.md lines=3650
+src/engine/scene-transition.js
+src/engine/screen-timers.js
+src/engine/take-sync-barrier.js
+src/engine/template-cg-orphan-sweep.js
+src/engine/timeline-engine.js
+src/engine/timeline-keyframe-mixer.js
+src/engine/timeline-playback-amcp-schedule.js
+src/engine/timeline-playback-amcp-send.js
+src/engine/timeline-playback-helpers.js
+src/engine/timeline-playback-runtime.js
+src/engine/timeline-playback-transport-bulk.js
+src/engine/timeline-playback.js
+src/engine/timeline-scrub-gate.js
+src/engine/timeline-take.js

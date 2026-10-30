@@ -1,0 +1,27 @@
+# batch 026 area=godot/client/features/devices md=godot-client-features-devices--part1.md lines=6739
+godot/client/features/devices/cable_gesture.gd
+godot/client/features/devices/cable_layer.gd
+godot/client/features/devices/cable_model.gd
+godot/client/features/devices/cable_rope.gd
+godot/client/features/devices/cable_rules.gd
+godot/client/features/devices/cable_seed.gd
+godot/client/features/devices/cables_list.gd
+godot/client/features/devices/cluster_model.gd
+godot/client/features/devices/cluster_panel.gd
+godot/client/features/devices/decklink_drop_flow.gd
+godot/client/features/devices/decklink_drop_io.gd
+godot/client/features/devices/decklink_input_model.gd
+godot/client/features/devices/decklink_order.gd
+godot/client/features/devices/decklink_order_editor.gd
+godot/client/features/devices/decklink_port_controls.gd
+godot/client/features/devices/decklink_port_model.gd
+godot/client/features/devices/destination_inspector.gd
+godot/client/features/devices/destinations_model.gd
+godot/client/features/devices/destinations_panel.gd
+godot/client/features/devices/devices_model.gd
+godot/client/features/devices/devices_tab.gd
+godot/client/features/devices/devices_toolbar.gd
+godot/client/features/devices/file_pick.gd
+godot/client/features/devices/gpu_entries.gd
+godot/client/features/devices/gpu_layout.gd
+godot/client/features/devices/gpu_layout_editor.gd

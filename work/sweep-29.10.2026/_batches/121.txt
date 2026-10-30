@@ -1,0 +1,3 @@
+# batch 121 area=tools/shaders md=tools-shaders.md lines=374
+tools/shaders/convert-shaderamp.py
+tools/shaders/validate-shader-configs.js

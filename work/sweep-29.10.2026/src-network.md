@@ -1,0 +1,19 @@
+# src/network — sweep 29.10.2026 (batch 084)
+
+Files: 1 · lines: 407 · findings: 0 BUG-HIGH, 1 BUG, 0 DEAD, 3 RISK, 4 QUALITY
+
+Method notes: the file was read in full. All commands are built from fixed strings (`execFileSync` with argv arrays;
+`sudo -n` only on a fixed allow-list of binaries/scripts), so there is no injection from request input. There is no
+nmcli/ip use here, and nothing in this module changes addresses, routes or interfaces; the worst a call can do to
+connectivity is stop/logout the Tailscale daemon, which is behind the nuclear-password check in
+src/api/routes-network-tailscale.js. Live check: `GET /api/system/setup` (calls `getPublicTailscaleSummary`) answers in ~36 ms on this box.
+
+## src/network/tailscale-service.js
+- `RISK` src/network/tailscale-service.js:208-239 (`getTailscaleStatus`) — fully synchronous: up to 4 `systemctl is-active` spawns (5 s timeout each, :138-149 called twice per unit from :154-161), a `curl` (6 s timeout, :217) and a `tailscale status --json` (4 s, :165 and 10 s in :128), all with `execFileSync` on the event loop. It is reached from `GET /api/system/setup` (routes-system-setup.js:138) and from every Tailscale route, and `startTailscaleLogin` calls it 2-3 times. With a hung `tailscaled` this blocks the whole API/OSC/WS loop for many seconds; healthy it is ~10 ms. Make it async (the file already has an http-over-unix helper, `localApiRequest`) or cache the result for a few seconds.
+- `RISK` src/network/tailscale-service.js:285-313 — `setTailscaleEnabled` writes `enabled` to config before the sudo call and does not roll back on failure, so a failed `systemctl enable --now` leaves `config/tailscale.json` saying `enabled: true` while the daemon is down (the route returns 502 but the saved flag stays). Stopping the daemon also drops any remote session that arrives over Tailscale itself, with no warning in this layer.
+- `RISK` src/network/tailscale-service.js:361-363 (`saveTailscalePrefs` -> config/tailscale-config.js:21) — `hostname` is stored as a free string and later read by tools/runtime/highascg-tailscale-up.sh with `read -r HOSTNAME ACCEPT_ROUTES`. A hostname containing whitespace (`my box`) makes `HOSTNAME=my` and `ACCEPT_ROUTES="box 0"`, so `acceptRoutes` is silently ignored (and the hostname is truncated). No shell injection (the script uses an argv array), but the value is never validated against a hostname grammar. Validate `^[A-Za-z0-9-]{1,63}$` on save.
+- `BUG` src/network/tailscale-service.js:141-148 — `systemctlIsActive`: `systemctl is-active` exits 3 for `activating`, so `execFileSync` throws, and the catch only recognises the stdout `failed`; `activating` falls to `'inactive'`. The `st === 'activating'` branch at line 141 can therefore never be reached with a non-zero exit, and `detectTailscaleDaemon` (:157) reports a starting daemon as `inactive`. Failing case: right after `setTailscaleEnabled(true)` the status response says the daemon is inactive/not running until `active`. Fix: map stdout `activating` in the catch.
+- `QUALITY` src/network/tailscale-service.js:343-345 — after `login-interactive` it sleeps a fixed 800 ms and reads the status once; if `AuthURL` is not populated yet the caller gets `authUrl: null` and has to retry by hand.
+- `QUALITY` src/network/tailscale-service.js:315-318 — `startTailscaleLogin(_prefs)` ignores its argument although JSDoc documents `prefs` and both route callers pass `loadTailscaleConfig()`.
+- `QUALITY` src/network/tailscale-service.js:289-296, :302-310 — every systemctl call is duplicated for `/bin/systemctl` and `/usr/bin/systemctl` (same binary on merged-usr); on a real failure each command runs twice.
+- `QUALITY` src/network/tailscale-service.js:215-228 — status is fetched by spawning `curl` against the unix socket although `localApiRequest` (same file) does the same over `http` without a process; `curl` missing silently falls back to the CLI.

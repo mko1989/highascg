@@ -1,0 +1,24 @@
+# batch 070 area=src/bootstrap md=src-bootstrap.md lines=2319
+src/bootstrap/args.js
+src/bootstrap/audio-capture-lifecycle.js
+src/bootstrap/caspar-amcp-watchdog.js
+src/bootstrap/caspar-info-ready.js
+src/bootstrap/compose-preview-lifecycle.js
+src/bootstrap/config.js
+src/bootstrap/device-graph-boot-sync.js
+src/bootstrap/dotenv.js
+src/bootstrap/fetch-server-info-config.js
+src/bootstrap/gpu-drm-hotplug-watch.js
+src/bootstrap/gpu-topology-factory-reset.js
+src/bootstrap/led-test-layer-999.js
+src/bootstrap/modules.js
+src/bootstrap/os-layout-watchdog.js
+src/bootstrap/osc-lifecycle.js
+src/bootstrap/process-guards.js
+src/bootstrap/safe-mode.js
+src/bootstrap/sandbox.js
+src/bootstrap/shutdown.js
+src/bootstrap/startup-led-test-pattern.js
+src/bootstrap/streaming-lifecycle.js
+src/bootstrap/system-inventory-file.js
+src/bootstrap/v4l2-bridge-lifecycle.js

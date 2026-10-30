@@ -1,0 +1,142 @@
+# tools/smoke part 8 — sweep 29.10.2026 (batch 129)
+
+Files: 69 · lines: 6891 · findings: 0 BUG-HIGH, 1 BUG, 0 DEAD, 4 RISK, 4 QUALITY
+
+## tools/smoke/smoke-wo378-channel-source-vocabulary.test.js
+- `OK`
+## tools/smoke/smoke-wo379-shader-store-and-stack-clear.test.js
+- `RISK` tools/smoke/smoke-wo379-shader-store-and-stack-clear.test.js:52 — calls the real `store.reconcileShaderStore()` against the repo's own `data/shaders/` and `template/shaders/` (src/shaderfx/shader-store.js:25-26; writes via atomicWriteFile in reconcileShaderStore, :254-300) instead of a temp root. On a box whose store has diverged, the first call writes or recovers files into the Syncthing-synced trees, and the idempotence assertion at :54-55 depends on live state. Fix: make the shader dirs injectable and test against a temp root.
+## tools/smoke/smoke-wo380-shadertoy-import.test.js
+- `OK`
+## tools/smoke/smoke-wo381-operator-gui-channel-reserved.test.js
+- `OK`
+## tools/smoke/smoke-wo381-planned-badge-and-timer-dock.test.js
+- `OK`
+## tools/smoke/smoke-wo382-operator-tools-flag-settable.test.js
+- `OK`
+## tools/smoke/smoke-wo383-tdz-gate.test.js
+- `OK`
+## tools/smoke/smoke-wo387-desktop-app-catalog.test.js
+- `QUALITY` tools/smoke/smoke-wo387-desktop-app-catalog.test.js:218 — empty section banner "MORE THAN ONE WINDOW AT A TIME (owner report, 29.07)" (:218-219) with no test under it; the behaviour it names is not covered in this file. Fix: delete the banner or add the test.
+## tools/smoke/smoke-wo388-crop-aware-align.test.js
+- `OK`
+## tools/smoke/smoke-wo391c-xrandr-cache-backoff.test.js
+- `OK`
+## tools/smoke/smoke-wo393-zero-outputs.test.js
+- `OK`
+## tools/smoke/smoke-wo395-streaming-status-outputs.test.js
+- `OK`
+## tools/smoke/smoke-wo396-decklink-cold-path.test.js
+- `OK`
+## tools/smoke/smoke-wo397-confine-tick-x-free.test.js
+- `OK`
+## tools/smoke/smoke-wo400-supervisor-cleanup.test.js
+- `OK`
+## tools/smoke/smoke-wo401-perf-first-wave.test.js
+- `OK`
+## tools/smoke/smoke-wo403-shader-live-playlist-follow.test.js
+- `OK`
+## tools/smoke/smoke-wo406-monitor-bus.test.js
+- `OK`
+## tools/smoke/smoke-wo407-gl-sync-env.test.js
+- `OK`
+## tools/smoke/smoke-wo408-compose-ui-batch.test.js
+- `OK`
+## tools/smoke/smoke-wo409-prv-mixer-strips.test.js
+- `OK`
+## tools/smoke/smoke-wo412-opgui-cable-implies-monitor.test.js
+- `OK`
+## tools/smoke/smoke-wo413-usb-automount.test.js
+- `OK`
+## tools/smoke/smoke-wo414-pinned-host-channel-collision.test.js
+- `OK`
+## tools/smoke/smoke-wo417-calamares-log-rescue.test.js
+- `OK`
+## tools/smoke/smoke-wo418-review-fixes.test.js
+- `OK`
+## tools/smoke/smoke-wo419-review-rows-6-7-10.test.js
+- `OK`
+## tools/smoke/smoke-wo421-config-durability.test.js
+- `OK`
+## tools/smoke/smoke-wo422-batch-no-replay-after-send.test.js
+- `OK`
+## tools/smoke/smoke-wo423-wo424-install-and-update.test.js
+- `OK`
+## tools/smoke/smoke-wo425-427-audio-fps-decklink.test.js
+- `OK`
+## tools/smoke/smoke-wo428-decklink-detect-gated.test.js
+- `OK`
+## tools/smoke/smoke-wo429-iso-secrets-excluded.test.js
+- `OK`
+## tools/smoke/smoke-wo430-decklink-kernel-module-excluded.test.js
+- `OK`
+## tools/smoke/smoke-wo433-headers-ship-downloads-scan.test.js
+- `OK`
+## tools/smoke/smoke-wo434-no-drop-seed-embed-server.test.js
+- `OK`
+## tools/smoke/smoke-wo436-mapping-inspector-cache-revert.test.js
+- `OK`
+## tools/smoke/smoke-wo437-mapping-dims-gl-sync.test.js
+- `OK`
+## tools/smoke/smoke-wo439-nvidia-sync-tick-mapping-rig.test.js
+- `OK`
+## tools/smoke/smoke-wo440-441-apply-force-inspector-fit.test.js
+- `OK`
+## tools/smoke/smoke-wo442-custom-dims-fossils.test.js
+- `OK`
+## tools/smoke/smoke-wo443-monitor-audio-not-in-project.test.js
+- `OK`
+## tools/smoke/smoke-wo444-caspar-env-per-launch.test.js
+- `OK`
+## tools/smoke/smoke-wo446-lighting-protocol-dispatch.test.js
+- `OK`
+## tools/smoke/smoke-wo447-vsync-default-off.test.js
+- `OK`
+## tools/smoke/smoke-wo448-timeline-unrouted-default.test.js
+- `OK`
+## tools/smoke/smoke-wo449-clip-extend-loop.test.js
+- `OK`
+## tools/smoke/smoke-wo450-companion-status-probe.test.js
+- `OK`
+## tools/smoke/smoke-wo453-sim-parity.test.js
+- `OK`
+## tools/smoke/smoke-wo455-update-cache-fallback.test.js
+- `OK`
+## tools/smoke/smoke-wo458-ventoy-exfat-mount.test.js
+- `QUALITY` tools/smoke/smoke-wo458-ventoy-exfat-mount.test.js:43 — `fakeTree()` mkdtemp()s under os.tmpdir() and nothing in the file removes it (no rmSync), so each run leaks `wo458-*` trees. Fix: track the dirs and remove them in an `after` hook.
+## tools/smoke/smoke-wo459-installer-slideshow-media-server.test.js
+- `QUALITY` tools/smoke/smoke-wo459-installer-slideshow-media-server.test.js:30 — the broadcast/playout check only inspects lines that match `qsTr(` or `text:`, so the same word in any other QML property passes this smoke. The ISO verifier greps the whole file, so the gap is only on the source side. Fix: drop the `qsTr|text:` pre-filter.
+## tools/smoke/smoke-wo460-shutdown-host-button.test.js
+- `OK`
+## tools/smoke/smoke-wo461-grub-selected-entry-contrast.test.js
+- `OK`
+## tools/smoke/smoke-wo462-iso-copy-race-guard.test.js
+- `OK`
+## tools/smoke/smoke-wo463-automount-skips-dm-held-partitions.test.js
+- `OK`
+## tools/smoke/smoke-wo464-liveroot-guard-runs-first.test.js
+- `OK`
+## tools/smoke/smoke-wo465-build-restores-dev-deps.test.js
+- `OK`
+## tools/smoke/smoke-wo47-manifest.mjs
+- `BUG` tools/smoke/smoke-wo47-manifest.mjs:49 — stale pin: `mustContain(embedFragmentPath, [...])` requires the string `home/casparcg/highascg/dist-web`, which is no longer a line in tools/eggs/live-usb/penguins-eggs-exclude-highascg-embed-server.list (only a comment at :23 mentions dist-web/, because dist-web is baked into the ISO on purpose). `npm run smoke:wo47-manifest` therefore throws. Not run in CI: excluded at tools/ci/collect-offline-tests.js:24 and referenced by no workflow. Fix: drop the dist-web needle, or assert the intended shape (dist-web NOT excluded).
+## tools/smoke/smoke-wo491-remove-destination-releases-decklink.test.js
+- `OK`
+## tools/smoke/smoke-wo492-amcp-clear-chatter.test.js
+- `RISK` tools/smoke/smoke-wo492-amcp-clear-chatter.test.js:172 — `runApply` swaps in the mock getChannelMap by intercepting the exact require id `'../config/routing'` (Module.prototype.require patch, :170-174). src/engine/multiview-apply.js requires exactly that string today (verified), so a refactor to `'../config/routing-map'` or a `.js` suffix silently makes the test use the real channel map, and the CG 99-30 expectations at :227 then fail for the wrong reason. Fix: inject the channel map through ctx or the options argument.
+## tools/smoke/smoke-wo493-decklink-pixel-format-option.test.js
+- `OK`
+## tools/smoke/smoke-wo494-remove-mapping-node-releases-decklink.test.js
+- `OK`
+## tools/smoke/smoke-wo496-apply-reads-actual-cabling.test.js
+- `OK`
+## tools/smoke/smoke-wo497-ui-load-and-probe-cache.test.js
+- `QUALITY` tools/smoke/smoke-wo497-ui-load-and-probe-cache.test.js:63 — the built-bundle test skips whenever dist-web/index.html is absent (`t.skip`, :63-65). The file header (WO-538) says CI never builds the client, so this assertion never runs in CI. Fix: run it in the build-client job after the build step, or assert against a fixture.
+## tools/smoke/smoke-wo498-no-nginx-gzip.test.js
+- `OK`
+## tools/smoke/smoke-wo499-update-always-restarts.test.js
+- `RISK` tools/smoke/smoke-wo499-update-always-restarts.test.js:105 — the success-path case runs the real helper with `mountpoint` stubbed to exit 0, so `stage_drop_to_volume "$EXFAT_ROOT"` (scripts/exfat/highascg-webui-server-update.sh:245) executes `mkdir -p /home/casparcg/exfat/drop-update/applied` for real. EXFAT_ROOT is hard-coded at helper :16 and the test cannot override it (it sets only HIGHASCG_UPDATE_DEST). On the box that path is the operator exFAT mount. Fix: make EXFAT_ROOT env-overridable like DST and point the test at a temp dir.
+## tools/smoke/smoke-wo500-meter-null-skips-consumed-channels.test.js
+- `OK`
+## tools/smoke/smoke-wo501-update-detaches-from-service-cgroup.test.js
+- `RISK` tools/smoke/smoke-wo501-update-detaches-from-service-cgroup.test.js:148 — the attached-mode case ('without --detach the WO-499 flow is unchanged') reaches the same unguarded `stage_drop_to_volume "$EXFAT_ROOT"` (helper :245), with `mountpoint` stubbed to 0, so it creates /home/casparcg/exfat/drop-update/ on whatever machine runs it. Same root cause as smoke-wo499 :105. The --detach cases return at helper :203 before the stage and are safe.

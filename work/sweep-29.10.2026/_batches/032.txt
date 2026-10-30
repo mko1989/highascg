@@ -1,0 +1,7 @@
+# batch 032 area=godot/client/features/multiview md=godot-client-features-multiview.md lines=1518
+godot/client/features/multiview/multiview_tab.gd
+godot/client/features/multiview/mv_canvas.gd
+godot/client/features/multiview/mv_doc.gd
+godot/client/features/multiview/mv_geometry.gd
+godot/client/features/multiview/mv_layout.gd
+godot/client/features/multiview/mv_prefs.gd

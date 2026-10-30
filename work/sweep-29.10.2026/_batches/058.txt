@@ -1,0 +1,3 @@
+# batch 058 area=scripts/replication md=scripts-replication.md lines=147
+scripts/replication/install-replication-ssh-wrapper.sh
+scripts/replication/setup-replication-ssh.sh

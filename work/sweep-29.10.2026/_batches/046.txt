@@ -1,0 +1,5 @@
+# batch 046 area=godot/retro md=godot-retro.md lines=230
+godot/retro/install.sh
+godot/retro/retro_keys.gd
+godot/retro/retro_window.gd
+godot/retro/run-retro.sh

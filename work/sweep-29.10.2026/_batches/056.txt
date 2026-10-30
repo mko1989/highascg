@@ -1,0 +1,10 @@
+# batch 056 area=scripts/lib md=scripts-lib.md lines=1260
+scripts/lib/apt-block-service-starts.sh
+scripts/lib/archive-common.sh
+scripts/lib/decklink-dkms-cache-lib.sh
+scripts/lib/decklink-install-lib.sh
+scripts/lib/install-config.sh
+scripts/lib/install-helpers-binaries.sh
+scripts/lib/install-helpers-runtime.sh
+scripts/lib/install-helpers-versions.sh
+scripts/lib/install-helpers.sh

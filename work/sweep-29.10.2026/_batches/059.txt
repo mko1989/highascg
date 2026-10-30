@@ -1,0 +1,7 @@
+# batch 059 area=scripts/runtime md=scripts-runtime.md lines=452
+scripts/runtime/decklink-install-from-exfat.sh
+scripts/runtime/highascg-clean-slate-reset.sh
+scripts/runtime/highascg-set-system-time.sh
+scripts/runtime/install-network-apply.sh
+scripts/runtime/remove-highascg-https-proxy.sh
+scripts/runtime/remove-highascg-web-proxy.sh

@@ -1,0 +1,13 @@
+# batch 067 area=src/audio-desk md=src-audio-desk.md lines=1453
+src/audio-desk/audio-page.html
+src/audio-desk/audio-routes.js
+src/audio-desk/desk-models.js
+src/audio-desk/desk-service.js
+src/audio-desk/desk-store.js
+src/audio-desk/drivers/allenheath-dlive.js
+src/audio-desk/drivers/allenheath-sq.js
+src/audio-desk/drivers/behringer-wing.js
+src/audio-desk/drivers/behringer-x32.js
+src/audio-desk/drivers/midi-tcp.js
+src/audio-desk/drivers/osc-udp.js
+src/audio-desk/drivers/yamaha-rcp.js

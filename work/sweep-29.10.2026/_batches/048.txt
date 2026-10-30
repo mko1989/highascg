@@ -1,0 +1,12 @@
+# batch 048 area=scripts md=scripts.md lines=109
+scripts/apply-bridge-label-highascgdat.sh
+scripts/backup-caspar-config.sh
+scripts/cg-studio-run.js
+scripts/clean-eggs-dev-host.sh
+scripts/dev-push.sh
+scripts/disable-nvidia-multi-driver-boot.sh
+scripts/highascg-exfat-remount-sync.sh
+scripts/install-exfat-systemd-units.sh
+scripts/install-host-boot-branding.sh
+scripts/install.sh
+scripts/write-highascg-systemd-unit.sh

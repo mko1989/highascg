@@ -1,0 +1,6 @@
+# batch 021 area=root md=root.md lines=1288
+eslint.config.js
+index.js
+run.sh
+vite.config.js
+vite.map.config.js

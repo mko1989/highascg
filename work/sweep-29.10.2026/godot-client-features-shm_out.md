@@ -1,0 +1,8 @@
+# godot/client/features/shm_out — sweep 29.10.2026 (batch 037)
+
+Files: 1 · lines: 70 · findings: 0 BUG-HIGH, 1 BUG, 0 DEAD, 1 RISK, 1 QUALITY
+
+## godot/client/features/shm_out/viewport_publisher.gd
+- `BUG` godot/client/features/shm_out/viewport_publisher.gd:47 — the resize re-open forgets the fps. `start(vp, ring_name, fps := 50)` passes `fps` to `sink.open`, but is never stored; `_process` re-opens with `start(viewport, sink.get_name())`, which takes the default 50. Failing case: `start(vp, "ring", 25)`, then the viewport is resized → the ring is re-created with fps 50 (HshmSink.open writes it into the ring header, godot/extensions/hshm/src/sink/hshm_sink.cpp:26) while frames are still pushed at 25. Fix: keep `_fps` in `start()` and reuse it.
+- `RISK` godot/client/features/shm_out/viewport_publisher.gd:54,86-90 — `_on_data` is the `texture_get_data_async` callback, queued from inside `call_on_render_thread`. It touches `_in_flight` and `sink.publish_rgba8` while the main thread's `_process` / `stop()` / `start()` can `close()` and replace `sink` (`HshmSink::publish_rgba8` checks `open_` with no lock). If Godot invokes the callback on the render thread, `stop()` racing a publish is possible. I did not verify which thread the callback runs on in the engine version used. The e2e (tools/e2e/godot-shm-writer.sh) only covers the steady state.
+- `QUALITY` godot/client/features/shm_out/viewport_publisher.gd:9 — not wired into the client (header says WO-738 step 3 pending). Consumers: tools/e2e/godot-shm-writer.sh:41 + godot/client/tests/test_shm_out.gd only. grep: `grep -rn "viewport_publisher\|shm_out" godot tools scripts src` → those two plus the e2e main.gd. Deliberate and detachable per WO-743, noted only so the owner knows it is production-unused.

@@ -1,0 +1,11 @@
+# batch 045 area=godot/extensions/hshm md=godot-extensions-hshm.md lines=912
+godot/extensions/hshm/build.sh
+godot/extensions/hshm/src/hshm_source.cpp
+godot/extensions/hshm/src/hshm_source.h
+godot/extensions/hshm/src/register_types.cpp
+godot/extensions/hshm/src/retro/retro_host.cpp
+godot/extensions/hshm/src/retro/retro_host.h
+godot/extensions/hshm/src/retro/retro_register.cpp
+godot/extensions/hshm/src/sink/hshm_sink.cpp
+godot/extensions/hshm/src/sink/hshm_sink.h
+godot/extensions/hshm/src/sink/sink_register.cpp

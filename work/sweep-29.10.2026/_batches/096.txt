@@ -1,0 +1,10 @@
+# batch 096 area=src/stage md=src-stage.md lines=1274
+src/stage/glb-units.js
+src/stage/glb-write.js
+src/stage/mvr-3ds.js
+src/stage/mvr-export.js
+src/stage/mvr-gdtf.js
+src/stage/mvr-math.js
+src/stage/mvr-patch.js
+src/stage/mvr-scene.js
+src/stage/mvr-store.js

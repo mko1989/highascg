@@ -1,0 +1,5 @@
+# batch 076 area=src/companion md=src-companion.md lines=700
+src/companion/button-preview-cache.js
+src/companion/companion-config.js
+src/companion/satellite-preview-client.js
+src/companion/satellite-protocol.js

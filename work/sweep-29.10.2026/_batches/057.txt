@@ -1,0 +1,2 @@
+# batch 057 area=scripts/nvidia md=scripts-nvidia.md lines=39
+scripts/nvidia/disable-nvidia-multi-driver-boot.sh

@@ -1,0 +1,5 @@
+# batch 139 area=tools/wiki md=tools-wiki.md lines=468
+tools/wiki/build-wiki.js
+tools/wiki/md-to-html.js
+tools/wiki/resolve-link.js
+tools/wiki/wiki-pages.config.js

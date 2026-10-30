@@ -1,0 +1,23 @@
+# batch 136 area=tools/startup md=tools-startup.md lines=1488
+tools/startup/diagnose-screen-consumers.sh
+tools/startup/place-screen-consumers.sh
+tools/startup/run-health-checks.sh
+tools/startup/stick-boot-test/run-stick-boot-tests.sh
+tools/startup/stick-boot-test/stick-test-lib.sh
+tools/startup/stick-boot-test/tests/test-01-live-identity.sh
+tools/startup/stick-boot-test/tests/test-02-stick-layout.sh
+tools/startup/stick-boot-test/tests/test-03-exfat-operator.sh
+tools/startup/stick-boot-test/tests/test-04-drop-update.sh
+tools/startup/stick-boot-test/tests/test-05-systemd-wo47.sh
+tools/startup/stick-boot-test/tests/test-06-caspar-supervisor.sh
+tools/startup/stick-boot-test/tests/test-07-amcp-playout.sh
+tools/startup/stick-boot-test/tests/test-08-highascg-ui.sh
+tools/startup/stick-boot-test/tests/test-09-openbox-wiring.sh
+tools/startup/stick-boot-test/tests/test-10-boot-journal.sh
+tools/startup/stick-boot-test/tests/test-11-replication-trust.sh
+tools/startup/stick-boot-test/tests/test-12-exfat-network-conf.sh
+tools/startup/verify-caspar-autostart.sh
+tools/startup/verify-decklink.sh
+tools/startup/verify-live-stick.sh
+tools/startup/verify-passwordless-sudo.sh
+tools/startup/verify-storage-drivers.sh

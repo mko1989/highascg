@@ -1,0 +1,16 @@
+# batch 138 area=tools/tracking-detect md=tools-tracking-detect.md lines=1477
+tools/tracking-detect/body.py
+tools/tracking-detect/bytetrack.py
+tools/tracking-detect/detector.py
+tools/tracking-detect/export-models.sh
+tools/tracking-detect/face.py
+tools/tracking-detect/face_embed.py
+tools/tracking-detect/fetch-face-models.sh
+tools/tracking-detect/pose.py
+tools/tracking-detect/seg.py
+tools/tracking-detect/setup-venv.sh
+tools/tracking-detect/sidecar.py
+tools/tracking-detect/test_body.py
+tools/tracking-detect/test_face.py
+tools/tracking-detect/test_pose.py
+tools/tracking-detect/test_seg.py

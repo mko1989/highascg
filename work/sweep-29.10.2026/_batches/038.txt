@@ -1,0 +1,22 @@
+# batch 038 area=godot/client/features/timeline md=godot-client-features-timeline.md lines=3998
+godot/client/features/timeline/timeline_clip_inspector.gd
+godot/client/features/timeline/timeline_dest.gd
+godot/client/features/timeline/timeline_edit.gd
+godot/client/features/timeline/timeline_flag_draw.gd
+godot/client/features/timeline/timeline_flag_inspector.gd
+godot/client/features/timeline/timeline_flags.gd
+godot/client/features/timeline/timeline_keyframes.gd
+godot/client/features/timeline/timeline_keys.gd
+godot/client/features/timeline/timeline_kf_draw.gd
+godot/client/features/timeline/timeline_kf_section.gd
+godot/client/features/timeline/timeline_layer_inspector.gd
+godot/client/features/timeline/timeline_layers.gd
+godot/client/features/timeline/timeline_layout.gd
+godot/client/features/timeline/timeline_math.gd
+godot/client/features/timeline/timeline_media.gd
+godot/client/features/timeline/timeline_nav.gd
+godot/client/features/timeline/timeline_send_to.gd
+godot/client/features/timeline/timeline_tab.gd
+godot/client/features/timeline/timeline_transport.gd
+godot/client/features/timeline/timeline_view.gd
+godot/client/features/timeline/timeline_view_draw.gd

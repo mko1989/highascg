@@ -1,0 +1,9 @@
+# batch 012 area=client/components md=client-components--part9.md lines=1969
+client/components/timeline-transport.js
+client/components/timer-control-panel-display.js
+client/components/timer-control-panel-inline-time.js
+client/components/timer-control-panel-settings-form.js
+client/components/timer-control-panel.js
+client/components/ui-icons.js
+client/components/usb-import-modal.js
+client/components/variables-panel.js

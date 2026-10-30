@@ -1,0 +1,9 @@
+# batch 094 area=src/shaderfx md=src-shaderfx.md lines=1175
+src/shaderfx/caspar-html-gpu.js
+src/shaderfx/shader-fx-params.js
+src/shaderfx/shader-live-instances.js
+src/shaderfx/shader-live-ops.js
+src/shaderfx/shader-live-session.js
+src/shaderfx/shader-store.js
+src/shaderfx/shader-template-export.js
+src/shaderfx/shadertoy-import.js

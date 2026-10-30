@@ -1,0 +1,26 @@
+# batch 023 area=godot/client/core md=godot-client-core.md lines=2617
+godot/client/core/api.gd
+godot/client/core/api_timeouts.gd
+godot/client/core/auth_model.gd
+godot/client/core/auth_prompt.gd
+godot/client/core/client_prefs.gd
+godot/client/core/config.gd
+godot/client/core/connection_profiles_model.gd
+godot/client/core/demo/demo_extras.gd
+godot/client/core/demo/demo_scene.gd
+godot/client/core/demo/demo_server.gd
+godot/client/core/devices_target.gd
+godot/client/core/devices_target_model.gd
+godot/client/core/math_input.gd
+godot/client/core/net_util.gd
+godot/client/core/numeric_field.gd
+godot/client/core/platform.gd
+godot/client/core/project_sync.gd
+godot/client/core/project_sync_policy.gd
+godot/client/core/project_undo.gd
+godot/client/core/project_undo_model.gd
+godot/client/core/settings_payload.gd
+godot/client/core/settings_state.gd
+godot/client/core/state_store.gd
+godot/client/core/stream_upload.gd
+godot/client/core/ws.gd

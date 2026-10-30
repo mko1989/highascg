@@ -1,0 +1,17 @@
+# tools/demo — sweep 29.10.2026 (batch 111)
+
+Files: 1 · lines: 237 · findings: 0 BUG-HIGH, 2 BUG, 0 DEAD, 2 RISK, 4 QUALITY
+
+Documented use: work/work-orders/815_WO_simulated_server_demo_mode.md:55,146 (WO-815); the output dir godot/client/demo/ is consumed by godot/client/core/demo/demo_server.gd. No package.json script, no CI (needs a capture dir from a live node). Note for COVERAGE: batch 111 lists only build-demo-data.py, but the tracked sibling `tools/demo/build-demo-extras.py` (210 lines) is not in any batch; it was read here too (see the end).
+
+## tools/demo/build-demo-data.py
+- `BUG` tools/demo/build-demo-data.py:175 — `build_settings` writes `"screenDestinations": state["screenDestinations"]`, the capture's ORIGINAL destinations, while `build_state` renames a deep copy (:142-147 → `dst_demo_N`, neutral labels). Result in the tracked, public data set: `godot/client/demo/settings.json` has `dst_mvo4vpa4_1 "Dioda"` and `dst_mvpcvuqw_1 "Proj"`, while `state.json` has `dst_demo_1 "LED wall"` / `dst_demo_2 "Projection"` (verified by loading both files). So the demo's settings and state disagree on destination ids, and a real show label is shipped in a public repo (git remote github.com/mko1989/highascg). Fix: return the renamed `dests` from build_state (or rename in build_channel_map) and feed that to build_settings.
+- `BUG` tools/demo/build-demo-data.py:198 — the "public-safe" scan is case-sensitive, which is why the leak above passed: FORBIDDEN (:48) lists lowercase `"dioda"`, the file contains `"Dioda"`. `"harder"`/`"mhp"` likewise miss `Harder`/`MHP`. Fix: lower-case the haystack and the needles; also scan the key strings of the rebuilt objects.
+- `RISK` tools/demo/build-demo-data.py:48 — the scrubber and the LOOKS table (:25-33) spell the private names they hide ("mhp", "harder", "MARCIN", "LUNG", "VISUALE", `W głowie dioda`, `KV LOOP projekcja`) in a tracked script of a public repo. Hash them or load the deny-list from an untracked file.
+- `QUALITY` tools/demo/build-demo-data.py:207 — default `--project` is `projects/mhp_harder.json`; `projects/` is gitignored (`.gitignore:18`), so the tool cannot run from a clean clone, and LOOKS pins that one project's look names (a missing name raises a bare `StopIteration` at :65).
+- `QUALITY` tools/demo/build-demo-data.py:226 — the scan runs inside the write loop: a hit in file N calls `sys.exit` after files 1..N-1 were already overwritten, leaving a half-updated demo set. Scan all outputs first, then write.
+- `RISK` tools/demo/build-demo-data.py:95 — every timeline gets the same id `tl-opener` (and :105 indexes `stage["objects"][0..2]`). The source project has 1 timeline and 5 stage objects (verified), so latent; a second timeline would produce duplicate ids, fewer than 3 objects an IndexError.
+- `QUALITY` tools/demo/build-demo-data.py:199 — secret regex matches only exact key names (`password|token|…`); `nuclearPasswordHash`, `*_key`, `streamKey` variants in other casing are not caught (empty today).
+
+### tools/demo/build-demo-extras.py (not in batch 111's list; read for completeness)
+- `QUALITY` tools/demo/build-demo-extras.py:198 — thumbs.json is scanned by its media-id keys only (the base64 payloads are generated, so fine). `RENAME` (:48) hardcodes one owner device name `sc60mon`. Imports build-demo-data.py by file path (`importlib`, :33), so it shares the case-sensitive scan above. Otherwise OK.

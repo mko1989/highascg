@@ -1,0 +1,144 @@
+# Sweep coverage — 29.10.2026
+
+| batch | area | findings file | lines | status |
+|---|---|---|---|---|
+| 001 | caspar/modules | [caspar-modules.md](caspar-modules.md) | 1173 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 2 RISK, 3 QUALITY |
+| 002 | client | [client.md](client.md) | 727 | done — 0 BUG-HIGH, 0 BUG, 3 DEAD, 1 RISK, 2 QUALITY |
+| 003 | client/assets | [client-assets.md](client-assets.md) | 197 | done — 0 BUG-HIGH, 1 BUG, 2 DEAD, 0 RISK, 1 QUALITY |
+| 004 | client/components | [client-components--part1.md](client-components--part1.md) | 6733 | done — 0 BUG-HIGH, 2 BUG, 22 DEAD, 9 RISK, 16 QUALITY |
+| 005 | client/components | [client-components--part2.md](client-components--part2.md) | 6784 | done — 2 BUG-HIGH, 14 BUG, 7 DEAD, 7 RISK, 23 QUALITY |
+| 006 | client/components | [client-components--part3.md](client-components--part3.md) | 6770 | done — 0 BUG-HIGH, 5 BUG, 3 DEAD, 7 RISK, 21 QUALITY |
+| 007 | client/components | [client-components--part4.md](client-components--part4.md) | 6637 | done — 0 BUG-HIGH, 6 BUG, 9 DEAD, 5 RISK, 17 QUALITY |
+| 008 | client/components | [client-components--part5.md](client-components--part5.md) | 6828 | done — 0 BUG-HIGH, 11 BUG, 9 DEAD, 6 RISK, 30 QUALITY (6 files OK) |
+| 009 | client/components | [client-components--part6.md](client-components--part6.md) | 6990 | done — 0 BUG-HIGH, 9 BUG, 15 DEAD, 7 RISK, 36 QUALITY (5 files OK) |
+| 010 | client/components | [client-components--part7.md](client-components--part7.md) | 6951 | done — 0 BUG-HIGH, 9 BUG, 9 DEAD, 12 RISK, 20 QUALITY |
+| 011 | client/components | [client-components--part8.md](client-components--part8.md) | 6674 | done — 0 BUG-HIGH, 10 BUG, 5 DEAD, 13 RISK, 26 QUALITY |
+| 012 | client/components | [client-components--part9.md](client-components--part9.md) | 1969 | done — 0 BUG-HIGH, 6 BUG, 1 DEAD, 3 RISK, 11 QUALITY |
+| 013 | client/lib | [client-lib--part1.md](client-lib--part1.md) | 6960 | done — 0 BUG-HIGH, 3 BUG, 11 DEAD, 6 RISK, 22 QUALITY |
+| 014 | client/lib | [client-lib--part2.md](client-lib--part2.md) | 6608 | done — 0 BUG-HIGH, 11 BUG, 20 DEAD, 8 RISK, 25 QUALITY |
+| 015 | client/lib | [client-lib--part3.md](client-lib--part3.md) | 6847 | done — 0 BUG-HIGH, 7 BUG, 23 DEAD, 5 RISK, 29 QUALITY |
+| 016 | client/lib | [client-lib--part4.md](client-lib--part4.md) | 6959 | done — 0 BUG-HIGH, 6 BUG, 15 DEAD, 7 RISK, 15 QUALITY |
+| 017 | client/lib | [client-lib--part5.md](client-lib--part5.md) | 5039 | done — 0 BUG-HIGH, 9 BUG, 9 DEAD, 3 RISK, 11 QUALITY |
+| 018 | client/styles | [client-styles--part1.md](client-styles--part1.md) | 6999 | done — 0 BUG-HIGH, 4 BUG, 31 DEAD, 1 RISK, 26 QUALITY |
+| 019 | client/styles | [client-styles--part2.md](client-styles--part2.md) | 6826 | done — 0 BUG-HIGH, 2 BUG, 14 DEAD, 0 RISK, 14 QUALITY |
+| 020 | client/tools | [client-tools.md](client-tools.md) | 6504 | done — 1 BUG-HIGH, 8 BUG, 23 DEAD, 11 RISK, 27 QUALITY |
+| 021 | root | [root.md](root.md) | 1288 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 3 RISK, 8 QUALITY |
+| 022 | godot/client/app | [godot-client-app.md](godot-client-app.md) | 4967 | done — 0 BUG-HIGH, 2 BUG, 3 DEAD, 2 RISK, 8 QUALITY |
+| 023 | godot/client/core | [godot-client-core.md](godot-client-core.md) | 2617 | done — 0 BUG-HIGH, 0 BUG, 1 DEAD, 8 RISK, 2 QUALITY |
+| 024 | godot/client/e2e | [godot-client-e2e.md](godot-client-e2e.md) | 1605 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 1 RISK, 3 QUALITY |
+| 025 | godot/client/features/audio | [godot-client-features-audio.md](godot-client-features-audio.md) | 2610 | done — 0 BUG-HIGH, 0 BUG, 3 DEAD, 0 RISK, 5 QUALITY |
+| 026 | godot/client/features/devices | [godot-client-features-devices--part1.md](godot-client-features-devices--part1.md) | 6739 | done — 0 BUG-HIGH, 2 BUG, 3 DEAD, 3 RISK, 3 QUALITY |
+| 027 | godot/client/features/devices | [godot-client-features-devices--part2.md](godot-client-features-devices--part2.md) | 6646 | done — 0 BUG-HIGH, 3 BUG, 2 DEAD, 3 RISK, 6 QUALITY |
+| 028 | godot/client/features/devices | [godot-client-features-devices--part3.md](godot-client-features-devices--part3.md) | 2610 | done — 0 BUG-HIGH, 2 BUG, 3 DEAD, 1 RISK, 5 QUALITY |
+| 029 | godot/client/features/live | [godot-client-features-live--part1.md](godot-client-features-live--part1.md) | 6954 | done — 0 BUG-HIGH, 3 BUG, 6 DEAD, 5 RISK, 12 QUALITY |
+| 030 | godot/client/features/live | [godot-client-features-live--part2.md](godot-client-features-live--part2.md) | 6976 | done — 0 BUG-HIGH, 4 BUG, 4 DEAD, 10 RISK, 11 QUALITY |
+| 031 | godot/client/features/live | [godot-client-features-live--part3.md](godot-client-features-live--part3.md) | 432 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 1 RISK, 0 QUALITY |
+| 032 | godot/client/features/multiview | [godot-client-features-multiview.md](godot-client-features-multiview.md) | 1518 | done — 0 BUG-HIGH, 0 BUG, 1 DEAD, 3 RISK, 8 QUALITY |
+| 033 | godot/client/features/previs | [godot-client-features-previs--part1.md](godot-client-features-previs--part1.md) | 6845 | done — 0 BUG-HIGH, 5 BUG, 2 DEAD, 5 RISK, 10 QUALITY |
+| 034 | godot/client/features/previs | [godot-client-features-previs--part2.md](godot-client-features-previs--part2.md) | 6996 | done — 0 BUG-HIGH, 4 BUG, 6 DEAD, 6 RISK, 15 QUALITY |
+| 035 | godot/client/features/previs | [godot-client-features-previs--part3.md](godot-client-features-previs--part3.md) | 4585 | done — 0 BUG-HIGH, 1 BUG, 3 DEAD, 2 RISK, 3 QUALITY |
+| 036 | godot/client/features/settings | [godot-client-features-settings.md](godot-client-features-settings.md) | 2770 | done — 0 BUG-HIGH, 5 BUG, 0 DEAD, 0 RISK, 5 QUALITY |
+| 037 | godot/client/features/shm_out | [godot-client-features-shm_out.md](godot-client-features-shm_out.md) | 70 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 1 RISK, 1 QUALITY |
+| 038 | godot/client/features/timeline | [godot-client-features-timeline.md](godot-client-features-timeline.md) | 3998 | done — 0 BUG-HIGH, 6 BUG, 4 DEAD, 6 RISK, 10 QUALITY |
+| 039 | godot/client | [godot-client.md](godot-client.md) | 115 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 0 RISK, 1 QUALITY |
+| 040 | godot/client/tests | [godot-client-tests--part1.md](godot-client-tests--part1.md) | 6892 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 6 RISK, 12 QUALITY |
+| 041 | godot/client/tests | [godot-client-tests--part2.md](godot-client-tests--part2.md) | 6942 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 3 RISK, 4 QUALITY |
+| 042 | godot/client/tests | [godot-client-tests--part3.md](godot-client-tests--part3.md) | 423 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 0 RISK, 1 QUALITY |
+| 043 | godot/client/video | [godot-client-video.md](godot-client-video.md) | 680 | done — 0 BUG-HIGH, 0 BUG, 6 DEAD, 2 RISK, 3 QUALITY |
+| 044 | godot | [godot.md](godot.md) | 70 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 1 RISK, 1 QUALITY |
+| 045 | godot/extensions/hshm | [godot-extensions-hshm.md](godot-extensions-hshm.md) | 912 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 8 RISK, 6 QUALITY |
+| 046 | godot/retro | [godot-retro.md](godot-retro.md) | 230 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 1 RISK, 2 QUALITY |
+| 047 | godot/spikes/m0 | [godot-spikes-m0.md](godot-spikes-m0.md) | 1036 | done — 0 BUG-HIGH, 2 BUG, 4 DEAD, 2 RISK, 3 QUALITY |
+| 048 | scripts | [scripts.md](scripts.md) | 109 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 0 RISK, 3 QUALITY |
+| 049 | scripts/boot | [scripts-boot.md](scripts-boot.md) | 214 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 3 RISK, 3 QUALITY |
+| 050 | scripts/ci | [scripts-ci.md](scripts-ci.md) | 32 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 0 RISK, 2 QUALITY |
+| 051 | scripts/deploy | [scripts-deploy.md](scripts-deploy.md) | 432 | done — 0 BUG-HIGH, 4 BUG, 0 DEAD, 4 RISK, 3 QUALITY |
+| 052 | scripts/deprecated | [scripts-deprecated.md](scripts-deprecated.md) | 2682 | done — 0 BUG-HIGH, 17 BUG, 20 DEAD, 6 RISK, 6 QUALITY |
+| 053 | scripts/eggs | [scripts-eggs.md](scripts-eggs.md) | 74 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 2 RISK, 1 QUALITY |
+| 054 | scripts/exfat | [scripts-exfat.md](scripts-exfat.md) | 2774 | done — 0 BUG-HIGH, 3 BUG, 4 DEAD, 4 RISK, 13 QUALITY |
+| 055 | scripts/fix | [scripts-fix.md](scripts-fix.md) | 354 | done — 0 BUG-HIGH, 5 BUG, 0 DEAD, 2 RISK, 2 QUALITY |
+| 056 | scripts/lib | [scripts-lib.md](scripts-lib.md) | 1260 | done — 0 BUG-HIGH, 4 BUG, 3 DEAD, 2 RISK, 11 QUALITY |
+| 057 | scripts/nvidia | [scripts-nvidia.md](scripts-nvidia.md) | 39 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 0 RISK, 1 QUALITY |
+| 058 | scripts/replication | [scripts-replication.md](scripts-replication.md) | 147 | done — 0 BUG-HIGH, 2 BUG, 0 DEAD, 0 RISK, 1 QUALITY |
+| 059 | scripts/runtime | [scripts-runtime.md](scripts-runtime.md) | 452 | done — 0 BUG-HIGH, 1 BUG, 1 DEAD, 2 RISK, 4 QUALITY |
+| 060 | scripts/setup | [scripts-setup.md](scripts-setup.md) | 1914 | done — 1 BUG-HIGH, 10 BUG, 1 DEAD, 8 RISK, 18 QUALITY |
+| 061 | src/api | [src-api--part1.md](src-api--part1.md) | 6810 | done — 1 BUG-HIGH, 8 BUG, 3 DEAD, 14 RISK, 23 QUALITY |
+| 062 | src/api | [src-api--part2.md](src-api--part2.md) | 6953 | done — 1 BUG-HIGH, 15 BUG, 10 DEAD, 18 RISK, 34 QUALITY |
+| 063 | src/api | [src-api--part3.md](src-api--part3.md) | 6992 | done — 1 BUG-HIGH, 6 BUG, 5 DEAD, 11 RISK, 11 QUALITY |
+| 064 | src/api | [src-api--part4.md](src-api--part4.md) | 4873 | done — 1 BUG-HIGH, 5 BUG, 8 DEAD, 11 RISK, 34 QUALITY |
+| 065 | src | [src.md](src.md) | 513 | done — 0 BUG-HIGH, 0 BUG, 2 DEAD, 0 RISK, 3 QUALITY |
+| 066 | src/artnet | [src-artnet.md](src-artnet.md) | 1697 | done — 0 BUG-HIGH, 6 BUG, 2 DEAD, 3 RISK, 12 QUALITY |
+| 067 | src/audio-desk | [src-audio-desk.md](src-audio-desk.md) | 1453 | done — 0 BUG-HIGH, 2 BUG, 7 DEAD, 4 RISK, 9 QUALITY |
+| 068 | src/audio | [src-audio.md](src-audio.md) | 3683 | done — 0 BUG-HIGH, 3 BUG, 3 DEAD, 7 RISK, 8 QUALITY |
+| 069 | src/autofollow | [src-autofollow.md](src-autofollow.md) | 60 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 0 RISK, 2 QUALITY |
+| 070 | src/bootstrap | [src-bootstrap.md](src-bootstrap.md) | 2319 | done — 0 BUG-HIGH, 4 BUG, 1 DEAD, 4 RISK, 11 QUALITY |
+| 071 | src/capture | [src-capture.md](src-capture.md) | 1351 | done — 0 BUG-HIGH, 3 BUG, 1 DEAD, 2 RISK, 5 QUALITY |
+| 072 | src/caspar | [src-caspar.md](src-caspar.md) | 4410 | done — 0 BUG-HIGH, 11 BUG, 15 DEAD, 14 RISK, 9 QUALITY |
+| 073 | src/cg-studio | [src-cg-studio.md](src-cg-studio.md) | 1773 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 2 RISK, 7 QUALITY |
+| 074 | src/cluster | [src-cluster.md](src-cluster.md) | 2563 | done — 0 BUG-HIGH, 4 BUG, 2 DEAD, 10 RISK, 3 QUALITY |
+| 075 | src/companion-bridge | [src-companion-bridge.md](src-companion-bridge.md) | 512 | done — 0 BUG-HIGH, 0 BUG, 5 DEAD, 3 RISK, 5 QUALITY |
+| 076 | src/companion | [src-companion.md](src-companion.md) | 700 | done — 0 BUG-HIGH, 5 BUG, 1 DEAD, 2 RISK, 10 QUALITY |
+| 077 | src/config | [src-config--part1.md](src-config--part1.md) | 6922 | done — 0 BUG-HIGH, 5 BUG, 16 DEAD, 17 RISK, 41 QUALITY |
+| 078 | src/config | [src-config--part2.md](src-config--part2.md) | 6875 | done — 0 BUG-HIGH, 9 BUG, 9 DEAD, 13 RISK, 23 QUALITY (12 files OK) |
+| 079 | src/engine | [src-engine--part1.md](src-engine--part1.md) | 6686 | done — 0 BUG-HIGH, 6 BUG, 5 DEAD, 14 RISK, 23 QUALITY (14 files OK) |
+| 080 | src/engine | [src-engine--part2.md](src-engine--part2.md) | 6953 | done — 1 BUG-HIGH, 10 BUG, 17 DEAD, 12 RISK, 12 QUALITY |
+| 081 | src/engine | [src-engine--part3.md](src-engine--part3.md) | 3650 | done — 3 BUG-HIGH, 7 BUG, 10 DEAD, 7 RISK, 15 QUALITY |
+| 082 | src/fixtures | [src-fixtures.md](src-fixtures.md) | 5812 | done — 0 BUG-HIGH, 2 BUG, 3 DEAD, 9 RISK, 15 QUALITY |
+| 083 | src/media | [src-media.md](src-media.md) | 6117 | done — 2 BUG-HIGH, 16 BUG, 11 DEAD, 16 RISK, 26 QUALITY |
+| 084 | src/network | [src-network.md](src-network.md) | 407 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 3 RISK, 4 QUALITY |
+| 085 | src/osc | [src-osc.md](src-osc.md) | 1545 | done — 0 BUG-HIGH, 2 BUG, 2 DEAD, 3 RISK, 10 QUALITY |
+| 086 | src/plugins | [src-plugins.md](src-plugins.md) | 223 | done — 1 BUG-HIGH, 2 BUG, 1 DEAD, 0 RISK, 1 QUALITY |
+| 087 | src/preview | [src-preview.md](src-preview.md) | 2769 | done — 0 BUG-HIGH, 2 BUG, 11 DEAD, 6 RISK, 17 QUALITY |
+| 088 | src/previs | [src-previs.md](src-previs.md) | 452 | done — 0 BUG-HIGH, 1 BUG, 1 DEAD, 1 RISK, 4 QUALITY |
+| 089 | src/ptz | [src-ptz.md](src-ptz.md) | 682 | done — 0 BUG-HIGH, 2 BUG, 1 DEAD, 1 RISK, 7 QUALITY |
+| 090 | src/replication | [src-replication--part1.md](src-replication--part1.md) | 6990 | done — 2 BUG-HIGH, 9 BUG, 5 DEAD, 19 RISK, 38 QUALITY |
+| 091 | src/replication | [src-replication--part2.md](src-replication--part2.md) | 706 | done — 0 BUG-HIGH, 0 BUG, 3 DEAD, 6 RISK, 6 QUALITY |
+| 092 | src/sampling | [src-sampling.md](src-sampling.md) | 1001 | done — 0 BUG-HIGH, 9 BUG, 1 DEAD, 6 RISK, 7 QUALITY |
+| 093 | src/server | [src-server.md](src-server.md) | 1946 | done — 1 BUG-HIGH, 4 BUG, 3 DEAD, 9 RISK, 11 QUALITY |
+| 094 | src/shaderfx | [src-shaderfx.md](src-shaderfx.md) | 1175 | done — 0 BUG-HIGH, 2 BUG, 0 DEAD, 2 RISK, 11 QUALITY |
+| 095 | src/show-timers | [src-show-timers.md](src-show-timers.md) | 381 | done — 0 BUG-HIGH, 0 BUG, 1 DEAD, 0 RISK, 5 QUALITY |
+| 096 | src/stage | [src-stage.md](src-stage.md) | 1274 | done — 0 BUG-HIGH, 3 BUG, 0 DEAD, 6 RISK, 7 QUALITY |
+| 097 | src/state | [src-state.md](src-state.md) | 2270 | done — 0 BUG-HIGH, 3 BUG, 2 DEAD, 2 RISK, 8 QUALITY |
+| 098 | src/streaming | [src-streaming.md](src-streaming.md) | 956 | done — 0 BUG-HIGH, 0 BUG, 2 DEAD, 7 RISK, 8 QUALITY |
+| 099 | src/support | [src-support.md](src-support.md) | 467 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 2 RISK, 4 QUALITY |
+| 100 | src/system | [src-system--part1.md](src-system--part1.md) | 6635 | done — 0 BUG-HIGH, 4 BUG, 20 DEAD, 18 RISK, 28 QUALITY |
+| 101 | src/system | [src-system--part2.md](src-system--part2.md) | 1299 | done — 1 BUG-HIGH, 3 BUG, 2 DEAD, 6 RISK, 7 QUALITY |
+| 102 | src/tracking | [src-tracking.md](src-tracking.md) | 4366 | done — 0 BUG-HIGH, 3 BUG, 12 DEAD, 6 RISK, 11 QUALITY |
+| 103 | src/utils | [src-utils--part1.md](src-utils--part1.md) | 6972 | done — 0 BUG-HIGH, 8 BUG, 28 DEAD, 15 RISK, 33 QUALITY |
+| 104 | src/utils | [src-utils--part2.md](src-utils--part2.md) | 4750 | done — 1 BUG-HIGH, 3 BUG, 12 DEAD, 13 RISK, 19 QUALITY |
+| 105 | src/virtual-output | [src-virtual-output.md](src-virtual-output.md) | 1501 | done — 1 BUG-HIGH, 2 BUG, 5 DEAD, 2 RISK, 7 QUALITY |
+| 106 | src/vr | [src-vr.md](src-vr.md) | 889 | done — 0 BUG-HIGH, 1 BUG, 1 DEAD, 2 RISK, 4 QUALITY |
+| 107 | test/api | [test-api.md](test-api.md) | 90 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 0 RISK, 2 QUALITY |
+| 108 | test/client | [test-client.md](test-client.md) | 67 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 0 RISK, 2 QUALITY |
+| 109 | test | [test.md](test.md) | 1118 | done — 0 BUG-HIGH, 0 BUG, 3 DEAD, 0 RISK, 13 QUALITY |
+| 110 | tools/ci | [tools-ci.md](tools-ci.md) | 1623 | done — 0 BUG-HIGH, 3 BUG, 2 DEAD, 5 RISK, 11 QUALITY |
+| 111 | tools/demo | [tools-demo.md](tools-demo.md) | 237 | done — 0 BUG-HIGH, 2 BUG, 0 DEAD, 2 RISK, 4 QUALITY |
+| 112 | tools/dev | [tools-dev.md](tools-dev.md) | 982 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 1 RISK, 2 QUALITY |
+| 113 | tools/e2e | [tools-e2e.md](tools-e2e.md) | 2243 | done — 0 BUG-HIGH, 3 BUG, 0 DEAD, 5 RISK, 9 QUALITY |
+| 114 | tools/eggs | [tools-eggs--part1.md](tools-eggs--part1.md) | 6953 | done — 2 BUG-HIGH, 11 BUG, 3 DEAD, 36 RISK, 37 QUALITY |
+| 115 | tools/eggs | [tools-eggs--part2.md](tools-eggs--part2.md) | 3097 | done — 0 BUG-HIGH, 9 BUG, 1 DEAD, 13 RISK, 26 QUALITY |
+| 116 | tools/hshm-bridge | [tools-hshm-bridge.md](tools-hshm-bridge.md) | 712 | done — 0 BUG-HIGH, 3 BUG, 0 DEAD, 2 RISK, 5 QUALITY |
+| 117 | tools/map | [tools-map.md](tools-map.md) | 977 | done — 0 BUG-HIGH, 1 BUG, 1 DEAD, 1 RISK, 12 QUALITY |
+| 118 | tools/release | [tools-release.md](tools-release.md) | 661 | done — 1 BUG-HIGH, 3 BUG, 0 DEAD, 8 RISK, 11 QUALITY |
+| 119 | tools/replication | [tools-replication.md](tools-replication.md) | 554 | done — 0 BUG-HIGH, 2 BUG, 2 DEAD, 1 RISK, 6 QUALITY |
+| 120 | tools/runtime | [tools-runtime.md](tools-runtime.md) | 4583 | done — 2 BUG-HIGH, 7 BUG, 0 DEAD, 17 RISK, 13 QUALITY |
+| 121 | tools/shaders | [tools-shaders.md](tools-shaders.md) | 374 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 3 RISK, 2 QUALITY |
+| 122 | tools/smoke | [tools-smoke--part1.md](tools-smoke--part1.md) | 6807 | done — 0 BUG-HIGH, 0 BUG, 11 DEAD, 20 RISK, 31 QUALITY |
+| 123 | tools/smoke | [tools-smoke--part2.md](tools-smoke--part2.md) | 7000 | done — 0 BUG-HIGH, 0 BUG, 29 DEAD, 4 RISK, 18 QUALITY |
+| 124 | tools/smoke | [tools-smoke--part3.md](tools-smoke--part3.md) | 6992 | done — 0 BUG-HIGH, 0 BUG, 32 DEAD, 3 RISK, 11 QUALITY |
+| 125 | tools/smoke | [tools-smoke--part4.md](tools-smoke--part4.md) | 6881 | done — 0 BUG-HIGH, 0 BUG, 24 DEAD, 7 RISK, 19 QUALITY |
+| 126 | tools/smoke | [tools-smoke--part5.md](tools-smoke--part5.md) | 6992 | done — 0 BUG-HIGH, 0 BUG, 30 DEAD, 4 RISK, 27 QUALITY |
+| 127 | tools/smoke | [tools-smoke--part6.md](tools-smoke--part6.md) | 6758 | done — 0 BUG-HIGH, 0 BUG, 4 DEAD, 5 RISK, 33 QUALITY |
+| 128 | tools/smoke | [tools-smoke--part7.md](tools-smoke--part7.md) | 6976 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 5 RISK, 11 QUALITY |
+| 129 | tools/smoke | [tools-smoke--part8.md](tools-smoke--part8.md) | 6891 | done — 0 BUG-HIGH, 1 BUG, 0 DEAD, 4 RISK, 4 QUALITY |
+| 130 | tools/smoke | [tools-smoke--part9.md](tools-smoke--part9.md) | 6971 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 7 RISK, 22 QUALITY |
+| 131 | tools/smoke | [tools-smoke--part10.md](tools-smoke--part10.md) | 6927 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 7 RISK, 29 QUALITY |
+| 132 | tools/smoke | [tools-smoke--part11.md](tools-smoke--part11.md) | 6988 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 3 RISK, 14 QUALITY |
+| 133 | tools/smoke | [tools-smoke--part12.md](tools-smoke--part12.md) | 6969 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 2 RISK, 12 QUALITY |
+| 134 | tools/smoke | [tools-smoke--part13.md](tools-smoke--part13.md) | 6817 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 1 RISK, 8 QUALITY |
+| 135 | tools/smoke | [tools-smoke--part14.md](tools-smoke--part14.md) | 2001 | done — 0 BUG-HIGH, 0 BUG, 10 DEAD, 12 RISK, 6 QUALITY |
+| 136 | tools/startup | [tools-startup.md](tools-startup.md) | 1488 | pending |
+| 137 | tools/sweep | [tools-sweep.md](tools-sweep.md) | 1241 | pending |
+| 138 | tools/tracking-detect | [tools-tracking-detect.md](tools-tracking-detect.md) | 1477 | pending |
+| 139 | tools/wiki | [tools-wiki.md](tools-wiki.md) | 468 | pending |
+| 140 | late additions (files committed after the 29.10 batching; `tools/demo/build-demo-extras.py` is covered at the end of tools-demo.md) | [late-additions.md](late-additions.md) | 1021 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 2 RISK, 6 QUALITY |

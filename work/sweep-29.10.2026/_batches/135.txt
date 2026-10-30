@@ -1,0 +1,26 @@
+# batch 135 area=tools/smoke md=tools-smoke--part14.md lines=2001
+tools/smoke/smoke-wo813-web-clip-trim.test.js
+tools/smoke/smoke-wo814-take-order-play-last.test.js
+tools/smoke/smoke-wo818-notchlc-warning.test.js
+tools/smoke/smoke-wo821-hardware-hold.test.js
+tools/smoke/smoke-wo822-no-https-proxy.test.js
+tools/smoke/smoke-wo823-load-from-file-keeps-rig.test.js
+tools/smoke/smoke-wo824-import-keeps-open-project.test.js
+tools/smoke/smoke-wo827-web-deck-import-repaint.test.js
+tools/smoke/smoke-ws-client-state.test.js
+tools/smoke/smoke-ws-restart-reconnect.test.js
+tools/smoke/smoke-xrandr-canvas-check.js
+tools/smoke/smoke-xrandr-custom-mode.js
+tools/smoke/smoke-xrandr-layout-verify.test.js
+tools/smoke/smoke-xrandr-mode-validation.test.js
+tools/smoke/smoke-xrandr-persist-script.js
+tools/smoke/smoke-zip-slip.test.js
+tools/smoke/spike-casparcg-adapter.js
+tools/smoke/spike-casparcg-connection-2.js
+tools/smoke/spike-casparcg-connection-3.js
+tools/smoke/spike-casparcg-connection-4.js
+tools/smoke/spike-casparcg-connection-5.js
+tools/smoke/spike-casparcg-connection.js
+tools/smoke/spike-cls-typed.js
+tools/smoke/test-artnet-input.js
+tools/smoke/verify-streaming-channel.mjs

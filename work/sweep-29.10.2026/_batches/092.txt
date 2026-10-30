@@ -1,0 +1,6 @@
+# batch 092 area=src/sampling md=src-sampling.md lines=1001
+src/sampling/dmx-output.js
+src/sampling/dmx-sampling-ingress.js
+src/sampling/dmx-sampling.js
+src/sampling/fixture-transform.js
+src/sampling/sampling-worker.js

@@ -1,0 +1,4 @@
+# batch 065 area=src md=src.md lines=513
+src/app-context.js
+src/module-registry.js
+src/repo-paths.js

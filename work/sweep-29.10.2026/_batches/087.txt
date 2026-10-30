@@ -1,0 +1,12 @@
+# batch 087 area=src/preview md=src-preview.md lines=2769
+src/preview/compose-preview-activity.js
+src/preview/compose-preview-backpressure.js
+src/preview/compose-preview-blocklist.js
+src/preview/compose-preview-cache.js
+src/preview/compose-preview-companion-quadrants.js
+src/preview/compose-preview-companion-thumb.js
+src/preview/compose-preview-consumer.js
+src/preview/compose-preview-dirty.js
+src/preview/compose-preview-ffmpeg-args.js
+src/preview/compose-preview-ffmpeg-jpeg.js
+src/preview/compose-preview-mode.js

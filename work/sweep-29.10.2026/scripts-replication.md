@@ -1,0 +1,11 @@
+# scripts/replication — sweep 29.10.2026 (batch 058)
+
+Files: 2 · lines: 147 · findings: 0 BUG-HIGH, 2 BUG, 0 DEAD, 0 RISK, 1 QUALITY
+
+## scripts/replication/install-replication-ssh-wrapper.sh
+- `OK` — source exists (`tools/runtime/highascg-replication-ssh.sh`), `install -m 755` handles the non-executable source; callers: `tools/runtime/replication-pair-qa.sh:53`, `tools/sweep/checks-system.js:186`, stick-boot test 11.
+
+## scripts/replication/setup-replication-ssh.sh
+- `BUG` scripts/replication/setup-replication-ssh.sh:118 — `INSTALL_DROPIN=1` never works for a normal user. `sudo bash "$0" --install-dropin-internal "$KEY" "$REPL_USER"` re-runs this script, but no code handles `--install-dropin-internal` (only `--show-pubkey` / `--install-peer-key`, L99-109); the root re-run sees empty `PEER` (sudo env_reset drops it) → `usage` → exit 1, hidden by `2>/dev/null`. The fallback `install_systemd_dropin` then returns 1 for non-root (L67-70); as the last command of an `||` list that triggers `set -e`, so the script exits 1 before printing the pubkey and before `test_peer`. (With `sudo -E` the re-run would instead redo the whole pairing as root with HOME=/root.) Fix: call `install_systemd_dropin` through `sudo` via a real subcommand, or just document `sudo INSTALL_DROPIN=1 …`.
+- `BUG` scripts/replication/setup-replication-ssh.sh:96 — `test_peer` can never succeed: `rsync -avzn --dry-run … "${peer}:${REPO_ROOT}/media/" /dev/null`. rsync refuses a non-directory destination when the source expands to more than one entry. Reproduced locally with a 1-file source: `rsync -avzn --dry-run dir/ /dev/null` → `ERROR: destination must be a directory when copying more than 1 file`, rc 3. With `set -e` the script dies on the final step and never prints the `OK: replication rsync SSH …` line even though keys are installed. Fix: dry-run into `$(mktemp -d)` (or probe with `ssh … true` through the forced-command wrapper). It also assumes the peer's repo lives at the same absolute path as the local `REPO_ROOT`.
+- `QUALITY` scripts/replication/setup-replication-ssh.sh:94,96 — `-e "ssh ${ssh_opts[*]}"` flattens the array into a string, so a `REPL_SSH_KEY` path with spaces breaks; `REPO_ROOT` is also interpolated unescaped into the `node -e` source (L55).

@@ -1,0 +1,8 @@
+# batch 137 area=tools/sweep md=tools-sweep.md lines=1241
+tools/sweep/checks-app.js
+tools/sweep/checks-cluster.js
+tools/sweep/checks-code.js
+tools/sweep/checks-sandbox.js
+tools/sweep/checks-system.js
+tools/sweep/run-sweep.js
+tools/sweep/sweep-util.js

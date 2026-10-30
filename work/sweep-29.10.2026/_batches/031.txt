@@ -1,0 +1,4 @@
+# batch 031 area=godot/client/features/live md=godot-client-features-live--part3.md lines=432
+godot/client/features/live/transitions.gd
+godot/client/features/live/usb_import_dialog.gd
+godot/client/features/live/usb_import_model.gd

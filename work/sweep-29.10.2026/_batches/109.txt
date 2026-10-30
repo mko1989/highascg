@@ -1,0 +1,15 @@
+# batch 109 area=test md=test.md lines=1118
+test/companion-control-status.test.js
+test/multiview-aspect-ratio.test.js
+test/multiview-playback-osc.test.js
+test/project-media-parity.test.js
+test/replication-caspar-parity.test.js
+test/replication-channel-parity.test.js
+test/replication-project-media-rsync.test.js
+test/startup-led-test-ip-refresh.test.js
+test/system-hardware-summary.smoke.js
+test/system-network-reset.test.js
+test/system-setup-caspar.test.js
+test/wo-184-smoke-tests.js
+test/wo-208-smoke-tests.js
+test/wo-238-adjust-fill-ignores-crop.test.js

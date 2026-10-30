@@ -1,0 +1,11 @@
+# batch 105 area=src/virtual-output md=src-virtual-output.md lines=1501
+src/virtual-output/v4l2-bridge-args.js
+src/virtual-output/v4l2-bridge-audio-sink.js
+src/virtual-output/v4l2-bridge-audio.js
+src/virtual-output/v4l2-bridge-cache.js
+src/virtual-output/v4l2-bridge-config-validate.js
+src/virtual-output/v4l2-bridge-config.js
+src/virtual-output/v4l2-bridge-consumer.js
+src/virtual-output/v4l2-bridge-relay.js
+src/virtual-output/v4l2-bridge.js
+src/virtual-output/v4l2-kernel-modules.js

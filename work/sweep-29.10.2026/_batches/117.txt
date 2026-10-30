@@ -1,0 +1,6 @@
+# batch 117 area=tools/map md=tools-map.md lines=977
+tools/map/ast-scanner-metadata.js
+tools/map/ast-scanner-parse.js
+tools/map/ast-scanner.js
+tools/map/generate-map-data.js
+tools/map/timing-test.js

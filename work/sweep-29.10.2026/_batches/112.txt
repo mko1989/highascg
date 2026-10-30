@@ -1,0 +1,7 @@
+# batch 112 area=tools/dev md=tools-dev.md lines=982
+tools/dev/fake-cluster-peer.js
+tools/dev/gen-api-contract.js
+tools/dev/gen-godot-golden-multiview.mjs
+tools/dev/measure-playback-rate.js
+tools/dev/patch-rewir-middot.py
+tools/dev/subset-dejavu-ui-symbols.sh

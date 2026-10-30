@@ -1,0 +1,14 @@
+# batch 073 area=src/cg-studio md=src-cg-studio.md lines=1773
+src/cg-studio/cg-studio-context.js
+src/cg-studio/export-template.js
+src/cg-studio/http-utils.js
+src/cg-studio/lt-param-registry.js
+src/cg-studio/public/app.js
+src/cg-studio/public/index.html
+src/cg-studio/public/placement-math.js
+src/cg-studio/public/studio.css
+src/cg-studio/register.js
+src/cg-studio/routes.js
+src/cg-studio/studio-lt-defaults.js
+src/cg-studio/studio-server.js
+src/cg-studio/template-scan.js

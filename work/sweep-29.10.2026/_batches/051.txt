@@ -1,0 +1,4 @@
+# batch 051 area=scripts/deploy md=scripts-deploy.md lines=432
+scripts/deploy/dev-push.sh
+scripts/deploy/extract-backup-box-local.sh
+scripts/deploy/push-backup-box.sh

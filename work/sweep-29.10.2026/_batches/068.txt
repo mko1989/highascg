@@ -1,0 +1,18 @@
+# batch 068 area=src/audio md=src-audio.md lines=3683
+src/audio/alsa-mixer-controls.js
+src/audio/alsa-mixer-enumerate.js
+src/audio/alsa-mixer.js
+src/audio/audio-capture-fft.js
+src/audio/audio-devices.js
+src/audio/beat-detect.js
+src/audio/fft.js
+src/audio/hdmi-iec958-select.js
+src/audio/hdmi-sinks.js
+src/audio/input-audio-routing.js
+src/audio/live-audio-bridge.js
+src/audio/live-audio-health.js
+src/audio/live-input-start.js
+src/audio/meter-health.js
+src/audio/meter-null-consumer.js
+src/audio/mixer-state.js
+src/audio/monitor-pair.js

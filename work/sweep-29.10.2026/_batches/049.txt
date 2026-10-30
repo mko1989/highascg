@@ -1,0 +1,4 @@
+# batch 049 area=scripts/boot md=scripts-boot.md lines=214
+scripts/boot/install-fast-boot-network.sh
+scripts/boot/install-host-boot-branding.sh
+scripts/boot/install-nvidia-persistenced-boot-order.sh

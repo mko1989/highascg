@@ -1,0 +1,2 @@
+# batch 053 area=scripts/eggs md=scripts-eggs.md lines=74
+scripts/eggs/clean-eggs-dev-host.sh

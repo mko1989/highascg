@@ -1,0 +1,8 @@
+# batch 101 area=src/system md=src-system--part2.md lines=1299
+src/system/server-update.js
+src/system/stick-transfer.js
+src/system/sweep-after-update.js
+src/system/video-feed-encoder.js
+src/system/video-feed-worker.js
+src/system/video-feed.js
+src/system/video-surfaces.js

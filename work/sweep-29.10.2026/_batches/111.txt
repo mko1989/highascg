@@ -1,0 +1,2 @@
+# batch 111 area=tools/demo md=tools-demo.md lines=237
+tools/demo/build-demo-data.py

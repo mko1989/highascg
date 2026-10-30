@@ -1,0 +1,5 @@
+# batch 055 area=scripts/fix md=scripts-fix.md lines=354
+scripts/fix/fix-boot-emergency-recovery.sh
+scripts/fix/fix-highascg-no-exfat-startup-block.sh
+scripts/fix/fix-host-boot-console-and-hang.sh
+scripts/fix/fix-host-boot-display-hang.sh

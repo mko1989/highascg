@@ -1,0 +1,12 @@
+# batch 024 area=godot/client/e2e md=godot-client-e2e.md lines=1605
+godot/client/e2e/e2e_runner.gd
+godot/client/e2e/e2e_scenario.gd
+godot/client/e2e/e2e_ui.gd
+godot/client/e2e/scenarios/01_new_project.gd
+godot/client/e2e/scenarios/02_outputs.gd
+godot/client/e2e/scenarios/03_looks_layers.gd
+godot/client/e2e/scenarios/04_timeline.gd
+godot/client/e2e/scenarios/05_live_inputs.gd
+godot/client/e2e/scenarios/06_xr_walk.gd
+godot/client/e2e/scenarios/07_pixel_map.gd
+godot/client/e2e/scenarios/08_audio_monitor_pair.gd

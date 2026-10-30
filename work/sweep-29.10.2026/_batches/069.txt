@@ -1,0 +1,2 @@
+# batch 069 area=src/autofollow md=src-autofollow.md lines=60
+src/autofollow/register.js

@@ -1,0 +1,2 @@
+# batch 050 area=scripts/ci md=scripts-ci.md lines=32
+scripts/ci/run-local-ci.sh

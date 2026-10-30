@@ -1,0 +1,15 @@
+# batch 025 area=godot/client/features/audio md=godot-client-features-audio.md lines=2610
+godot/client/features/audio/audio_actions.gd
+godot/client/features/audio/audio_console_ctl.gd
+godot/client/features/audio/audio_dock.gd
+godot/client/features/audio/audio_dock_master.gd
+godot/client/features/audio/audio_dock_model.gd
+godot/client/features/audio/audio_dock_row.gd
+godot/client/features/audio/audio_meter_model.gd
+godot/client/features/audio/audio_rows.gd
+godot/client/features/audio/audio_strip.gd
+godot/client/features/audio/audio_tab.gd
+godot/client/features/audio/audio_tab_split.gd
+godot/client/features/audio/fader_cap.gd
+godot/client/features/audio/layer_levels.gd
+godot/client/features/audio/meter_bank.gd

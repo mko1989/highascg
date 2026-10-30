@@ -1,0 +1,2 @@
+# batch 107 area=test/api md=test-api.md lines=90
+test/api/routes-media-thumb.test.js

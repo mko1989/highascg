@@ -1,0 +1,22 @@
+# scripts/fix — sweep 29.10.2026 (batch 055)
+
+Files: 4 · lines: 354 · findings: 0 BUG-HIGH, 5 BUG, 0 DEAD, 2 RISK, 2 QUALITY
+
+Cross-cutting: the four scripts were moved from `scripts/` to `scripts/fix/` (WO-143/273) and their internal `scripts/…` references were not all updated. `scripts/fix-boot-emergency-recovery.sh` does not exist (`ls scripts/fix-boot-emergency-recovery.sh` → no such file; the only copies are `scripts/fix/…` and a broken forwarder under `scripts/deprecated/`). Usage strings and `docs/BOOT_EMERGENCY_RECOVERY.md:23` still tell the operator to run the missing path.
+
+## scripts/fix/fix-boot-emergency-recovery.sh
+- `BUG` scripts/fix/fix-boot-emergency-recovery.sh:82-86 — the awk that rewrites the ESP line has no `$1 !~ /^#/` guard (the count at line 26 and the UUID read at line 49 have it). Ubuntu's curtin fstab carries a comment `# /boot/efi was on /dev/nvme0n1p1 during curtin installation` (this box's `/etc/fstab:10`); awk splits it as `$1="#"`, `$2="/boot/efi"`, so `$2 == "/boot/efi"` matches. Failing case: stale ESP UUID → both the comment line and the real line are replaced by the new `/dev/disk/by-uuid/… /boot/efi vfat umask=0077,nofail 0 1` → two identical live mount lines and the curtin comment is gone. A second run's `dedupe_fstab_boot_efi` collapses them, but the first boot sees duplicates.
+- `BUG` scripts/fix/fix-boot-emergency-recovery.sh:56-64 — ESP picking: first unmounted `vfat` whose path matches `nvm|sd[a-z]`. `lsblk` lists `sd*` (major 8) before `nvme*` (major 259). Failing case: stale fstab UUID while a Ventoy stick is plugged in (its `VTOYEFI` partition is vfat and unmounted, `/dev/sdb2`) → `efi_dev=/dev/sdb2`, fstab is rewritten to the stick's UUID, and after the stick is removed `/boot/efi` is unmounted (nofail hides it) so `update-grub`/kernel hooks write the ESP to the root FS. Fix: prefer the partition on the disk holding `/` (or `PARTTYPE`=c12a7328…), and never a removable device.
+- `QUALITY` scripts/fix/fix-boot-emergency-recovery.sh:9,13 — usage text names `scripts/fix-boot-emergency-recovery.sh` (missing path). The `scripts/install-exfat-systemd-units.sh` and `scripts/write-highascg-systemd-unit.sh` calls at lines 100-101 are fine (root forwarders exist).
+
+## scripts/fix/fix-highascg-no-exfat-startup-block.sh
+- `BUG` scripts/fix/fix-highascg-no-exfat-startup-block.sh:8 — `exec bash "${REPO_ROOT}/scripts/fix-boot-emergency-recovery.sh"`: missing path → "No such file or directory", nothing runs. Fix: `${REPO_ROOT}/scripts/fix/fix-boot-emergency-recovery.sh`. (Also `$0` instead of `${BASH_SOURCE[0]}` on line 7, harmless.)
+
+## scripts/fix/fix-host-boot-console-and-hang.sh
+- `BUG` scripts/fix/fix-host-boot-console-and-hang.sh:74 — `bash "${REPO_ROOT}/scripts/fix-boot-emergency-recovery.sh"` → missing path; `set -e` aborts here, after `install-exfat-systemd-units.sh` has already run (line 73) and before the networkd mask, console-issue patch and GRUB change. The script's headline fixes (2-minute boot stall, hidden boot log) are never applied. Same one-line fix as above.
+- `RISK` scripts/fix/fix-host-boot-console-and-hang.sh:36,39 — rewrites `GRUB_CMDLINE_LINUX_DEFAULT` to `console=tty0 loglevel=7 nosplash noresume systemd.show_status=auto`. `fix-host-boot-display-hang.sh:36` and `scripts/boot/install-host-boot-branding.sh:90` write a different line that includes `consoleblank=0 fbcon=nodefer nvidia-drm.modeset=1 nvidia-drm.fbdev=1`. Running this script after either of those silently drops the DRM modeset flags; the three scripts fight over one setting with no shared source.
+- `QUALITY` scripts/fix/fix-host-boot-console-and-hang.sh:8 — usage string names the missing `scripts/fix-host-boot-console-and-hang.sh` path (the same applies to `fix-host-boot-display-hang.sh:7`).
+
+## scripts/fix/fix-host-boot-display-hang.sh
+- `BUG` scripts/fix/fix-host-boot-display-hang.sh:101 — same missing `scripts/fix-boot-emergency-recovery.sh`; aborts before the networkd mask, throbber/nodm override and `fix_grub` (lines 103-108), so none of the display fixes land.
+- `RISK` scripts/fix/fix-host-boot-display-hang.sh:110-113 — the NVIDIA 595 branch runs `scripts/deprecated/nvidia/install-nvidia-gsp-rpc-workaround.sh` unguarded; `scripts/deprecated` is excluded from clone ISOs (`penguins-eggs-exclude-highascg-embed-server.list:30-31`), so on an ISO-installed box with a 595 driver `set -e` aborts at this line, after the GRUB edit but before the final `daemon-reload` and `reset-failed`. Fix: move the workaround out of `deprecated/` or add an `-f` test.

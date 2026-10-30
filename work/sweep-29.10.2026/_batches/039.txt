@@ -1,0 +1,3 @@
+# batch 039 area=godot/client md=godot-client.md lines=115
+godot/client/run-client.sh
+godot/client/run-xr.sh

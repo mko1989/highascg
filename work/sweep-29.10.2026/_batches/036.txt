@@ -1,0 +1,24 @@
+# batch 036 area=godot/client/features/settings md=godot-client-features-settings.md lines=2770
+godot/client/features/settings/about_model.gd
+godot/client/features/settings/alsa_mixer_model.gd
+godot/client/features/settings/alsa_mixer_panel.gd
+godot/client/features/settings/decklink_pane.gd
+godot/client/features/settings/live_audio_model.gd
+godot/client/features/settings/live_audio_pane.gd
+godot/client/features/settings/network_model.gd
+godot/client/features/settings/network_pane.gd
+godot/client/features/settings/nuclear_pane.gd
+godot/client/features/settings/os_password_model.gd
+godot/client/features/settings/pane_kit.gd
+godot/client/features/settings/settings_form.gd
+godot/client/features/settings/settings_model.gd
+godot/client/features/settings/settings_panes.gd
+godot/client/features/settings/settings_tab.gd
+godot/client/features/settings/system_model.gd
+godot/client/features/settings/system_pane.gd
+godot/client/features/settings/tailscale_model.gd
+godot/client/features/settings/tailscale_pane.gd
+godot/client/features/settings/updates_model.gd
+godot/client/features/settings/updates_pane.gd
+godot/client/features/settings/variables_model.gd
+godot/client/features/settings/variables_pane.gd

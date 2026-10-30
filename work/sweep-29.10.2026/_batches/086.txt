@@ -1,0 +1,2 @@
+# batch 086 area=src/plugins md=src-plugins.md lines=223
+src/plugins/plugin-manager.js

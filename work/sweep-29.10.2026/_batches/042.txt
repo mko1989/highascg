@@ -1,0 +1,4 @@
+# batch 042 area=godot/client/tests md=godot-client-tests--part3.md lines=423
+godot/client/tests/test_xr_box_fan_wo774.gd
+godot/client/tests/test_xr_walk.gd
+godot/client/tests/test_zone_model.gd

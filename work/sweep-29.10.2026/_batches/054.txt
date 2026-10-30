@@ -1,0 +1,20 @@
+# batch 054 area=scripts/exfat md=scripts-exfat.md lines=2774
+scripts/exfat/apply-bridge-label-highascgdat.sh
+scripts/exfat/highascg-apply-server-drop.sh
+scripts/exfat/highascg-boot-stick.sh
+scripts/exfat/highascg-bridge-arrive.sh
+scripts/exfat/highascg-bridge-boot.sh
+scripts/exfat/highascg-exfat-arrive.sh
+scripts/exfat/highascg-exfat-boot.sh
+scripts/exfat/highascg-exfat-bootstrap.sh
+scripts/exfat/highascg-exfat-network-apply.sh
+scripts/exfat/highascg-exfat-remount-sync.sh
+scripts/exfat/highascg-exfat-server-update.sh
+scripts/exfat/highascg-fix-config-permissions.sh
+scripts/exfat/highascg-webui-server-update.sh
+scripts/exfat/install-exfat-systemd-units-units.sh
+scripts/exfat/install-exfat-systemd-units.sh
+scripts/exfat/install-exfat-units-bridge.sh
+scripts/exfat/install-exfat-units-enable.sh
+scripts/exfat/install-exfat-units-exfat.sh
+scripts/exfat/write-highascg-systemd-unit.sh

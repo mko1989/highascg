@@ -1,0 +1,5 @@
+# batch 106 area=src/vr md=src-vr.md lines=889
+src/vr/magicq-mvr.js
+src/vr/vr-desk-panel.js
+src/vr/vr-session.js
+src/vr/wayvr-ipc.js

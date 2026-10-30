@@ -1,0 +1,2 @@
+# batch 037 area=godot/client/features/shm_out md=godot-client-features-shm_out.md lines=70
+godot/client/features/shm_out/viewport_publisher.gd

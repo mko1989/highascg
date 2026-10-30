@@ -1,0 +1,11 @@
+# batch 047 area=godot/spikes/m0 md=godot-spikes-m0.md lines=1036
+godot/spikes/m0/main.gd
+godot/spikes/m0/mode_atlas.gd
+godot/spikes/m0/mode_canvas.gd
+godot/spikes/m0/mode_previs.gd
+godot/spikes/m0/run-spike.sh
+godot/spikes/m0/shm_native.gd
+godot/spikes/m0/shm_reader.gd
+godot/spikes/m0/shm_texture.gd
+godot/spikes/m0/stats.gd
+godot/spikes/m0/tools/make_test_stage.gd

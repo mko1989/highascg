@@ -1,0 +1,12 @@
+# batch 001 area=caspar/modules md=caspar-modules.md lines=1173
+caspar/modules/shm/consumer/shm_consumer.cpp
+caspar/modules/shm/consumer/shm_consumer.h
+caspar/modules/shm/hshm_abi.h
+caspar/modules/shm/hshm_reader.h
+caspar/modules/shm/hshm_writer.h
+caspar/modules/shm/producer/shm_producer.cpp
+caspar/modules/shm/producer/shm_producer.h
+caspar/modules/shm/shm.cpp
+caspar/modules/shm/shm.h
+caspar/modules/shm/tests/hshm_pattern.cpp
+caspar/modules/shm/tests/hshm_seqlock_test.cpp

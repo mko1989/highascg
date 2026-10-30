@@ -1,0 +1,11 @@
+# batch 097 area=src/state md=src-state.md lines=2270
+src/state/clear-multiview-layout.js
+src/state/info-channel-parse.js
+src/state/live-audio-only-look-state.js
+src/state/live-deck-state.js
+src/state/live-scene-reconcile.js
+src/state/live-scene-state.js
+src/state/playback-tracker-media.js
+src/state/playback-tracker-osc.js
+src/state/playback-tracker.js
+src/state/state-manager.js

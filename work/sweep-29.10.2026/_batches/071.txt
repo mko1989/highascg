@@ -1,0 +1,9 @@
+# batch 071 area=src/capture md=src-capture.md lines=1351
+src/capture/browser-capture-args.js
+src/capture/browser-capture-bridge.js
+src/capture/browser-source-region.js
+src/capture/v4l2-enumerate.js
+src/capture/v4l2-input-bridge.js
+src/capture/v4l2-input-config-validate.js
+src/capture/v4l2-input-config.js
+src/capture/v4l2-input-health.js

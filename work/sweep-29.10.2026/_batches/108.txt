@@ -1,0 +1,2 @@
+# batch 108 area=test/client md=test-client.md lines=67
+test/client/thumbnail-error-handler.test.js

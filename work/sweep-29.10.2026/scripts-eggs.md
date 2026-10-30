@@ -1,0 +1,8 @@
+# scripts/eggs — sweep 29.10.2026 (batch 053)
+
+Files: 1 · lines: 74 · findings: 0 BUG-HIGH, 0 BUG, 0 DEAD, 2 RISK, 1 QUALITY
+
+## scripts/eggs/clean-eggs-dev-host.sh
+- `RISK` scripts/eggs/clean-eggs-dev-host.sh:43-46,52-56 — on the machine that is also the live playout box (this one: `ROOT=/home/casparcg/highascg`), a real run deletes `dist-web/` (the UI served on :4200) and empties `log/` and `cef-cache/` while Caspar/CEF may be running. `npm run clean:eggs-host` (`package.json:18`) and `tools/eggs/README.md:12` present it as a normal pre-produce step; the header calls it "safe for the machine that runs penguins-eggs". Failing case: run on the box between shows → the operator UI answers 404 until `npm run build:client` is run. There is no confirmation prompt, only `--dry-run`. Fix: state "stops serving the UI" in the header, or rebuild at the end.
+- `RISK` scripts/eggs/clean-eggs-dev-host.sh:34-38 — `for path in core core.*` then `rm -f`: `core.*` also matches real repo files (`core.js`, `core.md`) and `rm -f` on a directory named `core` fails, which aborts the script under `set -e` (not in `--dry-run`). Nothing named `core*` is at the repo root today, so latent. Narrow it to `core` and `core.[0-9]*` and test `-f`.
+- `QUALITY` scripts/eggs/clean-eggs-dev-host.sh:55 — `run find … -delete 2>/dev/null || run rm -rf "$ROOT/$dir"/*`: if `find` fails halfway, the fallback `rm -rf dir/*` skips dot-files and reports nothing. Minor. Path arithmetic is correct since WO-756 (`ROOT` is two levels up). Callers: `package.json:18` via the `scripts/clean-eggs-dev-host.sh` forwarder, `scripts/README.md:99`.

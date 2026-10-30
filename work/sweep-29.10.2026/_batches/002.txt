@@ -1,0 +1,6 @@
+# batch 002 area=client md=client.md lines=727
+client/app.js
+client/index.html
+client/map.html
+client/setup.html
+client/styles.css

@@ -1,0 +1,5 @@
+# batch 118 area=tools/release md=tools-release.md lines=661
+tools/release/collect-third-party-licenses.sh
+tools/release/make-github-release-server.sh
+tools/release/prune-auto-releases.sh
+tools/release/release-lib.sh
