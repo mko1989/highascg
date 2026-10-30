@@ -99,6 +99,8 @@ function createVideoFeed(deps = {}) {
 	function addClient(ws, query = {}) {
 		const c = { roles: new Set(), params: feedParams(query) }
 		clients.set(ws, c)
+		// WO-830a: an oversize / invalid-UTF-8 frame makes ws emit 'error'; with no listener node exits (process-guards)
+		ws.on('error', (e) => log('warn', `[video-feed] client: ${e?.message || e}`))
 		ws.on('message', (data, isBinary) => {
 			if (isBinary) return
 			let m
@@ -128,7 +130,14 @@ function attachVideoFeed(httpServer, ctx, { log } = {}) {
 	const feed = createVideoFeed({ log: (lvl, msg) => (log ? log(msg) : undefined) })
 	const wss = new WebSocketServer({ noServer: true })
 	const onUpgrade = (req, socket, head) => {
-		const url = new URL(req.url || '', 'http://127.0.0.1')
+		// WO-830a: `GET //` makes `new URL('//', base)` throw before auth — an uncaught throw here is a remote node restart
+		let url
+		try {
+			url = new URL(req.url || '', 'http://127.0.0.1')
+		} catch {
+			socket.write('HTTP/1.1 400 Bad Request\r\n\r\n')
+			return socket.destroy()
+		}
 		if (url.pathname !== FEED_PATH) return
 		const { checkWebSocketAuth, isOriginAllowed } = require('../server/auth')
 		if (!isOriginAllowed(req, ctx?.config)) {

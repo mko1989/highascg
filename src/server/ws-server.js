@@ -281,6 +281,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	httpServer.on('upgrade', onUpgrade)
 
 	wss.on('connection', (ws) => {
+		ws.on('error', (e) => log('[WS] socket error: ' + (e?.message || e))) // WO-830a: oversize/invalid frame emits 'error'; unhandled → process-guards exit
 		const firstClient = clients.size === 0
 		clients.add(ws)
 		notifyOperatorClientCount()
@@ -420,6 +421,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	})
 
 	replWss.on('connection', (ws) => {
+		ws.on('error', (e) => log('[WS] replication socket error: ' + (e?.message || e))) // WO-830a (see above)
 		log('[WS] replication peer connected')
 		try {
 			const { registerPeerWsClient, getReplicationRuntime } = require('../replication/replication-service')

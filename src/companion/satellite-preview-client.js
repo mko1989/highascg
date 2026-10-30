@@ -8,6 +8,8 @@ const { writePreviewJpeg, decodeSubStateText } = require('./button-preview-cache
 
 const PING_MS = 2000
 const RECONNECT_MS = 3000
+/** WO-830a: highest row / column index a page-preview subscription may cover (Companion pages are <= 32 x 32). */
+const MAX_GRID_INDEX = 31
 
 class SatellitePreviewClient extends EventEmitter {
 	constructor() {
@@ -165,10 +167,13 @@ class SatellitePreviewClient extends EventEmitter {
 		if (!cfg.satelliteEnabled) return { ok: false, reason: 'satellite_disabled' }
 		this.configure(config)
 		const size = cfg.pickerGridSize
-		const rowMin = grid?.rowMin ?? 0
-		const rowMax = grid?.rowMax ?? size - 1
-		const colMin = grid?.colMin ?? 0
-		const colMax = grid?.colMax ?? size - 1
+		// WO-830a: the route forwards the body's rowMax/colMax as-is — `colMax: 1e9` queued billions of coords (heap OOM).
+		// Companion pages are at most 32 × 32; clamp every bound into that and keep min <= max.
+		const bound = (v, dflt) => Math.min(MAX_GRID_INDEX, Math.max(0, Math.trunc(Number(v ?? dflt)) || 0))
+		const rowMin = bound(grid?.rowMin, 0)
+		const rowMax = Math.max(rowMin, bound(grid?.rowMax, size - 1))
+		const colMin = bound(grid?.colMin, 0)
+		const colMax = Math.max(colMin, bound(grid?.colMax, size - 1))
 		const keys = new Set()
 		const coords = []
 		for (let r = rowMin; r <= rowMax; r++) {

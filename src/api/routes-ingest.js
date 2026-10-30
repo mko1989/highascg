@@ -7,6 +7,8 @@
 
 const fs = require('fs')
 const path = require('path')
+const { Readable, Transform } = require('stream')
+const { pipeline } = require('stream/promises')
 const busboy = require('busboy')
 const { extractZipSafely } = require('../utils/safe-unzip')
 const { JSON_HEADERS, jsonBody } = require('./response')
@@ -58,6 +60,24 @@ function setDownloadState(ctx, patch) {
 		}
 	}
 	Object.assign(ctx._ingestDownloadState, patch, { updatedAt: Date.now() })
+}
+
+/**
+ * WO-830a: stream a fetch() body (web ReadableStream) into `savePath` with pipeline(): the write stream's 'error'
+ * (full disk, EACCES) is handled from the first write — the old loop attached its listener after the loop, so
+ * process-guards exited node — and backpressure is honoured instead of buffering the whole download in memory.
+ * @param {ReadableStream} body
+ * @param {string} savePath
+ * @param {(bytes: number) => void} [onChunk]
+ */
+function writeBodyToFile(body, savePath, onChunk) {
+	const counter = new Transform({
+		transform(chunk, _enc, cb) {
+			if (onChunk) onChunk(chunk.length)
+			cb(null, chunk)
+		},
+	})
+	return pipeline(Readable.fromWeb(body), counter, fs.createWriteStream(savePath))
 }
 
 /**
@@ -356,16 +376,8 @@ async function handleDownload(body, ctx) {
 			if (!response.ok) throw new Error(`HTTP ${response.status}`)
 			const total = parseInt(response.headers.get('content-length') || '', 10)
 			let received = 0
-
-			const fileStream = fs.createWriteStream(savePath)
-			const reader = response.body.getReader()
-
-			while (true) {
-				const { done, value } = await reader.read()
-				if (done) break
-				const buf = Buffer.from(value)
-				received += buf.length
-				fileStream.write(buf)
+			await writeBodyToFile(response.body, savePath, (n) => {
+				received += n
 				if (Number.isFinite(total) && total > 0) {
 					setDownloadState(ctx, {
 						active: true,
@@ -374,12 +386,6 @@ async function handleDownload(body, ctx) {
 						message: `Downloading ${filename}…`,
 					})
 				}
-			}
-			fileStream.end()
-
-			await new Promise((resolve, reject) => {
-				fileStream.on('finish', resolve)
-				fileStream.on('error', reject)
 			})
 
 			if (path.extname(savePath).toLowerCase() === '.zip') {
@@ -458,4 +464,4 @@ async function handleIngestPreview(query, ctx) {
 	}
 }
 
-module.exports = { handleUpload, handleDownload, handleGetDownloadStatus, handleIngestPreview }
+module.exports = { handleUpload, handleDownload, handleGetDownloadStatus, handleIngestPreview, writeBodyToFile }

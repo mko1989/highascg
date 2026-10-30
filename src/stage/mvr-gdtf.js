@@ -13,6 +13,10 @@ const xml2js = require('xml2js')
 const { IDENTITY, mul, gdtfMatrix, scale } = require('./mvr-math')
 
 // Internal / tiny nodes: no body to draw.
+/** WO-830a: node / part budget for one fixture's geometry walk (real fixtures: a few dozen nodes). */
+const MAX_GDTF_VISITS = 4096
+const MAX_GDTF_PARTS = 512
+
 const SKIP = new Set(['Beam', 'WiringObject', 'Inventory', 'Laser', 'Magnet', 'FilterBeam', 'FilterColor',
 	'FilterGobo', 'FilterShaper', 'MediaServerCamera', 'MediaServerLayer', 'MediaServerMaster', 'Break'])
 
@@ -55,19 +59,31 @@ async function gdtfParts(xmlText, mode, has) {
 		const [l, w, h] = md.size
 		return md.type !== 'Pigtail' && l > 0.005 && w > 0.005 && h > 0.005 ? { mesh: 'prim:box', fit: [l, w, h] } : null
 	}
+	// WO-830a: GeometryReference → Geometry could loop (A refs B, B refs A) or fan out exponentially (each level refs the
+	// next twice): a 420 B file made 131k parts. A reference target already open on this path is skipped, and the whole
+	// fixture is capped at MAX_GDTF_VISITS nodes / MAX_GDTF_PARTS parts.
+	const openRefs = new Set()
+	let visits = 0
 	const walk = (node, parent, depth) => {
-		if (depth > 32 || SKIP.has(node['#name'])) return
+		if (depth > 32 || SKIP.has(node['#name']) || ++visits > MAX_GDTF_VISITS || parts.length >= MAX_GDTF_PARTS) return
 		const m = mul(parent, gdtfMatrix(attr(node, 'Position')))
 		if (node['#name'] === 'GeometryReference') {
 			const ref = byName.get(attr(node, 'Geometry'))
-			if (ref && ref !== node) walk(ref, m, depth + 1)
+			if (ref && ref !== node && !openRefs.has(ref)) {
+				openRefs.add(ref)
+				walk(ref, m, depth + 1)
+				openRefs.delete(ref)
+			}
 			return
 		}
 		const mesh = attr(node, 'Model') ? meshOf(attr(node, 'Model')) : null
 		if (mesh) parts.push({ mesh: mesh.mesh, m: mesh.fit ? mul(m, scale(...mesh.fit)) : m })
 		for (const c of kids(node)) walk(c, m, depth + 1)
 	}
-	if (start) walk(start, [...IDENTITY], 0)
+	if (start) {
+		openRefs.add(start)
+		walk(start, [...IDENTITY], 0)
+	}
 	return { name: attr(ft, 'Name') || '', parts, missing: [...missing] }
 }
 

@@ -30,6 +30,13 @@ function intMeterSampleToDbfs(raw) {
 	return -120
 }
 
+/**
+ * WO-830a: one OSC datagram is attacker-sized (UDP :6251 is bound on 0.0.0.0 by default). `nb_channels` and the
+ * `/N/dBFS` meter index each drove an unbounded `levels.push` loop (a 10^9 value = OOM / frozen node). No real
+ * Caspar channel carries more than a few dozen audio channels, so anything past this is a malformed or hostile packet.
+ */
+const MAX_AUDIO_CHANNELS = 64
+
 const audioMethods = {
 	/**
 	 * @returns {boolean} true when a CONSUMED value (nbChannels, dBFS, peak) changed — WO-401
@@ -41,7 +48,7 @@ const audioMethods = {
 		if (lm) return this._routeLayerAudio(ch, parseInt(lm[1], 10), vals)
 		const c = this._ensureChannel(ch)
 		if (sub === 'nb_channels') {
-			const n = Math.max(0, parseInt(String(vals[0]), 10) || 0)
+			const n = Math.min(MAX_AUDIO_CHANNELS, Math.max(0, parseInt(String(vals[0]), 10) || 0))
 			const changed = c.audio.nbChannels !== n || c.audio.levels.length !== n
 			c.audio.nbChannels = n
 			c.audio._nbChannelsFromOsc = true
@@ -56,7 +63,7 @@ const audioMethods = {
 			const a = c.audio
 			// Do not inflate channel count from padded volume bundles — trust nb_channels when set.
 			const cap = a._nbChannelsFromOsc && a.nbChannels > 0 ? a.nbChannels : vals.length
-			const n = Math.min(vals.length, cap)
+			const n = Math.min(vals.length, cap, MAX_AUDIO_CHANNELS)
 			let changed = false
 			if (!a._nbChannelsFromOsc && a.nbChannels !== n) {
 				a.nbChannels = n
@@ -90,7 +97,7 @@ const audioMethods = {
 				a._meterIndexBase = rawIdx === 0 ? 0 : 1
 			}
 			const idx = a._meterIndexBase === 1 ? rawIdx - 1 : rawIdx
-			if (idx < 0 || !Number.isFinite(idx)) return false
+			if (idx < 0 || idx >= MAX_AUDIO_CHANNELS || !Number.isFinite(idx)) return false
 			const rawDb = Number(vals[0])
 			let changed = false
 			while (a.levels.length <= idx) {
@@ -125,7 +132,7 @@ const audioMethods = {
 		const entry = byLayer[layer] || (byLayer[layer] = { nbChannels: 0, levels: [], _lastUpdateAt: 0 })
 		const ca = this._channels[ch]?.audio
 		const cap = ca?._nbChannelsFromOsc && ca.nbChannels > 0 ? ca.nbChannels : vals.length
-		const n = Math.min(vals.length, cap)
+		const n = Math.min(vals.length, cap, MAX_AUDIO_CHANNELS)
 		const now = Date.now()
 		entry.nbChannels = n
 		entry._lastUpdateAt = now

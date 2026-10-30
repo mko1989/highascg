@@ -21,6 +21,9 @@
 const { JSON_HEADERS, jsonBody, parseBodyStrict } = require('./response')
 const { isMainBusDestinationMode, normalizeScreenDestinations } = require('../config/screen-destinations')
 
+/** WO-830a: highest screen count config consumers allow (see build-caspar-generator-config-*.js `Math.min(16, …)`). */
+const MAX_SCREEN_IDX = 16
+
 /**
  * @param {string} path
  * @param {string} body raw request body
@@ -54,11 +57,13 @@ function handleScreenLabel(body, ctx) {
 
 	const screenIdx = parseInt(String(payload.screenIdx ?? ''), 10)
 	const label = String(payload.label ?? '').trim()
-	if (!Number.isFinite(screenIdx) || screenIdx < 0) {
+	// WO-830a: the legacy-array fallback below pads `screenLabels` up to screenIdx — `screenIdx: 1e9` OOM'd node.
+	// Screen counts everywhere else in the config cap at 16 (resolveMainScreenCount consumers), so refuse beyond that.
+	if (!Number.isFinite(screenIdx) || screenIdx < 0 || screenIdx >= MAX_SCREEN_IDX) {
 		return {
 			status: 400,
 			headers: JSON_HEADERS,
-			body: jsonBody({ error: 'screenIdx must be a non-negative integer' }),
+			body: jsonBody({ error: `screenIdx must be an integer from 0 to ${MAX_SCREEN_IDX - 1}` }),
 		}
 	}
 

@@ -1,6 +1,7 @@
 'use strict'
 
 const fs = require('fs')
+const { pipeline } = require('stream/promises')
 const path = require('path')
 const unzipper = require('unzipper')
 
@@ -42,13 +43,9 @@ async function extractZipSafely(zipPath, targetDir) {
 			throw new Error('zip total uncompressed size limit exceeded')
 		}
 		fs.mkdirSync(path.dirname(dest), { recursive: true })
-		await new Promise((resolve, reject) => {
-			entry
-				.stream()
-				.pipe(fs.createWriteStream(dest))
-				.on('finish', resolve)
-				.on('error', reject)
-		})
+		// WO-830a: `.pipe()` forwards no errors — a corrupt entry's stream 'error' was unhandled (process-guards then exits
+		// node on a crafted upload). pipeline() rejects on either side's error and destroys both streams.
+		await pipeline(entry.stream(), fs.createWriteStream(dest))
 		count++
 		if (count > MAX_ENTRIES) throw new Error('zip entry limit exceeded')
 	}

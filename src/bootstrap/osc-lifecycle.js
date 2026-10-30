@@ -4,6 +4,18 @@ const { handlePlaylistOscUpdate } = require('../engine/scene-take-lbg-playlist')
 
 let lastPlaylistTickAt = 0
 
+/**
+ * WO-830 (sweep §2a #3): the wildcard bind exposed the OSC parser to the whole LAN. When Caspar runs on this box
+ * (loopback host) its OSC can only come from loopback, so the wildcard narrows to 127.0.0.1. An explicit address and
+ * a remote Caspar keep what the config says.
+ */
+function effectiveOscBind(config) {
+	const osc = config.osc
+	const host = String(config.caspar?.host || '127.0.0.1').trim().toLowerCase()
+	const local = host === 'localhost' || host === '::1' || /^127\./.test(host)
+	return osc.listenAddress === '0.0.0.0' && local ? { ...osc, listenAddress: '127.0.0.1' } : osc
+}
+
 function createOscLifecycle({
 	appCtx,
 	config,
@@ -43,7 +55,7 @@ function createOscLifecycle({
 		}
 		const oscState = new OscState(appCtx.log, config.osc)
 		appCtx.oscState = oscState
-		oscListener = new OscListener(config.osc, appCtx.log, oscState)
+		oscListener = new OscListener(effectiveOscBind(config), appCtx.log, oscState)
 		oscListener.start()
 
 		/**
@@ -100,4 +112,4 @@ function createOscLifecycle({
 	return { startOscSubsystem, stopOscSubsystem, restartOscSubsystem, getOscReceiverStats }
 }
 
-module.exports = { createOscLifecycle }
+module.exports = { createOscLifecycle, effectiveOscBind }

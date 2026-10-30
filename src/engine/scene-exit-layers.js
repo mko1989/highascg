@@ -275,7 +275,8 @@ async function clearSceneProgramLookStackLayers(amcp, channel, self) {
 	const layersArray = [...layersToClear].sort((a, b) => a - b)
 	if (layersArray.length === 0) return
 
-	const chunkSize = Math.floor(resolveMaxBatchCommands(amcp._context) / 3)
+	// WO-830a: amcp_max_batch_commands 1 or 2 floored to 0, and `i += 0` never advanced — a frozen node.
+	const chunkSize = Math.max(1, Math.floor(resolveMaxBatchCommands(amcp._context) / 3))
 	for (let i = 0; i < layersArray.length; i += chunkSize) {
 		const chunk = layersArray.slice(i, i + chunkSize)
 		const lines = []

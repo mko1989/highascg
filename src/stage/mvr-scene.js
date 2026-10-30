@@ -14,6 +14,9 @@ const { mul, mvrMatrix, toGodot, scale } = require('./mvr-math')
 const { parseXml, kids, attr } = require('./mvr-gdtf')
 
 const OBJECTS = new Set(['SceneObject', 'GroupObject', 'Fixture', 'Truss', 'Support', 'VideoScreen', 'Projector', 'FocusPoint'])
+/** WO-830a: geometry-node visits allowed per scene object / per whole scene (real rigs: tens per object). */
+const MAX_GEOMETRY_VISITS = 4096
+const MAX_SCENE_GEOMETRY_VISITS = 500000
 const child = (node, name) => kids(node).find((n) => n['#name'] === name)
 const text = (node, name) => {
 	const c = child(node, name)
@@ -70,9 +73,13 @@ async function parseScene(xmlText, { has, resolveGdtf }) {
 	const meshes = new Set()
 	const report = { objects: 0, fixtures: 0, parts: 0, missing_gdtf: new Set(), gdtf_no_model: new Set(), missing_files: new Set(), unsupported: new Set() }
 	const gdtfCache = new Map()
+	let sceneVisits = 0
 
-	const addGeometry = (parts, node, m, depth) => {
-		if (depth > 16) return
+	// WO-830a: a Symdef that (directly or through others) contains a Symbol of itself, or a fan-out of Symbols per level,
+	// expanded 16 levels deep to 131k parts from a 420 B file (OOM). A symdef already open on the current path is a cycle
+	// (skipped), and one object may visit at most MAX_GEOMETRY_VISITS nodes whatever the shape.
+	const addGeometry = (parts, node, m, depth, open = new Set(), budget = { n: 0 }) => {
+		if (depth > 16 || ++budget.n > MAX_GEOMETRY_VISITS || ++sceneVisits > MAX_SCENE_GEOMETRY_VISITS) return
 		const at = mul(m, mvrMatrix(text(node, 'Matrix')))
 		if (node['#name'] === 'Geometry3D') {
 			const name = attr(node, 'fileName')
@@ -81,8 +88,12 @@ async function parseScene(xmlText, { has, resolveGdtf }) {
 			else if (/\.gltf$/i.test(file)) report.unsupported.add(file)
 			else parts.push({ mesh: `mvr:${file}`, m: at })
 		} else if (node['#name'] === 'Symbol') {
-			const def = symdefs.get(String(attr(node, 'symdef')).toUpperCase())
-			for (const g of kids(child(def, 'ChildList'))) addGeometry(parts, g, at, depth + 1)
+			const key = String(attr(node, 'symdef')).toUpperCase()
+			const def = symdefs.get(key)
+			if (open.has(key)) return
+			open.add(key)
+			for (const g of kids(child(def, 'ChildList'))) addGeometry(parts, g, at, depth + 1, open, budget)
+			open.delete(key)
 		}
 	}
 
@@ -92,7 +103,8 @@ async function parseScene(xmlText, { has, resolveGdtf }) {
 			if (!OBJECTS.has(kind) || depth > 32) continue
 			const m = mul(parent, mvrMatrix(text(node, 'Matrix')))
 			const parts = []
-			for (const g of kids(child(node, 'Geometries'))) addGeometry(parts, g, m, 0)
+			const budget = { n: 0 }
+			for (const g of kids(child(node, 'Geometries'))) addGeometry(parts, g, m, 0, new Set(), budget)
 			const obj = { uuid: attr(node, 'uuid') || '', name: attr(node, 'name') || kind, kind, layer }
 			if (kind === 'Fixture') {
 				const spec = text(node, 'GDTFSpec')
