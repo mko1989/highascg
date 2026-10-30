@@ -108,8 +108,6 @@ function planConfigSignature(plan) {
 }
 
 module.exports = {
-	SLICE_WINDOW_DEVICE_BASE,
-	MAX_SLICE_WINDOWS,
 	screenConsumerIndex,
 	sliceWindowsFromConfig,
 	amcpNum,

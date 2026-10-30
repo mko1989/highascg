@@ -80,4 +80,4 @@ async function reapplyAllMappingSlices(ctx) {
 	return results
 }
 
-module.exports = { applyLineFor, applySliceWindow, applyMappingNodeSlices, reapplyAllMappingSlices }
+module.exports = { applyLineFor, applyMappingNodeSlices, reapplyAllMappingSlices }

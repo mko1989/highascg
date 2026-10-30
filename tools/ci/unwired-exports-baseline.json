@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 710,
+	"count": 707,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -389,7 +389,6 @@
 		"src/config/portaudio-output.js: PORTAUDIO_HOST_APIS",
 		"src/config/program-audio-layouts.js: resolveCabledLayoutsByMain",
 		"src/config/routing-map.js: resolvePreviewEnabledByMain",
-		"src/config/routing-setup.js: setupMappingChannels",
 		"src/config/routing.js: routeToLayer",
 		"src/config/screen-consumer-port-resolve.js: OPERATOR_GUI_PORT_FLAGS",
 		"src/config/screen-consumer-port-resolve.js: PGM_DESTINATION_MODES",
@@ -412,7 +411,6 @@
 		"src/engine/playlist-path-match.js: sameFileName",
 		"src/engine/playlist-path-match.js: scorePlaylistPathMatch",
 		"src/engine/project-hardware-config.js: HARDWARE_CONFIG_VERSION",
-		"src/engine/project-hardware-config.js: hardwareConfigToSnapshotPayload",
 		"src/engine/project-store.js: LEGACY_AUTOSAVE_PATH",
 		"src/engine/project-store.js: PROJECTS_DIR",
 		"src/engine/project-store.js: TRASH_SUBDIR",
@@ -707,7 +705,6 @@
 		"src/virtual-output/v4l2-bridge-audio.js: isVirtualCameraAudioEnabled",
 		"src/virtual-output/v4l2-bridge-cache.js: getV4l2BridgeJpgAmcpPath",
 		"src/virtual-output/v4l2-bridge-consumer.js: removeV4l2BridgeConsumer",
-		"src/virtual-output/v4l2-bridge.js: resolveVirtualCameraChannel",
 		"src/virtual-output/v4l2-kernel-modules.js: VCAM_MODULES_WRAPPER",
 		"src/virtual-output/v4l2-kernel-modules.js: v4l2DevicePresent",
 		"src/vr/magicq-mvr.js: SHOW_DIR",

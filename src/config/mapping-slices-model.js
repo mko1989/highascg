@@ -294,7 +294,6 @@ function withEffectiveSlices(graph) {
 }
 
 module.exports = {
-	MAX_SLICES,
 	normalizeSlice,
 	normalizeSlices,
 	migrateLegacyMappings,
@@ -303,5 +302,4 @@ module.exports = {
 	reconcileNodeSettings,
 	reconcileGraphSlices,
 	withEffectiveSlices,
-	normRotation,
 }

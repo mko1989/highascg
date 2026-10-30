@@ -181,12 +181,9 @@ function isOneToOne(slice) {
 
 module.exports = {
 	rectCorners,
-	rotateAbout,
-	flipPermutation,
 	screenCorners,
 	dstQuad,
 	isConvexQuad,
-	quadArea,
 	bounds,
 	homography,
 	applyHomography,

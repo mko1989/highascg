@@ -231,12 +231,8 @@ function planAllMappingNodes(graph, opts = {}) {
 
 module.exports = {
 	REASONS,
-	DEFAULT_CHANNEL_BUDGET,
 	resolveOutputSinks,
-	isPlainCopy,
 	compileSlice,
-	outputPositions,
 	planMappingNode,
 	planAllMappingNodes,
-	buildSliceWindow,
 }
