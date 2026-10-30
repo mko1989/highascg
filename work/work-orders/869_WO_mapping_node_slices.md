@@ -1,7 +1,7 @@
 # WO-869 — Mapping node slices: cut a screen destination's output into slices and place them freely on an output canvas (Resolume-style)
 
 **Area:** devices-config, amcp, godot-client
-**Status: IN PROGRESS (30.10) — P1 model/planner/API, P2 Godot editor and P3 path (b) built; slices verified on the real Dioda head (gpu-texture on, config baseline, live APPLY, Caspar-restart re-apply; §5.1) after two WO-868 interaction fixes; open: caps probe, path (a) route-slices (§6)**
+**Status: IN PROGRESS (30.10) — P1 model/planner/API, P2 Godot editor and P3 path (b) built; slices verified on the real Dioda head (gpu-texture on, config baseline, live APPLY, Caspar-restart re-apply; §5.1) after two WO-868 interaction fixes; caps probe done (§7); open: path (a) route-slices (§6)**
 
 Owner 30.10: "need also a way inside mapping node to slice the output of a screen destination and position it freely on a set canvas output. similar to how resolume works with slices. i have a round around way of doing this with rendering the canvas then playing its sliced up routes on the output, but there must be an easier way to do this. doesnt caspar has something built in for these purposes? if not there needs to be a pull request that has something similar."
 
@@ -384,13 +384,53 @@ in `scratchpad/wo869live/`.
 ## 6. What remains
 
 - **Binary swap: DONE 30.10 17:32** (dev box). `bin/casparcg` = md5 `ab668967…` (the build above); rollback `bin/casparcg.pre-wo869` (`fb955e76…`, the 16:37 build of `e8d457ec6` + the same uncommitted WO-820/800 tree, so the swap adds only `ce7132e50` + `deac375bb`). AMCP `RESTART` → run.sh relaunched it (`/proc/<pid>/exe` md5 checked), then node restarted (Apply check 0). After: the node re-staged the PRV look on ch2, `/api/system/operator-first` + the WO-857 listener (UDP 6290) answer, 0 `[error]` lines in the journal, :0 shows the GUI on DP-4 and the (empty-PGM) Dioda window on DP-0. The live project has no slices yet, so the slice path on real heads is still the open check below.
-- **Caps probe:** the planner assumes the running Caspar has screen slices (`caps.screenSlices` is never set). A connect-time probe (`APPLY <ch>-640 SLICES SET 0`, where 400 means none) that sets the caps and falls back to `refused`/direct is not built.
+- ~~Caps probe~~ — done 30.10 (§7).
 - **Path (a) route-slices** (SDI scaling/rotation and per-slice sources): the planner models it and the budget refusal (Q3), but there is no generator or apply code. It also needs #1814 (crop leak) in the fork.
 - ~~Real GPU check~~ — done on the box 30.10 (§5.1): gpu-texture on, real DP-0 head, xrandr layout, stacking.
 - **Fork caveat:** an intermittent startup SEGV with two screen windows on one channel on Xvfb, seen with both the old and the new binary (not caused by this change). Watch for it on the box, where the PGM window plus a slice window means two windows when another GPU cable keeps the PGM window on.
 - **Not tested:** a channel format change while a window is live. (Re-apply after a real Caspar restart: done, §5.1.)
 - **Planner edge:** a node with a slice window plus an empty GPU output (no slice) keeps that output `direct`, so the PGM window stays on and may overlap the slice window.
 - **Owner QA:** one pass of the editor against a real two-head wall or LED processor.
+
+## 7. Caps probe (30.10)
+
+**Investigation**
+- The planner took `caps.screenSlices !== false` as "has slices" (`mapping-slices-plan.js:162`), and no caller ever passed caps (`routes-device-view.js:117`, `config-generator-slice-windows.js:56`, `mapping-slices-apply.js`, `pixel-mapping-config.js:64`, `mapping-gpu-os-layout.js:81`). On a rollback binary (`bin/casparcg.pre-wo869`, the 24.04 ones) a sliced node would get a device-41 window that draws the whole frame, the PGM window off, and every live edit refused.
+- The probe this WO proposed, `APPLY <ch>-640 SLICES SET 0`, is unsafe: on a live slice window it clears the slices (the fork accepts it, `screen_consumer.cpp` `call()` → `set_slices`).
+- A malformed `APPLY … SLICES` cannot tell builds apart either: the fork answers 403, and so would any upstream build with #1638 but no slices (`output.cpp:85` returns false for an unknown index or a consumer whose `call()` declines).
+- A read-only signal exists: the fork's screen consumer `state()` always writes `screen/slices` (the count, 0 when unsliced). Live `INFO 2` on the box shows `<slices>0</slices>` under `port_600`; the stock consumer has no such element.
+- Reply shapes, measured with a second `ConnectionManager` on the live Caspar (scratchpad `wo869caps/shape.js`):
+  - the bare `INFO` list comes back as `["1 1080p5000 PLAYING", …]`;
+  - an unknown command rejects with `COMMAND_UNKNOWN_DATA: …`, not "400";
+  - `APPLY 2-65535 SLICES CLEAR` on the fork gives `403 APPLY FAILED` plus a Caspar warning "No consumer found for index 65535". Nothing changes.
+
+**What was done**
+- `src/config/caspar-caps.js` (new): one process-wide `{ screenSlices: true|false|null, source, at }`, plus `screenSlicesFromInfoXml`. One record, because the generator, the os-layout, the API and the live apply all plan the same node and must agree. `null` = not probed = the old behaviour.
+- `src/engine/caspar-caps-probe.js` (new) `probeCasparCaps`:
+  1. bare `INFO`, then `INFO <ch>` until a channel has a screen consumer, whose block answers;
+  2. if no channel has one: `APPLY <first ch>-65535 SLICES CLEAR` (an index that cannot exist). Unknown command → false; 403 → stays null.
+  It never sends `SLICES SET`.
+- `routing-setup.js` `setupMappingChannels` runs the probe before `reapplyAllMappingSlices`, on every (re)connect.
+- `mapping-slices-plan.js`: `caps` defaults to `getCasparCaps()`; explicit caps still win.
+  With `false`, GPU outputs go `refused` with `REASONS.NO_SCREEN_SLICES`, and the first slice is still placed the legacy way. The generator then writes no slice window and keeps the PGM window.
+- `mapping-slices-apply.js`: a live APPLY refused as an unknown command (a rollback swapped in after connect) sets the caps to false (`apply-refused`). A 403 (bad set) leaves them alone.
+- `routes-device-view.js` GET returns `casparCaps` next to `mappingSlicePlans`.
+
+**Verified**
+- `tools/smoke/smoke-wo869-caspar-caps.test.js` (curated, `offline-test-files-3.js`) **13/13**:
+  - the INFO reader on the box's real screen block;
+  - the error shapes;
+  - fork, stock and no-screen probes (INFO only; the 65535 APPLY);
+  - the planner, generator (`screen_1_slice_windows` gone) and re-apply follow the caps;
+  - a 403 does not flip them.
+- WO-868/869 smokes **80/80**.
+- **Real binaries**, via `probeCasparCaps` over a real `ConnectionManager`:
+  - live fork (:5250): `supported (INFO 2)`;
+  - scratch Caspar on Xvfb :169 / 5264, `bin/casparcg.pre-wo869`, plain config: `NOT supported (INFO 1)`;
+  - same binary, no screen consumers: `NOT supported (no APPLY command)`, `apply:400`;
+  - the WO-869 build (`bin/casparcg`), no screen consumers: `null`, `no-screen-consumer`.
+  Evidence: `scratchpad/wo869caps/old-binary.out`, `noscreen.out`.
+- **Live node** (owner restarted highascg 21:06; it had been stopped since 18:53 by the `pre-produce-preflight.sh` dry run): the journal shows `[caspar-caps] screen slices supported (INFO 2)`, and GET `/api/device-view` returns `casparCaps: {screenSlices: true, source: "info:2"}`. The line appears twice per connect because `setupMappingChannels` runs twice on boot; the probe is read-only, so that is harmless.
 
 ## Owner decisions (30.10)
 

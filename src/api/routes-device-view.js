@@ -15,6 +15,7 @@ const CRUD_MAPPING = require('./device-view-crud-mapping')
 const { enrichExtraLiveSource, enrichExtraLiveSources } = require('../config/extra-live-source-enrich')
 const { reconcileGraphSlices, withEffectiveSlices } = require('../config/mapping-slices-model')
 const { planAllMappingNodes } = require('../config/mapping-slices-plan')
+const { getCasparCaps } = require('../config/caspar-caps')
 
 /**
  * Merge patch into on-disk config and refresh `ctx.config` from ConfigManager (same as `change` listener).
@@ -115,6 +116,7 @@ async function handleGet(path, ctx, query, req) {
 		audioOutputs: Array.isArray(ctx.config?.audioOutputs) ? ctx.config.audioOutputs : [],
 		mappingTemplates: Array.isArray(ctx.config?.mappingTemplates) ? ctx.config.mappingTemplates : [],
 		mappingSlicePlans: planAllMappingNodes(graph), // WO-869: which backend draws each mapping output
+		casparCaps: getCasparCaps(), // WO-869: what the running Caspar draws (screenSlices null = not probed yet)
 	}
 
 	// T202.3: Generate ETag from payload JSON hash

@@ -12,6 +12,8 @@
 
 const { getChannelMap } = require('../config/routing')
 const { sliceWindowsFromConfig, slicesSetParams } = require('../config/mapping-slices-windows')
+const { setCasparCaps } = require('../config/caspar-caps')
+const { isUnknownCommandError } = require('./caspar-caps-probe')
 
 /** @type {Map<string, Promise<unknown>>} window key → tail of its apply chain */
 const chains = new Map()
@@ -49,6 +51,8 @@ function applySliceWindow(ctx, w) {
 		} catch (e) {
 			const error = String(e?.message || e)
 			log(ctx, 'warn', `[mapping-slices] ${w.label}: ${line.slice(0, 60)}… refused: ${error}`)
+			// A binary without APPLY (a rollback swapped in since the connect probe): plan the legacy way from now on.
+			if (isUnknownCommandError(e)) setCasparCaps({ screenSlices: false, source: 'apply-refused' })
 			return { ok: false, line, error }
 		}
 	}

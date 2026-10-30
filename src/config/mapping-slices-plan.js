@@ -18,6 +18,7 @@
  */
 
 const { dstQuad, isConvexQuad, isOneToOne } = require('./mapping-slices-geometry')
+const { getCasparCaps } = require('./caspar-caps')
 const { effectiveSlices } = require('./mapping-slices-model')
 
 const REASONS = {
@@ -112,13 +113,13 @@ function outputPositions(outputs) {
 /**
  * @param {object} node pixel_mapping device
  * @param {{ sinks?: Map<string, string|null>, graph?: object, caps?: { screenSlices?: boolean|null, routeSlices?: boolean },
- *   channelBudget?: { used: number, max?: number } }} [opts]
+ *   channelBudget?: { used: number, max?: number } }} [opts] `caps` defaults to the running Caspar's (config/caspar-caps.js)
  */
 function planMappingNode(node, opts = {}) {
 	const settings = node?.settings || {}
 	const outputs = Array.isArray(settings.outputs) ? settings.outputs : []
 	const sinks = opts.sinks || resolveOutputSinks(opts.graph || {}, node)
-	const caps = opts.caps || {}
+	const caps = opts.caps || getCasparCaps()
 	const budget = opts.channelBudget || null
 	const positions = outputPositions(outputs)
 	const slices = effectiveSlices(node)

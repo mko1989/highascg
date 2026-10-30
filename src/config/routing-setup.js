@@ -362,6 +362,13 @@ async function setupMappingChannels(self) {
 	// plus a single decklink consumer with subregions and synced ports — no extra mapping channels or AMCP mirrors.
 	// WO-869: a mapping node's slice window (screen consumer 640+k on its feed's PGM channel) gets the node's
 	// current slices again — the XML <slices> is only the baseline the config was generated with.
+	// The caps probe goes first: on a binary without screen slices the planner refuses those outputs, so nothing is
+	// sent and the generator falls back to the legacy head layout (engine/caspar-caps-probe.js).
+	try {
+		await require('../engine/caspar-caps-probe').probeCasparCaps(self)
+	} catch (e) {
+		self?.log?.('warn', `[caspar-caps] probe: ${e?.message || e}`)
+	}
 	try {
 		await require('../engine/mapping-slices-apply').reapplyAllMappingSlices(self)
 	} catch (e) {
