@@ -107,6 +107,7 @@ spare ch7):
   channels still decode full-size files.
 - What would help: a low-res proxy of each clip for preview, or routing PGM layers instead of re-decoding them.
 - The geometry part ("calculate at PGM size, show at half") is how the GUI preview already works.
+- **Owner, 30.10:** "Not worth the hassle" — no half-res PRV channel and no proxy-clip WO; PRV stays at PGM size.
 
 ## What was VERIFIED (20.10, box)
 
