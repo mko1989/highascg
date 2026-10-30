@@ -42,6 +42,30 @@ static func snap(yaw: float, x: float, armed: bool) -> Array:
 	return [yaw, armed or absf(x) < 0.3]
 
 
+## WO-859 — owner 30.10: "the righthand analog should allow flying by moving up and down". The right stick's y lifts
+## or lowers the rig while it outweighs x (x snap-turns) and the ray is off the wrist panel (there it scrolls); never
+## below the floor (0). The right stick's click lands back on the floor.
+const FLY_SPEED := 1.5  # m/s at a full push
+const FLY_DEAD := 0.2
+
+
+static func fly(height: float, stick: Vector2, dt: float, speed := FLY_SPEED) -> float:
+	if absf(stick.y) < FLY_DEAD or absf(stick.y) <= absf(stick.x):
+		return height
+	return maxf(0.0, height + stick.y * speed * dt)
+
+
+## The stick's x for the snap turn: 0 while y outweighs it, so a diagonal flight never turns.
+static func turn_x(stick: Vector2) -> float:
+	return stick.x if absf(stick.x) > absf(stick.y) else 0.0
+
+
+## WO-859 — owner 30.10: "when the first trigger is held down it acts as ctrl/cmd [...] so user can select multiple
+## fixtures by clicking one by one". The left trigger held adds to the selection; the left grip still does too (WO-774).
+static func add_held(left_trigger: bool, left_grip: bool) -> bool:
+	return left_trigger or left_grip
+
+
 ## A trigger along a ray. `hit_id` = the head the ray goes through (else `near_id`, the head centred nearest it);
 ## a head → {do: "pick", id, add} (the left grip held adds, as ctrl-click — WO-774); else {do: "press"}: a press in the
 ## stage off the heads that waits for its release (a drag = a box select). WO-841: the trigger only selects — it never

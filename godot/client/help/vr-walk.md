@@ -76,12 +76,14 @@ in the Quest. That window has its own settings, so the kiosk is not touched. Clo
 | Control | What it does |
 |---|---|
 | Right trigger | Selection only — it never aims |
-| Right trigger on a head | Select it (left grip held: add to the selection) |
+| Right trigger on a head | Select it (left trigger or left grip held: add to the selection, like ctrl / cmd) |
 | Right grip held | The selected heads point where the ray meets the floor and follow it; let go to stop. Nothing with no selection or while pointing at the Programmer |
-| Right trigger held off the heads, drag | Draw a box: on release it selects the heads inside (left grip held: adds) |
+| Right trigger held off the heads, drag | Draw a box: on release it selects the heads inside (left trigger or left grip held: adds) |
 | Left grip + right grip held, move the controller | Fan the selection: sideways spreads pan, up / down spreads tilt |
 | Left stick | Walk (push fully to go 3x faster) |
 | Right stick left / right | Turn 30° |
+| Right stick up / down | Fly up / down (never below the floor) |
+| Right stick click | Back down to the floor |
 | Left wrist | The Programmer: point at it with the right controller |
 | Right trigger on the Programmer | Click (hold it to drag a slider; left grip held adds in the fixture list) |
 | Right stick up / down on the Programmer | Scroll it |

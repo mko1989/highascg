@@ -7,7 +7,9 @@ extends Node3D
 ##    floor aims nothing. The right grip (middle finger, "the second trigger") POINTS: held, the selected heads aim
 ##    where the controller's ray meets the floor and follow it while it moves (throttled, Walk.aim_due), let go ends
 ##    it; with nothing selected, or the ray on the wrist panel, it does nothing. Left grip + right grip is the pan /
-##    tilt fan (xr_fan.gd, WO-774) as the controller moves. Left stick walks, right stick snap-turns.
+##    tilt fan (xr_fan.gd, WO-774) as the controller moves. Left stick walks, right stick snap-turns. WO-859: the left
+##    trigger held adds to the selection like the left grip (ctrl / cmd); the right stick up / down flies, its click
+##    lands back on the floor.
 ##    The full Programmer rides the left wrist (xr_panel.gd, WO-757): pointing at it, the trigger clicks there instead;
 ##    Y shows / hides it, the right stick up / down scrolls it; its type filter limits what the controller picks.
 ##  - No headset: a first-person camera at eye height. WASD walk (shift x3), left-drag look, wheel steps. The previs's
@@ -101,7 +103,9 @@ func _start_xr() -> bool:
 		if b == "trigger_click":
 			trigger(true, _add_held())
 		elif b == "grip_click":
-			grip(true, _add_held()))
+			grip(true, _left_grip())  # the fan is the left GRIP + right grip; the left trigger only adds
+		elif b == "primary_click":  # WO-859: the right stick's click lands back on the floor
+			_origin.position.y = 0.0)
 	_right.button_released.connect(func(b: String) -> void:
 		if b == "trigger_click":
 			trigger(false, _add_held())
@@ -259,7 +263,10 @@ func _xr_move(dt: float) -> void:
 	if stick.length() > 0.15:
 		var head_yaw := _cam.global_basis.get_euler().y
 		_origin.position = Walk.step(_origin.position, head_yaw, stick, dt, Walk.SPEED * (3.0 if stick.length() > 0.95 else 1.0))
-	var s := Walk.snap(_origin.rotation.y, _right.get_vector2(&"primary").x, _snap_armed)
+	var rs := _right.get_vector2(&"primary")
+	if not panel.pointed():  # on the panel the stick scrolls it (_point)
+		_origin.position.y = Walk.fly(_origin.position.y, rs, dt)
+	var s := Walk.snap(_origin.rotation.y, Walk.turn_x(rs), _snap_armed)
 	_origin.rotation.y = s[0]
 	_snap_armed = s[1]
 
@@ -363,8 +370,13 @@ func _only_type() -> String:
 	return str(panel.type_filter()) if panel != null and panel.has_method("type_filter") else ""
 
 
-## WO-774: the add modifier is the left grip (WO-841: the right grip points; both together fan).
+## WO-774: the add modifier (ctrl / cmd) is the left grip; WO-859: or the left trigger held (the right grip points;
+## left grip + right grip fan).
 func _add_held() -> bool:
+	return _left != null and Walk.add_held(_left.is_button_pressed(&"trigger_click"), _left_grip())
+
+
+func _left_grip() -> bool:
 	return _left != null and _left.is_button_pressed(&"grip_click")
 
 

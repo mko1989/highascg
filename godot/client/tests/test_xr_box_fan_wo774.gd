@@ -171,7 +171,7 @@ func test_trigger_release_never_aims() -> void:
 func test_hooks() -> void:
 	var src := FileAccess.get_file_as_string("res://features/previs/xr/xr_walk.gd")
 	t.ok(src.contains("return _left != null and _left.is_button_pressed(&\"grip_click\")"), "the add modifier is the left grip")
-	t.ok(src.contains("\t\telif b == \"grip_click\":\n\t\t\tgrip(true, _add_held())"), "WO-841: the right grip goes to grip() (point, or fan with the left)")
+	t.ok(src.contains("\t\telif b == \"grip_click\":\n\t\t\tgrip(true, _left_grip())"), "WO-841: the right grip goes to grip() (point, or fan with the left grip — WO-859: not the left trigger)")
 	t.ok(src.contains("rig.hit(_pointer, centre, only), rig.near(_pointer, centre, NEAR_PX, only)"),
 		"a trigger on a head honours the type filter")
 	t.ok(src.contains("tab.aim_drag.sel.pick(r.id, r.add)\n\t\treturn"), "a head is still picked at once on the press")
