@@ -1,0 +1,40 @@
+# HighAsCG Calamares branding for penguins-eggs 26.10 (coa), WO-870 Phase 4.
+# install-eggs-config.sh fills the NVIDIA branch in and installs this as /etc/penguins-eggs.d/branding/calamares/branding/
+# branding.desc.tmpl; `eggs sysinstall calamares` renders it on the live system (Go text/template, fields of
+# coa's BrandingConfig) into installer.d/branding/eggs/branding.desc. coa always names the branding dir "eggs",
+# so componentName must stay "eggs" or Calamares refuses the branding.
+---
+componentName: eggs
+
+images:
+  productIcon:    "highascg-eggs-theme-logo.png"
+  productLogo:    "highascg-eggs-theme-logo.png"
+  productWelcome: "welcome.png"
+
+slideshow:       "show.qml"
+slideshowAPI:    1
+
+strings:
+  productName:         "HIGHASCG NVIDIA @BRANCH@"
+  shortProductName:    "highascg nvidia @BRANCH@"
+  version:             "NVIDIA @BRANCH@"
+  shortVersion:        "NVIDIA @BRANCH@"
+  versionedName:       "HighAsCG (NVIDIA @BRANCH@)"
+  shortVersionedName:  "HIGHASCG NVIDIA @BRANCH@"
+  bootloaderEntryName: "{{ .BootloaderEntryName }}"
+  productUrl:          "https://github.com/mko1989/highascg"
+  supportUrl:          "https://github.com/mko1989/highascg/issues"
+  knownIssuesUrl:      "https://github.com/mko1989/highascg/issues"
+  releaseNotesUrl:     "https://github.com/mko1989/highascg/releases"
+
+style:
+  SidebarBackground:        "#292F34"
+  sidebarBackground:        "#292F34"
+  SidebarBackgroundCurrent: "#D35400"
+  sidebarBackgroundCurrent: "#D35400"
+  SidebarText:              "#FFFFFF"
+  sidebarText:              "#FFFFFF"
+  SidebarTextCurrent:       "#292F34"
+  sidebarTextCurrent:       "#292F34"
+
+welcomeStyleCalamares: true

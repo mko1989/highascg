@@ -19,6 +19,8 @@ const {
 const CALAMARES_BIN = '/usr/bin/calamares'
 const EGGS_BIN = '/usr/bin/eggs'
 const LAUNCH_CALAMARES = '/usr/local/bin/launch-calamares.sh'
+/** coa utils.IsLive() (penguins-eggs 26.10.30, pkg/utils/is-live.go): `eggs sysinstall` refuses without one of these. */
+const LIVE_DIRS = ['/run/live/medium', '/lib/live/mount/medium', '/run/archiso/bootmnt', '/run/miso/bootmnt', '/run/initramfs/live']
 const CASPAR_CONTROL = '/usr/local/bin/caspar-systemd-control.sh'
 
 /**
@@ -63,8 +65,17 @@ function isExecutable(bin) {
 	}
 }
 
+/** WO-870 Phase 4: `eggs` is the 26.10 Go rewrite (coa), which installs only from a live session. */
+function eggsIsSysinstall() {
+	try {
+		return fs.realpathSync(EGGS_BIN).endsWith('/coa')
+	} catch {
+		return false
+	}
+}
+
 /**
- * @returns {{ installed: boolean, binary: string|null, eggsAvailable: boolean, launchable: boolean }}
+ * @returns {{ installed: boolean, binary: string|null, eggsAvailable: boolean, launchable: boolean, liveOnly: boolean }}
  */
 function detectCalamaresStatus() {
 	const calamaresInstalled = isExecutable(CALAMARES_BIN) || Boolean(execSyncSafe('command -v calamares'))
@@ -73,12 +84,15 @@ function detectCalamaresStatus() {
 	const eggsCalamares = isExecutable(EGGS_BIN)
 	const launchable = calamaresInstalled || eggsCalamares
 	const sudoLaunchAvailable = calamaresInstalled && calamaresSudoLaunchAvailable()
+	const sysinstall = eggsCalamares && eggsIsSysinstall()
 	return {
 		installed: calamaresInstalled,
-		binary: calamaresInstalled ? CALAMARES_BIN : eggsCalamares ? `${EGGS_BIN} calamares` : null,
+		binary: sysinstall ? `${EGGS_BIN} sysinstall calamares` : calamaresInstalled ? CALAMARES_BIN : null,
 		eggsAvailable: eggsCalamares,
 		launchable,
 		sudoLaunchAvailable,
+		/* true on an installed box with eggs 26.10: the launcher would refuse, so the button explains instead */
+		liveOnly: sysinstall && !LIVE_DIRS.some((d) => fs.existsSync(d)),
 	}
 }
 
@@ -268,7 +282,10 @@ function calamaresSudoLaunchAvailable() {
 function launchCalamaresAsync(ctx) {
 	const calamares = detectCalamaresStatus()
 	if (!calamares.installed) {
-		return { ok: false, status: 503, error: 'Calamares not installed. Run eggs calamares --install on the build host.' }
+		return { ok: false, status: 503, error: 'Calamares not installed. Install the calamares package on the build host and rebuild the ISO.' }
+	}
+	if (calamares.liveOnly) {
+		return { ok: false, status: 409, error: 'Install to disk runs from the live stick (eggs 26.10 installs only from a live session).' }
 	}
 
 	if (!isExecutable(LAUNCH_CALAMARES)) {

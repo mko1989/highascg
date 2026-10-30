@@ -72,11 +72,15 @@ func refresh() -> void:
 	_caspar.text = "Caspar scanner: %s · server: %s%s" % [str(cs.get("scanner", "?")), str(cs.get("server", "?")),
 		" (stopped — autorestart off)" if cs.get("inhibited") == true else ""]
 	var cal: Dictionary = r.data.get("calamares", {}) if r.data.get("calamares") is Dictionary else {}
-	_install.disabled = not (cal.get("installed") == true and cal.get("sudoLaunchAvailable") != false)
+	_install.disabled = not (cal.get("installed") == true and cal.get("sudoLaunchAvailable") != false
+		and cal.get("liveOnly") != true)
 	# WO-721: the reason is on screen, not only in a tooltip a kiosk operator has to hover to find.
 	_install_why.text = ("Calamares not installed on this system" if cal.get("installed") != true
 		else ("Passwordless sudo for Calamares not configured — run: sudo bash scripts/setup/12-passwordless-sudo.sh"
-			if cal.get("sudoLaunchAvailable") == false else ""))
+			if cal.get("sudoLaunchAvailable") == false
+			# WO-870: eggs 26.10 installs only from a live session
+			else ("Install to disk runs from the live stick — boot the HighAsCG USB stick to install"
+				if cal.get("liveOnly") == true else "")))
 	_install.tooltip_text = _install_why.text
 
 

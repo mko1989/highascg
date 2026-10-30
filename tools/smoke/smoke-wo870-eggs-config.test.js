@@ -93,8 +93,9 @@ describe('WO-870 generate-eggs-config: custom.yaml', () => {
 		assert.match(yaml, /^ {2}iso_prefix: highascg-nvidia-615$/m)
 		assert.match(yaml, /^ {4}algorithm: "xz"$/m)
 	})
-	it('does not enable the calamares installer (only a comment)', () => {
-		assert.ok(!/^\s*installer:/m.test(yaml))
+	it('enables the calamares installer under remaster: (coa reads Remaster.Installer; top level is ignored)', () => {
+		assert.match(yaml, /^remaster:\n(?: {2}.*\n|\n)*? {2}installer: calamares$/m)
+		assert.equal(yaml.match(/^\s*installer:/gm).length, 1)
 	})
 	it('rejects a non-numeric branch', () => {
 		assert.throws(() => gen.buildCustomYaml({ branch: 'abc' }))

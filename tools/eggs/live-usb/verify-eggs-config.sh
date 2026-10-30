@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # WO-870 Phase 2: check-only twin of install-eggs-config.sh. Compares the sha256 of every installed file under
-# /etc/penguins-eggs.d/ (custom.exclude.list, custom.yaml, branding/livecd/*) with freshly generated content.
+# /etc/penguins-eggs.d/ (custom.exclude.list, custom.yaml, branding/livecd/*, branding/calamares/branding/*) with
+# freshly generated content.
 # PASS/FAIL per file with a one-line reason; exit 1 on any mismatch. Runs as non-root (files are world-readable).
 # Same --branch / --embed / env knobs as install-eggs-config.sh; EGGS_CONF_DIR overrides the directory.
 set -uo pipefail
@@ -38,7 +39,7 @@ for f in "${GENERATED[@]}"; do
 			why="differs from generated ($(grep -cv '^[[:space:]]*\(#\|$\)' "$have_file") vs $(grep -cv '^[[:space:]]*\(#\|$\)' "${TMP}/gen/${f}") patterns)"
 		fi
 	elif [[ "$f" == branding/* ]]; then
-		why="differs from the repo theme (highascg-eggs-theme/theme/livecd)"
+		why="differs from the repo theme (highascg-eggs-theme/theme/${f#branding/})"
 	else
 		why="differs from generated (installed iso_prefix: $(sed -n 's/^[[:space:]]*iso_prefix:[[:space:]]*//p' "$have_file" | head -1))"
 		[[ -z "$(sed -n 's/^[[:space:]]*iso_prefix:.*/x/p' "$have_file")" ]] && why="differs from generated (installed file has no iso_prefix)"

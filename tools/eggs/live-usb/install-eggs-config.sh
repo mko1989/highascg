@@ -3,6 +3,10 @@
 # Phase 3: also the boot-menu branding, branding/livecd/ (copied as-is from highascg-eggs-theme/theme/livecd). coa's
 # generate-menus.sh renders our menus only when BOTH *.main.cfg exist there, and boot-assets takes the theme
 # files only when splash.png exists there, so the five files travel together. {{{fullname}}} is filled in here.
+# Phase 4: the Calamares branding overlay, branding/calamares/branding/ (branding.desc.tmpl + show.qml + images from
+# highascg-eggs-theme/theme/calamares/branding). `eggs sysinstall calamares` copies it over its default branding and
+# renders branding.desc.tmpl; @BRANCH@ is filled in here. No module overlays (branding/calamares/modules/): coa
+# generates partition/users confs per build, and a whole-file override would drop its efi/layout/password keys.
 #
 #   bash install-eggs-config.sh --out DIR      # default: write custom.* + branding/livecd/* into DIR (no root)
 #   sudo bash install-eggs-config.sh --apply   # install into /etc/penguins-eggs.d/ (root; owner runs this)
@@ -24,7 +28,9 @@ GEN="${HERE}/generate-eggs-config.js"
 CONF_DIR="${EGGS_CONF_DIR:-/etc/penguins-eggs.d}"
 THEME_LIVECD="${HERE}/highascg-eggs-theme/theme/livecd"
 LIVECD=(grub.main.cfg isolinux.main.cfg grub.theme.cfg isolinux.theme.cfg splash.png)
-FILES=(custom.exclude.list custom.yaml "${LIVECD[@]/#/branding/livecd/}")
+THEME_CALAMARES="${HERE}/highascg-eggs-theme/theme/calamares/branding"
+CALAMARES=(branding.desc.tmpl show.qml highascg-eggs-theme-logo.png highascg-mascot.png welcome.png)
+FILES=(custom.exclude.list custom.yaml "${LIVECD[@]/#/branding/livecd/}" "${CALAMARES[@]/#/branding/calamares/branding/}")
 
 OUT=""
 APPLY=0
@@ -65,12 +71,15 @@ generate_into() {
 	# coa renders {{{fullname}}} from the build host's os-release ("Ubuntu 26.04.1 LTS"); the menus keep the old
 	# eggs name (basename-derived, "HIGHASCG NVIDIA 595 Live" on the Sept ISO), so it is filled in here.
 	sed -i "s/{{{fullname}}}/HIGHASCG NVIDIA ${BR}/g" "${dir}/branding/livecd/grub.main.cfg" "${dir}/branding/livecd/isolinux.main.cfg"
+	mkdir -p "${dir}/branding/calamares/branding"
+	for f in "${CALAMARES[@]}"; do cp "${THEME_CALAMARES}/${f}" "${dir}/branding/calamares/branding/${f}"; done
+	sed -i "s/@BRANCH@/${BR}/g" "${dir}/branding/calamares/branding/branding.desc.tmpl"
 }
 
 if [[ "$APPLY" -eq 0 ]]; then
 	[[ -n "$OUT" ]] || { echo "install-eggs-config: give --out DIR (write only) or --apply (install into ${CONF_DIR})" >&2; exit 2; }
 	generate_into "$OUT"
-	echo "Wrote ${OUT}/custom.exclude.list ($(grep -cv '^[[:space:]]*\(#\|$\)' "${OUT}/custom.exclude.list") patterns), ${OUT}/custom.yaml (branch ${BR}, embed-server=${EMBED}) and ${OUT}/branding/livecd/ (${#LIVECD[@]} files)"
+	echo "Wrote ${OUT}/custom.exclude.list ($(grep -cv '^[[:space:]]*\(#\|$\)' "${OUT}/custom.exclude.list") patterns), ${OUT}/custom.yaml (branch ${BR}, embed-server=${EMBED}), ${OUT}/branding/livecd/ (${#LIVECD[@]} files) and ${OUT}/branding/calamares/branding/ (${#CALAMARES[@]} files)"
 	exit 0
 fi
 

@@ -62,7 +62,8 @@ ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-vcam-module
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/lib/highascg/highascg-apply-hardware-hostname.sh
 EOF
 
-# eggs calamares --install runs as root on the build host only (install-eggs-calamares.sh).
+# Calamares itself is set up as root on the build host only (install-eggs-calamares.sh). With eggs 26.10 the launcher
+# (already root via the rule above) runs `eggs sysinstall calamares` on the live stick — no extra rule (WO-870).
 # Do not grant NOPASSWD wildcards — WO-97.
 
 visudo -cf "$TMP" >/dev/null

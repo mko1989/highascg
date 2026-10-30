@@ -1,7 +1,7 @@
 # WO-870 — penguins-eggs 26.10 rewrite: `produce` is gone (`remaster`), theme/basename/max/calamares flags removed — migrate the ISO pipeline
 
 **Area:** os-iso
-**Status: IN PROGRESS (30.10) — Phases 0.2(b), 1, 2, 3 done offline; dry runs 1-2 clean (owner); next: re-apply config, dry run 3; Phases 4-5 open; blocks the next ISO build**
+**Status: IN PROGRESS (30.10) — Phases 0.2(b), 1, 2, 3, 4 done offline; dry runs 1-3 clean (owner, initrd verified); Phase 5 open; next: re-apply config, then the first full build (Phase 7); blocks the next ISO build**
 **Source:** WO-832 owner host checks 30.10: `eggs produce --help` → `unknown command "produce"`; `eggs` is now v26.10.25, a Go/C rewrite; the verify also reports `missing /etc/calamares`.
 **Related:** WO-832 (post-26.04 remnants; its "unverifiable here" note is resolved by this WO), WO-430 (merged-usr exclude twin lines), WO-431 (phantom dpkg entries / payload gates), WO-464 (liveroot bind-mount guard), WO-462 (torn-ISO copy race), WO-481/WO-475 (Calamares bridge release), WO-148 (installer branding), WO-168 / WO-429 (exclude fragments, credentials), WO-47 (exFAT).
 
@@ -584,5 +584,117 @@ Run after `install-eggs-config.sh --apply` (`verify-eggs-config.sh`: 7× PASS, i
 - The ISO ships the `calamares` package. On the stick, `eggs sysinstall calamares` generates the config and starts it.
 - The plan's `installer: krill` default stays until Phase 4 points `launch-calamares.sh` at it (F5).
 
-**Open:** the initrd contents (plymouth theme, nvidia modules, our hooks) need root to read. The owner listing is
-pending.
+**initrd, verified from the owner's listing** (`file` + `lsinitramfs`, 30.10, 2742 entries):
+- `vmlinuz` is `7.0.0-38-generic`, the same as the pin.
+- Plymouth: theme `highascg`, and `default.plymouth` points at it (`Theme=highascg`).
+- NVIDIA: `nvidia`, `nvidia-modeset`, `nvidia-drm` and `nvidia-uvm` (`.ko.zst`) plus `firmware/nvidia/615.71.09/gsp_*.bin`.
+- Live boot: `overlay`, `exfat` and `isofs` are modules; `squashfs` and `loop` are built into the kernel
+  (`CONFIG_SQUASHFS=y`, `BLK_DEV_LOOP=y`).
+- Our files: `conf/conf.d/highascg-live-iso-build.conf`, `etc/modprobe.d/highascg-nvidia-plymouth.conf`,
+  `highascg-storage-block.conf` and the 99-highascg udev rules.
+
+Dry run 3 is clean end to end; nothing is open from it.
+
+### Phase 4 — Calamares route (30.10)
+
+**Investigation** (coa 26.10.30 source, `pkg/sysinstall/setup/*`, `pkg/cmd/sysinstall_calamares.go`):
+- **Preconditions.** `eggs sysinstall calamares` needs root and `utils.IsLive()`, meaning one of `/run/live/medium`,
+  `/lib/live/mount/medium`, `/run/archiso/bootmnt`, `/run/miso/bootmnt` or `/run/initramfs/live` must exist. It also needs
+  the live squashfs. Otherwise it fails with "can only be run on a live system".
+- **What it does.** `BuildInstaller` wipes `/etc/penguins-eggs.d/installer.d` and extracts the stock tree. That tree has a
+  **fixed** `settings.conf` exec sequence: `partition mount unpackfs removeuser machineid fstab locale keyboard localecfg
+  users displaymanager shellprocess@live-cleanup shellprocess@krill-chroot-runner umount`. Then:
+  - `brandingDesc` copies `branding.default/calamares/branding` into `installer.d/branding/eggs` and renders the stock
+    `branding.desc.tmpl`.
+  - It copies the **vendor overlay** `/etc/penguins-eggs.d/branding/calamares/branding` over that (`copyBrandingOverlay`
+    skips `modules/`), and renders the vendor `branding.desc.tmpl` with Go `text/template` (`BrandingConfig`: ProductName …
+    ReleaseNotesUrl).
+  - It writes the module confs.
+  - `calamaresModulesOverlay` copies `…/branding/calamares/modules/*.yaml|.conf` **over whole files**. It runs after
+    `partitionConf`/`userConf`.
+  - It runs `calamares -d -D 8 -c /etc/penguins-eggs.d/installer.d/` and waits; the log is `/var/log/calamares-install.log`.
+- **Census.** Sent after the install unless `--anonymous`, `EGGS_ANONYMOUS=1` or custom.yaml `anonymous` is set.
+- **Bootloader and initramfs.** These moved out of Calamares into the brain's `krill-chroot-runner`
+  (`install.bash.tmpl`):
+  - `update-initramfs -u -k all`;
+  - EFI: `grub-install --target=x86_64-efi` with the removable fallback (shim if present);
+  - BIOS: `grub-install --target=i386-pc "$TARGET_DISK"`;
+  - then `update-grub`.
+
+  The host has `grub-pc 2.14-2ubuntu2.1`, `/usr/lib/grub/{i386-pc,x86_64-efi}`, `shim-signed` and
+  `grub-efi-amd64-signed`, so the clone carries both targets.
+- **Branding dir name.** It is always `eggs`, so `componentName` must be `eggs`. Our theme's `branding.desc` is a
+  stub (`# this is only a stub`) and must not ship. The Oct 23 ISO's shipped desc (read from its squashfs) had
+  `componentName: highascg-eggs-theme`, our logo/welcome/`show.qml`, Ubuntu URLs and "HIGHASCG NVIDIA 595".
+- **`remaster.installer: calamares`** in custom.yaml (`Remaster.Installer`, remaster.go:142) only makes remaster fatal
+  when the calamares binary is missing. The brain's `HasCalamares` launcher is independent of it.
+
+**Old patches, decided one by one:**
+- **`shellprocess@release_bridge`** (WO-481): the sequence is fixed and cannot take a new step, so the bridge is
+  released by the launcher only. *Residual risk:* the brain's own `install-system.desktop` (`pkexec eggs sysinstall`)
+  bypasses the launcher. Our live session is the HighAsCG GUI, not a desktop, so the Web/Godot button is the path in
+  practice.
+- **mkinitramfs / boot_deploy / boot_reconfigure / before_bootloader (grub-pc) / bootloader.conf paths**: dropped.
+  Those modules are not in the sequence; the brain does it (above).
+- **l10n helper / install_translations / logs helper**: dropped, because neither is in the new sequence.
+  `nomodeset`: dropped; `update-grub` uses the clone's `/etc/default/grub`.
+- **Module overlays** (`theme/calamares/modules/{locale,partition,users}.yaml`): **not shipped**. They would replace coa's
+  generated `partition.conf` (efi block, partitionLayout, table type) and `users.conf` (password rules, hostname,
+  sudoers group) as whole files. `locale.yaml` only moved the default zone from Rome to Madrid, which was never an owner
+  choice.
+- The fix scripts stay for the legacy flavor; under `new`, the preflight no longer runs them.
+
+**What was done:**
+- `theme/calamares/branding/branding.desc.tmpl` (new):
+  - `componentName: eggs`, our logo/welcome/`show.qml`, the stock sidebar colours;
+  - strings `HIGHASCG NVIDIA @BRANCH@` and the GitHub repo URLs;
+  - `bootloaderEntryName` from `{{ .BootloaderEntryName }}`.
+- `install-eggs-config.sh` installs the overlay `branding/calamares/branding/{branding.desc.tmpl, show.qml,
+  highascg-eggs-theme-logo.png, highascg-mascot.png, welcome.png}` and fills `@BRANCH@`.
+  - `verify-eggs-config.sh` covers it through its generated-file loop; the header and FAIL reason were updated.
+  - The stock `[1-7]-*.png` slides stay in the merged dir, but our `show.qml` references none of them.
+- `generate-eggs-config.js`: `remaster.installer: calamares`.
+- `launch-calamares.sh`:
+  - `eggs_sysinstall()` is true when `/usr/bin/eggs` resolves to `coa`; `HIGHASCG_EGGS_FLAVOR` overrides it.
+  - `is_live()` checks coa's IsLive dirs (`HIGHASCG_LIVE_DIRS` for tests).
+  - The overlay is checked instead of `/etc/calamares` (`branding.desc.tmpl`).
+  - `--check` adds the live test.
+  - Off a live session the launcher exits before anything is stopped.
+  - The launch runs `eggs sysinstall calamares --anonymous` inside the unchanged stop → release → installer → restore
+    envelope. The legacy `calamares -d` branch is kept.
+- `routes-system-setup.js`:
+  - status gains `liveOnly` (eggs is coa and no live dir), and `binary` reads `… sysinstall calamares`;
+  - launch answers 409 "Install to disk runs from the live stick …" before the sudo spawn;
+  - the stale "eggs calamares --install" advice is gone.
+- `nuclear_pane.gd`: the button is disabled on `liveOnly`, with the reason on screen.
+- Made flavor-aware:
+  - `verify-calamares-installed.sh` (new: overlay, `eggs sysinstall calamares --help`, launcher has `sysinstall
+    calamares`; legacy-only: `/etc/calamares`, cleanup.sh, mkinitramfs, l10n/logs);
+  - `pre-produce-preflight.sh` (no fix-calamares-shellprocess under new; the WO-481 launcher refresh stays);
+  - `install-eggs-calamares.sh` (new: apt package if missing, `install-eggs-config.sh --apply`, then verify; the legacy
+    sync never copies the `.tmpl`).
+- `12-passwordless-sudo.sh`: comment only, no new rule. The launcher already runs as root.
+
+**Verified (offline, 30.10):**
+- The template was rendered with Go's real `text/template` (the same `BrandingConfig` shape). Parsed as YAML:
+  `componentName eggs`, our images, `productName HIGHASCG NVIDIA 615`.
+- Launcher `--check` with `HIGHASCG_EGGS_FLAVOR=new`: live dir + overlay → 0; no live dir → 1 "not a live session"; logo
+  removed → 1. On the box itself (coa, installed system) → 1, as intended.
+- `GET` status on the box: `liveOnly: true`, `binary: /usr/bin/eggs sysinstall calamares`.
+- The verifier, run against the box with the root gate stripped (scratch copy):
+  - OK: calamares binary, dpkg, polkit, `eggs sysinstall calamares --help`, launcher `--release-bridge`, sudo rule;
+  - FAIL as expected until the owner re-applies: the overlay is not installed yet, and `/usr/local/bin/launch-calamares.sh`
+    predates WO-870 (the preflight refreshes it).
+- Smokes:
+  - new `smoke-wo870-calamares-sysinstall.test.js` (11, curated): overlay, Go field names, `--out` content, no modules
+    dir, launcher envelope order + live guard before the stop loop, `--check` executed, route 409 + `liveOnly` with
+    stubs, Godot text;
+  - the WO-870 config smoke now pins `installer: calamares` under `remaster:`;
+  - the WO-475/481, WO-423 and WO-721 smokes pass unchanged.
+- Godot `run_tests.gd`: 23890 passed, 0 failed. `run-client.sh --check` boots clean.
+
+**Owner QA on the first stick** (Phase 7; it cannot be proven before a build):
+- the installer starts from the GUI button with the bridge mounted (WO-481 scenario);
+- the branding shows (logo, HighAsCG slideshow, "HIGHASCG NVIDIA 615");
+- after install, both UEFI and BIOS boot the disk;
+- `/etc/penguins-eggs.d/installer.d/modules/` is copied off for the record.

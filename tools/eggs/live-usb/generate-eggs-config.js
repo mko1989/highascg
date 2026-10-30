@@ -117,7 +117,9 @@ function buildCustomYaml({ branch }) {
 		'    # level is zstd-only (kept from the stock file); xz ignores it',
 		'    level: 3',
 		'  # user/password stay at the defaults (unused in --clone).',
-		'  # installer: calamares   # only after the launcher route is proven (makes remaster fatal without calamares)',
+		'  # Phase 4: remaster stops when the calamares package is missing, so no ISO ships without install-to-disk.',
+		'  # (Only this guard: the installer itself is `eggs sysinstall calamares` on the live stick.)',
+		'  installer: calamares',
 		'',
 	].join('\n')
 }

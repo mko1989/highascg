@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Check-only: Calamares is installed the way eggs produce expects (Pacman.calamaresExists).
+# WO-870 Phase 4, eggs 26.10 (coa): Calamares is configured at launch on the live stick (`eggs sysinstall
+# calamares` → /etc/penguins-eggs.d/installer.d), so the /etc/calamares branding and the shellprocess/l10n/logs
+# patches are legacy-only; instead the HighAsCG overlay in /etc/penguins-eggs.d/branding/calamares/branding is checked.
 #
 #   sudo bash tools/eggs/live-usb/verify-calamares-installed.sh
 set -euo pipefail
@@ -14,6 +17,9 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 FAIL=0
+# shellcheck source=eggs-cli-lib.sh
+source "${HERE}/eggs-cli-lib.sh"
+FLAVOR="$(highascg_eggs_flavor)"
 
 fail() {
 	echo "ERROR: $*" >&2
@@ -41,35 +47,43 @@ else
 	fail "dpkg calamares not installed"
 fi
 
-[[ -d /etc/calamares ]] && ok "/etc/calamares" \
-	|| fail "missing /etc/calamares — run install-eggs-calamares.sh"
+if [[ "$FLAVOR" == "new" ]]; then
+	BRAND="$(highascg_eggs_conf_dir)/branding/calamares/branding"
+	DESC="branding.desc.tmpl"
+	REAPPLY="sudo bash ${HERE}/install-eggs-config.sh --apply"
+else
+	[[ -d /etc/calamares ]] && ok "/etc/calamares" \
+		|| fail "missing /etc/calamares — run install-eggs-calamares.sh"
+	BRAND="/etc/calamares/branding/highascg-eggs-theme"
+	DESC="branding.desc"
+	REAPPLY="run install-eggs-calamares.sh"
+fi
 
-BRAND="/etc/calamares/branding/highascg-eggs-theme"
-if [[ -f "${BRAND}/branding.desc" ]]; then
-	ok "branding ${BRAND}/branding.desc"
-	icon="$(awk -F': *' '/^[[:space:]]*productIcon:/{print $2; exit}' "${BRAND}/branding.desc" | tr -d ' \"')"
-	logo="$(awk -F': *' '/^[[:space:]]*productLogo:/{print $2; exit}' "${BRAND}/branding.desc" | tr -d ' \"')"
+if [[ -f "${BRAND}/${DESC}" ]]; then
+	ok "branding ${BRAND}/${DESC}"
+	icon="$(awk -F': *' '/^[[:space:]]*productIcon:/{print $2; exit}' "${BRAND}/${DESC}" | tr -d ' \"')"
+	logo="$(awk -F': *' '/^[[:space:]]*productLogo:/{print $2; exit}' "${BRAND}/${DESC}" | tr -d ' \"')"
 	for want in "$icon" "$logo"; do
 		[[ -n "$want" ]] || continue
 		if [[ -f "${BRAND}/${want}" ]]; then
 			ok "branding image ${want}"
 		else
-			fail "missing ${BRAND}/${want} — re-run install-eggs-calamares.sh (eggs logo name mismatch)"
+			fail "missing ${BRAND}/${want} — ${REAPPLY} (logo name mismatch)"
 		fi
 	done
 else
-	fail "missing ${BRAND}/branding.desc — run install-eggs-calamares.sh"
+	fail "missing ${BRAND}/${DESC} — ${REAPPLY}"
 fi
 
 # WO-148: installer slideshow must be HighAsCG, not stock penguins-eggs
 if [[ ! -f "${BRAND}/show.qml" ]]; then
-	fail "missing ${BRAND}/show.qml (installer slideshow) — run install-eggs-calamares.sh"
+	fail "missing ${BRAND}/show.qml (installer slideshow) — ${REAPPLY}"
 elif grep -q 'penguins-eggs' "${BRAND}/show.qml"; then
-	fail "${BRAND}/show.qml is the stock penguins-eggs slideshow — run install-eggs-calamares.sh (WO-148)"
+	fail "${BRAND}/show.qml is the stock penguins-eggs slideshow — ${REAPPLY} (WO-148)"
 elif grep -q 'HighAsCG' "${BRAND}/show.qml"; then
 	ok "installer slideshow is HighAsCG-branded (show.qml)"
 else
-	fail "${BRAND}/show.qml has no HighAsCG branding — run install-eggs-calamares.sh"
+	fail "${BRAND}/show.qml has no HighAsCG branding — ${REAPPLY}"
 fi
 
 if [[ -f /usr/share/polkit-1/actions/com.github.calamares.calamares.policy ]]; then
@@ -80,7 +94,13 @@ else
 	fail "missing Calamares polkit policy under /usr/share/polkit-1/actions/"
 fi
 
-if command -v eggs >/dev/null 2>&1 && eggs calamares --help >/dev/null 2>&1; then
+if [[ "$FLAVOR" == "new" ]]; then
+	if eggs sysinstall calamares --help >/dev/null 2>&1; then
+		ok "eggs sysinstall calamares CLI"
+	else
+		fail "eggs sysinstall calamares CLI unavailable"
+	fi
+elif command -v eggs >/dev/null 2>&1 && eggs calamares --help >/dev/null 2>&1; then
 	ok "eggs calamares CLI"
 else
 	fail "eggs calamares CLI unavailable"
@@ -98,6 +118,13 @@ if [[ -x /usr/local/bin/launch-calamares.sh ]]; then
 	else
 		fail "installed launcher predates WO-481 (no --release-bridge) — sudo install -m 0755 ${REPO_ROOT}/tools/runtime/launch-calamares.sh /usr/local/bin/launch-calamares.sh"
 	fi
+	if [[ "$FLAVOR" == "new" ]]; then
+		if grep -q 'sysinstall calamares' /usr/local/bin/launch-calamares.sh; then
+			ok "launcher runs eggs sysinstall calamares (WO-870)"
+		else
+			fail "installed launcher predates WO-870 (runs bare calamares) — sudo install -m 0755 ${REPO_ROOT}/tools/runtime/launch-calamares.sh /usr/local/bin/launch-calamares.sh"
+		fi
+	fi
 else
 	fail "missing /usr/local/bin/launch-calamares.sh — sudo bash ${REPO_ROOT}/scripts/setup/13-caspar-systemd-units.sh"
 fi
@@ -109,35 +136,39 @@ else
 	fail "passwordless sudo for Calamares missing — sudo bash ${REPO_ROOT}/scripts/setup/12-passwordless-sudo.sh ${USER_CASPAR}"
 fi
 
-if [[ -x /usr/sbin/cleanup.sh ]]; then
+if [[ "$FLAVOR" == "new" ]]; then
+	echo "skip: /usr/sbin/cleanup.sh, shellprocess and l10n/logs helper patches — legacy /etc/calamares only (WO-870 Phase 4)"
+elif [[ -x /usr/sbin/cleanup.sh ]]; then
 	ok "/usr/sbin/cleanup.sh (Calamares cleanup job)"
 else
 	fail "missing /usr/sbin/cleanup.sh — run fix-calamares-shellprocess.sh"
 fi
 
-if grep -q '/usr/sbin/mkinitramfs' /etc/calamares/modules/shellprocess@mkinitramfs.conf 2>/dev/null; then
-	ok "shellprocess@mkinitramfs uses /usr/sbin/mkinitramfs"
-else
-	fail "shellprocess@mkinitramfs not patched — run fix-calamares-shellprocess.sh"
-fi
+if [[ "$FLAVOR" != "new" ]]; then
+	if grep -q '/usr/sbin/mkinitramfs' /etc/calamares/modules/shellprocess@mkinitramfs.conf 2>/dev/null; then
+		ok "shellprocess@mkinitramfs uses /usr/sbin/mkinitramfs"
+	else
+		fail "shellprocess@mkinitramfs not patched — run fix-calamares-shellprocess.sh"
+	fi
 
-if [[ -x /usr/libexec/calamares/calamares-l10n-helper.sh ]]; then
-	if grep -q 'HighAsCG — offline-safe' /usr/libexec/calamares/calamares-l10n-helper.sh 2>/dev/null; then
-		ok "Calamares l10n helper patched (offline-safe)"
+	if [[ -x /usr/libexec/calamares/calamares-l10n-helper.sh ]]; then
+		if grep -q 'HighAsCG — offline-safe' /usr/libexec/calamares/calamares-l10n-helper.sh 2>/dev/null; then
+			ok "Calamares l10n helper patched (offline-safe)"
+		else
+			fail "calamares-l10n-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
+		fi
 	else
-		fail "calamares-l10n-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
+		fail "missing calamares-l10n-helper.sh — run fix-calamares-shellprocess.sh"
 	fi
-else
-	fail "missing calamares-l10n-helper.sh — run fix-calamares-shellprocess.sh"
-fi
-if [[ -x /usr/libexec/calamares/calamares-logs-helper.sh ]]; then
-	if grep -q 'HighAsCG — offline-safe' /usr/libexec/calamares/calamares-logs-helper.sh 2>/dev/null; then
-		ok "Calamares logs helper patched (avoids end-of-install exit 1)"
+	if [[ -x /usr/libexec/calamares/calamares-logs-helper.sh ]]; then
+		if grep -q 'HighAsCG — offline-safe' /usr/libexec/calamares/calamares-logs-helper.sh 2>/dev/null; then
+			ok "Calamares logs helper patched (avoids end-of-install exit 1)"
+		else
+			fail "calamares-logs-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
+		fi
 	else
-		fail "calamares-logs-helper.sh is eggs default — run fix-calamares-shellprocess.sh"
+		fail "missing calamares-logs-helper.sh — run fix-calamares-shellprocess.sh"
 	fi
-else
-	fail "missing calamares-logs-helper.sh — run fix-calamares-shellprocess.sh"
 fi
 
 if [[ "$FAIL" -gt 0 ]]; then

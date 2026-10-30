@@ -6,8 +6,37 @@ set -euo pipefail
 USER_CASPAR="${HIGHASCG_USER:-casparcg}"
 HOME_CASPAR="/home/${USER_CASPAR}"
 CALAMARES_BIN="${CALAMARES_BIN:-/usr/bin/calamares}"
-BRAND="${CALAMARES_BRAND_DIR:-/etc/calamares/branding/highascg-eggs-theme}"
+EGGS_BIN="${EGGS_BIN:-/usr/bin/eggs}"
 DISPLAY_WAIT_SEC="${HIGHASCG_CALAMARES_DISPLAY_WAIT_SEC:-45}"
+# WO-870 Phase 4: penguins-eggs 26.10 (`eggs` -> coa) builds the Calamares config at launch time on the live stick
+# (`eggs sysinstall calamares`: /etc/penguins-eggs.d/installer.d, our overlay from branding/calamares/branding) and
+# refuses anywhere else. The TypeScript line wrote /etc/calamares at build time and ran plain `calamares`.
+# Live = one of coa's utils.IsLive() dirs (pkg/utils/is-live.go, 26.10.30).
+LIVE_DIRS="${HIGHASCG_LIVE_DIRS:-/run/live/medium /lib/live/mount/medium /run/archiso/bootmnt /run/miso/bootmnt /run/initramfs/live}"
+
+eggs_sysinstall() {
+	case "${HIGHASCG_EGGS_FLAVOR:-}" in
+	new) return 0 ;;
+	legacy | none) return 1 ;;
+	esac
+	[[ -x "${EGGS_BIN}" && "$(readlink -f "${EGGS_BIN}")" == */coa ]]
+}
+
+is_live() {
+	local d
+	for d in ${LIVE_DIRS}; do
+		[[ -d "${d}" ]] && return 0
+	done
+	return 1
+}
+
+if eggs_sysinstall; then
+	BRAND="${CALAMARES_BRAND_DIR:-/etc/penguins-eggs.d/branding/calamares/branding}"
+	BRAND_DESC="branding.desc.tmpl"
+else
+	BRAND="${CALAMARES_BRAND_DIR:-/etc/calamares/branding/highascg-eggs-theme}"
+	BRAND_DESC="branding.desc"
+fi
 
 run_branding_fix() {
 	if [[ -x /usr/local/lib/highascg/fix-calamares-branding.sh ]]; then
@@ -16,10 +45,10 @@ run_branding_fix() {
 }
 
 branding_images_ok() {
-	[[ -f "${BRAND}/branding.desc" ]] || return 1
+	[[ -f "${BRAND}/${BRAND_DESC}" ]] || return 1
 	local icon logo want
-	icon="$(awk -F': *' '/^[[:space:]]*productIcon:/{print $2; exit}' "${BRAND}/branding.desc" | tr -d ' \"')"
-	logo="$(awk -F': *' '/^[[:space:]]*productLogo:/{print $2; exit}' "${BRAND}/branding.desc" | tr -d ' \"')"
+	icon="$(awk -F': *' '/^[[:space:]]*productIcon:/{print $2; exit}' "${BRAND}/${BRAND_DESC}" | tr -d ' \"')"
+	logo="$(awk -F': *' '/^[[:space:]]*productLogo:/{print $2; exit}' "${BRAND}/${BRAND_DESC}" | tr -d ' \"')"
 	for want in "$icon" "$logo"; do
 		[[ -n "$want" ]] || continue
 		[[ -f "${BRAND}/${want}" ]] || return 1
@@ -43,7 +72,14 @@ wait_for_display() {
 
 if [[ "${1:-}" == "--check" ]]; then
 	command -v "${CALAMARES_BIN}" >/dev/null 2>&1 || exit 1
-	run_branding_fix || exit 1
+	if eggs_sysinstall; then
+		is_live || {
+			echo "ERROR: not a live session — eggs 26.10 installs to disk only from the live stick" >&2
+			exit 1
+		}
+	else
+		run_branding_fix || exit 1
+	fi
 	branding_images_ok || {
 		echo "ERROR: Calamares branding images missing in ${BRAND}" >&2
 		exit 1
@@ -140,7 +176,11 @@ if [[ -z "${HIGHASCG_CAL_SCOPED:-}" ]] && command -v systemd-run >/dev/null 2>&1
 fi
 
 if ! command -v "${CALAMARES_BIN}" >/dev/null 2>&1; then
-	echo "Calamares not installed (eggs calamares --install or apt install calamares)" >&2
+	echo "Calamares not installed (apt install calamares on the build host, then rebuild the ISO)" >&2
+	exit 1
+fi
+if eggs_sysinstall && ! is_live; then
+	echo "ERROR: install to disk needs the live stick — eggs 26.10 (sysinstall) refuses on an installed system" >&2
 	exit 1
 fi
 
@@ -158,7 +198,7 @@ if command -v xhost >/dev/null 2>&1; then
 	runuser -u "${USER_CASPAR}" -- env DISPLAY="${DISPLAY}" xhost +SI:localuser:root >/dev/null 2>&1 || true
 fi
 
-run_branding_fix
+eggs_sysinstall || run_branding_fix
 branding_images_ok || {
 	echo "ERROR: Calamares branding images still missing after fix (${BRAND})" >&2
 	exit 1
@@ -183,7 +223,13 @@ trap restore_bridge EXIT INT TERM
 release_bridge
 
 status=0
-"${CALAMARES_BIN}" -d || status=$?
+if eggs_sysinstall; then
+	# Builds installer.d (our branding overlay on top), then runs `calamares -d -D 8 -c …/installer.d/` and waits;
+	# its log is /var/log/calamares-install.log. --anonymous: no census (custom.yaml anonymous: true says the same).
+	"${EGGS_BIN}" sysinstall calamares --anonymous || status=$?
+else
+	"${CALAMARES_BIN}" -d || status=$?
+fi
 
 # Installer closed (finished or cancelled) — bring the box back. After a real install the
 # user reboots into the new system anyway; restarting first costs nothing and un-bricks a

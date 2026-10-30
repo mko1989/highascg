@@ -33,6 +33,21 @@ REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 THEME_ROOT="${HERE}/highascg-eggs-theme"
 THEME_ABS="$(cd "$THEME_ROOT" && pwd)"
 EGGS_YAML="${EGGS_YAML:-/etc/penguins-eggs.d/eggs.yaml}"
+
+# shellcheck source=eggs-cli-lib.sh
+source "${HERE}/eggs-cli-lib.sh"
+if [[ "$(highascg_eggs_flavor)" == "new" ]]; then
+	# WO-870 Phase 4: eggs 26.10 has no `eggs calamares --install/--theme`; it builds the Calamares config at launch
+	# on the live stick (`eggs sysinstall calamares`) from /etc/penguins-eggs.d, where install-eggs-config.sh puts
+	# our branding overlay. The host only needs the package (remaster refuses without it: custom.yaml installer).
+	echo "==> eggs 26.10: Calamares package only (config is generated on the live stick, WO-870 Phase 4)"
+	if ! dpkg-query -W -f='${Status}' calamares 2>/dev/null | grep -qE '(install|hold) ok installed'; then
+		apt-get install -y calamares
+	fi
+	bash "${HERE}/install-eggs-config.sh" --apply
+	bash "${HERE}/verify-calamares-installed.sh"
+	exit 0
+fi
 FIX_SRC="${HERE}/fix-calamares-branding.sh"
 FIX_DST=/usr/local/lib/highascg/fix-calamares-branding.sh
 
@@ -108,7 +123,7 @@ BRAND_DIR="/etc/calamares/branding/highascg-eggs-theme"
 if [[ -d "$BRAND_DIR" ]]; then
 	echo "==> Sync HighAsCG Calamares slideshow → ${BRAND_DIR}"
 	find "${THEME_ABS}/theme/calamares/branding" -maxdepth 1 -type f \
-		! -name branding.desc -exec install -m 0644 -o root -g root -t "$BRAND_DIR" {} +
+		! -name branding.desc ! -name branding.desc.tmpl -exec install -m 0644 -o root -g root -t "$BRAND_DIR" {} +
 	# drop the stale penguins-eggs slide PNGs (1-reproductive-system.png … 7-created-by.png)
 	rm -f "${BRAND_DIR}"/[1-7]-*.png
 	if ! grep -q 'HighAsCG' "${BRAND_DIR}/show.qml" 2>/dev/null; then
