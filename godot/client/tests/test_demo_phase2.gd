@@ -95,9 +95,13 @@ func test_reader_follows_the_bus() -> void:
 	_now[0] += 10.0
 	s.handle(POST, "/api/scene/take-look", {"sceneId": "look-song-1", "mainIdx": 0, "target": "program"})
 	t.ok(pgm.poll(), "a take redraws")
+	_now[0] += 5000.0  # the fade (WO-865) has run out
+	t.ok(pgm.poll(), "…and again when the fade is done")
 	t.ok(pgm.frame != before, "with the new look")
 	s.handle(POST, "/api/ftb", {"screenIdx": 0})
 	t.ok(pgm.poll(), "FTB redraws")
+	_now[0] += 5000.0
+	t.ok(pgm.poll(), "…to black")
 	var img := Image.create_from_data(pgm.width, pgm.height, false, Image.FORMAT_RGBA8, pgm.frame)
 	t.eq(_px(img, 480, 224), Color.BLACK, "an empty bus is black")
 	var prv: RefCounted = Video.new("prv2", s)

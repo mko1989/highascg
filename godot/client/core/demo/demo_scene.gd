@@ -14,7 +14,7 @@ static func route(s: RefCounted, verb: String, path: String, b: Variant) -> Vari
 	var body: Dictionary = b if b is Dictionary else {}
 	match [verb, path]:
 		["POST", "/api/scene/take-look"]:
-			return take(s, str(body.get("sceneId", "")), body.get("mainIdx"), str(body.get("target", "program")))
+			return take(s, str(body.get("sceneId", "")), body.get("mainIdx"), str(body.get("target", "program")), body)
 		["POST", "/api/scene/preview-push"]:
 			var r: Dictionary = take(s, str(body.get("sceneId", "")), body.get("mainIdx"), "preview")
 			if r.ok:
@@ -60,7 +60,8 @@ static func bus_channel(s: RefCounted, main: int, target: String) -> int:
 
 
 ## take-look: `target` "program" or "preview"; the main is `main_idx`, else the look's own mainScope.
-static func take(s: RefCounted, scene_id: String, main_idx: Variant, target: String) -> Dictionary:
+## `opts` is the request body: `forceCut` / `transitionOverride` (program only) pick the fade like routes-scene-take-look.js.
+static func take(s: RefCounted, scene_id: String, main_idx: Variant, target: String, opts := {}) -> Dictionary:
 	if scene_id == "":
 		return s.refuse(400, "sceneId required")
 	var look := find_look(s, scene_id)
@@ -73,6 +74,7 @@ static func take(s: RefCounted, scene_id: String, main_idx: Variant, target: Str
 		return s.refuse(400, "no %s channel for main %d" % [tgt, main])
 	var live: Dictionary = (s.state.get("scene", {}) as Dictionary).get("live", {}).duplicate(true)
 	live[str(ch)] = {"sceneId": scene_id, "scene": look.duplicate(true), "updatedAt": s.now_ms.call()}
+	s.bus_fx[str(ch)] = {"kind": "take", "transition": transition_for(look, tgt, opts), "fps": channel_fps(s, ch), "at": s.clock()}
 	s.change("scene.live", live)
 	var bus := "previewSceneIdByMain" if tgt == "preview" else "liveSceneIdByMain"
 	var by_main: Variant = (s.project.get("scenes", {}) as Dictionary).get(bus)
@@ -81,12 +83,28 @@ static func take(s: RefCounted, scene_id: String, main_idx: Variant, target: Str
 	return s.reply({"ok": true, "sceneId": scene_id, "mainIdx": main, "target": tgt, "channel": ch, "demo": true})
 
 
+## The transition of a take: the look's own `defaultTransition`; "Take (global)" replaces it on a program take; forceCut cuts.
+static func transition_for(look: Dictionary, target: String, opts: Dictionary) -> Dictionary:
+	if opts.get("forceCut") == true:
+		return {"type": "CUT", "duration": 0, "tween": "linear"}
+	if target == "program" and opts.get("transitionOverride") is Dictionary:
+		return opts.transitionOverride
+	return look.get("defaultTransition", {}) if look.get("defaultTransition") is Dictionary else {}
+
+
+static func channel_fps(s: RefCounted, ch: int) -> float:
+	var by: Variant = (s.state.get("channelMap", {}) as Dictionary).get("channelResolutionsByChannel")
+	var res: Variant = (by as Dictionary).get(str(ch)) if by is Dictionary else null
+	return float(res.get("fps", 25)) if res is Dictionary else 25.0
+
+
 static func clear_bus(s: RefCounted, main: int, target: String) -> Dictionary:
 	var ch := bus_channel(s, main, target)
 	if ch <= 0:
 		return s.refuse(400, "no %s channel for main %d" % [target, main])
 	var live: Dictionary = (s.state.get("scene", {}) as Dictionary).get("live", {}).duplicate(true)
 	live.erase(str(ch))
+	s.bus_fx[str(ch)] = {"kind": "ftb" if target == "program" else "clear", "fps": channel_fps(s, ch), "at": s.clock()}
 	s.change("scene.live", live)
 	return s.reply({"ok": true, "channel": ch, "demo": true})
 

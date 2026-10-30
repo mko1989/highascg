@@ -20,6 +20,9 @@ const Scene := preload("res://core/demo/demo_scene.gd")
 const Extras := preload("res://core/demo/demo_extras.gd")
 const Timeline := preload("res://core/demo/demo_timeline.gd")
 const Video := preload("res://core/demo/demo_video.gd")
+const Bus := preload("res://core/demo/demo_bus.gd")
+const Media := preload("res://core/demo/demo_media.gd")
+const TimelineLook := preload("res://core/demo/demo_timeline_look.gd")
 
 const DATA_DIR := "res://demo"
 const NOT_IN_DEMO := "not in demo"
@@ -43,6 +46,9 @@ var tl_cells := {}  ## timeline id → playback cell
 var tl_air := ""  ## the timeline on air
 var tl_sent_at := -INF  ## when the last `timeline.tick` went out
 var op_cells: Array = []  ## the operator channel's compose windows (POST /api/operator-gui/layout; demo_video.gd draws them)
+var bus_fx := {}  ## channel (string) → how its last look change came {kind, transition, fps} (demo_scene.gd; demo_bus.gd fades by it)
+var tl_shown := {}  ## channel → the timeline id its bus shows ("" = the look; demo_timeline_look.gd)
+var buses := {}  ## channel → demo_bus.gd model (the display engine's one picture of that bus)
 var unsupported: Array[String] = []  ## "METHOD /path" of every request answered with not-in-demo (tests, the WO log)
 ## "now" in ms since the epoch — this computer's clock (the timers run on it); tests set a fixed clock.
 var now_ms: Callable = func() -> float: return Time.get_unix_time_from_system() * 1000.0
@@ -110,6 +116,25 @@ func get_bytes(raw_path: String) -> Dictionary:
 			return {"ok": true, "status": 200, "bytes": b, "headers": PackedStringArray(["Content-Type: image/jpeg"]), "error": ""}
 	not_in_demo("GET", path)
 	return {"ok": false, "status": 501, "bytes": PackedByteArray(), "headers": PackedStringArray(), "error": NOT_IN_DEMO}
+
+
+## The display engine's clock, seconds: this computer's (tests move `now_ms`).
+func clock() -> float:
+	return float(now_ms.call()) / 1000.0
+
+
+## The model of a channel's bus (the look in `scene.live[ch]`, its layers and fade) brought up to date at `now` seconds.
+func bus(ch: int, now: float) -> RefCounted:
+	var b: RefCounted = buses.get(ch)
+	if b == null:
+		b = Bus.new(ch)
+		b.media_info = func(id: String) -> Dictionary: return Media.info(state, id)
+		buses[ch] = b
+	var cm: Variant = state.get("channelMap")
+	b.size = Video.still_size(cm, ch)
+	var shown: Array = TimelineLook.apply(self, ch, Video.live_entry(self, ch), bus_fx.get(str(ch), {}), now)  # a timeline on air wins
+	b.update(shown[0], shown[1], now)
+	return b
 
 
 ## Once a frame (core/ws.gd): what runs on the server's clock — the timeline on air.

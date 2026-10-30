@@ -38,6 +38,8 @@ MEDIA = {  # demo media id → (type, durationMs, fps, fileSize)
 	"demo/loop_b.mov": ("MOVIE", 24000, 50, 156000000), "demo/song_1_wall.mov": ("MOVIE", 215000, 50, 1400000000),
 	"demo/bumper.mov": ("MOVIE", 8000, 50, 52000000), "demo/black.png": ("STILL", 0, 0, 25000),
 	"demo/projection_loop.mov": ("MOVIE", 20000, 50, 64000000), "demo/song_1_projection.mov": ("MOVIE", 215000, 50, 690000000),
+	# WO-865: the two playable Ogg Theora placeholders (tools/demo/build-demo-videos.sh makes the files, add-demo-videos.py the looks)
+	"demo/placeholder_loop.ogv": ("MOVIE", 10000, 25, 446000), "demo/placeholder_clip.ogv": ("MOVIE", 30000, 25, 1261000),
 }
 LIVE = {"1": "look-opener", "2": "look-loop-a", "3": "look-proj-loop", "4": "look-proj-song-1"}  # channel → look on air
 TEMPLATES = ["BLACK", "COLOR_BG", "PLAYBACK_TIMERS", "COUNTDOWN/COUNTDOWN", "LED_TEST_PATTERN/INDEX", "PIP_BORDER",

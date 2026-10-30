@@ -14,6 +14,7 @@ const SurfaceHolders := preload("res://video/surface_holders.gd")
 const VideoFeed := preload("res://video/video_feed.gd")
 const Demo := preload("res://core/demo/demo_server.gd")
 const DemoVideo := preload("res://core/demo/demo_video.gd")
+const DemoStage := preload("res://core/demo/demo_stage.gd")
 const LEASE_EVERY_S := 5.0
 
 signal sources_changed  # WO-694: the roles that have a Caspar channel changed (pickers rebuild)
@@ -25,6 +26,7 @@ var _surfaces := {}  # role -> { reader, tex, native, path }
 var holders := SurfaceHolders.new()  # WO-617: only held roles are polled, uploaded and leased
 var _timer: Timer
 var feed: VideoFeed = null  # WO-670 P1: set when pictures come over the network
+var _stage: DemoStage = null  # WO-865: a demo's display engine (SubViewports are the role textures)
 
 
 func _ready() -> void:
@@ -86,8 +88,18 @@ func _ensure(role: String) -> Dictionary:
 			r = DemoVideo.new(role, Demo.shared())
 		else:
 			r = feed.reader(role) if feed != null else (ShmNative.new(path) if native else ShmReader.new(path))
-		_surfaces[role] = {"reader": r, "tex": ShmTexture.new(), "native": native, "path": path}
+		# WO-865: in a demo the texture is the engine's SubViewport, nothing is uploaded
+		var tex: Variant = {"texture": demo_stage().texture(role)} if Config.demo else ShmTexture.new()
+		_surfaces[role] = {"reader": r, "tex": tex, "native": native, "path": path}
 	return _surfaces[role]
+
+
+## WO-865: the demo display engine (core/demo/demo_stage.gd), created on first use.
+func demo_stage() -> DemoStage:
+	if _stage == null:
+		_stage = DemoStage.new(Demo.shared())
+		add_child(_stage)
+	return _stage
 
 
 func path_for(role: String) -> String:
@@ -132,6 +144,11 @@ func _apply_descriptors(list: Variant) -> void:
 
 
 func _process(_delta: float) -> void:
+	if Config.demo:  # WO-865: the GPU draws every held role, the readers only say "no signal"
+		for role in holders.roles():
+			_ensure(role).reader.update_lost()
+		demo_stage().step(holders.roles(), Demo.shared().clock())
+		return
 	if feed != null:
 		feed.pump(holders.roles())
 	for role in holders.roles():
