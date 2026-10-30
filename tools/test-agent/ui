@@ -1,0 +1,161 @@
+#!/usr/bin/env node
+'use strict'
+
+/**
+ * WO-836 Part 3c — the test agent's hands and eyes. Real X input (xdotool) on the test instance's own Xvfb display;
+ * the Godot client (e2e scenario 99_remote) only reports where labelled controls are. Reference: tools/test-agent/README.md.
+ *
+ *   ui start [--sandbox|--live] [--out DIR] [--server URL]     ui stop
+ *   ui list [buttons|fields|tabs|options|rows|labels|all] [--under X] [--limit N] [--json]
+ *   ui tab <title>    ui click <label> [--double] [--right] [--under X] [--contains] [--kind K] [--nth N]
+ *   ui type <field> <text> [--no-submit]    ui choose <option> <item>    ui drag <from label> <to label>
+ *   ui click_xy X Y [--double|--right]  ui drag_xy X1 Y1 X2 Y2 [--steps N]  ui move X Y  ui scroll X Y up|down [N]
+ *   ui type "text"    ui key ctrl+z    ui shot <name>    ui wait <s>    ui wait_for <label> [timeout] [--gone]
+ *   ui state    ui find <label>
+ * Prints one JSON object per command; exit 1 when ok:false.
+ */
+
+const path = require('path')
+const os = require('os')
+const { parseArgs } = require('./lib/cmdline')
+const { normalizeKey } = require('./lib/keys')
+const state = require('./lib/state')
+const driver = require('./lib/driver')
+const remote = require('./lib/remote')
+const xi = require('./lib/xinput')
+const act = require('./lib/actions')
+const { formatList } = require('./lib/format')
+
+const BOOL = ['double', 'right', 'contains', 'no-submit', 'json', 'gone', 'force', 'sandbox', 'live']
+const VAL = ['under', 'kind', 'nth', 'out', 'server', 'steps', 'limit', 'settle', 'timeout', 'from-nth', 'to-nth', 'to-under', 'to-kind', 'port']
+
+function need(pos, n, usage) {
+	if (pos.length < n) throw new Error(`usage: ui ${usage}`)
+}
+
+async function run(argv) {
+	const cmd = argv[0]
+	if (!cmd || cmd === 'help' || cmd === '--help') {
+		console.log(require('fs').readFileSync(__filename, 'utf8').split('\n').slice(3, 17).join('\n'))
+		return { ok: true, result: 'see tools/test-agent/README.md' }
+	}
+	// "ui click_xy 10 20" has negative-free numbers only, so flag parsing is safe
+	const { pos, flags } = parseArgs(argv.slice(1), { bool: BOOL, val: VAL })
+	const t0 = Date.now()
+	let result
+	if (cmd === 'start') {
+		const mode = flags.live ? 'live' : 'sandbox'
+		if (flags.live && flags.sandbox) throw new Error('--sandbox and --live are exclusive')
+		if (!flags.live && !flags.sandbox) throw new Error('say which: ui start --sandbox (throwaway server) or ui start --live (the box)')
+		const out = flags.out || path.join(os.tmpdir(), 'highascg-test-agent', new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19))
+		const st = await driver.start({ mode, out, server: flags.server, port: flags.port ? Number(flags.port) : undefined })
+		result = { started: mode, server: st.server, display: st.display, remote_port: st.port, out: st.out, shots: path.join(st.out, 'shots') }
+		return { ok: true, result, ms: Date.now() - t0 }
+	}
+	if (cmd === 'stop') return { ok: true, result: await driver.stop(), ms: Date.now() - t0 }
+	if (cmd === 'wait') {
+		need(pos, 1, 'wait <seconds>')
+		await xi.sleepMs(Number(pos[0]) * 1000)
+		return { ok: true, result: { waited: Number(pos[0]) }, ms: Date.now() - t0 }
+	}
+	const st = state.requireState()
+	const d = st.display
+	switch (cmd) {
+		case 'list': {
+			const kind = pos[0] || 'all'
+			const res = await act.ask(st, { cmd: 'list', kind, under: flags.under || '', limit: flags.limit ? Number(flags.limit) : 250 })
+			if (!flags.json) {
+				console.log(formatList(res))
+				return { ok: true, quiet: true }
+			}
+			result = res
+			break
+		}
+		case 'find':
+			need(pos, 1, 'find <label> [--kind K] [--under X] [--contains]')
+			result = await act.ask(st, { cmd: 'find', label: pos[0], kind: flags.kind || '', under: flags.under || '', contains: !!flags.contains })
+			break
+		case 'tab':
+			need(pos, 1, 'tab <title>')
+			result = await act.tab(st, pos[0], flags)
+			break
+		case 'click':
+			need(pos, 1, 'click <label> [--double] [--right] [--under X] [--contains] [--kind K] [--nth N]')
+			result = await act.click(st, pos[0], flags)
+			break
+		case 'type':
+			if (pos.length === 1) {
+				xi.typeText(d, pos[0])
+				result = { typed: pos[0], into: 'whatever has keyboard focus' }
+			} else {
+				need(pos, 2, 'type <field caption or placeholder> <text> [--no-submit]   |   type "text" (into the focused control)')
+				result = await act.type(st, pos[0], pos.slice(1).join(' '), flags)
+			}
+			break
+		case 'choose':
+			need(pos, 2, 'choose <option button caption> <item label>')
+			result = await act.choose(st, pos[0], pos.slice(1).join(' '), flags)
+			break
+		case 'drag':
+			need(pos, 2, 'drag <from label> <to label>')
+			result = await act.drag(st, pos[0], pos[1], flags)
+			break
+		case 'key':
+			need(pos, 1, 'key <keyspec e.g. ctrl+z, space, delete>')
+			xi.key(d, normalizeKey(pos[0]))
+			await xi.sleepMs(250)
+			result = { key: normalizeKey(pos[0]) }
+			break
+		case 'click_xy': {
+			need(pos, 2, 'click_xy X Y [--double|--right]')
+			await xi.click(d, Number(pos[0]), Number(pos[1]), { button: flags.right ? 3 : 1, double: !!flags.double })
+			await xi.sleepMs(350)
+			result = { clicked_at: [Number(pos[0]), Number(pos[1])] }
+			break
+		}
+		case 'drag_xy':
+			need(pos, 4, 'drag_xy X1 Y1 X2 Y2 [--steps N]')
+			await xi.drag(d, ...pos.slice(0, 4).map(Number), { steps: Number(flags.steps || 14) })
+			await xi.sleepMs(500)
+			result = { dragged: pos.slice(0, 4).map(Number) }
+			break
+		case 'move':
+			need(pos, 2, 'move X Y')
+			xi.move(d, Number(pos[0]), Number(pos[1]))
+			await xi.sleepMs(200)
+			result = { pointer: [Number(pos[0]), Number(pos[1])] }
+			break
+		case 'scroll':
+			need(pos, 3, 'scroll X Y up|down [N]')
+			if (!['up', 'down'].includes(pos[2])) throw new Error('scroll direction must be up or down')
+			await xi.scroll(d, Number(pos[0]), Number(pos[1]), pos[2], Number(pos[3] || 3))
+			await xi.sleepMs(300)
+			result = { scrolled: pos[2], at: [Number(pos[0]), Number(pos[1])], notches: Number(pos[3] || 3) }
+			break
+		case 'shot':
+			result = await act.shot(st, pos[0])
+			break
+		case 'state':
+			result = await act.ask(st, { cmd: 'state' })
+			break
+		case 'wait_for': {
+			need(pos, 1, 'wait_for <label> [timeout] [--gone]')
+			result = await act.ask(st, { cmd: 'wait_for', label: pos[0], timeout: Number(pos[1] || flags.timeout || 8), gone: !!flags.gone, kind: flags.kind || '', under: flags.under || '', contains: !!flags.contains })
+			break
+		}
+		default:
+			throw new Error(`unknown command '${cmd}' — run: ui help`)
+	}
+	return { ok: true, result, ms: Date.now() - t0 }
+}
+
+run(process.argv.slice(2)).then(
+	(r) => {
+		if (!r.quiet) console.log(JSON.stringify(r))
+		process.exit(0)
+	},
+	(e) => {
+		console.log(JSON.stringify({ ok: false, error: e.message }))
+		process.exit(1)
+	},
+)

@@ -117,3 +117,76 @@ the full test cheaply."*
   scrolls, typing, shortcuts. The Godot side only reports what is on screen (labels plus screen coordinates) and takes
   screenshots. `ui click "Take"` finds the button and then clicks it with the X mouse. Canvases use raw
   `click_xy`/`drag_xy` chosen from the screenshot. Verification is from the screen and from the air (PRINT/INFO).
+
+## 3c. Part 3 driver (30.10, agent wo836d)
+
+Owner, same day: *"i want the full test suite to act as a user, so clicks on screen, doing real tests like a human user
+would do."* So the driver does **real OS-level input**; Godot only supplies the eyes.
+
+### What was built
+
+- **Hands: `tools/test-agent/ui`** (node, CommonJS, `lib/*.js`). `ui start --sandbox|--live [--out DIR] [--server URL]` starts its
+  own `Xvfb :N` (N from 120 up, 1920x1080) and one Godot client with `--e2e=99_remote` on it (pid-recorded in
+  `~/.highascg/test-agent/state.json`, override `HIGHASCG_TEST_STATE`); `--sandbox` also starts `tools/e2e/sandbox-server.js`
+  (via `lib/sandbox-daemon.js`). `--live` = the node on :4200: the client adopts `.private/api-token` itself
+  (core/config.gd `adopt_local_password`, HOME stays real), no token is passed or printed. All input is `xdotool` on that
+  display (`lib/xinput.js` refuses `:0`): label commands (`tab`, `click`, `type`, `choose`, `drag`) = ask the eyes where the
+  label is, hover (real motion), check the hovered control is the target (`covered` → "X is covered by Y"), click; raw commands
+  `click_xy`, `drag_xy`, `move`, `scroll`, `type "text"`, `key ctrl+z` (key names normalised in `lib/keys.js`). `ui shot` grabs
+  the **whole Xvfb screen** with ffmpeg x11grab (popups, dialogs, pointer included). `ui stop` kills by pid.
+- **Eyes: `godot/client/e2e/scenarios/99_remote.gd` + `e2e_eyes.gd`**. TCP 127.0.0.1:6299 (`--e2e-remote-port=`), newline JSON,
+  answers `{ok, result|error, ms}`. Commands: `ping list find wait_for state covered popups shot quit`. Read-only: it never
+  pushes an input event. `list` returns every visible Button / toggle / OptionButton (+items) / LineEdit / SpinBox / TextEdit
+  (caption + hint + value) / TabBar tab / Tree row / ItemList item / Label / tooltip-bearing Control / open popup-menu row with
+  its label, tooltip, enabled, and SCREEN rect+centre (window origin added, clipped by the scroll areas it sits in, not by the
+  parent chain of an embedded dialog). `find` failures name the closest labels. `nodes_of()` walks internal children too
+  (`find_children` skips them — that is where AcceptDialog keeps OK / Cancel). PopupMenu has no item-rect API: rows carry an
+  ESTIMATED centre, and the driver nudges the real pointer until the popup reports that row focused (`aimAtMenuItem`, used by
+  `choose` and by `click --kind menuitem`).
+  `e2e_runner.gd`: `--e2e=all` skips `99_*` (the listener never returns), only an explicit `--e2e=99_remote` starts it.
+- **`tools/test-agent/caspar`**: `print <ch> [--crop x,y,w,h]` (AMCP PRINT straight to Caspar → newest PNG in the media root →
+  copied into the run's `prints/`, scratch file removed → `{png, frame, mean_luma, mean_rgb, nonblack_fraction, mean_alpha,
+  alpha_nonzero_fraction, alpha_note}`; crop beyond the frame is refused, not clamped; the alpha plane is reported because PRINT
+  frames are RGBA), `info <ch>[-<layer>]` (INFO channel XML through the node's own `info-channel-parse.js`), `channels`, `api <GET>`.
+  Sandbox: `print` says "no Caspar in the sandbox" (exit 2). Pure PNG decode/crop/stats/encode in `lib/png.js` (zlib only).
+- **`tools/test-agent/README.md`** (the reference a Haiku agent gets), **`cards/_TEMPLATE.md`**, pilot cards
+  **`01_looks_take.md`** (look with two layers → PRV → TAKE → FTB, PRINT numbers live-only) and **`02_timeline_play.md`** (timeline,
+  clip, play, pause, play to the end → end hold, play again → restart, stop), **`provision-fixtures.js`** (the three sandbox fixture
+  files into the live media root; `--remove`), **`.claude/skills/release-test/SKILL.md`** (the `/release-test` coordinator: driver
+  `--live`, one Haiku agent per card, sequential, verdict + evidence under `work/release-reports/<date>/`, `report.md`, stronger
+  model only for FAIL/UNCLEAR).
+
+### Verified (sandbox only; nothing was sent to :4200 / :5250)
+
+- Driver end to end on the sandbox: `start`, `list` (buttons / fields / tabs / rows / labels / menu / options), `tab`, `click`,
+  `click --right` + `--kind menuitem`, `choose` (real popup list), `type` (real keys into a LineEdit and into a dialog), `key`
+  (F3 toggled the performance overlay through X), `drag` (media row → "+", real X press / glide / release) and `drag_xy` (editor frame,
+  timeline lane), `shot` (full-screen PNG viewed with Read: coordinates in `list` line up with the picture), `stop` (no process left).
+  `--live --server <sandbox url>` exercised the live code path (HOME real, token adoption) without touching :4200.
+- Both pilot cards were walked literally in the sandbox: card 01 passes (PRINT steps 6 and 8 skipped as LIVE-ONLY; INFO shows both
+  clips on PRV channel 2 layers 10/11 and on PGM channel 1 layers 110/111, FTB empties both, cleanup restores 0 looks).
+  Card 02 steps 1–7 and 9 pass; **step 8 FAILS**: see Finding.
+- Tests: `tools/smoke/test-agent-pure.test.js` 12/12 (arg parsing, key names, `ui list` formatter, PNG round trip incl. all filters,
+  crop bounds, alpha note, AMCP reply parsing, INFO → clips, `caspar print/info` against a fake Caspar + temp media folder, sandbox
+  "no Caspar", `:0` refusal). eslint clean on the new files, `check-max-file-lines` 0 over, Godot suite 23407 passed / 0 failed.
+
+### Finding (not fixed — godot/client/features/timeline is another agent's scope)
+
+WO-834's "Play after the end hold restarts from 0" does not happen from the Godot client. `timeline_transport.gd toggle_play()` POSTs
+`/seek {ms: playhead}` and then `/play {from: playhead}`. The hold parks the playhead at `duration − 1 frame` (e.g. 4746 of 4786 ms);
+`seek()` clears `cell.endHeld`, so `play()` (timeline-playback-runtime.js:43) never sees the held state and resumes at 4746 → ends and
+holds again at once (observed: state `playing:false, endHeld:true, position 4746` after Play; server log RESUME / PAUSE / SEEK, no PLAY). The
+smoke only tests the engine (`play(id)` without a prior seek). Card 02 step 8 pins this. Fix idea: the client should not seek before
+Play when the timeline is `endHeld` (or `seek` should keep `endHeld` when the target is the hold position and `play()` compares
+`fromMs >= duration − 1000/fps`).
+
+### Not covered / owner notes
+
+- The GUI has no "delete timeline": card 02 renames its timeline `ZZ release-test` and lists it as LEFTOVER for the coordinator.
+- Cards touch the owner's live project (a look, a timeline) and clean up through the GUI; the live second client is the same client
+  the owner uses (hardware reconcile etc. run for it too) — first live run must be watched.
+- `caspar print` could not be exercised against a real Caspar (only a fake AMCP server); PNG pickup relies on PRINT landing in the
+  media root as WO-845 documents. The PGM thresholds in card 01 (luma 60–190, nonblack ≥ 0.85) come from stats of the fixture clip
+  and SMPTE still scaled to 1920x1080 (luma ≈ 123–129, nonblack 1.0) and need a first live calibration run.
+- Layout note seen on the sandbox: with the Timeline tab open the right-hand Inspector was cut off at the window edge in one run
+  (others agent's WIP area, not investigated).

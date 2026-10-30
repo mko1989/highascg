@@ -21,7 +21,8 @@ static func scenario_names(arg: String) -> PackedStringArray:
 		return out
 	var files := DirAccess.get_files_at(DIR)
 	for f in files:
-		if f.ends_with(".gd"):
+		# WO-836: 99_remote is the agent driver's listener (never returns) — only an explicit --e2e=99_remote starts it
+		if f.ends_with(".gd") and not f.begins_with("99_"):
 			out.append(f.get_basename())
 	out.sort()
 	return out

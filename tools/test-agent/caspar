@@ -1,0 +1,125 @@
+#!/usr/bin/env node
+'use strict'
+
+/**
+ * WO-836 Part 3c — what is ON AIR, as numbers. Reference: tools/test-agent/README.md.
+ *
+ *   caspar print <channel> [--crop x,y,w,h] [--threshold N]   PRINT → PNG + {mean_luma, mean_rgb, nonblack_fraction, alpha…}
+ *   caspar info <ch>[-<layer>]                                INFO → clip / state / time per layer
+ *   caspar channels                                           which Caspar channels are PGM / PRV (from /api/settings channelMap)
+ *   caspar api <GET path>                                     authenticated GET against the node, prints the JSON
+ *
+ * Target: the running driver (ui start --live|--sandbox) or HIGHASCG_TEST_TARGET=live|sandbox. The sandbox has no
+ * real Caspar: `print` says so and exits 2 (cards mark their PRINT steps live-only).
+ */
+
+const fs = require('fs')
+const path = require('path')
+const { parseArgs, parseCrop, parseChannelLayer } = require('./lib/cmdline')
+const { resolveTarget, request } = require('./lib/target')
+const { amcp } = require('./lib/amcp')
+const { parseInfo } = require('./lib/info')
+const png = require('./lib/png')
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+async function casparAddr(t) {
+	if (process.env.CASPAR_HOST) return { host: process.env.CASPAR_HOST, port: Number(process.env.CASPAR_PORT || 5250) }
+	const s = await request(t, 'GET', '/api/settings')
+	return { host: s.caspar?.host || '127.0.0.1', port: Number(s.caspar?.port || 5250), media: s.local_media_path || '' }
+}
+
+/** INFO XML from the target: live = AMCP to Caspar, sandbox = the node's simulated Caspar over /api/amcp/raw. */
+async function infoXml(t, ch) {
+	if (t.mode === 'sandbox') {
+		const r = await request(t, 'POST', '/api/amcp/raw', { cmd: `INFO ${ch}` })
+		return typeof r.data === 'string' ? r.data : JSON.stringify(r.data)
+	}
+	const a = await casparAddr(t)
+	return (await amcp(a.host, a.port, `INFO ${ch}`)).data
+}
+
+async function print(t, pos, flags) {
+	if (t.mode === 'sandbox') {
+		const e = new Error('no Caspar in the sandbox — PRINT is live-only (the simulated Caspar renders no pictures). Mark this step LIVE-ONLY and verify with `ui shot` and `caspar info` instead.')
+		e.exitCode = 2
+		throw e
+	}
+	const { channel } = parseChannelLayer(pos[0])
+	const crop = flags.crop ? parseCrop(flags.crop) : null
+	const a = await casparAddr(t)
+	const dir = process.env.HIGHASCG_PRINT_DIR || path.resolve(a.media || '/home/casparcg/highascg/media')
+	const t0 = Date.now() - 300
+	await amcp(a.host, a.port, `PRINT ${channel}`)
+	// Caspar's PRINT reply names no file: it writes a timestamped PNG into the media root — newest PNG since t0
+	let file = null
+	for (let i = 0; i < 30 && !file; i++) {
+		await sleep(150)
+		let best = 0
+		for (const f of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
+			if (!f.toLowerCase().endsWith('.png')) continue
+			const st = fs.statSync(path.join(dir, f))
+			if (st.mtimeMs >= t0 && st.size > 40 && st.mtimeMs > best) {
+				best = st.mtimeMs
+				file = path.join(dir, f)
+			}
+		}
+	}
+	if (!file) throw new Error(`PRINT ${channel} was accepted but no new PNG appeared in ${dir} within 4.5 s`)
+	await sleep(150) // let Caspar finish writing
+	const outDir = path.join(t.out || path.join(require('os').tmpdir(), 'highascg-test-agent'), 'prints')
+	fs.mkdirSync(outDir, { recursive: true })
+	const n = String(fs.readdirSync(outDir).length + 1).padStart(2, '0')
+	const dest = path.join(outDir, `${n}_ch${channel}.png`)
+	fs.copyFileSync(file, dest)
+	fs.unlinkSync(file) // the scratch print is the test's, not the media library's
+	let img = png.decodePng(fs.readFileSync(dest))
+	const res = { channel, png: dest, frame: `${img.width}x${img.height}` }
+	if (crop) {
+		img = png.cropImage(img, crop)
+		res.crop = crop
+		res.crop_png = dest.replace(/\.png$/, `_crop_${crop.x}_${crop.y}_${crop.w}_${crop.h}.png`)
+		fs.writeFileSync(res.crop_png, png.encodePng(img))
+	}
+	return { ...res, ...png.stats(img, { threshold: flags.threshold != null ? Number(flags.threshold) : 16 }) }
+}
+
+async function info(t, pos) {
+	const { channel, layer } = parseChannelLayer(pos[0])
+	// this Caspar build answers `INFO ch-layer` with the whole channel (caspar-seek memory): ask for the channel, filter here
+	const parsed = await parseInfo(await infoXml(t, channel), layer)
+	return { channel, framerate: parsed.framerate, layers: parsed.layers, playing: parsed.layers.filter((l) => l.clip).map((l) => `${l.layer}: ${l.clip} (${l.state})`) }
+}
+
+async function main(argv) {
+	const [cmd, ...rest] = argv
+	const { pos, flags } = parseArgs(rest, { val: ['crop', 'threshold'] })
+	const t = resolveTarget()
+	if (cmd === 'print') {
+		if (!pos[0]) throw new Error('usage: caspar print <channel> [--crop x,y,w,h]')
+		return print(t, pos, flags)
+	}
+	if (cmd === 'info') {
+		if (!pos[0]) throw new Error('usage: caspar info <ch>[-<layer>]')
+		return info(t, pos)
+	}
+	if (cmd === 'channels') {
+		const cm = (await request(t, 'GET', '/api/settings')).channelMap || {}
+		return { program: cm.programChannels || [], preview: cm.previewChannels || [], note: 'use these numbers in caspar print / caspar info; main 1 = the first entry of each list' }
+	}
+	if (cmd === 'api') {
+		if (!pos[0] || !pos[0].startsWith('/api/')) throw new Error('usage: caspar api /api/<path>   (GET only)')
+		return request(t, 'GET', pos[0])
+	}
+	throw new Error('usage: caspar print|info|channels|api …  (see tools/test-agent/README.md)')
+}
+
+main(process.argv.slice(2)).then(
+	(r) => {
+		console.log(JSON.stringify({ ok: true, result: r }))
+	},
+	(e) => {
+		console.log(JSON.stringify({ ok: false, error: e.message }))
+		process.exit(e.exitCode || 1)
+	},
+)
