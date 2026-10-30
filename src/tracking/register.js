@@ -468,7 +468,7 @@ module.exports = {
 		_detectSent = { json: '', at: 0 }
 		fusion.reset()
 		pose3d.reset()
-		_presenters = createPresenters(ctx, { hub }) // reloads the /tmp roster after a server restart
+		_presenters = createPresenters(ctx, { hub }) // WO-835: starts empty, wipes leftovers in /tmp
 		_presentersSent = { json: '', at: 0 }
 		if (ctx) ctx.presenters = _presenters
 		if (_desk) _desk.stop()
@@ -491,6 +491,7 @@ module.exports = {
 		if (_ctx && _ctx.trackingHub === hub) delete _ctx.trackingHub
 		if (_ctx) delete _ctx.fixtureService
 		if (_ctx && _ctx.presenters === _presenters) delete _ctx.presenters
+		if (_presenters) _presenters.dispose() // WO-835: photos + roster deleted on shutdown
 		_presenters = null
 		if (_desk) _desk.stop()
 		_desk = null

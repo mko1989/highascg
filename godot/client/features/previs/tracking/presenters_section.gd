@@ -13,7 +13,7 @@ const THUMB := Vector2(60, 80)
 var driver: Node  # marker_driver.gd: the last tracking:detections (persons to bind)
 var _snap := {}  # {presenters, suggestions}
 var _urls: Array = []
-var _photos := {}  # presenter id → ImageTexture
+var _photos := {}  # "id:created" → ImageTexture (memory only, never user://)
 var _list: VBoxContainer
 var _url_box: VBoxContainer
 var _note: Label
@@ -121,7 +121,7 @@ func _row(p: Dictionary, suggestion: Dictionary, choices: Array) -> Control:
 	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	top.add_child(pic)
-	_photo(id, pic)
+	_photo(id, pic, "%s:%s" % [id, str(p.get("created", 0))]) # WO-835: a wiped + re-created p1 is a new photo
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var name_l := Label.new()
@@ -181,9 +181,9 @@ func _actions_field(title: String, key: String, p: Dictionary, id: String) -> Co
 	return row
 
 
-func _photo(id: String, into: TextureRect) -> void:
-	if _photos.has(id):
-		into.texture = _photos[id]
+func _photo(id: String, into: TextureRect, key: String) -> void:
+	if _photos.has(key):
+		into.texture = _photos[key]
 		return
 	var r: Dictionary = await Api.get_bytes("%s/%s/photo" % [BASE, id])
 	if not r.ok:
@@ -191,9 +191,9 @@ func _photo(id: String, into: TextureRect) -> void:
 	var img := Image.new()
 	if img.load_jpg_from_buffer(r.bytes) != OK:
 		return
-	_photos[id] = ImageTexture.create_from_image(img)
+	_photos[key] = ImageTexture.create_from_image(img)
 	if is_instance_valid(into):
-		into.texture = _photos[id]
+		into.texture = _photos[key]
 
 
 func _post(path: String, body: Dictionary) -> void:

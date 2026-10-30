@@ -4,7 +4,7 @@
  * WO-675 P2 — body recognition for wide stage shots. presenter-match.js: a body-only suggestion needs its own
  * threshold, sightings and margin; face and body agreeing say `face+body`, disagreeing say nothing; a clearly seen
  * face vetoes a body match; one suggestion per presenter, face-backed first. presenters.js: the intake photo's body
- * feature (status, persisted, reloaded, wantsBodies). Wiring: the sidecar's `body` reaches the sink as kind 'body',
+ * feature (status, wantsBodies; not reloaded after a restart, WO-835). Wiring: the sidecar's `body` reaches the sink as kind 'body',
  * `bodies` goes in the sidecar config, the intake passes a YOLO to face_embed.py. Sidecar: test_body.py (venv only).
  */
 
@@ -103,7 +103,7 @@ describe('WO-675 P2 presenter body feature', () => {
 	}
 	const settle = () => new Promise((r) => setImmediate(r))
 
-	it('the intake photo gives a body feature; kept across a restart; drives wantsBodies and body suggestions', async () => {
+	it('the intake photo gives a body feature; not kept across a restart (WO-835); drives wantsBodies and body suggestions', async () => {
 		const { p, dir, embed } = roster({ ok: false, detail: 'no face', body: { ok: true, feature: body(3), via: 'detector' } })
 		await p.create({ consent: true, name: 'Anna', photo: JPEG })
 		await settle()
@@ -115,7 +115,7 @@ describe('WO-675 P2 presenter body feature', () => {
 		for (let i = 0; i < 3; i++) p.observe([{ key: 'cam_1:4', feature: body(3) }], 'body')
 		assert.deepEqual(p.suggestions(), [{ presenter: 'p1', key: 'cam_1:4', score: 1, via: 'body' }])
 		const q = createPresenters(null, { dir, hub: new MarkerHub(), embed })
-		assert.equal(q.wantsBodies(), true, 'the body feature came back from roster.json')
+		assert.equal(q.wantsBodies(), false, 'WO-835: the body feature is not reloaded from roster.json')
 	})
 
 	it('no person → none; no body result at all → unavailable', async () => {

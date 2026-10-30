@@ -6,8 +6,10 @@
  * owner D1: the faces only SUGGEST); a bound presenter drives a hub marker named after them, and a zone action
  * `presenter` fires that presenter's own actions (look / Companion — the mic is a Companion button, owner D4).
  *
- * Owner D2: everything lives in /tmp (photos, roster, face features), so a reboot removes it. Never in the project,
- * config/, a stick or Syncthing. D3: no photo is accepted without the tech's consent tick.
+ * Owner D2 (WO-835): everything lives in /tmp (photos, roster, face features) and nowhere else. Never in the project,
+ * config/, a stick or Syncthing. A reboot removes /tmp; a server restart removes it too, because a fresh process
+ * starts with an EMPTY roster and deletes any leftover files (no load() from disk), and a clean shutdown deletes them
+ * as well. That is exactly what the consent text on the intake page promises. D3: no photo without the consent tick.
  *
  * Faces: tools/tracking-detect/face_embed.py (OpenCV Zoo YuNet + SFace) gives each intake photo a 128-d unit
  * feature; the detection sidecar sends features of the persons on stage (`observe`). Cosine similarity, smoothed per
@@ -23,13 +25,24 @@ const childProcess = require('child_process')
 const { parseAction } = require('./zone-actions')
 const { createMatcher, unit, KINDS } = require('./presenter-match')
 
-const DIR = process.env.HIGHASCG_PRESENTERS_DIR || path.join(os.tmpdir(), 'highascg-presenters')
+const DEFAULT_DIR = path.join(os.tmpdir(), 'highascg-presenters')
+// WO-835: the roots a presenter dir may live under: tmpfs-like locations that a reboot empties.
+const TMP_ROOTS = () => [os.tmpdir(), '/dev/shm']
+const DIR = process.env.HIGHASCG_PRESENTERS_DIR || DEFAULT_DIR
 const MARKER_BASE = 65000 // presenter n drives hub marker MARKER_BASE + n (hub ids are 1…65535)
 const MAX_PRESENTERS = 200
 const MAX_PHOTO_BYTES = 6 * 1024 * 1024
 const SUGGEST_MIN = KINDS.face.min
 const TEXT_MAX = { name: 64, mic: 16, note: 280 }
 const ACTIONS_MAX = 8
+
+/** WO-835: a dir is acceptable only inside a tmp root; anything else (repo, config/, ~) would let photos outlive a reboot. */
+function underTmp(dir) {
+	const d = path.resolve(dir)
+	return TMP_ROOTS().some((r) => d.startsWith(path.resolve(r) + path.sep))
+}
+
+const STALE = /^(roster\.json(\.tmp)?|p\d+\.jpg)$/
 
 const clip = (v, n) => String(v ?? '').trim().slice(0, n)
 
@@ -49,7 +62,9 @@ function cleanActions(v) {
  */
 function createPresenters(ctx, deps = {}) {
 	const log = typeof ctx?.log === 'function' ? ctx.log.bind(ctx) : () => {}
-	const dir = deps.dir || DIR
+	const wanted = deps.dir || DIR
+	const dir = underTmp(wanted) ? path.resolve(wanted) : DEFAULT_DIR
+	if (dir !== path.resolve(wanted)) log('warn', `[presenters] ${wanted} is not under a tmp dir (owner D2: photos never persist); using ${dir}`)
 	const now = deps.now || Date.now
 	const hub = deps.hub || null
 	const embed = deps.embed || defaultEmbed
@@ -77,15 +92,24 @@ function createPresenters(ctx, deps = {}) {
 		}
 	}
 
-	function load() {
+	/** WO-835: delete every presenter file in the dir (own file names only). A new process never reloads them. */
+	function wipe() {
+		let names
 		try {
-			const j = JSON.parse(fs.readFileSync(path.join(dir, 'roster.json'), 'utf8'))
-			for (const p of Array.isArray(j?.presenters) ? j.presenters : []) {
-				if (p && typeof p.id === 'string' && /^p\d+$/.test(p.id)) roster.set(p.id, { ...p, person: null, face: unit(p.face), body: unit(p.body) })
-			}
+			names = fs.readdirSync(dir)
 		} catch (_) {
-			/* none yet (or wiped by a reboot) */
+			return 0
 		}
+		let n = 0
+		for (const f of names.filter((x) => STALE.test(x))) {
+			try {
+				fs.unlinkSync(path.join(dir, f))
+				n++
+			} catch (_) {
+				/* already gone */
+			}
+		}
+		return n
 	}
 
 	function nextSlot() {
@@ -219,9 +243,17 @@ function createPresenters(ctx, deps = {}) {
 		matcher.clear()
 	}
 
-	load()
+	// WO-835: boot starts empty. The roster entries go with the photos: an entry exists only to be matched against its
+	// photo's face/body features, so without the photo it is dead weight (and name + feature is personal data).
+	const wiped = wipe()
+	if (wiped) log('info', `[presenters] removed ${wiped} leftover file(s) from a previous run (photos never survive a restart)`)
 	return {
 		dir,
+		/** Shutdown: delete photos + roster now (the consent text promises it). */
+		dispose: () => {
+			roster.clear()
+			wipe()
+		},
 		get rev() {
 			return rev
 		},
@@ -273,4 +305,4 @@ function defaultEmbed(photo) {
 	})
 }
 
-module.exports = { createPresenters, cleanActions, MARKER_BASE, SUGGEST_MIN, DIR }
+module.exports = { createPresenters, cleanActions, underTmp, MARKER_BASE, SUGGEST_MIN, DIR, DEFAULT_DIR }

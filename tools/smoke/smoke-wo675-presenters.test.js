@@ -2,7 +2,7 @@
 
 /**
  * WO-675 — presenter recognition. Server: the /tmp roster (consent required, JPEG only, photo + roster.json 0600,
- * reloaded after a restart, removed with the presenter); face suggestions only above SFace's threshold and clear of
+ * wiped on a restart (WO-835), removed with the presenter); face suggestions only above SFace's threshold and clear of
  * the runner-up, never auto-bound (owner D1); the operator's assign drives a named hub marker; the zone action
  * `presenter` fires that presenter's own Companion / look actions; the HTTP routes incl. the phone intake page.
  * Detect service: face features reach the sink and never the WS snapshot. Sidecar: test_face.py (venv only).
@@ -66,16 +66,19 @@ describe('WO-675 presenter roster', () => {
 		assert.equal(fs.statSync(dir).mode & 0o077, 0, 'the dir is owner-only')
 	})
 
-	it('reloads after a server restart (same /tmp dir) and forgets bindings; remove deletes the photo', async () => {
+	it('a server restart starts empty (WO-835: photos never survive it); remove deletes the photo', async () => {
 		const { p, dir, embed, hub } = roster()
 		await p.create({ consent: true, name: 'Anna', photo: JPEG })
 		await settle()
 		p.assign('p1', 'w:3')
+		assert.ok(fs.existsSync(path.join(dir, 'p1.jpg')))
 		const q = createPresenters(null, { dir, hub, embed })
-		assert.equal(q.list().length, 1)
-		assert.equal(q.list()[0].name, 'Anna')
-		assert.equal(q.list()[0].person, null, 'a restart drops the binding: track ids do not survive it')
-		assert.equal(q.wantsFaces(), true, 'the face feature came back from roster.json')
+		assert.equal(q.list().length, 0, 'the roster is not reloaded from disk')
+		assert.equal(q.wantsFaces(), false, 'no face feature came back')
+		assert.equal(fs.existsSync(path.join(dir, 'p1.jpg')), false, 'the old photo was wiped on boot')
+		assert.equal(fs.existsSync(path.join(dir, 'roster.json')), false)
+		const r = await q.create({ consent: true, name: 'Ben', photo: JPEG })
+		assert.equal(r.status, 201)
 		assert.ok(q.remove('p1'))
 		assert.equal(fs.existsSync(path.join(dir, 'p1.jpg')), false)
 	})
