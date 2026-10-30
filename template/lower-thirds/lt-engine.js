@@ -351,7 +351,11 @@
 
         const container = CORE.cfg.containerSel ? document.querySelector(CORE.cfg.containerSel) : null;
         if (!container) return;
-        const scale = numericOverride(CORE.style.boxScale, 0.01);
+        // The inspectors' "Scale %" is renderScale, a percent (owner 30.10: it did nothing — only boxScale, a factor,
+        // was read); an explicit boxScale (CG Studio) still wins.
+        const hasBox = CORE.style.boxScale != null && CORE.style.boxScale !== '';
+        const pct = hasBox ? null : numericOverride(CORE.style.renderScale, 1);  // percent: 100 = as designed
+        const scale = hasBox ? numericOverride(CORE.style.boxScale, 0.01) : pct == null ? null : pct / 100;
         if (scale != null && scale !== 1) {
             // Scale about the anchored corner so the marginX/marginY the operator set stays put.
             const pos = (CORE.style.position || 'left').toLowerCase();

@@ -233,6 +233,15 @@ for (const rel of ENGINES) {
 			assert.equal(center.container.lastWrite('transformOrigin'), 'center bottom')
 		})
 
+		it('the inspectors\' Scale % (renderScale, a percent) scales the container; boxScale wins (WO-860)', () => {
+			const big = applyStyleVia(rel, { renderScale: 150, position: 'left' })
+			assert.equal(big.container.lastWrite('transform'), 'scale(1.5)')
+			const as = applyStyleVia(rel, { renderScale: '100' })
+			assert.ok(!as.container.writtenProps().includes('transform'), '100 % must not write transform')
+			const both = applyStyleVia(rel, { renderScale: 150, boxScale: 0.5 })
+			assert.equal(both.container.lastWrite('transform'), 'scale(0.5)')
+		})
+
 		it('boxScale of exactly 1 is a no-op, not an identity transform', () => {
 			const { container } = applyStyleVia(rel, { boxScale: 1 })
 			assert.ok(!container.writtenProps().includes('transform'), 'scale 1 must not write transform')

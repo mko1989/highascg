@@ -333,7 +333,10 @@ window.LTEngineStyles = (function () {
 
         const container = C().cfg.containerSel ? document.querySelector(C().cfg.containerSel) : null;
         if (!container) return;
-        const scale = numericOverride(C().style.boxScale, 0.01);
+        // The inspectors' "Scale %" is renderScale, a percent; an explicit boxScale (a factor, CG Studio) still wins.
+        const hasBox = C().style.boxScale != null && C().style.boxScale !== '';
+        const pct = hasBox ? null : numericOverride(C().style.renderScale, 1);  // percent: 100 = as designed
+        const scale = hasBox ? numericOverride(C().style.boxScale, 0.01) : pct == null ? null : pct / 100;
         if (scale != null && scale !== 1) {
             // Scale about the anchored corner so the marginX/marginY the operator set stays put.
             const pos = (C().style.position || 'left').toLowerCase();
