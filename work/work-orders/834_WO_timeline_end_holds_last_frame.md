@@ -1,7 +1,7 @@
 # WO-834 — Timeline end holds the last frame (D8)
 
 **Area:** engine
-**Status: DONE offline (30.10, smoke 4/4, Godot 23015/0) — live wire test on PGM pending the next node restart (batched with the sweep fixes)**
+**Status: DONE (30.10) — smoke 5/5; live on the box after the node restart: hold at duration − 1 frame, then the Godot client's seek + Play restarts from 0 (§4)**
 **Source:** WO-828 D8, owner 30.10: *"the timeline should end on last frame always (unless it was ofcourse set manualy to
 something different), but when timeline end equal clip end then last frame."*
 **Related:** WO-828, WO-829.
@@ -62,3 +62,7 @@ Fix in `timeline-playback-runtime.js`:
 
 Verified: new smoke case "the clients' seek-to-playhead before Play keeps the hold" passes, and so does the old
 "a seek after the hold clears it" case. All timeline smokes pass 177/0.
+- Live, after the node restart (30.10, PRV only): the timeline "Timeline" (66276 ms) was played from 64500 ms. It
+  parked at 66236 ms with `endHeld: true` and `playing: false`. Then the Godot client's exact Play sequence ran
+  (`/seek {ms: 66236}`, `/sendto`, `/play {from: 66236}`). The result was `playing: true` and `position: 1515` 1.5 s
+  later, so it restarted from 0. It was stopped afterwards.
