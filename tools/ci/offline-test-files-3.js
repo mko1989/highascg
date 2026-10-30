@@ -222,6 +222,7 @@ module.exports = [
 	'tools/smoke/smoke-wo869-caspar-caps.test.js',
 	'tools/smoke/smoke-wo872-beat-metrics.test.js',
 	'tools/smoke/smoke-wo872-beat-grid.test.js',
+	'tools/smoke/smoke-wo872-level-norm.test.js',
 	'tools/smoke/smoke-wo857-console-selection.test.js',
 	'tools/smoke/smoke-wo868-operator-first-golden.test.js',
 	'tools/smoke/smoke-wo868-channel-remap.test.js',

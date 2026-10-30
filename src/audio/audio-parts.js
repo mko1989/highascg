@@ -8,7 +8,8 @@
  *  - kick / snare / hats: band-limited spectral flux, each against its own last second (mean + k·std, × ratio,
  *    re-arm, refractory, floor), decided 2 hops later: only near the band's own peak, and when two drums fire
  *    together the weaker band must be close enough in level to be its own hit (a kick's click is not a snare).
- *  - bass / mid / high: band energy against a decaying peak (AGC), so a quiet DJ and a loud band both span 0..1.
+ *  - bass / mid / high: band energy against its own P5..P95 of the last 4 s (WO-872, level-norm.js), so a quiet DJ and
+ *    a loud band both span 0..1 and a loud hit does not pump them; 0 while the BS.1770 silence gate is closed.
  *  - tonal: harmonic energy 300–3400 Hz (causal HPSS: median over the last 9 hops vs across ±8 bins) × the harmonic
  *    ratio — the real-time proxy for vocals / leads (true vocals need stems, WO-861 §1.3).
  *  - loudness, onset, density, arousal, valence, energy, section, drop: audio-mood.js (CanYuzbey port) on a 30 Hz tick.
@@ -18,6 +19,7 @@
 
 const { fftRadix2 } = require('./fft')
 const { createLoudness, createMood, createDensity, createSections, FPS } = require('./audio-mood')
+const { createPercentileAgc, createSilenceGate } = require('./level-norm')
 
 const WIN = 2048
 const HOP = 512
@@ -100,7 +102,7 @@ function createBandOnset({ fr, k: k0 = 1.5, ratio = 1.5, refractoryMs = 100 }) {
 	}
 }
 
-/** Level against a decaying peak, instant attack, ~150 ms release. */
+/** Level against a decaying peak, instant attack, ~150 ms release (the drum buses: `near()` is tuned on MDB Drums). */
 function createAgc(fr) {
 	let peak = -200
 	let v = 0
@@ -198,15 +200,16 @@ function createAudioParts(opts = {}) {
 	}
 	const hits = { kick: { n: 0, at: -1e9 }, snare: { n: 0, at: -1e9 }, hats: { n: 0, at: -1e9 } }
 	const agc = {
-		bass: createAgc(fr),
-		mid: createAgc(fr),
-		high: createAgc(fr),
-		tonal: createAgc(fr),
+		bass: createPercentileAgc(fr, B.bass[1] - B.bass[0] + 1),
+		mid: createPercentileAgc(fr, B.mid[1] - B.mid[0] + 1),
+		high: createPercentileAgc(fr, B.high[1] - B.high[0] + 1),
+		tonal: createPercentileAgc(fr, B.tonal[1] - B.tonal[0] + 1),
 		kick: createAgc(fr),
 		snare: createAgc(fr),
 		hats: createAgc(fr),
 	}
 	let tonalRatio = 0
+	const gate = createSilenceGate(sr)
 
 	const loud = createLoudness()
 	const mood = createMood()
@@ -339,10 +342,10 @@ function createAudioParts(opts = {}) {
 		if (sFull) dens.onset(t / 1000)
 		tickOnset = Math.max(tickOnset, Math.max(0, Math.min(1, (on.full.rel(fx.full) - 1) / 3)))
 
-		agc.bass.step(sum(mag, B.bass, true), gated)
-		agc.mid.step(sum(mag, B.mid, true), gated)
-		agc.high.step(sum(mag, B.high, true), gated)
-		agc.tonal.step(hTonal, gated)
+		agc.bass.step(sum(mag, B.bass, true), gate.silent)
+		agc.mid.step(sum(mag, B.mid, true), gate.silent)
+		agc.high.step(sum(mag, B.high, true), gate.silent)
+		agc.tonal.step(hTonal, gate.silent)
 
 		const low = sum(mag, B.bass)
 		const high = sum(mag, B.high)
@@ -389,6 +392,7 @@ function createAudioParts(opts = {}) {
 		push(x) {
 			for (let i = 0; i < x.length; i++) {
 				const v = x[i]
+				gate.push(v)
 				input[inFill] = v
 				inFill = (inFill + 1) % WIN
 				tickSq += v * v
@@ -447,6 +451,7 @@ function createAudioParts(opts = {}) {
 			prevLogP.fill(0)
 			for (const k in on) on[k].reset()
 			for (const k in agc) agc[k].reset()
+			gate.reset()
 			for (const k in hits) hits[k].at = -1e9 // no pulse frozen on the stale frame
 			for (const h of hist) h.fill(0)
 			for (const k of DRUMS) {

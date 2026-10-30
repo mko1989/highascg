@@ -74,6 +74,11 @@ func test_beat_phase() -> void:
 	var at: float = st.beat.at
 	t.ok(absf(S.apply(st, {}, -100.0, at).beat - 0.2) < 1e-6, "100 ms early at 120 bpm: phase 0.2 → 1 − 0.8")
 	t.ok(absf(S.apply(st, {}, 100.0, at + 100.0).beat - 1.0) < 1e-6, "100 ms late: the beat lands 100 ms after the frame")
+	# WO-872: the tempo is held through silence while the grid is dropped (phase 0) — no beat unless locked
+	var off := _feed([], 100.0, {"bpm": 120, "phase": 0.0, "locked": false})
+	t.eq(M.buses_of({"beat": {"bpm": 120, "phase": 0.0, "locked": false}}).beat, 0.0, "unlocked: the beat bus is 0")
+	t.eq(S.apply(off, {"beat": 0.0}, -100.0, off.beat.at).get("beat"), 0.0, "unlocked: no shifted beat either")
+	t.ok(absf(M.buses_of({"beat": {"bpm": 120, "phase": 0.1}}).beat - 0.6) < 1e-6, "no `locked` key (an older server): as before")
 
 
 func test_slice_sync() -> void:

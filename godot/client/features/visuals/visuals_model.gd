@@ -37,7 +37,9 @@ static func buses_of(frame: Variant) -> Dictionary:
 	var beat: Variant = frame.get("beat")
 	if beat is Dictionary:  # WO-662 phase 0..1 from the last beat → a pulse that is 1 on the beat
 		var ph := _num(beat.get("phase"))
-		out["beat"] = clampf(1.0 - ph * 4.0, 0.0, 1.0) if _num(beat.get("bpm")) > 0.0 else 0.0
+		# WO-872: only while locked — the tempo is held through silence, where the dropped grid reads phase 0 (a stuck 1)
+		var on := _num(beat.get("bpm")) > 0.0 and bool(beat.get("locked", true))
+		out["beat"] = clampf(1.0 - ph * 4.0, 0.0, 1.0) if on else 0.0
 	return out
 
 

@@ -1,7 +1,7 @@
 # WO-872 — Beat tracking: compare with fosfora, adopt its grid/tempo/benchmark ideas
 
 **Area:** audio
-**Status: IN PROGRESS (30.10) — steps 1-4 done (GTZAN holdout beat F .387 → .608, AMLt .519 → .711); step 5 (percentile AGC for audio-parts) next**
+**Status: DONE (30.10, GTZAN holdout beat F .387 → .608 offline and matched live on the box over WS; percentile AGC + BS.1770 gate verified by smokes, GTZAN pumping probe and a live WS probe; step 6 and the genre-prior UI deferred)**
 
 Owner 30.10: "I also found the vj visual app I want to take inspiration from for beat detection etc.
 https://github.com/kevinraymond/fosfora".
@@ -58,6 +58,7 @@ Their own causal scores (`docs/BENCHMARKS.md`): Ballroom F .549 / Acc1 .689, Har
 4. **Onset function.** SuperFlux on log bands with the 0.60/0.28/0.12 partition weights, and a median+2·MAD threshold with 50 ms cooldown. This reuses `audio-parts.js`'s SuperFlux helper.
 5. **Percentile AGC** (P5/P95 over 4 s, knee 0.85) for the bass/mid/high levels in `audio-parts.js`, plus a LUFS silence gate with hysteresis. This removes pumping after a loud hit and noise-floor triggers in quiet rooms.
 6. **Later / not now.**
+   - The genre prior as an operator setting (from step 3). The knobs exist (`priorBpm` / `priorOct` pass through `createBeatDetector`), but there is no UI. GTZAN mixes genres, so it cannot score a per-genre preset.
    - The LightGBM models: needs a tree-walker port and CC-BY credits; the gain is incremental.
    - Phase arbiter: only if the benchmark shows off-beat locks.
    - Downbeat/drop: their own numbers are weak; our WO-861 mood/drop stays.
@@ -98,6 +99,17 @@ Their own causal scores (`docs/BENCHMARKS.md`): Ballroom F .549 / Acc1 .689, Har
   - **Silence** (below −60 dB for 0.5 s) drops the grid and the lock and keeps the tempo.
   - **Test music paced by wall clock (`audio-capture-fft.js` `pacePcm`).** The first live probe disagreed with the offline tracker, and the gap was different for every clip. Measured on its own (`ffmpeg -re` into a pipe, bytes compared with elapsed time), ffmpeg's output ran **0.07 s ahead of real time at 1 s and 0.57 s ahead from about 10 s on**. `-readrate_initial_burst 0` left that unchanged. So test-music beats came out up to half a second early, and on reggae.00020 (period 469 ms) that landed them off the beat. The PCM now goes through a queue that releases `sampleRate` samples per second of wall time, on a 10 ms tick. A starved stretch is skipped rather than caught up, as a live input would drop it. `-re` stays, so the queue never grows beyond about 0.6 s.
   - **Licences.** `THIRD_PARTY_NOTICES` gains fosfora (MIT, used under MIT; design and constants, no code copied) and mir_eval (MIT, `beat-metrics.js`). The About credits list fosfora.
+- **Step 5, level ranging and the silence gate (30.10)**, in the new `src/audio/level-norm.js`; `audio-parts.js` wires them in.
+  - **Percentile AGC** for the bass / mid / high / tonal buses: dB per-bin RMS against its own P5..P95 over 4 s, soft knee 0.85 (fosfora's constants).
+    - Floor −80 dB, also fosfora's. Measured with a 2048 FFT: a 60 Hz tone at −6 dBFS leaks −87 dB into mid and −140 dB into high, while the quietest GTZAN classical clip has a high-band P1 of −78 dB. Without the floor the leakage was stretched to full scale (`smoke-wo861` "a 60 Hz tone lights bass, not high" caught it).
+    - **6 dB minimum span reaching down from P95** (ours). A steady tone or pad reads ~0.95, as the peak AGC read it; fosfora's pure percentile turns it into ±1 dB jitter stretched over 0..1, or 0. Centring the span instead gave 0.5 and failed the WO-861 "held chord lights tonal" test.
+    - Smoothing as before: instant attack, 150 ms release.
+  - **Silence gate:** ITU-R BS.1770 K-weighting (the two biquads at any rate, libebur128's derivation), 400 ms momentary loudness, opens at −55 LUFS, closes after 0.25 s under −60 LUFS. While it is closed the four buses read 0 and their windows are frozen.
+  - **Unchanged:** the drum buses keep the decaying-peak AGC, because their `near()` peak test is tuned on MDB Drums (WO-866); so does the per-hop −60 dB flux gate. So the MDB drum F is untouched (the MDB set is not on this box to re-run).
+- **Godot beat bus gated on `locked` (`visuals_model.gd`, `visuals_sync.gd`).**
+  - The new tracker holds its tempo through silence and drops the grid, so `phase` reads 0 on every frame. The model turned that into `beat = 1 − 4·0`: **a beat bus stuck at 1 whenever the music stopped**. WO-662's phase kept cycling instead, so it pulsed.
+  - The bus is now 0 unless `locked`. A frame without the key, from an older server, behaves as before.
+- **Test music paced by wall clock** (see §4, live).
 ## 4. What was VERIFIED
 - `beat-metrics.js` against the real mir_eval 0.8.2 (wheel unpacked in the scratchpad, system numpy/scipy): **400 random cases, 0 mismatches, max diff 0**. The cases cover on-beat jitter, off-beat, double and half tempo, random clicks, dropped beats, and one pair exactly 70 ms apart (that edge case was the one difference before the edge-test fix). Seven of them are pinned in `smoke-wo872-beat-metrics.test.js` (curated, 10/10).
 - **Baseline, the WO-662 tracker on all 998 readable GTZAN clips:**
@@ -138,4 +150,25 @@ Their own causal scores (`docs/BENCHMARKS.md`): Ballroom F .549 / Acc1 .689, Har
   - The engine costs 8.5 % of one core (standalone probe, rock.00003).
   - `smoke-wo872-beat-grid` 4/4 (adds a pin for the pacer); audio-capture, WO-333, WO-662 and WO-866 smokes pass, 60/60 in total.
 - **Cost.** 998 clips × 30 s in 16 s on 14 workers: about 135× real time per core.
+- **Step 5.**
+  - `smoke-wo872-level-norm` (curated, 5/5):
+    - one 30 ms full-scale burst leaves bass / mid / high within 0.05 of the clean run 1-5 s later;
+    - a −20 dB passage re-ranges within 4 s;
+    - −57 LUFS noise stays gated, with every level at 0;
+    - hysteresis: a dip to −57 holds the gate open, and −70 closes it 0.25-0.7 s in;
+    - BS.1770 calibration: a 997 Hz sine at −20 dBFS reads −23.01 LUFS. The 48 kHz coefficients equal the standard's table to every printed digit.
+  - Run against HEAD's `audio-parts.js`, the pumping test fails (mid 0.164 vs 0.719) and so does the quiet-room test. The tests discriminate.
+  - **GTZAN pumping probe** (8 clips, one per genre, with a 30 ms full-scale burst at 10 s). Mean |Δlevel| against the clean clip over 10.5-14 s:
+
+| | bass | mid | high |
+|---|---|---|---|
+| old peak AGC | .017 | .083 | **.439** |
+| percentile AGC | .004 | .010 | **.014** |
+
+  - Worst old case: classical, high band .834.
+  - CPU: `audio-parts` costs 5.3 % of a core, up from 4.9 % (rock.00003, 30 s).
+  - `smoke-wo861-audio-parts`, `wo866-drum-tuning`, `wo861-live-audio-single-flight` and `wo333-audio-capture-fft` all pass, 43/43.
+  - Godot headless suite: 23893 passed, 0 failed. That includes the new `test_beat_phase` cases: unlocked gives 0 in the model and in sync, and a frame without `locked` behaves as before. The owner's running GUI picks this up on its next relaunch.
+  - **Live on the box** (rock.00003 test music over WS): bass / mid / high P10-P90 are .28-.92, .37-.95 and .44-.97 at 30 fps. The analog input with nothing plugged reads 0/0/0, so the gate is closed. The beat is unchanged (hiphop.00012 live F .976).
+  - The first ~10 s of WS frames after a node restart arrive at 16-23 fps (JIT warm-up). Every steady-state probe ran at 30 fps.
 

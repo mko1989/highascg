@@ -83,12 +83,15 @@ Copyright (c) 2025-2026 Kevin Raymond
 License: MIT OR Apache-2.0; used here under MIT (text below).
 
 HighAsCG's beat tracker (WO-872) ports the design and constants of fosfora's audio analysis at commit 82633d7
-(crates/fosfora-app/src/audio/beat.rs). It is re-implemented in JavaScript; no fosfora source or model file is copied.
+(crates/fosfora-app/src/audio/). It is re-implemented in JavaScript; no fosfora source or model file is copied.
 
   src/audio/beat-onset.js ← SuperFlux on log bands, partition weights 0.60 / 0.28 / 0.12 (beat.rs:307-440)
   src/audio/beat-tempo.js ← TempoEstimator: bias-corrected ACF, comb, log-Gaussian prior, seed gate, Kalman in log2 BPM,
                             lock hysteresis, metrical anchor (beat.rs:499-760, 1414-1650)
   src/audio/beat-grid.js  ← BeatScheduler: predicted grid, PI phase/trim loop, muted free-run (beat.rs:1660-2490)
+  src/audio/level-norm.js ← percentile ranging P5 / P95 over ~4 s with a 0.85 soft knee, the −80 dB floor, the BS.1770
+                            silence gate −55 / −60 LUFS with a 0.25 s hold (normalizer.rs, ranging.rs, analyzer.rs:143-151,
+                            loudness.rs:45-54)
 
 The changes (tuned defaults, what was left out) are listed in those files and in
 work/work-orders/872_WO_beat_tracking_fosfora_comparison.md.

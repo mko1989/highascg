@@ -39,7 +39,7 @@ static func observe(state: Dictionary, frame: Variant, buses: Dictionary, now_ms
 		state.n[d] = n
 		state.hits[d] = hits
 	var beat: Variant = frame.get("beat") if frame is Dictionary else null
-	state.beat = {"bpm": _num(beat.get("bpm")), "phase": _num(beat.get("phase")), "at": now_ms} if beat is Dictionary else {}
+	state.beat = {"bpm": _num(beat.get("bpm")), "phase": _num(beat.get("phase")), "locked": bool(beat.get("locked", true)), "at": now_ms} if beat is Dictionary else {}
 	state.frames.append([now_ms, buses])
 	while state.frames.size() > 2 and state.frames[1][0] <= now_ms - MAX_MS - 100:
 		state.frames.pop_front()
@@ -67,7 +67,7 @@ static func apply(state: Dictionary, buses: Dictionary, sync_ms: float, now_ms: 
 			if per > 0.0:
 				var k := mini(floori((now_ms - s - hits[-1]) / per), AHEAD)
 				out[d] = pulse(now_ms - (hits[-1] + k * per + s))
-	if float(state.beat.get("bpm", 0.0)) > 0.0:
+	if float(state.beat.get("bpm", 0.0)) > 0.0 and state.beat.get("locked", true):  # WO-872: unlocked → the model's 0 stands
 		var ms: float = 60000.0 / state.beat.bpm
 		var ph := fposmod(state.beat.phase + (now_ms - state.beat.at - s) / ms, 1.0)
 		out["beat"] = clampf(1.0 - ph * 4.0, 0.0, 1.0)
