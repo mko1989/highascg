@@ -10,7 +10,7 @@ Boot order: **`home-casparcg-exfat.mount`** → **`highascg-exfat-media-prep.ser
 
 ## 1. One-time on the **build / dev machine** (becomes the eggs `--clone` source)
 
-Before **`sudo eggs produce --clone`** (or **`build-highascg-egg.sh`**), bake WO-47 into **`/`** so the clone snapshots it:
+Before **`sudo eggs remaster --clone`** (legacy: `eggs produce --clone`) (or **`build-highascg-egg.sh`**), bake WO-47 into **`/`** so the clone snapshots it:
 
 ```bash
 sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh   # or: npm run eggs:prepare
@@ -33,12 +33,12 @@ Or run the granular steps manually:
 
 4. Install everything else (Caspar deps, WO-38, WO-47, **`highascg.service`**) on the imaging host: **`sudo bash scripts/install.sh`** (recommended once). For **WO-47 + service ordering only** (if the rest is already baked): **`sudo bash scripts/install-exfat-systemd-units.sh casparcg`** then **`sudo bash scripts/write-highascg-systemd-unit.sh casparcg`** — or use **`prepare-eggs-clone-with-exfat.sh`** above instead of repeating these fragments.
 
-5. **Squashfs empty mount points** (before `eggs produce`):  
+5. **Squashfs empty mount points** (before `eggs remaster`):  
    `sudo bash tools/eggs/live-usb/ensure-empty-live-usb-dirs.sh`
 
 6. **Build the ISO** (your usual eggs flow), e.g.:  
    `sudo bash tools/eggs/live-usb/build-highascg-egg.sh` (or `npm run eggs:build`)  
-   (or `eggs produce --clone …` after merge excludes).
+   (or `eggs remaster --clone …` after `install-eggs-config.sh --apply`; legacy: `eggs produce --clone …` after merge excludes).
 
 ---
 

@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Check-only: host is ready for eggs produce. Does NOT install or modify the system.
+# Check-only: host is ready for eggs remaster (legacy eggs: produce). Does NOT install or modify the system.
+# WO-870: flavor-aware — new eggs: managed config (custom.yaml, custom.exclude.list, branding/livecd via
+# verify-eggs-config.sh) + calamares package + `eggs sysinstall calamares --help`; legacy: exclude.list,
+# eggs.yaml theme and /etc/calamares as before.
 #
 #   sudo bash tools/eggs/live-usb/verify-eggs-prepare-host.sh
 #
@@ -22,6 +25,9 @@ EXCLUDE="${EGGS_EXCLUDE_LIST:-/etc/penguins-eggs.d/exclude.list}"
 # WO-832: eggs 26.10 moved the theme to /etc/penguins-eggs.d/branding.default
 # shellcheck source=eggs-theme-lib.sh
 source "${HERE}/eggs-theme-lib.sh"
+# shellcheck source=eggs-cli-lib.sh
+source "${HERE}/eggs-cli-lib.sh"
+EGGS_FLAVOR="$(highascg_eggs_flavor)"
 EGGS_LIVECD="${EGGS_LIVECD:-$(highascg_eggs_theme_dir 2>/dev/null || echo /etc/penguins-eggs.d/branding.default)/livecd}"
 FAIL=0
 
@@ -63,6 +69,8 @@ need_cmd() {
 echo "==> Eggs prepare verify (check-only, no installs)"
 
 need_cmd eggs "sudo bash ${REPO_ROOT}/work/setup-boot-branding-phase1.sh"
+[[ "$EGGS_FLAVOR" != "none" ]] && ok "eggs flavor ${EGGS_FLAVOR} ($(highascg_eggs_bin 2>/dev/null || echo ?))" \
+	|| fail "eggs answers neither remaster nor produce — install penguins-eggs"
 [[ -d "$EGGS_LIVECD" ]] && ok "eggs livecd theme ${EGGS_LIVECD}" \
 	|| fail "missing ${EGGS_LIVECD} — install penguins-eggs"
 
@@ -120,18 +128,27 @@ for unit in \
 		|| fail "missing /etc/systemd/system/${unit} — sudo bash ${REPO_ROOT}/scripts/install-exfat-systemd-units.sh ${USER_CASPAR}"
 done
 
-need_path "$EXCLUDE" \
-	"sudo HIGHASCG_EGGS_EXCLUDE_FRAGMENT=${HERE}/penguins-eggs-exclude-highascg-embed-server.list bash ${HERE}/merge-penguins-eggs-exclude-highascg.sh --replace"
-
-# install-eggs-live-grub-theme.sh writes repo theme + eggs.yaml — does not replace /usr/.../livecd/
 THEME_ROOT="${HERE}/highascg-eggs-theme"
 THEME_LIVE="${THEME_ROOT}/theme/livecd"
-EGGS_YAML="${EGGS_YAML:-/etc/penguins-eggs.d/eggs.yaml}"
-if [[ -f "${THEME_LIVE}/grub.main.cfg" && -f "${THEME_LIVE}/splash.png" && -f "${THEME_LIVE}/grub.theme.cfg" ]] \
-	&& [[ -f "$EGGS_YAML" ]] && grep -qE '^theme:[[:space:]]+.*highascg-eggs-theme' "$EGGS_YAML"; then
-	ok "eggs GRUB theme ready (${THEME_ROOT}; eggs.yaml theme: set)"
+if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
+	# New eggs: custom.exclude.list + custom.yaml + branding/livecd/* — verify-eggs-config.sh owns the content check.
+	if bash "${HERE}/verify-eggs-config.sh"; then
+		ok "managed eggs config matches the repo (custom.exclude.list, custom.yaml, $(highascg_eggs_branding_dir)/livecd)"
+	else
+		fail "managed eggs config differs (FAIL lines above) — sudo bash ${HERE}/install-eggs-config.sh --apply"
+	fi
 else
-	fail "eggs GRUB theme not ready — sudo bash ${HERE}/install-eggs-live-grub-theme.sh"
+	need_path "$EXCLUDE" \
+		"sudo HIGHASCG_EGGS_EXCLUDE_FRAGMENT=${HERE}/penguins-eggs-exclude-highascg-embed-server.list bash ${HERE}/merge-penguins-eggs-exclude-highascg.sh --replace"
+
+	# install-eggs-live-grub-theme.sh writes repo theme + eggs.yaml — does not replace /usr/.../livecd/
+	EGGS_YAML="${EGGS_YAML:-/etc/penguins-eggs.d/eggs.yaml}"
+	if [[ -f "${THEME_LIVE}/grub.main.cfg" && -f "${THEME_LIVE}/splash.png" && -f "${THEME_LIVE}/grub.theme.cfg" ]] \
+		&& [[ -f "$EGGS_YAML" ]] && grep -qE '^theme:[[:space:]]+.*highascg-eggs-theme' "$EGGS_YAML"; then
+		ok "eggs GRUB theme ready (${THEME_ROOT}; eggs.yaml theme: set)"
+	else
+		fail "eggs GRUB theme not ready — sudo bash ${HERE}/install-eggs-live-grub-theme.sh"
+	fi
 fi
 
 if [[ -d "${HIGHASCG_ROOT}/node_modules" ]]; then
@@ -145,15 +162,24 @@ if [[ "$EMBED_CALAMARES" == "1" ]]; then
 	if command -v calamares >/dev/null 2>&1 && [[ -x /usr/bin/calamares ]]; then
 		ok "Calamares /usr/bin/calamares ($(calamares --version 2>/dev/null | head -1 || echo installed))"
 	else
-		fail "Calamares missing — sudo bash ${HERE}/install-eggs-calamares.sh (eggs produce warns without it)"
+		fail "Calamares missing — sudo bash ${HERE}/install-eggs-calamares.sh (the ISO installer needs it)"
 	fi
 	if dpkg-query -W -f='${Status}' calamares 2>/dev/null | grep -qE '(install|hold) ok installed'; then
 		ok "dpkg calamares"
 	else
 		fail "dpkg calamares not installed — sudo bash ${HERE}/install-eggs-calamares.sh"
 	fi
-	[[ -d /etc/calamares ]] && ok "/etc/calamares" \
-		|| fail "missing /etc/calamares — sudo bash ${HERE}/install-eggs-calamares.sh"
+	if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
+		# New eggs generates the Calamares config on the live system (no /etc/calamares at build time).
+		if timeout 10 "$(highascg_eggs_bin 2>/dev/null || echo eggs)" sysinstall calamares --help >/dev/null 2>&1 </dev/null; then
+			ok "eggs sysinstall calamares (launcher command present)"
+		else
+			fail "eggs sysinstall calamares --help failed — this eggs cannot start the installer"
+		fi
+	else
+		[[ -d /etc/calamares ]] && ok "/etc/calamares" \
+			|| fail "missing /etc/calamares — sudo bash ${HERE}/install-eggs-calamares.sh"
+	fi
 else
 	ok "HIGHASCG_ISO_EMBED_CALAMARES=0 — skipping Calamares checks"
 fi
@@ -179,7 +205,7 @@ if ss -tln 2>/dev/null | grep -q ':5250 '; then
 		n_run=$((n_run + 1))
 	done
 	if [[ "$n_main" -gt 1 || "$n_run" -gt 1 ]]; then
-		fail "duplicate Caspar supervisors (main=${n_main}, run.sh=${n_run}) on :5250 — stop extras before produce"
+		fail "duplicate Caspar supervisors (main=${n_main}, run.sh=${n_run}) on :5250 — stop extras before the build"
 	else
 		ok "Caspar AMCP :5250 (main=${n_main}, run.sh=${n_run}; CEF children ignored)"
 	fi
@@ -195,5 +221,5 @@ if [[ "$FAIL" -gt 0 ]]; then
 	echo "  Or: sudo bash ${HERE}/prepare-eggs-clone-with-exfat.sh ${USER_CASPAR}" >&2
 	exit 1
 fi
-echo "Prepare verify passed — host looks ready for eggs produce."
+echo "Prepare verify passed — host looks ready for eggs ${EGGS_FLAVOR} (remaster/produce)."
 exit 0

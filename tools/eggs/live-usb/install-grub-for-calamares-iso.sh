@@ -30,4 +30,4 @@ for pkg in grub-pc grub-pc-bin grub-efi-amd64-bin; do
 	fi
 done
 
-echo "OK: GRUB BIOS + EFI packages ready for eggs produce squashfs clone"
+echo "OK: GRUB BIOS + EFI packages ready for eggs remaster squashfs clone"

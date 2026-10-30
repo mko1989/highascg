@@ -56,7 +56,7 @@ typ=$(lsblk -ndo TYPE "$DEV" 2>/dev/null || true)
 
 if [[ -z "$ISO" ]]; then
 	ISO="$(find_latest_iso)" || {
-		echo "No ISO under /home/eggs/ — pass --iso" >&2
+		echo "No ISO under /home/eggs/ (eggs 26.10: <name>-*.iso link; legacy: <name>_*.iso, also mnt/) — pass --iso" >&2
 		exit 1
 	}
 fi
@@ -64,7 +64,7 @@ fi
 	echo "ISO not found: $ISO" >&2
 	exit 1
 }
-iso_mib="$(du -m "$ISO" | awk '{print $1}')"
+iso_mib="$(du -mL "$ISO" | awk '{print $1}')"
 if [[ "$iso_mib" -lt 1500 ]]; then
 	echo "ERROR: ISO is only ${iso_mib} MiB — expected ~2400–3500 MiB (lean excludes, no nvidia-pool)." >&2
 	echo "       A truncated squashfs cannot boot. Run full build:" >&2
@@ -79,7 +79,7 @@ if getent passwd "$USER_CASPAR" >/dev/null 2>&1; then
 	chown "${USER_CASPAR}:${grp}" /home/casparcg/exfat /home/casparcg/highascg/media/exfat
 fi
 
-ISO_BYTES="$(stat -c%s "$ISO")"
+ISO_BYTES="$(stat -L -c%s "$ISO")"
 ISO_HUMAN="$(numfmt --to=iec-i --suffix=B "$ISO_BYTES" 2>/dev/null || echo "${ISO_BYTES} bytes")"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

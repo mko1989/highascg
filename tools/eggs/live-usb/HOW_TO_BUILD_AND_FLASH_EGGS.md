@@ -1,6 +1,6 @@
 # Build an ISO and put it on a Ventoy stick
 
-One produce per boot — `eggs produce` leaves live-system bind mounts under `/home/eggs/liveroot`
+One build per boot — `eggs remaster` (legacy: `eggs produce`) leaves live-system bind mounts under `/home/eggs/liveroot`
 and the build refuses to start again until you reboot.
 
 ```bash

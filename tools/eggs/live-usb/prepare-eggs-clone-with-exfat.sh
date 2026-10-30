@@ -208,8 +208,9 @@ bash "${HERE}/verify-startup-on-host.sh"
 
 echo ""
 echo "==> Ready for clone snapshot:"
-echo "    sudo eggs produce --nointeractive --clone --max --excludes static --basename \"yourname\""
-echo "    Or: sudo bash ${HERE}/build-highascg-egg.sh"
+echo "    sudo bash ${HERE}/build-highascg-egg.sh   (picks the eggs flavor, applies the managed config — WO-870)"
+echo "    Bare clone: sudo bash ${REPO_ROOT}/work/run-eggs-produce-clone-only.sh"
+echo "      (eggs 26.10 runs: eggs remaster --clone --anonymous; legacy eggs: eggs produce --nointeractive --clone --max …)"
 echo ""
 
 if [[ "$SKIP_HIGHASCG_SYSTEMD_RESTART" != "1" ]]; then

@@ -6,22 +6,24 @@ find_latest_iso() {
 	find_newest_iso_since 0 "${BASENAME:-}"
 }
 
-# Newest *.iso under /home/eggs/ (+ mnt/) written at or after EPOCH (0 = any).
-# Optional BASENAME prefix filter (e.g. highascg → highascg_*.iso).
+# Newest *.iso in the eggs nest (/home/eggs, EGGS_NEST) + its legacy mnt/, written at or after EPOCH (0 = any).
+# Optional BASENAME prefix filter; both flavors' names match (WO-870): new `BASENAME-<date>.iso` (coa iso_prefix),
+# legacy `BASENAME_<arch>_<date>.iso`. A coa target_dir ISO is a symlink in the nest — stat -L dates the ISO itself.
 find_newest_iso_since() {
 	local since="${1:-0}"
 	local prefix="${2:-}"
+	local nest="${EGGS_NEST:-/home/eggs}"
 	local latest="" t=0 f ts dir base
 	shopt -s nullglob
-	for dir in /home/eggs /home/eggs/mnt; do
+	for dir in "$nest" "${nest}/mnt"; do
 		[[ -d "$dir" ]] || continue
 		for f in "${dir}"/*.iso; do
 			[[ -f "$f" ]] || continue
 			if [[ -n "$prefix" ]]; then
 				base="${f##*/}"
-				[[ "$base" == "${prefix}"* ]] || [[ "$base" == "${prefix}_"* ]] || continue
+				[[ "$base" == "${prefix}-"* ]] || [[ "$base" == "${prefix}_"* ]] || continue
 			fi
-			ts=$(stat -c %Y "$f" 2>/dev/null) || continue
+			ts=$(stat -L -c %Y "$f" 2>/dev/null) || continue
 			((ts >= since)) || continue
 			if ((ts >= t)); then
 				t=$ts
@@ -31,7 +33,7 @@ find_newest_iso_since() {
 	done
 	shopt -u nullglob
 	[[ -n "$latest" ]] || {
-		echo "No *.iso under /home/eggs/ (since epoch ${since}${prefix:+, prefix ${prefix}})." >&2
+		echo "No *.iso under ${nest}/ (since epoch ${since}${prefix:+, name ${prefix}-* or ${prefix}_*})." >&2
 		return 1
 	}
 	printf '%s' "$latest"
@@ -147,7 +149,7 @@ dd_iso_with_progress() {
 	}
 
 	dev_base="$(basename "$dev")"
-	iso_bytes="$(stat -c%s "$iso")"
+	iso_bytes="$(stat -L -c%s "$iso")"
 
 	echo "Writing ${iso} → ${dev} (bs=${bs}) …" >&2
 	dd if="$iso" of="$dev" bs="$bs" iflag=fullblock status=none &

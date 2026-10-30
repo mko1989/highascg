@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Stop WO-47/52 exFAT + bridge units and unmount volumes before eggs produce.
+# Stop WO-47/52 exFAT + bridge units and unmount volumes before eggs remaster.
 # Prevents baking stick/bridge disk content into filesystem.squashfs.
 #
 # Usage:
 #   sudo bash tools/eggs/live-usb/stop-and-unmount-wo47-for-eggs-produce.sh
 #
-# Restore after produce:
+# Restore after the build:
 #   sudo bash tools/eggs/live-usb/unmask-exfat-systemd.sh
 #   sudo bash scripts/highascg-exfat-remount-sync.sh
 set -euo pipefail
@@ -65,7 +65,7 @@ for unit in \
 	stop_unit "$unit"
 done
 
-log "Mask runtime automount/arrive (prevent re-mount during produce)"
+log "Mask runtime automount/arrive (prevent re-mount during the build)"
 for unit in \
 	highascg-exfat-arrive.service \
 	highascg-bridge-arrive.service \
@@ -101,10 +101,10 @@ done
 
 if [[ "$FAIL" -gt 0 ]]; then
 	if [[ "$STRICT" == "1" ]]; then
-		echo "ERROR: umount WO-47 paths before eggs produce (or set STRICT=0 to warn only)." >&2
+		echo "ERROR: umount WO-47 paths before eggs remaster (or set STRICT=0 to warn only)." >&2
 		exit 1
 	fi
 	echo "WARN: ${FAIL} WO-47 path(s) still mounted — squashfs may bake disk content." >&2
 fi
 
-echo "OK: WO-47 volumes stopped/unmounted for eggs produce"
+echo "OK: WO-47 volumes stopped/unmounted for eggs remaster"

@@ -4,6 +4,7 @@
 #
 #   sudo bash tools/eggs/live-usb/fix-calamares-shellprocess.sh
 #   HIGHASCG_CALAMARES_ROOT=/home/eggs/mnt/squashfs-calamares-patch-root sudo bash ...
+#   sudo bash tools/eggs/live-usb/fix-calamares-shellprocess.sh --log-rescue-only   # eggs 26.10: WO-417 unit only
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {
@@ -27,7 +28,30 @@ else
 	echo "==> Calamares shellprocess fix target: live system (/)"
 fi
 
-mkdir -p "$MOD" "$LIB" "$SBIN"
+mkdir -p "$LIB" "$SBIN"
+
+# WO-417: an exec-phase failure (bootloader) aborts BEFORE shellprocess@logs, losing
+# session.log with the live tmpfs. Live-only unit mirrors it to HIGHASCGEXF instead.
+install_log_rescue() {
+	local src="${HERE}/calamares-session-log-rescue.sh" unit="${HERE}/systemd/calamares-session-log-rescue.service"
+	[[ -f "$src" && -f "$unit" ]] || return 0
+	local sysd="${ROOT}/etc/systemd/system"
+	mkdir -p "$sysd" "${sysd}/multi-user.target.wants"
+	install -m 0755 "$src" "${LIB}/calamares-session-log-rescue.sh"
+	install -m 0644 "$unit" "${sysd}/calamares-session-log-rescue.service"
+	ln -sf ../calamares-session-log-rescue.service \
+		"${sysd}/multi-user.target.wants/calamares-session-log-rescue.service"
+	echo "==> installed + enabled calamares-session-log-rescue (live sessions only)"
+}
+
+# WO-870 Phase 4: eggs 26.10 builds its own Calamares config on the stick, so none of the /etc/calamares patches
+# below apply — but the krill-chroot-runner step (grub/initramfs) can still abort mid-install, so the rescue stays.
+if [[ "${1:-}" == "--log-rescue-only" ]]; then
+	install_log_rescue
+	exit 0
+fi
+
+mkdir -p "$MOD"
 
 echo "==> Calamares shellprocess: full paths for chroot (mkinitramfs, dpkg-reconfigure)"
 
@@ -184,8 +208,6 @@ fi
 L10N_SRC="${HERE}/calamares-l10n-helper.sh"
 NOMODESET_SRC="${HERE}/calamares-nomodeset-helper.sh"
 LOGS_SRC="${HERE}/calamares-logs-helper.sh"
-RESCUE_SRC="${HERE}/calamares-session-log-rescue.sh"
-RESCUE_UNIT_SRC="${HERE}/systemd/calamares-session-log-rescue.service"
 if [[ -f "$L10N_SRC" ]]; then
 	install -m 0755 "$L10N_SRC" "${LIB}/calamares-l10n-helper.sh"
 	echo "==> installed ${LIB}/calamares-l10n-helper.sh (offline-safe)"
@@ -199,17 +221,7 @@ if [[ -f "$LOGS_SRC" ]]; then
 	echo "==> installed ${LIB}/calamares-logs-helper.sh (offline-safe install logs)"
 fi
 
-# WO-417: an exec-phase failure (bootloader) aborts BEFORE shellprocess@logs, losing
-# session.log with the live tmpfs. Live-only unit mirrors it to HIGHASCGEXF instead.
-if [[ -f "$RESCUE_SRC" && -f "$RESCUE_UNIT_SRC" ]]; then
-	SYSD="${ROOT}/etc/systemd/system"
-	mkdir -p "$SYSD" "${SYSD}/multi-user.target.wants"
-	install -m 0755 "$RESCUE_SRC" "${LIB}/calamares-session-log-rescue.sh"
-	install -m 0644 "$RESCUE_UNIT_SRC" "${SYSD}/calamares-session-log-rescue.service"
-	ln -sf ../calamares-session-log-rescue.service \
-		"${SYSD}/multi-user.target.wants/calamares-session-log-rescue.service"
-	echo "==> installed + enabled calamares-session-log-rescue (live sessions only)"
-fi
+install_log_rescue
 
 if [[ ! -x "${SBIN}/cleanup.sh" ]]; then
 	# WO-832: eggs 26.10 keeps the distro tree in /etc/penguins-eggs.d/distros (older: /usr/lib/penguins-eggs/conf/distros).

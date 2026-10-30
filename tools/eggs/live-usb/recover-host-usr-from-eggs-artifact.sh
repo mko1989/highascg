@@ -54,13 +54,25 @@ liveroot_staging_ok() {
 	[[ -f /home/eggs/liveroot/usr/bin/bash && -f /home/eggs/liveroot/bin/bash ]]
 }
 
+# Pinned NVIDIA branch of the build (bash builtin read — /usr may be gone); any branch when unreadable.
+iso_branch() {
+	local br=""
+	read -r br </etc/highascg/nvidia-iso-driver 2>/dev/null || true
+	[[ "$br" =~ ^[0-9]+$ ]] && printf '%s' "$br" || printf '*'
+}
+
+# WO-870: both eggs flavors — new: staging /home/eggs/isodir, ISO highascg-nvidia-<br>-<date>.iso;
+# legacy: staging /home/eggs/mnt/iso, ISO highascg-nvidia-<br>_amd64_<date>.iso.
 find_artifact() {
-	local f
+	local f br
+	br="$(iso_branch)"
 	for f in \
 		"$ARTIFACT" \
+		/home/eggs/isodir/live/filesystem.squashfs \
 		/home/eggs/mnt/iso/live/filesystem.squashfs \
-		/home/eggs/mnt/highascg-nvidia-595_amd64_*.iso \
-		/home/eggs/highascg-nvidia-595_amd64_*.iso \
+		/home/eggs/highascg-nvidia-${br}-*.iso \
+		/home/eggs/mnt/highascg-nvidia-${br}_*.iso \
+		/home/eggs/highascg-nvidia-${br}_*.iso \
 		/home/eggs/mnt/*.iso \
 		/home/eggs/*.iso; do
 		[[ -n "$f" && -f "$f" ]] || continue
@@ -183,4 +195,4 @@ echo "    Reboot now:  /sbin/reboot  or  echo b > /proc/sysrq-trigger"
 echo "    After reboot:"
 echo "      sudo bash /home/casparcg/highascg/scripts/setup/02-verify-kernel-117.sh"
 echo "      sudo bash /home/casparcg/highascg/scripts/highascg-exfat-remount-sync.sh"
-echo "    NEVER rm /home/eggs — reboot after interrupted eggs produce, then pre-produce-preflight.sh only."
+echo "    NEVER rm /home/eggs — reboot after an interrupted eggs remaster/produce, then pre-produce-preflight.sh only."

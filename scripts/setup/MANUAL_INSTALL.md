@@ -31,7 +31,7 @@ Legacy monolith `scripts/install.sh` (phases 1–5) still works; prefer this pat
 
 - `apt install linux-image-generic` (pulls kernel 124+)
 - Install closed `cuda-drivers` / Ubuntu `nvidia-driver-595` on Blackwell (needs **open** modules)
-- `rm` under `/home/eggs` during or after interrupted `eggs produce`
+- `rm` under `/home/eggs` during or after interrupted `eggs remaster` / `eggs produce`
 
 ---
 
@@ -434,7 +434,7 @@ ss -ltn | grep 5250
 |----------|---------|---------|
 | `USER_CASPAR` | all setup scripts | Default `casparcg` |
 | `CASPAR_PLAYOUT_ROOT` | 05, 07, 08, 09 | Default `/home/casparcg/highascg` |
-| `HIGHASCG_NVIDIA_DRIVER` | 03, eggs produce | Default `595` |
+| `HIGHASCG_NVIDIA_DRIVER` | 03, eggs remaster | 03: default `595`; ISO build: the installed driver branch (stamped into `/etc/highascg/nvidia-iso-driver`) |
 | `HIGHASCG_NDI_SDK_TAR` | 04 | Offline NDI tarball path |
 | `HIGHASCG_SKIP_CEF` | 08 | Skip CEF download |
 | `HIGHASCG_HOST_BOOT_MODE` | 11 | `dmesg` (default) or `plymouth` |

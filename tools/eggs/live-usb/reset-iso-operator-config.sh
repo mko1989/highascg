@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Reset HighAsCG operator config on the eggs build host before squashfs snapshot.
-# Does not run npm — safe to call again immediately before `eggs produce`.
+# Does not run npm — safe to call again immediately before `eggs remaster`.
 #
 # Usage:
 #   sudo bash tools/eggs/live-usb/reset-iso-operator-config.sh

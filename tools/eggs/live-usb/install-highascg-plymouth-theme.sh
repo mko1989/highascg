@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install HighAsCG Plymouth theme on the eggs build host (before eggs produce --clone).
+# Install HighAsCG Plymouth theme on the eggs build host (before eggs remaster --clone).
 #
 # Default: script theme — boot status lines on the left + throbber-boot/ (4 frames) top-right.
 # Optional: HIGHASCG_PLYMOUTH_FULL_ANIM=1 → large mascot animation right 1/3 (30 frames).

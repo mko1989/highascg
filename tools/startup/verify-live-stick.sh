@@ -45,7 +45,7 @@ elif grep -q cow_spacesize /proc/cmdline 2>/dev/null; then
 	warn "cmdline has cow_spacesize but NOT persistence — OS changes use RAM overlay (2G), not LABEL=persistence partition"
 	bad "rebuild ISO with highascg-eggs-theme + reflash; boot entry must include persistence kernel param"
 else
-	bad "no persistence in cmdline — rebuild ISO with eggs produce --theme highascg-eggs-theme"
+	bad "no persistence in cmdline — rebuild ISO (eggs 26.10: install-eggs-config.sh --apply, then eggs remaster; legacy: eggs produce --theme highascg-eggs-theme)"
 fi
 if grep -E 'overlay|live-rw' /proc/mounts 2>/dev/null | head -3; then
 	ok "overlay/live-rw active"
@@ -134,7 +134,7 @@ done
 INITRD=""
 if [[ -d /run/live/medium ]]; then
 	shopt -s nullglob
-	for i in /run/live/medium/live/initrd*.img; do INITRD="$i"; break; done
+	for i in /run/live/medium/live/initrd.img /run/live/medium/live/initrd.img-* /run/live/medium/live/initrd*.img; do INITRD="$i"; break; done
 	shopt -u nullglob
 fi
 if [[ -z "$INITRD" ]]; then
@@ -187,37 +187,57 @@ if sudo -u "$USER_CASPAR" sudo -n /usr/local/bin/launch-calamares.sh --check 2>/
 else
 	bad "launch-calamares --check failed — sudoers or launcher broken"
 fi
-BRAND="/etc/calamares/branding/highascg-eggs-theme"
-if [[ -f "${BRAND}/branding.desc" ]]; then
-	icon="$(awk -F': *' '/^[[:space:]]*productIcon:/{print $2; exit}' "${BRAND}/branding.desc" | tr -d ' \"')"
-	if [[ -n "$icon" ]] && [[ -f "${BRAND}/${icon}" ]]; then
-		ok "Calamares branding logo ${icon}"
-	elif [[ -x /usr/local/lib/highascg/fix-calamares-branding.sh ]]; then
-		echo "  repairing Calamares branding (eggs logo name mismatch)…"
-		if sudo /usr/local/lib/highascg/fix-calamares-branding.sh 2>/dev/null \
-			&& [[ -f "${BRAND}/${icon}" ]]; then
-			ok "Calamares branding logo ${icon} (repaired)"
+# WO-870: an eggs 26.10 ISO carries the Calamares overlay; `eggs sysinstall calamares` builds
+# /etc/penguins-eggs.d/installer.d from it at launch, so /etc/calamares (and the legacy shellprocess patches) are not
+# what the installer reads.
+CAL_OVERLAY=/etc/penguins-eggs.d/branding/calamares
+if [[ -f "${CAL_OVERLAY}/branding/show.qml" ]]; then
+	for f in branding/show.qml branding/branding.desc.tmpl branding/highascg-eggs-theme-logo.png; do
+		if [[ -f "${CAL_OVERLAY}/${f}" ]]; then
+			ok "Calamares overlay ${f}"
 		else
-			bad "Calamares branding logo missing (${icon:-unknown}) — sudo bash tools/eggs/live-usb/install-eggs-calamares.sh"
+			bad "Calamares overlay ${f} missing — rebuild ISO after install-eggs-config.sh --apply"
+		fi
+	done
+	# no modules/ overrides on purpose: they would replace coa's generated partition/users confs whole
+	if [[ -f /usr/libexec/calamares/calamares-session-log-rescue.sh ]] && systemctl is-enabled --quiet calamares-session-log-rescue.service 2>/dev/null; then
+		ok "calamares-session-log-rescue enabled (WO-417: install logs land on HIGHASCGEXF)"
+	else
+		bad "calamares-session-log-rescue missing — rebuild ISO (pre-produce-preflight installs it)"
+	fi
+else
+	BRAND="/etc/calamares/branding/highascg-eggs-theme"
+	if [[ -f "${BRAND}/branding.desc" ]]; then
+		icon="$(awk -F': *' '/^[[:space:]]*productIcon:/{print $2; exit}' "${BRAND}/branding.desc" | tr -d ' \"')"
+		if [[ -n "$icon" ]] && [[ -f "${BRAND}/${icon}" ]]; then
+			ok "Calamares branding logo ${icon}"
+		elif [[ -x /usr/local/lib/highascg/fix-calamares-branding.sh ]]; then
+			echo "  repairing Calamares branding (eggs logo name mismatch)…"
+			if sudo /usr/local/lib/highascg/fix-calamares-branding.sh 2>/dev/null \
+				&& [[ -f "${BRAND}/${icon}" ]]; then
+				ok "Calamares branding logo ${icon} (repaired)"
+			else
+				bad "Calamares branding logo missing (${icon:-unknown}) — sudo bash tools/eggs/live-usb/install-eggs-calamares.sh"
+			fi
+		else
+			bad "Calamares branding logo missing (${icon:-unknown}) — rebuild ISO after install-eggs-calamares.sh"
 		fi
 	else
-		bad "Calamares branding logo missing (${icon:-unknown}) — rebuild ISO after install-eggs-calamares.sh"
+		bad "Calamares branding.desc missing — ISO built without install-eggs-calamares.sh"
 	fi
-else
-	bad "Calamares branding.desc missing — ISO built without install-eggs-calamares.sh"
-fi
-if grep -q '/usr/sbin/mkinitramfs' /etc/calamares/modules/shellprocess@mkinitramfs.conf 2>/dev/null; then
-	ok "Calamares shellprocess patched (exit-127 fix)"
-elif [[ -f "${HOME}/highascg/tools/eggs/live-usb/fix-calamares-shellprocess.sh" ]]; then
-	echo "  applying Calamares shellprocess fix (chroot PATH / offline l10n)…"
-	if sudo bash "${HOME}/highascg/tools/eggs/live-usb/fix-calamares-shellprocess.sh" 2>/dev/null \
-		&& grep -q '/usr/sbin/mkinitramfs' /etc/calamares/modules/shellprocess@mkinitramfs.conf 2>/dev/null; then
-		ok "Calamares shellprocess patched (exit-127 fix, applied from repo)"
+	if grep -q '/usr/sbin/mkinitramfs' /etc/calamares/modules/shellprocess@mkinitramfs.conf 2>/dev/null; then
+		ok "Calamares shellprocess patched (exit-127 fix)"
+	elif [[ -f "${HOME}/highascg/tools/eggs/live-usb/fix-calamares-shellprocess.sh" ]]; then
+		echo "  applying Calamares shellprocess fix (chroot PATH / offline l10n)…"
+		if sudo bash "${HOME}/highascg/tools/eggs/live-usb/fix-calamares-shellprocess.sh" 2>/dev/null \
+			&& grep -q '/usr/sbin/mkinitramfs' /etc/calamares/modules/shellprocess@mkinitramfs.conf 2>/dev/null; then
+			ok "Calamares shellprocess patched (exit-127 fix, applied from repo)"
+		else
+			bad "Calamares shellprocess not patched — rebuild ISO or sudo bash tools/eggs/live-usb/fix-calamares-shellprocess.sh"
+		fi
 	else
-		bad "Calamares shellprocess not patched — rebuild ISO or sudo bash tools/eggs/live-usb/fix-calamares-shellprocess.sh"
+		bad "Calamares shellprocess not patched — rebuild ISO after fix-calamares-shellprocess.sh"
 	fi
-else
-	bad "Calamares shellprocess not patched — rebuild ISO after fix-calamares-shellprocess.sh"
 fi
 if [[ -d /sys/firmware/efi ]]; then
 	ok "firmware: UEFI (Calamares needs ESP /boot/efi on target)"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Mount HIGHASCGDAT + HIGHASCGEXF (when present) and run boot mtime sync + project → volume push.
 #
-# Use after eggs produce (build umounts volumes) or when exfat-sync was skipped (nothing mounted).
+# Use after eggs remaster (build umounts volumes) or when exfat-sync was skipped (nothing mounted).
 #
 #   sudo bash scripts/highascg-exfat-remount-sync.sh
 set -euo pipefail

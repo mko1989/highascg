@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Keep swap off the HighAsCG live USB squashfs without permanently removing it from the build host.
 #
-#   prepare   — before eggs produce: drop /swap.img from fstab (backup), swapoff file (keep file)
-#   restore   — after eggs produce: restore fstab, re-enable /swap.img if present
+#   prepare   — before eggs remaster: drop /swap.img from fstab (backup), swapoff file (keep file)
+#   restore   — after eggs remaster: restore fstab, re-enable /swap.img if present
 #   permanent — for lean imaging hosts: remove swap file + fstab line (see prepare-eggs-minimal.sh)
 #
 # Usage:
@@ -42,7 +42,7 @@ remove_swap_fstab_lines() {
 }
 
 cmd_restore() {
-	echo "==> Restore build-host fstab / swap after ISO produce"
+	echo "==> Restore build-host fstab / swap after the ISO build"
 	if [[ -f "$FSTAB_BAK" ]]; then
 		cp -a "$FSTAB_BAK" /etc/fstab
 		rm -f "$FSTAB_BAK"

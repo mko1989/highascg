@@ -4,6 +4,8 @@
 #   - penguins-eggs is installed, and
 #   - /etc/penguins-eggs.d/exclude.list exists (usually: first "eggs produce" or config step).
 # Then: sudo eggs produce --clone --excludes static --basename "…"
+# LEGACY eggs only (WO-870): eggs 26.10 (`remaster`) reads /etc/penguins-eggs.d/custom.exclude.list, which
+# install-eggs-config.sh generates whole from the same fragments — this marker-block merge does not feed it.
 set -euo pipefail
 TARGET="${EGGS_EXCLUDE_LIST:-/etc/penguins-eggs.d/exclude.list}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -119,4 +121,5 @@ fi
   sed -e 's/^[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "$FRAG"
 } >> "$TARGET"
 echo "Appended HighAsCG excludes to: $TARGET" >&2
-echo "Next: sudo eggs produce --clone --excludes static --basename \"…\"" >&2
+echo "Next (legacy eggs): sudo eggs produce --clone --excludes static --basename \"…\"" >&2
+echo "  eggs 26.10 ignores this file — it reads custom.exclude.list: sudo bash ${HERE}/install-eggs-config.sh --apply" >&2

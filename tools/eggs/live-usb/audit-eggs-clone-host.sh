@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-flight checks before `eggs produce --clone` — fail fast on bloat that must not enter squashfs.
+# Pre-flight checks before `eggs remaster --clone` (legacy: `eggs produce --clone`) — fail fast on bloat that must not enter squashfs.
 #
 # Usage:
 #   sudo bash tools/eggs/live-usb/audit-eggs-clone-host.sh
@@ -34,14 +34,36 @@ ok() {
 	echo "OK: $*"
 }
 
-echo "==> HighAsCG eggs clone host audit (strict=${STRICT})"
+# WO-870: the new eggs (Go rewrite) reads <conf>/custom.exclude.list, which install-eggs-config.sh --apply rewrites
+# from the repo fragments right before `eggs remaster` — so audit what WILL be applied (generated into a temp dir),
+# not whatever older copy sits in /etc. EGGS_EXCLUDE_LIST still wins; legacy keeps exclude.list.
+# shellcheck source=eggs-cli-lib.sh
+source "${HERE}/eggs-cli-lib.sh"
+EGGS_FLAVOR="$(highascg_eggs_flavor)"
+EXCLUDE_FIX="sudo HIGHASCG_EGGS_EXCLUDE_FRAGMENT=${HERE}/penguins-eggs-exclude-highascg-embed-server.list bash ${HERE}/merge-penguins-eggs-exclude-highascg.sh --replace"
+if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
+	EXCLUDE_FIX="edit the fragments in ${HERE} (generate-eggs-config.js sources), then sudo bash ${HERE}/install-eggs-config.sh --apply"
+	if [[ -z "${EGGS_EXCLUDE_LIST:-}" ]]; then
+		AUDIT_GEN="$(mktemp -d)"
+		trap 'rm -rf "$AUDIT_GEN"' EXIT
+		if bash "${HERE}/install-eggs-config.sh" --out "$AUDIT_GEN" >/dev/null 2>&1; then
+			EXCLUDE="${AUDIT_GEN}/custom.exclude.list"
+		else
+			EXCLUDE="$(highascg_eggs_conf_dir)/custom.exclude.list"
+			fail "install-eggs-config.sh --out failed — auditing the installed ${EXCLUDE} instead"
+		fi
+	fi
+fi
+EXCLUDE_NAME="$(basename "$EXCLUDE")"
 
-# --- liveroot: never produce/clean while eggs bind-mounts live /usr, /opt, … ---
+echo "==> HighAsCG eggs clone host audit (strict=${STRICT}, eggs ${EGGS_FLAVOR}, excludes: ${EXCLUDE})"
+
+# --- liveroot: never remaster/produce/clean while eggs bind-mounts live /usr, /opt, … ---
 if eggs_liveroot_has_host_bind_mounts "$LIVEROOT"; then
-	fail "eggs liveroot has LIVE system bind mounts under ${LIVEROOT} — reboot before produce (rm/umount there can erase /usr, /bin, …)"
+	fail "eggs liveroot has LIVE system bind mounts under ${LIVEROOT} — reboot before the next eggs run (rm/umount there can erase /usr, /bin, …)"
 	eggs_liveroot_print_host_bind_mounts "$LIVEROOT"
 else
-	ok "no eggs liveroot bind mounts (safe to run eggs produce — never rm ${LIVEROOT})"
+	ok "no eggs liveroot bind mounts (safe to run eggs remaster/produce — never rm ${LIVEROOT})"
 fi
 
 # --- swap: file may stay on disk (and even active on build host) when exclude.list omits it ---
@@ -54,9 +76,9 @@ for sw in /swap.img /swapfile; do
 	sw_name="${sw#/}"
 	if swapon --show 2>/dev/null | grep -qF "$sw"; then
 		if swap_listed_in_exclude "$sw_name"; then
-			warn "swap is active: $sw — excluded from squashfs (OK for produce); optional: strip-host-swap-for-live-iso.sh prepare (swapoff + drop fstab swap lines for live boot)"
+			warn "swap is active: $sw — excluded from squashfs (OK for the clone); optional: strip-host-swap-for-live-iso.sh prepare (swapoff + drop fstab swap lines for live boot)"
 		else
-			fail "swap is active: $sw — add to exclude.list or run strip-host-swap-for-live-iso.sh prepare"
+			fail "swap is active: $sw — add to ${EXCLUDE_NAME} or run strip-host-swap-for-live-iso.sh prepare"
 		fi
 	else
 		ok "swap not active: $sw"
@@ -64,7 +86,7 @@ for sw in /swap.img /swapfile; do
 	if [[ -f "$sw" ]]; then
 		SZ="$(du -h "$sw" 2>/dev/null | awk '{print $1}')"
 		if swap_listed_in_exclude "$sw_name"; then
-			ok "$sw on disk (${SZ}) — listed in exclude.list (will not be in squashfs)"
+			ok "$sw on disk (${SZ}) — listed in ${EXCLUDE_NAME} (will not be in squashfs)"
 		else
 			fail "$sw exists (${SZ}) but not excluded in ${EXCLUDE}"
 		fi
@@ -79,7 +101,7 @@ for mp in /home/casparcg/highascg/media/bridge /home/casparcg/highascg/media/exf
 		case "$FST" in
 		tmpfs | autofs) fail "$mp is on $FST ($SRC) — umount before clone" ;;
 		exfat | ext4 | btrfs | xfs | vfat)
-			warn "$mp is mounted ($FST $SRC) — umount before produce (stop-and-unmount-wo47-for-eggs-produce.sh)"
+			warn "$mp is mounted ($FST $SRC) — umount before the clone (stop-and-unmount-wo47-for-eggs-produce.sh)"
 			;;
 		*) warn "$mp is mounted ($FST $SRC)" ;;
 		esac
@@ -93,7 +115,7 @@ if [[ -d /opt/nvidia-pool ]]; then
 	POOL_SZ="$(du -sh /opt/nvidia-pool 2>/dev/null | awk '{print $1}')"
 	fail "/opt/nvidia-pool still present (${POOL_SZ}) — run: HIGHASCG_PURGE_NVIDIA_POOL=1 sudo bash scripts/disable-nvidia-multi-driver-boot.sh"
 elif [[ -f "$EXCLUDE" ]] && ! grep -qE '^opt/nvidia-pool' "$EXCLUDE"; then
-	warn "exclude.list missing opt/nvidia-pool (stale ISO risk if pool is re-created)"
+	warn "${EXCLUDE_NAME} missing opt/nvidia-pool (stale ISO risk if pool is re-created)"
 else
 	ok "no /opt/nvidia-pool on host"
 fi
@@ -123,9 +145,9 @@ elif dpkg-query -W cuda-drivers &>/dev/null && dpkg-query -W cuda-keyring &>/dev
 elif [[ -n "$NV_BR" ]] && dpkg-query -W "nvidia-driver-${NV_BR}" &>/dev/null; then
 	warn "closed Ubuntu nvidia-driver-${NV_BR} stack — Blackwell needs: sudo apt install nvidia-driver-${NV_BR}-open"
 elif command -v nvidia-smi &>/dev/null; then
-	warn "nvidia-smi present (driver ${NV_BR:-unknown}) but no known driver package matched — check dpkg -l 'nvidia-*' before eggs produce"
+	warn "nvidia-smi present (driver ${NV_BR:-unknown}) but no known driver package matched — check dpkg -l 'nvidia-*' before eggs remaster"
 else
-	warn "no NVIDIA driver — install one before eggs produce (26.04: sudo apt install nvidia-driver-<N>-open)"
+	warn "no NVIDIA driver — install one before eggs remaster (26.04: sudo apt install nvidia-driver-<N>-open)"
 fi
 if ! command -v aplay &>/dev/null; then
 	warn "alsa-utils missing (aplay) — sudo apt install alsa-utils"
@@ -133,16 +155,19 @@ else
 	ok "alsa-utils present"
 fi
 
-# --- exclude.list installed and merged ---
+# --- exclude list installed and merged (legacy exclude.list / new custom.exclude.list as generated) ---
+# tmp/* is a built-in exclude of the new eggs (WO-870 1.3), so only the legacy list has to carry it.
+EXCLUDE_NEEDLES=('home/casparcg/.antigravity-ide-server' 'opt/nvidia-pool' 'swapfile')
+[[ "$EGGS_FLAVOR" == "legacy" ]] && EXCLUDE_NEEDLES+=('tmp/\*')
 if [[ ! -f "$EXCLUDE" ]]; then
-	fail "missing ${EXCLUDE} — run: sudo HIGHASCG_EGGS_EXCLUDE_FRAGMENT=${HERE}/penguins-eggs-exclude-highascg-embed-server.list bash ${HERE}/merge-penguins-eggs-exclude-highascg.sh --replace"
+	fail "missing ${EXCLUDE} — ${EXCLUDE_FIX}"
 else
-	ok "exclude.list present ($(wc -l <"$EXCLUDE") lines)"
-	for needle in 'home/casparcg/.antigravity-ide-server' 'opt/nvidia-pool' 'swapfile' 'tmp/\*'; do
+	ok "${EXCLUDE_NAME} present ($(wc -l <"$EXCLUDE") lines)"
+	for needle in "${EXCLUDE_NEEDLES[@]}"; do
 		if grep -qE "^${needle}$|^${needle//\*/\\*}" "$EXCLUDE" 2>/dev/null || grep -qF "$needle" "$EXCLUDE"; then
-			ok "exclude.list contains: ${needle}"
+			ok "${EXCLUDE_NAME} contains: ${needle}"
 		else
-			warn "exclude.list missing line: ${needle}"
+			warn "${EXCLUDE_NAME} missing line: ${needle}"
 		fi
 	done
 fi
@@ -150,7 +175,7 @@ fi
 # --- IDE bloat on build host (always excluded from squashfs) ---
 for dir in /home/casparcg/.antigravity-ide-server /home/casparcg/.cursor-server; do
 	if [[ -d "$dir" ]]; then
-		warn "$(du -sh "$dir" 2>/dev/null | awk -v d="$dir" '{print $1 " " d}') on host — must stay out of squashfs via exclude.list"
+		warn "$(du -sh "$dir" 2>/dev/null | awk -v d="$dir" '{print $1 " " d}') on host — must stay out of squashfs via ${EXCLUDE_NAME}"
 	fi
 done
 
@@ -161,17 +186,17 @@ if [[ "$EMBED_SERVER" == "1" ]]; then
 	if [[ -d "$NM" ]] && [[ -f /home/casparcg/highascg/package.json ]]; then
 		ok "node_modules present ($(du -sh "$NM" 2>/dev/null | awk '{print $1}')) — embed-server ISO will include production deps"
 	else
-		warn "node_modules missing — run prepare / install-iso-defaults (npm ci) before produce for standalone boot"
+		warn "node_modules missing — run prepare / install-iso-defaults (npm ci) before the clone for standalone boot"
 	fi
 	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/highascg/node_modules' "$EXCLUDE"; then
-		fail "exclude.list omits node_modules but HIGHASCG_ISO_EMBED_SERVER=1 — re-merge embed-server fragment (node_modules must be IN squashfs)"
+		fail "${EXCLUDE_NAME} omits node_modules but HIGHASCG_ISO_EMBED_SERVER=1 — re-merge embed-server fragment (node_modules must be IN squashfs)"
 	fi
 else
 	if [[ -d "$NM" ]]; then
 		warn "$(du -sh "$NM" 2>/dev/null | awk '{print $1}') $NM on host — WO-47 shell: must stay out of squashfs (server from exFAT drop-update/)"
 	fi
 	if [[ -f "$EXCLUDE" ]] && ! grep -qE '^home/casparcg/highascg/node_modules' "$EXCLUDE"; then
-		warn "exclude.list missing node_modules lines (WO-47 shell should omit them from squashfs)"
+		warn "${EXCLUDE_NAME} missing node_modules lines (WO-47 shell should omit them from squashfs)"
 	fi
 fi
 
@@ -183,7 +208,7 @@ if [[ "$EMBED_COMPANION" == "1" ]]; then
 	if [[ -x "$COMPANION_BIN" ]]; then
 		ok "Companion headless present ($(du -sh /home/casparcg/companion 2>/dev/null | awk '{print $1}'))"
 	else
-		fail "Companion missing at ${COMPANION_BIN} — extract tarball to /home/casparcg/companion before produce"
+		fail "Companion missing at ${COMPANION_BIN} — extract tarball to /home/casparcg/companion before the clone"
 	fi
 	if [[ -f "$COMPANION_MOD" ]]; then
 		ok "highpass-highascg module packaged under .config/companion/modules"
@@ -196,11 +221,11 @@ if [[ "$EMBED_COMPANION" == "1" ]]; then
 		fail "missing /etc/systemd/system/companion.service — run prepare-companion-for-eggs-clone.sh"
 	fi
 	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/companion(/|$)' "$EXCLUDE"; then
-		fail "exclude.list omits /home/casparcg/companion but HIGHASCG_ISO_EMBED_COMPANION=1"
+		fail "${EXCLUDE_NAME} omits /home/casparcg/companion but HIGHASCG_ISO_EMBED_COMPANION=1"
 	fi
 	# The DB (v5.0/) and machid may be excluded (WO-669 "clean" Companion); the folder itself and modules/ may not.
 	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/\.config/companion(/\*?|/modules(/.*)?)?$' "$EXCLUDE"; then
-		fail "exclude.list omits .config/companion (or its modules/) but HIGHASCG_ISO_EMBED_COMPANION=1"
+		fail "${EXCLUDE_NAME} omits .config/companion (or its modules/) but HIGHASCG_ISO_EMBED_COMPANION=1"
 	fi
 else
 	ok "HIGHASCG_ISO_EMBED_COMPANION=0 — skipping Companion clone checks"
@@ -212,12 +237,16 @@ if [[ "$EMBED_CALAMARES" == "1" ]]; then
 	if command -v calamares >/dev/null 2>&1 && [[ -x /usr/bin/calamares || -x "$(command -v calamares)" ]]; then
 		ok "Calamares present ($(calamares --version 2>/dev/null | head -1 || echo installed))"
 	else
-		fail "Calamares missing — run tools/eggs/live-usb/install-eggs-calamares.sh before produce"
+		fail "Calamares missing — run tools/eggs/live-usb/install-eggs-calamares.sh before the eggs build"
 	fi
-	if command -v eggs >/dev/null 2>&1 && eggs calamares --help >/dev/null 2>&1; then
-		ok "eggs calamares CLI available"
+	# WO-870: the new eggs launches the installer as `eggs sysinstall calamares` (legacy: `eggs calamares`).
+	CAL_CMD=(calamares)
+	[[ "$EGGS_FLAVOR" == "legacy" ]] || CAL_CMD=(sysinstall calamares)
+	EGGS_CLI="$(highascg_eggs_bin 2>/dev/null || true)"
+	if [[ -n "$EGGS_CLI" ]] && timeout 10 "$EGGS_CLI" "${CAL_CMD[@]}" --help >/dev/null 2>&1 </dev/null; then
+		ok "eggs ${CAL_CMD[*]} CLI available"
 	else
-		fail "eggs calamares not available — run install-eggs-calamares.sh"
+		fail "eggs ${CAL_CMD[*]} not available — run install-eggs-calamares.sh"
 	fi
 else
 	ok "HIGHASCG_ISO_EMBED_CALAMARES=0 — skipping Calamares checks"
@@ -232,7 +261,7 @@ elif [[ -f "$THEME_SPLASH" ]] && { cmp -s "${HERE}/branding/splash.boot.png" "$T
 	|| cmp -s "$BRANDING" "$THEME_SPLASH" 2>/dev/null; }; then
 	ok "GRUB splash.png ready in highascg-eggs-theme"
 else
-	warn "run install-eggs-live-grub-theme.sh / finalize-boot-branding before produce"
+	warn "run install-eggs-live-grub-theme.sh / finalize-boot-branding before the clone"
 fi
 THEME_ALT="$(update-alternatives --query default.plymouth 2>/dev/null | sed -n 's/^Value: //p' || true)"
 if [[ "$THEME_ALT" == *highascg* ]]; then
@@ -270,12 +299,12 @@ decklink_excludes_in_exclude_list() {
 
 if [[ "$ISO_FORBID" == "1" ]]; then
 	if decklink_excludes_in_exclude_list; then
-		ok "DeckLink exclude.list present (WO-92 — BMD omitted from squashfs)"
+		ok "DeckLink ${EXCLUDE_NAME} present (WO-92 — BMD omitted from squashfs)"
 	else
 		fail "DeckLink excludes missing in ${EXCLUDE} — run prepare or merge penguins-eggs-exclude-decklink.list"
 	fi
 	if dpkg-query -W desktopvideo &>/dev/null; then
-		ok "desktopvideo on build host — stays installed locally, masked from ISO by exclude.list"
+		ok "desktopvideo on build host — stays installed locally, masked from ISO by ${EXCLUDE_NAME}"
 	elif [[ "${HIGHASCG_SKIP_DECKLINK_CHECK:-0}" == "1" ]]; then
 		warn "desktopvideo not installed (HIGHASCG_SKIP_DECKLINK_CHECK=1)"
 	else
@@ -295,7 +324,7 @@ fi
 
 echo ""
 if [[ "$FAIL" -gt 0 && "$STRICT" == "1" ]]; then
-	echo "Audit FAILED (${FAIL} error(s), ${WARN} warning(s)). Fix before eggs produce." >&2
+	echo "Audit FAILED (${FAIL} error(s), ${WARN} warning(s)). Fix before eggs remaster/produce." >&2
 	exit 1
 fi
 echo "Audit passed (${WARN} warning(s))."

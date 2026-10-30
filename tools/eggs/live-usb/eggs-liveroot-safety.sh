@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Guards for penguins-eggs liveroot — NEVER delete/unmount/write through host bind mounts.
 #
-# During `eggs produce --clone`, eggs bind-mounts live /usr, /opt, /home, … into
+# During `eggs produce --clone` (legacy) / `eggs remaster --clone` (new), eggs bind-mounts live /usr, /opt, /home, … into
 # /home/eggs/liveroot/*.  rm -rf liveroot or umount those targets destroys the REAL system.
 #
 # Source this from eggs maintenance scripts:
@@ -77,10 +77,15 @@ eggs_liveroot_print_host_bind_mounts() {
 	done
 }
 
-# True while eggs produce / mksquashfs is still using liveroot.
+# Process needles for a build that is still using liveroot. legacy: `eggs produce`; new (WO-870, Go rewrite):
+# `eggs remaster` / `coa remaster`, and its root helper `oa /tmp/coa/oa-plan.json` (bare `oa` on stdin in
+# crypted mode); both flavors end in mksquashfs reading liveroot.
+EGGS_LIVEROOT_BUSY_PATTERN='eggs produce|eggs remaster|coa remaster|(^|/)oa( .*oa-plan\.json|$)|mksquashfs.*/home/eggs/liveroot'
+
+# True while eggs produce/remaster, oa or mksquashfs is still using liveroot.
 eggs_liveroot_produce_in_progress() {
 	[[ -x "$PGREP" ]] || return 1
-	"$PGREP" -f 'eggs produce|mksquashfs.*/home/eggs/liveroot' >/dev/null 2>&1
+	"$PGREP" -f "$EGGS_LIVEROOT_BUSY_PATTERN" >/dev/null 2>&1
 }
 
 # Refuse destructive ops while eggs has the live system mounted under liveroot.
@@ -91,7 +96,7 @@ eggs_liveroot_assert_safe_for_mutation() {
 	eggs_liveroot_prereq_check || return 1
 
 	if eggs_liveroot_produce_in_progress; then
-		echo "ERROR: refusing to ${op} ${root} — eggs produce / mksquashfs still running." >&2
+		echo "ERROR: refusing to ${op} ${root} — eggs produce/remaster (oa, mksquashfs) still running." >&2
 		echo "  Wait for it to finish, or if you Ctrl-C'd: reboot before any liveroot cleanup." >&2
 		return 1
 	fi

@@ -27,6 +27,7 @@ find_session_log() {
 
 copy_to_exfat() {
 	src="$1"
+	name="$2"
 	dev="$(blkid -L "$LABEL" 2>/dev/null)" || return 1
 	[ -n "$dev" ] || return 1
 	mp="$(findmnt -nr -o TARGET -S "$dev" 2>/dev/null | head -1)"
@@ -38,7 +39,7 @@ copy_to_exfat() {
 		mounted_here=1
 	fi
 	mkdir -p "$mp/logs"
-	cp "$src" "$mp/logs/calamares-session-$(hostname).log" 2>/dev/null
+	cp "$src" "$mp/logs/${name}-$(hostname).log" 2>/dev/null
 	sync
 	# Only unmount what this loop mounted — never a mount the system owns.
 	[ "$mounted_here" = 1 ] && umount "$OWN_MP" 2>/dev/null
@@ -46,6 +47,8 @@ copy_to_exfat() {
 }
 
 while :; do
-	log="$(find_session_log)" && copy_to_exfat "$log"
+	log="$(find_session_log)" && copy_to_exfat "$log" calamares-session
+	# WO-870: eggs 26.10 (`eggs sysinstall calamares`) also tees the whole run, krill-chroot-runner included, here.
+	[ -f /var/log/calamares-install.log ] && copy_to_exfat /var/log/calamares-install.log calamares-install
 	sleep "$INTERVAL"
 done

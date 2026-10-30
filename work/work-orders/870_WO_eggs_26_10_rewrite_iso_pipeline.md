@@ -1,7 +1,7 @@
 # WO-870 — penguins-eggs 26.10 rewrite: `produce` is gone (`remaster`), theme/basename/max/calamares flags removed — migrate the ISO pipeline
 
 **Area:** os-iso
-**Status: IN PROGRESS (30.10) — Phases 0.2(b), 1, 2, 3, 4 done offline; dry runs 1-3 clean (owner, initrd verified); Phase 5 open; next: re-apply config, then the first full build (Phase 7); blocks the next ISO build**
+**Status: IN PROGRESS (30.10) — Phases 0.2(b), 1-5 done offline; dry runs 1-3 clean (owner, initrd verified); next: owner re-applies config, then the first full build (Phase 7) + stick QA; blocks the next ISO build**
 **Source:** WO-832 owner host checks 30.10: `eggs produce --help` → `unknown command "produce"`; `eggs` is now v26.10.25, a Go/C rewrite; the verify also reports `missing /etc/calamares`.
 **Related:** WO-832 (post-26.04 remnants; its "unverifiable here" note is resolved by this WO), WO-430 (merged-usr exclude twin lines), WO-431 (phantom dpkg entries / payload gates), WO-464 (liveroot bind-mount guard), WO-462 (torn-ISO copy race), WO-481/WO-475 (Calamares bridge release), WO-148 (installer branding), WO-168 / WO-429 (exclude fragments, credentials), WO-47 (exFAT).
 
@@ -698,3 +698,70 @@ Dry run 3 is clean end to end; nothing is open from it.
 - the branding shows (logo, HighAsCG slideshow, "HIGHASCG NVIDIA 615");
 - after install, both UEFI and BIOS boot the disk;
 - `/etc/penguins-eggs.d/installer.d/modules/` is copied off for the record.
+
+### Phase 5 — verify scripts and names (30.10)
+
+Done in a worktree helper (no git operations), then merged, corrected and verified in the main tree.
+
+**Investigation:**
+- **ISO name and symlink.** coa names the ISO `${iso_prefix}-YYYY-MM-DD_HHMM.iso`. With `target_dir`, only a symlink is
+  left in `/home/eggs`, so every `du -m` / `stat -c%s` on it measured the link itself. That affected the size floor in
+  `create-operator-stick-from-dd.sh` and the partition maths in `flash-stick-common.sh` and
+  `create-operator-stick-from-dd.sh`.
+- **Process names.** coa runs as `eggs remaster` → `coa remaster` → `oa /tmp/coa/oa-plan.json` (bare `oa` when
+  crypted) → `mksquashfs /home/eggs/liveroot`. The WO-464 busy pgrep only knew `eggs produce`.
+- **New ISO layout:** volid `OA_LIVE`, `EFI/BOOT/BOOTX64.EFI` plus a trampoline `search --label OA_LIVE`, and
+  unversioned `live/{vmlinuz,initrd.img}`. Legacy: lowercase `EFI/boot/bootx64.efi` and `live/initrd.img-<kver>`.
+- **Reading an ISO without root.** The squashfs inside it can be read in place: xorriso `report_lba` →
+  `unsquashfs -o <lba*2048>`.
+
+**What was done:**
+- `iso-read-lib.sh` (new): list/extract (xorriso or bsdtar), PVD volid, member offset/size, squashfs cat/list, and the
+  bzImage release.
+- `verify-iso-boot-branding.sh` reads the built ISO only. New-layout asserts:
+  - volid, and trampoline label = volid;
+  - `BOOTX64.EFI` and `efi.img`;
+  - no `{{{`;
+  - branch title;
+  - every `/live` file a menu boots exists;
+  - kernel release = pin (FAIL on new, WARN on legacy).
+- `verify-iso-squashfs-excludes.sh` reads the ISO through `unsquashfs -o`. The layout split moved into
+  `verify-iso-squashfs-calamares.sh` (new):
+  - legacy: the `/etc/calamares` checks;
+  - new: the overlay `show.qml`, `branding.desc[.tmpl]` and logo, and **no** `modules/` overrides.
+  - The DeckLink/secret/twin needles are unchanged.
+- `eggs-liveroot-safety.sh`: the busy pattern also matches remaster/coa/oa.
+- `flash-stick-common.sh` `find_newest_iso_since`: finds both names in the nest and in `mnt/`, with an exact prefix, using
+  `stat -L`. ISO sizes use `-L` everywhere.
+- Flavor-aware: the prepare/audit/finalize/theme scripts, the recovery finders, the clone-only runner (detected branch)
+  and `verify-live-stick.sh` (overlay + log-rescue check, initrd glob).
+- The §2.4 "eggs remaster" renames in scripts and docs.
+- **Corrected from the helper's draft** (it predated Phase 4):
+  - its new-flavor check *required* `modules/*.yaml`; it now FAILs on any override and passes without one;
+  - comments claimed `eggs sysinstall` writes `/etc/calamares`; they now describe `installer.d` at launch.
+- `build-highascg-egg.sh` runs both ISO verifiers on every flavor; the "not ported" WARN skips are gone.
+- **WO-417 log rescue under the new flavor:**
+  - `fix-calamares-shellprocess.sh` moves the rescue install into `install_log_rescue`, with a `--log-rescue-only` mode
+    that exits before any `/etc/calamares` write;
+  - the preflight runs that mode under `new`, so the krill-chroot-runner step (grub, initramfs) keeps a log trail;
+  - the rescue loop now also copies coa's `/var/log/calamares-install.log` → `logs/calamares-install-<host>.log` on
+    HIGHASCGEXF;
+  - `verify-calamares-installed.sh` checks the unit on both flavors.
+
+**Verified:**
+- `smoke-wo870-phase5-verify.test.js` 26/26 (curated). It covers:
+  - the both-flavor ISO finder, incl. symlink-by-target dating and exact prefix;
+  - 12 busy/not-busy argv lines through the real guard;
+  - volid and bzImage reads;
+  - synthetic xorriso ISOs: OA_LIVE passes; volid/label mismatch, `{{{`, pin and missing-initrd FAIL;
+  - squashfs overlay passes without `modules/`, FAILs with a `modules/partition.yaml`, and forced-legacy FAILs.
+- The eggs/ISO/Calamares-related smokes: 663/663, after repointing the WO-417 smoke to the refactor and adding
+  `--log-rescue-only` + preflight pins.
+- `--log-rescue-only` on a temp root writes only the unit, the wants link and the helper.
+- The legacy Oct 23 backup ISO, read in place:
+  - squashfs verifier passes (64 OK);
+  - boot-branding verifier passes (1 WARN: its kernel ≠ the current pin).
+- `smoke-wo47-manifest.mjs` (not curated) fails identically at base `1dbc323f`, so it predates this work. Left alone.
+
+**Not verified:** no real eggs 26.10 ISO exists yet; the new-layout checks were proven on synthetic images built from the
+dry-run `/home/eggs/isodir` boot files. The first full build (Phase 7) runs both verifiers for real.

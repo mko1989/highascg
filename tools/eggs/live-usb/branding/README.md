@@ -20,7 +20,9 @@ highascg-eggs-theme/          ← vendor root (eggs.yaml theme: or --theme)
     branding/                 ← Calamares (optional)
 ```
 
-Produce must use that vendor **at ISO build time**:
+**eggs 26.10 (`eggs remaster`, WO-870):** the theme reaches the ISO through **`/etc/penguins-eggs.d/branding/livecd/`** (grub/isolinux theme + `splash.png`) and the Calamares overlay **`…/branding/calamares/`**, both written by **`install-eggs-config.sh --apply`** (checked by `verify-eggs-config.sh`). There is no `--theme`, no `eggs.yaml theme:` and no inject step; `build-highascg-egg.sh` applies the config and runs `eggs remaster`. **`verify-iso-boot-branding.sh`** reads the built ISO directly (no root, no mount): volume id `OA_LIVE`, `EFI/BOOT/BOOTX64.EFI`, no `{{{` in either menu, title **`HIGHASCG NVIDIA <branch> Live`**, `live/vmlinuz` release == pinned kernel.
+
+Legacy eggs — produce must use that vendor **at ISO build time**:
 
 ```bash
 grep '^theme:' /etc/penguins-eggs.d/eggs.yaml
@@ -43,14 +45,14 @@ sudo bash tools/eggs/live-usb/install-eggs-live-grub-theme.sh
 # also installs Plymouth + updates initramfs
 
 sudo bash tools/eggs/live-usb/build-highascg-egg.sh
-# or: sudo bash tools/eggs/live-usb/verify-iso-boot-branding.sh /home/eggs/mnt/highascg_*.iso
+# or: bash tools/eggs/live-usb/verify-iso-boot-branding.sh /home/eggs/highascg-nvidia-<branch>-*.iso   (legacy: /home/eggs/mnt/highascg_*.iso)
 ```
 
 Re-flash the USB after a new ISO is produced.
 
-**Important:** `eggs produce` runs **`mkinitramfs`** and writes a **new** `live/initrd*.img` on the ISO (it does not copy `/boot/initrd.img` verbatim). Plymouth must be configured on the build host **immediately before** `eggs produce` — `build-highascg-egg.sh` runs `finalize-boot-branding-for-eggs-produce.sh` for that.
+**Important (legacy eggs):** `eggs produce` runs **`mkinitramfs`** and writes a **new** `live/initrd*.img` on the ISO (it does not copy `/boot/initrd.img` verbatim). Plymouth must be configured on the build host **immediately before** `eggs produce` — `build-highascg-egg.sh` runs `finalize-boot-branding-for-eggs-produce.sh` for that.
 
-**GRUB wallpaper:** Eggs copies stock **`splash.png` after** the ISO tree is built, so a plain `eggs produce` **drops** your custom GRUB image. **`build-highascg-egg.sh`** always runs **`inject-iso-boot-branding.sh`** after produce (re-copies `splash.png`, rebuilds initrd, re-packs ISO). If you run `eggs produce` manually you **must** pass **`--theme …/highascg-eggs-theme`** and then run **`inject-iso-boot-branding.sh`** + **`verify-iso-boot-branding.sh`**.
+**GRUB wallpaper (legacy eggs):** Eggs copies stock **`splash.png` after** the ISO tree is built, so a plain `eggs produce` **drops** your custom GRUB image. **`build-highascg-egg.sh`** always runs **`inject-iso-boot-branding.sh`** after produce (re-copies `splash.png`, rebuilds initrd, re-packs ISO). If you run `eggs produce` manually you **must** pass **`--theme …/highascg-eggs-theme`** and then run **`inject-iso-boot-branding.sh`** + **`verify-iso-boot-branding.sh`**.
 
 After the build, `verify-iso-boot-branding.sh` checks the ISO initrd for `highascg` and that `boot/grub/splash.png` is not stock penguins.
 
@@ -148,7 +150,7 @@ then rename or let the install script sort them.
 | Purple Ubuntu dots | Old initrd (`ubuntu-text`) — reinstall Plymouth + rebuild ISO |
 | verify passes theme but stick still blank | Stick not re-flashed after inject, or testing old ISO from before inject |
 
-## Preview before eggs produce / USB flash
+## Preview before eggs remaster / USB flash
 
 **Do not run `plymouthd` / `plymouth --show-splash` on the eggs build host** while Xorg, nodm, or CasparCG outputs are up — it takes over DRM and can blank monitors until reboot or `recover-display-after-plymouth.sh`.
 
@@ -184,7 +186,7 @@ Edit:
 - **GRUB:** `tools/eggs/live-usb/highascg-eggs-theme/theme/livecd/grub.theme.cfg`
 - **Plymouth:** `tools/eggs/live-usb/branding/plymouth/highascg.plymouth` (`BackgroundStartColor`, `ProgressBarForegroundColor`, …)
 
-Then re-run **`install-eggs-live-grub-theme.sh`** and **`eggs produce`**.
+Then re-run **`install-eggs-config.sh --apply`** and **`eggs remaster`** (legacy: **`install-eggs-live-grub-theme.sh`** and **`eggs produce`**).
 
 ## Calamares installer slideshow
 

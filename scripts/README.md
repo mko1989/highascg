@@ -288,7 +288,7 @@ Answer these in order; the first "yes" is your directory.
    → `scripts/setup/` (numbered if part of the fresh-Ubuntu sequence), `scripts/boot/`,
    `scripts/exfat/`, or `scripts/replication/`. Run once per machine, never during playout.
 
-3. **Does it only ever run on the build host** (eggs produce, release packaging, wiki,
+3. **Does it only ever run on the build host** (eggs remaster, release packaging, wiki,
    mirrors, QA)? → `tools/eggs/`, `tools/release/`, `tools/wiki/`, `tools/ci/`, `tools/map/`,
    `tools/smoke/`, `tools/startup/`. These may be excluded from the ISO.
 

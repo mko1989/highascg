@@ -2,7 +2,9 @@
 # Bash builtins only — run on broken host over SSH (no ls/grep needed).
 shopt -s nullglob
 echo "==> recovery source discovery"
+# WO-870: new eggs stages in /home/eggs/isodir, legacy in /home/eggs/mnt/iso; the *.iso globs cover both names.
 for f in \
+	/home/eggs/isodir/live/filesystem.squashfs \
 	/home/eggs/mnt/iso/live/filesystem.squashfs \
 	/home/eggs/mnt/*.iso \
 	/home/eggs/*.iso; do

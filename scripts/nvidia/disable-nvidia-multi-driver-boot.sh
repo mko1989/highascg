@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Remove first-boot NVIDIA picker + pool gate (single-driver-per-ISO model).
-# Run on build host before eggs produce, or on deployed rig once: sudo bash scripts/disable-nvidia-multi-driver-boot.sh
+# Run on build host before eggs remaster, or on deployed rig once: sudo bash scripts/disable-nvidia-multi-driver-boot.sh
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {
@@ -31,7 +31,7 @@ if [[ -d /opt/nvidia-pool ]]; then
 		rm -rf /opt/nvidia-pool
 		log "removed /opt/nvidia-pool"
 	else
-		log "keeping /opt/nvidia-pool (set HIGHASCG_PURGE_NVIDIA_POOL=1 to remove before eggs produce)"
+		log "keeping /opt/nvidia-pool (set HIGHASCG_PURGE_NVIDIA_POOL=1 to remove before eggs remaster)"
 	fi
 fi
 

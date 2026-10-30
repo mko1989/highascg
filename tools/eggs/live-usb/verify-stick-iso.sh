@@ -6,7 +6,7 @@
 #
 # Why this exists: a copy that is never flushed leaves exFAT metadata (the full size) committed
 # while most data clusters still hold stale bytes. `ls -l` looks perfect, GRUB still renders the
-# branded menu from the ISO's early blocks, and then `linux /live/vmlinuz-*` dies with
+# branded menu from the ISO's early blocks, and then `linux /live/vmlinuz[-*]` dies with
 # "invalid magic number" because the kernel region is garbage. Size is not evidence — hash is.
 #
 # ALWAYS `sync` and unmount the stick before pulling it.
@@ -29,7 +29,10 @@ verify_one() {
 		return
 	}
 	if [[ -z "$src_iso" ]]; then
+		# eggs 26.10 links <name>-<date>.iso into /home/eggs; legacy eggs left <name>_*.iso there or in mnt/.
 		src_iso="${SRC_DIR}/$(basename "$stick_iso")"
+		[[ -f "$src_iso" ]] || [[ ! -f "${SRC_DIR}/mnt/$(basename "$stick_iso")" ]] \
+			|| src_iso="${SRC_DIR}/mnt/$(basename "$stick_iso")"
 	fi
 	if [[ ! -f "$src_iso" ]]; then
 		bad "$(basename "$stick_iso"): no source ISO at ${src_iso} — pass it as the 2nd argument"

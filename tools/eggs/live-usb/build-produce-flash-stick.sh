@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Full pipeline: eggs produce → dd ISO → exFAT (slot 3, rest of disk) → seed layout.
+# Full pipeline: eggs remaster (legacy: produce) → dd ISO → exFAT (slot 3, rest of disk) → seed layout.
 #
 # Default target disk: /dev/sda (override with --usb or USB_DEVICE=).
-# ISO path: newest file under /home/eggs/ (+ mnt/) from this build (BASENAME prefix).
+# ISO path: newest <BASENAME>-*.iso (eggs 26.10) or <BASENAME>_*.iso (legacy) under /home/eggs/ (+ mnt/) from this build.
 #
 # Usage:
 #   sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh
@@ -79,13 +79,13 @@ if "$DO_BUILD"; then
 	PRODUCE_STAMP="$(date -u +%Y-%m-%d_%H%M%S)"
 	export HIGHASCG_BUILD_STAMP="$PRODUCE_STAMP"
 	echo "==> BUILD_STAMP=${PRODUCE_STAMP} (written by build-highascg-egg.sh)"
-	echo "==> Phase 1/2: eggs produce (BASENAME=${BASENAME})"
+	echo "==> Phase 1/2: eggs build (remaster|produce) (BASENAME=${BASENAME})"
 	bash "$BUILD_SCRIPT"
 	echo
 	# WO-432 (owner 05.08): install-iso-defaults.sh prunes the LIVE repo's node_modules
 	# to production for the squashfs — restore the dev tree immediately (not after the
 	# flash phase, so --build-only and a failed flash still leave the box usable).
-	echo "==> npm install (restore dev+optional node_modules after produce prune)"
+	echo "==> npm install (restore dev+optional node_modules after the build prune)"
 	repo_user="$(stat -c %U "$REPO_ROOT")"
 	runuser -u "$repo_user" -- bash -c "cd '$REPO_ROOT' && npm install --include=optional --no-audit --no-fund" \
 		|| echo "WARN: node_modules restore failed — run 'npm install --include=optional' in $REPO_ROOT as $repo_user" >&2

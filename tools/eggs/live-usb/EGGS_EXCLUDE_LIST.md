@@ -2,6 +2,8 @@
 
 Single file to replace **`/etc/penguins-eggs.d/exclude.list`** on the eggs build host.
 
+> **eggs 26.10 (WO-870):** `eggs remaster` (coa) reads **only** `/etc/penguins-eggs.d/custom.exclude.list` and ignores `exclude.list`. That file is generated from the same fragments by **`install-eggs-config.sh --apply`** (`verify-eggs-config.sh` checks it); `tmp/*` is a coa built-in. Everything below about `exclude.list` and the merge script applies to **legacy eggs** only — the fragment files and the squashfs verifier are shared.
+
 **WO-168 T168.2:** [`exclude.list`](exclude.list) is now **pure upstream** (penguins-eggs/refractasnapshot master template) — it contains **no** HighAsCG-specific entries. HighAsCG excludes live only in the fragment files below; `merge-penguins-eggs-exclude-highascg.sh` appends the right one to `/etc/penguins-eggs.d/exclude.list` at prepare-time. Previously `exclude.list` also carried a baked-in, hand-duplicated HighAsCG block (lines ~105–204) that drifted from the fragments — removed.
 
 | File | Purpose |
@@ -17,7 +19,7 @@ Single file to replace **`/etc/penguins-eggs.d/exclude.list`** on the eggs build
 
 **`prepare-eggs-clone-with-exfat.sh` is safe** — it only installs systemd units, merges `exclude.list`, creates empty mount stubs under `~/highascg/media` and `~/exfat`, tweaks swap **fstab** (restored after produce), and runs `apt install` for stick tooling. It does **not** delete or replace `/usr`, `/bin`, `/lib`, etc.
 
-**The danger is `eggs produce --clone` staging (`/home/eggs/liveroot`):** while produce runs (or after a **crashed/interrupted** produce), eggs **bind-mounts your live** `/usr`, `/opt`, `/home`, … **into** `/home/eggs/liveroot/`. If you then run `rm -rf /home/eggs/liveroot` or `umount -R /home/eggs/liveroot`, you destroy the **real** system tree.
+**The danger is `eggs remaster --clone` (legacy: `eggs produce --clone`) staging (`/home/eggs/liveroot`):** while produce runs (or after a **crashed/interrupted** produce), eggs **bind-mounts your live** `/usr`, `/opt`, `/home`, … **into** `/home/eggs/liveroot/`. If you then run `rm -rf /home/eggs/liveroot` or `umount -R /home/eggs/liveroot`, you destroy the **real** system tree.
 
 | Action | Safe on running host? |
 |--------|------------------------|
@@ -41,7 +43,7 @@ cd ~/highascg
 sudo cp tools/eggs/live-usb/exclude.list /etc/penguins-eggs.d/exclude.list
 ```
 
-Optional before `eggs produce` (avoids Tailscale log noise during squashfs):
+Optional before `eggs remaster` (avoids Tailscale log noise during squashfs):
 
 ```bash
 sudo systemctl stop snap.tailscale.tailscaled.service 2>/dev/null || true
@@ -53,7 +55,7 @@ Then:
 sudo npm run eggs:build
 ```
 
-## Volatile IDE paths (eggs produce)
+## Volatile IDE paths (eggs remaster)
 
 Exclude **`home/casparcg/.antigravity-ide-server/*`** (and `.cursor*`, `.vscode-server`) so mksquashfs does not scan live log files that change during the snapshot (“changed size while reading”). After adding lines to the fragment, re-merge:
 
@@ -148,7 +150,7 @@ Pre/post checks:
 
 ```bash
 sudo bash tools/eggs/live-usb/audit-eggs-clone-host.sh
-sudo eggs produce …   # use build-highascg-egg.sh (not bare eggs produce)
+sudo eggs remaster …   # use build-highascg-egg.sh (not bare eggs remaster / produce)
 bash tools/eggs/live-usb/verify-iso-squashfs-excludes.sh
 ```
 

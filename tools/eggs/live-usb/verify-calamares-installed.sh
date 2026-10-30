@@ -136,6 +136,13 @@ else
 	fail "passwordless sudo for Calamares missing — sudo bash ${REPO_ROOT}/scripts/setup/12-passwordless-sudo.sh ${USER_CASPAR}"
 fi
 
+if [[ -x /usr/libexec/calamares/calamares-session-log-rescue.sh ]] \
+	&& [[ -L /etc/systemd/system/multi-user.target.wants/calamares-session-log-rescue.service ]]; then
+	ok "calamares-session-log-rescue enabled (WO-417)"
+else
+	fail "calamares-session-log-rescue missing — sudo bash ${HERE}/fix-calamares-shellprocess.sh --log-rescue-only"
+fi
+
 if [[ "$FLAVOR" == "new" ]]; then
 	echo "skip: /usr/sbin/cleanup.sh, shellprocess and l10n/logs helper patches — legacy /etc/calamares only (WO-870 Phase 4)"
 elif [[ -x /usr/sbin/cleanup.sh ]]; then

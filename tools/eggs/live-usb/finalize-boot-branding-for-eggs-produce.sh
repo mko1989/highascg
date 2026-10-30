@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Last-mile boot branding on the eggs build host, immediately before `eggs produce`.
+# Last-mile boot branding on the eggs build host, immediately before `eggs remaster` (legacy: `eggs produce`).
 #
-# - GRUB/isolinux splash + theme path in eggs.yaml
+# - GRUB/isolinux splash in the repo theme (+ theme path in eggs.yaml, legacy eggs only)
 # - Plymouth default theme + initramfs hooks for the running kernel
 #
 # Usage:
@@ -56,7 +56,20 @@ if [[ -f "$EGGS_PENGUINS" ]] && cmp -s "$LIVE_SPLASH" "$EGGS_PENGUINS"; then
 	exit 1
 fi
 
-if ! grep -q "^theme: ${THEME_ABS}\$" "$EGGS_YAML"; then
+# WO-870: legacy eggs reads eggs.yaml `theme:`; the new one reads <conf>/branding/livecd/, which
+# install-eggs-config.sh --apply copies from this repo theme right before `eggs remaster` and verify-eggs-config.sh
+# then gates (byte-equal). Here — before that apply — a difference is only reported, never fatal.
+# shellcheck source=eggs-cli-lib.sh
+source "${HERE}/eggs-cli-lib.sh"
+EGGS_FLAVOR="$(highascg_eggs_flavor)"
+if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
+	BRAND_LIVECD="$(highascg_eggs_branding_dir)/livecd"
+	for f in grub.theme.cfg isolinux.theme.cfg splash.png; do
+		if ! cmp -s "${THEME_ABS}/theme/livecd/${f}" "${BRAND_LIVECD}/${f}"; then
+			echo "NOTE: ${BRAND_LIVECD}/${f} differs from the repo theme (or is missing) — install-eggs-config.sh --apply updates it before eggs remaster"
+		fi
+	done
+elif ! grep -q "^theme: ${THEME_ABS}\$" "$EGGS_YAML"; then
 	echo "ERROR: eggs.yaml theme is not ${THEME_ABS}" >&2
 	grep '^theme:' "$EGGS_YAML" >&2 || true
 	exit 1
@@ -73,10 +86,14 @@ if [[ ! -f "/boot/initrd.img-${KVER}" || ! -f "/boot/vmlinuz-${KVER}" ]]; then
 	exit 1
 fi
 
-highascg_rebuild_host_initramfs "$KVER" "finalize before eggs produce"
+highascg_rebuild_host_initramfs "$KVER" "finalize before eggs remaster/produce"
 
-echo "OK: boot branding ready for eggs produce"
-echo "     theme: $(grep '^theme:' "$EGGS_YAML")"
+echo "OK: boot branding ready for eggs ${EGGS_FLAVOR}"
+if [[ "$EGGS_FLAVOR" == "legacy" ]]; then
+	echo "     theme: $(grep '^theme:' "$EGGS_YAML")"
+else
+	echo "     theme: ${THEME_ABS}/theme/livecd → $(highascg_eggs_branding_dir)/livecd"
+fi
 echo "     splash: $(stat -c '%s bytes %n' "$LIVE_SPLASH")"
 echo "     plymouth: ${THEME_ALT}"
 echo "     kernel: ${KVER}"

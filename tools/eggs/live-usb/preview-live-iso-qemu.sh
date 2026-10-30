@@ -16,7 +16,7 @@ if [[ -z "$ISO" ]]; then
 	ISO="$(find_latest_iso 2>/dev/null || true)"
 fi
 [[ -f "$ISO" ]] || {
-	echo "No ISO. Build first or pass path: sudo $0 /home/eggs/mnt/highascg_*.iso" >&2
+	echo "No ISO. Build first or pass path: sudo $0 /home/eggs/highascg-nvidia-<branch>-*.iso (legacy eggs: …_amd64_*.iso)" >&2
 	exit 1
 }
 

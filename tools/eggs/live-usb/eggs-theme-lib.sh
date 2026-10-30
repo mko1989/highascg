@@ -1,4 +1,4 @@
-# Locate the penguins-eggs stock theme directory (source, do not execute).
+# Locate the penguins-eggs stock theme directory and the managed branding dir (source, do not execute).
 # WO-832: eggs 26.10.25 moved the theme out of /usr/lib/penguins-eggs/addons/eggs/theme into
 # /etc/penguins-eggs.d/branding.default (applications/ artwork/ calamares/ livecd/). Older eggs
 # still ship the /usr/lib tree, so try the new location first and fall back.
@@ -16,4 +16,10 @@ highascg_eggs_theme_dir() {
 		return 0
 	done
 	return 1
+}
+
+# WO-870: the new eggs (Go rewrite) reads our branding from <conf>/branding (livecd/, calamares/), written by
+# install-eggs-config.sh --apply. Prints the dir whether or not it exists yet; EGGS_CONF_DIR moves it like there.
+highascg_eggs_branding_dir() {
+	printf '%s\n' "${EGGS_CONF_DIR:-/etc/penguins-eggs.d}/branding"
 }

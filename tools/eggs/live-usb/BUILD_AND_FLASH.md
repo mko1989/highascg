@@ -65,7 +65,7 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
    sudo bash tools/eggs/live-usb/build-highascg-egg.sh   # or: npm run eggs:build
    ```
 
-   The build script runs **`prepare-eggs-clone-with-exfat.sh`** first (mount + bind + boot sync units, **`highascg.service`** ordering, empty **`~/exfat`** / **`~/highascg/media/*`** stubs, merge of **`tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list`**). If **`/etc/penguins-eggs.d/exclude.list`** does not exist yet, run Eggs config or a preliminary **`eggs produce`** once; then rerun the build script or **`sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh`** (also: `npm run eggs:prepare`). Stick + exFAT workflow: [**`EXFAT_DATA_ZERO_TOUCH.md`**](EXFAT_DATA_ZERO_TOUCH.md).
+   The build script runs **`prepare-eggs-clone-with-exfat.sh`** first (mount + bind + boot sync units, **`highascg.service`** ordering, empty **`~/exfat`** / **`~/highascg/media/*`** stubs, merge of **`tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list`**). Legacy eggs only: if **`/etc/penguins-eggs.d/exclude.list`** does not exist yet, run Eggs config or a preliminary **`eggs produce`** once (eggs 26.10 uses **`custom.exclude.list`** from **`install-eggs-config.sh --apply`**, which the build applies itself); then rerun the build script or **`sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh`** (also: `npm run eggs:prepare`). Stick + exFAT workflow: [**`EXFAT_DATA_ZERO_TOUCH.md`**](EXFAT_DATA_ZERO_TOUCH.md).
 
    Optional:
 
@@ -73,7 +73,7 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
    sudo BASENAME=highascg bash tools/eggs/live-usb/build-highascg-egg.sh
    ```
 
-3. **Kernel (one version)** — `build-highascg-egg.sh` runs `sync-eggs-kernel-and-purge-stale.sh` with **`HIGHASCG_ENSURE_LATEST_KERNEL=1`**: installs **`linux-image-generic`**, points **`eggs.yaml`** at the **newest** `linux-image-*-generic`, purges older images. The ISO matches that kernel, not necessarily the kernel you booted before the build. If the script warns that running ≠ latest, **reboot** after the build (or before a long `eggs produce`) so DKMS (NVIDIA, DeckLink) matches.
+3. **Kernel (one version)** — `build-highascg-egg.sh` runs `sync-eggs-kernel-and-purge-stale.sh` with **`HIGHASCG_ENSURE_LATEST_KERNEL=1`**: installs **`linux-image-generic`**, points **`eggs.yaml`** at the **newest** `linux-image-*-generic`, purges older images. The ISO matches that kernel, not necessarily the kernel you booted before the build. If the script warns that running ≠ latest, **reboot** after the build (or before a long `eggs remaster`) so DKMS (NVIDIA, DeckLink) matches.
 
 4. **Output**: ISO under `/home/eggs/` — name starts with `BASENAME` (default `highascg`), e.g.  
    `highascg_amd64_YYYY-MM-DD_HHMM.iso`
@@ -86,7 +86,7 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
 
 6. **Excludes** (large dirs omitted from squashfs): fragment merged via **`prepare-eggs-clone-with-exfat.sh`** (or **`merge-penguins-eggs-exclude-highascg.sh`**) — includes **`home/casparcg/highascg/media`** and **`home/casparcg/exfat/*`** so the ISO carries an empty WO-47 stub, not developer scratch files. **`swap.img`** is excluded and **`strip-host-swap-for-live-iso.sh`** drops file-swap from **`/etc/fstab`** during produce (restored on the build host after **`build-highascg-egg.sh`**).
 
-7. **Tailscale / tailnet identity**: A cloned ISO is **not** automatically “logged out.” If `tailscaled` state existed on the build host when `eggs produce` ran, that **machine key** is copied into the squashfs unless every storage path is excluded. The laptop then joins the tailnet **as the same node** as the builder (same key → same identity; it effectively replaces that machine until you fix it).  
+7. **Tailscale / tailnet identity**: A cloned ISO is **not** automatically “logged out.” If `tailscaled` state existed on the build host when `eggs remaster` ran, that **machine key** is copied into the squashfs unless every storage path is excluded. The laptop then joins the tailnet **as the same node** as the builder (same key → same identity; it effectively replaces that machine until you fix it).  
    - `.deb` installs often use **`/var/lib/tailscale/`**, but **snap** layouts use **`/var/snap/tailscale/…`** — so “no `/var/lib/tailscale`” does **not** prove there is no shipped identity.  
    - Custom locations: check **`systemctl cat tailscaled`** and **`/etc/default/tailscaled`** for `--statedir=` / `--state=`. Add matching paths to **`tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list`**, run **`merge-penguins-eggs-exclude-highascg.sh`**, rebuild.  
    - **Legacy persistence** ([`legacy-persistence/FLASH_AND_PERSIST.md`](./legacy-persistence/FLASH_AND_PERSIST.md), `/ union`) saves overlays too — once state exists on the stick, it keeps coming back until you delete or reflash.  
@@ -149,7 +149,7 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
 
 ## GRUB says live/install but there is no disk installer
 
-The menu text does **not** guarantee Calamares (GUI installer) is inside the ISO. With **`eggs produce --clone`** you get a live system clone; the graphical installer is only present if you add it **on the build host**, then rebuild.
+The menu text does **not** guarantee Calamares (GUI installer) is inside the ISO. With **`eggs remaster --clone`** (legacy: `eggs produce --clone`) you get a live system clone; the graphical installer is only present if you add it **on the build host**, then rebuild.
 
 ### Option A — Calamares (GUI install baked into the ISO)
 

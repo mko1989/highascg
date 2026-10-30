@@ -47,16 +47,22 @@ if eggs_liveroot_has_host_bind_mounts "$LIVEROOT"; then
 	exit 1
 fi
 
-BR="$(cat /etc/highascg/nvidia-iso-driver 2>/dev/null || echo 595)"
-# The managed custom.yaml (iso_prefix) is generated for this branch; only export a real stamp, not the 595 fallback.
-if [[ -s /etc/highascg/nvidia-iso-driver ]]; then
-	export HIGHASCG_NVIDIA_DRIVER="${HIGHASCG_NVIDIA_DRIVER:-$BR}"
+# WO-870: the branch is the stamp, else the installed driver (the ISO is a clone of this host) — never a
+# hard-coded 595 (the box runs 615 since 26.04). The managed custom.yaml (iso_prefix) is generated for it.
+# shellcheck source=../scripts/lib/nvidia-branch.sh
+source "${REPO}/scripts/lib/nvidia-branch.sh"
+BR="$(cat /etc/highascg/nvidia-iso-driver 2>/dev/null || true)"
+[[ "$BR" =~ ^[0-9]{3}$ ]] || BR="$(highascg_installed_nvidia_branch 2>/dev/null || true)"
+if [[ ! "$BR" =~ ^[0-9]{3}$ ]]; then
+	echo "ERROR: no NVIDIA branch (/etc/highascg/nvidia-iso-driver empty, no installed driver) — set HIGHASCG_NVIDIA_DRIVER." >&2
+	exit 1
 fi
+export HIGHASCG_NVIDIA_DRIVER="${HIGHASCG_NVIDIA_DRIVER:-$BR}"
 BASENAME="${BASENAME:-highascg-nvidia-${BR}}"
 THEME_ABS="$(cd "${LIVE_USB}/highascg-eggs-theme" && pwd)"
 LOG="${REPO}/work/eggs-produce-clone-$(date +%Y%m%d-%H%M%S).log"
 
-echo "==> eggs produce --clone only"
+echo "==> eggs ${EGGS_FLAVOR} --clone only (remaster|produce)"
 echo "    basename: ${BASENAME}"
 echo "    theme:    ${THEME_ABS}"
 echo "    log:      ${LOG}"
@@ -72,7 +78,12 @@ highascg_eggs_build_iso "${BASENAME}" "${THEME_ABS}"
 # re-packs ISO) then verify. Failures propagate; the host remount below still runs.
 brand_rc=0
 if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
-	echo "WARN: inject/verify of ISO boot branding not ported to eggs ${EGGS_FLAVOR} yet (WO-870 Phase 3/5) — branding is NOT verified" >&2
+	# WO-870: eggs 26.10 builds the theme in from branding/livecd/ — nothing to inject, verify the built ISO.
+	set +e
+	echo "==> Verify ISO boot branding (mandatory — WO-148)"
+	bash "${LIVE_USB}/verify-iso-boot-branding.sh"
+	brand_rc=$?
+	set -e
 elif [[ "${HIGHASCG_SKIP_ISO_BOOT_BRANDING:-0}" == "1" ]]; then
 	echo "WARN: HIGHASCG_SKIP_ISO_BOOT_BRANDING=1 — ISO is UNBRANDED (debug only, do not flash)" >&2
 else
@@ -102,4 +113,4 @@ if [[ "$brand_rc" -ne 0 ]]; then
 fi
 
 echo "==> done $(date -Is)"
-echo "ISO under /home/eggs/ — $(highascg_eggs_iso_glob "${BASENAME}" | tr '\n' ' ')(legacy: branding injected + verified)"
+echo "ISO under /home/eggs/ — $(highascg_eggs_iso_glob "${BASENAME}" | tr '\n' ' ')(boot branding verified)"

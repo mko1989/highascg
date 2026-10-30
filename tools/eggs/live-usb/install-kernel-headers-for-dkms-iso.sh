@@ -44,4 +44,4 @@ if [[ "$base_hdr" != "$HDR" ]] && dpkg-query -W -f='${Status}' "$base_hdr" 2>/de
 	apt-mark hold "$base_hdr" 2>/dev/null || true
 fi
 
-echo "OK: ${HDR} + build-essential + dkms ready for eggs produce"
+echo "OK: ${HDR} + build-essential + dkms ready for eggs remaster"

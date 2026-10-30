@@ -102,7 +102,7 @@ run_dd() {
 	fi
 
 	local isos devs
-	isos=$(stat -c%s "$iso" 2>/dev/null) || die "Cannot stat ISO: $iso"
+	isos=$(stat -L -c%s "$iso" 2>/dev/null) || die "Cannot stat ISO: $iso"
 	devs=$(blockdev --getsize64 "$dev" 2>/dev/null) || die "Cannot read size of $dev"
 	if (( isos > devs )); then
 		die "ISO ($isos bytes) is larger than $dev ($devs bytes)."

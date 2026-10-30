@@ -63,6 +63,7 @@ if [[ "$(highascg_eggs_flavor)" == "new" ]]; then
 	# WO-870 Phase 4: eggs 26.10 writes the Calamares config at launch on the live stick (installer.d); the
 	# /etc/calamares shellprocess patches have nothing to patch. Our overlay is checked by verify-eggs-config.sh.
 	echo "==> Calamares: eggs 26.10 configures it on the live stick (eggs sysinstall calamares) — no /etc/calamares patches"
+	bash "${HERE}/fix-calamares-shellprocess.sh" --log-rescue-only
 else
 	echo "==> Calamares shellprocess fixes (last chance before squashfs clone — avoids install exit 127)"
 	echo "     note: eggs produce regenerates /etc/calamares; patch-iso-squashfs-calamares.sh runs after produce"

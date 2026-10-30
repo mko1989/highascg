@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Point penguins-eggs at the HighAsCG livecd GRUB/isolinux theme (persistence default)
 # and install GRUB + Plymouth branding.
+# New eggs (WO-870): prepares the repo theme + Plymouth only; the eggs.yaml `theme:` edit is legacy-only.
 #
 # Usage:
 #   sudo bash tools/eggs/live-usb/install-eggs-live-grub-theme.sh
@@ -36,10 +37,15 @@ fi
 	echo "penguins-eggs livecd theme not found at $EGGS_LIVECD (also tried /usr/lib/penguins-eggs/addons/eggs/theme) — install eggs first." >&2
 	exit 1
 }
-[[ -f "$EGGS_YAML" ]] || {
+# WO-870: only the legacy eggs reads eggs.yaml `theme:`. The new one (Go rewrite) takes the theme from
+# <conf>/branding/livecd/, copied from this repo theme by install-eggs-config.sh --apply right before eggs runs.
+# shellcheck source=eggs-cli-lib.sh
+source "${HERE}/eggs-cli-lib.sh"
+EGGS_FLAVOR="$(highascg_eggs_flavor)"
+if [[ "$EGGS_FLAVOR" == "legacy" && ! -f "$EGGS_YAML" ]]; then
 	echo "Missing $EGGS_YAML — run eggs configuration once." >&2
 	exit 1
-}
+fi
 
 THEME_ABS="$(cd "$THEME_ROOT" && pwd)"
 LIVE="${THEME_ABS}/theme/livecd"
@@ -97,7 +103,9 @@ if [[ -d "${EGGS_THEME}/calamares/modules" ]]; then
 	cp -Lf "${EGGS_THEME}/calamares/modules/"*.yaml "${CAL_DIR}/modules/" 2>/dev/null || true
 fi
 
-if grep -q '^theme:' "$EGGS_YAML"; then
+if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
+	: # new eggs: no yaml theme key (see above)
+elif grep -q '^theme:' "$EGGS_YAML"; then
 	sed -i "s|^theme:.*|theme: ${THEME_ABS}|" "$EGGS_YAML"
 else
 	printf '\ntheme: %s\n' "$THEME_ABS" >>"$EGGS_YAML"
@@ -112,8 +120,13 @@ PLYMOUTH_NOTE="highascg throbber-script (${nthrob} frames top-right + status log
 echo "OK: eggs theme → ${THEME_ABS}"
 echo "     GRUB: default Live entry (exFAT-only; no union persistence on kernel line)"
 echo "     Plymouth: ${PLYMOUTH_NOTE} (see branding/README.md)"
+if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
+	echo "     eggs ${EGGS_FLAVOR}: theme reaches the ISO via $(highascg_eggs_branding_dir)/livecd/"
+	echo "       (sudo bash ${HERE}/install-eggs-config.sh --apply; build-highascg-egg.sh runs it before eggs remaster)"
+	exit 0
+fi
 grep '^theme:' "$EGGS_YAML"
 echo
-echo "IMPORTANT: eggs produce ignores eggs.yaml theme: unless you pass --theme."
+echo "IMPORTANT (legacy eggs only): eggs produce ignores eggs.yaml theme: unless you pass --theme."
 echo "  build-highascg-egg.sh passes: eggs produce ... --theme ${THEME_ABS}"
 echo "  Manual: sudo eggs produce --nointeractive --clone --max --basename highascg --theme ${THEME_ABS}"

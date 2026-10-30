@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ensure Bitfocus Companion + highpass-highascg module are on the build host before
-# `eggs produce --clone` snapshots the filesystem into the ISO squashfs.
+# `eggs remaster --clone` (legacy: `eggs produce --clone`) snapshots the filesystem into the ISO squashfs.
 #
 # Usage (root, from repo):
 #   sudo bash tools/eggs/companion/prepare-companion-for-eggs-clone.sh
@@ -31,7 +31,7 @@ SERVICE_INSTALL="${HERE}/install-companion-service.sh"
 
 if [[ ! -x "${COMPANION_HOME}/companion_headless.sh" ]]; then
 	echo "ERROR: Companion not found at ${COMPANION_HOME}/companion_headless.sh" >&2
-	echo "  Extract the Bitfocus Companion headless tarball to ${COMPANION_HOME} before eggs produce." >&2
+	echo "  Extract the Bitfocus Companion headless tarball to ${COMPANION_HOME} before eggs remaster." >&2
 	exit 1
 fi
 
@@ -63,4 +63,4 @@ if [[ ! -d "${MODULES_DIR}/highpass-highascg" ]]; then
 	exit 1
 fi
 
-echo "OK: Companion + highpass-highascg ready for eggs produce clone"
+echo "OK: Companion + highpass-highascg ready for eggs remaster clone"

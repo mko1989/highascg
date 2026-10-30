@@ -173,8 +173,8 @@ echo "==> BUILD_STAMP=${PRODUCE_STAMP}"
 echo "==> Build ISO basename=${BASENAME} theme=${THEME_ABS} (single NVIDIA driver ${BR})"
 highascg_eggs_build_iso "${BASENAME}" "${THEME_ABS}"
 
-# WO-870 Phase 3-5 not landed: the squashfs/mnt-iso post-processing below targets the legacy nest layout
-# (/home/eggs/mnt/iso, mkisofs helper, /etc/calamares) and does not exist after `eggs remaster`.
+# WO-870: the squashfs/mnt-iso post-processing (patch + inject) targets the legacy nest layout (/home/eggs/mnt/iso,
+# mkisofs helper, /etc/calamares) and does not exist after `eggs remaster`; both verifiers read either ISO layout.
 echo "==> Patch Calamares in squashfs (eggs produce regenerates /etc/calamares after preflight)"
 if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
 	echo "     skip: eggs ${EGGS_FLAVOR} — Calamares is generated on the live system (WO-870 Phase 4)"
@@ -194,15 +194,9 @@ else
 fi
 
 echo "==> Verify squashfs excludes (no swap file, nvidia-pool, dev trees)"
-if [[ "$EGGS_FLAVOR" == "legacy" ]]; then
-	bash "${HERE}/verify-iso-squashfs-excludes.sh"
-else
-	echo "WARN: verify-iso-squashfs-excludes.sh not ported to eggs ${EGGS_FLAVOR} yet (WO-870 Phase 5) — run it by hand on the ISO" >&2
-fi
+bash "${HERE}/verify-iso-squashfs-excludes.sh"
 
-if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
-	echo "WARN: skipping ISO boot branding verify — not ported to eggs ${EGGS_FLAVOR} yet (WO-870 Phase 5)" >&2
-elif [[ "${HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY:-0}" == "1" ]]; then
+if [[ "${HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY:-0}" == "1" ]]; then
 	echo "==> Skip ISO boot branding verify (HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY=1)"
 else
 	echo "==> Verify ISO boot branding (set HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY=1 or FAST=1 to shorten)"
@@ -275,12 +269,13 @@ if [[ -n "$BUILT_ISO" ]]; then
 	echo "  cp ${BUILT_ISO} /path/to/ventoy/ && sync"
 	echo "  bash ${HERE}/verify-stick-iso.sh /path/to/ventoy/$(basename "$BUILT_ISO")"
 else
-	echo "Done. ISO is under /home/eggs/ (name starts with ${BASENAME}_, nvidia-${BR})"
+	# WO-870: name per flavor — new `${BASENAME}-<date>.iso`, legacy `${BASENAME}_<arch>_<date>.iso`.
+	echo "Done. ISO is under $(highascg_eggs_nest)/ (name $(highascg_eggs_iso_glob "$BASENAME" | paste -sd' ' | sed 's/ / or /g'), nvidia-${BR})"
 fi
 echo
 echo "Full build + flash /dev/sda:"
 echo "  sudo HIGHASCG_NVIDIA_DRIVER=${BR} bash ${HERE}/build-produce-flash-stick.sh -y"
 echo
 echo "Flash only (this ISO):"
-echo "  sudo bash ${HERE}/create-operator-stick-from-dd.sh /dev/sda --iso ${BUILT_ISO:-/home/eggs/${BASENAME}_*.iso}"
+echo "  sudo bash ${HERE}/create-operator-stick-from-dd.sh /dev/sda --iso ${BUILT_ISO:-$(highascg_eggs_nest)/$(highascg_eggs_iso_glob "$BASENAME" | head -n1)}"
 echo "  (see tools/eggs/live-usb/FLASH_AND_PERSIST.md)"

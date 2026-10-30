@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bake ISO-first defaults on the eggs build host before `eggs produce --clone`.
+# Bake ISO-first defaults on the eggs build host before `eggs remaster --clone` (legacy: `eggs produce --clone`).
 #
 # - Caspar: config/casparcg.config from config/casparcg.config.iso
 # HighAsCG: production node_modules for server embed; dist-web/ baked on ISO (operator UI on :4200)

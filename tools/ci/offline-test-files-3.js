@@ -230,4 +230,5 @@ module.exports = [
 	'tools/smoke/smoke-wo870-calamares-sysinstall.test.js',
 	'tools/smoke/smoke-wo870-eggs-config.test.js',
 	'tools/smoke/smoke-wo870-eggs-flavor.test.js',
+	'tools/smoke/smoke-wo870-phase5-verify.test.js',
 ]

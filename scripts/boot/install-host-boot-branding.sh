@@ -10,7 +10,8 @@
 # Optional Plymouth boot on host (throbber, no full dmesg):
 #   sudo HIGHASCG_HOST_BOOT_MODE=plymouth bash scripts/install-host-boot-branding.sh
 #
-# ISO/live-USB: eggs produce + inject-iso-boot-branding.sh (see branding/README.md).
+# ISO/live-USB: eggs remaster takes the theme from /etc/penguins-eggs.d/branding/livecd (legacy: eggs produce +
+# inject-iso-boot-branding.sh); see branding/README.md.
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {

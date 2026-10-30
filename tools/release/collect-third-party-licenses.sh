@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Collect third-party license texts from the build host into licenses/.
 #
-# Run on a host that matches what eggs produce will clone (after scripts/setup/).
+# Run on a host that matches what eggs remaster will clone (after scripts/setup/).
 #
 #   bash tools/release/collect-third-party-licenses.sh
 #   sudo bash tools/release/collect-third-party-licenses.sh   # also refresh deb copyrights

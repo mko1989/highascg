@@ -11,7 +11,7 @@
 
 `rm -rf /home/eggs/liveroot` while eggs **bind-mounts** live `/usr` into liveroot deletes the real system.
 
-**After any Ctrl-C during `eggs produce` → `reboot` before any liveroot cleanup.**
+**After any Ctrl-C during `eggs remaster` (or legacy `eggs produce`) → `reboot` before any liveroot cleanup.**
 
 ## Recovery A — SSH + artifact on disk (fastest if ISO/squashfs is complete)
 
