@@ -1,7 +1,8 @@
 # WO-828 — Timeline inside a look: does the take transition and play as the WOs say? (live verification + fixes)
 
-**Status: IN PROGRESS (29.10) — spec compiled from 25 WOs, 13-step live test run on the box (AMCP wire + journal + state +
-PGM luma probe); 8 deviations found, fixes in progress**
+**Status: IN PROGRESS (30.10) — D1, D2, D3, D4, D5, D7 fixed and verified (offline suite 3659 pass / 0 fail, 247/247
+timeline smokes; live wire + PGM luma probe per fix, §5; independent coordinator re-run 30.10 06:00, §5.1). Open: D9 (new,
+CUT normal → timeline look shows 3 black frames, §3, follow-up in progress), D6 and D8 (owner decisions, §3).**
 **Source:** owner 29.10: "find either a work order or a note that explains a proper timeline transition and playing a
 timeline from inside a look and run full tests to see if it's transitioning and playing exactly as explained."
 **Related:** WO-139, 152, 528, 537, 540, 541, 544–561, 574, 618, 782, 814 (sources of the spec below).
@@ -90,13 +91,168 @@ full and fades the incoming bank in on top** — a monotonic luma ramp, no dip.
 
 ## 2. What was done
 
-(in progress)
+Fixed in priority order D1, D2, D7, D5, D3, D4. D6 and D8 were left alone on purpose (§3).
 
-## 3. Owner decisions
+- **`src/engine/timeline-playback-runtime.js`**
+  - `play()` takes a new `seamless` option (≈ l.77). It applies only when the same timeline is already on air. It keeps
+    the old `_prevKey` transport cache while `_applyAt` runs, so `_sendClipTransport` knows which layers already hold the
+    same clip.
+  - The loop wrap in `_tick` (l.395) now calls `play(airId, 0, { seamless: true })` (D2).
+  - New method `joinChannels(id, channels)` (l.353, D1/D5). It drops the cache for the joined channels only and runs a
+    forced `_syncAmcpLayers` limited to those channels (`onlyChannels`) at the current position. The channels already
+    playing are left untouched.
+  - Why `joinChannels` and not a tick-join: an implicit join through the next tick resolves the clip `atEntry` with
+    startBehaviour `beginning`, which lands at SEEK 0. The explicit forced sync seeks to the playhead.
+- **`src/engine/timeline-playback-amcp-send.js`**
+  - `_syncAmcpLayers` accepts `onlyChannels` (l.124).
+  - `_sendClipTransport` (l.312–351) skips the `STOP` when the layer already plays the same clip (`seamless`), on both
+    the normal branch and the loopAlways branch. PLAY with a clip is LOADBG + swap in Caspar, so the old frame stays on
+    screen until the new one is ready. The STOP was what opened the black gap.
+  - Why D2 is option (a), PLAY without STOP: it measured 0 black frames (§5), so LOADBG-ahead and a native LOOP were not
+    needed. A native LOOP would also lose the timeline's own clip/keyframe semantics.
+- **`src/engine/scene-transition.js` `programChannelToScreenIdx`** (l.46–50, D7): a preview channel now maps to its own
+  screen (`previewChannels[i] → i`); an unknown channel still falls back to 0.
+- **`src/engine/timeline-take.js` `startSceneTimelineLayer`** (l.300–345):
+  - **D1/D5 join.** A preview-scoped call (`restrictToPreview`) for a timeline that is on air with a program claim
+    (`joinsRunning`) only adds the preview claim and calls `joinChannels`. It never calls `play(restart)`, which STOPped
+    and re-PLAYed program at 0. If the timeline already plays on that preview channel (`alreadyOnCh`), nothing is sent,
+    so a second exchange does not re-PLAY PRV. The deferred PGM→PRV exchange call takes the same path. This is what puts
+    an outgoing timeline look on PRV.
+  - **D3 retake.** An unrestricted take of a timeline already on air on this program channel (`retakeOnAir`) sends no
+    `OPACITY 0 0` preset and no fade-up. It calls `play(0, { restart, seamless })` (no STOP), and with
+    `startAtCurrentPosition` it does nothing at all. It returns `[]`, so the pipeline has nothing to ramp.
+  - **Race fix (found live in step 11a).** The `OPACITY 0 0` preset now goes out before `setSendTo`. Before, the preset's
+    await sat between the routing change and `play()`. A timeline already playing on PRV only got a regular tick in that
+    gap, and the tick sent a full unprotected transport (`OPACITY 1 0` + STOP/PLAY) to program: a cut instead of a fade.
+    D5 makes "playing on PRV only" a normal state, so the old ordering would bite often.
+- **`src/engine/scene-take-lbg-amcp-pipeline.js`** (l.231–234, D4): when a look is timeline-only (`takeJobs.length === 0`
+  with timeline layers to fade in), the outgoing exit layers are not ramped. The timeline (band 210+) fades in over the
+  held outgoing look, the same rule as normal→normal and `runTimelineDirectTake`. A mixed look keeps the normal exit
+  rule. The `onProgramPlayCommitted()` result (the PGM→PRV exchange promise) is stored in `fadeClockRef.programPlayHook`
+  (l.380).
+- **`src/engine/scene-take-lbg-teardown.js`** (l.119–132, D4): when the take is timeline-only, the opacity poll waits for
+  the incoming timeline layer to reach 1 instead of the held outgoing layer to reach 0. The outgoing look is held at
+  full, so polling it for 0 would always burn the whole budget.
+- **`src/engine/scene-take-lbg.js`** (l.421–429, D5/D7): passes `timelineFadeInRefLayer` to the teardown. After the
+  teardown it awaits the exchange (`programPlayHook`), then calls `releaseOrStopOutgoingTimeline` instead of a blind
+  `eng.stop()`.
+- **`src/engine/scene-take-lbg-timeline-guard.js`**, new `releaseOrStopOutgoingTimeline` (l.111–131, D5): if the
+  outgoing timeline is on both buses (the exchange joined PRV), it drops only the program claim (`setSendTo` with
+  `skipAmcpApply`, so only the program channel gets the differential STOP) and clears the WO-545 exit hold. Otherwise it
+  stops the timeline as before.
+  - Why release and not stop: PRV must show what `scene.live[prv]` names. Stopping both buses left PRV empty (D5).
+    Restarting on PRV would jump to 0.
+- **`src/api/routes-scene-take.js`** (l.348–356): rewrote the stale WO-556 comment on the exchange call. It now describes
+  the program-only claim, the join and the release-only teardown. No code change; `deferTimelinePlay` stays.
+- **Tests**
+  - `smoke-wo541-timeline-only-look-crossfade.test.js`: test 2 changed (see §3). Added a test that a mixed look still
+    fades its exit-only layers.
+  - `smoke-wo556-preview-flash-and-exit-restart.test.js`: Bug B now asserts "no program line, PRV joins at the playhead".
+    The mock position is advanced to 5 s, so a restart (SEEK 0) and a join are distinguishable.
+  - New `smoke-wo828-timeline-look-take-deviations.test.js` (16 tests), registered in `tools/ci/offline-test-files-2.js`.
+    It covers:
+    - D7 mapping;
+    - `joinChannels`: seeks to the playhead, sends nothing to program, refuses unrouted or off-air, no re-join;
+    - the D2 seamless wrap on both clip branches, plus a check that a plain restart still STOPs;
+    - the D3 retake: no preset, no STOP, SEEK 0, `[]`;
+    - the 11a race: a tick injected during the preset await; this check fails with the old ordering, verified with a
+      scratch script;
+    - D5 release vs stop;
+    - the source pins for the hook await and the teardown reference.
 
-- **D8:** at the end of a non-looping timeline inside a look — hold the last frame (like a media layer), or stop to
-  black (today)?
-- **D6:** one timeline per screen (needs per-screen engine playback) vs the current single air timeline.
+## 3. Decisions
+
+- **D3 (taken here, from WO-537 + WO-548).** A retake of the timeline look already on air on that PGM restarts the
+  timeline at 0 (WO-537: "a look take starts at 0"), at full opacity, with no preset, no fade and no STOP (WO-548: "stays
+  lit throughout"). The picture jumps to frame 0 of the clip with no dip. With `startAtCurrentPosition` the retake leaves
+  playback running. If the owner would rather a retake keep running from the current position, it is a one-line change
+  (the `retakeOnAir` branch).
+- **D4: rule change to smoke-wo541 test 2, not a silent weakening.** That test pinned the outgoing layer fading out in
+  the same batch. Measured live, that double ramp was the 27 % dip (§1.3 step 2). The test now pins the opposite: the
+  outgoing layer is held, and the reason is written in the test. A mixed look keeps the old exit rule (new test).
+  - **Caveat:** a timeline that does not fill the frame (or has transparent areas) shows the held outgoing look around
+    or under it until the teardown clears it, about 0.5 s after the fade. This is the same visual as normal→normal. If
+    the owner wants the outgoing look gone during the fade for such timelines, that needs a coverage-aware rule.
+- **WO-556 test change.** "The exchange call sends no PLAY" became "sends nothing to program; PRV joins at the playhead".
+  The WO-556 fault (a program restart at 0 mid-crossfade) stays pinned. The old regression test still documents the
+  `play(restart)` behaviour.
+- **D6 (owner decision, not fixed):** one timeline per screen (needs per-screen engine playback) vs the current single air
+  timeline.
+- **D8 (owner decision, not fixed):** at the end of a non-looping timeline inside a look, hold the last frame (like a
+  media layer), or stop to black (today)? Seen again in this run: the mixed test look (timeline layer without loop) went to
+  its normal layer only after 20 s, while `scene.live` still names the look.
+- **Observed edge case, open.** After a node restart the engine has no timelines (the test timeline is engine-only and
+  must be re-PUT). The PGM→PRV exchange then still records a timeline look in `scene.live[prv]` whose timeline is not on
+  air, so PRV shows nothing for it (seen 30.10: `scene.live[4] = wo828-tl-proj`, playback null). Engine timelines in
+  real projects are loaded from the project, so this may only affect hand-made test timelines.
+- **D9 (new, open, not caused by this WO).** A CUT from a normal look to a timeline look shows 3 black PGM frames
+  (22:30:41.839–.880). The CUT path sends `STOP/PLAY 1-210` and `STOP 1-110` in the same millisecond. The timeline clip's
+  first frame is not decoded yet, and nothing is LOADBG'd ahead. A normal CUT holds the outgoing look until the
+  LOADBG'd PLAY is acked (reference: 0 black). The code involved (the CUT `play()` branch and the CUT exit) is untouched
+  by this WO. Fix candidate: on a CUT, keep the outgoing layers until the timeline's PLAY is acked plus one or two frames,
+  like the normal path. Left for a follow-up, because it changes CUT timing for every timeline look.
+- **Mixed look (step 3), noted.** The mixed look still uses the normal A/B rule for its normal layer. When the incoming
+  normal layer lands on the lower bank, the outgoing one fades out under the fading-in timeline. Luma goes 129 → 120.8 →
+  124.8, a shallow 6 % U (math: 0.75·K2 + 0.25·L1 at mid-fade), not a black frame. This is unchanged by WO-828. Holding
+  the outgoing look here too would need the bank-order rule to know about the timeline band.
+
+## 5. Verified (29–30.10)
+
+**Offline:**
+- `node tools/ci/run-offline-tests.js`: 3661 tests, 3659 pass, 0 fail, 2 skipped. In one run,
+  `smoke-wo570-look-media-transport` failed once on a wall-clock tolerance while the box was loaded (5113 ms vs ≤ 5050).
+  It is unrelated to this diff, passed 3/3 when re-run alone, and passed in the clean full re-run.
+- The 45 timeline smoke files: 247/247 (the pre-change baseline was 229/229 across 44 files).
+- `check-max-file-lines`: 0 files over 500 lines. `npx eslint` on every touched or new file: clean.
+
+**Live.** Server restarted on the final code (PID 1851396) and `wo828tl` re-PUT. Evidence:
+- AMCP wire from `log/caspar_2026-10-29.log`.
+- `GET /api/state`.
+- The `pgm1` luma probe, which covers Dioda ch1 only (no shm tap on ch3).
+
+Raw captures are in the session scratchpad `wo828/`: `x*`/`w*`/`f*` `.txt` + `.tsv`.
+
+| Fix | Step | Wire | Luma (pgm1) |
+|---|---|---|---|
+| D4 | Loop1 → TL-only, MIX 25 (x02) | `1-210 OPACITY 0 0`, `STOP/PLAY 1-210 … SEEK 0`, `1-210 OPACITY 1 25 linear`; **no outgoing ramp line**; poll `MIXER 1-210 OPACITY` (target 1), then `CG/STOP 1-10` 510 ms after the fade start | 104.7 → 124.8 strictly monotonic over 25 frames (0 down-steps > 0.2), 0 black |
+| D2 | loop wrap (w02, 22:25:54.995) | only `PLAY 1-210 … SEEK 0`, no STOP | 75 frames around the wrap 124.6–126.1, no frame-counter gap, 0 black (and 0/0 at 2 earlier wraps, 22:14:09 / 22:14:29) |
+| D3 | retake TL-only (w04) | `MIXER 1-210 OPACITY 1 0` + `PLAY 1-210 … SEEK 0` only — no `OPACITY 0 0`, no STOP, no fade-up | 120.9 → 122.3, min 119.7 (clip content range), 0 black |
+| D3 (CUT) | retake TL-only with CUT (x10_cut_retake) | `OPACITY 1 0` + `PLAY 1-210 … SEEK 0`, no STOP | 0 black |
+| D1 | PRV take of TL-only while on PGM (w07, x07) | **0 ch1 lines**; `STOP/PLAY 2-210 … SEEK 64` / `SEEK 706` (the playhead); sendTo {preview, program} | 0 black, max reversal 0.03–0.07 |
+| D5 | TL-only → KV LOOP 2 (x05, PRV already showing the TL look) | `1-210 OPACITY 0 12 DEFER` in the take batch; **no 2-210 line at all**; poll then `STOP 1-210` 477 ms after the fade start; end: playback playing, sendTo {preview:true, program:false}, `scene.live[2] = wo828-tl-only` | 0 black, no dip |
+| D5 | same, PRV not yet showing it (w05, before the `alreadyOnCh` refinement) | exchange `PLAY 2-210 … SEEK 770` (join at the playhead), `STOP 1-210` after the poll, no STOP 2-210; `INFO 2-210` = KV LOOP 2 playing at 18.38 s | 0 black |
+| race | TL proj playing on PRV ch4 only → PGM take on ch3 (f11a) | first ch3 line `MIXER 3-210 OPACITY 0 0`, then `STOP/PLAY 3-210`, `3-210 OPACITY 1 25`; **no `OPACITY 1 0`**; outgoing 3-10 held, cleared after the poll | (ch3: no probe) |
+| D7 | TL proj → KV LOOP projekcja on ch3 (f11b) | **0 ch1/ch2 lines**; `3-210 OPACITY 0 12` at 14.728, poll at 15.136, `STOP 3-210` at 15.138 (after the 240 ms fade); PRV ch4 joins: `PLAY 4-210 … SEEK 796` | (ch3: no probe) |
+
+Regression steps:
+- 6 (PRV take of an unrelated look while the TL is on PGM): 0 ch1 lines; only `STOP 2-210` (preview claim released); 0
+  black.
+- 3 (mixed): timeline preset/fade as S1; normal layer via the bank rule; 0 black (the shallow U in §3).
+- 9 (easeboth): `1-210 OPACITY 1 25 easeinoutquad`, no Caspar error, eased monotonic ramp 104 → 124.
+- 10 (CUT normal → TL): `OPACITY 1 0`, STOP/PLAY, no preset/fade. As before, but the probe shows **3 black frames**
+  (D9, §3). A reference CUT normal → normal shows 0.
+- 13: `POST /api/timelines/wo828tl/stop` without force while on PGM returns **409**.
+- End state: Dioda ch1 = KV LOOP 2 (layer 10), Proj ch3 = KV LOOP projekcja (`INFO`); playback null.
+
+Not proven: D7 and the race on the Proj PGM picture itself, because there is no luma tap on ch3. The wire shows the
+fade-then-STOP order. Owner QA on the glass is still useful for multi-screen.
+
+### 5.1 Coordinator re-run (30.10, 05:59–06:01, node started 22:28:37 on the final code)
+
+Independent of the fix agent, same harness (`take.sh` + `lumaprobe.py pgm1`):
+- KV LOOP 2 → TL-only (MIX): `1-210 OPACITY 0 0`, `STOP/PLAY 1-210 … SEEK 0`; teardown as §5.
+- PRV-only take of the TL look while it is on PGM: **0 lines to ch1** (only `2-210` lines).
+- Loop wraps at 05:59:56.543, 06:00:16.544, 06:00:36.578, 06:00:56.581: each is a bare `PLAY 1-210 … SEEK 0` with no STOP.
+  Probe over 45 s (2250 samples, two wraps inside): **0 black**, min 118.9 (clip content), max frame-to-frame reversal 0.16.
+- TL-only → KV LOOP 2 (MIX 12): `1-210 OPACITY 0 12 linear DEFER`, poll, `STOP 1-210` 415 ms later; **no 2-210 line**;
+  end: playback playing with sendTo {preview:true, program:false}, `scene.live[2] = wo828-tl-only`; luma 121.6 → 121.7,
+  0 black, dip 0.2.
+- Gates: `npm run lint` equivalent (`eslint . --max-warnings 216`, the git-ignored `godot/export/` web build excluded as in
+  CI): 0 errors, 215 warnings; `prettier --check tools/ci …`: clean; `check-max-file-lines`: 0 over.
+- Cleanup: the three test looks removed from the live deck (`scene_deck_sync`), `DELETE /api/timelines/wo828tl` → 200,
+  and the `wo828tl` entry that an earlier test autosave had put into `projects/mhp_harder.json` removed via
+  `POST /api/project/autosave` (rev 333 → 334); `grep wo828 projects/` → none. Dioda PGM/PRV = KV LOOP 2,
+  Proj = KV LOOP projekcja.
 
 ## 4. Source map
 

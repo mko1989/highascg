@@ -49,4 +49,5 @@ module.exports = [
 	'tools/smoke/smoke-wo801-monitor-pair.test.js',
 	'tools/smoke/smoke-wo800-web-layer-levels.test.js',
 	'tools/smoke/smoke-wo827-web-deck-import-repaint.test.js',
+	'tools/smoke/smoke-wo828-timeline-look-take-deviations.test.js',
 ]

@@ -228,7 +228,10 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				}
 			}
 			// Layers only in the leaving look: fade out on the active bank during the transition window.
-			for (const layer of exitMedia || []) {
+			// WO-828 D4: not under a timeline-only look — it fades in on top (band 210+) over the outgoing look
+			// HELD at full, which the teardown clears after the fade (fading both gave a 27 % luma dip).
+			const holdOutgoing = takeJobs.length === 0 && timelineFadeInPhys.length > 0
+			for (const layer of holdOutgoing ? [] : exitMedia || []) {
 				const ln = Number(layer.layerNumber)
 				if (!Number.isFinite(ln) || takeJobLogicalNums.has(ln)) continue
 				const pOut = phys(ln, activeBank)
@@ -374,7 +377,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		self.log?.('info', `[scene-take-lbg] timing ch${channel}: phaseA-done=${tPhaseA - takeT0}ms play-acked=${Date.now() - takeT0}ms jobs=${takeJobs.length}`)
 		if (typeof onProgramPlayCommitted === 'function') {
 			try {
-				onProgramPlayCommitted()
+				fadeClockRef.programPlayHook = onProgramPlayCommitted() // WO-828 D5: the exchange, awaited before the timeline release
 			} catch (e) {
 				self.log?.('warn', `[scene-take-lbg] play-committed hook failed: ${e?.message || e}`)
 			}

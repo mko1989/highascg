@@ -297,9 +297,46 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 	 * mirrors `runTimelineDirectTake`'s own `setSendTo` call above (line ~158), which already only
 	 * ever claims `{ preview: false, program: true }` for exactly this reason — this function was
 	 * the one path still forcing both. */
+	const onAir = eng._airTimelineId === tlId
+	const before = onAir && !opts.restrictToPreview ? eng._sendToFor(tlId) || {} : {} // WO-828 D3: routing before this take
 	const program = opts.restrictToPreview ? !!eng._sendToFor(tlId)?.program : true
 	const preview = !!opts.restrictToPreview
+	const joinsRunning = opts.restrictToPreview && onAir && program
+	// already playing on this preview channel (e.g. PRV took it earlier): a re-join would STOP/PLAY PRV for nothing
+	const alreadyOnCh = joinsRunning && !!eng._channelsFor?.(eng._sendToFor(tlId) || {}).includes(channel)
+	const retakeOnAir = !opts.restrictToPreview && onAir && before.program && eng._channelsFor(before).includes(channel)
+	const tl = eng.get?.(tlId)
+	const physLayers = collectTimelinePhysicalLayers(tl)
+	/* WO-152 B152.1 preset, sent BEFORE the routing change (WO-828): the fade path's only await used to sit
+	 * between `setSendTo` and `play()`. A timeline already PLAYING elsewhere (e.g. on PRV only, WO-828 D5) got
+	 * a regular tick in that gap, which found this channel uncached and sent a full unprotected transport —
+	 * `OPACITY 1 0` + PLAY on program before the preset: a cut, not a fade (measured live, 29.10). */
+	if (opts.fadeDur > 0 && !joinsRunning && !retakeOnAir && !opts.deferPlay && physLayers.length && amcp) {
+		await amcp
+			.batchSendChunked(
+				physLayers.map((L) => `MIXER ${channel}-${L} OPACITY 0 0`),
+				{ skipMixerPreCommit: true },
+			)
+			.catch(() => {})
+	}
 	eng.setSendTo({ preview, program, screenIdx: opts.screenIdx }, tlId, { skipAmcpApply: true })
+	/* WO-828 D1/D5: a preview-scoped call for a timeline that is already live on PROGRAM joins the running
+	 * playback on its preview channel at the current position — never `play(restart)`, which STOPped and
+	 * re-PLAYed program at 0 (a black PGM frame and a jump to 0). The deferred PGM→PRV exchange call takes
+	 * the same join: it is the only thing that puts the outgoing timeline look on PRV (the PGM take's
+	 * teardown then releases only the program claim, scene-take-lbg-timeline-guard.js). */
+	if (joinsRunning) {
+		if (!alreadyOnCh) eng.joinChannels?.(tlId, [channel])
+		return []
+	}
+	/* WO-828 D3: a real take of a timeline that is already on air on THIS program channel (a retake, or
+	 * another look holding the same timeline) restarts it at 0 (WO-537) at full opacity — no `OPACITY 0 0`
+	 * preset, no fade-up, and no STOP before the PLAY (`seamless`): WO-548 "stays lit throughout". */
+	if (retakeOnAir) {
+		eng.setLoop(tlId, !!layer.loop)
+		if (!opts.startAtCurrentPosition) eng.play(tlId, 0, { restart: true, seamless: true })
+		return []
+	}
 	/* WO-554: `deferPlay` exists for routes-scene-take.js's pgm/prv "stage on preview" call, which
 	 * runs BEFORE the real, unrestricted `pgmTakePromise` for the SAME `incomingScene` (both reach
 	 * this function for the identical tlId — see the WO-549/553 comments below on `restrictToPreview`
@@ -326,16 +363,7 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 		eng.play(tlId, startPos, { restart })
 		return []
 	}
-	const tl = eng.get(tlId)
-	const physLayers = collectTimelinePhysicalLayers(tl)
-	if (physLayers.length && amcp) {
-		await amcp
-			.batchSendChunked(
-				physLayers.map((L) => `MIXER ${channel}-${L} OPACITY 0 0`),
-				{ skipMixerPreCommit: true },
-			)
-			.catch(() => {})
-	}
+	// (the OPACITY 0 0 preset for these layers went out above, before the routing change)
 	// WO-528: the caller fades these in, so the engine must not write an instant full-opacity value
 	// between the preset above and that fade — same fault as the Take path, and the reason a timeline
 	// inside a look "flashes ... and gets back to the look".

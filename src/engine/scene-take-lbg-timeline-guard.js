@@ -107,4 +107,27 @@ function resolveTimelineIdToReleaseFromPreview(pbNow, incomingLayers, hasContent
 	return stillWantedByThisIncomingScene ? null : pbNow.timelineId
 }
 
-module.exports = { resolveActiveTimelineIdToFadeOut, resolveTimelineIdToReleaseFromPreview }
+/**
+ * WO-828 D5: end of a take that faded timeline `id` out on program `channel`. When the PGM→PRV exchange has
+ * meanwhile put the outgoing timeline look on PRV (sendTo now preview + program), release only the program
+ * claim — `setSendTo` STOPs just the removed program channel (WO-555) — and the timeline keeps playing on
+ * PRV, matching scene.live. Otherwise (nothing on PRV wants it) stop it everywhere, as before.
+ * @param {object} eng TimelineEngine
+ * @param {string} id
+ * @param {number} channel the program channel this take faded it out on
+ * @returns {'released'|'stopped'}
+ */
+function releaseOrStopOutgoingTimeline(eng, id, channel) {
+	const st = eng?._sendToFor?.(id) || {}
+	const keepsPreview =
+		eng?._airTimelineId === id && st.preview && st.program && eng._channelsFor(st).includes(channel)
+	if (!keepsPreview) {
+		eng.stop(id)
+		return 'stopped'
+	}
+	if (eng._opacityExitHoldId === id) eng.setOpacityExitHold(null)
+	eng.setSendTo({ preview: true, program: false, screenIdx: st.screenIdx }, id, { skipAmcpApply: true })
+	return 'released'
+}
+
+module.exports = { resolveActiveTimelineIdToFadeOut, resolveTimelineIdToReleaseFromPreview, releaseOrStopOutgoingTimeline }

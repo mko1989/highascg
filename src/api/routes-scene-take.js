@@ -345,19 +345,15 @@ async function handleSceneTakeInner(body, ctx, sync) {
 						 * look results in retaking the timeline look instead of playing the new one."
 						 * This call only ever wants the preview bus.
 						 *
-						 * WO-556: `previousPgmScene` is the look that WAS on program — when it itself
-						 * contains a timeline (exactly the "switch away from a timeline look" case),
-						 * that timeline is either still legitimately airing (mid exit-fade, run by the
-						 * concurrent `pgmTakePromise`/`activeTimelineIdToFadeOut` above) or already
-						 * stopped — never something that needs STARTING here. Its preview routing is
-						 * already correct (nothing has touched it since the earlier take put it on
-						 * both buses) — `startSceneTimelineLayer`'s unconditional `eng.play(...,
-						 * {restart:true})` was the only consequential thing this call did to it: an
-						 * unwanted position-0 restart stomping the smooth crossfade-out mid-transition
-						 * ("the timeline restarts during the transition" — todos, 03.09). Deferred: this
-						 * call's timeline handling becomes routing-only (a no-op when nothing changed),
-						 * same mechanism WO-554 uses for the staging call, different reason (there: a
-						 * redundant real take follows; here: nothing should ever (re)play it). */
+						 * WO-556 / WO-828 D5: `previousPgmScene` is the look that WAS on program — when it
+						 * holds a timeline (the "switch away from a timeline look" case), that timeline is
+						 * still airing on PROGRAM only (WO-559: a take claims program, not preview), mid
+						 * exit-fade by the concurrent `pgmTakePromise`. It must never be restarted here
+						 * (`deferTimelinePlay`: the old `play(restart)` stomped the crossfade-out at 0 —
+						 * todos 03.09). This call ADDS the preview claim and joins PRV at the timeline's
+						 * current position (`startSceneTimelineLayer` → `joinChannels`); the PGM take's
+						 * teardown then releases only the program claim (`releaseOrStopOutgoingTimeline`),
+						 * so PRV keeps playing the look scene.live names for it. */
 						await runSceneTakeLbg(ctx.amcp, {
 							...takeOpts,
 							channel: bus1,

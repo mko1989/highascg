@@ -121,7 +121,7 @@ module.exports = {
 		 * `_applyKeyedMixerProp` (WO-528/WO-544) already suppresses both write paths under
 		 * `takeFade`; this just widens WHEN that suppression applies for this one timeline. */
 		const takeFade = !!opts.takeFade || this._opacityExitHoldId === id
-		const channels = this._channels()
+		const channels = opts.onlyChannels ? this._channels().filter((c) => opts.onlyChannels.includes(c)) : this._channels() // WO-828 joinChannels
 		const playing = this._airTimelineId === id && (this._pbFor(id).playing ?? false)
 		const mixerDirty = new Set()
 		const channelLines = new Map() // T173.4: collect MIXER lines per channel
@@ -309,6 +309,8 @@ module.exports = {
 		if (!self?.amcp) return { hasDeferredLines: false }
 		const { playing, startTransport } = opts
 		if (startTransport) cancelScrub(this, ch, caspLayer) // WO-790: a waiting scrub seek must not land on the new transport
+		// WO-828 D2/D3: the same clip re-PLAYed in place (loop wrap, retake) — no STOP, which opened a black gap
+		const seamless = !meta.isRoute && this._seamlessPrevKey?.get(`${ch}-${caspLayer}`)?.clipId === clip.id
 
 		if (meta.loopAlways) {
 			if (!startTransport) return { hasDeferredLines: false }
@@ -316,7 +318,7 @@ module.exports = {
 			const afSuffix = playAfSuffix(clip, layout)
 			const cl = `${ch}-${caspLayer}`
 			const cmd = `PLAY ${cl} ${meta.srcQ} LOOP${afSuffix}`
-			self.amcp.stop(ch, caspLayer).catch(_err => {
+			if (!seamless) self.amcp.stop(ch, caspLayer).catch(_err => {
 				this._logDebug(`STOP ${ch}-${caspLayer} failed: ${_err.message}`)
 			})
 			self.amcp.raw(cmd).catch(_err => {
@@ -345,8 +347,8 @@ module.exports = {
 		// T173.1: collect transport + mixer init lines into one batch
 		const lines = []
 
-		// STOP first so Caspar reapplies AF when route/clip changes
-		lines.push('STOP ' + cl)
+		// STOP first so Caspar reapplies AF when route/clip changes (not needed — and a black gap — for the same clip)
+		if (!seamless) lines.push('STOP ' + cl)
 
 		// T173.2: check if there's an opacity segment tween at clip-local 0
 		// Determine if we'll use a tween or just init opacity

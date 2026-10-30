@@ -128,7 +128,11 @@ describe('WO-556 Bug A: releasing a preview claim must not flash program', () =>
 })
 
 describe('WO-556 Bug B: the outgoing look\'s timeline must never be restarted by the preview-exchange call', () => {
-	it('deferPlay:true + restrictToPreview:true (already on program): routes correctly, sends no PLAY', async () => {
+	/* WO-828 D5 (29.10): "sends no PLAY" became "sends no PLAY to PROGRAM". The exchange call now JOINS the
+	 * running timeline on the preview channel at its current position (PRV must show the look scene.live
+	 * claims for it; the PGM teardown then releases only the program claim). The WO-556 fault — a restart at
+	 * 0 on program mid crossfade-out — stays pinned: no program line, no SEEK 0 anywhere. */
+	it('deferPlay:true + restrictToPreview:true (already on program): routes correctly, never touches program, joins PRV', async () => {
 		const { self, eng, sentLines } = makeEngine()
 		// The timeline is already live on program (the earlier real take — WO-559: program only).
 		await startSceneTimelineLayer(self, self.amcp, 1, { source: { value: 'tl1' } }, {
@@ -136,6 +140,10 @@ describe('WO-556 Bug B: the outgoing look\'s timeline must never be restarted by
 			screenIdx: 0,
 			startAtCurrentPosition: false,
 		})
+		// The look has been on air for 5 s (otherwise a correct join and a restart both SEEK 0).
+		const cell = eng._pbFor('tl1')
+		cell._p0 = 5000
+		cell._t0 = Date.now()
 		sentLines.length = 0
 		// Now simulate the previewExchangePromise call: restrictToPreview + deferPlay, as
 		// routes-scene-take.js now sends it for previousPgmScene's timeline.
@@ -147,13 +155,17 @@ describe('WO-556 Bug B: the outgoing look\'s timeline must never be restarted by
 			deferPlay: true,
 		})
 		assert.deepEqual(fadeIn, [])
-		assert.equal(sentLines.filter((l) => /^PLAY\s/.test(String(l))).length, 0, 'must not restart the exiting timeline')
+		assert.equal(sentLines.filter((l) => /^(PLAY|STOP|LOAD|MIXER) 1[-\s]/.test(String(l))).length, 0, `must not touch the exiting timeline on program: ${JSON.stringify(sentLines)}`)
+		assert.ok(!sentLines.some((l) => / SEEK 0\b/.test(String(l))), `no restart at 0: ${JSON.stringify(sentLines)}`)
+		assert.equal(sentLines.filter((l) => /^PLAY 2-210 /.test(String(l))).length, 1, `PRV joins the running timeline: ${JSON.stringify(sentLines)}`)
 		// Program claim preserved (WO-555 Fix C), preview claim added — routing itself is correct.
 		assert.deepEqual(eng._sendToFor('tl1'), { preview: true, program: true, screenIdx: 0 })
 	})
 
-	it('regression check: WITHOUT deferPlay, the identical call DOES restart it (the reported bug)', async () => {
-		const { self, eng, sentLines } = makeEngine()
+	/* WO-828 D1: this used to DOCUMENT the bug (a preview-only call restarting program). The preview-only path
+	 * (no deferPlay) now takes the same join as the exchange call — pinned as the fix, not the bug. */
+	it('WITHOUT deferPlay (preview-only path), the identical call joins PRV too — program is never restarted', async () => {
+		const { self, sentLines } = makeEngine()
 		await startSceneTimelineLayer(self, self.amcp, 1, { source: { value: 'tl1' } }, {
 			fadeDur: 0,
 			screenIdx: 0,
@@ -165,9 +177,23 @@ describe('WO-556 Bug B: the outgoing look\'s timeline must never be restarted by
 			screenIdx: 0,
 			startAtCurrentPosition: false,
 			restrictToPreview: true,
-			// deferPlay intentionally omitted — reproduces the pre-fix previewExchangePromise call
 		})
-		assert.ok(sentLines.some((l) => /^PLAY\s/.test(String(l))), 'documents the pre-WO-556 restart-during-transition bug')
+		assert.ok(!sentLines.some((l) => /^(PLAY|STOP|LOAD|MIXER) 1[-\s]/.test(String(l))), `nothing on program: ${JSON.stringify(sentLines)}`)
+		assert.ok(sentLines.some((l) => /^PLAY 2-210 /.test(String(l))), `PRV joins: ${JSON.stringify(sentLines)}`)
+	})
+
+	it('regression check (pre-WO-828 behaviour, kept as documentation): play(restart) re-sends program', async () => {
+		const { self, eng, sentLines } = makeEngine()
+		await startSceneTimelineLayer(self, self.amcp, 1, { source: { value: 'tl1' } }, {
+			fadeDur: 0,
+			screenIdx: 0,
+			startAtCurrentPosition: false,
+		})
+		eng.setSendTo({ preview: true, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
+		sentLines.length = 0
+		eng.play('tl1', 0, { restart: true }) // what the preview calls used to do instead of joining
+		assert.ok(sentLines.includes('STOP 1-210'), `play(restart) STOPs program: ${JSON.stringify(sentLines)}`)
+		assert.ok(sentLines.some((l) => /^PLAY 1-210 .* SEEK 0/.test(String(l))), 'and re-PLAYs it at 0 — the WO-556 / WO-828 D1 fault')
 	})
 })
 

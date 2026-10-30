@@ -107,17 +107,47 @@ describe('WO-541: a timeline-only look reaches its own crossfade', () => {
 		assert.equal(notified, 1, 'program-transition-started notified exactly once')
 	})
 
-	it('the outgoing (previously live) layer still fades out in the same batch', async () => {
+	/* WO-828 D4 (29.10): this test used to pin the OPPOSITE — the outgoing layer fading out in the same batch.
+	 * Measured live (PGM luma probe), that double ramp dipped the picture 130 → 95 → 125 (27 %) mid-fade, while
+	 * every other take holds the outgoing look at full under the incoming one (normal→normal: monotonic ramp).
+	 * The timeline band (210+) sits above both look banks, so a timeline-only look fades in OVER the held
+	 * outgoing look; the teardown clears it after the fade (and polls the timeline reaching 1, not the held
+	 * layer reaching 0). Same rule as runTimelineDirectTake's "Mix, not double-ramp". */
+	it('the outgoing (previously live) layer is HELD at full under the incoming timeline — not faded out', async () => {
 		const { amcp, sent } = amcpDouble()
 		await runSceneTakeLbgAmcpPipeline(
 			amcp,
 			{ start: null },
 			baseArgs({ exitMedia: [{ layerNumber: 5, source: { type: 'media', value: 'outgoing-clip' } }] }),
 		)
+		assert.ok(sent.includes('MIXER 1-210 OPACITY 1 25'), `the timeline still fades in: ${JSON.stringify(sent)}`)
 		assert.ok(
-			sent.includes('MIXER 1-5 OPACITY 0 25'),
-			`outgoing layer 5 fades out alongside the incoming timeline: ${JSON.stringify(sent)}`,
+			!sent.some((l) => /^MIXER 1-5 OPACITY/.test(l)),
+			`outgoing layer 5 is not ramped (held at full, cleared by the teardown): ${JSON.stringify(sent)}`,
 		)
+	})
+
+	it('a MIXED look (timeline + normal layer) keeps the normal exit rule: exit-only layers still fade out', async () => {
+		const { amcp, sent } = amcpDouble()
+		const job = {
+			layer: { layerNumber: 10, source: { type: 'media', value: 'in.mov' } },
+			pLayer: 110,
+			clip: 'IN',
+			mixerLines: [],
+			targetOpacity: 1,
+			incomingIsAboveOutgoing: true,
+			incomingStartsHidden: true,
+			hasLoadTransition: false,
+			playPlan: { channel: 1, layer: 110, commandName: 'PLAY' },
+			pipOverlays: [],
+			loadPlan: null,
+		}
+		await runSceneTakeLbgAmcpPipeline(
+			amcp,
+			{ start: null },
+			baseArgs({ takeJobs: [job], exitMedia: [{ layerNumber: 5, source: { type: 'media', value: 'outgoing-clip' } }] }),
+		)
+		assert.ok(sent.some((l) => /^MIXER 1-5 OPACITY 0 25/.test(l)), `exit-only layer 5 fades out: ${JSON.stringify(sent)}`)
 	})
 
 	it('no bank crossfade requested (shouldRunBankCrossfade=false): stays a no-op here — the plain exit-fade path owns it', async () => {

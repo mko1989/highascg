@@ -116,7 +116,12 @@ async function runSceneTakeLbgTeardown(ctx) {
 		const verifyBudgetMs = Math.max(0, 2 * fadeMs - (Date.now() - fadeClockStart))
 		if (verifyBudgetMs > 0) {
 			let refLayer = null
-			if (ctx.activeTimelineIdToFadeOut) {
+			let refTarget = 0
+			if (ctx.timelineFadeInRefLayer != null && !ctx.activeTimelineIdToFadeOut) {
+				// WO-828 D4: the outgoing look is held at full under a timeline-only look — wait for the timeline to reach 1.
+				refLayer = ctx.timelineFadeInRefLayer
+				refTarget = 1
+			} else if (ctx.activeTimelineIdToFadeOut) {
 				const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
 				refLayer = TIMELINE_LAYER_BASE
 			} else if (exitMedia.length > 0) {
@@ -124,7 +129,7 @@ async function runSceneTakeLbgTeardown(ctx) {
 				if (Number.isFinite(ln)) refLayer = phys(ln, activeBank)
 			}
 			if (refLayer != null) {
-				await waitForOpacitySettled(amcp, channel, refLayer, 0, verifyBudgetMs)
+				await waitForOpacitySettled(amcp, channel, refLayer, refTarget, verifyBudgetMs)
 			}
 		}
 	}

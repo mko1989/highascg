@@ -74,12 +74,22 @@ module.exports = {
 		if (wasPausedResume) {
 			this._resumeAll()
 		} else {
+			/* WO-828 D2/D3: `seamless` re-PLAYs a clip that is already running on a layer WITHOUT the
+			 * preceding STOP — Caspar keeps the old producer's picture up while the new one opens (PLAY with
+			 * a clip = LOADBG + swap), so a loop wrap or a retake no longer shows the ~8 black frames the STOP
+			 * opened (measured 160 ms at every wrap). Consumed by `_sendClipTransport`. */
+			const seamlessPrev = opts?.seamless && prevAir === id ? this._prevKey : null
 			if (prevAir === id) {
 				this._prevKey = new Map()
 				this._lastKfValues.clear()
 				this._lastKfSegment.clear()
 			}
-			this._applyAt(id, pos, true, { takeFade: opts?.takeFade === true })
+			this._seamlessPrevKey = seamlessPrev
+			try {
+				this._applyAt(id, pos, true, { takeFade: opts?.takeFade === true })
+			} finally {
+				this._seamlessPrevKey = null
+			}
 		}
 
 		this._lastTickPositionMs = undefined
@@ -331,6 +341,26 @@ module.exports = {
 		this._emitPb(tid)
 	},
 
+	/**
+	 * WO-828 D1/D5: bring channels newly added to the AIR timeline's routing up at its CURRENT position
+	 * (PLAY … SEEK <now>, or LOAD when paused) — only those channels, nothing is sent to the others. A
+	 * preview-scoped take of a timeline already live on program uses this instead of `play(restart)`,
+	 * which STOPped and re-PLAYed program at 0. No-op unless `id` is on air.
+	 * @param {string} id
+	 * @param {number[]} channels
+	 * @returns {boolean} true when a join was sent
+	 */
+	joinChannels(id, channels) {
+		if (!id || this._airTimelineId !== id || !Array.isArray(channels) || !channels.length) return false
+		const routed = this._channels().filter((c) => channels.includes(c))
+		if (!routed.length) return false
+		for (const key of [...this._prevKey.keys()]) {
+			if (routed.includes(Number(key.split('-')[0]))) this._prevKey.delete(key)
+		}
+		this._syncAmcpLayers(id, cellNowMs(this._pbFor(id)), { force: true, onlyChannels: routed })
+		return true
+	},
+
 	setLoop(id, loop) {
 		this._pbFor(id).loop = !!loop
 		this._emitPb(id)
@@ -362,7 +392,7 @@ module.exports = {
 		ms = cellNowMs(cell)
 		if (ms >= tl.duration) {
 			if (cell.loop) {
-				this.play(airId, 0)
+				this.play(airId, 0, { seamless: true }) // WO-828 D2: no STOP at the wrap (black frames on PGM)
 				return
 			}
 			this.stop(airId)

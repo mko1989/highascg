@@ -42,7 +42,12 @@ function programChannelToScreenIdx(config, channel) {
 	const programs = []
 	for (let i = 0; i < map.screenCount; i++) programs.push(map.programCh(i + 1))
 	const idx = programs.indexOf(n)
-	return idx >= 0 ? idx : 0
+	if (idx >= 0) return idx
+	/* WO-828 D7: a PREVIEW channel belongs to its own screen (previewChannels[i] → i). The old fallback
+	 * to 0 sent ch4 (Proj PRV) to screen 0, so the PGM→PRV exchange on ch4 routed the Proj timeline onto
+	 * Dioda ch1/ch2 and STOPped ch3 mid-fade. */
+	const prvIdx = Array.isArray(map.previewChannels) ? map.previewChannels.indexOf(n) : -1
+	return prvIdx >= 0 ? prvIdx : 0
 }
 
 function sourceEqual(a, b) {

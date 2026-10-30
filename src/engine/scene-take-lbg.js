@@ -32,7 +32,11 @@ const { finalizeTakeBankState } = require('./scene-take-lbg-bank-finalize')
 const { sendExitAndTimelineFadeLines } = require('./scene-take-lbg-exit-fade')
 const { collectOrphanLookLogicalLayers, collectOrphanLookPhysicalLayers, clearPhysicalLookLayers } = require('./scene-exit-layers')
 const { remapIntraLookRoutesForTakeChannel, assertSceneHasNoSelfRoutes } = require('./scene-route-deps')
-const { resolveActiveTimelineIdToFadeOut, resolveTimelineIdToReleaseFromPreview } = require('./scene-take-lbg-timeline-guard')
+const {
+	resolveActiveTimelineIdToFadeOut,
+	resolveTimelineIdToReleaseFromPreview,
+	releaseOrStopOutgoingTimeline,
+} = require('./scene-take-lbg-timeline-guard')
 
 /**
  * @param {object} amcp
@@ -414,10 +418,15 @@ async function runSceneTakeLbg(amcp, opts) {
 		phys,
 		activeTimelineIdToFadeOut,
 		incomingTemplateHostLayers,
+		timelineFadeInRefLayer: shouldRunBankCrossfade && takeJobs.length === 0 ? timelineFadeInPhys[0] : null, // WO-828 D4
 	})
 
 	if (activeTimelineIdToFadeOut) {
-		self.timelineEngine.stop(activeTimelineIdToFadeOut)
+		/* WO-828 D5: the PGM→PRV exchange (started at the PLAY commit) may have put this timeline's look on
+		 * PRV and joined it there — wait for it, then release only the PROGRAM claim (differential STOP,
+		 * WO-555/556) instead of `stop()`, which also killed the PRV copy scene.live still claimed. */
+		if (fadeClockRef.programPlayHook) await Promise.resolve(fadeClockRef.programPlayHook).catch(() => {})
+		releaseOrStopOutgoingTimeline(self.timelineEngine, activeTimelineIdToFadeOut, channel)
 	}
 
 	await finalizeTakeBankState(amcp, {
