@@ -27,6 +27,7 @@ const LOOP_CROSS := 0.45  # rad: how far past the top the loop starts / ends, so
 const SWING_K := 0.03  # pendulum restoring force
 const SWING_PUSH := 0.012  # how much the cable's sideways acceleration kicks a loop
 const SWING_DAMP := 0.93
+const GRAB_REACH := 1.1  # a held point may pull the cable this much past its rest length (it already hangs a little stretched)
 const SLEEP_EPS := 0.03  # px (or rad × 100) per step
 const SLEEP_STEPS := 40
 const CHAOS_BEND := 0.3  # the tangle holds its shape
@@ -46,6 +47,9 @@ var _span0 := 1.0
 var _a := Vector2.ZERO
 var _b := Vector2.ZERO
 var _still := 0
+var _grab := -1  # rope point held by the pointer (see grab()), -1 = none
+var _goff := Vector2.ZERO  # held point − pointer at the press, so it stays under the cursor
+var _gto := Vector2.ZERO  # where the pointer wants the held point
 
 
 static func make(a: Vector2, b: Vector2, loop_count: int, seed: int) -> RefCounted:
@@ -137,6 +141,46 @@ func pin(a: Vector2, b: Vector2) -> void:
 		_still = 0
 
 
+## Hold rope point `i` (a free one: not the plug or its boot) at the pointer `at`: the rope follows it, the ends stay
+## plugged. Wakes the rope; `release()` lets it swing back, keeping the last drag's momentum.
+func grab(i: int, at: Vector2) -> void:
+	_grab = clampi(i, 2, maxi(2, x.size() - 3))
+	_goff = Vector2(x[_grab], y[_grab]) - at
+	_gto = Vector2(x[_grab], y[_grab])
+	_still = 0
+
+
+func drag(at: Vector2) -> void:
+	_gto = at + _goff
+	_still = 0
+
+
+func release() -> void:
+	_grab = -1
+	_still = 0
+
+
+func grabbed() -> bool:
+	return _grab >= 0
+
+
+## The pointer can pull the held point no further than the cable paid out to each plug lets it (a taut rope, not a
+## stretched one): `_gto` clamped to the circle of each end's cable length around that end's boot.
+func _grab_target(n: int, s: float) -> Vector2:
+	var ra := 0.0
+	var rb := 0.0
+	for k in range(1, _grab):
+		ra += float(_cons[k][2])
+	for k in range(_grab, n - 1):
+		rb += float(_cons[k][2])
+	var t := _gto
+	for e in [[Vector2(x[1], y[1]), ra * s * GRAB_REACH], [Vector2(x[n - 1], y[n - 1]), rb * s * GRAB_REACH]]:
+		var d: Vector2 = t - e[0]
+		if d.length() > e[1]:
+			t = e[0] + d.normalized() * e[1]
+	return t
+
+
 ## One frame: Verlet-integrate the free points, satisfy the lengths with the ends pinned, swing the coils.
 ## The run's rest lengths follow the span (a card dragged away pays out cable).
 func step() -> void:
@@ -144,7 +188,13 @@ func step() -> void:
 	if n < 4:
 		return
 	var s := maxf(1.0, _boot_span()) / _span0
+	if _grab >= 0:
+		_gto = _grab_target(n, s)
 	for i in range(2, n - 1):
+		if i == _grab:
+			_ox[i] = x[i]  # the pointer moves it (_pin_ends); what it travelled this frame is its momentum
+			_oy[i] = y[i]
+			continue
 		var vx := (x[i] - _ox[i]) * DAMPING
 		var vy := (y[i] - _oy[i]) * DAMPING + _gravity
 		_ox[i] = x[i]
@@ -162,8 +212,8 @@ func step() -> void:
 			if d < 0.001:
 				continue
 			var f: float = (d - c[2] * s) / d * 0.5 * c[3]
-			var fi := i > 1
-			var fj := j < n - 1
+			var fi := i > 1 and i != _grab
+			var fj := j < n - 1 and j != _grab
 			if fi and fj:
 				x[i] += dx * f
 				y[i] += dy * f
@@ -189,12 +239,14 @@ func step() -> void:
 		c.spin = (float(c.spin) - SWING_K * sin(float(c.angle) - float(c.rest)) - push) * SWING_DAMP
 		c.angle = float(c.angle) + float(c.spin)
 		moved = maxf(moved, absf(float(c.spin)) * 100.0)
-	_still = _still + 1 if moved < SLEEP_EPS else 0
+	_still = _still + 1 if moved < SLEEP_EPS and _grab < 0 else 0
 
 
 ## Move each free point that sits in a keep-out rect to its nearest edge, without bounce.
 func _push_out(n: int) -> void:
 	for i in range(2, n - 1):
+		if i == _grab:
+			continue
 		var p := Vector2(x[i], y[i])
 		for r: Rect2 in keepout:
 			if not r.has_point(p):
@@ -231,22 +283,41 @@ func _pin_ends(n: int) -> void:
 	for i in [0, 1, n - 1, n]:
 		_ox[i] = x[i]
 		_oy[i] = y[i]
+	if _grab >= 0:
+		x[_grab] = _gto.x
+		y[_grab] = _gto.y
 
 
 ## The drawn cable: the rope, with each coil's loop spliced in where it hangs.
 func points() -> PackedVector2Array:
+	return _splice(false)[0]
+
+
+## [points(), owners]: owners[k] is the rope point index drawn point k belongs to (a loop's points: the one it hangs
+## from) — what cable_grab.gd needs to know which rope point a press on the drawn cable holds.
+func points_owned() -> Array:
+	return _splice(true)
+
+
+func _splice(want_owners: bool) -> Array:
 	var at := {}
 	for c in coils:
 		at[c.i] = c
 	var out := PackedVector2Array()
+	var own := PackedInt32Array()
 	for i in x.size():
-		var p := Vector2(x[i], y[i])
-		out.append(p)
+		out.append(Vector2(x[i], y[i]))
+		if want_owners:
+			own.append(i)
 		if at.has(i):
-			var lp := loop_points(p, at[i])
+			var lp := loop_points(out[out.size() - 1], at[i])
 			if not _hits_keepout(lp):
 				out.append_array(lp)
-	return out
+				if want_owners:
+					own.resize(out.size())
+					for k in range(out.size() - lp.size(), out.size()):
+						own[k] = i
+	return [out, own]
 
 
 func _hits_keepout(pts: PackedVector2Array) -> bool:

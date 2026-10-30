@@ -205,6 +205,9 @@ func _ready() -> void:
 	right.add_child(ClusterPanel.new())
 	_cables = CableLayer.new()
 	add_child(_cables)
+	_cables.unplug.connect(_gesture.pull)  # owner 30.10: a plug pulled out by its boot
+	_cables.unplug_drop.connect(_gesture.unplug_drop)
+	_cables.port_clicked.connect(_open_port)
 	_cables.loops = Toolbar.saved_loops()  # WO-674: remembered per client
 	_bar.loops_changed.connect(func(n: int) -> void: _cables.loops = n)
 	_bar.view_changed.connect(func(_m: String) -> void:
@@ -444,12 +447,11 @@ func _input(event: InputEvent) -> void:
 	var pos: Vector2 = event.global_position
 	if not _over_tab(pos):
 		return
-	for key in _anchors:
-		var p: Control = _anchors[key]
-		if is_instance_valid(p) and p.is_visible_in_tree() and p.get_global_rect().grow(3).has_point(pos):
-			get_viewport().set_input_as_handled()
-			_gesture.click(key)
-			return
+	var key: String = _cables.anchor_at(pos)
+	if key != "":
+		get_viewport().set_input_as_handled()
+		_gesture.click(key)
+		return
 	if _gesture.armed():
 		_gesture.cancel()
 		return
@@ -457,23 +459,20 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	var port := _rear.label_at(pos) if _rear.visible else ""
-	if port != "":
+	var pick: Dictionary = _cables.press(pos, port)  # a plug pulls, a body drags (cable_grab.gd); else a port opens its page
+	if port != "" and pick.is_empty():
 		get_viewport().set_input_as_handled()
 		_open_port(port)
 		return
-	var on_ui := _list.get_global_rect().has_point(pos) or _bar.get_global_rect().has_point(pos)
-	var hit: String = _cables.hit(_cables.get_global_transform().affine_inverse() * pos)
-	if hit != "":
+	if not pick.is_empty():
 		get_viewport().set_input_as_handled()
-		_gesture.select_edge(hit)
+		if port == "":  # a plug in a socket: its click (no pull) still opens the port (cable_layer port_clicked)
+			_gesture.select_edge(pick.id)
 	elif (_rear if _rear.visible else _nodes).get_global_rect().has_point(pos) and not get_viewport().gui_get_hovered_control() is BaseButton:
-		if _gesture.selected_edge != "":
-			_gesture.selected_edge = ""
-			_sync()
+		_gesture.deselect()
 		_open_server()
-	elif not on_ui and _gesture.selected_edge != "":
-		_gesture.selected_edge = ""
-		_sync()
+	elif not (_list.get_global_rect().has_point(pos) or _bar.get_global_rect().has_point(pos)):
+		_gesture.deselect()
 
 
 ## Only clicks that land on this tab (not on a popup or menu drawn over it).

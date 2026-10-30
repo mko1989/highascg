@@ -67,6 +67,12 @@ func select_edge(id: String) -> void:
 	changed.emit()
 
 
+func deselect() -> void:
+	if selected_edge != "":
+		selected_edge = ""
+		changed.emit()
+
+
 ## A connector dot was clicked; `key` is its anchor key (`id` or `id#pgm` / `id#prv`).
 func click(key: String) -> void:
 	if busy:
@@ -89,6 +95,30 @@ func click(key: String) -> void:
 	_start_prewarm()
 	changed.emit()
 	status.emit("Cable armed: click another connector dot to connect", true)
+
+
+## cable_layer.gd `unplug`: a plug pulled out of its port (or clicked on the selected cable) — the WO-278 re-grab.
+func pull(edge_id: String, key: String) -> void:
+	select_edge(edge_id)
+	await click(key)
+
+
+## Owner 30.10: a plug pulled out by its boot (cable_layer.gd `unplug` began the re-grab) was let go over `key` ("" =
+## no connector): another connector moves the cable there, its own ports leave it as it was, empty space removes the
+## cable (Ctrl+Z puts it back).
+func unplug_drop(key: String) -> void:
+	if busy:
+		return
+	match R.unplug_outcome(regrab, source_id, key):
+		"restore":
+			cancel()
+		"move":
+			await click(key)
+		"remove":
+			var edge_id := R.s(regrab.get("edgeId"))
+			_clear()
+			await remove_edge(edge_id)
+			status.emit("Cable unplugged — Ctrl+Z puts it back.", true)
 
 
 ## Empty space or Esc: leave the gesture; nothing was written, so a held end simply reappears.

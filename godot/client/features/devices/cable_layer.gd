@@ -6,6 +6,11 @@ extends Control
 ## and settles when its ports move instead of the web's one-shot solve; a new loop count re-lays the ropes.
 ## Slice 2c: `selected_id` thickens a cable like hover, `hidden_id` hides the cable whose end is held (re-grab), and
 ## while `ghost_from` is set a dashed straight ghost runs from that anchor to `pointer` (web --ghost, dasharray 5 4).
+## Owner 30.10: a press on a rope's body grabs that point (`press()`), the rope follows the pointer with both ends still
+## plugged and swings back on release; within cable_grab.gd's END_PX of a port dot it is the plug instead: dragging it
+## past UNPLUG_PX pulls it out (`unplug`, the gesture's re-grab) and letting go reports where (`unplug_drop`) — on another
+## connector it moves there, anywhere else the cable is removed (cable_gesture.gd unplug_drop). A plain click on the plug of
+## the selected cable still lifts it (WO-278 click-to-move).
 ## `hit()` is the click hit-test the tab uses, since the layer itself stays click-through.
 ## Slice 10b: `simple` (Node view) draws each cable as cable_model.gd's fanned Bézier instead — rebuilt at once on
 ## any anchor change (it is cheap), the fan counted over `edges` (the graph's, minus the held one, like the web) — and
@@ -13,8 +18,14 @@ extends Control
 
 const CableModel := preload("res://features/devices/cable_model.gd")
 const CableRope := preload("res://features/devices/cable_rope.gd")
+const CableGrab := preload("res://features/devices/cable_grab.gd")
 const GHOST := Color("#58a6ff")
 const HIT_PX := 6.0
+const UNPLUG_PX := 8.0  # a press on a plug becomes a pull after this much travel
+
+signal unplug(id: String, key: String)  # a plug was pulled out of its port (or clicked on the selected cable)
+signal unplug_drop(key: String)  # …and let go over this connector dot ("" = none)
+signal port_clicked(port: String)  # a plug sitting in a rear-panel socket was clicked, not pulled: the socket's click
 
 var anchors := {}  # anchor key → port_icon.gd Control
 var cables: Array = []  # devices_model.gd build().cables
@@ -59,12 +70,15 @@ var _built := {}  # cable id → {key, pts, color, ends} (Node view)
 var _ropes := {}  # cable id → cable_rope.gd (rear panel, WO-672)
 var _ends := {}  # cable id → [from, to] (local), as of the last anchor change
 var _sig := ""
+var _drag := {}  # {id, rope}: the cable body held by the pointer
+var _plug := {}  # {id, key, at (global), sel, pulled}: a press on a cable's plug, until the button comes up
 var _keepout := []  # Rect2 (local): the controls a chaos tangle stays off
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	visibility_changed.connect(release)
 
 
 func set_cables(list: Array, anchor_map: Dictionary) -> void:
@@ -195,6 +209,106 @@ func hit(local: Vector2) -> String:
 				best_d = dist
 				best = id
 	return best
+
+
+## A left press at `global` on a cable (the tab's click-through hit-test, plus grabbing): {} when none, else {id}, and the
+## tab selects that cable as a click always did. A press on the body of a rope starts dragging it; a press on a plug arms
+## `_plug` (a pull past UNPLUG_PX unplugs, see _input). `port`: the rear-panel port row / socket under the press — there
+## only a plug counts (the plug sits in the socket), and its click without a pull is the socket's (`port_clicked`).
+func press(global: Vector2, port := "") -> Dictionary:
+	var local := get_global_transform().affine_inverse() * global
+	if simple:
+		var h := hit(local)
+		return {} if h == "" else {"id": h}
+	var shapes := {}
+	var owners := {}
+	for id in _ends:
+		var r: RefCounted = _ropes.get(id)
+		if r != null:
+			var po: Array = r.points_owned()
+			shapes[id] = po[0]
+			owners[id] = po[1]
+		else:
+			shapes[id] = _shape(id)
+	var pick := CableGrab.pick(shapes, owners, _ends, local, hidden_id)
+	if pick.is_empty() or (port != "" and pick.kind != "end"):
+		return {}
+	var out := {"id": pick.id}
+	if pick.kind == "end":
+		release()
+		_plug = {"id": pick.id, "key": _end_key(pick.id, pick.end), "at": global, "sel": pick.id == selected_id, "pulled": false,
+			"port": port}
+	elif pick.idx >= 0 and _ropes.has(pick.id):
+		release()
+		_drag = {"id": pick.id, "rope": _ropes[pick.id]}
+		_drag.rope.grab(pick.idx, local)
+		active_id = pick.id
+	return out
+
+
+## The connector dot under `global` (its rect grown 3 px), "" = none — the tab's click target and the unplug drop.
+func anchor_at(global: Vector2) -> String:
+	for key in anchors:
+		var p: Control = anchors[key]
+		if is_instance_valid(p) and p.is_visible_in_tree() and p.get_global_rect().grow(3).has_point(global):
+			return key
+	return ""
+
+
+func _end_key(id: String, end: String) -> String:
+	for c in cables:
+		if c.id == id:
+			return c.from if end == "source" else c.to
+	return ""
+
+
+func dragging() -> bool:
+	return not _drag.is_empty() or not _plug.is_empty()
+
+
+## Let go: the rope swings back under the sim (also when the tab hides or the cable is re-laid).
+func release() -> void:
+	_plug = {}
+	if not _drag.is_empty():
+		(_drag.rope as RefCounted).release()
+		_drag = {}
+
+
+## The held point follows the pointer; any release (or a motion with the button up) lets go.
+func _input(event: InputEvent) -> void:
+	if not _plug.is_empty():
+		_plug_input(event)
+	if _drag.is_empty():
+		return
+	if _ropes.get(_drag.id) != _drag.rope:
+		release()
+	elif event is InputEventMouseMotion:
+		if event.button_mask & MOUSE_BUTTON_MASK_LEFT:
+			(_drag.rope as RefCounted).drag(get_global_transform().affine_inverse() * event.global_position)
+		else:
+			release()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		release()
+
+
+## A held plug: pulled past UNPLUG_PX → `unplug` once; button up → `unplug_drop` after a pull, or (no pull) the old click:
+## a socket opens its port page, the selected cable's plug lifts for a click on the new port (WO-278).
+func _plug_input(event: InputEvent) -> void:
+	var up: bool = event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed
+	var mm := event as InputEventMouseMotion  # only the button event ends a press (a pointer warp moves with mask 0)
+	if mm and not _plug.pulled and mm.global_position.distance_to(_plug.at) > UNPLUG_PX:
+		_plug.pulled = true
+		unplug.emit(_plug.id, _plug.key)
+	if not up:
+		return
+	var p := _plug
+	_plug = {}
+	if p.pulled:
+		unplug_drop.emit(anchor_at((event as InputEventMouse).global_position))
+	elif p.get("port", "") != "":
+		port_clicked.emit(p.port)
+	elif p.sel and p.key != "":
+		unplug.emit(p.id, p.key)
 
 
 func _draw() -> void:

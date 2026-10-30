@@ -266,6 +266,15 @@ static func pick_regrab(edges: Array, connector_id: String, selected_edge_id: St
 	return {}
 
 
+## Owner 30.10 — a plug pulled out by its boot is let go over `key` ("" = no connector): "none" (no end held), "restore"
+## (back on its own anchor), "move" (another connector: the re-grab click) or "remove" (empty space: the cable comes out).
+static func unplug_outcome(grab: Dictionary, anchor_id: String, key: String) -> String:
+	var id := key.get_slice("#", 0)
+	if grab.is_empty():
+		return "none"
+	return "restore" if id == anchor_id else "move" if id != "" else "remove"
+
+
 ## planCableRegrab: {action: retarget|restore|none, reason?, removeEdgeId?, sourceId?, sinkId?, conflictEdgeId?}.
 ## Never persists — anything short of a valid new target is a restore, which is free (the edge was never removed).
 static func plan_regrab(payload: Dictionary, grab: Dictionary, target_id: String) -> Dictionary:
