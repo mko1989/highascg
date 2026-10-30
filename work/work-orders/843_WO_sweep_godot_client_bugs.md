@@ -1,7 +1,7 @@
 # WO-843 — Sweep: Godot client bugs
 
 **Area:** godot-client
-**Status: OPEN (30.10)**
+**Status: DONE (30.10, full Godot headless suite 23657 passed / 0 failed + source re-check of every fix; not exercised in the live GUI, owner QA listed below)**
 **Source:** code sweep 29.10 (REPORT §4f, §5 Godot client, §7c debounce-after-reassign / count+1 ids (Godot side)).
 
 Items: 4f timeline splitter drag saves a stale ConfigFile and clobbers ui.cfg keys (haze, previs folds, API
@@ -41,6 +41,13 @@ Not touched (deferred as told): timeline snap off-by-one and vertical scroll (WO
 
 ## 3. Verified
 
-- Full Godot suite `godot --headless --path godot/client --script res://tests/run_tests.gd`: 23264 passed, 0 failed. `GODOT=... ./run-client.sh --check` from godot/client: "boot OK (no script errors)". `node tools/ci/check-max-file-lines.js`: 0 files over 500.
+- Re-run 30.10 15:15 (final check, all fixes re-read in the tree): full suite 23657 passed, 0 failed; `check-max-file-lines.js`: 0 over 500. Earlier run: 23264 passed, 0 failed.
+- Full Godot suite `godot --headless --path godot/client --script res://tests/run_tests.gd`. `GODOT=... ./run-client.sh --check` from godot/client: "boot OK (no script errors)". `node tools/ci/check-max-file-lines.js`: 0 files over 500.
 - `test_wo843_client_sweep.gd` (13 test functions): splitter keeps haze/fold/password keys written after the "tab build" copy (real ConfigFile round trip); trim field decisions; MERGE migration; Camera-mode key gate; click-vs-drag; duplicate output ids (stream/record/audio and mapping); retarget order.
-- Limits of proof: the countdown / lower-third sections and previs_tab cannot be loaded under `--script` (autoloads missing), so those three fixes are pinned by source-text/order assertions plus the pure helper, not by running the node. The old MERGE behaviour was proven by the old golden itself (it asserted "MIX+ ANIMATE" / CUT). Not exercised in the live GUI (no pointer automation); owner QA: drag the timeline splitter then check haze persists, blur a media In field untouched, Delete in Camera mode, click at 16x in the pixel map.
+- Limits of proof: the countdown / lower-third sections and previs_tab cannot be loaded under `--script` (autoloads missing), so those three fixes are pinned by source-text/order assertions plus the pure helper, not by running the node. The old MERGE behaviour was proven by the old golden itself (it asserted "MIX+ ANIMATE" / CUT). The four GUI checks are covered by the GUI e2e below (real mouse / key events); nothing is left to owner QA.
+- GUI e2e `11_wo843_sweep` 5/5 (30.10, `node tools/e2e/run-gui-e2e.js --e2e=11_wo843_sweep`, sandbox server + hidden Xvfb, real viewport events; scenario `godot/client/e2e/scenarios/11_wo843_sweep.gd`; the harness now also seeds the pixel-map fixture for it, passes `HIGHASCG_E2E_SANDBOX` and takes `--client=<dir>`):
+  - 1 splitter: haze set to "Thick haze" through the Previs toolbar picker and a Previs fold clicked, then the Timeline splitter dragged 90 px with the button held; user://ui.cfg afterwards still has haze 1.0 and the fold key, plus the new `[timeline] preview_h` (570 = the splitter offset).
+  - 2 media In field: In typed as 1.2 (stored 1200, field shows 0:01.05), then focused by a click and blurred with Tab untouched; the sandbox's media-library registry file (rewritten by every save; its mtime moved on the real save) did not change, stored trimInMs still 1200 (old code would have stored 1050).
+  - 3 Previs Camera mode: two LED walls added through Add ▾, Camera mode, Delete + Backspace + Ctrl+D pressed: client stage objects and the autosaved project's `previs.stage.objects` both stay at 2; control: the same Delete in 3D mode removes one (client and project).
+  - 4 pixel map at 26.6x zoom (12.9 view px per channel pixel, via 18 wheel notches): a plain click on empty picture leaves the region count at 0; control: a 70 px drag at that zoom draws one.
+  - Probes calibrated against the old code: the same scenario run on a scratch copy of the client with the four fixes reverted (splitter re-saving the build-time ConfigFile, blur always saving + decimal-seconds parse, `stage_keys` always true, rect-size click test) fails all four checks (haze lost = null, trimInMs 1050 + registry rewritten, 2 -> 1 objects, a 1 x 1 region R1 at 1000,899). Suite after the harness change: 23657 passed, 0 failed.

@@ -47,7 +47,7 @@ async function main() {
 
 	// WO-807: 07_pixel_map needs the fixture engine (tracking plugin), a loopback-only copy of the MHP patch and a known
 	// picture on the sandbox's PGM 1 surface (tools/e2e/pixel-map-fixture.js)
-	const pixelMap = scenarios === 'all' || scenarios.split(',').includes('07_pixel_map')
+	const pixelMap = scenarios === 'all' || scenarios.split(',').some((s) => s === '07_pixel_map' || s === '11_wo843_sweep') // 11: WO-843's pixel-map click
 	const pm = pixelMap ? require('./pixel-map-fixture') : null
 	const root = path.join(out, 'sandbox')
 	// WO-801: 08_audio_monitor_pair needs a PRV screen — the same seeded PGM/PRV destination (it turns the headphone
@@ -60,7 +60,7 @@ async function main() {
 	try {
 		const userDir = path.join(out, 'godot-user')
 		fs.mkdirSync(userDir, { recursive: true })
-		const godotArgs = ['--rendering-driver', 'opengl3', '--path', path.join(REPO_ROOT, 'godot/client'), '--',
+		const godotArgs = ['--rendering-driver', 'opengl3', '--path', path.resolve(arg('client', path.join(REPO_ROOT, 'godot/client'))), '--', // --client=<copy>: a scratch client (negative controls)
 			`--server=${sb.url}`, `--e2e=${scenarios}`, `--e2e-out=${path.join(out, 'shots')}`, '--windowed',
 			'--video=feed'] // pictures over the sandbox's WebSocket feed: the client never maps the live box's /dev/shm
 		if (arg('xr')) godotArgs.push('--xr') // WO-741 (detachable): walk the previs, scenario 06_xr_walk
@@ -68,7 +68,7 @@ async function main() {
 		const log = fs.openSync(path.join(out, 'godot.log'), 'w')
 		const child = spawn('xvfb-run', xvfb, {
 			// user:// (ui.cfg, connection profiles, cluster follow) lands in the run folder, never the operator client's
-			env: { ...process.env, XDG_DATA_HOME: userDir, XDG_CONFIG_HOME: userDir, HIGHASCG_SERVER: sb.url },
+			env: { ...process.env, XDG_DATA_HOME: userDir, XDG_CONFIG_HOME: userDir, HIGHASCG_SERVER: sb.url, HIGHASCG_E2E_SANDBOX: root },
 			stdio: ['ignore', 'pipe', 'pipe'],
 			detached: true, // own process group: a kill takes xvfb-run, Xvfb and Godot together (no orphaned Xvfb)
 		})

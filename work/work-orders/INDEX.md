@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-777 live WOs (35 open, 120 in progress, 622 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+780 live WOs (37 open, 120 in progress, 623 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (158)
+## engine — Looks, takes, timeline, playback (159)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -165,6 +165,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 852 DONE [engine+web-client] Work order: Per-main look spaces, global looks, and main selector UI → 852_WO_per_main_looks_and_global_looks.md
 - 858 OPEN [engine+audio,godot-client] Godot as the live-visuals engine: audio analysis → visuals (FlowKit, audio part… → 858_WO_godot_audio_reactive_visuals_report.md
 - 860 DONE [engine+godot-client] Lower-third looks: overlay take over PGM, Scale % that works, the template visi… → 860_WO_lower_third_overlay_looks_scale_prv.md
+- 868 OPEN [engine+os-iso] Operator GUI channel and monitor first everywhere (Caspar channel 1, leftmost X… → 868_WO_gui_channel_and_monitor_first.md
 
 ## amcp — AMCP client and protocol (19)
 
@@ -434,7 +435,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 817 DONE [godot-client+audio] Godot look editor: audio-only layers transparent and not pickable in the viewer… → 817_WO_audio_only_layers_list_only_in_viewer.md
 - 838 DONE [godot-client] Lockscreen (Settings) → 838_WO_lockscreen.md
 - 839 DONE [godot-client] Number fields take only numbers: gibberish reverts, never salvaged → 839_WO_number_fields_numbers_only.md
-- 843 OPEN [godot-client] Sweep: Godot client bugs → 843_WO_sweep_godot_client_bugs.md
+- 843 DONE [godot-client] Sweep: Godot client bugs → 843_WO_sweep_godot_client_bugs.md
 - 863 DONE [godot-client+engine,audio] Visuals tab: audio-reactive canvas, 3D / Flow views, send to a screen destinati… → 863_WO_visuals_tab_canvas_flow_send_to_screen.md
 - 864 DONE [godot-client+devices-config] Devices tab: grab a cable with the pointer; pulling a plug near its port dot un… → 864_WO_devices_grab_cable_pull_plug.md
 - 865 DONE [godot-client+web-client] Demo display engine: moving PGM / PRV pictures, fades on take, live look edits,… → 865_WO_demo_display_engine_fades.md
@@ -549,7 +550,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 791 DONE [companion] Companion: recall look presets to PRV, to PGM, or to PGM with auto take → 791_WO_companion_look_preset_recall.md
 - 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
 
-## devices-config — Devices tab, settings, config generation (51)
+## devices-config — Devices tab, settings, config generation (52)
 
 - 33 IN PROGRESS [devices-config+web-client] Device view (program): index & dependency order → 33_WO_DEVICE_VIEW_INDEX.md
 - 33a OPEN [devices-config+web-client] Device view: data model, persistence, and HTTP API → 33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md
@@ -602,8 +603,9 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 821 DONE [devices-config] Autosave stamps this box's hardware config into a project loaded without its ha… → 821_WO_autosave_stamps_box_hardware_into_project.md
 - 823 DONE [devices-config+godot-client] Godot "Load from file" stamps this box's rig over the file's own hardwareConfig → 823_WO_godot_load_from_file_keeps_file_rig.md
 - 824 DONE [devices-config] Opening a show file trashes the project that was open → 824_WO_import_keeps_open_project.md
+- 869 OPEN [devices-config+amcp,godot-client] Mapping node slices: cut a screen destination's output into slices and place th… → 869_WO_mapping_node_slices.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (71)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (72)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -676,6 +678,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 848 OPEN [os-iso+caspar-build] Installation: Caspar-only CEF (block generic, sync, symlinks, loader safety) → 848_WO_install_cef_casparonly_pinning_symlinks.md
 - 855 DONE [os-iso] Work order: Remove persistence partition workflow (exfat-only) → 855_WO_remove_persistence_partition_workflow_exfat_only.md
 - 856 DONE [os-iso] Work order: Single NVIDIA driver per live ISO (no multi-driver pool) → 856_WO_single_nvidia_driver_per_iso.md
+- 870 OPEN [os-iso] penguins-eggs 26.10 rewrite: produce is gone (remaster), theme/basename/max/cal… → 870_WO_eggs_26_10_rewrite_iso_pipeline.md
 
 ## network — Cluster, replication, Tailscale, auth (39)
 
