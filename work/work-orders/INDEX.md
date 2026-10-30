@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-769 live WOs (42 open, 119 in progress, 608 done) and 46 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+771 live WOs (44 open, 119 in progress, 608 done) and 46 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (157)
+## engine — Looks, takes, timeline, playback (158)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -164,6 +164,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 850 OPEN [engine] Work order: Fix + Animate transitions (same on-air layer, synced PLAY/FILL, PRV… → 850_WO_fix_animate_transition_same_layer_smooth.md
 - 851 OPEN [engine+godot-client] Work order: Look presets & layer presets (screen-management programming) → 851_WO_look_and_layer_presets.md
 - 852 OPEN [engine+web-client] Work order: Per-main look spaces, global looks, and main selector UI → 852_WO_per_main_looks_and_global_looks.md
+- 858 OPEN [engine+audio,godot-client] Godot as the live-visuals engine: audio analysis → visuals (FlowKit, audio part… → 858_WO_godot_audio_reactive_visuals_report.md
 
 ## amcp — AMCP client and protocol (18)
 
@@ -312,7 +313,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 769 IN PROGRESS [mapping+engine] Multiview PRV cells listed the PGM look's layers (no running times); playlist d… → 769_WO_mv_prv_cells_read_pgm_look_playlist_drop_hint.md
 - 807 DONE [mapping+lighting] Region-to-fixture-pixel mapping: average a screen area into one pixel of a ligh… → 807_WO_region_to_fixture_pixel_mapping.md
 
-## lighting — DMX, Art-Net, sACN, fixtures, consoles (32)
+## lighting — DMX, Art-Net, sACN, fixtures, consoles (33)
 
 - 09 OPEN [lighting+engine] Global per-screen border effects and Art-Net control → 09_WO_Global_Per_Screen_Border_Effects.md
 - 179 DONE [lighting+mapping] Lighting I/O: Art-Net listener off by default, sACN input option, region-averag… → 179_WO_ARTNET_SACN_DEFAULTS_AND_PIXELMAP_SAMPLING.md
@@ -346,6 +347,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 804 IN PROGRESS [lighting] Calibrate the rig together: pick anchor heads, operator places them, the rest i… → 804_WO_calibrate_rig_anchor_heads_infer_rest.md
 - 812 DONE [lighting+godot-client] Previs: hide the projector beam lines → 812_WO_previs_projector_beams_toggle.md
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
+- 857 OPEN [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
 ## godot-client — Godot client (81)
 
