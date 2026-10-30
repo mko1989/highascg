@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-783 live WOs (30 open, 120 in progress, 633 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+783 live WOs (29 open, 121 in progress, 633 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -245,7 +245,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 861 DONE [audio+engine,godot-client] Real-time audio "parts" for live visuals: drum hits, tonal, mood/energy buses f… → 861_WO_realtime_audio_parts_buses.md
 - 862 DONE [audio+godot-client,web-client] audio mixer shows screen labels; a new live input starts unrouted → 862_WO_audio_mixer_screen_labels_new_input_unrouted.md
 - 866 DONE [audio+godot-client] Drum detection vs real music: measure against annotated drums, better detector,… → 866_WO_drum_detection_alignment.md
-- 872 OPEN [audio] Beat tracking: compare with fosfora, adopt its grid/tempo/benchmark ideas → 872_WO_beat_tracking_fosfora_comparison.md
+- 872 IN PROGRESS [audio] Beat tracking: compare with fosfora, adopt its grid/tempo/benchmark ideas → 872_WO_beat_tracking_fosfora_comparison.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (29)
 

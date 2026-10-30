@@ -1,7 +1,7 @@
 # WO-872 — Beat tracking: compare with fosfora, adopt its grid/tempo/benchmark ideas
 
 **Area:** audio
-**Status: OPEN (30.10) — investigation + ranked proposal written; step 1 (benchmark harness) is the next unit, owner may re-rank**
+**Status: IN PROGRESS (30.10) — steps 1-4 done (GTZAN holdout beat F .387 → .608, AMLt .519 → .711); step 5 (percentile AGC for audio-parts) next**
 
 Owner 30.10: "I also found the vj visual app I want to take inspiration from for beat detection etc.
 https://github.com/kevinraymond/fosfora".
@@ -73,6 +73,30 @@ Their own causal scores (`docs/BENCHMARKS.md`): Ballroom F .549 / Acc1 .689, Har
     - Split: even clip numbers are **tune**, odd ones **holdout**.
     - Options: `--jobs` (fork pool; 1000 clips take 11 s at 12 jobs), `--opts`, `--out`, `--baseline` (prints the deltas).
 
+- **Steps 2-4, tracker rebuilt (30.10)** as three stages behind the unchanged `createBeatDetector` API (`push` / `nowMs` / `snapshot` / `reset`). The FFT engine, the shaders (`player-beat.js`) and Godot's `visuals_sync.gd` need no change. `snapshot()` gains `locked`, and `phase` now comes from the grid, so it runs on through a breakdown.
+  - **`src/audio/beat-onset.js` (stage 1).**
+    - SuperFlux on 64 log bands (20 Hz-16 kHz, snapped to bins), with low/mid/high partition means weighted 0.60/0.28/0.12.
+    - **4096-point FFT** (1024: F −.12; 2048: −.04).
+  - **`src/audio/beat-tempo.js` (stage 2).**
+    - Bias-corrected FFT-ACF of the last **6 s** (8 s: −.01; 12 s: −.04). Top-5 peaks × fosfora's 9 metrical ratios, scored as comb (h = 1-4) × log-Gaussian prior × continuity bonus.
+    - Seed gate: confidence 0.35, or two readings within 5 % over 2 s at **0.1**. 0.2 left 25 clips with no tempo at all, among them rock_00000, which read a steady 120 BPM for 15 s at confidence 0.13-0.18.
+    - Kalman in log2 BPM, with a divergence reset.
+    - Lock hysteresis with support **τ 1.5 s** (fosfora's 2.5 s locked a median 8.9 s into a clip), enter 0.6, exit 0.35.
+    - Metrical anchor after an 8 s lock.
+    - **Prior centred on 140 BPM**, σ 1 octave. GTZAN's median is 115, but the comb leans slow: 115-130 scored lower.
+  - **`src/audio/beat-grid.js` (stage 3).**
+    - Beats fire at predicted instants. The phase is seeded from the last 4 s of onset strength folded on the period, not from the next onset.
+    - PI loop: phase gain **0.5** (fosfora 0.3; 0.15 scored −.03), trim gain 0.02 (±2 %).
+    - Support EMA per beat; muted below 0.2, speaks again above 0.4.
+    - Before the tempo locks, a beat fires only where an onset and the grid agree.
+    - A support hit must reach **¼ of the recent hits' median strength**. Without that, steady noise in a breakdown always offered some onset within 50 ms and kept the grid speaking (new smoke). GTZAN cost: −.001.
+  - **Left out after measuring.**
+    - The off-beat arbiter (−.001 with the low band standing in for fosfora's kick model).
+    - Local-mean whitening before the ACF (−.03).
+    - The 2:3 / 3:4 ratio cuts (−.01).
+    - An onset pick ratio over the mean (−.01 to −.03).
+  - **Silence** (below −60 dB for 0.5 s) drops the grid and the lock and keeps the tempo.
+  - **Licences.** `THIRD_PARTY_NOTICES` gains fosfora (MIT, used under MIT; design and constants, no code copied) and mir_eval (MIT, `beat-metrics.js`). The About credits list fosfora.
 ## 4. What was VERIFIED
 - `beat-metrics.js` against the real mir_eval 0.8.2 (wheel unpacked in the scratchpad, system numpy/scipy): **400 random cases, 0 mismatches, max diff 0**. The cases cover on-beat jitter, off-beat, double and half tempo, random clicks, dropped beats, and one pair exactly 70 ms apart (that edge case was the one difference before the edge-test fix). Seven of them are pinned in `smoke-wo872-beat-metrics.test.js` (curated, 10/10).
 - **Baseline, the WO-662 tracker on all 998 readable GTZAN clips:**
@@ -83,3 +107,21 @@ Their own causal scores (`docs/BENCHMARKS.md`): Ballroom F .549 / Acc1 .689, Har
 
   Per genre: hip-hop F .233 with Acc1 .82, so the tempo is right and the phase is wrong. Metal is the best at F .568; classical is the worst at .333 (Acc1 .35).
 - The fosfora constants cited above were checked in the source (`beat.rs:317-319, 646, 657-659, 1716-1718`; `normalizer.rs:9, 22`) and the license files were read. Our side was read at the cited lines.
+- **Steps 2-4, GTZAN.** All tuning used the tune split only; the holdout was scored once with the final defaults.
+
+| split | F | CMLt | AMLt | Acc1 | Acc2 |
+|---|---|---|---|---|---|
+| tune, WO-662 | .381 | .274 | .530 | .637 | .849 |
+| tune, WO-872 | **.621** | **.499** | **.710** | .683 | .853 |
+| holdout, WO-662 | .387 | .272 | .519 | .634 | .866 |
+| holdout, WO-872 | **.608** | **.475** | **.711** | .650 | .844 |
+
+  - All 998 clips: F .384 → .615.
+  - Per genre on the holdout: disco .795, reggae .784, rock .662 and hip-hop .613 (from .23 across all clips). Classical is .281, where the tracker mostly declines to lock.
+  - Remaining errors on the tune split: 87 clips have the wrong tempo (F .25), 15 of them at 4/3 of it, a duple/triple confusion; 76 clips are an octave off (F .52). Clips with the right tempo score F .72.
+- **Smokes.**
+  - `smoke-wo662-beat-detect` 14/14 unchanged on the new inside: synthetic 96/120/128/174 BPM lock, flywheel, noise gives no beats, a held bass note, silence stops the beat.
+  - New `smoke-wo872-beat-grid` (curated): lock within 6 s with every beat on the kick grid (< 6 % of a period); a 4 s drum breakdown mutes the grid (≤ 2 beats), holds the tempo and keeps the published phase; the returning kicks land on the old grid. It also pins the three-stage split.
+  - `smoke-wo616-about` 7/7.
+- **Cost.** 998 clips × 30 s in 16 s on 14 workers: about 135× real time per core.
+

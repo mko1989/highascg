@@ -78,6 +78,74 @@ The changes are listed in src/audio/audio-mood.js and work/work-orders/861_WO_re
   SOFTWARE.
 
 ================================================================================
+fosfora — https://github.com/kevinraymond/fosfora
+Copyright (c) 2025-2026 Kevin Raymond
+License: MIT OR Apache-2.0; used here under MIT (text below).
+
+HighAsCG's beat tracker (WO-872) ports the design and constants of fosfora's audio analysis at commit 82633d7
+(crates/fosfora-app/src/audio/beat.rs). It is re-implemented in JavaScript; no fosfora source or model file is copied.
+
+  src/audio/beat-onset.js ← SuperFlux on log bands, partition weights 0.60 / 0.28 / 0.12 (beat.rs:307-440)
+  src/audio/beat-tempo.js ← TempoEstimator: bias-corrected ACF, comb, log-Gaussian prior, seed gate, Kalman in log2 BPM,
+                            lock hysteresis, metrical anchor (beat.rs:499-760, 1414-1650)
+  src/audio/beat-grid.js  ← BeatScheduler: predicted grid, PI phase/trim loop, muted free-run (beat.rs:1660-2490)
+
+The changes (tuned defaults, what was left out) are listed in those files and in
+work/work-orders/872_WO_beat_tracking_fosfora_comparison.md.
+
+  MIT License
+
+  Copyright (c) 2025-2026 Kevin Raymond
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+================================================================================
+mir_eval — https://github.com/mir-evaluation/mir_eval
+Copyright (c) 2014 Colin Raffel
+License: MIT (text below).
+
+  tools/audio/beat-metrics.js ← mir_eval 0.8.2 beat.py (trim_beats, f_measure, continuity, reference variations) and
+                                util.py (match_events), ported line for line (WO-872).
+
+  The MIT License (MIT)
+
+  Copyright (c) 2014 Colin Raffel
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+
+================================================================================
 Rewir — https://github.com/warszawskie-kroje/rewir
 Copyright © 2016 Stowarzyszenie Kulturotwórcze Miastodwa
 License: SIL Open Font License 1.1 (https://scripts.sil.org/OFL). No Reserved Font Name is declared.

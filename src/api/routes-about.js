@@ -21,6 +21,13 @@ const CREDITS = [
 		url: 'https://github.com/openfollowapp/openfollow',
 	},
 	{
+		name: 'fosfora',
+		what: 'Beat tracking — onset, tempo and beat-grid design ported from it (WO-872)',
+		license: 'MIT OR Apache-2.0',
+		copyright: 'Copyright (c) 2025-2026 Kevin Raymond',
+		url: 'https://github.com/kevinraymond/fosfora',
+	},
+	{
 		name: 'CasparCG Server',
 		what: 'Playout engine',
 		license: 'GPL-3.0',

@@ -2,204 +2,69 @@
 
 /**
  * WO-662 — beat detection for shader audio reactivity (owner 21.10: "Add beat detection and a way to weave it into
- * shaders audio reactivity").
+ * shaders audio reactivity"); WO-872 (30.10) rebuilt the inside after fosfora (github.com/kevinraymond/fosfora,
+ * MIT OR Apache-2.0) and the GTZAN benchmark (tools/audio/eval-beat-tracker.js).
  *
  * Runs on the raw mono samples the FFT engine already receives (src/audio/audio-capture-fft.js pushSamples), not on
- * the 30 Hz frames, so beats are timed to one hop (512 samples ≈ 10.7 ms at 48 kHz). Three stages, the textbook
- * pipeline — a low-band energy detector was tried first and failed on a real backing track (WO-662 Investigation):
- *  1. onsets: spectral flux (sum of positive log-magnitude rises, 1024-point FFT per hop, up to 10 kHz), picked
- *     where it rises above the last second's mean + k·std; one per rise (re-armed when it falls back);
- *  2. tempo: autocorrelation of the last 6 s of flux (plus half of the double lag, so the bar agrees), 70–180 BPM,
- *     a mild prior toward 120 against octave errors, parabolic peak for sub-hop precision; a new tempo must
- *     repeat before it replaces the current one;
- *  3. grid: once the tempo is confident, beats fire ON the grid (flywheel through a missing kick) and onsets near
- *     the grid pull its phase (early onset = the beat, late onset = half-way correction); off-grid onsets (hats,
- *     offbeats) are ignored. The flywheel stops 2 s after the last onset, so silence stops the beat.
- * Pure: time is the sample clock, so tests drive it with synthetic audio.
+ * the 30 Hz frames, so beats are timed to one hop (512 samples ≈ 10.7 ms at 48 kHz). Three stages:
+ *  1. onset strength — SuperFlux on log bands, low / mid / high weighted 0.60 / 0.28 / 0.12 (beat-onset.js);
+ *  2. tempo — comb-scored autocorrelation with a prior, seed gate, Kalman filter, lock hysteresis and a metrical
+ *     anchor against half / double flips (beat-tempo.js);
+ *  3. grid — beats fire at predicted instants, onsets only correct the phase (PI loop); a breakdown mutes the grid
+ *     without losing its phase; an off-beat lock is moved half a beat (beat-grid.js).
+ * Silence (below gateDb for 0.5 s) drops the grid and the lock; the tempo stays as the guess for what comes back.
+ * Pure: time is the sample clock, so tests and the benchmark drive it with recorded or synthetic audio.
  */
 
-const { fftRadix2, blackmanWindow } = require('./fft')
+const { createOnsetFunction } = require('./beat-onset')
+const { createTempoTracker } = require('./beat-tempo')
+const { createBeatGrid } = require('./beat-grid')
 
-const MIN_BPM = 70
-const MAX_BPM = 180
-const CONF_LOCK = 0.12 // tempo confidence the grid needs before it outranks raw onsets
-const RATIO = 1.5 // an onset's flux over the last second's mean, at least
-const WINDOW = 0.2 // ± share of a period an onset may sit from the grid and still count as the beat
+const TEMPO_EVERY = 6 // hops between tempo estimates (≈ 16 Hz at 48 kHz)
+const SILENCE_MS = 500
 
 /**
- * @param {{ sampleRate?: number, hop?: number, k?: number, gateDb?: number, refractoryMs?: number }} [opts]
+ * @param {{ sampleRate?: number, hop?: number, gateDb?: number, fftSize?: number, delayMs?: number, grid?: object,
+ *   priorBpm?: number, priorOct?: number, minBpm?: number, maxBpm?: number, historyS?: number, lockTau?: number,
+ *   seedConf?: number, seedConf2?: number, ratios?: number[] }} [opts] all but sampleRate are benchmark knobs
  */
 function createBeatDetector(opts = {}) {
 	const sr = opts.sampleRate || 48000
 	const hop = opts.hop || 512
-	const win = hop * 2
-	const fr = sr / hop // flux frames per second
-	const k = opts.k ?? 1.5
+	const fr = sr / hop // onset frames per second
 	const gateDb = opts.gateDb ?? -60
-	const refractory = opts.refractoryMs ?? 100
-	const bins = Math.min(win >> 1, Math.round(10000 / (sr / win)))
-	const w = blackmanWindow(win)
-	const re = new Float64Array(win)
-	const im = new Float64Array(win)
-	const prevLog = new Float64Array(bins)
+	const onset = createOnsetFunction({ sampleRate: sr, fftSize: opts.fftSize, gateDb })
+	const win = onset.size
+	// how late an onset reads behind the sound (GTZAN: 20 ms beat 0 and half the window, 43 ms)
+	const delayMs = opts.delayMs ?? 20
+	const tempo = createTempoTracker({
+		fr,
+		...pick(opts, ['priorBpm', 'priorOct', 'minBpm', 'maxBpm', 'seedConf', 'seedConf2', 'lockTau', 'ratios', 'historyS']),
+	})
+	const grid = createBeatGrid({ fr, delayMs, ...opts.grid })
 	const input = new Float32Array(win)
 	let inFill = 0
 	let sinceHop = 0
-
-	const envLen = Math.round(8 * fr)
-	const env = new Float64Array(envLen)
-	let envN = 0
-	let envI = 0
 	let hops = 0
-
-	let armed = true
-	let lastOnsetMs = -1e9
 	let level = 0
-
-	let bpm = 0
-	let conf = 0
-	let candidate = 0
-	let candidateHits = 0
-	let count = 0
-	let lastBeatMs = -1
-	let nextBeatMs = 0
-	const lagMin = Math.floor((60 * fr) / MAX_BPM)
-	const lagMax = Math.ceil((60 * fr) / MIN_BPM)
+	let quietMs = 0
 
 	const nowMs = () => (hops * hop * 1000) / sr
-	const envAt = (back) => env[(envI - 1 - back + envLen * 2) % envLen] // back = 0 → newest
-
-	function beat(t) {
-		count++
-		lastBeatMs = t
-		nextBeatMs = bpm ? t + 60000 / bpm : t
-	}
-
-	/** A new tempo re-spaces the grid from the last beat (the old nextBeat belongs to the old period). */
-	function switchTo(est) {
-		bpm = est
-		candidateHits = 0
-		if (lastBeatMs >= 0) nextBeatMs = lastBeatMs + 60000 / bpm
-	}
-
-	function tempo() {
-		const n = Math.min(envN, Math.round(6 * fr))
-		if (n < 2 * lagMax + 8) return
-		let mean = 0
-		for (let i = 0; i < n; i++) mean += envAt(i)
-		mean /= n
-		// [1 2 3 2 1] smoothing: flux spikes are 1–2 hops wide and a beat period is rarely a whole number of hops,
-		// so unsmoothed peaks drift off each other after a few periods (174 BPM locked at 69.5 without it).
-		const x = new Float64Array(n)
-		for (let i = 0; i < n; i++) {
-			let v = 0
-			let wsum = 0
-			for (let d = -2; d <= 2; d++) {
-				const j = n - 1 - i + d
-				if (j < 0 || j >= n) continue
-				v += (3 - Math.abs(d)) * envAt(j)
-				wsum += 3 - Math.abs(d)
-			}
-			x[i] = v / wsum - mean
-		}
-		const acf = (lag) => {
-			let s = 0
-			for (let i = lag; i < n; i++) s += x[i] * x[i - lag]
-			return s / (n - lag)
-		}
-		const r0 = acf(0)
-		if (r0 <= 1e-12) return
-		const score = new Float64Array(lagMax + 2)
-		let best = -1
-		for (let lag = lagMin - 1; lag <= lagMax + 1; lag++) {
-			const b = (60 * fr) / lag
-			const prior = Math.exp(-0.5 * (Math.log2(b / 120) / 1.2) ** 2)
-			score[lag] = (acf(lag) + 0.5 * acf(2 * lag)) * prior
-			if (lag >= lagMin && lag <= lagMax && (best < 0 || score[lag] > score[best])) best = lag
-		}
-		const a = score[best - 1]
-		const c = score[best + 1]
-		const den = a - 2 * score[best] + c
-		const lagF = best + (den < 0 ? Math.max(-0.5, Math.min(0.5, (0.5 * (a - c)) / den)) : 0)
-		const est = (60 * fr) / lagF
-		conf = Math.max(0, Math.min(1, acf(best) / r0))
-		if (bpm && Math.abs(est - bpm) / bpm < 0.04) {
-			bpm = bpm * 0.7 + est * 0.3
-			candidateHits = 0
-		} else if (candidate && Math.abs(est - candidate) / candidate < 0.04) {
-			if (++candidateHits >= 2) switchTo(est)
-		} else {
-			candidate = est
-			candidateHits = 0
-			if (!bpm) switchTo(est)
-		}
-	}
 
 	function onHop() {
-		// window the last `win` samples (input is a ring ordered oldest-first from inFill)
-		let ms = 0
-		for (let i = 0; i < win; i++) {
-			const v = input[(inFill + i) % win]
-			ms += v * v
-			re[i] = v * w[i]
-			im[i] = 0
-		}
-		fftRadix2(re, im)
-		let flux = 0
-		for (let b = 1; b < bins; b++) {
-			const l = Math.log(1 + 100 * Math.hypot(re[b], im[b]))
-			const d = l - prevLog[b]
-			if (d > 0) flux += d
-			prevLog[b] = l
-		}
-		const db = 10 * Math.log10(ms / win + 1e-12)
+		const { odf, db } = onset.step(input, inFill)
 		level = Math.max(0, Math.min(1, (db - gateDb) / -gateDb))
-		if (db < gateDb) flux = 0
 		hops++
 		const t = nowMs()
-
-		// onset: above the last second's mean + k·std
-		const m = Math.min(envN, Math.round(fr))
-		let mean = 0
-		let sq = 0
-		for (let i = 0; i < m; i++) {
-			const v = envAt(i)
-			mean += v
-			sq += v * v
+		quietMs = db < gateDb ? quietMs + 1000 / fr : 0
+		if (quietMs >= SILENCE_MS && quietMs < SILENCE_MS + 1000 / fr) {
+			grid.drop()
+			tempo.unlock()
 		}
-		mean = m ? mean / m : 0
-		const std = m ? Math.sqrt(Math.max(0, sq / m - mean * mean)) : 0
-		// k·std alone fires on plain noise (its flux wobbles too); a real onset also clears RATIO × the mean.
-		const thr = Math.max(mean + k * std, RATIO * mean)
-		let onset = false
-		if (m >= fr / 2 && flux > 0) {
-			if (armed && flux > thr && t - lastOnsetMs >= refractory) {
-				onset = true
-				armed = false
-				lastOnsetMs = t
-			} else if (!armed && flux < (mean + thr) / 2) {
-				armed = true
-			}
-		}
-		env[envI] = flux
-		envI = (envI + 1) % envLen
-		if (envN < envLen) envN++
-		if (hops % 32 === 0) tempo()
-
-		const locked = bpm > 0 && conf >= CONF_LOCK
-		const period = bpm ? 60000 / bpm : 0
-		// No grid yet, or it went by unanswered (just locked / music resumed): the next onset re-seeds it.
-		const stale = lastBeatMs < 0 || t - nextBeatMs > WINDOW * period
-		if (onset) {
-			if (!locked || stale) beat(t)
-			else if (nextBeatMs - t <= WINDOW * period)
-				beat(t) // early (or on time): this onset IS the beat
-			else if (t - lastBeatMs <= WINDOW * period) nextBeatMs += (t - lastBeatMs) / 2 // late: pull the grid half-way
-		}
-		if (locked && !stale && t >= nextBeatMs) {
-			if (t - lastOnsetMs < 2000) beat(nextBeatMs)
-			else nextBeatMs = t + period // music stopped: hold the grid, no beats
-		}
+		if (quietMs >= SILENCE_MS) return
+		tempo.push(odf)
+		if (hops % TEMPO_EVERY === 0) tempo.update(TEMPO_EVERY / fr)
+		grid.step(t, odf, tempo.state())
 	}
 
 	return {
@@ -217,34 +82,41 @@ function createBeatDetector(opts = {}) {
 		/** Stream time in ms (sample clock) — the clock beat times are on. */
 		nowMs,
 		/**
-		 * @returns {{ n: number, age: number, bpm: number, conf: number, phase: number, level: number }}
+		 * @returns {{ n: number, age: number, bpm: number, conf: number, phase: number, level: number, locked: boolean }}
 		 *   n = beats so far (a change = a new beat), age = ms since the last beat (-1 = none yet), phase = 0..1
-		 *   through the current beat period.
+		 *   through the current beat period (the grid's, so it runs on through a breakdown), conf = tempo support 0..1,
+		 *   locked = the tempo is locked and the grid is speaking.
 		 */
 		snapshot() {
-			const age = lastBeatMs >= 0 ? nowMs() - lastBeatMs : -1
-			const period = bpm ? 60000 / bpm : 0
+			const t = nowMs()
+			const g = grid.state(t)
+			const ts = tempo.state()
 			return {
-				n: count,
-				age: Math.round(age),
-				bpm: Math.round(bpm * 10) / 10,
-				conf: Math.round(conf * 100) / 100,
-				phase: period && age >= 0 ? Math.round(((age % period) / period) * 1000) / 1000 : 0,
+				n: g.n,
+				age: g.beatMs >= 0 ? Math.round(t - g.beatMs) : -1,
+				bpm: Math.round(ts.bpm * 10) / 10,
+				conf: Math.round(ts.support * 100) / 100,
+				phase: Math.round(g.phase * 1000) / 1000,
 				level: Math.round(level * 1000) / 1000,
+				locked: ts.locked && !g.muted && g.period > 0,
 			}
 		},
 		/** Source gone (stale feed): forget tempo and grid; the beat count keeps counting up. */
 		reset() {
 			input.fill(0)
-			prevLog.fill(0)
-			env.fill(0)
-			envN = envI = 0
 			inFill = sinceHop = 0
-			armed = true
-			level = bpm = conf = candidate = candidateHits = 0
-			lastBeatMs = -1
+			level = quietMs = 0
+			onset.reset()
+			tempo.reset()
+			grid.reset() // keeps the beat count
 		},
 	}
+}
+
+function pick(o, keys) {
+	const out = {}
+	for (const k of keys) if (o[k] !== undefined) out[k] = o[k]
+	return out
 }
 
 /**

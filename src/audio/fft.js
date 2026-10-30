@@ -164,4 +164,4 @@ function rmsOf(samples) {
 	return Math.sqrt(acc / samples.length)
 }
 
-module.exports = { fftRadix2, blackmanWindow, pcmS16leToMonoFloats, analyserFreqBytes, waveformBytes, rmsOf }
+module.exports = { fftRadix2, pcmS16leToMonoFloats, analyserFreqBytes, waveformBytes, rmsOf }
