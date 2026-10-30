@@ -254,3 +254,18 @@ The ruler background covered only the track side (`_ruler` draws from `HEADER_W`
 under the ruler line drew its name into the corner cell around "+ Screen". `timeline_view_draw.gd _screen_button` now
 paints the cell (and its bottom line) first. e2e `09_timeline_control_lane` has a new step that scrolls 14 px and counts
 bright pixels in the cell outside the button. It found 31 on the old code (FAIL) and 0 with the fix: 6 passed, 0 failed.
+
+## Follow-up (b) fixed (30.10): the web client knows `light` flags
+
+The fault was worse than drawing them as unknown. `client/lib/timeline-state.js updateFlag` coerces any type outside
+`FLAG_TYPES` to `'pause'`, so any web edit of a light flag, even a label change, turned it into a Pause flag, and the
+canvas drew it as a red pause triangle.
+
+- `FLAG_TYPES` now includes `light`.
+- New `lightFlagSummary()` gives the Godot chip's wording ("Go 1 / cue 3", "Fader 4 to 80%").
+- The canvas draws light flags teal (`#2dd4bf`).
+- The flag inspector offers "Lighting console cue", and a hint names the action and console. Editing the console and
+  action stays in Godot.
+
+Verified: `tools/smoke/smoke-wo837-web-light-flag.test.js` passes 3/3 (curated), and eslint is clean. The client was
+rebuilt with `npm run build:client`.

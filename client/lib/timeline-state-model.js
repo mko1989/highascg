@@ -14,8 +14,24 @@ export const DEFAULT_SEND_TO = { preview: true, program: false, screenIdx: 0 }
 /** Ms after last clip/flag end when auto-growing `timeline.duration`. */
 export const CONTENT_END_PADDING_MS = 2000
 
-/** @type {readonly ['pause', 'play', 'jump', 'companion_press']} */
-export const FLAG_TYPES = ['pause', 'play', 'jump', 'companion_press']
+/** WO-837: `light` (a lighting-console cue) is authored in the Godot client; the web shows and keeps it. */
+/** @type {readonly ['pause', 'play', 'jump', 'companion_press', 'light']} */
+export const FLAG_TYPES = ['pause', 'play', 'jump', 'companion_press', 'light']
+
+/** WO-837: a light flag's action in words, as the Godot chip (timeline_light.gd summary): "Go 1 / cue 3", "Fader 4 to 80%". */
+export function lightFlagSummary(f) {
+	const v = (x) => (x == null || x === '' ? '?' : String(x))
+	switch (f?.action) {
+		case 'fader':
+			return `Fader ${v(f.fader)} to ${v(f.level)}%`
+		case 'release':
+			return `Release ${v(f.list)}`
+		case 'command':
+			return `Cmd: ${v(f.command)}`
+		default:
+			return `Go ${v(f.list)}` + (f?.cue != null && f.cue !== '' ? ` / cue ${f.cue}` : '')
+	}
+}
 
 export function isValidFlagType(type) {
 	return FLAG_TYPES.includes(type)

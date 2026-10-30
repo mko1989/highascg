@@ -204,6 +204,8 @@ module.exports = [
 	'tools/smoke/smoke-wo845-pointer-barrier-constants.test.js',
 	'tools/smoke/smoke-wo846-work-order-index.test.js',
 	'tools/smoke/test-agent-pure.test.js',
+	'tools/smoke/smoke-wo837-web-light-flag.test.js',
+	'tools/smoke/smoke-wo845b-followups.test.js',
 	'tools/smoke/smoke-xrandr-custom-mode.js',
 	'tools/smoke/smoke-xrandr-layout-verify.test.js',
 	'tools/smoke/smoke-xrandr-persist-script.js',

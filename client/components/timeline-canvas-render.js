@@ -231,6 +231,7 @@ function flagTypeColor(type) {
 	if (t === 'play') return '#3fb950'
 	if (t === 'jump') return '#a371f7'
 	if (t === 'companion_press') return '#f0a030'
+	if (t === 'light') return '#2dd4bf' // WO-837: lighting-console cue (the Godot control-lane chip's teal)
 	return '#f85149'
 }
 

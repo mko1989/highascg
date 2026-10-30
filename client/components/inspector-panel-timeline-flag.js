@@ -1,4 +1,5 @@
 import { timelineState } from '../lib/timeline-state.js'
+import { lightFlagSummary } from '../lib/timeline-state-model.js'
 import { api } from '../lib/api-client.js'
 import { fmtHms, parseHmsInput } from './timeline-canvas.js'
 import {
@@ -94,7 +95,8 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	const typeSel = document.createElement('select')
 	typeSel.className = 'inspector-field__select'
 	typeSel.innerHTML =
-		'<option value="pause">Pause</option><option value="play">Play (resume)</option><option value="jump">Jump to</option><option value="companion_press">Companion button press</option>'
+		'<option value="pause">Pause</option><option value="play">Play (resume)</option><option value="jump">Jump to</option><option value="companion_press">Companion button press</option>' +
+		'<option value="light">Lighting console cue</option>'
 	typeSel.value = flag.type || 'pause'
 	typeSel.addEventListener('change', () => {
 		timelineState.updateFlag(timelineId, flagId, { type: typeSel.value })
@@ -166,6 +168,14 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	hint.textContent = 'For “Jump to”, set a time (hh:mm:ss:ms) or pick another flag; time wins if both are set.'
 	if (!showJump) hint.style.display = 'none'
 	grp.appendChild(hint)
+
+	if (flag.type === 'light') {
+		// WO-837: the console and action are edited in the Godot client (Devices → Lighting consoles); the web keeps them
+		const lightHint = document.createElement('p')
+		lightHint.className = 'inspector-field inspector-field--hint'
+		lightHint.textContent = `${lightFlagSummary(flag)} on console "${flag.consoleId || '—'}". Edit the console and action in the Godot client.`
+		grp.appendChild(lightHint)
+	}
 
 	const showCompanion = (flag.type || 'pause') === 'companion_press'
 
