@@ -31,17 +31,7 @@
 	min-height: auto;
 	padding: 8px 10px;
 }
-.device-view__backpanel-label {
-	position: absolute;
-	inset: 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 12px;
-	text-align: center;
-	font-size: 12px;
-	opacity: 0.75;
-}
+
 .device-view__backpanel--caspar {
 	min-height: auto;
 	--rear-label-gutter: 72px;
@@ -50,9 +40,7 @@
 		linear-gradient(180deg, rgba(17, 24, 39, 0.8), rgba(30, 41, 59, 0.65)),
 		repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.08) 0, rgba(148, 163, 184, 0.08) 1px, transparent 1px, transparent 22px);
 }
-.device-view__backpanel-metal {
-	display: none;
-}
+
 .device-view__backpanel-slots {
 	position: relative;
 	display: grid;
@@ -113,42 +101,7 @@
 	border-color: #3b82f6;
 	color: #3b82f6;
 }
-.device-view__backpanel-slot-apply {
-	background: rgba(255, 60, 60, 0.1);
-	border: 1px solid rgba(255, 60, 60, 0.3);
-	color: #ff6060;
-	border-radius: 4px;
-	padding: 4px 8px;
-	cursor: pointer;
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	font-size: 11px;
-	font-weight: 600;
-	transition: all 0.2s;
-}
-.device-view__backpanel-slot-apply:hover {
-	background: rgba(255, 60, 60, 0.2);
-	border-color: #ff6060;
-	box-shadow: 0 0 10px rgba(255, 60, 60, 0.2);
-}
-.device-view__backpanel-slot-apply:active {
-	transform: scale(0.95);
-}
-.device-view__backpanel-slot-apply svg {
-	display: block;
-	transition: transform 0.5s ease;
-}
-.device-view__backpanel-slot-apply:hover svg {
-	transform: rotate(180deg);
-}
-.device-view__backpanel-controls {
-	position: relative;
-	margin-top: 8px;
-	display: flex;
-	justify-content: flex-end;
-	z-index: 10;
-}
+
 .device-view__backpanel-slot-connectors {
 	display: flex;
 	flex-direction: column;
@@ -230,22 +183,4 @@
 .device-view__backpanel-column:nth-child(3) {
 	align-items: flex-start;
 }
-.device-view__backpanel-connector-row {
-	display: grid;
-	grid-template-columns: 18px 1fr;
-	align-items: center;
-	gap: 4px;
-}
-.device-view__backpanel-connector-row small {
-	font-size: 10px;
-	opacity: 0.82;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.device-view__backpanel-connector-icon {
-	width: 16px;
-	height: 16px;
-	object-fit: contain;
-	opacity: 0.95;
-}
+

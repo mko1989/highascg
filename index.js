@@ -17,7 +17,6 @@ const { OscListener } = require('./src/osc/osc-listener'); const { applyOscSnaps
 const { startPeriodicSync, startOscPlaybackInfoSupplement } = require('./src/utils/periodic-sync')
 const { ConfigManager } = require('./src/config/config-manager'); const { refreshConfigComparison } = require('./src/config/config-compare')
 const { hashSubsystemReload } = require('./src/config/config-reload-signature')
-const { SamplingManager } = require('./src/sampling/dmx-sampling')
 const { getChannelMap, setupAllRouting, setupInputsChannel } = require('./src/config/routing')
 const { reconcileAfterInfoGather } = require('./src/state/live-scene-reconcile'); const { createStreamingLifecycle } = require('./src/bootstrap/streaming-lifecycle')
 const { createOscLifecycle } = require('./src/bootstrap/osc-lifecycle'); const { createFetchServerInfoConfigAndBroadcast } = require('./src/bootstrap/fetch-server-info-config')
@@ -209,7 +208,7 @@ function main() {
 		appCtx.runMediaLibraryQueryCycle = () => { runMediaLibraryQueryCycle(appCtx); scheduleMediaReconcile(appCtx) }
 		scheduleMediaReconcile(appCtx, 10000)
 		appCtx.startPeriodicSync = (self) => startPeriodicSync(self || appCtx)
-		appCtx.refreshConfigComparison = refreshConfigComparison; appCtx.samplingManager = new SamplingManager(appCtx)
+		appCtx.refreshConfigComparison = refreshConfigComparison
 		appCtx.parseInfoConfigForDecklinks = parseInfoConfigForDecklinks
 		appCtx.setupAllRouting = setupAllRouting
 		appCtx.reconcileAfterInfoGather = reconcileAfterInfoGather
@@ -255,7 +254,6 @@ function main() {
 			subsystemReloadSig = nextSig
 			logger.info('[Config] Reloading subsystems...')
 			if (appCtx.restartOscSubsystem) appCtx.restartOscSubsystem(); handleConfigReload()
-			if (appCtx.samplingManager) appCtx.samplingManager.updateConfig(config.dmx).catch(e => appCtx.log('error', '[DMX] update failed: ' + (e.message || e)))
 			if (appCtx.artnetReceiver) appCtx.artnetReceiver.reconfigure()
 			if (casparConn) {
 				if (config.offline_mode) {
@@ -379,7 +377,6 @@ function main() {
 					runConnectionQueryCycle(appCtx)
 					if (typeof appCtx.startPeriodicSync === 'function') appCtx.startPeriodicSync(appCtx)
 					startOscPlaybackInfoSupplement(appCtx)
-					if (appCtx.samplingManager) appCtx.samplingManager.updateConfig(config.dmx).catch(e => appCtx.log('error', '[DMX] Initial failed: ' + (e.message || e)))
 					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparConnected()
 					if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onCasparConnected()
 				} else if (payload.connected === false) {

@@ -52,11 +52,9 @@ test('no / unusable fill → exactly the previous output', () => {
 	assert.deepEqual(buildSceneTemplateCgUpdateOnlyLines(1, 11, spec), ['CG 1-701 UPDATE 0 {}'])
 })
 
-test('both take pipelines pass the job fill to the template builders', () => {
+test('the take pipeline passes the job fill to the template builders', () => {
 	const root = path.resolve(__dirname, '../..')
 	const lbg = fs.readFileSync(path.join(root, 'src/engine/scene-take-lbg-amcp-pipeline.js'), 'utf8')
 	assert.match(lbg, /buildSceneTemplateCgUpdateOnlyLines\(channel, job\.layer\.layerNumber, job\.templateCg, \{ fill: job\.f \}\)/)
 	assert.match(lbg, /buildSceneTemplateCgAmcpLines\(channel, job\.layer\.layerNumber, job\.templateCg, \{ \.\.\.cgFade, fill: job\.f \}\)/)
-	const pgm = fs.readFileSync(path.join(root, 'src/engine/scene-take-pgm-only.js'), 'utf8')
-	assert.match(pgm, /const cgOpts = isShader \? cgFade : \{ \.\.\.cgFade, fill: job\.f \}/)
 })

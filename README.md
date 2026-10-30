@@ -106,7 +106,6 @@ Defaults live in `config/`. Override via environment variables:
 | `HIGHASCG_ENFORCE_AUTH` | Require API token for `/api/*` and operator WS (`1`/`true`) | **unset** (open API) |
 | `HIGHASCG_CORS_ORIGINS` | Extra allowed CORS origins when auth is enforced (comma-separated) | **unset** |
 | `OSC_LISTEN_PORT` | OSC UDP port | `6251` |
-| `CASPAR_ARM_FILE` | Staged Caspar startup arm file | `/home/casparcg/highascg/data/caspar-armed` |
 
 CLI flags: `node index.js --help`.
 
@@ -128,9 +127,6 @@ Production ISO / eggs images enable auth via systemd drop-in (`25-api-auth.conf`
 
 ### OSC (CasparCG → HighAsCG)
 CasparCG sends OSC over UDP. HighAsCG listens on `OSC_LISTEN_PORT` (default `6251`).
-
-### Staged Caspar startup
-HighAsCG can start first, apply config, then arm Caspar: `GET/POST/DELETE /api/system/caspar-arm`.
 
 ---
 

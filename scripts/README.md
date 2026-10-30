@@ -39,8 +39,6 @@ Core provisioning sequence: kernel, NVIDIA, NDI, CasparCG, browser, permissions,
 
 **Helper libraries:**
 - `lib/install-helpers.sh` — Common functions (apt block, user creation)
-- `lib/install-helpers-github.sh` — GitHub asset download/verify
-- `lib/install-helpers-packages.sh` — Package selection by NVIDIA driver version
 - `lib/install-config.sh` — Config file template installation
 - `lib/decklink-install-lib.sh` — DeckLink SDK helpers
 - `lib/apt-block-service-starts.sh` — Prevent daemon auto-start during install
@@ -64,9 +62,7 @@ Core provisioning sequence: kernel, NVIDIA, NDI, CasparCG, browser, permissions,
 
 #### `scripts/exfat/install-*.sh` — ExFAT volume systemd units
 - `install-exfat-systemd-units.sh` — Main installer
-- `install-exfat-units-exfat.sh` — exFAT mount + sync
-- `install-exfat-units-bridge.sh` — Bridge mode hooks
-- `install-exfat-units-enable.sh` — Enable/start systemd services
+- `install-exfat-systemd-units-units.sh` — the unit definitions, sourced by the installer (the old `install-exfat-units-{exfat,bridge,enable}.sh` copies were removed in WO-831)
 
 #### `scripts/exfat/` — High-ASCII runtime wired into systemd
 **These are installed to `/etc/highascg/systemd-exfat/` or copied to `bin/` on playout machines:**
@@ -93,9 +89,9 @@ Utility functions (listed above)
 
 #### Other provisioning scripts (root of `scripts/`)
 - `install.sh` — Monolithic installer (legacy; still works; phases 1–5)
-- `fix-host-boot-*.sh` — Boot troubleshooting (duplicate sources in `scripts/fix/`)
-- `fix-boot-emergency-recovery.sh` — EFI/GRUB recovery
-- `fix-highascg-no-exfat-startup-block.sh` — exFAT mount ordering
+- `fix/fix-host-boot-*.sh` — Boot troubleshooting (WO-831: forwarders removed; run these from `scripts/fix/`)
+- `fix/fix-boot-emergency-recovery.sh` — EFI/GRUB recovery
+- `fix/fix-highascg-no-exfat-startup-block.sh` — exFAT mount ordering
 - `clean-eggs-dev-host.sh` — Clear local eggs build state
 
 ---
@@ -184,7 +180,7 @@ These are invoked by the Node.js application at runtime. Each lists its call sit
 
 **Installation into `/usr/local/lib/highascg/`:**
 Some helpers are copied to `/usr/local/lib/highascg/` during provisioning (readable by playout processes on live-USB):
-- `highascg-network-apply.sh` — installed by `scripts/exfat/install-exfat-units-exfat.sh`
+- `highascg-network-apply.sh` — installed by `scripts/runtime/install-network-apply.sh`
 - `highascg-replication-ssh.sh` — installed by `scripts/replication/install-replication-ssh-wrapper.sh`
 - `highascg-vcam-modules-up.sh` — installed by `scripts/setup/12-passwordless-sudo.sh` (v4l2 kernel modules)
 - `fix-calamares-branding.sh` → `/usr/local/lib/highascg/fix-calamares-branding.sh` — Installed by `tools/eggs/live-usb/install-eggs-calamares.sh`
@@ -267,10 +263,8 @@ These are installed by `fix-calamares-shellprocess.sh` into the live-USB squashf
 
 | Path | Reason | Status |
 |------|--------|--------|
-| `scripts/deprecated/` | **The single archive** — everything retired lives here (WO-273) | Archive; kept for diff reference. Never referenced by runtime. |
+| `scripts/deprecated/` | **The single archive** — everything retired lives here (WO-273) | Archive. WO-831 (owner 30.10: "delete anything dead") removed everything with no live caller; what remains is `legacy/` (still behind `scripts/install.sh`) and `nvidia/install-nvidia-gsp-rpc-workaround.sh` (called by `scripts/fix/fix-host-boot-display-hang.sh`). |
 | `scripts/deprecated/legacy/` | Old install phases (1–5), was `scripts/legacy/` | Superseded by `scripts/setup/01-16` ordered flow |
-| `scripts/deprecated/unused/` | Dead scripts (no references), was `scripts/unused/` | Keep for audit trail; do not run |
-| `scripts/deprecated/lib/` | Abandoned 2026-07-04 split of `lib/install-helpers.sh` | All 23 functions still live in the monolith; nothing sourced these |
 | `scripts/fix/` | Duplicate sources of root `fix-*.sh` | Keep newest; deprecate pair |
 | `tools/eggs/live-usb/legacy-persistence/` | Old persistence schemes | Not used in current ISO |
 | `tools/eggs/unused/` | Unused eggs modules | Audit trail only |

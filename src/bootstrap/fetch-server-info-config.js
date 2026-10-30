@@ -8,16 +8,13 @@ const { broadcastWsStateSnapshot } = require('../api/get-state')
 /**
  * @param {{
  *   appCtx: object,
- *   config: object,
+ *   config?: object, // WO-831: no longer read (it only fed the DMX sampler refresh)
  *   onAfterInfoConfigReady?: () => void,
  * }} opts
  * `onAfterInfoConfigReady` runs after INFO CONFIG is fetched (or fails), config comparison is updated when XML exists,
  * and startup LED test pattern AMCP is sent. Use for NDI / UDP STREAM so they start only after Caspar vs HighAsCG alignment.
  */
-function createFetchServerInfoConfigAndBroadcast({ appCtx, config, onAfterInfoConfigReady }) {
-	/** Debounce DMX refresh so INFO CONFIG + connect/save do not stop/start sampling twice in one burst. */
-	let dmxAfterInfoConfigTimer = null
-
+function createFetchServerInfoConfigAndBroadcast({ appCtx, onAfterInfoConfigReady }) {
 	return async function fetchServerInfoConfigAndBroadcast() {
 		if (!appCtx.amcp?.query?.infoConfig) {
 			try {
@@ -46,14 +43,6 @@ function createFetchServerInfoConfigAndBroadcast({ appCtx, config, onAfterInfoCo
 				}
 				if (typeof appCtx._wsBroadcast === 'function') {
 					broadcastWsStateSnapshot(appCtx)
-				}
-				if (appCtx.samplingManager && config.dmx?.enabled) {
-					clearTimeout(dmxAfterInfoConfigTimer)
-					dmxAfterInfoConfigTimer = setTimeout(() => {
-						appCtx.samplingManager.updateConfig(config.dmx).catch((e) => {
-							appCtx.log('error', '[DMX] Config refresh after INFO CONFIG: ' + (e?.message || e))
-						})
-					}, 650)
 				}
 				appCtx.log('info', '[Caspar] INFO CONFIG loaded — channel resolutions match running server')
 				try {

@@ -166,11 +166,11 @@ describe('WO-629 routes', () => {
 		assert.equal((await routes.handlePost('wat', {}, {})).status, 404)
 	})
 
-	it('router: specific routes registered before the Caspar-only /api/led-test-card/* wildcard', () => {
+	it('router: the no-Caspar settings/:op routes exist and the dead Caspar-only /api/led-test-card/* wildcard stays gone', () => {
+		// WO-831: the wildcard was shadowed by /:op and its handler only accepts the bare path (served by router-dispatch's legacy chain).
 		const src = require('node:fs').readFileSync(require.resolve('../../src/api/router.js'), 'utf8')
-		const get = src.indexOf("routes.get('/api/led-test-card/settings'")
-		const op = src.indexOf("routes.post('/api/led-test-card/:op'")
-		const wild = src.indexOf("routes.post('/api/led-test-card/*'")
-		assert.ok(get > 0 && op > 0 && op < wild)
+		assert.ok(src.indexOf("routes.get('/api/led-test-card/settings'") > 0)
+		assert.ok(src.indexOf("routes.post('/api/led-test-card/:op'") > 0)
+		assert.equal(src.indexOf("routes.post('/api/led-test-card/*'"), -1)
 	})
 })

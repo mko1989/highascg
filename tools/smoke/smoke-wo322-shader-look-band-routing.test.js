@@ -97,14 +97,10 @@ describe('WO-322 (c): teardown source wiring', () => {
 		assert.match(src, /if \(spec && !isShaderCgName\(spec\.cgName\)\)/)
 	})
 
-	it('take pipelines: shader branch uses job.pLayer with no cgFade; pgm-only skips clear-on-other-channels for shaders', () => {
+	it('take pipelines: shader branch uses job.pLayer with no cgFade', () => {
 		const lbg = read('src/engine/scene-take-lbg-amcp-pipeline.js')
 		assert.match(lbg, /isShaderCgName\(job\.templateCg\.cgName\)/)
 		assert.match(lbg, /buildSceneTemplateCgAmcpLines\(channel, job\.pLayer, job\.templateCg, \{\}\)/)
-		const pgm = read('src/engine/scene-take-pgm-only.js')
-		assert.match(pgm, /const isShader = isShaderCgName\(job\.templateCg\.cgName\)/)
-		assert.match(pgm, /const cgFade = !isShader && fadeDur > 0/)
-		assert.match(pgm, /isShader \? job\.pLayer : job\.layer\.layerNumber/)
 	})
 })
 

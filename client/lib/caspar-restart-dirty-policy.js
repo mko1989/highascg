@@ -1,8 +1,8 @@
 /**
  * Device View Caspar restart dirty policy (WO-81; end-state decision matrix WO-172 T172.3).
- * Keep in sync with src/streaming/caspar-restart-dirty-policy.js (smoke tests) — note this copy
- * has diverged (v4l2_out branch, mode-aware stream_out) as of WO-172; the sibling file is out of
- * WO-172's touch scope and was left as-is (see WO-172 work log).
+ * This is the only copy: the server-side twin (src/streaming/caspar-restart-dirty-policy.js) was
+ * never required by anything and had diverged from this one (v4l2_out branch, mode-aware stream_out,
+ * WO-172) — removed in WO-831.
  *
  * WO-172 T172.3 decision matrix (A172.2):
  *  - stream_out / record_out cabling, "attach" mode (streamingChannel.dedicatedOutputChannel is not
@@ -19,9 +19,6 @@
  *    excluded): unchanged from WO-81.
  */
 
-/** Settings slices that only affect runtime AMCP consumers — not generated Caspar XML. */
-const RUNTIME_ONLY_PATCH_KEYS = new Set(['streamOutputs', 'recordOutputs'])
-
 /**
  * @param {{ streamingChannel?: { dedicatedOutputChannel?: boolean | string } } | null | undefined} settings
  * @returns {boolean}
@@ -30,27 +27,6 @@ export function isStreamingDedicatedOutputChannel(settings) {
 	const sc = settings && typeof settings === 'object' ? settings.streamingChannel : null
 	if (!sc || typeof sc !== 'object') return false
 	return sc.dedicatedOutputChannel === true || sc.dedicatedOutputChannel === 'true'
-}
-
-/**
- * @param {Record<string, unknown>} patch
- * @returns {boolean}
- */
-export function settingsPatchAffectsCasparRestart(patch) {
-	if (!patch || typeof patch !== 'object') return false
-	for (const key of Object.keys(patch)) {
-		if (RUNTIME_ONLY_PATCH_KEYS.has(key)) continue
-		if (key === 'streamingChannel') {
-			const sc = patch.streamingChannel
-			if (!sc || typeof sc !== 'object') continue
-			if ('enabled' in sc) return true
-			if (sc.videoMode != null || sc.dedicatedOutputChannel != null) return true
-			continue
-		}
-		if (key === 'deviceGraph' || key === 'screenDestinations' || key === 'casparServer') return true
-		if (key.startsWith('screen_') || key.startsWith('multiview_')) return true
-	}
-	return false
 }
 
 /**

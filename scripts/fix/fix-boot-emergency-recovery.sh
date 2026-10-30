@@ -6,11 +6,11 @@
 #   2. home-casparcg-exfat.mount enabled at boot → 90s wait for absent HIGHASCGEXF USB
 #
 # Run on each affected machine:
-#   cd ~/highascg && sudo bash scripts/fix-boot-emergency-recovery.sh
+#   cd ~/highascg && sudo bash scripts/fix/fix-boot-emergency-recovery.sh
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {
-	echo "Run as root: sudo bash scripts/fix-boot-emergency-recovery.sh" >&2
+	echo "Run as root: sudo bash scripts/fix/fix-boot-emergency-recovery.sh" >&2
 	exit 1
 }
 

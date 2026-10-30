@@ -20,7 +20,7 @@ USB and bridge volumes are **optional at boot**. Missing stick or bridge disk mu
 ## One-command fix (run on each affected PC)
 
 ```bash
-cd ~/highascg && sudo bash scripts/fix-boot-emergency-recovery.sh
+cd ~/highascg && sudo bash scripts/fix/fix-boot-emergency-recovery.sh
 sudo reboot
 ```
 

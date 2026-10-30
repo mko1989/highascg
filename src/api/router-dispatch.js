@@ -9,10 +9,8 @@ const { JSON_HEADERS, jsonBody, parseBody, parseQueryString } = require('./respo
 const routesAmcp = require('./routes-amcp')
 const routesMixer = require('./routes-mixer')
 const routesCg = require('./routes-cg')
-const routesData = require('./routes-data')
 const routesMultiview = require('./routes-multiview')
 const routesScene = require('./routes-scene')
-const routesMisc = require('./routes-misc')
 const routesTimeline = require('./routes-timeline')
 const routesProject = require('./routes-project')
 const routesLedTestCard = require('./routes-led-test-card')
@@ -116,8 +114,6 @@ function makeRouteRequest(routes) {
 					if (r) return r
 					r = await routesCg.handlePost(p, body, ctx)
 					if (r) return r
-					r = await routesData.handlePost(p, body, ctx)
-					if (r) return r
 					r = await routesMedia.handlePost(p, body, ctx, req, query)
 					if (r) return r
 					r = await routesMultiview.handlePost(p, body, ctx)
@@ -125,8 +121,6 @@ function makeRouteRequest(routes) {
 					r = await routesScene.handlePost(p, body, ctx)
 					if (r) return r
 					r = await routesProject.handlePost(p, body, ctx)
-					if (r) return r
-					r = await routesMisc.handlePost(p, body, ctx)
 					if (r) return r
 				}
 

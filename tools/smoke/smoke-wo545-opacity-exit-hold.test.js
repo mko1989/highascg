@@ -187,15 +187,10 @@ describe('WO-545: setOpacityExitHold', () => {
 	})
 })
 
-describe('WO-545: wired into both take orchestrators', () => {
+describe('WO-545: wired into the take orchestrator (scene-take-pgm-only.js went in WO-831)', () => {
 	const lbg = fs.readFileSync(path.join(__dirname, '../../src/engine/scene-take-lbg.js'), 'utf8')
-	const pgmOnly = fs.readFileSync(path.join(__dirname, '../../src/engine/scene-take-pgm-only.js'), 'utf8')
 
 	it('scene-take-lbg.js sets the hold under the same gate as the fade-out DEFER', () => {
 		assert.match(lbg, /setOpacityExitHold\(activeTimelineIdToFadeOut\)/)
-	})
-
-	it('scene-take-pgm-only.js sets the hold under the same gate as its fade-out DEFER', () => {
-		assert.match(pgmOnly, /setOpacityExitHold\(activeTimelineIdToFadeOut\)/)
 	})
 })

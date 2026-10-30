@@ -64,16 +64,6 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 				appCtx.log('warn', `[Shutdown] streaming: ${e.message}`)
 			}
 
-			if (appCtx.samplingManager) {
-				try {
-					await Promise.race([
-						appCtx.samplingManager.stop(),
-						new Promise((_, reject) => setTimeout(() => reject(new Error('DMX stop timeout')), 3000)),
-					])
-				} catch (e) {
-					appCtx.log('warn', `[Shutdown] dmx: ${e.message}`)
-				}
-			}
 			stopOscSubsystem()
 			if (typeof appCtx._stopUsbHotplugWatcher === 'function') appCtx._stopUsbHotplugWatcher()
 			if (typeof appCtx._stopUsbAutoMount === 'function') appCtx._stopUsbAutoMount()

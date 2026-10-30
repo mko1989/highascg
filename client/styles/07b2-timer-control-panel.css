@@ -69,51 +69,6 @@
 	overflow: hidden;
 }
 
-.timer-control-panel__selector {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-}
-
-.timer-control-panel__select {
-	width: 100%;
-	padding: 6px 8px;
-	background: var(--bg-input, var(--bg-2, #161b22));
-	border: 1px solid var(--border);
-	border-radius: 4px;
-	color: var(--text);
-	font-size: 0.75rem;
-	cursor: pointer;
-}
-
-.timer-control-panel__select:hover,
-.timer-control-panel__select:focus {
-	border-color: var(--accent);
-	outline: none;
-}
-
-.timer-control-panel__display {
-	text-align: center;
-	font-size: 1.8rem;
-	font-weight: 700;
-	font-variant-numeric: tabular-nums;
-	color: var(--accent);
-	font-family: 'Courier New', monospace;
-	padding: 8px;
-	background: rgba(0, 0, 0, 0.2);
-	border-radius: 4px;
-	min-height: 2.5em;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.timer-control-panel__buttons {
-	display: flex;
-	gap: 6px;
-	justify-content: center;
-}
-
 .timer-control-panel__btn {
 	flex: 1;
 	padding: 8px 12px;
@@ -134,59 +89,6 @@
 }
 
 .timer-control-panel__btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.timer-control-panel__hms-label {
-	font-size: 0.7rem;
-	font-weight: 700;
-	text-transform: uppercase;
-	color: var(--text-muted);
-	letter-spacing: 0.05em;
-	margin-top: 4px;
-	margin-bottom: -8px;
-}
-
-.timer-control-panel__hms {
-	display: flex;
-	gap: 8px;
-}
-
-.timer-control-panel__preset-row {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
-	margin-top: 8px;
-}
-
-.timer-control-panel__preset-btn {
-	padding: 4px 8px;
-	background: rgba(255, 255, 255, 0.05);
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	border-radius: 3px;
-	color: var(--text-muted);
-	font-size: 0.65rem;
-	font-weight: 500;
-	cursor: pointer;
-	transition: all 0.12s ease;
-	white-space: nowrap;
-	flex: 0 0 auto;
-}
-
-.timer-control-panel__preset-btn:hover:not(:disabled) {
-	background: rgba(255, 255, 255, 0.12);
-	border-color: var(--accent);
-	color: var(--text);
-}
-
-.timer-control-panel__preset-btn:active:not(:disabled) {
-	background: rgba(88, 166, 255, 0.18);
-	border-color: var(--accent);
-	color: var(--accent);
-}
-
-.timer-control-panel__preset-btn:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
 }
@@ -337,12 +239,6 @@
 	line-height: 1.35;
 	color: var(--text-muted);
 	opacity: 0.85;
-}
-
-.timer-control-panel__settings-row {
-	display: flex;
-	gap: 6px;
-	align-items: flex-end;
 }
 
 .timer-control-panel__settings-input,

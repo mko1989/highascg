@@ -103,7 +103,7 @@ test('the take pipeline emits VOLUME unconditionally (stale-0 defence)', () => {
 	 * a retaken layer silent forever. Same defensive rule WO-217 T217.2 established for OPACITY. */
 	const fs = require('fs')
 	const path = require('path')
-	for (const f of ['scene-take-lbg-jobs.js', 'scene-take-pgm-only.js']) {
+	for (const f of ['scene-take-lbg-jobs.js']) {
 		const src = fs
 			.readFileSync(path.join(__dirname, '..', '..', 'src', 'engine', f), 'utf8')
 			.replace(/\/\*[\s\S]*?\*\//g, '')

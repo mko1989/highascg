@@ -129,8 +129,8 @@ module.exports = [
 		},
 	},
 	{
-		// Node-side helpers that live under client/tools (operator CLI, server patches): node globals, not browser.
-		files: ['client/tools/operator-desktop/**/*.js', 'client/tools/to-server/**/*.js'],
+		// Node-side helpers that live under client/tools (operator CLI): node globals, not browser.
+		files: ['client/tools/operator-desktop/**/*.js'],
 		languageOptions: { globals: { ...globals.node } },
 	},
 	{

@@ -61,24 +61,8 @@ function readStoredProfileOrigin() {
 	}
 }
 
-/**
- * Persist API origin override (A/B host profiles, manual failover reconnect).
- * @param {string} origin
- */
-export function setApiOriginOverride(origin) {
-	// Never persist cross-host overrides when the UI is served from the playout box itself.
-	if (pageIsPlayoutServerUi() || getCompanionPathPrefix()) return
-	const normalized = normalizeOrigin(origin)
-	if (typeof globalThis !== 'undefined') {
-		globalThis.__HIGHASCG_API_ORIGIN__ = normalized
-	}
-	try {
-		if (normalized) localStorage.setItem('highascg_api_origin_override', normalized)
-		else localStorage.removeItem('highascg_api_origin_override')
-	} catch {
-		/* ignore */
-	}
-}
+// WO-831: setApiOriginOverride (the only writer of highascg_api_origin_override — A/B profile switching in the
+// deleted replication-status-banner / connection-profiles) was removed; the reader above stays for stored values.
 
 /**
  * Drop a loopback/baked dev origin when the page is opened on the playout host (or LAN).

@@ -4,7 +4,7 @@
 #   - ~90s perceived hang (networkd-wait-online, exfat ordering, ignore_loglevel flood)
 #   - GRUB countdown: large black letterbox (gfxmode not matching 1920×1080 splash)
 #
-#   cd ~/highascg && sudo bash scripts/fix-host-boot-display-hang.sh
+#   cd ~/highascg && sudo bash scripts/fix/fix-host-boot-display-hang.sh
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {
@@ -98,7 +98,7 @@ EOF
 
 log "Refresh WO-47/WO-52 units (exfat-boot --no-block ordering)"
 bash "${REPO_ROOT}/scripts/install-exfat-systemd-units.sh" "$USER_CASPAR"
-bash "${REPO_ROOT}/scripts/fix-boot-emergency-recovery.sh" "$USER_CASPAR"
+bash "${REPO_ROOT}/scripts/fix/fix-boot-emergency-recovery.sh" "$USER_CASPAR"
 
 log "Disable systemd-networkd-wait-online (~2 min stall on unused NICs)"
 systemctl disable systemd-networkd-wait-online.service 2>/dev/null || true

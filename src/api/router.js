@@ -25,21 +25,18 @@ const routesMultiview = require('./routes-multiview')
 const routesScene = require('./routes-scene')
 const routesPreviewNudge = require('./routes-preview-nudge')
 const routesPgmCapture = require('./routes-pgm-capture')
-const routesMisc = require('./routes-misc')
 const routesTimeline = require('./routes-timeline')
 const routesStreaming = require('./routes-streaming')
 const routesOsc = require('./routes-osc')
 const routesSettings = require('./routes-settings')
 const routesAudio = require('./routes-audio')
 const routesProject = require('./routes-project')
-const routesLedTestCard = require('./routes-led-test-card')
 const routesComposePreview = require('./routes-compose-preview')
 const routesVirtualCamera = require('./routes-virtual-camera')
 const routesV4l2Input = require('./routes-v4l2-input')
 const routesFtb = require('./routes-ftb')
 const routesOperatorDock = require('./routes-operator-dock')
 const routesLedTestControl = require('./routes-led-test-control')
-const routesSystemStaged = require('./routes-system-staged')
 const routesIngest = require('./routes-ingest')
 const routesUsbIngest = require('./routes-usb-ingest')
 const routesStreamingChannel = require('./routes-streaming-channel')
@@ -300,15 +297,8 @@ routes.get('/api/streaming/ndi-sources', ({ path, ctx }) => routesStreaming.hand
 routes.post('/api/streaming/toggle', ({ path, body, ctx }) => routesStreaming.handlePost(path, body, ctx).catch(e => ({ status: 502, headers: JSON_HEADERS, body: jsonBody({ error: String(e) }) })), { requireCaspar: false })
 routes.post('/api/streaming/restart', ({ path, body, ctx }) => routesStreaming.handlePost(path, body, ctx).catch(e => ({ status: 502, headers: JSON_HEADERS, body: jsonBody({ error: String(e) }) })), { requireCaspar: false })
 
-// Config apply
-routes.post('/api/config/apply', ({ path, body, ctx }) => routesConfig.handlePost(path, body, ctx), { requireCaspar: false })
+// Config reset (WO-831: POST /api/config/apply removed — ctx.applyServerConfigAndRestart was never defined, every call was a 501)
 routes.post('/api/config/reset', ({ path, body, ctx }) => routesConfig.handlePost(path, body, ctx), { requireCaspar: false })
-
-// System Staged
-routes.get('/api/system/staged/*', ({ method, path }) => routesSystemStaged.handle(method, path), { requireCaspar: false })
-routes.get('/api/system/staged', ({ method, path }) => routesSystemStaged.handle(method, path), { requireCaspar: false })
-routes.post('/api/system/staged/*', ({ method, path }) => routesSystemStaged.handle(method, path), { requireCaspar: false })
-routes.post('/api/system/staged', ({ method, path }) => routesSystemStaged.handle(method, path), { requireCaspar: false })
 
 // Ingest
 routes.post('/api/ingest/upload', ({ req, ctx }) => routesIngest.handleUpload(req, null, ctx), { requireCaspar: false })
@@ -458,11 +448,9 @@ routes.get('/api/mixer', ({ path, query, ctx }) => routesMixer.handleGet(path, q
 
 routes.post('/api/amcp/*', ({ path, body, ctx }) => routesAmcp.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/mixer/*', ({ path, body, ctx }) => routesMixer.handlePost(path, body, ctx), { requireCaspar: true })
-routes.post('/api/led-test-card/*', ({ path, body, ctx }) => routesLedTestCard.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/ftb/*', ({ path, body, ctx }) => routesFtb.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/pip-overlay/*', ({ path, body, ctx }) => routesPipOverlay.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/cg/*', ({ path, body, ctx }) => routesCg.handlePost(path, body, ctx), { requireCaspar: true })
-routes.post('/api/data/*', ({ path, body, ctx }) => routesData.handlePost(path, body, ctx), { requireCaspar: true })
 
 // Media Caspar required POST operations (like PLAY, CLEAR)
 routes.post('/api/media/*', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: true })
@@ -477,7 +465,6 @@ routes.post('/api/scene/*', ({ path, body, ctx }) => routesScene.handlePost(path
 routes.post('/api/preview/mixer-nudge', ({ body, ctx }) => routesPreviewNudge.handlePreviewMixerNudge(body, ctx), { requireCaspar: true })
 // WO-272: operator capture button — Caspar PRINT of the resolved PGM channel (PNG lands in the Caspar media folder).
 routes.post('/api/pgm/capture', ({ body, ctx }) => routesPgmCapture.handlePgmCapture(body, ctx), { requireCaspar: true })
-routes.post('/api/misc/*', ({ path, body, ctx }) => routesMisc.handlePost(path, body, ctx), { requireCaspar: true })
 
 // Timeline catchall post
 routes.get('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.handle(method, path, body, ctx), { requireCaspar: true })

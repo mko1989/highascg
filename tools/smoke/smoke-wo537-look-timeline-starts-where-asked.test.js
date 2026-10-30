@@ -100,8 +100,8 @@ describe('WO-537: the look path asks for it', () => {
 		assert.match(src, /eng\.play\(tlId, startPos, \{ takeFade: true, restart \}\)/, 'the MIX branch')
 	})
 
-	it('and both look callers really do ask for position 0', () => {
-		for (const rel of ['src/engine/scene-take-lbg-jobs.js', 'src/engine/scene-take-pgm-only.js']) {
+	it('and the look caller really does ask for position 0', () => {
+		for (const rel of ['src/engine/scene-take-lbg-jobs.js']) {
 			assert.match(read(rel), /startAtCurrentPosition: false/, `${rel} demands a restart`)
 		}
 	})
@@ -117,8 +117,8 @@ describe('WO-537: a timeline layer is never given two competing ramps', () => {
 	 * fade-in), whichever was inserted later into the deferred list decides, and the fade-out was
 	 * inserted first. WO-537 §4's original note had this backwards. */
 
-	it('both take implementations skip the fade-out for a layer that is also fading in', () => {
-		for (const rel of ['src/engine/scene-take-lbg.js', 'src/engine/scene-take-pgm-only.js']) {
+	it('the take implementation skips the fade-out for a layer that is also fading in', () => {
+		for (const rel of ['src/engine/scene-take-lbg.js']) {
 			assert.match(
 				read(rel),
 				/if \(timelineFadeInPhys\.includes\(pOut\)\) continue/,

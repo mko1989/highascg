@@ -23,7 +23,6 @@ const { createLiveDeckState } = require('./state/live-deck-state')
  * @property {object|null} oscState
  * @property {{ connected: boolean, host: string, port: number }} _casparStatus
  * @property {import('./config/config-manager').ConfigManager} configManager
- * @property {import('./sampling/dmx-sampling').SamplingManager|null} samplingManager
  * @property {() => object} getState
  * @property {() => object} [getStateWsBootstrap]
  * @property {(level: string, msg: string) => void} log
@@ -152,7 +151,6 @@ function createAppContext(deps) {
 			port: deps.casparPort,
 		},
 		configManager: deps.configManager,
-		samplingManager: null,
 		log: deps.log,
 		setUiSelection: deps.setUiSelection,
 		resetConfigToDefaults: deps.resetConfigToDefaults,

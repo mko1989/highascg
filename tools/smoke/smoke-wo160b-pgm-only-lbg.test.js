@@ -60,14 +60,10 @@ test('WO-160b: routes-scene-take.js pgm-only log message updated', () => {
 	assert.ok(!hasOldLogMessage, 'old log message removed (no A/B banks)')
 })
 
-test('WO-160b: scene-take-pgm-only.js marked as legacy', () => {
+test('WO-160b: scene-take-pgm-only.js deleted (WO-831: legacy since WO-160b, no callers)', () => {
 	const fs = require('fs')
 	const path = require('path')
-	const source = fs.readFileSync(path.join(__dirname, '../../src/engine/scene-take-pgm-only.js'), 'utf8')
-
-	// Verify legacy header was added
-	const hasLegacyComment = source.includes('LEGACY since WO-160b')
-	assert.ok(hasLegacyComment, 'scene-take-pgm-only.js marked as legacy')
+	assert.ok(!fs.existsSync(path.join(__dirname, '../../src/engine/scene-take-pgm-only.js')), 'legacy pgm-only engine is gone')
 })
 
 test('WO-160b: scene-take.js deleted (no callers)', () => {
@@ -78,11 +74,6 @@ test('WO-160b: scene-take.js deleted (no callers)', () => {
 	// Verify the dead scene-take.js file is deleted
 	const exists = fs.existsSync(sceneTakePath)
 	assert.ok(!exists, 'scene-take.js file deleted (runSceneTake had no callers)')
-})
-
-test('WO-160b: normalizeTransitionForPgmOnly exported (client-side usage)', () => {
-	const { normalizeTransitionForPgmOnly } = require('../../src/engine/scene-take-pgm-only')
-	assert.ok(typeof normalizeTransitionForPgmOnly === 'function', 'normalizeTransitionForPgmOnly exported (client mirror may use it)')
 })
 
 test('T181.2: PGM-only take with MIX+ANIMATE transition produces PLAY plan with transition params', async () => {

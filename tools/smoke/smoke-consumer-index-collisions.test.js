@@ -6,6 +6,7 @@
  * the first. Found 2026-07-20: the meter-null consumer (added to EVERY channel on connect) shared
  * index 96 with the streaming RECORD consumer, and DMX file sampling shared 97 with the RTMP
  * consumer. A record started before a Caspar reconnect would have been silently displaced.
+ * (WO-831: the DMX file-sampling consumer, slot 721, went with src/sampling and is no longer listed.)
  */
 
 const { describe, it } = require('node:test')
@@ -13,7 +14,6 @@ const assert = require('node:assert/strict')
 
 const INDICES = {
 	METER_NULL_CONSUMER_INDEX: require('../../src/audio/meter-null-consumer').METER_NULL_CONSUMER_INDEX,
-	DMX_FILE_CONSUMER_INDEX: require('../../src/sampling/dmx-sampling-ingress').DMX_FILE_CONSUMER_INDEX,
 	STREAMING_RECORD_CONSUMER_INDEX:
 		require('../../src/api/routes-streaming-channel-shared').STREAMING_RECORD_CONSUMER_INDEX,
 	STREAMING_RTMP_CONSUMER_INDEX:
@@ -42,16 +42,11 @@ describe('consumer indices are unique per subsystem', () => {
 		assert.deepEqual(clashes, [], 'an ADD at an occupied index evicts the existing consumer')
 	})
 
-	it('the two historical collisions specifically stay resolved', () => {
+	it('the meter-null / record historical collision stays resolved', () => {
 		assert.notEqual(
 			INDICES.METER_NULL_CONSUMER_INDEX,
 			INDICES.STREAMING_RECORD_CONSUMER_INDEX,
 			'the meter consumer is added to every channel and would displace a running record',
-		)
-		assert.notEqual(
-			INDICES.DMX_FILE_CONSUMER_INDEX,
-			INDICES.STREAMING_RTMP_CONSUMER_INDEX,
-			'DMX sampling would displace a running RTMP stream',
 		)
 	})
 })

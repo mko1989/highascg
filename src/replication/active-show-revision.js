@@ -58,6 +58,5 @@ async function getLeaderActiveShowPingFields(ctx) {
 }
 
 module.exports = {
-	computeActiveShowRevision,
 	getLeaderActiveShowPingFields,
 }

@@ -1,5 +1,5 @@
 /**
- * Drag overlay, ingest URL/upload progress, publish modal progress.
+ * Drag overlay, ingest URL/upload progress.
  */
 
 .sources-drag-overlay {
@@ -152,24 +152,5 @@
 	font-variant-numeric: tabular-nums;
 	min-width: 2.5rem;
 	text-align: right;
-}
-
-.publish-modal .progress-bar-wrap {
-	height: 8px;
-	background: rgba(255, 255, 255, 0.08);
-	border-radius: 4px;
-	overflow: hidden;
-}
-.publish-modal .progress-bar {
-	height: 100%;
-	background: var(--accent);
-	border-radius: 4px;
-	transition: width 0.12s ease-out;
-}
-.publish-upload-percent {
-	font-size: 0.75rem;
-	color: var(--text-muted);
-	font-variant-numeric: tabular-nums;
-	margin-top: 2px;
 }
 

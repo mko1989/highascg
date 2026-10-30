@@ -49,12 +49,7 @@
 	font-size: 12px;
 	line-height: 1.6;
 }
-.device-view__edge-rm {
-	margin-left: 10px;
-	font-size: 11px;
-	padding: 2px 8px;
-	cursor: pointer;
-}
+
 .device-view__edge-item {
 	cursor: pointer;
 }
@@ -84,19 +79,7 @@
 	margin: 4px 0 8px;
 	opacity: 0.9;
 }
-.device-view__inherited-box {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	padding: 2px 8px;
-	background: rgba(88, 166, 255, 0.12);
-	border: 1px solid rgba(88, 166, 255, 0.35);
-	border-radius: 4px;
-	color: #8bbfff;
-	font-size: 10px;
-	font-weight: 600;
-	margin-bottom: 8px;
-}
+
 .device-view__kv {
 	display: grid;
 	gap: 6px;
@@ -123,9 +106,7 @@
 	overflow-wrap: anywhere;
 	min-width: 0;
 }
-.device-view__links {
-	display: inline-flex;
-}
+
 .device-view__status {
 	font-size: 12px;
 	margin-top: 8px;
@@ -136,17 +117,7 @@
 .device-view__status--err {
 	color: #f87171;
 }
-.device-view__stream-badge {
-	display: inline-flex;
-	align-items: center;
-	padding: 2px 8px;
-	border-radius: 999px;
-	font-size: 11px;
-	line-height: 1.4;
-	background: rgba(34, 197, 94, 0.18);
-	border: 1px solid rgba(34, 197, 94, 0.75);
-	color: #86efac;
-}
+
 .device-view__inspector-links {
 	display: flex;
 	flex-wrap: wrap;
@@ -197,21 +168,13 @@
 	flex-direction: column;
 	gap: 6px;
 }
-.device-view__decklink-input-row {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: 8px;
-	font-size: 12px;
-}
+
 .device-view__section-divider {
 	border: none;
 	border-top: 1px dashed rgba(148, 163, 184, 0.25);
 	margin: 8px 0;
 }
-.device-view__cable-btn {
-	font-size: 12px !important;
-}
+
 .device-view--external-inspector .device-view__layout {
 	grid-template-columns: 240px 180px 1fr;
 }
@@ -226,13 +189,7 @@
 		margin-top: 6px;
 	}
 }
-.device-view__input--inherited {
-	background: rgba(88, 166, 255, 0.08) !important;
-	border: 1px solid rgba(88, 166, 255, 0.35) !important;
-	color: #8bbfff !important;
-	font-weight: 600;
-	cursor: default;
-}
+
 .device-view__inspector-link-btn {
 	background: none;
 	border: none;

@@ -61,77 +61,12 @@ function syncthingRequest(method, apiPath, body = null) {
 	})
 }
 
-async function getSyncthingConfig() {
-	return syncthingRequest('GET', '/rest/config')
-}
-
-async function saveSyncthingConfig(config) {
-	return syncthingRequest('PUT', '/rest/config', config)
-}
-
 async function getLocalSyncthingDeviceId() {
 	const st = await syncthingRequest('GET', '/rest/system/status')
 	if (st.ok && st.json?.myID) return st.json.myID
 	return null
 }
 
-async function scanFolder(folderId) {
-	return syncthingRequest('POST', `/rest/db/scan?folder=${encodeURIComponent(folderId)}`)
-}
-
-async function ensureRemoteDevice(deviceId, name) {
-	const cfgRes = await getSyncthingConfig()
-	if (!cfgRes.ok || !cfgRes.json) return { ok: false, error: cfgRes.error || 'config read failed' }
-	const cfg = cfgRes.json
-	cfg.devices = Array.isArray(cfg.devices) ? cfg.devices : []
-	if (!cfg.devices.some((d) => d.deviceID === deviceId)) {
-		cfg.devices.push({
-			deviceID: deviceId,
-			name: name || deviceId.slice(0, 7),
-			addresses: ['dynamic'],
-			compressed: true,
-		})
-	}
-	const save = await saveSyncthingConfig(cfg)
-	return save.ok ? { ok: true } : { ok: false, error: save.error || 'config save failed' }
-}
-
-async function ensureSharedFolder(folderId, folderPath, deviceIds, folderType = 'sendreceive') {
-	const cfgRes = await getSyncthingConfig()
-	if (!cfgRes.ok || !cfgRes.json) return { ok: false, error: cfgRes.error || 'config read failed' }
-	const cfg = cfgRes.json
-	cfg.folders = Array.isArray(cfg.folders) ? cfg.folders : []
-	let folder = cfg.folders.find((f) => f.id === folderId)
-	const deviceEntries = deviceIds.map((id) => ({ deviceID: id }))
-	if (!folder) {
-		folder = {
-			id: folderId,
-			label: folderId,
-			path: folderPath,
-			type: folderType,
-			devices: deviceEntries,
-			rescanIntervalS: 60,
-			fsWatcherEnabled: true,
-			ignorePerms: true,
-		}
-		cfg.folders.push(folder)
-	} else {
-		folder.path = folderPath
-		folder.type = folderType
-		folder.devices = deviceEntries
-	}
-	const save = await saveSyncthingConfig(cfg)
-	if (!save.ok) return { ok: false, error: save.error || 'config save failed' }
-	await scanFolder(folderId)
-	return { ok: true, folderId }
-}
-
-module.exports = {
-	syncthingRequest,
-	getSyncthingConfig,
-	saveSyncthingConfig,
-	getLocalSyncthingDeviceId,
-	scanFolder,
-	ensureRemoteDevice,
-	ensureSharedFolder,
-}
+// WO-831: only the device-id read is used (pairing + replication GET). The config-writing helpers
+// (ensureSharedFolder / ensureRemoteDevice / scanFolder …) had no caller — media moves by rsync.
+module.exports = { getLocalSyncthingDeviceId }

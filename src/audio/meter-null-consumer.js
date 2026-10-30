@@ -21,14 +21,13 @@
  * while `<frame>` still advances and OSC audio meters keep flowing.
  *
  * @see src/streaming/caspar-ffmpeg-setup.js (full MPEG-TS STREAM)
- * @see src/sampling/dmx-sampling-ingress.js (consumer index 97)
  */
 'use strict'
 
 const { amcpInfoText } = require('../streaming/caspar-ffmpeg-setup')
 const { parseChannelVideoModesFromInfoConfigXml } = require('../config/server-info-config')
 
-/** Dedicated slot — below DMX (97), above typical route layers. */
+/** Dedicated slot — above typical route layers. */
 /* 720, not 96: 96 is STREAMING_RECORD_CONSUMER_INDEX. This consumer is added to EVERY channel
  * on connect, so it would silently displace a running RECORD — Caspar replaces whatever occupies
  * the index. The high range (7xx) is where the other long-lived internal consumers live

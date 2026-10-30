@@ -5,7 +5,7 @@
 #   - systemd ordering cycle: highascg-exfat-boot ↔ highascg-bridge-boot
 #
 # Run once before more eggs work:
-#   cd ~/highascg && sudo bash scripts/fix-host-boot-console-and-hang.sh
+#   cd ~/highascg && sudo bash scripts/fix/fix-host-boot-console-and-hang.sh
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {
@@ -71,7 +71,7 @@ fix_console_issue_unit() {
 
 log "Refresh WO-47/WO-52 units (fix bridge/exfat ordering cycle)"
 bash "${REPO_ROOT}/scripts/install-exfat-systemd-units.sh" "$USER_CASPAR"
-bash "${REPO_ROOT}/scripts/fix-boot-emergency-recovery.sh" "$USER_CASPAR"
+bash "${REPO_ROOT}/scripts/fix/fix-boot-emergency-recovery.sh" "$USER_CASPAR"
 
 fix_console_issue_unit
 mask_networkd_wait_online
