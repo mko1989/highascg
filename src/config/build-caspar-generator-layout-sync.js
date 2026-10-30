@@ -56,6 +56,13 @@ function applyLayoutPositionsToMerged(merged) {
 				mappingFeedScreens.add(feed.screenIndex)
 			}
 		}
+		/* WO-868 × WO-869: the mapping canvas sits right of the operator GUI heads — slice windows move with it. */
+		const lead = Number(layout?.mappingCanvasOffsetX) || 0
+		for (const k of Object.keys(merged)) {
+			if (lead > 0 && /^screen_\d+_slice_windows$/.test(k) && Array.isArray(merged[k])) {
+				merged[k] = merged[k].map((w) => ({ ...w, x: (Number(w.x) || 0) + lead }))
+			}
+		}
 		const bbox = layout?.mappingGpuBBox
 		const hasMappingGpu = Array.isArray(layout?.mappingGpuOutputs) && layout.mappingGpuOutputs.length > 0
 		for (let n = 1; n <= 16; n++) {

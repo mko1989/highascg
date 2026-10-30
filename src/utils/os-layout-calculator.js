@@ -3,7 +3,8 @@
 const { buildMappingGpuLayoutArtifacts } = require('./mapping-gpu-os-layout')
 const logger = require('./logger').defaultLogger
 const { collectGpuLayoutAssignments } = require('./os-layout-calculator-assign')
-const { mergeMappingGpuOutputsWithScreens } = require('./os-layout-calculator-helpers')
+const { mergeMappingGpuOutputsWithScreens, recomputeMappingGpuBBox } = require('./os-layout-calculator-helpers')
+const { isOperatorGuiFirst } = require('../config/operator-gui-first')
 const { applyMappingGpuPlacementOffsets } = require('./os-layout-calculator-offset')
 const { computePlacedLayoutResults } = require('./os-layout-calculator-place')
 
@@ -51,6 +52,16 @@ function logLayoutPlan(results) {
 	} catch (_) {}
 }
 
+/** Width the operator GUI heads take at the left edge when "Operator GUI first" is on (computePlacedLayoutResults put them at 0). */
+function operatorFirstLead(config, results) {
+	if (!isOperatorGuiFirst(config)) return 0
+	let lead = 0
+	for (const info of Object.values(results.operatorGui || {})) {
+		if (info && Number.isFinite(info.x) && Number.isFinite(info.width)) lead = Math.max(lead, info.x + info.width)
+	}
+	return lead
+}
+
 function calculateLayoutPositions(config) {
 	const assignments = collectGpuLayoutAssignments(config)
 	const results = computePlacedLayoutResults(config, assignments)
@@ -59,6 +70,14 @@ function calculateLayoutPositions(config) {
 	let mappingGpuBBox
 	;({ mappingGpuOutputs, mappingGpuBBox } = mergeMappingGpuOutputsWithScreens(config, results, mappingGpuOutputs))
 
+	/* WO-868 × WO-869: with "Operator GUI first" the operator monitor keeps the left edge and the pixel-mapping canvas
+	 * starts right of it; the mapping rows and every slice window move by this lead (layout-sync shifts the windows). */
+	const lead = mappingGpuOutputs.length ? operatorFirstLead(config, results) : 0
+	if (lead > 0) {
+		mappingGpuOutputs = mappingGpuOutputs.map((r) => ({ ...r, x: r.x + lead }))
+		mappingGpuBBox = recomputeMappingGpuBBox(mappingGpuOutputs)
+	}
+
 	applyMappingGpuPlacementOffsets(
 		config,
 		results,
@@ -66,10 +85,12 @@ function calculateLayoutPositions(config) {
 		mappingGpuOutputs,
 		assignments.operatorScreenAssignments,
 		assignments.graphHasDestinationGpuBinding,
+		lead,
 	)
 
 	results.mappingGpuOutputs = mappingGpuOutputs
 	results.mappingGpuBBox = mappingGpuBBox
+	if (lead > 0) results.mappingCanvasOffsetX = lead  // absent otherwise: the pre-WO-868 layout goldens stay byte-identical
 
 	logLayoutPlan(results)
 	return results

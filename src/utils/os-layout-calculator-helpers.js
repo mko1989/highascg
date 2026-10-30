@@ -209,4 +209,5 @@ module.exports = {
 	getHorizontalLayoutOrder,
 	hasOperatorOsLayoutOverride,
 	mergeMappingGpuOutputsWithScreens,
+	recomputeMappingGpuBBox,
 }

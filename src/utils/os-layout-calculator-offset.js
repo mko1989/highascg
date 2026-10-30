@@ -23,6 +23,8 @@ const { resolvePixelMapFeedToProgramScreen } = require('../config/pixel-mapping-
  * @param {object[]} mappingGpuOutputs
  * @param {Map<number, object>} operatorScreenAssignments
  * @param {boolean} graphHasDestinationGpuBinding
+ * @param {number} [lead] WO-868: the operator GUI width ahead of the mapping canvas ("Operator GUI first"). Those heads
+ *   stay at the left edge; the others already carry it in their cumulative x, so they move by the canvas span only.
  */
 function applyMappingGpuPlacementOffsets(
 	config,
@@ -31,6 +33,7 @@ function applyMappingGpuPlacementOffsets(
 	mappingGpuOutputs,
 	operatorScreenAssignments,
 	graphHasDestinationGpuBinding,
+	lead = 0,
 ) {
 	const skipWo40aAutoOffset = !graphHasDestinationGpuBinding && operatorScreenAssignments.size > 0
 	if (skipWo40aAutoOffset || !mappingGpuBBox || mappingGpuOutputs.length === 0) return
@@ -58,7 +61,7 @@ function applyMappingGpuPlacementOffsets(
 	const spanY = mappingGpuBBox.maxY - mappingGpuBBox.minY
 	const verticalStack = spanY > spanX
 	const axis = verticalStack ? 'y' : 'x'
-	const off = Math.max(0, verticalStack ? mappingGpuBBox.maxY : mappingGpuBBox.maxX)
+	const off = Math.max(0, verticalStack ? mappingGpuBBox.maxY : mappingGpuBBox.maxX - lead)
 	if (off <= 0) return
 
 	const manual = (...keys) => {
@@ -81,7 +84,7 @@ function applyMappingGpuPlacementOffsets(
 		if (manual(`multiview_${n}_os_${axis}`, `multiview_os_${axis}`) != null) continue
 		info[axis] = (Number(info[axis]) || 0) + off
 	}
-	for (const [key, info] of operatorGui) {
+	for (const [key, info] of lead > 0 ? [] : operatorGui) {
 		const n = parseInt(key, 10)
 		if (!Number.isFinite(n) || n < 1 || !info) continue
 		if (manual(`operator_gui_${n}_os_${axis}`, `operator_gui_os_${axis}`) != null) continue

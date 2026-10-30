@@ -183,9 +183,7 @@ function planOperatorFirst(ctx, opts) {
 	}
 	const before = layoutRows(config)
 	const after = layoutRows(target)
-	if (enable && before.mappingGpuOutputs > 0) {
-		refusals.push({ code: 'mapping_gpu_outputs', message: 'A pixel-mapping rig feeds GPU outputs: its canvas owns the left edge, so the GUI cannot be first.' })
-	}
+	// A pixel-mapping canvas on GPU heads no longer refuses: it starts right of the operator GUI (os-layout-calculator).
 	if (String(cs.casparConfigOverride || '').trim()) {
 		refusals.push({ code: 'config_override', message: 'A manual casparcg.config override is set; the generated channel order would be ignored.' })
 	}

@@ -1,7 +1,7 @@
 # WO-869 — Mapping node slices: cut a screen destination's output into slices and place them freely on an output canvas (Resolume-style)
 
 **Area:** devices-config, amcp, godot-client
-**Status: IN PROGRESS (30.10) — P1 model/planner/API, P2 Godot editor and P3 path (b) (fork APPLY + screen slices, generator, live APPLY) built and verified offline, in the GUI sandbox and on a scratch Caspar; fork binary swapped on the box 30.10 (§6); slices on real heads not yet exercised; path (a) route-slices not built (§6)**
+**Status: IN PROGRESS (30.10) — P1 model/planner/API, P2 Godot editor and P3 path (b) built; slices verified on the real Dioda head (gpu-texture on, config baseline, live APPLY, Caspar-restart re-apply; §5.1) after two WO-868 interaction fixes; open: caps probe, path (a) route-slices (§6)**
 
 Owner 30.10: "need also a way inside mapping node to slice the output of a screen destination and position it freely on a set canvas output. similar to how resolume works with slices. i have a round around way of doing this with rendering the canvas then playing its sliced up routes on the output, but there must be an easier way to do this. doesnt caspar has something built in for these purposes? if not there needs to be a pull request that has something similar."
 
@@ -323,14 +323,72 @@ Backend = path (b) for GPU heads (the planner's default case). SDI = placement o
   - Screenshots: `…/wo869/gen/g1-config.png`, `g2-apply.png`.
 - Not touched: the live device graph and project, Apply on the box, the highascg service, display :0.
 
+### 5.1 Real heads on the box (30.10, after the WO-868 switch)
+
+Rig: Dioda PGM (ch 2, 3840x1792) → test node `mapping_mvv97x1j_1` → `out_1` (custom 3840x1792) → DP-0. Slices:
+- `sA`: src left half → dst right half;
+- `sB`: src right half → dst left half, `flipH`.
+
+The probe image was 3840x1792 quadrants with a white marker top-left and a cyan marker top-right (`PLAY 2-200`). Evidence is
+in `scratchpad/wo869live/`.
+
+**Two defects found before the first Apply, fixed:**
+1. **The mapping canvas took the left edge.** `/api/caspar-config/generate` put the slice window at x=0. The journal
+   layout had `operator_gui_1 DP-4 pos=3840,0` and `mapping→GPU DP-0 pos=0,0`. Applying would have undone "Operator GUI
+   first", which the owner wants on always.
+   - WO-868 only refused this combination at switch time (`mapping_gpu_outputs`); a node added afterwards was not
+     covered.
+   - Fix, `os-layout-calculator.js` `operatorFirstLead`: with operator-first the operator GUI heads keep x=0, and the
+     mapping rows (and so their bbox) shift right by the heads' width.
+   - `os-layout-calculator-offset.js`: with a lead, the operator GUI is not shifted, and the others move by the canvas
+     span (`maxX - lead`), because their cumulative x already holds the lead.
+   - `build-caspar-generator-layout-sync.js` shifts every `screen_N_slice_windows` entry by `layout.mappingCanvasOffsetX`.
+     The key is only set when non-zero, so the WO-868 OFF/ON layout goldens stay byte-identical.
+   - The WO-868 refusal is removed (`operator-first-plan.js`).
+2. **The PGM window stayed on.** `applySliceWindowsToScreens` took the first destination with
+   `mainScreenIndex+1 === n`. That was the Operator GUI destination (also index 0), and its own DP-4 cable counted as
+   "another GPU head" of Dioda.
+   - Fix: operator_gui / multiview / stream / host_channel destinations are skipped (`NOT_PROGRAM`).
+- Smoke: `tools/smoke/smoke-wo869-operator-first-slices.test.js` (3/3; box rig in miniature, operator-first and legacy order).
+  It is in `tools/ci/offline-test-files-3.js`.
+- Related smokes (wo868*, wo869*, os-layout offset, operator-gui 4k rect, wo242/437/439 mapping, xrandr verify, wo515):
+  130/130.
+- `smoke-mapping-gpu-os-layout-2.js` and `smoke-device-graph-output-mapping.js` fail identically at HEAD. They are not
+  in the curated list, and this change does not affect them.
+
+**Real-head results** (node restarted onto the fix, then `POST /api/caspar-config/apply`):
+- **Generated config vs live:** the only diff is the Dioda PGM `<screen>` (device 1) replaced by the slice window
+  (device 41) at `<x>1920</x>` 3840x1792 with the two `<slices>`.
+- **Apply:** `ok`, `restartSent`, `reconnected`, `layoutApplied`. xrandr stays DP-4 `+0+0`, DP-0 `+1920+0`. `INFO 2` shows
+  `port_640` (screen consumer, gpu_texture true) with both slices.
+- **Config baseline on the head:** x11grab of DP-0 (1920,0 3840x1792) against the expected mapping of `caspar print 2`
+  (halves swapped, right half mirrored): **107520 points, bad=0**.
+  - Control: the unsliced print gives bad=107520.
+  - The cyan marker moved from x 3440 to x 100 (`dp0-slices1.png`).
+- **Live edit:** `updateMappingSlices` with `sA` squashed into the top half → `casparRestartNeeded:false`,
+  `APPLY 2-640 SLICES SET 2 …` → `202 APPLY OK`.
+  - Same Caspar PID, same X window id (no recreation).
+  - Probe: bad=277 of 107520, all on colour edges (rows 200/448, bilinear boundary samples; 0 off-edge).
+  - Control against the pre-edit picture: bad=41467 (`dp0-slices2.png`).
+- **Caspar restart re-apply** (AMCP `RESTART`, the XML still holding the old slices): node logged
+  `[mapping-slices] re-applied 1/1 slice window(s)` with the live set.
+  - Head after re-PLAY vs the live-edited picture: **bad=0**. Against the config baseline: bad=41467
+    (`dp0-after-restart.png`).
+- **Stacking:** one screen consumer on ch 2 (PGM window off), so the two-windows-per-channel SEGV case does not arise.
+  The operator GUI on DP-4 is unaffected and shows the node in Devices (`dp4-gui.png`).
+- **Restored:** `removeMappingNode`, the Dioda → DP-0 cable re-added, Apply again.
+  - The graph (devices + edges) equals the pre-test snapshot.
+  - The live `casparcg.config` is byte-identical to the pre-test copy.
+  - ch 2 back to `port_600`; channels [2,4]/[3,5]; 0 journal errors; probe media deleted.
+
 ## 6. What remains
 
 - **Binary swap: DONE 30.10 17:32** (dev box). `bin/casparcg` = md5 `ab668967…` (the build above); rollback `bin/casparcg.pre-wo869` (`fb955e76…`, the 16:37 build of `e8d457ec6` + the same uncommitted WO-820/800 tree, so the swap adds only `ce7132e50` + `deac375bb`). AMCP `RESTART` → run.sh relaunched it (`/proc/<pid>/exe` md5 checked), then node restarted (Apply check 0). After: the node re-staged the PRV look on ch2, `/api/system/operator-first` + the WO-857 listener (UDP 6290) answer, 0 `[error]` lines in the journal, :0 shows the GUI on DP-4 and the (empty-PGM) Dioda window on DP-0. The live project has no slices yet, so the slice path on real heads is still the open check below.
 - **Caps probe:** the planner assumes the running Caspar has screen slices (`caps.screenSlices` is never set). A connect-time probe (`APPLY <ch>-640 SLICES SET 0`, where 400 means none) that sets the caps and falls back to `refused`/direct is not built.
 - **Path (a) route-slices** (SDI scaling/rotation and per-slice sources): the planner models it and the budget refusal (Q3), but there is no generator or apply code. It also needs #1814 (crop leak) in the fork.
-- **Real GPU check:** the gpu-texture path (forced on in production) is not pixel-verified. On Xvfb its baseline is black even without slices, so the probes ran with `gpu-texture=false`. Check on the box after the swap: real heads, a slice window over the xrandr layout, and window stacking.
+- ~~Real GPU check~~ — done on the box 30.10 (§5.1): gpu-texture on, real DP-0 head, xrandr layout, stacking.
 - **Fork caveat:** an intermittent startup SEGV with two screen windows on one channel on Xvfb, seen with both the old and the new binary (not caused by this change). Watch for it on the box, where the PGM window plus a slice window means two windows when another GPU cable keeps the PGM window on.
-- **Not tested:** a channel format change while a window is live; re-apply after a real Caspar restart (the code path is smoke-tested only).
+- **Not tested:** a channel format change while a window is live. (Re-apply after a real Caspar restart: done, §5.1.)
 - **Planner edge:** a node with a slice window plus an empty GPU output (no slice) keeps that output `direct`, so the PGM window stays on and may overlap the slice window.
 - **Owner QA:** one pass of the editor against a real two-head wall or LED processor.
 

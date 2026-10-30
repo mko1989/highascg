@@ -23,6 +23,7 @@ const {
 } = require('./device-graph-destination-wiring')
 
 const KEY_RE = /^screen_\d+_slice_windows$/
+const NOT_PROGRAM = new Set(['operator_gui', 'multiview', 'stream', 'host_channel'])
 
 /** The pixel_map_out connector ids of a node's screen-slices outputs. */
 function sliceOutputConnectorIds(graph, w) {
@@ -76,7 +77,10 @@ function applySliceWindowsToScreens(merged, appConfig) {
 	const rest = withoutSources(ctx, drop)
 	for (const [n, list] of byScreen) {
 		merged[`screen_${n}_slice_windows`] = list
-		const dest = ctx.destinations.find((d) => (Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0)) + 1 === n)
+		// The screen's program destination: an operator GUI / multiview / stream / host destination can share its
+		// mainScreenIndex, and its own GPU cable kept the PGM window on (WO-869 on the box, operator GUI index 0).
+		const dest = ctx.destinations.find((d) => !NOT_PROGRAM.has(String(d?.mode || 'pgm_prv')) &&
+			(Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0)) + 1 === n)
 		if (!dest) continue
 		const otherGpu = destinationSourceIds(dest, n - 1, rest).some((src) => reachesGpuFromSource(src, rest, { pgmOnly: true }))
 		if (!otherGpu) merged[`screen_${n}_screen_consumer`] = false

@@ -218,6 +218,7 @@ module.exports = [
 	'tools/smoke/smoke-wo869-mapping-slices-api.test.js',
 	'tools/smoke/smoke-wo869-slice-golden.test.js',
 	'tools/smoke/smoke-wo869-slice-windows-generator.test.js',
+	'tools/smoke/smoke-wo869-operator-first-slices.test.js',
 	'tools/smoke/smoke-wo857-console-selection.test.js',
 	'tools/smoke/smoke-wo868-operator-first-golden.test.js',
 	'tools/smoke/smoke-wo868-channel-remap.test.js',

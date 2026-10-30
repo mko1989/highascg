@@ -505,3 +505,10 @@ Done by me in dev mode (the owner allows any test on the box, PGM config include
 - New project still never carries the flag (`withoutMachineLocalCasparKeys`), so the live box keeps its own value.
 - `smoke-wo868-operator-first-golden.test.js`: 8/8. Godot `run_tests.gd`: 23890 passed, 0 failed.
 
+**Pixel-mapping GPU rigs with operator-first (30.10, found in WO-869 §5.1).** The switch used to refuse while a mapping
+node fed GPU heads (`mapping_gpu_outputs`), but a node added after the switch was not covered: its canvas took x=0 and
+pushed the operator monitor right.
+- Now the operator GUI keeps the left edge, and the mapping canvas and its slice windows start right of it
+  (`os-layout-calculator.js` `operatorFirstLead`).
+- The refusal is removed. Verified on the real DP-0 head (WO-869 §5.1).
+
