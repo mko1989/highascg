@@ -13,6 +13,7 @@ const NEAR_PX := 28.0
 var sel: RefCounted = Sel.shared()
 var post: Callable  ## (body: Dictionary) → awaitable result; the tab passes Api.post_json on /api/fixtures/program/aim
 var active := false
+var hold := false  ## WO-841: a VR grip is pointing the selection — `aimed` waits for end_hold(), not every batch
 var _busy := false
 var _next: Variant = null  # the newest target not sent yet
 
@@ -65,5 +66,12 @@ func aim(psn: Array) -> void:
 		_next = null
 		await post.call({"ids": sel.ids.duplicate(), "target": t})
 	_busy = false
-	if not active:
+	if not active and not hold:
+		sel.aimed.emit()
+
+
+## WO-841: the VR grip was let go — announce `aimed` (sliders follow) once the last request is back.
+func end_hold() -> void:
+	hold = false
+	if not active and not _busy:
 		sel.aimed.emit()

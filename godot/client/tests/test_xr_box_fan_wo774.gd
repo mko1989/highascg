@@ -2,7 +2,7 @@ extends RefCounted
 ## WO-774 — VR box select (the press ray's view, drag threshold, inside test, order, outline), the fixture-type filter
 ## (patch types, select a type), the right grip's pan / tilt fan (shares, dead zone, hand move, bases, values) and its
 ## session (xr_fan.gd: one write per fixture, untouched axes never written, the release announces `aimed`), and the
-## trigger's routing: the floor aim now fires on the release.
+## trigger's routing (WO-841: a release on the floor no longer aims — the right grip does, test_xr_grip_wo841.gd).
 
 const Walk := preload("res://features/previs/xr/xr_walk_model.gd")
 const Fan := preload("res://features/previs/xr/xr_fan.gd")
@@ -143,13 +143,15 @@ func test_fan_session() -> void:
 	t.eq(posts.size(), 0, "after the release the hand moves nothing")
 
 
-func test_trigger_aims_on_release() -> void:
+func test_trigger_release_never_aims() -> void:
+	# WO-841: the floor aim of WO-774's release moved to the right grip (test_xr_grip_wo841.gd).
 	var w: Node3D = XrWalk.new()
 	var g := GDScript.new()
 	g.source_code = "extends RefCounted\nvar sel = null\nvar aims: Array = []\nfunc aim(p: Array) -> void: aims.append(p)\n"
 	g.reload()
 	var drag: RefCounted = g.new()
 	drag.sel = Sel.new()
+	drag.sel.set_ids(["a"])
 	var tab := Control.new()
 	var tg := GDScript.new()
 	tg.source_code = "extends Control\nvar fixtures3d = null\nvar aim_drag = null\n"
@@ -157,13 +159,11 @@ func test_trigger_aims_on_release() -> void:
 	tab.set_script(tg)
 	tab.aim_drag = drag
 	w.tab = tab
-	w._press = {"from": Vector3.ZERO, "dir": Vector3(0, -1, -1), "add": false, "aim": [1.0, 2.0, 0.0], "box": false}
+	w._press = {"from": Vector3.ZERO, "dir": Vector3(0, -1, -1), "add": false, "box": false}
 	w.trigger(false, false)
-	t.eq(drag.aims, [[1.0, 2.0, 0.0]], "a press on the floor without a drag aims on its release (the press ray's spot)")
+	t.eq(drag.aims, [], "a press on the floor without a drag, released, with a selection: no aim")
 	t.eq(w._press, {}, "and is done")
-	w._press = {"from": Vector3.ZERO, "dir": Vector3(0, -1, -1), "add": false, "aim": null, "box": false}
-	w.trigger(false, false)
-	t.eq(drag.aims.size(), 1, "no selection (nothing to aim): the release does nothing")
+	t.eq(drag.sel.ids, ["a"], "the selection is untouched")
 	tab.free()
 	w.free()
 
@@ -171,7 +171,7 @@ func test_trigger_aims_on_release() -> void:
 func test_hooks() -> void:
 	var src := FileAccess.get_file_as_string("res://features/previs/xr/xr_walk.gd")
 	t.ok(src.contains("return _left != null and _left.is_button_pressed(&\"grip_click\")"), "the add modifier is the left grip")
-	t.ok(src.contains("\t\telif b == \"grip_click\":\n\t\t\t_fan_p0 = _right.position"), "the right grip starts a fan")
+	t.ok(src.contains("\t\telif b == \"grip_click\":\n\t\t\tgrip(true, _add_held())"), "WO-841: the right grip goes to grip() (point, or fan with the left)")
 	t.ok(src.contains("rig.hit(_pointer, centre, only), rig.near(_pointer, centre, NEAR_PX, only)"),
 		"a trigger on a head honours the type filter")
 	t.ok(src.contains("tab.aim_drag.sel.pick(r.id, r.add)\n\t\treturn"), "a head is still picked at once on the press")

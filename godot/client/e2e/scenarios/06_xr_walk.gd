@@ -3,7 +3,8 @@ extends "res://e2e/e2e_scenario.gd"
 ## one the previs renders and picks through, W walks, a left-drag looks, and a right-press on the floor with heads
 ## selected aims them (the request the Programmer's Point at sends), through the walk camera. WO-757: the Programmer panel
 ## the headset wears on the left wrist, held in front of the walk camera here, works by ray: a trigger on Groups opens
-## its menu inside the panel, Store under it answers.
+## its menu inside the panel, Store under it answers. WO-841: the right grip points the selection at the ray's floor
+## spot; a trigger released on the floor aims nothing.
 ## Runs only with `node tools/e2e/run-gui-e2e.js --xr` (else one step says it was not run).
 
 const F := preload("res://features/previs/fixtures/fixtures_3d_model.gd")
@@ -96,6 +97,33 @@ func run() -> void:
 		print("[e2e] aim ", JSON.stringify(sent[0]), " camera ", cam.position)
 		return expect(sent[0].ids == ["e2e-head"] and at != null and Vector2(t[0], t[1]).distance_to(Vector2(at.x, -at.z)) < 0.05,
 			"sent %s, expected the floor at %s" % [JSON.stringify(sent[0]), at])
+	)
+	await step("WO-841: the grip points the selection at the ray's floor spot, a trigger release aims nothing", func() -> String:
+		var walk: Node3D = page.stage.walk
+		var sent: Array = []
+		var keep: Callable = page.aim_drag.post
+		page.aim_drag.post = func(b: Dictionary) -> Dictionary:
+			sent.append(b)
+			return {"ok": true}
+		Sel.shared().set_ids(["e2e-head"])
+		var from: Vector3 = page.stage.camera().global_position
+		var dir := (Vector3(1.0, 0.0, -4.0) - from).normalized()  # the controller's ray: the floor at x 1, 4 m upstage
+		walk._press = {"from": from, "dir": dir, "add": false, "box": false}
+		walk.trigger(false, false)  # a trigger released on the floor with a selection
+		await ui.frames(2)
+		var after_trigger := sent.size()
+		walk.grip(true, false)
+		walk._grip_aim(from, dir, 0.0, false)
+		await ui.frames(2)
+		walk.grip(false, false)
+		await ui.frames(2)
+		page.aim_drag.post = keep
+		Sel.shared().set_ids([])
+		if sent.size() != 1:
+			return "trigger sent %d, grip sent %d" % [after_trigger, sent.size() - after_trigger]
+		var t: Array = sent[0].target
+		return expect(after_trigger == 0 and sent[0].ids == ["e2e-head"] and Vector2(t[0], t[1]).distance_to(Vector2(1.0, 4.0)) < 0.01,
+			"sent %s" % JSON.stringify(sent[0]))
 	)
 	await step("The Programmer panel works by ray", func() -> String:
 		var walk: Node3D = page.stage.walk

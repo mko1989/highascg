@@ -2,9 +2,12 @@ extends Node3D
 ## WO-741 (future development, detachable) — walk into the Previs tab's stage (MVR scene, heads and beams, LED screens)
 ## at 1:1 and program lights from inside it. Only with the client flag `-- --xr` (previs_stage.gd, one marked hook).
 ##  - Headset: Godot started with `--xr-mode on` and an OpenXR runtime running → XROrigin3D + XRCamera3D + two
-##    controllers. Right trigger on a head selects it (the left grip held adds); on the floor its release aims the
-##    selection there; held and dragged it draws a box that selects the heads inside (WO-774). The right grip held fans
-##    the selection's pan / tilt as the controller moves (xr_fan.gd, WO-774). Left stick walks, right stick snap-turns.
+##    controllers. WO-841: the right trigger (index finger) only SELECTS — on a head it picks it (the left grip held
+##    adds), held off the heads and dragged it draws a box that selects the heads inside (WO-774); a release on the
+##    floor aims nothing. The right grip (middle finger, "the second trigger") POINTS: held, the selected heads aim
+##    where the controller's ray meets the floor and follow it while it moves (throttled, Walk.aim_due), let go ends
+##    it; with nothing selected, or the ray on the wrist panel, it does nothing. Left grip + right grip is the pan /
+##    tilt fan (xr_fan.gd, WO-774) as the controller moves. Left stick walks, right stick snap-turns.
 ##    The full Programmer rides the left wrist (xr_panel.gd, WO-757): pointing at it, the trigger clicks there instead;
 ##    Y shows / hides it, the right stick up / down scrolls it; its type filter limits what the controller picks.
 ##  - No headset: a first-person camera at eye height. WASD walk (shift x3), left-drag look, wheel steps. The previs's
@@ -36,10 +39,12 @@ var _yaw := 0.0
 var _pitch := 0.0
 var _looking := false
 var _snap_armed := true
-var _press := {}  # WO-774: a trigger press in the stage off the heads {from, dir, add, aim (PSN or null), box}
+var _press := {}  # WO-774: a trigger press in the stage off the heads {from, dir, add, box}
 var _box: MeshInstance3D  # the box being dragged
 var _fan: RefCounted  # WO-774: the right grip's fan (xr_fan.gd)
 var _fan_p0 := Vector3.ZERO  # the right controller (room metres) when the grip went down
+var _grip := "none"  # WO-841: what the right grip does until it is let go: "point" / "fan" / "none" (Walk.grip_mode)
+var _aim_st := {}  # WO-841: the last aim a held grip sent {psn, t} (Walk.aim_due)
 
 
 ## The walk for `stage` when it sits in the Previs tab (the one with heads to program), else null (the Live tab's
@@ -96,13 +101,12 @@ func _start_xr() -> bool:
 		if b == "trigger_click":
 			trigger(true, _add_held())
 		elif b == "grip_click":
-			_fan_p0 = _right.position  # room metres: walking with the stick meanwhile does not fan
-			_fan.start())
+			grip(true, _add_held()))
 	_right.button_released.connect(func(b: String) -> void:
 		if b == "trigger_click":
 			trigger(false, _add_held())
 		elif b == "grip_click":
-			_fan.end())
+			grip(false, false))
 	panel = load("res://features/previs/xr/xr_panel.gd").new()  # loaded here: it needs the app's autoloads (Api, Store)
 	panel.position = PANEL_UP
 	panel.rotation.x = deg_to_rad(PANEL_TILT)
@@ -247,8 +251,10 @@ func _xr_move(dt: float) -> void:
 		_mirror.global_transform = _cam.global_transform
 	_point(dt)
 	_drag()
-	if _fan.active:
+	if _grip == "fan" and _fan.active:
 		_fan.move(Walk.fan_move(_fan_p0, _right.position, _cam.basis))
+	elif _grip == "point":
+		_grip_aim(_right.global_position, -_right.global_basis.z, Time.get_ticks_msec() / 1000.0, panel != null and panel.pointed())
 	var stick := _left.get_vector2(&"primary")
 	if stick.length() > 0.15:
 		var head_yaw := _cam.global_basis.get_euler().y
@@ -274,8 +280,8 @@ func _point(dt: float) -> void:
 
 
 ## Trigger down / up (`add` = the left grip held): on the panel it clicks (and drags) there. In the stage a press on a
-## head picks it at once; elsewhere the press waits for its release — dragged, a box select; not, the floor aim it
-## always was (WO-774: the aim moved from the press to the release so a drag can be a box instead).
+## head picks it at once; elsewhere the press waits for its release — dragged, a box select; not dragged, nothing
+## (WO-841: the floor aim of WO-774 moved to the right grip — the trigger only selects).
 func trigger(pressed: bool, add: bool) -> void:
 	var on_panel: bool = panel != null and panel.pointed()
 	if panel != null and (on_panel or not pressed):
@@ -292,12 +298,11 @@ func _trigger(add: bool) -> void:
 	var only := _only_type()
 	var from := _right.global_position
 	var dir := -_right.global_basis.z
-	var r := Walk.trigger(rig.hit(_pointer, centre, only), rig.near(_pointer, centre, NEAR_PX, only),
-		not tab.aim_drag.sel.ids.is_empty(), from, dir, add)
+	var r := Walk.trigger(rig.hit(_pointer, centre, only), rig.near(_pointer, centre, NEAR_PX, only), add)
 	if r.do == "pick":
 		tab.aim_drag.sel.pick(r.id, r.add)
 		return
-	_press = {"from": from, "dir": dir, "add": add, "aim": r.get("psn"), "box": false}
+	_press = {"from": from, "dir": dir, "add": add, "box": false}
 
 
 ## WO-774: a stage press dragged past Walk.BOX_MIN_DEG becomes a box, drawn while the trigger is held.
@@ -322,8 +327,35 @@ func _release(add: bool) -> void:
 	if p.box:
 		var ids := Walk.box_pick(p.from, p.dir, -_right.global_basis.z, tab.fixtures3d.heads(), _only_type())
 		sel.set_ids(Walk.box_select(sel.ids, ids, add or p.add))
-	elif p.aim != null:
-		tab.aim_drag.aim(p.aim)
+
+
+## WO-841: the right grip down (`left_held` = the left grip already held) / up. Left + right = the WO-774 fan; the
+## right alone points the selection at the ray's floor spot every frame until it is let go (`_grip_aim`).
+func grip(pressed: bool, left_held: bool) -> void:
+	if pressed:
+		_grip = Walk.grip_mode(left_held, not tab.aim_drag.sel.ids.is_empty(), panel != null and panel.pointed())
+		_aim_st = {}
+		if _grip == "fan":
+			_fan_p0 = _right.position if _right != null else Vector3.ZERO  # room metres: walking with the stick meanwhile does not fan
+			_fan.start()
+		elif _grip == "point":
+			tab.aim_drag.hold = true  # one `aimed` at the release, not a slider rebuild per batch
+		return
+	if _grip == "fan":
+		_fan.end()
+	elif _grip == "point":
+		tab.aim_drag.end_hold()
+	_grip = "none"
+
+
+## One frame of a pointing grip: the selection aims at the ray's floor spot, thinned by Walk.aim_due; nothing while the
+## ray is on the panel, in the sky, or the selection went empty.
+func _grip_aim(from: Vector3, dir: Vector3, now: float, on_panel: bool) -> void:
+	if on_panel or tab.aim_drag.sel.ids.is_empty():
+		return
+	var psn: Variant = Walk.point_psn(from, dir)
+	if psn != null and Walk.aim_due(_aim_st, psn, now):
+		tab.aim_drag.aim(psn)
 
 
 ## WO-774: the panel's type filter ("" = all types).
@@ -331,7 +363,7 @@ func _only_type() -> String:
 	return str(panel.type_filter()) if panel != null and panel.has_method("type_filter") else ""
 
 
-## WO-774: the add modifier is the left grip (the right grip fans).
+## WO-774: the add modifier is the left grip (WO-841: the right grip points; both together fan).
 func _add_held() -> bool:
 	return _left != null and _left.is_button_pressed(&"grip_click")
 

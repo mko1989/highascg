@@ -3,7 +3,7 @@ extends Node3D
 ## All / None, Release, Delete, groups, intensity, colour, wheels, CTO, pan / tilt, Point at, zoom, gobos) and under it
 ## Store / Recall to a look (xr_looks_row.gd), drawn into a SubViewport on a quad and worked with the right controller's
 ## ray (xr_walk.gd): pointing moves the mouse, the trigger clicks (held: drags a slider), the left grip held = ctrl
-## (adds in the list; WO-774: it was the right grip, which now fans), the right stick scrolls. Its popups (colour picker,
+## (adds in the list; WO-774: it was the right grip; WO-841: the right grip points the heads, both fan), the right stick scrolls. Its popups (colour picker,
 ## Groups menu, dialogs) are embedded, so they draw on the quad too. One shared selection (fixture_selection.gd):
 ## picking a head in the stage selects it here. WO-774: above it the type filter (xr_type_row.gd).
 

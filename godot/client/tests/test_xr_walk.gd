@@ -37,13 +37,12 @@ func test_look_and_snap() -> void:
 
 func test_trigger() -> void:
 	var down := Vector3(0, -1, -1).normalized()
-	t.eq(Walk.trigger("h1", "h2", false, Vector3(0, 2, 0), down), {"do": "pick", "id": "h1", "add": false}, "the head hit wins")
-	t.eq(Walk.trigger("", "h2", true, Vector3(0, 2, 0), down, true), {"do": "pick", "id": "h2", "add": true}, "near head, grip adds")
-	var aim := Walk.trigger("", "", true, Vector3(1, 2, 0), down)
-	t.eq(aim.do, "aim", "floor with a selection aims")
-	t.ok(absf(aim.psn[0] - 1.0) < 1e-5 and absf(aim.psn[1] - 2.0) < 1e-5 and aim.psn[2] == 0.0, "PSN = [x, -z, 0]: 2 m upstage")
-	t.eq(Walk.trigger("", "", false, Vector3(0, 2, 0), down), {"do": "none"}, "no selection: nothing")
-	t.eq(Walk.trigger("", "", true, Vector3(0, 2, 0), Vector3(0, 1, 0)), {"do": "none"}, "pointing at the sky: nothing")
+	t.eq(Walk.trigger("h1", "h2"), {"do": "pick", "id": "h1", "add": false}, "the head hit wins")
+	t.eq(Walk.trigger("", "h2", true), {"do": "pick", "id": "h2", "add": true}, "near head, grip adds")
+	t.eq(Walk.trigger("", ""), {"do": "press"}, "WO-841: off the heads the trigger only waits for a drag — it never aims")
+	var psn: Variant = Walk.point_psn(Vector3(1, 2, 0), down)
+	t.ok(psn is Array and absf(psn[0] - 1.0) < 1e-5 and absf(psn[1] - 2.0) < 1e-5 and psn[2] == 0.0, "PSN = [x, -z, 0]: 2 m upstage")
+	t.eq(Walk.point_psn(Vector3(0, 2, 0), Vector3(0, 1, 0)), null, "pointing at the sky: no spot")
 
 
 func test_walk_node_desktop() -> void:

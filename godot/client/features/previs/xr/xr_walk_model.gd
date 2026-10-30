@@ -1,6 +1,6 @@
 extends RefCounted
 ## WO-741 (future development, detachable) — the pure part of walking the previs: first-person moves at 1:1 (the MVR's
-## metres are real metres), mouse / stick look, snap turn, and what a controller trigger does. Godot frame: y up, the
+## metres are real metres), mouse / stick look, snap turn, and what a controller trigger / grip does. Godot frame: y up, the
 ## camera looks down -Z at yaw 0; PSN = [x, -z, 0] (fixtures_3d.gd, aim_drag.gd).
 
 const F := preload("res://features/previs/fixtures/fixtures_3d_model.gd")
@@ -43,16 +43,48 @@ static func snap(yaw: float, x: float, armed: bool) -> Array:
 
 
 ## A trigger along a ray. `hit_id` = the head the ray goes through (else `near_id`, the head centred nearest it);
-## a head → {do: "pick", id, add} (the left grip held adds, as ctrl-click — WO-774); no head with a selection → the floor under the ray
-## → {do: "aim", psn} (the server's follow IK, as Point at / a right-drag); else {do: "none"}.
-static func trigger(hit_id: String, near_id: String, has_sel: bool, from: Vector3, dir: Vector3, add := false) -> Dictionary:
+## a head → {do: "pick", id, add} (the left grip held adds, as ctrl-click — WO-774); else {do: "press"}: a press in the
+## stage off the heads that waits for its release (a drag = a box select). WO-841: the trigger only selects — it never
+## aims any more; the right grip points (grip_mode / aim_due below).
+static func trigger(hit_id: String, near_id: String, add := false) -> Dictionary:
 	var id := hit_id if hit_id != "" else near_id
 	if id != "":
 		return {"do": "pick", "id": id, "add": add}
-	if not has_sel:
-		return {"do": "none"}
+	return {"do": "press"}
+
+
+## WO-841 — owner 30.10: "make the pointing of selected heads in the vr world with the second trigger [the grip] ...
+## the first trigger should be only selecting." The right grip going down: with the left grip already held it is the
+## WO-774 fan ("fan"); else it points the selection ("point") — not while the ray is on the wrist panel and not with
+## nothing selected ("none"). The mode is decided at the press and kept until the right grip is let go.
+static func grip_mode(left_held: bool, has_sel: bool, on_panel: bool) -> String:
+	if left_held:
+		return "fan"
+	return "point" if has_sel and not on_panel else "none"
+
+
+## The floor spot under a ray as the server's PSN [x, -z, 0] (what the trigger's aim used to send), null in the sky.
+static func point_psn(from: Vector3, dir: Vector3) -> Variant:
 	var at: Variant = F.floor_hit(from, dir)
-	return {"do": "aim", "psn": [at.x, -at.z, 0.0]} if at != null else {"do": "none"}
+	return [at.x, -at.z, 0.0] if at != null else null
+
+
+## The held grip follows the ray, but the API is not flooded (aim_drag.gd sends one request at a time, newest wins;
+## this thins what is offered to it): at most one aim per AIM_MIN_S and only once the spot has moved AIM_MIN_M (metres
+## on the floor) from the last one sent. `st` keeps the last sent ({} = the grip just went down: send at once).
+const AIM_MIN_S := 1.0 / 15.0
+const AIM_MIN_M := 0.05
+
+
+## Whether `psn` goes out at time `now` (seconds); records it in `st` when so.
+static func aim_due(st: Dictionary, psn: Array, now: float) -> bool:
+	if st.has("psn"):
+		var last: Array = st.psn
+		if now - float(st.t) < AIM_MIN_S or Vector2(psn[0], psn[1]).distance_to(Vector2(last[0], last[1])) < AIM_MIN_M:
+			return false
+	st.psn = psn
+	st.t = now
+	return true
 
 
 ## WO-757: the Programmer panel (xr_panel.gd) — its quad in metres and its pixels (2 per mm, the same aspect).
@@ -220,8 +252,8 @@ static func of_type(patch: Array, type_id: String) -> Array:
 		func(f: Dictionary) -> String: return str(f.id))
 
 
-## WO-774 — owner 25.10: "the second one should change their fan." The right grip held, the controller moved: pan
-## fans by the sideways move, tilt by the up / down move. A fan spreads a value across the selection in its order:
+## WO-774 — owner 25.10: "the second one should change their fan." The right grip held (WO-841: with the left grip
+## already held; alone the right grip points), the controller moved: pan fans by the sideways move, tilt by the up / down move. A fan spreads a value across the selection in its order:
 ## the first fixture moves -spread, the last +spread, the middle stays (fan_k), each from its own value and clamped
 ## to its range. FAN_DEAD_M of hand jitter does nothing; then FAN_DEG_PER_M degrees per metre (tune in the headset).
 const FAN_DEG_PER_M := 150.0

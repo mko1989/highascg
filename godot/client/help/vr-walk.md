@@ -75,10 +75,11 @@ in the Quest. That window has its own settings, so the kiosk is not touched. Clo
 
 | Control | What it does |
 |---|---|
+| Right trigger | Selection only — it never aims |
 | Right trigger on a head | Select it (left grip held: add to the selection) |
-| Right trigger on the floor, let go | Aim the selected heads at that spot |
+| Right grip held | The selected heads point where the ray meets the floor and follow it; let go to stop. Nothing with no selection or while pointing at the Programmer |
 | Right trigger held off the heads, drag | Draw a box: on release it selects the heads inside (left grip held: adds) |
-| Right grip held, move the controller | Fan the selection: sideways spreads pan, up / down spreads tilt |
+| Left grip + right grip held, move the controller | Fan the selection: sideways spreads pan, up / down spreads tilt |
 | Left stick | Walk (push fully to go 3x faster) |
 | Right stick left / right | Turn 30° |
 | Left wrist | The Programmer: point at it with the right controller |
@@ -96,7 +97,7 @@ on a head then take only heads of that type, and **Select** selects all of them.
 
 **Fan** spreads the selected heads apart in the order they were selected (a box selects left to right as you see
 it): the first and the last move the opposite ways, the middle one stays. It starts from where the heads point now,
-so aim them at a spot first, then fan them out from it. Let go of the grip and they stay.
+so point them at a spot first (right grip), then hold the left grip and the right grip to fan them out from it. Let go and they stay.
 
 Walking around in your room moves you on the stage too: 1 m in the room is 1 m on the stage.
 
