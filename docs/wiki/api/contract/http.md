@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-533 routes.
+537 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -32,9 +32,13 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/audio/mixer` | registry | `src/api/router.js` |
 | POST | `/api/audio/monitor-source` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
 | POST | `/api/audio/mute` | registry | `src/api/router.js` |
+| POST | `/api/audio/parts-capture` | registry | `src/api/router.js` |
+| GET | `/api/audio/parts-sensitivity` | registry | `src/api/router.js` |
+| POST | `/api/audio/parts-sensitivity` | registry | `src/api/router.js` |
 | GET | `/api/audio/portaudio-devices` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
 | POST | `/api/audio/route` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
 | POST | `/api/audio/solo` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
+| POST | `/api/audio/test-music` | registry | `src/api/router.js` |
 | POST | `/api/audio/volume` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
 | * | `/api/auth/login` | handler | `src/server/auth.js` |
 | POST | `/api/auth/login` | registry | `src/api/router.js`, `src/api/routes-auth.js` |

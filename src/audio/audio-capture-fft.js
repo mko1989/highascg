@@ -147,9 +147,9 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 	/** WO-866: a recording of the samples the detectors see (`record()`), for tuning against a reference offline. */
 	let rec = null
 	function pushSamples(f32) {
-		if (rec) rec.take(f32)
 		beat.push(f32)
 		parts.push(f32)
+		if (rec) rec.take(f32)
 		const n = f32.length
 		if (n >= ring.length) {
 			ring.set(f32.subarray(n - ring.length))
