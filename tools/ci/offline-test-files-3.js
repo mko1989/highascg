@@ -203,6 +203,7 @@ module.exports = [
 	'tools/smoke/smoke-wo845-media.test.js',
 	'tools/smoke/smoke-wo845-pointer-barrier-constants.test.js',
 	'tools/smoke/smoke-wo846-work-order-index.test.js',
+	'tools/smoke/release-gui-suite.test.js',
 	'tools/smoke/test-agent-pure.test.js',
 	'tools/smoke/smoke-wo837-web-light-flag.test.js',
 	'tools/smoke/smoke-wo845b-followups.test.js',

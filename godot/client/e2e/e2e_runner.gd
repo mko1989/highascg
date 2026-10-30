@@ -44,13 +44,16 @@ func _run() -> void:
 		for n in scenario_names(str(Config.args.get("e2e", "all"))):
 			var path := "%s/%s.gd" % [DIR, n]
 			var script: GDScript = load(path) if ResourceLoader.exists(path) else null
-			if script == null:
-				all_results.append({"scenario": n, "step": "load", "ok": false, "skipped": false, "why": "no " + path, "ms": 0, "shot": ""})
+			if script == null or not script.can_instantiate():  # WO-836: a parse error used to crash the run here and hang it
+				all_results.append({"scenario": n, "step": "load", "ok": false, "skipped": false, "why": ("no " + path) if script == null else path + " does not compile (see godot.log)", "ms": 0, "shot": ""})
 				continue
 			var sc: RefCounted = script.new()
 			sc.ui = ui
 			sc.name = n
 			print("[e2e] ── %s" % n)
+			var left_open: Array = await ui.reset_screen()  # WO-836: a window the previous scenario left open swallows the pointer
+			if not left_open.is_empty():
+				print("[e2e] closed window(s) left open by the previous scenario: %s" % [left_open])
 			await sc.run()
 			all_results.append_array(sc.results)
 	var failed := all_results.filter(func(r: Dictionary) -> bool: return not r.ok and not r.skipped).size()

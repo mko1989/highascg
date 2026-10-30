@@ -1,7 +1,7 @@
 # WO-836 — Test categories: offline / live-box, and a GUI release suite with screenshot + PRINT checks
 
 **Area:** testing-ci
-**Status: IN PROGRESS (30.10) — parts 1 and 2 done and verified (offline 4485/4486, see §3); part 3 (GUI release suite) open**
+**Status: IN PROGRESS (30.10) — parts 1, 2 and 3 done and verified: offline 4485/4486 (§3), scripted GUI release suite `npm run test:release-gui` 73/73 green twice in a row (§3d); the agent-run live cards (§3c) await their first watched live run**
 **Source:** REPORT §7a/7b; owner 30.10: *"id like to have a full suite of tests that i could run before each relese and/or
 pull request that would run a routine test of all/most of the features by literally clicking in gui and verifing by
 screenshots/ casparcg channel prints. so the tests that do actual stuff on the box are needed. but they should be in their
@@ -190,3 +190,79 @@ Play when the timeline is `endHeld` (or `seek` should keep `endHeld` when the ta
   and SMPTE still scaled to 1920x1080 (luma ≈ 123–129, nonblack 1.0) and need a first live calibration run.
 - Layout note seen on the sandbox: with the Timeline tab open the right-hand Inspector was cut off at the window edge in one run
   (others agent's WIP area, not investigated).
+
+## 3d. Part 3 scripted release suite: `npm run test:release-gui` (30.10, agent wo836e)
+
+Owner ask: *"a GUI release suite with screenshot + PRINT checks"*, run before a release / PR, one report. §3c's cards are the
+human-like live run; this is the cheap repeatable one: no agent, no live box.
+
+### What was built
+- **`tools/e2e/run-release-gui.js`** (`npm run test:release-gui`; also the `gui` group of `npm run test:release`): two phases, each a
+  `run-gui-e2e.js` run with its own sandbox server, then one report. `sim` = every scenario in `godot/client/e2e/scenarios` except
+  06 (XR, needs `--xr`), 12 (air) and 99 (agent driver) against the simulated Caspar; `air` = scenario 12 against a throwaway real
+  Caspar. `--only=` / `--skip=` (`sim,air`), `--e2e=` narrows `sim`, `--out=DIR` (default `$TMPDIR/highascg-release-gui/<stamp>`).
+  Exit 0 = green, 1 = any failed step or a phase without results (a crashed client is a FAIL row, never a pass).
+- **`tools/e2e/release-report.js`**: `<out>/report.md` (phase table, per scenario/step table with the screenshot link, the kept
+  PRINT frames) + `<out>/results.json`.
+- **`tools/e2e/air-fixture.js`**: a THROWAWAY real CasparCG (`bin/casparcg`, `LD_LIBRARY_PATH=lib`): own `Xvfb`, own free AMCP port
+  (refuses 5250), 2 x 720p2500 (1 = PGM, 2 = PRV), no screen/audio consumers, media folder = the sandbox's, media-server pointed
+  at a dead port; killed by PID. `run-gui-e2e.js --air` starts it before the sandbox server and points the server at it
+  (`offline_mode:false`, `caspar:{host,port}`, a seeded 720p PGM/PRV destination) — additive flag, env `HIGHASCG_E2E_AIR`. The live
+  Caspar on :5250 is never contacted (PRINT goes through the sandbox node's `/api/amcp/raw` to the throwaway's port).
+- **`godot/client/e2e/e2e_probe.gd`** (pixel probes) + **`scenarios/12_air_print.gd`** (10 steps; "Not run" without `--air`):
+  1. probe self-test on synthetic frames: picture vs black on luma/nonblack/alpha, flat grey rejected, a bars-scaled-to-fit picture
+     rejected (geometry is part of the probe), a crop past the frame REFUSED not clamped (the ffmpeg X+W>3840 lesson);
+  2. channel map has PGM 1 / PRV 2 and `INFO` answers `720p2500` (the node really talks to the throwaway);
+  3. PGM and PRV PRINT black before anything is taken (RGBA: alpha 0 on a black channel, 255 on a picture — both reported);
+  4. clicks/drags as an operator: drag `e2e_bars` onto +, drop `e2e_still` into the editor, Close;
+  5. **screenshot probe**: the look card's thumbnail region of the client's own viewport image has a colour share >= 0.30, the empty
+     "+" tile < 0.02 (separates good from bad in the same frame);
+  6. click the card: PRV prints the still's bars (5 colour probe points at known x: yellow, cyan, green, magenta, red — `contentFit
+     native` of a 1920x1080 still on a 1280x720 channel shows the middle 1280 px, the grey/blue bars are cropped; the probe pins
+     that geometry), PGM stays black;
+  7. double-click (TAKE): PGM prints the same bars, alpha opaque;
+  8. FTB: PGM and PRV print black again.
+  PRINT is polled (a print every >= 1.1 s because Caspar names the file by the second; the throwaway renders in software GL, a clip's
+  first picture arrives ~3 s after PLAY, the still ~5-9 s) until the probe holds or 45-60 s; the accepted print is kept as
+  `shots/print_<label>_ch<N>_<n>.png` and its numbers are logged.
+- **Flake / harness fixes** (the baseline full run was 47/50 with 11 skipped):
+  - `07_pixel_map` "Pick channel 1": the window fills its channel list after two API round trips; the scenario picked from an empty
+    list in ~1 run in 2. Waits for `item_count > 0` (11 already did).
+  - `tools/e2e/pixel-map-fixture.js`: the fixture project's name now slugs to its own slug (`e2e pixel map`); a save re-slugs a
+    project from its name and renamed the file away, so `11_wo843_sweep` could not load `e2e_pixel_map` after 07 ran (full run only).
+  - `10_cable_pull` "Dragging the body swings it": judged one instant 0.3 s after the drag; the rope is a per-frame physics sim and
+    lagged on a loaded box (12 px miss). Polls up to 4 s for the rope to reach the pointer; assertion unchanged.
+  - `e2e_ui.gd reset_screen()` + `e2e_runner.gd`: windows a scenario leaves open (11 leaves the **PixelMap** window over the
+    Inspector) are closed before the next scenario starts; with it open the root viewport's hovered control is null over its area and
+    `13_wo866_visuals_audio` step 2 failed deterministically in a full run ("covered by <null>"), green alone. (Two earlier guesses —
+    a stale-hover retry in `_hover`/`press_drag` — were reverted, not the cause.)
+  - `e2e_runner.gd`: a scenario that does not compile is a failed `load` step instead of a crash on `script.new()` that hung the run.
+  - `run-gui-e2e.js` exit code clamped to 1 above 255 (8-bit wrap, see part 1 note).
+
+### Verified
+- `node tools/e2e/run-release-gui.js` twice in a row: **sim 63/63 + air 10/10 = 73/73, 0 failed, 0 skipped, exit 0** (133 s + 19 s, 131 s + 19 s).
+  Reports: `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo836/release4/report.md` and `release5/report.md`;
+  PRINT frames + step screenshots: `.../wo836/release5/air/shots/` (`print_prv_staged_ch2_1.png`, `print_pgm_taken_ch1_2.png`, ...); copy in `.../wo836/evidence_air_shots/`.
+  Before the fixes the same command was 71/72 + 1 skipped (13 failing) and the plain e2e run 47 passed / 3 failed.
+- Probe calibration: the throwaway Caspar's PRINT of black = alpha plane all zero, luma 0; with the still on air = luma 98, nonblack 0.87,
+  alpha 255 100 %. The PNG was opened and the bars looked at (first run: the probe wrongly expected 7 SMPTE bars — the still is `native`-fit
+  and cropped, found by viewing the print, probe corrected to the 5 visible bars).
+- Negative control (`--client=<scratch copy>` with the FTB click removed): the FTB step FAILS with "pgm_after_ftb ... not black (luma 98,
+  nonblack 0.87 ...)" after 10 prints; the earlier 9 steps pass.
+- `tools/smoke/release-gui-suite.test.js` 5/5 (combined report, no-results = FAIL row, air config vs mode, unknown phase exit 2); in
+  `offline-test-files-3.js`. Godot headless suite `23697 passed, 0 failed` (includes new `tests/test_e2e_probe.gd`: self-test, stats, crop
+  refusal). eslint on `tools/e2e` clean, 500-line check 0 over, prettier (tools/ci) clean, unwired-exports / script-paths gates pass.
+
+### Not covered / left
+- `06_xr_walk` stays opt-in (`run-gui-e2e.js --xr --e2e=06_xr_walk`); it is not in the release run.
+- Only the Live look flow is verified on air (stage / TAKE / FTB). Timeline play, outputs, audio and live inputs are checked against the
+  simulated Caspar (server state, INFO), not by PRINT. More air scenarios can reuse `e2e_probe.gd` + `--air`; the LED test card is a CEF
+  template and the throwaway has no template folder.
+- No product bug found by this suite; the card-02 finding in §3c (Play after the end hold does not restart) still stands.
+- `INDEX.md` untouched (the status keyword is still IN PROGRESS).
+
+### Coordinator re-run (30.10, 17:00)
+
+`npm run -s test:release-gui -- --out=…/scratchpad/wo836/verify` → `[release-gui] 73/73 steps passed`: sim 63/63 (134 s), air
+10/10 (19 s), exit 0. Air PRINT: PRV luma 98 / nonblack 0.87 after the card click, PGM the same after TAKE, and both black after FTB.
+The run includes the new `13_wo866_visuals_audio`.

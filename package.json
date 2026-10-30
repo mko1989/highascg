@@ -28,6 +28,7 @@
 		"test:live": "node tools/test-live/run-live-tests.js",
 		"test:release": "node tools/ci/run-release-tests.js",
 		"test:e2e:gui": "node tools/e2e/run-gui-e2e.js",
+		"test:release-gui": "node tools/e2e/run-release-gui.js",
 		"ci:local": "bash scripts/ci/run-local-ci.sh",
 		"exfat-sync": "node tools/runtime/exfat-sync-cli.js",
 		"map:generate": "node tools/map/generate-map-data.js",

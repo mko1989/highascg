@@ -7,8 +7,8 @@
  *
  *   1. offline   npm run test:ci        — the curated hermetic suite (what CI runs)
  *   2. live      npm run test:live      — tests that act on the real box (HIGHASCG_LIVE_TESTS=1, tools/test-live/)
- *   3. gui       npm run test:e2e:gui   — the sandboxed Godot GUI e2e (WO-719); WO-836 part 3 extends it with the
- *                                         screenshot + Caspar PRINT release scenarios
+ *   3. gui       npm run test:release-gui — the sandboxed Godot GUI e2e (WO-719 scenarios) plus the screenshot +
+ *                                         Caspar PRINT scenario against a throwaway Caspar (WO-836 part 3)
  *
  *   node tools/ci/run-release-tests.js                   # all three
  *   node tools/ci/run-release-tests.js --skip=gui        # comma list of: offline, live, gui
@@ -22,7 +22,7 @@ const REPO_ROOT = path.resolve(__dirname, '../..')
 const GROUPS = [
 	{ id: 'offline', label: 'offline suite (test:ci)', script: 'tools/ci/run-offline-tests.js' },
 	{ id: 'live', label: 'live box (test:live)', script: 'tools/test-live/run-live-tests.js' },
-	{ id: 'gui', label: 'GUI e2e (test:e2e:gui)', script: 'tools/e2e/run-gui-e2e.js' },
+	{ id: 'gui', label: 'GUI release suite (test:release-gui)', script: 'tools/e2e/run-release-gui.js' },
 ]
 
 const arg = (k) => {
@@ -50,7 +50,6 @@ for (const g of GROUPS) {
 		stdio: 'inherit',
 		env: process.env,
 	})
-	// run-gui-e2e exits with the failed-step COUNT; an 8-bit exit wraps 256 failures to 0, but any non-zero is a failure here
 	results.push({
 		...g,
 		status: r.status === 0 ? 'pass' : 'FAIL',

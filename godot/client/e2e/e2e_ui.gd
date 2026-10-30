@@ -360,6 +360,22 @@ func _move(p: Vector2, mask: int) -> void:
 	vp().push_input(m, true)
 
 
+## WO-836: a scenario starts with a clean screen. A named window a previous scenario left open (11 leaves the Pixel map window
+## over the Inspector) swallows the pointer: the root viewport then answers `gui_get_hovered_control()` = null over its area and
+## every later click or drag fails as "covered by <null>". Dialogs and named windows are hidden; popups and the engine's own
+## "@Window" helpers (tooltips) are left alone. Then the pointer goes to the middle with no button held.
+func reset_screen() -> Array:
+	var closed := []
+	for w in tree.root.find_children("*", "Window", true, false):
+		var win := w as Window
+		if win.visible and win != tree.root and not (win is Popup) and (win is AcceptDialog or not str(win.name).begins_with("@")):
+			closed.append(str(win.name))
+			win.hide()
+	_move(Vector2(960, 540), 0)
+	await frames(2)
+	return closed
+
+
 func _button(p: Vector2, idx: int, pressed: bool, double: bool) -> void:
 	var e := InputEventMouseButton.new()
 	e.position = p

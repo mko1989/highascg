@@ -11,6 +11,7 @@
  *   node tools/e2e/run-gui-e2e.js --out=/path/report-dir --keep   # keep the sandbox root for inspection
  *   node tools/e2e/run-gui-e2e.js --e2e=06_xr_walk --xr            # WO-741: the client walks the previs (-- --xr)
  *   node tools/e2e/run-gui-e2e.js --e2e=07_pixel_map               # WO-807: + fixture engine, loopback patch, test picture
+ *   node tools/e2e/run-gui-e2e.js --air --e2e=12_air_print         # WO-836: + a THROWAWAY real Caspar (2 x 720p, own Xvfb/AMCP port): PRINT checks
  *
  * Output: <out>/results.json, <out>/report.md, <out>/shots/NN_<scenario>_<step>.png, <out>/sandbox/server.log,
  * <out>/godot.log. Exit code = failed steps (0 = all green).
@@ -22,6 +23,7 @@ const os = require('os')
 const path = require('path')
 const { startSandbox } = require('./sandbox-server')
 const { writeReport } = require('./e2e-report')
+const { startAir, airSandboxConfig } = require('./air-fixture')
 
 const REPO_ROOT = path.resolve(__dirname, '../..')
 const arg = (k, d) => {
@@ -53,8 +55,12 @@ async function main() {
 	// WO-801: 08_audio_monitor_pair needs a PRV screen — the same seeded PGM/PRV destination (it turns the headphone
 	// output on itself, after 07: audio preview on at boot left 07's channel list empty in 2 of 3 runs)
 	const monitorPair = scenarios.split(',').includes('08_audio_monitor_pair')
-	const config = pm || monitorPair ? require('./pixel-map-fixture').sandboxConfig(root) : undefined
-	const sb = await startSandbox({ root, tracking: pixelMap, config, log: (s) => console.log(`[e2e] ${s}`) })
+	const air = arg('air') ? await startAir({ root, mediaDir: path.join(root, 'media'), log: (s) => console.log(`[e2e] ${s}`) }) : null // WO-836
+	const config = air ? airSandboxConfig(root) : pm || monitorPair ? require('./pixel-map-fixture').sandboxConfig(root) : undefined
+	const sb = await startSandbox({ root, tracking: pixelMap, config, caspar: air ? { host: air.host, port: air.port } : undefined, log: (s) => console.log(`[e2e] ${s}`) }).catch(async (e) => {
+		await air?.stop()
+		throw e
+	})
 	const fixtures = pm ? pm.prepare(sb, (s) => console.log(`[e2e] ${s}`)) : null
 	let code
 	try {
@@ -68,7 +74,7 @@ async function main() {
 		const log = fs.openSync(path.join(out, 'godot.log'), 'w')
 		const child = spawn('xvfb-run', xvfb, {
 			// user:// (ui.cfg, connection profiles, cluster follow) lands in the run folder, never the operator client's
-			env: { ...process.env, XDG_DATA_HOME: userDir, XDG_CONFIG_HOME: userDir, HIGHASCG_SERVER: sb.url, HIGHASCG_E2E_SANDBOX: root },
+			env: { ...process.env, XDG_DATA_HOME: userDir, XDG_CONFIG_HOME: userDir, HIGHASCG_SERVER: sb.url, HIGHASCG_E2E_SANDBOX: root, ...(air ? { HIGHASCG_E2E_AIR: String(air.port) } : {}) },
 			stdio: ['ignore', 'pipe', 'pipe'],
 			detached: true, // own process group: a kill takes xvfb-run, Xvfb and Godot together (no orphaned Xvfb)
 		})
@@ -115,9 +121,10 @@ async function main() {
 	} finally {
 		fixtures?.stop()
 		await sb.stop()
+		await air?.stop()
 		if (!arg('keep')) fs.rmSync(path.join(out, 'sandbox', 'media'), { recursive: true, force: true })
 	}
-	process.exit(code)
+	process.exit(code > 255 ? 1 : code) // an 8-bit exit status wraps 256 failed steps to 0 (WO-836)
 }
 
 main().catch((e) => {

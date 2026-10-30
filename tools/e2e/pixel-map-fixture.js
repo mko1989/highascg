@@ -46,7 +46,7 @@ function writeProject(projectsDir) {
 	const patch = (fx.patch || []).map((f) => ({ ...f, dest: DEST }))
 	const project = {
 		version: src.version,
-		name: 'e2e pixel map (MHP patch, loopback)',
+		name: 'e2e pixel map', // slugs to SLUG: a save (autosave) re-slugs a project from its name and would rename the file away from SLUG, so 11 could not load it after 07
 		slug: SLUG,
 		savedAt: new Date().toISOString(),
 		fixtures: {

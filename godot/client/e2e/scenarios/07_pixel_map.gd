@@ -251,6 +251,8 @@ func run() -> void:
 	)
 	await step("Pick channel 1 (PGM): the picture shows", func() -> String:
 		var ob: OptionButton = _ctl("OptionButton", "The Caspar channel whose output the regions sample")
+		# the window fills its channel list after two API round trips (reload()): an immediate pick saw an empty list (~1 run in 2)
+		await ui.wait_for(func() -> bool: return ob != null and ob.item_count > 0, 10.0)
 		var why: String = await ui.choose(ob, "Channel 1 (Program 1) · 1920×1080")
 		if why != "":
 			return why

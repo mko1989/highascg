@@ -78,10 +78,18 @@ func run() -> void:
 		var a := _to_global(pts[pts.size() / 2])
 		var b := a + Vector2(-60, 140)
 		var why: String = await _pull(a, b, func() -> String:
-			var held: PackedVector2Array = layer.get("_ropes")[edge].points_owned()[0]
+			# the rope is a physics sim stepped per frame: on a loaded box (software GL, parallel suites) it needs more than
+			# the fixed 0.3 s to catch up — poll up to 4 s for the rope to reach the pointer instead of judging one instant
 			var near := INF
-			for p in held:
-				near = minf(near, _to_global(p).distance_to(b))
+			var until := Time.get_ticks_msec() + 4000
+			while true:
+				var held: PackedVector2Array = layer.get("_ropes")[edge].points_owned()[0]
+				near = INF
+				for p in held:
+					near = minf(near, _to_global(p).distance_to(b))
+				if near <= 12.0 or Time.get_ticks_msec() > until:
+					break
+				await ui.frames(2)
 			if near > 12.0:
 				return "the rope did not follow the pointer (nearest point %.0f px away)" % near
 			return expect(not tab.get("_gesture").armed(), "a body drag lifted a plug"))
