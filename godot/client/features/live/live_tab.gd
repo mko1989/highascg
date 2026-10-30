@@ -148,11 +148,6 @@ func _transition_toolbar() -> Control:
 	all.tooltip_text = "Set the default transition on every look (with 2+ mains: the active main's deck)"
 	all.pressed.connect(func() -> void: deck.apply_default_to_all())
 	bar.add_child(all)
-	var shl := Button.new()
-	shl.text = "Shader Live"
-	shl.tooltip_text = "Edit the shaders on air live — every value rides onto the running output (also: click the logo)"
-	shl.pressed.connect(func() -> void: toggle_shader_live(true))
-	bar.add_child(shl)
 	for k in ["looks"]:  # WO-781: show / hide the look cards in the card section (presets: the right column's tab)
 		var b := Button.new()
 		b.text = "Looks"
