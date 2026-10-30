@@ -1,7 +1,7 @@
 # WO-44: Audio Output Routing and Solo System
 
 **Area:** audio
-**Status: OPEN (unverified — no status line before WO-846)**
+**Status: DONE (verified 30.10 by code check: consumer type select portaudio|system-audio client/components/device-view-inspector-audio.js:54-56,79,97; `<system-audio>` vs `<portaudio>` config emit src/config/build-caspar-generator-config-audio.js:34-59 + src/config/config-generator-audio-routing.js:55-96; mixer SOLO button with Ctrl/Cmd multi-solo client/components/audio-mixer-panel-input-layers.js:105,150,154; POST /api/audio/solo src/api/routes-audio.js:313 with clear-to-default source src/config/audio-preview.js:28,55-62; listening/owner QA of the second output tracked in WO-406) — was: no status line**
 
 
 ## Objective

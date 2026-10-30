@@ -1,7 +1,7 @@
 # WO-849 — Work order: Fix A/B bank transitions by layer stacking order
 
 **Area:** engine
-**Status: OPEN (unverified — no status line before WO-846)**
+**Status: DONE (verified 30.10 by code check: incomingIsAboveOutgoing src/engine/scene-take-lbg-jobs.js:294, pre-hide only for top incoming :299, prePlayOpacityFullLine for bottom incoming :338; single-sided fade (incoming OR outgoing) src/engine/scene-take-lbg-amcp-pipeline.js:217; later extended by WO-828 D4 / WO-553 in the same code; the WO's own live AMCP-capture check was never logged) — was: no status line**
 
 
 ## Goal

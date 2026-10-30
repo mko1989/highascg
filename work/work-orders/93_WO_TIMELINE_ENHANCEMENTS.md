@@ -1,7 +1,7 @@
 # Work Order: Timeline Enhancements
 
 **Area:** web-client
-**Status: OPEN (unverified — no status line before WO-846)**
+**Status: DONE (verified 30.10 by code check: timeline labels — rename in editor client/components/timeline-transport.js:265 and Sources browser Timeline tab client/components/sources-panel-helpers.js:192 (+ layer rename client/components/timeline-editor-handlers.js:427); clip drag to another layer client/components/timeline-canvas-pointer.js:241 (onMoveClip with target layer); layer reorder drag client/components/timeline-canvas-pointer.js:107,214 -> client/components/timeline-editor-handlers.js:376 -> client/lib/timeline-state.js:158 reorderLayer, layerHeights follow) — was: no status line**
 
 
 ## Overview

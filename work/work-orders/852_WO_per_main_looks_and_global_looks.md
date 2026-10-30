@@ -1,7 +1,7 @@
 # WO-852 — Work order: Per-main look spaces, global looks, and main selector UI
 
 **Area:** engine, web-client
-**Status: OPEN (unverified — no status line before WO-846)**
+**Status: DONE (verified 30.10 by code check: Scene.mainScope + migration client/lib/scene-state-helpers.js:195,222-231 (legacy -> all); per-main filter client/lib/scene-state.js:252-256 getScenesForMain; setSceneMainScope/addScene scope :268-279; eye toggle persisted client/lib/scene-state.js toggleMainEditorVisible, UI client/components/scene-list.js:174; mainScope in scene_deck_sync client/lib/app-scene-deck.js:12 and server src/engine/project-scenes-transform.js:15,50; Godot godot/client/features/live/deck_model.gd:4,14) — was: no status line**
 
 
 ## 1. Current behavior (baseline — verify before implementation)

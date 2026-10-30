@@ -614,7 +614,7 @@ UI copy that says “optional” (e.g. custom Caspar fields, xrandr rate) is pro
 | 31 | Stage auto-follow (PTZ / moving heads) | Not started (depends on 17/19) |
 | 32 | CG overlay studio (detachable HTML template editor) | Not started |
 | 33 | **Device view** — program index [33_WO_DEVICE_VIEW_INDEX.md](../work-orders/33_WO_DEVICE_VIEW_INDEX.md); split: 33a–33g (data model, enumeration, UI, PH cabling, EDID, settings migration, QA) | Not started (draft WOs) |
-| 34 | **Switcher-style transition rebuild** — 3-channel per-screen model (`PGM bus`, `PRV bus`, `OUT`) with bus-level TAKE and clip start policies ([34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md](../work-orders/34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md)) | Draft |
+| 34 | **Switcher-style transition rebuild** — 3-channel per-screen model (`PGM bus`, `PRV bus`, `OUT`) with bus-level TAKE and clip start policies ([34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md](../work-orders/deprecated/34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md)) | Draft |
 | 35 | **GPU physical connector stability** — mapping and persistence [35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md](../work-orders/35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md) | In progress |
 | 36 | **PortAudio/DeckLink channel fix** — channel routing stability [36_WO_DEVICE_VIEW_PORTAUDIO_DECKLINK_CHANNEL_FIX.md](../work-orders/36_WO_DEVICE_VIEW_PORTAUDIO_DECKLINK_CHANNEL_FIX.md) | In progress |
 | 37 | **Simulation Mode Placeholders** — Preshow preparation with virtual sources, templates, and resolution generation ([37_WO_SIMULATION_PLACEHOLDERS.md](../work-orders/37_WO_SIMULATION_PLACEHOLDERS.md)) | Not started |

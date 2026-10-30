@@ -1,7 +1,7 @@
 # WO-851 — Work order: Look presets & layer presets (screen-management programming)
 
 **Area:** engine, godot-client
-**Status: OPEN (unverified — no status line before WO-846)**
+**Status: DONE (verified 30.10 by code check: Inspector | Layer presets | Look presets mode tabs client/index.html:101-102; layerPresets[] save/apply/remove client/lib/scene-state-preset-actions.js:15-44; lookPresets save from PRV/PGM/editing client/components/inspector-panel-presets-modes.js:172-192; project export/import client/lib/scene-state-persistence-logic.js:142-152,215-216 and server deck src/state/live-deck-state.js:22-36; recall to PRV/PGM with transition POST /api/scene/look-preset/recall src/api/routes-scene.js:36 + src/api/routes-scene-look-preset.js (WO-601/781/782); Godot godot/client/core/project_sync.gd:95-96 layerPresets/lookPresets + tests/test_look_presets.gd; design deviation: a preset holds per-screen items [{mainIdx, sceneId}] instead of targetMains[]) — was: no status line**
 
 
 ## Purpose

@@ -100,7 +100,7 @@
 
 | ID | File | Status | Last touch |
 |----|------|--------|------------|
-| 34 | [34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md](../work-orders/34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md) | Draft | 2026-04-25 |
+| 34 | [34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md](../work-orders/deprecated/34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md) | Draft | 2026-04-25 |
 
 ### WO-34 initial scope (2026-04-25)
 

@@ -1,7 +1,7 @@
 # WO-44 — Segmented glow & shadow borders (per-edge splits + ease toward cuts)
 
 **Area:** engine
-**Status:** OPEN — Draft work order (not implemented)  
+**Status: IN PROGRESS (verified 30.10 by code check: only the plumbing exists — defaults segmentMode/segmentsPerEdge/segmentEase in src/engine/pip-overlay-utils.js:161-163,195-197 and Art-Net DMX ch 15-17 mapping in src/artnet/artnet-dmx-border.js:136-150, src/artnet/artnet-slot-config.js:60-63; MISSING: the geometry itself — template/pip_glow.html still has only the legacy conic `segmentation` hack (:79,:143,:204), template/pip_shadow.html has no segment code, client/lib/pip-overlay-registry.js has no segment fields, no inspector UI) — was: OPEN — Draft work order (not implemented)**
 **Scope:** Caspar HTML templates `template/pip_glow.html`, `template/pip_shadow.html`; inspector schema `client/lib/pip-overlay-registry.js`; merged CG defaults `src/engine/pip-overlay-utils.js` (`PIP_OVERLAY_PARAM_DEFAULTS`); global border + PIP overlay AMCP/CG JSON paths (same templates).  
 **Related:** WO-09 / WO-25 (PIP overlays), WO-43 (global border dual-layer / PGM stack).  
 **Note:** `pip_glow.html` today contains an experimental `segmentation` numeric field driving a **repeating conic-gradient mask** on the single `#pip-frame` — **not** the geometry described below. This WO supersedes or refactors that approach after design sign-off.

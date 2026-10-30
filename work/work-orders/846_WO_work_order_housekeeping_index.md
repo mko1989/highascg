@@ -134,9 +134,10 @@ The goal is the fewest tokens to find the right WO, plus exact paths for precisi
 
 ## 6. Follow-ups
 
-- **8 WOs say OPEN only because they never had a status line:** 34, 44, 45, 93, 849, 850, 851, 852. Each needs a
-  code check (built or not). Several look built: look presets exist (WO-840), and A/B bank transitions are the current
-  take engine.
+- **8 WOs said OPEN only because they never had a status line — checked 30.10 by code:** DONE: 44 (audio routing and
+  solo), 45, 93, 849, 850, 851, 852; IN PROGRESS: 44 (glow/shadow segmented border: defaults and Art-Net only, no
+  template geometry or inspector); DEPRECATED: 34 (switcher bus retired at routing-map.js:203-205, successor WO-849;
+  still to be moved to deprecated/ with `wo-move`).
 - **Low-confidence agent rows** (area or status from the title and first lines only) are listed in the scratchpad
   rows. Wrong areas are cheap to fix: edit the `**Area:**` line and run `build-index`.
 - **Duplicate numbers 09/33/44/79/121 remain.** The index lists both of each pair.

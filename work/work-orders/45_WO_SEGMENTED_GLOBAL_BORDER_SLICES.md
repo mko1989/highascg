@@ -1,7 +1,7 @@
 # Work Order 45: Segmented Global Border (Multi-Slice Support)
 
 **Area:** engine, mapping
-**Status: OPEN (unverified — no status line before WO-846)**
+**Status: DONE (verified 30.10 by code check: slices sent to the CG template src/engine/global-border.js:28-32,56-69,169; template renders one SVG container per slice template/pip_edge_strip.html:127-133,166; inspector "+ Add Slice" / "Full Canvas" client/components/inspector-global-border-slices.js:30,40, wired client/components/inspector-global-border.js:43; Godot slices editor godot/client/features/live/global_border_panel.gd:266-282) — was: no status line**
 
 
 ## Objective

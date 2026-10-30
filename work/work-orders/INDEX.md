@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-771 live WOs (44 open, 119 in progress, 608 done) and 46 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+770 live WOs (35 open, 120 in progress, 615 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (158)
+## engine — Looks, takes, timeline, playback (157)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -14,10 +14,9 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 25 DONE [engine] PIP Overlay Effects — Borders, Shadows & Edge Strips via CasparCG HTML Templates → 25_WO_PIP_OVERLAY_EFFECTS.md
 - 26 DONE [engine] Fade Out on Clip End (per Look Layer) → 26_WO_FADE_ON_CLIP_END.md
 - 32 IN PROGRESS [engine+web-client] CG Overlay Studio — Visual HTML Template Editor (detachable module) → 32_WO_CG_OVERLAY_STUDIO_MODULE.md
-- 34 OPEN [engine] Switcher-style bus transition rebuild (3-channel model) → 34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md
 - 43 IN PROGRESS [engine] Global border: PRV edit bus, PGM dual-layer presets, snapshot sync → 43_WO_GLOBAL_BORDER_PRV_PRESETS_DUAL_LAYER.md
-- 44 OPEN [engine] Segmented glow & shadow borders (per-edge splits + ease toward cuts) → 44_WO_GLOW_SHADOW_SEGMENTED_BORDER.md
-- 45 OPEN [engine+mapping] Segmented Global Border (Multi-Slice Support) → 45_WO_SEGMENTED_GLOBAL_BORDER_SLICES.md
+- 44 IN PROGRESS [engine] Segmented glow & shadow borders (per-edge splits + ease toward cuts) → 44_WO_GLOW_SHADOW_SEGMENTED_BORDER.md
+- 45 DONE [engine+mapping] Segmented Global Border (Multi-Slice Support) → 45_WO_SEGMENTED_GLOBAL_BORDER_SLICES.md
 - 46 DONE [engine+web-client] Layer Playlists (List Workflow) → 46_WO_LAYER_PLAYLISTS.md
 - 48 DONE [engine+video-io] Layer route as reusable Live source (resource saving) → 48_WO_LAYER_ROUTE_LIVE_SOURCE_REUSE.md
 - 57 OPEN [engine+web-client] Caspar ADD IMAGE compose preview (tick) — low-footprint live preview → 57_WO_CASPAR_IMAGE_COMPOSE_PREVIEW.md
@@ -160,10 +159,10 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 834 DONE [engine] Timeline end holds the last frame (D8) → 834_WO_timeline_end_holds_last_frame.md
 - 837 OPEN [engine+lighting] Timeline: screens, lights layer, control layer (D6) → 837_WO_timeline_screens_lights_control_layer.md
 - 840 DONE [engine+godot-client] Timer visibility lives in look presets (per screen), not in looks → 840_WO_timer_visibility_in_look_presets.md
-- 849 OPEN [engine] Work order: Fix A/B bank transitions by layer stacking order → 849_WO_fix_ab_bank_transition_layer_order.md
-- 850 OPEN [engine] Work order: Fix + Animate transitions (same on-air layer, synced PLAY/FILL, PRV… → 850_WO_fix_animate_transition_same_layer_smooth.md
-- 851 OPEN [engine+godot-client] Work order: Look presets & layer presets (screen-management programming) → 851_WO_look_and_layer_presets.md
-- 852 OPEN [engine+web-client] Work order: Per-main look spaces, global looks, and main selector UI → 852_WO_per_main_looks_and_global_looks.md
+- 849 DONE [engine] Work order: Fix A/B bank transitions by layer stacking order → 849_WO_fix_ab_bank_transition_layer_order.md
+- 850 DONE [engine] Work order: Fix + Animate transitions (same on-air layer, synced PLAY/FILL, PRV… → 850_WO_fix_animate_transition_same_layer_smooth.md
+- 851 DONE [engine+godot-client] Work order: Look presets & layer presets (screen-management programming) → 851_WO_look_and_layer_presets.md
+- 852 DONE [engine+web-client] Work order: Per-main look spaces, global looks, and main selector UI → 852_WO_per_main_looks_and_global_looks.md
 - 858 OPEN [engine+audio,godot-client] Godot as the live-visuals engine: audio analysis → visuals (FlowKit, audio part… → 858_WO_godot_audio_reactive_visuals_report.md
 
 ## amcp — AMCP client and protocol (18)
@@ -204,7 +203,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 
 - 06 DONE [audio] Multi-Channel Audio Playout Architecture (CasparCG on Ubuntu) → 06_WO_AUDIO_PLAYOUT.md
 - 16 DONE [audio] Yamaha DM3 Audio Integration → 16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md
-- 44 OPEN [audio] Audio Output Routing and Solo System → 44_WO_AUDIO_OUTPUT_ROUTING_AND_SOLO.md
+- 44 DONE [audio] Audio Output Routing and Solo System → 44_WO_AUDIO_OUTPUT_ROUTING_AND_SOLO.md
 - 157 IN PROGRESS [audio+web-client] Audio mixer: screen/channel routing level above stereo-pair routing on input st… → 157_WO_AUDIO_MIXER_SCREEN_THEN_PAIR_ROUTING.md
 - 164 DONE [audio+amcp] Live-audio health watchdog: stop the unconditional INFO 6-10 every 15 s (probe… → 164_WO_LIVE_AUDIO_WATCHDOG_QUIET_INFO_PROBE.md
 - 166 DONE [audio] Live audio input: device change from the inspector (no Caspar restart) → 166_WO_LIVE_AUDIO_DEVICE_SWAP_IN_INSPECTOR.md
@@ -448,7 +447,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 82 IN PROGRESS [web-client+devices-config] Device View — simple wiring mode (rear panel) → 82_WO_DEVICE_VIEW_SIMPLE_WIRING_MODE.md
 - 85 OPEN [web-client] Device View Simple Polish & Performance → 85_WO_DEVICE_VIEW_SIMPLE_POLISH.md
 - 86 DONE [web-client+devices-config] Device View Routing Matrix → 86_WO_DEVICE_VIEW_ROUTING_MATRIX.md
-- 93 OPEN [web-client] Work Order: Timeline Enhancements → 93_WO_TIMELINE_ENHANCEMENTS.md
+- 93 DONE [web-client] Work Order: Timeline Enhancements → 93_WO_TIMELINE_ENHANCEMENTS.md
 - 103 DONE [web-client] Client XSS hardening — shared dom-escape + innerHTML audit → 103_WO_CLIENT_XSS_HARDENING.md
 - 104 DONE [web-client] Client correctness & performance — stateStore global, WS reconnect/timeout, red… → 104_WO_CLIENT_CORRECTNESS_PERF.md
 - 112 DONE [web-client] Split Device View files over 500 lines → 112_WO_SPLIT_DEVICE_VIEW_OVER_500.md
@@ -827,11 +826,12 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 831 OPEN [process] Dead code removal (sweep §6) → 831_WO_dead_code_removal.md
 - 846 DONE [process] Work-order housekeeping: categorize, index, deprecate → 846_WO_work_order_housekeeping_index.md
 
-## Deprecated (46)
+## Deprecated (47)
 
 - 11 DEPRECATED [os-iso+devices-config] Boot Orchestrator & OS Setup → deprecated/11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md
 - 19 DEPRECATED [tracking-vr] Person Tracking — Stage Performer Detection from Camera Inputs & 3D Previs → deprecated/19_WO_PERSON_TRACKING.md
 - 31 DEPRECATED [tracking-vr+video-io] Stage Auto-Follow — PTZ Cameras & Moving-Heads from Tracking → deprecated/31_WO_STAGE_AUTOFOLLOW_PTZ.md
+- 34 DEPRECATED [engine] Switcher-style bus transition rebuild (3-channel model) → deprecated/34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md
 - 38 DEPRECATED [os-iso+media] Mount internal disk partition to media folder (live USB) → deprecated/38_WO_MEDIA_PARTITION_MOUNT_LIVE_USB.md
 - 51 DEPRECATED [web-client+network] Decoupling Frontend & Backend Architecture → deprecated/51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md
 - 89 DEPRECATED [video-io+web-client] CEF operator control (X11 bridge, host-target CDP, HTTP API) → deprecated/89_WO_CEF_OPERATOR_CONTROL.md

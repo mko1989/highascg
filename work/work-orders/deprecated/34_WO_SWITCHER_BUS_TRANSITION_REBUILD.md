@@ -1,7 +1,7 @@
 # Work Order 34: Switcher-style bus transition rebuild (3-channel model)
 
 **Area:** engine
-**Status: OPEN (unverified — no status line before WO-846)**
+**Status: DEPRECATED (verified 30.10 by code check: the 3-channel switcher-bus model was built in part, then retired — src/config/routing-map.js:203-205 "Switcher-bus (3-channel per destination) is retired", `const switcherBusMode = false`; transitionModel is forced to the 2-channel PGM/PRV flow; startPolicy enum (T34.9-T34.12) never existed anywhere in src/client/godot; live take path is the A/B-bank crossfade, successor WO-849) — was: no status line**
 
 
 > **AGENT COLLABORATION PROTOCOL**

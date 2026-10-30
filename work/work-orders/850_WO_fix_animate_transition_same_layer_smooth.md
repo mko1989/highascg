@@ -1,7 +1,7 @@
 # WO-850 — Work order: Fix `+ Animate` transitions (same on-air layer, synced PLAY/FILL, PRV exchange)
 
 **Area:** engine
-**Status: OPEN (unverified — no status line before WO-846)**
+**Status: DONE (verified 30.10 by code check: on-air pLayer for +Animate src/engine/scene-take-lbg-jobs.js:189-193, animated FILL tail :285-286, no bank flip src/engine/scene-take-lbg-bank-finalize.js:43, COMMIT/PLAY/COMMIT sandwich src/engine/scene-take-lbg-amcp-pipeline.js:341, inactive-bank clear src/engine/scene-take-lbg-bank-finalize.js:91-93; deviation: WO-574 moved the transition onto LOADBG + bare PLAY, scene-take-lbg-jobs.js:259-277, instead of PLAY ... MIX $D) — was: no status line**
 
 
 ## Goal
