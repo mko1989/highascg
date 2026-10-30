@@ -6,7 +6,7 @@
  * the D1/D5 join is also pinned in smoke-wo556-preview-flash-and-exit-restart.test.js (Bug B).
  */
 
-const { describe, it } = require('node:test')
+const { describe, it, after } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -17,6 +17,12 @@ const { programChannelToScreenIdx } = require('../../src/engine/scene-transition
 const { releaseOrStopOutgoingTimeline } = require('../../src/engine/scene-take-lbg-timeline-guard.js')
 
 const SRC = (rel) => fs.readFileSync(path.join(__dirname, '../../src', rel), 'utf8')
+
+const engines = []
+// The 60 s timelines would keep the 40 ms ticker (and the process) alive after the last test.
+after(() => {
+	for (const eng of engines) for (const tl of eng.getAll()) eng.stop(tl.id)
+})
 
 function makeEngine({ duration = 60000, loopAlways = false } = {}) {
 	const sentLines = []
@@ -50,6 +56,7 @@ function makeEngine({ duration = 60000, loopAlways = false } = {}) {
 	}
 	const eng = new TimelineEngine(self)
 	self.timelineEngine = eng
+	engines.push(eng)
 	const clip = { id: 'c1', startTime: 0, duration, source: { value: 'a.mov' } }
 	if (loopAlways) clip.loopAlways = true
 	eng.create({ id: 'tl1', duration, fps: 25, layers: [{ id: 'l1', name: 'L1', clips: [clip] }] })

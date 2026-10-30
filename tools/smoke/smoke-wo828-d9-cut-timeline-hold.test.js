@@ -3,7 +3,7 @@
 /**
  * WO-828 D9 — a CUT from a normal look into a timeline look showed 3 black PGM frames: the outgoing look was cleared in
  * the same millisecond as the timeline's `PLAY 1-210` (no LOADBG ahead), before its first frame decoded. Fix: on a CUT
- * over an on-air look, `startSceneTimelineLayer` waits for the timeline transport ack + 2 channel frames before the take
+ * over an on-air look, `startSceneTimelineLayer` waits for the timeline transport ack + 5 channel frames before the take
  * goes on to the teardown (scene-take-lbg-jobs.js `cutHoldMs`, timeline-take.js `holdForTransportAcks`).
  *
  * Drives the real POST /api/scene/take handler against a recording AMCP stub (as smoke-wo814).
@@ -123,7 +123,7 @@ test('D9: normal → normal CUT (look transition CUT) is byte-identical too — 
 	assert.deepEqual(flat(ev), NORMAL_CUT_GOLDEN)
 })
 
-test('D9: normal → timeline look CUT holds the outgoing look until the timeline PLAY is acked + 2 frames', async () => {
+test('D9: normal → timeline look CUT holds the outgoing look until the timeline PLAY is acked + 5 frames', async () => {
 	const { amcp, ev } = recordingAmcp()
 	const OLD = look('old', ['o1.mov'], MIX)
 	const TL = { id: 'tl', defaultTransition: CUT, layers: [{ layerNumber: 10, loop: true, source: { type: 'timeline', value: 'tl1' } }] }
