@@ -199,6 +199,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		skipLayerVisualEquality: !!opts.skipLayerVisualEquality,
 		restrictTimelineToPreview: !!opts.restrictTimelineToPreview,
 		deferTimelinePlay: !!opts.deferTimelinePlay,
+		holdTemplates: banklessTake, // WO-860: PRV staging (every preview take is bankless)
 		/* WO-553: buildTakeJobs's `incomingIsAboveOutgoing` carve-out for this flag was dead — its
 		 * only caller (here) never passed it, so a bank-B incoming layer always fought the real
 		 * exiting timeline's own fade-out with its own simultaneous fade-in (double-ramp → cut). */
@@ -408,6 +409,12 @@ async function runSceneTakeLbg(amcp, opts) {
 			const hostLayer = resolveTemplateCgHostLayer(layer.layerNumber, spec.cgName)
 			incomingTemplateHostLayers.add(hostLayer)
 		}
+	}
+	// WO-860: an overlay look's templates stay over the new look (a host this look declares is replaced, not kept)
+	if (!banklessTake) {
+		const { pgmOverlayHosts, releasePgmOverlayHosts } = require('./overlay-look')
+		releasePgmOverlayHosts(channel, incomingTemplateHostLayers)
+		for (const h of pgmOverlayHosts(channel)) incomingTemplateHostLayers.add(h)
 	}
 
 	// Border-only teardown path: when the new look removes the border and there's no exit

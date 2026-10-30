@@ -7,6 +7,7 @@ const { diffCasparLayerPlan } = require('../caspar/amcp-layer-diff-plan')
 const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 const { pipOverlaysFromLayer } = require('./pip-overlay')
 const { buildSceneTemplateCgSpec } = require('./scene-template-cg')
+const { holdLowerThirdCgData } = require('./overlay-look')
 const { isEmptyPlaylistItem } = require('./playlist-empty')
 const {
 	clipPath,
@@ -44,6 +45,7 @@ async function buildTakeJobs(opts) {
 		outgoingTopIsTimeline = false,
 		restrictTimelineToPreview = false,
 		deferTimelinePlay = false,
+		holdTemplates = false,
 	} = opts
 
 	const takeJobs = []
@@ -144,6 +146,8 @@ async function buildTakeJobs(opts) {
 		clip = startsEmpty ? 'EMPTY' : resolveSceneClipForAmcp(clip, self)
 
 		const templateCg = startsEmpty ? null : buildSceneTemplateCgSpec(layer, clip, self)
+		// WO-860: a lower third on PRV holds — its auto-out only hid what the look editor shows
+		if (templateCg && holdTemplates) templateCg.data = holdLowerThirdCgData(templateCg.data, templateCg.cgName)
 
 		const cur = currentMap.get(layer.layerNumber)
 		const hasOutgoingOnAir = layerHasContent(cur)

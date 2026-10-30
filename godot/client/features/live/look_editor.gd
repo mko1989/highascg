@@ -17,6 +17,7 @@ const View := preload("res://features/live/look_editor_view.gd")  # WO-654: whee
 const Ops := preload("res://features/live/look_layer_ops.gd")  # WO-657: mirror copy, layer names
 const Drop := preload("res://features/live/look_layer_drop.gd")  # WO-816: Sources drops (exchange on a layer / add)
 const Audio := preload("res://features/live/look_layer_audio.gd")  # WO-817: audio-only layers: not drawn / picked in the frame
+const Backdrop := preload("res://features/live/look_editor_backdrop.gd")  # WO-860: PRV, or HQ thumbnails without one
 const HANDLE := 8.0
 
 var scene_id := ""
@@ -25,6 +26,7 @@ var pusher: Pusher
 var _title: Label
 var _frame: Control
 var _video: TextureRect
+var _thumb: Control  # WO-860: the HQ thumbnail backdrop on a main without PRV (look_editor_backdrop.gd)
 var _overlay: Control  # boxes/handles — a child AFTER the video, so it paints on top of it
 var _list: ItemList
 var _fields := {}
@@ -138,8 +140,7 @@ func open(look_id: String, main_idx: int) -> void:
 	scene_id = look_id
 	main = main_idx
 	_view.reset()
-	_role = "prv%d" % (main + 1)
-	_video.texture = VideoSurfaces.texture(_role)
+	_role = Backdrop.open(self)
 	visible = true
 	_hold(true)
 	_sel = -1
@@ -205,9 +206,7 @@ static func _deg(l: Dictionary) -> float:
 
 func _process(_d: float) -> void:
 	if visible:
-		var b := _box()
-		_video.position = b.position
-		_video.size = b.size
+		Backdrop.place(self, _box())
 		_overlay.queue_redraw()
 
 
@@ -379,6 +378,7 @@ func _sync_fields() -> void:
 
 func _refresh_list() -> void:
 	_title.text = "Edit look: %s  (main %d → PRV)" % [look().get("name", "?"), main + 1]
+	Backdrop.refresh(self)
 	_list.clear()
 	for l in _layers():
 		var src: Dictionary = l.source if l.get("source") is Dictionary else {}

@@ -222,9 +222,12 @@ function buildClearTemplateCgOnOtherProgramChannelsLines(targetChannel, logicalO
 	const map = channelMapFromCtx(ctx)
 	const programs = Array.isArray(map.programChannels) ? map.programChannels : []
 	const lines = []
+	const { pgmOverlayHosts } = require('./overlay-look') // lazy: overlay-look requires this module
+	const host = resolveTemplateCgHostLayer(logicalOrHostLayer, spec?.cgName)
 	for (const ch of programs) {
 		const n = Number(ch)
 		if (!Number.isFinite(n) || n <= 0 || n === target) continue
+		if (pgmOverlayHosts(n).has(host)) continue // WO-860: another screen's overlay look owns it
 		lines.push(...buildSceneTemplateCgClearLines(n, logicalOrHostLayer, spec?.cgName))
 	}
 	return lines

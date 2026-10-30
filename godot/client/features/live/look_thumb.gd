@@ -24,10 +24,17 @@ func setup(look_: Dictionary, res: Vector2, cm_: Dictionary) -> void:
 	clip_contents = true
 	resized.connect(func() -> void: custom_minimum_size.y = roundf(size.x / aspect))
 	custom_minimum_size.y = roundf(TM.CARD_W / 2.0 / aspect)
+	refresh(look)
+
+
+## A new state of the same look (WO-860: the look editor's thumbnail backdrop follows the edits).
+func refresh(look_: Dictionary) -> void:
+	look = look_
 	for l in TM.sorted_layers(look):
 		var p := TM.thumb_path(l.get("source"), cm)
 		if p != "" and not _cache.has(p):
 			_fetch(p, queue_redraw)
+	queue_redraw()
 
 
 static func _fetch(path: String, cb: Callable) -> void:

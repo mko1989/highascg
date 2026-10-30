@@ -11,6 +11,8 @@ const { layerHasContent } = require('../engine/scene-transition')
 const { LOOK_LAYER_MIN, LOOK_LAYER_MAX } = require('../engine/look-layer-ranges')
 const { isAudioOnlyLook } = require('../engine/audio-only-look')
 const { handleAudioOnlyLookTake } = require('./routes-scene-take-audio-only')
+const { isOverlayLook } = require('../engine/overlay-look')
+const { handleOverlayLookTake } = require('./routes-scene-take-overlay')
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
 const { withTakeGroup } = require('../engine/take-sync-barrier')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
@@ -108,6 +110,8 @@ async function handleSceneTakeInner(body, ctx, sync) {
 	if (isAudioOnlyLook(b.incomingScene)) {
 		return handleAudioOnlyLookTake(b, ctx, channel, b.incomingScene)
 	}
+	// WO-860: only template CG (lower thirds…) → over the on-air look on its CG hosts, the look band untouched
+	if (isOverlayLook(b.incomingScene, ctx)) return handleOverlayLookTake(b, ctx, channel, b.incomingScene)
 
 	// WO-160 T160.3: logical look layers live in 10–99 (bank A physical = logical, bank B = +100).
 	// A stale client (old unbounded +10 numbering) must never write into the audio (1–9/101–109),
