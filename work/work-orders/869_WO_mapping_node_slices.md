@@ -1,7 +1,7 @@
 # WO-869 — Mapping node slices: cut a screen destination's output into slices and place them freely on an output canvas (Resolume-style)
 
 **Area:** devices-config, amcp, godot-client
-**Status: IN PROGRESS (30.10) — P1 model/planner/API, P2 Godot editor and P3 path (b) (fork APPLY + screen slices, generator, live APPLY) built and verified offline, in the GUI sandbox and on a scratch Caspar; waiting for the Caspar binary swap (§5 READY TO SWAP) and owner QA on real heads; path (a) route-slices not built (§6)**
+**Status: IN PROGRESS (30.10) — P1 model/planner/API, P2 Godot editor and P3 path (b) (fork APPLY + screen slices, generator, live APPLY) built and verified offline, in the GUI sandbox and on a scratch Caspar; fork binary swapped on the box 30.10 (§6); slices on real heads not yet exercised; path (a) route-slices not built (§6)**
 
 Owner 30.10: "need also a way inside mapping node to slice the output of a screen destination and position it freely on a set canvas output. similar to how resolume works with slices. i have a round around way of doing this with rendering the canvas then playing its sliced up routes on the output, but there must be an easier way to do this. doesnt caspar has something built in for these purposes? if not there needs to be a pull request that has something similar."
 
@@ -325,7 +325,7 @@ Backend = path (b) for GPU heads (the planner's default case). SDI = placement o
 
 ## 6. What remains
 
-- **Binary swap (owner):** the fork build above is READY TO SWAP. Until it is swapped, a generated slice window on the old binary ignores `<slices>` and shows the whole channel stretched into the window, and the live APPLY is refused (400, logged as a warning).
+- **Binary swap: DONE 30.10 17:32** (dev box). `bin/casparcg` = md5 `ab668967…` (the build above); rollback `bin/casparcg.pre-wo869` (`fb955e76…`, the 16:37 build of `e8d457ec6` + the same uncommitted WO-820/800 tree, so the swap adds only `ce7132e50` + `deac375bb`). AMCP `RESTART` → run.sh relaunched it (`/proc/<pid>/exe` md5 checked), then node restarted (Apply check 0). After: the node re-staged the PRV look on ch2, `/api/system/operator-first` + the WO-857 listener (UDP 6290) answer, 0 `[error]` lines in the journal, :0 shows the GUI on DP-4 and the (empty-PGM) Dioda window on DP-0. The live project has no slices yet, so the slice path on real heads is still the open check below.
 - **Caps probe:** the planner assumes the running Caspar has screen slices (`caps.screenSlices` is never set). A connect-time probe (`APPLY <ch>-640 SLICES SET 0`, where 400 means none) that sets the caps and falls back to `refused`/direct is not built.
 - **Path (a) route-slices** (SDI scaling/rotation and per-slice sources): the planner models it and the budget refusal (Q3), but there is no generator or apply code. It also needs #1814 (crop leak) in the fork.
 - **Real GPU check:** the gpu-texture path (forced on in production) is not pixel-verified. On Xvfb its baseline is black even without slices, so the probes ran with `gpu-texture=false`. Check on the box after the swap: real heads, a slice window over the xrandr layout, and window stacking.
@@ -333,7 +333,6 @@ Backend = path (b) for GPU heads (the planner's default case). SDI = placement o
 - **Not tested:** a channel format change while a window is live; re-apply after a real Caspar restart (the code path is smoke-tested only).
 - **Planner edge:** a node with a slice window plus an empty GPU output (no slice) keeps that output `direct`, so the PGM window stays on and may overlap the slice window.
 - **Owner QA:** one pass of the editor against a real two-head wall or LED processor.
-- INDEX.md / OPEN_ISSUES.md are not updated and `build-index` was not run, per instructions. The status line changed, so `node tools/wo/build-index.js` is due.
 
 ## Owner decisions (30.10)
 
