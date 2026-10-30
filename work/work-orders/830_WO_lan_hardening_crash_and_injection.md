@@ -1,7 +1,7 @@
 # WO-830 — LAN hardening: remote crash, injection, secrets (sweep §2, without the auth switch)
 
 **Area:** network
-**Status: IN PROGRESS (30.10) — 830a/b/c done offline and re-tested live on the box after the node restart (§3d); left: the owner's two `sudo install` commands for the root wrapper copies (§2b), which still differ from the repo**
+**Status: DONE (30.10) — 830a/b/c verified offline and live on the box (§3d); the owner installed both root wrapper copies, and `cmp` shows them identical to the repo (root, 0755)**
 **Source:** the 29.10 code sweep, `work/sweep-29.10.2026/REPORT.md` §2 (items 1–24). Owner 30.10: *"yes we need better
 auth handling. im putting that off till last … id like it to be hardened"* and *"there are a lot of bugs to fix"*.
 **Related:** WO-811 (the auth switch itself stays there and comes last), REVIEW-2026-08-03, WO-418/419.
@@ -132,4 +132,5 @@ The first is also what `scripts/setup/12-passwordless-sudo.sh` does on setup. Th
   - 11 server update; 12 plugins; 13 replication pairing;
   - the zip, ingest and MVR parsers.
 - **Root copies (§2b):** `cmp` against the installed `/usr/local/lib/highascg/highascg-vcam-modules-up.sh` and
-  `/usr/local/bin/highascg-replication-ssh` → both still differ. The owner's two `sudo install` lines are still pending.
+  `/usr/local/bin/highascg-replication-ssh` both differed at 16:25. The owner ran the two `sudo install` lines; `cmp` then
+  shows both identical to `tools/runtime/`, owned by root with mode 755.

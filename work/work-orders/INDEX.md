@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-781 live WOs (34 open, 120 in progress, 627 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+781 live WOs (32 open, 121 in progress, 628 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -200,7 +200,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 613 IN PROGRESS [caspar-build] Next CasparCG build: base it on upstream v2.5.1-stable → 613_WO_next_caspar_build_on_v2_5_1.md
 - 742 DONE [caspar-build+engine] Caspar shm producer: play a shared-memory ring written by another process (WO-7… → 742_WO_caspar_shm_producer.md
 - 820 DONE [caspar-build+media] NotchLC: native GPU decode in Caspar (spike + build) → 820_WO_notchlc_native_gpu_decode.md
-- 847 OPEN [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
+- 847 IN PROGRESS [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
 
 ## audio — Audio routing, devices, meters (41)
 
@@ -676,7 +676,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 748 DONE [os-iso+godot-client] Updates pane says "Phase: ?" after an update that succeeded (follow-up of WO-73… → 748_WO_updates_pane_phase_unknown_after_fast_restart.md
 - 749 DONE [os-iso] Releases did not ship the post-update sweep: .4 ran a stale copy after every up… → 749_WO_release_ships_post_update_sweep.md
 - 832 DONE [os-iso] Post-update remnants: ISO build, kernel pin, NVIDIA, 26.04 package names → 832_WO_post_26_04_update_remnants_iso_build.md
-- 848 OPEN [os-iso+caspar-build] Installation: Caspar-only CEF (block generic, sync, symlinks, loader safety) → 848_WO_install_cef_casparonly_pinning_symlinks.md
+- 848 IN PROGRESS [os-iso+caspar-build] Installation: Caspar-only CEF (block generic, sync, symlinks, loader safety) → 848_WO_install_cef_casparonly_pinning_symlinks.md
 - 855 DONE [os-iso] Work order: Remove persistence partition workflow (exfat-only) → 855_WO_remove_persistence_partition_workflow_exfat_only.md
 - 856 DONE [os-iso] Work order: Single NVIDIA driver per live ISO (no multi-driver pool) → 856_WO_single_nvidia_driver_per_iso.md
 - 870 OPEN [os-iso] penguins-eggs 26.10 rewrite: produce is gone (remaster), theme/basename/max/cal… → 870_WO_eggs_26_10_rewrite_iso_pipeline.md
@@ -720,7 +720,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 802 IN PROGRESS [network] Linking servers: only node servers link; Godot clients stay on their own node → 802_WO_linked_servers_node_only_godot_stays_local.md
 - 811 IN PROGRESS [network] Auth for every client (Godot auto-login, Companion, web UI) + change the caspar… → 811_WO_auth_all_clients_and_os_password.md
 - 822 DONE [network] Remove the :4443 HTTPS proxy (highascg-https-proxy), the way nginx went in WO-4… → 822_WO_remove_https_proxy.md
-- 830 IN PROGRESS [network] LAN hardening: remote crash, injection, secrets (sweep §2, without the auth swi… → 830_WO_lan_hardening_crash_and_injection.md
+- 830 DONE [network] LAN hardening: remote crash, injection, secrets (sweep §2, without the auth swi… → 830_WO_lan_hardening_crash_and_injection.md
 - 842 DONE [network+devices-config] Sweep: data loss, replication boot and server-side ops bugs → 842_WO_sweep_data_loss_and_server_ops.md
 
 ## media — Media library, thumbnails, ingest, transcode (21)
