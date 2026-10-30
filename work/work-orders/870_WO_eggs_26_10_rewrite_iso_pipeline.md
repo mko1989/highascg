@@ -475,7 +475,9 @@ Phase 4), xz level 3, `iso_prefix highascg-nvidia-615`. These are as generated.
 Its content is `live ALL=(ALL) SETENV: NOPASSWD: /usr/bin/calamares`.
 
 **Before the first full build (Phase 7).** Copy the Oct 23 ISO out of `/home/eggs/mnt` (only the Sept 3 ISO is in
-`~/iso-backup`). Legacy eggs `rm -rf`'d `mnt`/`liveroot` on produce. Whether `remaster` does too is unverified.
+`~/iso-backup`). *Done 30.10 after dry run 2:* copied with its sidecar to `~/iso-backup/`, `sha256sum -c` OK
+(`551ff7ec…`). `home/casparcg/iso-backup` is in the merged list (`/tmp/coa/excludes.list:346`), so the backups stay out of
+the squashfs. Free space on `/` afterwards is 33 GiB, against about 13.4 GiB needed. Legacy eggs `rm -rf`'d `mnt`/`liveroot` on produce. Whether `remaster` does too is unverified.
 
 
 ### Phase 6 — dry run 2 (30.10, run by the owner)
