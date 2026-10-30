@@ -59,7 +59,8 @@ describe('WO-835 presenter photos: /tmp only', () => {
 	})
 
 	it('a persistent dir (repo, home, config) is refused: files go to the default tmp dir instead', async () => {
-		const persistent = path.join(ROOT, 'projects', '_wo835-should-never-exist')
+		// the home dir, not the repo: a checkout can itself sit under /tmp (clean-tree CI copies), where the repo IS tmp
+		const persistent = path.join(os.homedir(), '.highascg', '_wo835-should-never-exist')
 		assert.equal(underTmp(persistent), false)
 		assert.equal(underTmp(path.join(os.homedir(), '.highascg', 'presenters')), false)
 		assert.equal(underTmp(os.tmpdir()), false, 'the tmp root itself is not a presenter dir')
