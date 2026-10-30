@@ -42,6 +42,14 @@ describe('WO-870 generate-eggs-config: custom.exclude.list', () => {
 		}
 	})
 
+	it('keeps ~/iso-backup out of the squashfs in both embed modes (22.10: a backup ISO rode in, +3.2 GB)', () => {
+		for (const embedServer of [true, false]) {
+			const p = patterns(gen.buildExcludeList({ embedServer }))
+			for (const l of ['home/casparcg/iso-backup', 'home/casparcg/iso-backup/*'])
+				assert.ok(p.includes(l), `embed=${embedServer}: missing ${l}`)
+		}
+	})
+
 	it('has no inline comments, no leading slash, no blanks-as-patterns, no duplicates', () => {
 		for (const l of pats) {
 			assert.ok(!l.includes('#'), `inline comment in: ${l}`)
