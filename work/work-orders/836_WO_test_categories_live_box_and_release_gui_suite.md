@@ -93,3 +93,21 @@ The sweep's `smoke-private-volume-sync` finding on `getMachineId` was also real:
 is not from this WO: it passes 3/3 alone, and `src/engine/timeline-*` was committed by WO-837 phase 1 at 11:27:43, i.e.
 during the run. No file under `config/`, `data/shaders`, `template/shaders`, `projects/` (non-autosave), `.private`,
 `/run/highascg` or `~/.config/highascg` was written by the suite (only the running server's own runtime files changed).
+
+## Part 3 redesigned (owner 30.10): agent-run test cards instead of a scripted suite
+
+Owner: *"maybe it doesnt make sense to script everything, rather create test instructions for haiku agents so i can run
+the full test cheaply."*
+
+- **Driver** (`tools/test-agent/`): a remote-control e2e scenario (`godot/client/e2e/scenarios/99_remote.gd`) that runs a second
+  Godot client on a hidden Xvfb display against the LIVE node and executes label-based commands through `e2e_ui.gd`
+  (tab, click, type, choose, drag, list, shot). CLI `tools/test-agent/ui` sends them and prints JSON. CLI
+  `tools/test-agent/caspar` does `print <ch>` (Caspar PRINT → PNG + luma/colour stats), `info <ch>[-<layer>]`, and API
+  GETs. The owner's GUI on :0 is never touched; PGM is (that is the point of a release test).
+- **Cards** (`tools/test-agent/cards/NN_<area>.md`): preconditions, numbered steps written as driver commands, the
+  expected result per step, the evidence to keep (shot / PRINT / API), and an explicit PASS/FAIL rule. Written for
+  Haiku: no judgement calls, exact labels, exact thresholds.
+- **Runner** (`.claude/skills/release-test/SKILL.md`, `/release-test`): runs the cards one after another with Haiku agents
+  (one GUI, one PGM, so not in parallel), collects verdicts and evidence into `work/release-reports/<date>/report.md`,
+  and hands only FAIL/UNCLEAR cards to a stronger model for triage.
+- The scripted scenarios 01–08 stay as the cheap sandbox smoke (`test:release` gui group).
