@@ -14,6 +14,7 @@ const { applyFullServerConfig } = require('../utils/full-config-apply')
 const { atomicWriteFile } = require('../utils/atomic-file-write')
 const { enforceScreenConsumerPolicy } = require('../config/screen-consumer-policy')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { validateRequestedConfigPath, assertWritableConfigTarget } = require('./caspar-config-path-guard')
 
 /**
  * @param {object} ctx
@@ -111,6 +112,12 @@ async function writeCasparConfigToDiskUnserialized(ctx, opts = {}) {
 			error:
 				'Set System → Caspar config path in Settings (saved in highascg.config.json), or CASPAR_CONFIG_PATH on the HighAsCG process when no path is saved.',
 		}
+	}
+	// WO-830b: whatever supplied the path (settings, env, request), the final target must be a *.config file.
+	const target = assertWritableConfigTarget(filePath)
+	if (!target.ok) {
+		apiLog(ctx, 'warn', `[Caspar config] Write refused (${filePath}): ${target.error}`)
+		return { ok: false, status: 400, error: target.error, path: filePath }
 	}
 	apiLog(ctx, 'info', `[Caspar config] Writing casparcg.config → ${filePath}`)
 	const oneShot = typeof opts.xml === 'string' ? opts.xml.trim() : ''
@@ -297,6 +304,22 @@ async function handlePost(p, body, ctx) {
 	if (p === '/api/caspar-config/apply') {
 		apiLog(ctx, 'info', '[Caspar config] POST /api/caspar-config/apply')
 		const b = parseBody(body) || {}
+		// WO-830b: validate request-supplied paths against the state BEFORE the body is merged into ctx.config.
+		let requestedPath = ''
+		if (typeof b.path === 'string' && b.path.trim()) {
+			const v = validateRequestedConfigPath(b.path, ctx)
+			if (!v.ok) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Invalid path: ${v.error}` }) }
+			requestedPath = v.path
+		}
+		if (b.casparServer && typeof b.casparServer === 'object' && b.casparServer.configPath != null) {
+			const cp = String(b.casparServer.configPath).trim()
+			if (cp) {
+				const v = validateRequestedConfigPath(cp, ctx)
+				if (!v.ok) {
+					return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Invalid casparServer.configPath: ${v.error}` }) }
+				}
+			}
+		}
 		if (b.casparServer && typeof b.casparServer === 'object') {
 			ctx.config.casparServer = {
 				...(defaults.casparServer || {}),
@@ -313,7 +336,7 @@ async function handlePost(p, body, ctx) {
 				...b.audioRouting,
 			})
 		}
-		const overridePath = typeof b.path === 'string' ? b.path.trim() : ''
+		const overridePath = requestedPath
 		if (overridePath) {
 			ctx.config.casparServer = { ...(ctx.config.casparServer || defaults.casparServer || {}), configPath: overridePath }
 			normalizeCasparServerConfigPath(ctx.config.casparServer)

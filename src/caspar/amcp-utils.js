@@ -18,7 +18,11 @@ function stripAmcpLineBreaks(s) {
 function param(str) {
 	if (str == null || str === '') return ''
 	const s = stripAmcpLineBreaks(String(str)).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-	return /\s/.test(s) ? `"${s}"` : s
+	// WO-830b: Caspar's tokenizer (protocol/util/tokenize.cpp) treats an unquoted `( … )` as a parameter list and
+	// ends the token at the `)`, so `{"f0":"(LIVE)"}` / `setpts=(PTS-STARTPTS)/1` / `Take(2)_final` arrived cut.
+	// Inside quotes parentheses are literal. Bare tokens (numbers, `LINEAR`, `MIX`) contain neither, so they
+	// still go out unquoted.
+	return /[\s()]/.test(s) ? `"${s}"` : s
 }
 
 /** FFmpeg audio filter for PLAY/LOAD AF — always quoted (pan=… contains `=` / `|`). */
@@ -62,6 +66,7 @@ function deferMixerAmcpLine(line) {
 
 module.exports = {
 	param,
+	stripAmcpLineBreaks,
 	audioFilterParam,
 	clipParamForPlay,
 	chLayer,

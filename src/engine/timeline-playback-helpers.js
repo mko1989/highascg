@@ -1,7 +1,7 @@
 'use strict'
 
 const { audioRouteToAudioFilter } = require('./audio-route')
-const { audioFilterParam } = require('../caspar/amcp-utils')
+const { audioFilterParam, param } = require('../caspar/amcp-utils')
 const { sceneLayerRotationMixerLines } = require('./scene-layer-rotation-amcp')
 
 /**
@@ -32,33 +32,40 @@ function mixerEffectNeutralLines(cl) {
  */
 function buildEffectAmcpLinesPlayback(type, params, cl) {
 	const p = params || {}
+	// WO-830b: effect params come from timeline JSON (PUT /api/timelines, project import, cluster replication).
+	// Numbers are coerced (`1\r\nCLEAR 1` → fallback), strings go through param() — no second AMCP command.
+	const n = (v, d) => {
+		if (v == null || v === '') return d
+		const x = Number(v)
+		return Number.isFinite(x) ? x : d
+	}
 	switch (type) {
 		case 'blend_mode':
-			return [`MIXER ${cl} BLEND ${String(p.mode || 'Normal').toUpperCase()}`]
+			return [`MIXER ${cl} BLEND ${param(String(p.mode || 'Normal').toUpperCase())}`]
 		case 'brightness':
-			return [`MIXER ${cl} BRIGHTNESS ${p.value ?? 1} 0`]
+			return [`MIXER ${cl} BRIGHTNESS ${n(p.value, 1)} 0`]
 		case 'contrast':
-			return [`MIXER ${cl} CONTRAST ${p.value ?? 1} 0`]
+			return [`MIXER ${cl} CONTRAST ${n(p.value, 1)} 0`]
 		case 'saturation':
-			return [`MIXER ${cl} SATURATION ${p.value ?? 1} 0`]
+			return [`MIXER ${cl} SATURATION ${n(p.value, 1)} 0`]
 		case 'levels':
-			return [`MIXER ${cl} LEVELS ${p.minIn ?? 0} ${p.maxIn ?? 1} ${p.gamma ?? 1} ${p.minOut ?? 0} ${p.maxOut ?? 1} 0`]
+			return [`MIXER ${cl} LEVELS ${n(p.minIn, 0)} ${n(p.maxIn, 1)} ${n(p.gamma, 1)} ${n(p.minOut, 0)} ${n(p.maxOut, 1)} 0`]
 		case 'chroma_key':
-			return [`MIXER ${cl} CHROMA ${p.key || 'None'} ${p.threshold ?? 0.34} ${p.softness ?? 0.44} ${p.spill ?? 1} ${p.blur ?? 0}`]
+			return [`MIXER ${cl} CHROMA ${param(p.key || 'None')} ${n(p.threshold, 0.34)} ${n(p.softness, 0.44)} ${n(p.spill, 1)} ${n(p.blur, 0)}`]
 		case 'crop':
-			return [`MIXER ${cl} CROP ${p.left ?? 0} ${p.top ?? 0} ${p.right ?? 1} ${p.bottom ?? 1} 0`]
+			return [`MIXER ${cl} CROP ${n(p.left, 0)} ${n(p.top, 0)} ${n(p.right, 1)} ${n(p.bottom, 1)} 0`]
 		case 'clip_mask':
-			return [`MIXER ${cl} CLIP ${p.left ?? 0} ${p.top ?? 0} ${p.width ?? 1} ${p.height ?? 1} 0`]
+			return [`MIXER ${cl} CLIP ${n(p.left, 0)} ${n(p.top, 0)} ${n(p.width, 1)} ${n(p.height, 1)} 0`]
 		case 'perspective':
-			return [`MIXER ${cl} PERSPECTIVE ${p.ulX ?? 0} ${p.ulY ?? 0} ${p.urX ?? 1} ${p.urY ?? 0} ${p.lrX ?? 1} ${p.lrY ?? 1} ${p.llX ?? 0} ${p.llY ?? 1} 0`]
+			return [`MIXER ${cl} PERSPECTIVE ${n(p.ulX, 0)} ${n(p.ulY, 0)} ${n(p.urX, 1)} ${n(p.urY, 0)} ${n(p.lrX, 1)} ${n(p.lrY, 1)} ${n(p.llX, 0)} ${n(p.llY, 1)} 0`]
 		case 'grid':
-			return [`MIXER ${cl} GRID ${p.resolution ?? 2} 0`]
+			return [`MIXER ${cl} GRID ${n(p.resolution, 2)} 0`]
 		case 'keyer':
 			return [`MIXER ${cl} KEYER ${p.enabled ? 1 : 0}`]
 		case 'rotation':
-			return sceneLayerRotationMixerLines(cl, p.degrees ?? 0)
+			return sceneLayerRotationMixerLines(cl, n(p.degrees, 0))
 		case 'anchor':
-			return [`MIXER ${cl} ANCHOR ${p.x ?? 0} ${p.y ?? 0} 0`]
+			return [`MIXER ${cl} ANCHOR ${n(p.x, 0)} ${n(p.y, 0)} 0`]
 		default:
 			return null
 	}

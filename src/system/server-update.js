@@ -8,10 +8,10 @@ const https = require('https')
 
 const { REPO_ROOT } = require('../repo-paths')
 const { readBuildStampFromDir, compareBuildStamps, parseServerReleaseAssetStamp } = require('./build-stamp')
+const { resolveVerifiedAsset, resolveGithubRepo } = require('./server-update-asset')
 
 const execFileAsync = promisify(execFile)
 
-const DEFAULT_GITHUB_REPO = 'mko1989/highascg'
 const CACHE_ROOT = '/var/cache/highascg/updates'
 /** Second source root the sudo apply helper accepts (validate_source_path) — see WO-455. */
 const FALLBACK_CACHE = '/tmp/highascg-updates'
@@ -119,12 +119,6 @@ function getVersionInfo() {
 		retainDrop: detectRetainMode(),
 		volumes: getVolumeStatus(),
 	}
-}
-
-function resolveGithubRepo() {
-	const env = String(process.env.HIGHASCG_GITHUB_RELEASE_REPO || '').trim()
-	if (env && /^[\w.-]+\/[\w.-]+$/.test(env)) return env
-	return DEFAULT_GITHUB_REPO
 }
 
 /**
@@ -386,9 +380,7 @@ async function startApplyJob(opts = {}) {
 		throw new Error('This server runs from a git checkout — update it with git, not from a release.')
 	}
 	const check = await checkForUpdate({ force: true })
-	const assetUrl = String(opts.assetUrl || check.assetUrl || '').trim()
-	const assetName = String(opts.assetName || check.assetName || '').trim()
-	if (!assetUrl) throw new Error('No server release asset URL available')
+	const { assetUrl, assetName } = resolveVerifiedAsset(check, opts)
 
 	const stamp = parseServerReleaseAssetStamp(assetName) || check.latest || `unknown-${Date.now()}`
 	const id = `upd-${Date.now()}`
@@ -406,7 +398,7 @@ async function startApplyJob(opts = {}) {
 	void (async () => {
 		try {
 			const cacheDir = resolveUpdateCacheDir(appendJobLog)
-			const tarPath = path.join(cacheDir, assetName || `highascg-server_${stamp}.tar.gz`)
+			const tarPath = path.join(cacheDir, path.basename(assetName))
 			const extractDir = path.join(cacheDir, `extract-${stamp}`)
 
 			applyJob.phase = 'download'
@@ -462,4 +454,5 @@ module.exports = {
 	startApplyJob,
 	getApplyStatus,
 	resolveGithubRepo,
+	resolveVerifiedAsset,
 }

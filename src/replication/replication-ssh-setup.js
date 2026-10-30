@@ -36,6 +36,21 @@ function normalizeSshPublicKeyLine(line) {
 	return `${type} ${key} ${comment}`.trim()
 }
 
+/**
+ * WO-830b: a peer host is spliced into `from="..."` of an authorized_keys line and into ssh/rsync argv. A newline
+ * in it planted a second, unrestricted key line (full shell as casparcg); a leading `-` is an ssh option. Accept
+ * only a plain hostname, IPv4 or IPv6 literal.
+ * @param {unknown} host
+ * @returns {boolean}
+ */
+function isValidPeerHost(host) {
+	if (typeof host !== 'string') return false
+	const h = host.trim()
+	if (!h || h.length > 253 || h !== host) return false
+	if (/^[0-9A-Fa-f:]*:[0-9A-Fa-f:.]*$/.test(h) && h.includes(':')) return h.length >= 2
+	return /^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(h) && !h.includes('..')
+}
+
 function resolveReplicationSshWrapperPath() {
 	if (fs.existsSync(INSTALLED_WRAPPER_PATH)) return INSTALLED_WRAPPER_PATH
 	if (fs.existsSync(REPO_WRAPPER_PATH)) return REPO_WRAPPER_PATH
@@ -89,6 +104,7 @@ function buildForcedCommandAuthorizedKeysEntry(publicKeyLine, opts = {}) {
 	/** @type {string[]} */
 	const options = []
 	const fromHost = String(opts.fromHost || '').trim()
+	if (fromHost && !isValidPeerHost(fromHost)) return null
 	if (fromHost && fromHost !== '127.0.0.1' && fromHost !== '::1') {
 		options.push(`from=${shellDoubleQuote(fromHost)}`)
 	}
@@ -300,6 +316,7 @@ function prepareReplicationSshForPairing(ctx, opts = {}) {
 function testReplicationSshToPeer(peerHost, log) {
 	const host = String(peerHost || '').trim()
 	if (!host) return { ok: false, error: 'peer host missing' }
+	if (!isValidPeerHost(host)) return { ok: false, error: 'peer host invalid' }
 	const keyPath = resolveReplicationSshIdentityPath()
 	if (!keyPath) return { ok: false, error: 'replication SSH key missing' }
 	const user = String(process.env.HIGHASCG_REPL_RSYNC_USER || 'casparcg').trim() || 'casparcg'
@@ -386,6 +403,7 @@ function handleExchangeReplicationSsh(ctx, body) {
 }
 
 module.exports = {
+	isValidPeerHost,
 	replicationSshKeyPath,
 	normalizeSshPublicKeyLine,
 	resolveReplicationSshWrapperPath,

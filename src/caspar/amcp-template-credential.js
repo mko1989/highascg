@@ -87,7 +87,10 @@ function carriesSharedPassword(line, config) {
  * @returns {{ line: string, error: Error | null }} `error` set (and `line` emptied) when the line carries the password
  */
 function prepareAmcpLine(line, config) {
-	const out = injectTemplateCredential(line, config)
+	// WO-830b: last line of defence for AMCP injection — an embedded CR/LF ends the command and starts a NEW one
+	// (`SEEK\r\nKILL`). Every builder is supposed to fold it (amcp-utils param()), but a raw interpolation anywhere
+	// reaches Caspar through here, for single commands and per batch line alike.
+	const out = injectTemplateCredential(String(line ?? '').replace(/[\r\n]+/g, ' '), config)
 	if (carriesSharedPassword(out, config)) return { line: '', error: passwordRefusal() }
 	return { line: out, error: null }
 }

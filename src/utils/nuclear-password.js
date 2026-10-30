@@ -31,9 +31,20 @@ function verifyNuclearPassword(provided, storedHash) {
 	const body = storedHash.slice(PREFIX.length)
 	const sep = body.indexOf('$')
 	if (sep <= 0) return false
-	const salt = Buffer.from(body.slice(0, sep), 'hex')
-	const expected = Buffer.from(body.slice(sep + 1), 'hex')
-	const derived = crypto.scryptSync(String(provided || ''), salt, expected.length, SCRYPT_PARAMS)
+	const saltHex = body.slice(0, sep)
+	const keyHex = body.slice(sep + 1)
+	// WO-830b: an empty or undecodable stored hash (`scrypt$ab$`, `scrypt$$zz`) decoded to a 0-byte key, and
+	// two 0-byte buffers compare equal — ANY password passed. Fail closed on anything that is not a real hash.
+	if (!/^(?:[0-9a-fA-F]{2}){8,}$/.test(saltHex) || !/^(?:[0-9a-fA-F]{2}){16,}$/.test(keyHex)) return false
+	const salt = Buffer.from(saltHex, 'hex')
+	const expected = Buffer.from(keyHex, 'hex')
+	if (salt.length < 8 || expected.length < 16) return false
+	let derived
+	try {
+		derived = crypto.scryptSync(String(provided || ''), salt, expected.length, SCRYPT_PARAMS)
+	} catch {
+		return false
+	}
 	if (derived.length !== expected.length) return false
 	return crypto.timingSafeEqual(derived, expected)
 }

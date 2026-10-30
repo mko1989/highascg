@@ -6,7 +6,7 @@
 
 'use strict'
 
-const { param } = require('../caspar/amcp-utils')
+const { param, clipParamForPlay } = require('../caspar/amcp-utils')
 const { isTemplateClip } = require('../state/playback-tracker-media')
 const { resolveTemplateCgHostLayer, channelMapFromCtx, TEMPLATE_CG_OVERLAY_LAYER_BASE } = require('./cg-routing')
 const { studioLtDefaults } = require('../cg-studio/studio-lt-defaults')
@@ -162,7 +162,9 @@ function buildSceneTemplateCgAmcpLines(channel, logicalOrHostLayer, spec, opts =
 	const dataStr =
 		typeof spec?.data === 'string' && spec.data.length > 0 ? spec.data : '{}'
 	const playOnLoad = spec?.playOnLoad !== false ? 1 : 0
-	const tpl = cgName.includes('/') ? `"${cgName}"` : cgName
+	// WO-830b: the name is scene data — escape `\`/`"`, fold CR/LF, quote on whitespace/parens (`my tpl` used to put
+	// `tpl` into the play-on-load slot; `x\r\nKILL` started a second command). Slash names stay always-quoted.
+	const tpl = cgName.includes('/') ? clipParamForPlay(cgName) : param(cgName)
 	// WO-207 T207.2: record this host as added (tracked removal on teardown or on take without the
 	// template). WO-322: overlay-band (700+) hosts only — a shader's look-band layer must never
 	// pollute the tracked-host set (its cleanup rides the look-layer teardown, not the 700+ sweep).

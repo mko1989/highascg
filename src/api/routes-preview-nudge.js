@@ -57,6 +57,33 @@ const NUDGE_MAX_LAYERS = 12
  *   (logical + 100 on bank B); null/omitted = logical layer IS physical (bank-less PRV).
  * @returns {string[]}
  */
+/**
+ * WO-830b: effect params arrive from the client body and buildEffectAmcpLines interpolates them raw into MIXER
+ * lines. Keep numbers, booleans, and short tokens of `[A-Za-z0-9_.#-]` (blend mode, chroma key colour name) — a
+ * string with CR/LF, spaces or quotes can no longer smuggle a second AMCP command or extra arguments.
+ * @param {unknown} params
+ * @returns {Record<string, number|boolean|string>}
+ */
+function sanitizeEffectParams(params) {
+	const out = {}
+	if (!params || typeof params !== 'object' || Array.isArray(params)) return out
+	for (const [k, v] of Object.entries(params)) {
+		if (typeof v === 'number') {
+			if (Number.isFinite(v)) out[k] = v
+		} else if (typeof v === 'boolean') {
+			out[k] = v
+		} else if (typeof v === 'string') {
+			const t = v.trim()
+			if (t !== '' && Number.isFinite(Number(t))) out[k] = Number(t)
+			else {
+				const tok = t.replace(/[^A-Za-z0-9_.#-]/g, '').slice(0, 32)
+				if (tok) out[k] = tok
+			}
+		}
+	}
+	return out
+}
+
 function buildNudgeLinesForLayer(previewCh, layer, f, physicalLayer = null, opts = {}) {
 	const ln = physicalLayer != null ? parseInt(physicalLayer, 10) : parseInt(layer.layerNumber, 10)
 	const cl = `${parseInt(previewCh, 10)}-${ln}`
@@ -76,7 +103,7 @@ function buildNudgeLinesForLayer(previewCh, layer, f, physicalLayer = null, opts
 	if (Array.isArray(layer.effects)) {
 		for (const fx of layer.effects) {
 			if (!fx || (fx.type !== 'crop' && !opts.allEffects)) continue
-			const fxLines = buildEffectAmcpLines(fx.type, fx.params || {}, cl)
+			const fxLines = buildEffectAmcpLines(fx.type, sanitizeEffectParams(fx.params), cl)
 			if (fxLines) lines.push(...fxLines.map((l) => deferMixerAmcpLine(l)))
 		}
 	}
@@ -263,6 +290,7 @@ async function handlePreviewMixerNudge(body, ctx) {
 module.exports = {
 	handlePreviewMixerNudge,
 	buildNudgeLinesForLayer,
+	sanitizeEffectParams,
 	NEUTRAL_EFFECT_PARAMS,
 	resolveNudgePreviewChannel,
 	resolveNudgePgmChannel,

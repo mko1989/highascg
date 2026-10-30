@@ -112,6 +112,13 @@ function getEntry(config, id) {
 
 function setEntry(config, id, patch) {
 	const next = normalizeStore(config)
+	// WO-830b: an id like `../../..` used to be persisted here (enable/disable/update take it from the URL) and
+	// later became a `require()` path on every boot. Refuse to store anything that is not a plain plugin id.
+	if (!isValidPluginId(id)) return next
+	if (patch && patch.moduleName !== undefined && !isValidModuleName(patch.moduleName)) {
+		const { moduleName: _drop, ...rest } = patch
+		patch = rest
+	}
 	next.entries[id] = { ...(next.entries[id] || {}), ...patch, id }
 	return next
 }
@@ -147,7 +154,11 @@ function listPlugins(config) {
 	}
 	for (const [id, entry] of Object.entries(store.entries)) {
 		if (PLUGIN_CATALOG.some((x) => x.id === id)) continue
+		// WO-830b: entries already persisted with a hostile id / moduleName (hand-edited config, or written before
+		// this guard) are never listed, so they are never enabled, resolved or require()d on boot.
+		if (!isValidPluginId(id) || !entry || typeof entry !== 'object') continue
 		const moduleName = String(entry.moduleName || id)
+		if (!isValidModuleName(moduleName)) continue
 		const loaded = moduleRegistry.isLoaded(moduleName)
 		const enabled = entry.enabled !== false
 		out.push({
@@ -167,6 +178,7 @@ function listPlugins(config) {
 }
 
 function resolvePlugin(config, id) {
+	if (!isValidPluginId(id)) return null
 	const listed = listPlugins(config)
 	return listed.find((p) => p.id === id) || null
 }
@@ -185,7 +197,7 @@ function loadEnabledPlugins(config, log) {
 
 function enablePluginNow(config, id, ctx) {
 	const p = resolvePlugin(config, id)
-	if (!p) return { ok: false, error: 'not_found' }
+	if (!p || !isValidModuleName(p.moduleName)) return { ok: false, error: 'not_found' }
 	const log = ctx && typeof ctx.log === 'function' ? ctx.log : null
 	const loaded = moduleRegistry.isLoaded(p.moduleName) || moduleRegistry.tryLoad(p.moduleName, log)
 	if (!loaded) {
@@ -219,5 +231,7 @@ module.exports = {
 	enablePluginNow,
 	disablePluginNow,
 	validatePluginInput,
+	isValidPluginId,
+	isValidModuleName,
 }
 

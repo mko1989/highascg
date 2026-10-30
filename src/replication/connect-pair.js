@@ -15,6 +15,7 @@ const {
 	installPeerAuthorizedKey,
 	ensurePeerAuthorizedKeyFromConfig,
 	testReplicationSshToPeer,
+	isValidPeerHost,
 } = require('./replication-ssh-setup')
 
 async function disconnectToStandalone(ctx, runtime, opts = {}) {
@@ -109,6 +110,7 @@ async function connectToLeader(ctx, runtime, opts) {
 	const leaderHost = String(opts.leaderHost || '').trim()
 	const leaderPort = parseInt(String(opts.leaderPort ?? 4200), 10) || 4200
 	if (!leaderHost) return { ok: false, error: 'leaderHost required' }
+	if (!isValidPeerHost(leaderHost)) return { ok: false, error: 'leaderHost must be a hostname or IP address' }
 
 	const ping = await peerHttpRequest({ host: leaderHost, port: leaderPort, token: '' }, '/api/replication/ping')
 	if (!ping.ok || !ping.json?.leaderAvailable) return { ok: false, error: 'leader not available at host' }
@@ -277,6 +279,8 @@ async function registerFollowerOnLeader(ctx, body) {
 	const followerHost = String(body.followerHost || body.peerHost || '').trim()
 	const followerSyncthingId = String(body.syncthingDeviceId || '').trim()
 	if (!followerHost) return { ok: false, error: 'followerHost required' }
+	// WO-830b: followerHost reaches authorized_keys (`from=`) and ssh argv — hostname / IP only.
+	if (!isValidPeerHost(followerHost)) return { ok: false, status: 400, error: 'followerHost must be a hostname or IP address' }
 
 	const prevHost = String(repl.peer?.host || '').trim()
 	if (prevHost && prevHost !== followerHost && typeof ctx.log === 'function') {
@@ -306,7 +310,8 @@ async function registerFollowerOnLeader(ctx, body) {
 		}
 	}
 
-	const followerCasparHost = String(body.followerCasparHost || body.peerCasparHost || followerHost).trim()
+	let followerCasparHost = String(body.followerCasparHost || body.peerCasparHost || followerHost).trim()
+	if (!isValidPeerHost(followerCasparHost)) followerCasparHost = followerHost
 	const followerCasparPort =
 		Math.max(1, parseInt(String(body.followerCasparPort ?? body.peerCasparPort ?? 5250), 10) || 5250)
 

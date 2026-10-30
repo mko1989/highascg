@@ -51,11 +51,28 @@ under_allowed_root() {
 	return 1
 }
 
+# WO-830b: the ONLY options the replication code makes rsync send to the receiving side (captured from
+# rsync 3.4.1 for sync-project-media-rsync.js rsyncArgs push/pull and the testReplicationSshToPeer probe):
+#   push       rsync --server -vlogDtprRze.iLsfxCIvu --mkpath . <root>/media/
+#   pull       rsync --server --sender -vlogDtprze.iLsfxCIvu . <root>/media/x/
+#   dry probe  rsync --server --sender -vnlogDtprze.iLsfxCIvu . <root>/media/
+# Short options are the -a/-v/-n/-z/-R letters plus rsync's own `e.<capability letters>` trailer; long options are
+# --server, --sender, --mkpath. Anything else (--daemon, --config=, --log-file=, -T, -f, --rsh, ...) used to pass
+# through and let the peer read or write any file as casparcg.
+validate_option() {
+	local tok="$1"
+	case "$tok" in
+		--server | --sender | --mkpath) return 0 ;;
+	esac
+	[[ "$tok" =~ ^-[vnlogDtprRz]+e\.[A-Za-z]*$ ]] && return 0
+	die "disallowed rsync option: $tok"
+}
+
 validate_token() {
 	local tok="$1"
 	[[ -n "$tok" ]] || return 0
 	[[ "$tok" == "." ]] && return 0
-	[[ "$tok" == -* ]] && return 0
+	# WO-830b: options never reach here — they are allow-listed by validate_option; a path may not start with '-'.
 	case "$tok" in
 		media|media/*|template|template/*) return 0 ;;
 	esac
@@ -115,7 +132,11 @@ for ((i = 2; i < ${#argv[@]}; i++)); do
 	fi
 	# again on the real text: "\.\." is no ".." on the command line, but it is one in the word
 	[[ "${argv[i]}" == *..* ]] && die "path traversal not allowed"
-	validate_token "${argv[i]}"
+	if [[ "${argv[i]}" == -* ]]; then
+		validate_option "${argv[i]}"
+	else
+		validate_token "${argv[i]}"
+	fi
 done
 
 RSYNC_BIN="$(command -v rsync || echo /usr/bin/rsync)"

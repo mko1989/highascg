@@ -31,6 +31,32 @@ async function execFirst(bins, args) {
 }
 
 /**
+ * WO-830b: the label ends up in a root-run wrapper (and a modprobe argument), so keep only a strict
+ * ASCII set. Anything else (`$`, backtick, quotes, backslash, CR/LF, `(`...) becomes `_`.
+ * @param {unknown} label
+ * @returns {string}
+ */
+function sanitizeCardLabel(label) {
+	const clean = String(label == null ? '' : label)
+		.replace(/[^A-Za-z0-9 ._-]/g, '_')
+		.slice(0, 64)
+		.trim()
+	return clean || 'CasparCG Out'
+}
+
+/** WO-830b: ALSA card id — the wrapper enforces the same `[A-Za-z0-9_-]+` pattern. */
+function sanitizeAlsaId(id) {
+	return String(id == null ? '' : id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) || 'HighAsCG_VCam'
+}
+
+/** WO-830b: clamp to a plain integer inside [min, max]; never emit NaN or anything non-numeric. */
+function clampInt(v, min, max, fallback) {
+	const n = parseInt(String(v), 10)
+	if (!Number.isFinite(n)) return fallback
+	return Math.min(max, Math.max(min, n))
+}
+
+/**
  * @param {object} config
  * @returns {{ videoNr: number, cardLabel: string, device: string }}
  */
@@ -38,7 +64,7 @@ function resolveV4l2LoopbackConfig(config) {
 	const vc = normalizeVirtualCameraConfig(config?.virtualCamera)
 	const device = vc.device
 	const videoNr = parseInt(String(device).replace('/dev/video', ''), 10)
-	const cardLabel = String(vc.label || 'CasparCG Out').slice(0, 64)
+	const cardLabel = sanitizeCardLabel(vc.label)
 	return {
 		videoNr: Number.isFinite(videoNr) ? videoNr : 10,
 		cardLabel,
@@ -74,12 +100,14 @@ function writeVcamModulesConf(config) {
 	const alsa = resolveAlsaLoopbackConfig(config)
 	const dir = path.dirname(VCAM_CONF_PATH)
 	fs.mkdirSync(dir, { recursive: true })
+	// WO-830b: every value is re-validated here (the root wrapper re-checks with a strict parser and
+	// does NOT `source` this file). Ranges match the wrapper's.
 	const body = [
-		`VIDEO_NR=${videoNr}`,
-		`CARD_LABEL=${shellConfQuote(cardLabel)}`,
-		`ALSA_INDEX=${alsa.cardIndex}`,
-		`ALSA_ID=${alsa.configuredCardId}`,
-		`ALSA_PCM=${alsa.pcmDevices}`,
+		`VIDEO_NR=${clampInt(videoNr, 0, 63, 10)}`,
+		`CARD_LABEL=${shellConfQuote(sanitizeCardLabel(cardLabel))}`,
+		`ALSA_INDEX=${clampInt(alsa.cardIndex, 0, 31, 20)}`,
+		`ALSA_ID=${sanitizeAlsaId(alsa.configuredCardId)}`,
+		`ALSA_PCM=${clampInt(alsa.pcmDevices, 1, 8, 2)}`,
 		`AUDIO_ENABLED=${vc.audioEnabled ? 1 : 0}`,
 		'',
 	].join('\n')
@@ -158,6 +186,8 @@ module.exports = {
 	VCAM_CONF_PATH,
 	VCAM_MODULES_WRAPPER,
 	resolveV4l2LoopbackConfig,
+	sanitizeCardLabel,
+	sanitizeAlsaId,
 	v4l2DevicePresent,
 	writeVcamModulesConf,
 	ensureVcamKernelModules,

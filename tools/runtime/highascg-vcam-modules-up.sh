@@ -10,15 +10,64 @@ CONF=/run/highascg/vcam-modules.conf
 	exit 1
 }
 
-# shellcheck disable=SC1090
-source "$CONF"
+# WO-830b: this runs as root and the file is written by the (unprivileged) node process, so it is
+# DATA, never code: no `source`. Each line must be exactly KEY=VALUE (VALUE optionally in "..."),
+# KEY from a fixed list; the value charset is checked per key below. Anything else aborts.
+VIDEO_NR=10
+CARD_LABEL="CasparCG Out"
+ALSA_INDEX=20
+ALSA_ID=HighAsCG_VCam
+ALSA_PCM=2
+AUDIO_ENABLED=1
 
-VIDEO_NR="${VIDEO_NR:-10}"
-CARD_LABEL="${CARD_LABEL:-CasparCG Out}"
-ALSA_INDEX="${ALSA_INDEX:-20}"
-ALSA_ID="${ALSA_ID:-HighAsCG_VCam}"
-ALSA_PCM="${ALSA_PCM:-2}"
-AUDIO_ENABLED="${AUDIO_ENABLED:-1}"
+line_re='^([A-Z_]+)=(.*)$'
+quoted_re='^"([A-Za-z0-9 ._-]*)"$'
+while IFS= read -r line || [[ -n "$line" ]]; do
+	[[ -z "$line" ]] && continue
+	if ! [[ "$line" =~ $line_re ]]; then
+		echo "invalid line in $CONF" >&2
+		exit 1
+	fi
+	key="${BASH_REMATCH[1]}"
+	val="${BASH_REMATCH[2]}"
+	if [[ "$val" =~ $quoted_re ]]; then
+		val="${BASH_REMATCH[1]}"
+	fi
+	case "$key" in
+		VIDEO_NR | ALSA_INDEX | ALSA_PCM)
+			[[ "$val" =~ ^[0-9]{1,3}$ ]] || {
+				echo "invalid $key" >&2
+				exit 1
+			}
+			printf -v "$key" '%s' "$val"
+			;;
+		CARD_LABEL)
+			[[ "$val" =~ ^[A-Za-z0-9\ ._-]{1,64}$ ]] || {
+				echo "invalid CARD_LABEL" >&2
+				exit 1
+			}
+			CARD_LABEL="$val"
+			;;
+		ALSA_ID)
+			[[ "$val" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || {
+				echo "invalid ALSA_ID" >&2
+				exit 1
+			}
+			ALSA_ID="$val"
+			;;
+		AUDIO_ENABLED)
+			[[ "$val" =~ ^(0|1|true|false|yes|no)$ ]] || {
+				echo "invalid AUDIO_ENABLED" >&2
+				exit 1
+			}
+			AUDIO_ENABLED="$val"
+			;;
+		*)
+			echo "unknown key $key" >&2
+			exit 1
+			;;
+	esac
+done <"$CONF"
 
 if ! [[ "$VIDEO_NR" =~ ^[0-9]+$ ]] || (( VIDEO_NR < 0 || VIDEO_NR > 63 )); then
 	echo "invalid VIDEO_NR" >&2
