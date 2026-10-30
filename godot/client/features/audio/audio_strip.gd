@@ -145,15 +145,21 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: 
 		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		badge.add_theme_color_override("font_color", ThemeBuilder.WARN if r.get("isPreview", false) == true else ThemeBuilder.ERROR)
 		acts.add_child(badge)
+	var sm := HBoxContainer.new()  # SOLO | MUTE side by side, small (owner 30.10: they were huge)
+	sm.add_theme_constant_override("separation", 2)
 	if r.get("isLiveInput", false) != true:
-		_solo = _toggle("S" if _dense else "SOLO", "Solo to the monitor output (Ctrl+click: add to the solo set)", ThemeBuilder.WARN)
+		_solo = _signal_toggle("S" if _dense else "SOLO", "Solo to the monitor output (Ctrl+click: add to the solo set)", ThemeBuilder.ORANGE)
 		_solo.pressed.connect(func() -> void: solo_pressed.emit(Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_META)))
-		acts.add_child(_solo)
+		sm.add_child(_solo)
 	if not master:
-		_mute = _toggle("M" if _dense else "MUTE", "Mute", ThemeBuilder.ERROR)
+		_mute = _signal_toggle("M" if _dense else "MUTE", "Mute", ThemeBuilder.ERROR)
 		_mute.button_pressed = r.get("muted", false) == true
 		_mute.pressed.connect(func() -> void: mute_pressed.emit())  # the button has already toggled: muted() = the new state
-		acts.add_child(_mute)
+		sm.add_child(_mute)
+	if sm.get_child_count() > 0:
+		acts.add_child(sm)
+	else:
+		sm.free()
 	if r.get("isAudioOnlyLook", false) == true:
 		var stop := _button("STOP", "Stop this audio-only look (the channel's video look stays)")
 		stop.pressed.connect(func() -> void: stop_pressed.emit())
@@ -168,6 +174,7 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: 
 		_send.tooltip_text = SEND_TIP
 		_send.add_theme_font_size_override("font_size", 10)
 		_send.fit_to_longest_item = false
+		_compact(_send)
 		for k in AA.SENDS:
 			_send.add_item(SEND_TEXT[k])
 		_send.item_selected.connect(func(i: int) -> void: send_selected.emit(AA.SENDS[i]))
@@ -235,6 +242,7 @@ func enable_monitor_pairs(pairs: Array) -> void:
 	_pair.tooltip_text = PAIR_TIP
 	_pair.add_theme_font_size_override("font_size", 10)
 	_pair.fit_to_longest_item = false
+	_compact(_pair)
 	for p in _pairs:
 		_pair.add_item(AA.monitor_pair_text(str(p)))
 	_pair.item_selected.connect(func(i: int) -> void: monitor_pair_selected.emit(str(_pairs[i])))
@@ -265,7 +273,8 @@ func _button(text: String, tip: String) -> Button:
 	b.text = text
 	b.tooltip_text = tip
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 11)
+	b.add_theme_font_size_override("font_size", 10)
+	_compact(b)
 	return b
 
 
@@ -296,16 +305,46 @@ func _compact_toggle(text: String, tip: String, on_colour: Color) -> Button:
 	var b := _toggle(text, tip, on_colour)
 	b.add_theme_font_size_override("font_size", 10)
 	b.custom_minimum_size = Vector2(30, 0)
-	for st in ["normal", "hover", "focus", "disabled", "pressed", "hover_pressed"]:
-		var sb := b.get_theme_stylebox(st)
+	_compact(b)
+	return b
+
+
+## SOLO / MUTE: a compact toggle that always shows its colour — coloured text off, filled with dark text on.
+func _signal_toggle(text: String, tip: String, colour: Color) -> Button:
+	var b := _toggle(text, tip, colour)
+	b.add_theme_font_size_override("font_size", 10)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.clip_text = true
+	for st in ["pressed", "hover_pressed"]:
+		b.add_theme_stylebox_override(st, ThemeBuilder.box(colour if st == "pressed" else colour.lightened(0.15), colour, 1, 4))
+	_compact(b)
+	for c in ["font_color", "font_hover_color"]:
+		b.add_theme_color_override(c, colour)
+	for c in ["font_pressed_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(c, ThemeBuilder.BG_DARK)
+	return b
+
+
+## Shrink a strip control to 3 px side / 1 px top-bottom padding (the theme's 8 px made every strip button huge). States
+## without an override get the dock's small-button boxes (the pre-tree theme lookup is Godot's default, near invisible).
+static func _compact(c: Control) -> void:
+	var base := {
+		"normal": ThemeBuilder.box(ThemeBuilder.BG_ELEVATED, ThemeBuilder.BORDER, 1, 4),
+		"hover": ThemeBuilder.box(ThemeBuilder.BG_ELEVATED.lightened(0.08), ThemeBuilder.TEXT_MUTED, 1, 4),
+		"disabled": ThemeBuilder.box(ThemeBuilder.BG_PANEL, ThemeBuilder.BORDER, 1, 4),
+		"pressed": ThemeBuilder.box(ThemeBuilder.BORDER, ThemeBuilder.TEXT_MUTED, 1, 4),
+	}
+	base["hover_pressed"] = base["pressed"]
+	for st in base:
+		var sb: StyleBox = c.get_theme_stylebox(st) if c.has_theme_stylebox_override(st) else base[st]
 		if sb is StyleBoxFlat:
 			var d := (sb as StyleBoxFlat).duplicate() as StyleBoxFlat
 			d.content_margin_left = 3
 			d.content_margin_right = 3
 			d.content_margin_top = 1
 			d.content_margin_bottom = 1
-			b.add_theme_stylebox_override(st, d)
-	return b
+			c.add_theme_stylebox_override(st, d)
+	c.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 
 func _draw_scale(c: Control) -> void:

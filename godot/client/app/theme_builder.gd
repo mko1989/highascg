@@ -14,6 +14,7 @@ const ACCENT_GREEN := Color("#2ecc71")
 const ACCENT_RED := Color("#e74c3c")
 const SUCCESS := Color("#3fb950")
 const WARN := Color("#d29922")
+const ORANGE := Color("#f0883e")  # audio SOLO (owner 30.10: red mute, orange solo)
 const ERROR := Color("#f85149")
 const RADIUS := 6
 const HEADER_H := 48
