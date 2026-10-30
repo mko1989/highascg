@@ -13,7 +13,8 @@ var t
 
 
 func _tmp(name: String) -> String:
-	return OS.get_cache_dir().path_join("wo843_%s_%d.cfg" % [name, Time.get_ticks_usec()])
+	# user:// always exists (the engine creates it); OS.get_cache_dir() (~/.cache) does not on a fresh CI runner.
+	return ProjectSettings.globalize_path("user://wo843_%s_%d.cfg" % [name, Time.get_ticks_usec()])
 
 
 # --- 4f: the splitter writes into the file as it is NOW, not as it was when the tab was built ------------------------

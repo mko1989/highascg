@@ -2,6 +2,10 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
+const { spawnSync } = require('node:child_process')
 const {
 	CustomXrandrModeRegistry,
 	buildCustomModeBootstrapShellLines,
@@ -61,11 +65,50 @@ test('buildApplyLayoutScriptContent orders custom modes before layout xrandr', (
 	assert.ok(primaryIdx > layoutIdx)
 })
 
+/**
+ * `cvt` ships in xserver-xorg-core, which a bare CI runner lacks, so the plumbing test injects a
+ * deterministic `cvt` shim through the `env` argument (PATH-first) instead of relying on the host.
+ */
+function withShimmedCvt(fn) {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cvt-shim-'))
+	try {
+		const bin = path.join(dir, 'cvt')
+		fs.writeFileSync(
+			bin,
+			[
+				'#!/bin/sh',
+				'echo "# $1x$2 49.93 Hz (CVT) hsync: 56.00 kHz; pclk: 141.50 MHz"',
+				'echo "Modeline \\"$1x$2_$3.00\\"  141.50  $1 1488 1632 1840  $2 1083 1088 1122 -hsync +vsync"',
+				'',
+			].join('\n'),
+			{ mode: 0o755 },
+		)
+		return fn({ ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH || ''}` })
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true })
+	}
+}
+
 test('computeModelineForWxH returns parsed mode without xrandr side effects', () => {
-	const plan = computeModelineForWxH({ width: 1920, height: 1080, refreshHz: 50, timingKind: 'cvt' })
+	const plan = withShimmedCvt((env) =>
+		computeModelineForWxH({ width: 1920, height: 1080, refreshHz: 50, timingKind: 'cvt', env }),
+	)
 	assert.ok(plan)
 	assert.match(plan.modeName, /^1920x1080_/)
 	assert.ok(plan.timings.length >= 9)
 	assert.equal(plan.width, 1920)
 	assert.equal(plan.height, 1080)
+	assert.equal(plan.timingKind, 'cvt')
 })
+
+const hasCvt = spawnSync('cvt', ['64', '64', '60'], { stdio: 'ignore' }).status === 0
+test(
+	'computeModelineForWxH works against the real host cvt',
+	{ skip: hasCvt ? false : 'host cvt binary not installed (xserver-xorg-core); plumbing covered by the shim test above' },
+	() => {
+		const plan = computeModelineForWxH({ width: 1920, height: 1080, refreshHz: 50, timingKind: 'cvt' })
+		assert.ok(plan)
+		assert.match(plan.modeName, /^1920x1080_/)
+		assert.ok(plan.timings.length >= 9)
+	},
+)

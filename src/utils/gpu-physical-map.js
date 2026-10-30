@@ -27,7 +27,7 @@ function canonicalPairName(a, b) {
  * @param {string|null} gpuModel
  * @returns {{ rows: object[], source: string }}
  */
-function resolvePhysicalTopology(cfg, gpuModel) {
+function resolvePhysicalTopology(cfg, gpuModel, xrandrRaw) {
 	const arr = Array.isArray(cfg?.gpuPhysicalTopology) ? cfg.gpuPhysicalTopology : null
 	if (arr?.length) {
 		const out = []
@@ -51,7 +51,7 @@ function resolvePhysicalTopology(cfg, gpuModel) {
 		}
 	}
 
-	const probed = discoverGpuPhysicalTopology({ config: cfg })
+	const probed = discoverGpuPhysicalTopology({ config: cfg, xrandrRaw })
 	if (probed?.rows?.length) {
 		return { rows: probed.rows, source: probed.source }
 	}
@@ -68,11 +68,15 @@ function drmLookupKey(name) {
 	return String(name || '').trim().toLowerCase()
 }
 
-function buildGpuPhysicalMap({ config, displays, connectors }) {
+/**
+ * @param {{ config?: object, displays?: object[], connectors?: object[], xrandrRaw?: string }} p
+ *   `xrandrRaw` (optional) injects the `xrandr --query` text for discovery instead of probing the host.
+ */
+function buildGpuPhysicalMap({ config, displays, connectors, xrandrRaw }) {
 	const gpuModel = getGpuModel()
-	const { rows: topology, source: topologySource } = resolvePhysicalTopology(config, gpuModel)
+	const { rows: topology, source: topologySource } = resolvePhysicalTopology(config, gpuModel, xrandrRaw)
 	const savedConfig = Array.isArray(config?.gpuPhysicalTopology) ? config.gpuPhysicalTopology : []
-	const probe = discoverGpuPhysicalTopology({ config })
+	const probe = discoverGpuPhysicalTopology({ config, xrandrRaw })
 	const discoveredRows = probe?.rows || null
 	const displayList = (Array.isArray(displays) ? displays : [])
 		.map((d) => (d && typeof d === 'object' ? d : null))

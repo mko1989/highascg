@@ -48,7 +48,7 @@ describe('gpu physical map', () => {
 			{ name: 'DP-4', shortName: 'DP-4', connected: true, xrandrName: 'DP-4' },
 			{ name: 'DP-5', shortName: 'DP-5', connected: false, xrandrName: 'DP-5' },
 		]
-		const map = buildGpuPhysicalMap({ config, displays, connectors })
+		const map = buildGpuPhysicalMap({ config, displays, connectors, xrandrRaw: NVIDIA_595_XRANDR })
 		const byId = Object.fromEntries(map.ports.map((p) => [p.physicalPortId, p]))
 		assert.equal(byId.gpu_p0.runtime.xrandrName, null)
 		assert.equal(byId.gpu_p0.runtime.connected, false)
@@ -70,7 +70,12 @@ describe('gpu physical map', () => {
 				...discovered.slice(1),
 			],
 		}
-		const map = buildGpuPhysicalMap({ config, displays: [], connectors: [] })
+		const map = buildGpuPhysicalMap({
+			config,
+			displays: [],
+			connectors: [],
+			xrandrRaw: NVIDIA_595_XRANDR, // hermetic: do not probe the host's xrandr/DRM
+		})
 		assert.equal(map.topologyMismatch, true)
 		assert.ok(Array.isArray(map.suggestedTopology))
 		assert.equal(map.suggestedTopology[0].dpA, 'DP-0')
