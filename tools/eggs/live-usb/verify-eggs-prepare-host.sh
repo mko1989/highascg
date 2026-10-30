@@ -171,7 +171,12 @@ if ss -tln 2>/dev/null | grep -q ':5250 '; then
 		_args="$(tr '\0' ' ' <"/proc/${_pid}/cmdline" 2>/dev/null || true)"
 		[[ "$_args" == *run.sh* ]] || continue
 		_cwd="$(readlink -f "/proc/${_pid}/cwd" 2>/dev/null || true)"
-		[[ "$_cwd" == "$HIGHASCG_ROOT" ]] && n_run=$((n_run + 1))
+		[[ "$_cwd" == "$HIGHASCG_ROOT" ]] || continue
+		# run.sh forks subshells (hang detector, WO-805) that keep its argv — count only a run.sh whose parent is not one.
+		_ppid="$(awk '/^PPid:/{print $2}' "/proc/${_pid}/status" 2>/dev/null || true)"
+		_pargs="$(tr '\0' ' ' <"/proc/${_ppid:-0}/cmdline" 2>/dev/null || true)"
+		[[ "$_pargs" == *run.sh* ]] && continue
+		n_run=$((n_run + 1))
 	done
 	if [[ "$n_main" -gt 1 || "$n_run" -gt 1 ]]; then
 		fail "duplicate Caspar supervisors (main=${n_main}, run.sh=${n_run}) on :5250 — stop extras before produce"

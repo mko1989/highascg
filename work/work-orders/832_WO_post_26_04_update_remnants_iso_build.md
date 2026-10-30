@@ -140,3 +140,15 @@ bash /home/casparcg/highascg/tools/release/collect-third-party-licenses.sh
 The stale `/usr/local/lib/highascg/{decklink-dkms-cache-lib.sh,highascg-apply-server-drop.sh}` are refreshed by the build's own
 `prepare-eggs-clone-with-exfat.sh` → `install-exfat-systemd-units.sh`; to refresh them now: `sudo bash /home/casparcg/highascg/scripts/install-exfat-systemd-units.sh casparcg`.
 The old 6.8.0-117 kernel packages stay until the build's sync step purges them (it now will, and will refuse to touch 7.0.0-38).
+
+## Owner run, 30.10 — results
+
+- Commands 1–3 took: kernel pin OK (7.0.0-38), theme OK, `/etc/highascg/nvidia-iso-driver` = 615, `cmp` of the installed
+  X apply script vs `tools/runtime/` is identical; exfat units installed. Licence refresh ran (no sudo): the manifest names
+  `nvidia-driver-615-open`.
+- Verify reported "duplicate Caspar supervisors (main=1, run.sh=2)". **False positive:** the second run.sh (ppid = the main
+  run.sh, child `sleep 10`) is run.sh's forked hang-detector subshell (WO-805), which keeps run.sh's argv. Fixed in
+  `tools/eggs/live-usb/verify-eggs-prepare-host.sh`: a run.sh whose parent is a run.sh is not counted. Dry run of the loop on
+  the box: the subshell is skipped, count 1.
+- "missing /etc/calamares" and `unknown command "produce"`: eggs is now 26.10.25, a rewrite (`produce` → `remaster`, no
+  `--theme/--basename/--max/--nointeractive`, no `calamares` command). Split out as **WO-870**, which blocks the next ISO build.
