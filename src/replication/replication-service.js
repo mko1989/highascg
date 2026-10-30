@@ -126,6 +126,11 @@ function startReplicationService(ctx, wsInfo = {}) {
 		markLiveStateDirty(runtime, ctx)
 	})
 
+	// WO-842 (sweep 4e): publish the runtime BEFORE the boot reload — reloadReplicationFromConfig looks it up
+	// via getReplicationRuntime(ctx) and returned "runtime not started" (a silent no-op) when this ran first.
+	ctx._replication = runtime
+	setReplicationRuntime(runtime, ctx)
+
 	if (repl.enabled && repl.peer.host) {
 		const { reloadReplicationFromConfig } = require('./replication-reload')
 		reloadReplicationFromConfig(ctx)
@@ -154,13 +159,11 @@ function startReplicationService(ctx, wsInfo = {}) {
 		})()
 	}
 
-	ctx._replication = runtime
 	ctx.onProjectSavedForReplication = (project) => {
 		void pushProjectToPeer(ctx, runtime, project, { reason: 'save' })
 	}
 	ctx.markReplicationLiveStateDirty = () => markLiveStateDirty(runtime, ctx)
 
-	setReplicationRuntime(runtime, ctx)
 	return runtime
 }
 

@@ -28,9 +28,26 @@ now_ms() {
 	fi
 }
 
+# WO-842 (sweep 5 Ops): `evtest --query DEV EV_KEY KEY_POWER` only says whether the key is pressed RIGHT NOW (rc 10) and
+# returns 0 for every readable device — so the PWRBN and /dev/input/event* fallbacks took the first node, event0 =
+# "Sleep Button" (KEY_SLEEP) on a box whose ACPI button is named differently, and --grab'ed the wrong device. Test the
+# capability bitmap instead: /sys/class/input/eventN/device/capabilities/key is hex words, most significant first,
+# one word per LONG_BIT bits.
+INPUT_SYSFS="${HIGHASCG_INPUT_SYSFS:-/sys/class/input}"
 _event_has_key_power() {
-	local dev="$1"
-	[[ -e "$dev" ]] && evtest --query "$dev" EV_KEY KEY_POWER >/dev/null 2>&1
+	local dev="$1" ev caps bits idx bit w
+	local -a words
+	ev="$(basename "$dev")"
+	caps="${INPUT_SYSFS}/${ev}/device/capabilities/key"
+	[[ -e "$dev" && -r "$caps" ]] || return 1
+	read -r -a words <"$caps" || return 1
+	bits="$(getconf LONG_BIT 2>/dev/null || echo 64)"
+	idx=$((KEY_CODE / bits))
+	bit=$((KEY_CODE % bits))
+	((idx < ${#words[@]})) || return 1
+	w="${words[$((${#words[@]} - 1 - idx))]}"
+	[[ "$w" =~ ^[0-9a-fA-F]+$ ]] || return 1
+	(((16#$w >> bit) & 1))
 }
 
 _find_power_events_from_proc() {

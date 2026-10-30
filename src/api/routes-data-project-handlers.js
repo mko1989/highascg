@@ -352,6 +352,14 @@ async function handleProject(path, body, ctx) {
 				body: jsonBody({ ok: true, slug: toSlug, activeSlug: toSlug }),
 			}
 		}
+		// WO-842 (sweep 4g): never rename onto another show — persistProject would overwrite its file
+		if (!toSlug || projectStore.readProjectFile(toSlug)) {
+			return {
+				status: 409,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: toSlug ? `A project named "${newName}" already exists` : 'Invalid project name', slug: toSlug }),
+			}
+		}
 		const renamed = {
 			...existing,
 			name: newName,

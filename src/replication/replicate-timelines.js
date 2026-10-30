@@ -6,6 +6,8 @@ const { getReplicationConfig } = require('../config/replication-config')
 const { peerPost, SYNC_REQUEST_TIMEOUT_MS } = require('./peer-client')
 
 const REPO_ROOT = path.resolve(__dirname, '../..')
+/** WO-842 (sweep 5): ids become a file name — no separators / dots-only segments, same charset the engine uses. */
+const TIMELINE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const TIMELINES_DIR = path.join(REPO_ROOT, 'timelines')
 
 /**
@@ -43,6 +45,7 @@ async function receiveTimelineFromPeer(ctx, body) {
 
 	const timelineId = String(body.timelineId || '').trim()
 	if (!timelineId) return { ok: false, error: 'missing timelineId' }
+	if (!TIMELINE_ID_RE.test(timelineId)) return { ok: false, error: 'invalid timelineId' }
 
 	if (body.deleted) {
 		const filePath = path.join(TIMELINES_DIR, `${timelineId}.json`)
@@ -71,4 +74,4 @@ async function receiveTimelineFromPeer(ctx, body) {
 	return { ok: true, timelineId }
 }
 
-module.exports = { pushTimelineToPeer, receiveTimelineFromPeer, TIMELINES_DIR }
+module.exports = { pushTimelineToPeer, receiveTimelineFromPeer, TIMELINES_DIR, TIMELINE_ID_RE }

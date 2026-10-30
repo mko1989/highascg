@@ -210,16 +210,18 @@ decklink_install_vendor_pair() {
 	if ! decklink_dkms_cache_restore "$ver" "$krel"; then
 		decklink_ensure_dkms_prereqs || return 1
 	fi
-	if [[ -n "$gui_deb" && -f "$gui_deb" ]]; then
-		DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb" "$gui_deb" || {
-			DEBIAN_FRONTEND=noninteractive apt-get install -f -y
-			DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb" "$gui_deb"
-		}
-	else
-		DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb" || {
-			DEBIAN_FRONTEND=noninteractive apt-get install -f -y
-			DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb"
-		}
+	# WO-842 (sweep 5 Ops): callers use `if decklink_install_vendor_pair …`, which turns `set -e` OFF for this whole
+	# body — a retry `dpkg -i` that still failed fell through to `return 0` and the service logged "ok: installed".
+	# Every failure is therefore an explicit `return 1`.
+	local -a debs=("$main_deb")
+	[[ -n "$gui_deb" && -f "$gui_deb" ]] && debs+=("$gui_deb")
+	if ! DEBIAN_FRONTEND=noninteractive dpkg -i "${debs[@]}"; then
+		DEBIAN_FRONTEND=noninteractive apt-get install -f -y || true
+		if ! DEBIAN_FRONTEND=noninteractive dpkg -i "${debs[@]}"; then
+			echo "decklink: dpkg -i failed after apt-get install -f (${debs[*]##*/})" >&2
+			[[ -z "$extract_dir" || ! -d "$extract_dir" ]] || rm -rf "$extract_dir"
+			return 1
+		fi
 	fi
 	decklink_rebuild_blackmagic_dkms || true
 	modprobe blackmagic_io 2>/dev/null || true

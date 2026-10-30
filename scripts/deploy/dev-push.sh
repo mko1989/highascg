@@ -2,7 +2,8 @@
 # Dev deploy: tar the unified repo → upload to /tmp on the playout host → ssh and extract.
 # Includes dist-web/ (built operator UI) by default. UI sources: client/ in this repo.
 #
-# Preserves machine-local paths on the target (never in tarball): bin/, lib/, cef-cache/, media/, config/, .env.
+# Preserves machine-local paths on the target (never in tarball, never deleted by the cleanup): bin/, lib/, cef-cache/,
+# media/, config/, data/, .private/, projects/, applied/, log/, node_modules/, .env.
 #
 # Config: `.env.deploy` in repo root, or export DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH, …
 # See comments in this file for DEPLOY_USE_SFTP, DEPLOY_REMOTE_SUDO, passwords, etc.
@@ -97,16 +98,43 @@ fi
 local_excludes=()
 archive_common_deploy_tar_excludes local_excludes
 archive_common_apply_deploy_packaging_rules "$ROOT" local_excludes
+# WO-842: per-box state never travels (the source's api-token / projects would overlay the target's on extract)
+local_excludes+=(--exclude=./.private --exclude=./projects --exclude=./applied)
 
 echo "→ tar → $TMP (server-only=${DEPLOY_SERVER_ONLY:-0})"
 tar czf "$TMP" "${local_excludes[@]}" .
+
+# WO-842 (sweep 4k): the remote cleanup used to `rm -rf` EVERY top-level entry that was not on a short keep list, which
+# took out data/, .private/api-token, projects/, log/ and applied/ of the target (the tarball never carries them). It now
+# removes only the top-level entries this tarball actually ships (an explicit, derived allowlist of what the push manages,
+# so stale files inside src/, client/, ... still go) and never one of the machine-local PROTECTED names, even if shipped.
+DEPLOY_PATH="${DEPLOY_PATH%/}"
+if [[ "$DEPLOY_PATH" != /* || "$(awk -F/ '{n=0; for(i=1;i<=NF;i++) if($i!="") n++; print n}' <<<"$DEPLOY_PATH")" -lt 2 ]]; then
+	echo "deploy failed: DEPLOY_PATH must be an absolute path at least two levels deep (got '${DEPLOY_PATH}')." >&2
+	exit 1
+fi
+DEPLOY_PROTECTED=(
+	config data .private projects applied log media _media bin lib cef-cache node_modules
+	.env .env.local highascg.config.json .highascg-state.json .module-state.json .highascg-previs
+)
+managed_names=()
+while IFS= read -r _name; do
+	[[ -z "$_name" || "$_name" == "." ]] && continue
+	if [[ ! "$_name" =~ ^[A-Za-z0-9._-]+$ || "$_name" == "." || "$_name" == ".." ]]; then
+		echo "WARN: not cleaning odd top-level name in tarball: ${_name}" >&2
+		continue
+	fi
+	for _p in "${DEPLOY_PROTECTED[@]}"; do [[ "$_name" == "$_p" ]] && continue 2; done
+	managed_names+=("$_name")
+done < <(tar tzf "$TMP" | sed -E 's#^\./##; s#/.*$##' | sort -u)
+MANAGED_LIST="${managed_names[*]}"
 
 PATH_Q=$(printf '%q' "$DEPLOY_PATH")
 TGZ_Q=$(printf '%q' "$DEPLOY_REMOTE_TMP")
 INDEX_Q=$(printf '%q' "${DEPLOY_PATH}/index.js")
 PKG_Q=$(printf '%q' "${DEPLOY_PATH}/package.json")
 
-REMOTE_INNER="set -euo pipefail; mkdir -p ${PATH_Q}; find ${PATH_Q} -mindepth 1 -maxdepth 1 ! -name 'highascg.config.json' ! -name '.highascg-state.json' ! -name '.module-state.json' ! -name '.highascg-previs' ! -name 'config' ! -name 'node_modules' ! -name 'media' ! -name 'bin' ! -name 'lib' ! -name 'cef-cache' ! -name '.env' -exec rm -rf {} +; env -u TAR_OPTIONS tar -m -xzf ${TGZ_Q} -C ${PATH_Q}; rm -f ${TGZ_Q}; if [[ ! -d ${PATH_Q}/node_modules ]]; then (cd ${PATH_Q} && npm ci --omit=dev); fi; ENV_F=${PATH_Q}/.env; touch \"\$ENV_F\"; if grep -q '^HIGHASCG_HEADLESS=true' \"\$ENV_F\" 2>/dev/null; then sed -i '/^HIGHASCG_HEADLESS=true/d' \"\$ENV_F\"; fi; chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${PATH_Q}"
+REMOTE_INNER="set -euo pipefail; mkdir -p ${PATH_Q}; for n in ${MANAGED_LIST}; do rm -rf -- ${PATH_Q}/\"\$n\"; done; env -u TAR_OPTIONS tar -m -xzf ${TGZ_Q} -C ${PATH_Q}; rm -f ${TGZ_Q}; if [[ ! -d ${PATH_Q}/node_modules ]]; then (cd ${PATH_Q} && npm ci --omit=dev); fi; ENV_F=${PATH_Q}/.env; touch \"\$ENV_F\"; if grep -q '^HIGHASCG_HEADLESS=true' \"\$ENV_F\" 2>/dev/null; then sed -i '/^HIGHASCG_HEADLESS=true/d' \"\$ENV_F\"; fi; chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${PATH_Q}"
 if [[ "$DEPLOY_REMOTE_SUDO" == "1" ]]; then
 	if [[ -n "$DEPLOY_SUDO_PASSWORD" ]]; then
 		SUDO_PW_SQ=${DEPLOY_SUDO_PASSWORD//\'/\'\"\'\"\'}

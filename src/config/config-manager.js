@@ -6,6 +6,7 @@ const EventEmitter = require('events')
 const defaults = require('./defaults')
 const { finalizeScreenDestinationsConfig } = require('./screen-destinations')
 const { applyStreamRecordMappingsFromGraph } = require('./device-graph-output-mapping')
+const { atomicWriteFileSync } = require('../utils/atomic-file-write')
 
 /**
  * Top-level keys that should be saved to separate files when in modular mode.
@@ -236,9 +237,7 @@ class ConfigManager extends EventEmitter {
 			} else {
 				assertConfigPathString(this.configPath)
 				const data = JSON.stringify(newConfig, null, 2)
-				const tmp = `${this.configPath}.tmp`
-				fs.writeFileSync(tmp, data, 'utf8')
-				fs.renameSync(tmp, this.configPath)
+				atomicWriteFileSync(this.configPath, data, 'utf8') // WO-842: unique tmp name
 				this.logger.info(`[Config] Saved monolithic config to ${this.configPath}`)
 			}
 
@@ -293,6 +292,9 @@ class ConfigManager extends EventEmitter {
 				Object.assign(result, JSON.parse(raw))
 			} catch (e) {
 				this.logger.error(`[Config] Failed to load general.json: ${e.message}`)
+				// WO-842 (sweep 4i): general.json holds ~60 keys; left in place, the next save() rewrote it from
+				// defaults. Move it aside (like every other modular file) so the damage is recoverable by hand.
+				this._quarantineCorruptFile(path.join(dir, 'general.json'))
 			}
 		}
 
@@ -358,9 +360,7 @@ class ConfigManager extends EventEmitter {
 	 */
 	_atomicWrite(filePath, data) {
 		assertFilePathString(filePath, 'atomic write path')
-		const tmp = `${filePath}.tmp`
-		fs.writeFileSync(tmp, data, 'utf8')
-		fs.renameSync(tmp, filePath)
+		atomicWriteFileSync(filePath, data, 'utf8')
 	}
 
 	_camelToSnake(str) {

@@ -316,10 +316,13 @@ usb_mkfs_exfat_labeled() {
 	local attempt rc=1
 	for attempt in 1 2; do
 		usb_prepare_partition_for_mkfs "$part" "$label"
+		# WO-842 (sweep 5 Ops): `rc=$?` after the closing `fi` read the status of the whole `if` (0 when the condition
+		# failed and there was no else), so a failed format returned 0 and callers printed "Done." — capture it in `else`.
 		if mkfs.exfat -L "$label" "$part"; then
 			return 0
+		else
+			rc=$?
 		fi
-		rc=$?
 		if [[ "$attempt" -eq 1 ]]; then
 			echo "WARN: mkfs.exfat busy on ${part} — quiesced WO-47 automount; retrying…" >&2
 		fi

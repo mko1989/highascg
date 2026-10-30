@@ -7,6 +7,14 @@ const { syncPeerCasparConnection } = require('./replication-reload')
 const { stopPlayheadSync } = require('./playhead-sync')
 const { peerHttpRequest } = require('./peer-client')
 
+/** Save the replication slice via the config manager and refresh ctx.config (no-op without a manager). */
+function persistReplication(ctx, nextRepl) {
+	if (!ctx.configManager) return
+	const cfg = { ...ctx.configManager.get(), replication: nextRepl }
+	ctx.configManager.save(cfg)
+	if (ctx.config) Object.assign(ctx.config, ctx.configManager.get())
+}
+
 /**
  * @param {object} ctx
  * @param {import('./replication-service').ReplicationRuntime} runtime
@@ -27,11 +35,7 @@ async function promoteToLeader(ctx, runtime, opts = {}) {
 		leaderAvailable: true,
 	})
 
-	if (ctx.configManager) {
-		const cfg = { ...ctx.configManager.get(), replication: nextRepl }
-		ctx.configManager.save(cfg)
-		if (ctx.config) Object.assign(ctx.config, ctx.configManager.get())
-	}
+	persistReplication(ctx, nextRepl)
 
 	runtime.roleState.forceRole('leader')
 	runtime.promotedAt = Date.now()
@@ -87,16 +91,15 @@ async function leaderYield(ctx, body) {
 	stopPlayheadSync()
 	if (runtime) syncPeerCasparConnection(ctx, runtime)
 
+	// WO-842 (sweep 4e): persist role 'follower' too — reloadReplicationFromConfig / a restart re-derive the
+	// role from config, so a persisted 'leader' resurrected the old leader as a second leader.
 	const nextRepl = normalizeReplicationConfig({
 		...repl,
 		leaderEpoch: incomingEpoch,
+		role: 'follower',
 		leaderAvailable: false,
 	})
-	if (ctx.configManager) {
-		const cfg = { ...ctx.configManager.get(), replication: nextRepl }
-		ctx.configManager.save(cfg)
-		if (ctx.config) Object.assign(ctx.config, ctx.configManager.get())
-	}
+	persistReplication(ctx, nextRepl)
 	if (runtime) {
 		runtime.roleState.forceRole('follower')
 		runtime.demotedAt = Date.now()
@@ -118,8 +121,16 @@ async function leaderYield(ctx, body) {
  */
 async function demoteToFollower(ctx, runtime, peerEpoch) {
 	stopPlayheadSync()
-	syncPeerCasparConnection(ctx, runtime)
+	// WO-842 (sweep 4e): persist the demotion (role + adopted epoch); the in-memory forced role alone was
+	// cleared by the next reload/restart, which put this box back to leader.
+	const repl = getReplicationConfig(ctx.config)
+	persistReplication(ctx, normalizeReplicationConfig({
+		...repl,
+		role: 'follower',
+		leaderEpoch: Math.max(repl.leaderEpoch || 0, peerEpoch || 0),
+	}))
 	runtime.roleState.forceRole('follower')
+	syncPeerCasparConnection(ctx, runtime) // after the role change, so the leader-only fan-out is torn down
 	runtime.demotedAt = Date.now()
 	runtime.peerLeaderEpoch = peerEpoch
 	if (typeof ctx.log === 'function') {

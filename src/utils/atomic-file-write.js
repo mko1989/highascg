@@ -10,7 +10,18 @@
  * on next start.
  */
 
-const fsp = require('fs').promises
+const fs = require('fs')
+const crypto = require('crypto')
+const fsp = fs.promises
+
+/**
+ * WO-842 (sweep 4j): a per-call temp name. The fixed `<file>.tmp` was shared by overlapping writers to the
+ * same target — the second rename hit ENOENT (write lost) and chunked writes could interleave in one inode.
+ * @param {string} filePath
+ */
+function uniqueTmpPath(filePath) {
+	return `${filePath}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`
+}
 
 /**
  * @param {string} filePath - absolute target path
@@ -23,7 +34,7 @@ async function atomicWriteFile(filePath, data, encoding = 'utf8') {
 	if (typeof filePath !== 'string' || !filePath.trim()) {
 		throw new TypeError(`atomicWriteFile filePath must be a non-empty string, got ${typeof filePath}`)
 	}
-	const tmp = `${filePath}.tmp`
+	const tmp = uniqueTmpPath(filePath)
 	try {
 		await fsp.writeFile(tmp, data, encoding)
 		await fsp.rename(tmp, filePath)
@@ -38,4 +49,23 @@ async function atomicWriteFile(filePath, data, encoding = 'utf8') {
 	}
 }
 
-module.exports = { atomicWriteFile }
+/** Sync twin (ConfigManager writes synchronously so save() ordering stays strictly FIFO). Same temp-name rule. */
+function atomicWriteFileSync(filePath, data, encoding = 'utf8') {
+	if (typeof filePath !== 'string' || !filePath.trim()) {
+		throw new TypeError(`atomicWriteFileSync filePath must be a non-empty string, got ${typeof filePath}`)
+	}
+	const tmp = uniqueTmpPath(filePath)
+	try {
+		fs.writeFileSync(tmp, data, encoding)
+		fs.renameSync(tmp, filePath)
+	} catch (e) {
+		try {
+			fs.unlinkSync(tmp)
+		} catch {
+			/* tmp may not exist */
+		}
+		throw e
+	}
+}
+
+module.exports = { atomicWriteFile, atomicWriteFileSync, uniqueTmpPath }

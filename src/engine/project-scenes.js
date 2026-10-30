@@ -309,7 +309,10 @@ function applyDeckSyncToProject(existing, data) {
 			? { ...existing.scenes }
 			: { scenes: [], layerPresets: [], lookPresets: [] }
 	const snapRaw = data.sceneSnapshots
-	const scenes = Array.isArray(snapRaw) && snapRaw.length
+	/* WO-842 (sweep 4h): an explicit `[]` is a deck with no looks, not "absent" — it used to fall back to the stored
+	 * scenes, so deleting the last look never reached disk (the live deck was emptied, the file kept the look).
+	 * Whether an empty deck may replace stored looks is validateIncomingProject's call (see mergeDeckSyncIntoProject). */
+	const scenes = Array.isArray(snapRaw)
 		? snapRaw.filter((s) => s && typeof s === 'object' && s.id != null && String(s.id).trim())
 		: Array.isArray(envelope.scenes)
 			? envelope.scenes
@@ -332,7 +335,10 @@ function mergeDeckSyncIntoProject(ctx, data) {
 		scenes: { scenes: [], layerPresets: [], lookPresets: [] },
 	}
 	const project = applyDeckSyncToProject(existing, data)
-	const check = validateIncomingProject(project, existing)
+	/* WO-842 (sweep 4h): the WO-311/329 anti-wipe guard stays: an empty deck over stored looks is only taken when
+	 * the client says it is deliberate (`allowEmpty: true` — the last look was deleted). A stale/blank tab that
+	 * just lists no looks is refused whole, so the live deck is not emptied while the file keeps the looks. */
+	const check = validateIncomingProject(project, existing, { allowReplace: data.allowEmpty === true })
 	if (!check.ok) {
 		if (typeof ctx.log === 'function') {
 			ctx.log(

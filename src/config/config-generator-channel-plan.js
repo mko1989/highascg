@@ -2,7 +2,7 @@
 
 const { findStandardModeId, getModeDimensions, getExtraAudioModeDimensions, STANDARD_VIDEO_MODES } = require('./config-modes')
 const { screenModeString } = require('./config-generator-mode-helpers')
-const { readCasparSetting } = require('./routing-map')
+const { multiviewModeDimensions } = require('./config-generator-multiview-mode')
 const { destinationsFromConfig } = require('./screen-destinations')
 
 /**
@@ -65,11 +65,11 @@ function buildChannelPlan(config, routeMap) {
 	}
 	const multiviewChannels = Array.isArray(routeMap.multiviewChannels) ? routeMap.multiviewChannels : (routeMap.multiviewCh != null ? [routeMap.multiviewCh] : [])
 	const multiviews = []
-	for (const ch of multiviewChannels) {
-		const mode = String(readCasparSetting(config, 'multiview_mode') ?? '1080p5000')
-		const dims = getModeDimensions(mode, config, ch)
-		multiviews.push({ ch, dims })
-	}
+	multiviewChannels.forEach((ch, idx) => {
+		// WO-842 (sweep 4l): per-output mode + multiview_custom_* — `getModeDimensions(…, ch)` looked a custom
+		// size up under screen_<CASPAR CHANNEL>_custom_* and fell back to 1920x1080
+		multiviews.push({ ch, dims: multiviewModeDimensions(config, idx + 1) })
+	})
 
 	/** Emit multiview `<channel>` blocks only when routing allocated multiview slot(s). */
 	const multiviewEnabled = multiviewChannels.length > 0

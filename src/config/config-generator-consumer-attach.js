@@ -3,6 +3,7 @@
 const { channelXmlComment } = require('./config-generator-xml-comments')
 const { STANDARD_VIDEO_MODES } = require('./config-modes')
 const { effectiveStandardVideoModeId } = require('./config-generator-mode-helpers')
+const { multiviewModeDimensions } = require('./config-generator-multiview-mode')
 const {
 	parseOptionalPixel,
 	channelLayoutElementXml,
@@ -40,10 +41,11 @@ const {
  */
 function buildMultiviewChannel(config, routeMap, ctx) {
 	const n = ctx.n || 1
-	const mode = String(config[`multiview_${n}_mode`] || config.multiview_mode || '1080p5000')
-	const dims = ctx.dims || STANDARD_VIDEO_MODES[mode] || { width: 1920, height: 1080, fps: 50 }
-	const modeId = mode
-	const mvStd = !!STANDARD_VIDEO_MODES[mode]
+	// WO-842 (sweep 4l): the channel's <video-mode> is the RESOLVED id (dims.modeId), never the raw setting — a
+	// non-standard size is 'custom' there, and `<video-mode>custom</video-mode>` names a mode nobody registered.
+	const dims = ctx.dims || multiviewModeDimensions(config, n)
+	const modeId = dims.modeId
+	const mvStd = !dims.isCustom
 	const stretch = 'none'
 	
 	// Multiview screen flags: per-index, then PGM screen 1 for window chrome, then global multiview_*.

@@ -3,8 +3,10 @@
 # Invoked by udev (99-highascg-exfat-arrive.rules) and safe to run manually as root.
 set -euo pipefail
 
-EXFAT_MP="/home/casparcg/exfat"
-LABEL_NODE="/dev/disk/by-label/HIGHASCGEXF"
+EXFAT_MP="${HIGHASCG_EXFAT_MP:-/home/casparcg/exfat}"
+LABEL_NODE="${HIGHASCG_EXFAT_LABEL_NODE:-/dev/disk/by-label/HIGHASCGEXF}"
+# WO-842: how long to wait for the queued mount job (see below). Env override is for tests.
+MOUNT_WAIT_SEC="${HIGHASCG_EXFAT_ARRIVE_MOUNT_WAIT_SEC:-15}"
 
 log() {
 	echo "[highascg-exfat-arrive] $*" >&2
@@ -36,6 +38,14 @@ fi
 
 if ! mountpoint -q "$EXFAT_MP"; then
 	start_unit home-casparcg-exfat.mount
+	# WO-842 (sweep 5 Ops): `systemctl start --no-block` only QUEUES the job, so the check right after it was almost
+	# always false — "exFAT not mounted" + exit 0 and the whole late-plug pipeline (server update, network apply,
+	# DeckLink install, sync) never ran (68 "not mounted" vs 46 "finished" in the journal). Poll, as
+	# highascg-exfat-boot.sh does for the same race.
+	for _ in $(seq 1 $((MOUNT_WAIT_SEC * 4))); do
+		mountpoint -q "$EXFAT_MP" && break
+		sleep 0.25
+	done
 fi
 if ! mountpoint -q "$EXFAT_MP"; then
 	log "exFAT not mounted at ${EXFAT_MP}"

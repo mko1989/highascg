@@ -122,6 +122,32 @@ async function connectToLeader(ctx, runtime, opts) {
 	const syncthingDeviceId = (await getLocalSyncthingDeviceId()) || ''
 	const followerCaspar = getCasparEndpointForPeer(ctx.config)
 
+	// WO-842 (sweep 5): remember what was configured so every failed-register branch can put it back —
+	// the follower pre-save below left a failed Connect as a paired follower that blocks local PGM takes.
+	const prevReplRaw = ctx.configManager ? ctx.configManager.get()?.replication : ctx.config?.replication
+	const prevRepl = getReplicationConfig(ctx.config)
+	const rollbackPreSave = (why) => {
+		try {
+			if (ctx.configManager) {
+				const cfg = { ...ctx.configManager.get() }
+				if (prevReplRaw === undefined) delete cfg.replication
+				else cfg.replication = prevReplRaw
+				ctx.configManager.save(cfg)
+				if (ctx.config) {
+					Object.assign(ctx.config, ctx.configManager.get())
+					if (prevReplRaw === undefined) delete ctx.config.replication
+				}
+			}
+			runtime.roleState.clearForcedRole()
+			runtime.roleState.configure({ enabled: prevRepl.enabled, role: prevRepl.role })
+			const { reloadReplicationFromConfig } = require('./replication-reload')
+			reloadReplicationFromConfig(ctx)
+		} catch (e) {
+			if (typeof ctx.log === 'function') ctx.log('warn', `[replication] connect rollback (${why}): ${e?.message || e}`)
+		}
+		if (typeof ctx.log === 'function') ctx.log('warn', `[replication] connect failed (${why}) — previous replication config restored`)
+	}
+
 	// Enable replication before register so the leader can push project/timelines during pairing.
 	const preRepl = normalizeReplicationConfig({
 		enabled: true,
@@ -181,6 +207,7 @@ async function connectToLeader(ctx, runtime, opts) {
 		},
 	)
 	if (!register.ok) {
+		rollbackPreSave('register')
 		return {
 			ok: false,
 			error:
@@ -196,6 +223,7 @@ async function connectToLeader(ctx, runtime, opts) {
 		nonce: handshakeExtras.handshake.nonce,
 	})
 	if (!leaderHandshake.ok) {
+		rollbackPreSave('handshake')
 		return { ok: false, error: leaderHandshake.error || 'leader handshake verification failed', status: 403 }
 	}
 	persistPeerDevicePublicKey(ctx, leaderHandshake.devicePublicKey)

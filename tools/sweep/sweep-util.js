@@ -37,6 +37,18 @@ function request(method, url, body, timeoutMs = 15000) {
 	return new Promise((resolve) => {
 		const t0 = Date.now()
 		const data = body === undefined ? null : Buffer.from(JSON.stringify(body))
+		// WO-842 (sweep 7e): settle exactly once, whatever the peer does. A response that dropped mid-body fires
+		// 'aborted'/'error' on `res` (never 'end', and not on `req`), and the socket-idle `timeout` option never fires on a
+		// drip-fed body — the promise hung forever, and the after-update sweep with it. A hard deadline backs both up.
+		let done = false
+		let deadline = null
+		const finish = (out) => {
+			if (done) return
+			done = true
+			clearTimeout(deadline)
+			resolve({ ms: Date.now() - t0, ...out })
+		}
+		const fail = (msg) => finish({ status: 0, data: null, text: '', error: msg })
 		const req = http.request(
 			url,
 			{
@@ -55,12 +67,22 @@ function request(method, url, body, timeoutMs = 15000) {
 					} catch {
 						/* not JSON */
 					}
-					resolve({ status: res.statusCode, data: json, text, ms: Date.now() - t0 })
+					finish({ status: res.statusCode, data: json, text })
+				})
+				res.on('error', (e) => fail(`response error: ${e.message}`))
+				res.on('aborted', () => fail('response aborted by the peer'))
+				res.on('close', () => {
+					if (!res.complete) fail('connection closed before the response finished')
 				})
 			}
 		)
+		deadline = setTimeout(() => {
+			fail(`timeout after ${timeoutMs} ms`)
+			req.destroy()
+		}, timeoutMs)
+		if (deadline.unref) deadline.unref()
 		req.on('timeout', () => req.destroy(new Error(`timeout after ${timeoutMs} ms`)))
-		req.on('error', (e) => resolve({ status: 0, data: null, text: '', ms: Date.now() - t0, error: e.message }))
+		req.on('error', (e) => fail(e.message))
 		if (data) req.write(data)
 		req.end()
 	})

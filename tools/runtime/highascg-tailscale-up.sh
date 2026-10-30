@@ -13,7 +13,10 @@ fi
 HOSTNAME=""
 ACCEPT_ROUTES=0
 if [[ -f "$CONFIG" ]] && command -v python3 >/dev/null 2>&1; then
-	read -r HOSTNAME ACCEPT_ROUTES < <(python3 - "$CONFIG" <<'PY'
+	# WO-842 (sweep 5 Ops): one value per LINE. `print(hostname, accept)` + `read -r HOSTNAME ACCEPT_ROUTES` collapsed the
+	# blank hostname (the default) so " 0" became HOSTNAME=0 -> `tailscale up --hostname 0`, and a hostname with a
+	# space split in two.
+	mapfile -t _cfg < <(python3 - "$CONFIG" <<'PY'
 import json, sys
 path = sys.argv[1]
 try:
@@ -22,10 +25,14 @@ try:
 except Exception:
     cfg = {}
 hostname = str(cfg.get("hostname") or "").strip()
+hostname = hostname.splitlines()[0].strip() if hostname else ""
 accept = "1" if cfg.get("acceptRoutes") is True else "0"
-print(hostname, accept)
+print(hostname)
+print(accept)
 PY
 )
+	HOSTNAME="${_cfg[0]:-}"
+	ACCEPT_ROUTES="${_cfg[1]:-0}"
 fi
 
 ARGS=(up)

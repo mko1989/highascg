@@ -55,6 +55,23 @@ function layerRecordFromParsedInfo(parsed) {
 }
 
 /**
+ * Channel frame rate from an OSC channel snapshot (`format` like `1080p2500`, `720p5994`, `1080i5000`).
+ * Caspar's interlaced modes name the FIELD rate, the channel runs at half of it.
+ * @param {{ framerate?: unknown, format?: unknown }} chan
+ * @returns {number}
+ */
+function oscChannelFps(chan) {
+	const direct = parseFloat(chan?.framerate)
+	if (Number.isFinite(direct) && direct > 0) return direct
+	const m = /([pi])(\d{3,5})$/i.exec(String(chan?.format || ''))
+	if (m) {
+		const n = parseInt(m[2], 10) / (m[1].toLowerCase() === 'i' ? 200 : 100)
+		if (Number.isFinite(n) && n > 0) return n
+	}
+	return 50
+}
+
+/**
  * @param {number} pgmCh
  * @param {object} ctx
  * @returns {{ framerate: string, layers: Record<string, object> } | null}
@@ -66,7 +83,9 @@ function exportLayersFromOsc(ctx, pgmCh) {
 	const chan = channels[pgmCh] ?? channels[String(pgmCh)]
 	if (!chan || typeof chan !== 'object') return null
 
-	const fps = parseInt(chan.framerate, 10) || 50
+	// WO-842 (sweep 5 Replication): OSC channel snapshots carry no `framerate` — it is only in `format`
+	// ('1080p2500'); the old read always fell back to 50, so a 25 fps channel exported frame 2000 for 40 s.
+	const fps = oscChannelFps(chan)
 	/** @type {Record<string, { clip: string, state: string, timeSec: number, frame: number, fps: number }>} */
 	const layers = {}
 	for (const [layerId, layer] of Object.entries(chan.layers || {})) {
@@ -166,4 +185,5 @@ module.exports = {
 	parseChannelPlayheadXml,
 	exportLayersFromOsc,
 	exportLayersFromState,
+	oscChannelFps,
 }

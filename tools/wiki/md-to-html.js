@@ -21,17 +21,32 @@ function slugifyHeading(text) {
 		.replace(/\s+/g, '-')
 }
 
+function unescapeHtml(s) {
+	return String(s)
+		.replace(/&quot;/g, '"')
+		.replace(/&gt;/g, '>')
+		.replace(/&lt;/g, '<')
+		.replace(/&amp;/g, '&')
+}
+
 function inlineFormat(text, linkResolver) {
-	let out = escapeHtml(text)
-	out = out.replace(/`([^`]+)`/g, '<code>$1</code>')
+	// WO-842 (sweep 7e): code spans are lifted out FIRST (escaped once, restored at the end). The old order turned them
+	// into <code> before the link pass, whose label was then escaped a second time: [`x`](y) rendered as
+	// "&lt;code&gt;x&lt;/code&gt;" (25 wiki pages), and a link href that held "&" was escaped twice.
+	const codes = []
+	let out = String(text).replace(/`([^`]+)`/g, (_m, c) => {
+		codes.push(`<code>${escapeHtml(c)}</code>`)
+		return `\uE000${codes.length - 1}\uE000`
+	})
+	out = escapeHtml(out)
 	out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
 	out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>')
 	out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
-		const resolved = linkResolver ? linkResolver(href) : href
+		const resolved = linkResolver ? linkResolver(unescapeHtml(href)) : unescapeHtml(href)
 		const extra = resolved.startsWith('#/') ? ' data-wiki-page="1"' : ''
-		return `<a href="${escapeHtml(resolved)}"${extra}>${escapeHtml(label)}</a>`
+		return `<a href="${escapeHtml(resolved)}"${extra}>${label}</a>`
 	})
-	return out
+	return out.replace(/\uE000(\d+)\uE000/g, (_m, i) => codes[Number(i)])
 }
 
 function isTableRow(line) {

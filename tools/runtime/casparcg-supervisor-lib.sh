@@ -119,6 +119,11 @@ caspar_crash_loop_backoff() {
 		caspar_supervisor_log "[run.sh] casparcg exited ${_ec} (restart ${_streak}/${_max}), waiting ${_sleep}s"
 	fi
 	sleep "$_sleep"
+	# WO-842 (sweep 5 Ops): re-stamp the state at RELAUNCH time. The streak only grows while the next exit comes within
+	# _window of the stamp; stamped at exit, the back-off sleep alone (5*2^n, capped at 120 = the window) put every later
+	# crash outside the window, the streak reset to 1 from the 6th crash on, and the give-up (18) could never fire.
+	# Stamped after the sleep, the gap is how long Caspar actually ran.
+	printf '%s %s %s\n' "$_streak" "$(date +%s)" "$_ec" >"$_state" 2>/dev/null || true
 	return 0
 }
 
