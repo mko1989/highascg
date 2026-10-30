@@ -22,7 +22,6 @@ import {
 	resolvePreviewAmcpChannel,
 	isPreviewBusAvailable,
 } from './scenes-preview-look-stack.js'
-import { linearGainToCasparDb } from './audio-volume-scale.js'
 import { buildPreviewContentSnapshot, isGeometryOnlyPreview, layerContentMetaForSnapshot, previewContentCompareKey } from './scenes-preview-snapshot.js'
 import { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } from './scene-layer-rotation-amcp.js'
 import { syncPreviewLiveToServer } from './scene-live-sync.js'
@@ -250,7 +249,10 @@ export async function pushSceneToPreviewImpl(opts) {
 				if (af) playCmd += ` AF "${String(af).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 
 				const volGain = layer.muted ? 0 : layer.volume != null ? layer.volume : 1
-				const vol = linearGainToCasparDb(volGain)
+				/* WO-833 (3k): Caspar's MIXER VOLUME is LINEAR (1.0 = unity) and the scene stores linear gain — the server
+				 * take sends it as-is (resolveTakeVolumeForSceneLayer). This used to convert to dB first, so unity
+				 * (0 dB) reached Caspar as 0 = silent PRV and 0.5 (-6 dB) as -6. */
+				const vol = Number.isFinite(Number(volGain)) ? Math.max(0, Number(volGain)) : 1
 				const curKeyer = shouldApplyStraightAlphaKeyer(!!layer.straightAlpha, layer.source?.value) ? 1 : 0
 
 				const prevMeta = lastPreviewContentSnapshot?.contentByLayer?.get(Number(ln))

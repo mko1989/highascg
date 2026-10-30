@@ -42,7 +42,7 @@ function applyClearCoalescing(lines, ctx) {
 	return coalesced
 }
 
-const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { JSON_HEADERS, jsonBody, parseBodyStrict } = require('./response')
 const playbackTracker = require('../state/playback-tracker')
 const { notifyProgramMutationMayInvalidateLive } = require('../state/live-scene-state')
 const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('../engine/audio-route')
@@ -54,6 +54,13 @@ const { resolveSceneClipForAmcp } = require('../engine/scene-take-lbg-helpers')
 function applyAmcpLineNormalizations(lines, ctx) {
 	const cfg = ctx?.config || {}
 	return normalizeClipPlayAmcpLines(normalizeDecklinkPlayAmcpLines(lines, cfg), ctx)
+}
+
+/** @param {unknown} v */
+function hasExplicitChannel(v) {
+	if (v == null || v === '' || typeof v === 'boolean') return false
+	const n = Number(v)
+	return Number.isInteger(n) && n >= 1
 }
 
 function jsonPlaybackBody(ctx, amcpResult, extra = null) {
@@ -75,8 +82,26 @@ async function handlePost(path, body, ctx) {
 	const amcp = ctx.amcp
 	if (!amcp) return null
 
-	const b = parseBody(body)
+	// WO-833 (3m): a malformed body used to parse to {} and the channel defaulted to 1 — `POST /api/clear` with a
+	// garbled body CLEARed PGM. Malformed JSON is a 400 on every route here.
+	const parsed = parseBodyStrict(body)
+	if (!parsed.ok || !parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value)) {
+		return {
+			status: 400,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: 'request body must be a JSON object' + (parsed.ok ? '' : ` (${parsed.error})`) }),
+		}
+	}
+	const b = parsed.value
 	const { channel = 1, layer } = b
+	// WO-833 (3m): destructive routes never fall back to the channel-1 default.
+	if ((path === '/api/stop' || path === '/api/clear') && !hasExplicitChannel(b.channel)) {
+		return {
+			status: 400,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: `${path.slice(5)}: explicit "channel" (integer >= 1) required` }),
+		}
+	}
 
 	switch (path) {
 		case '/api/amcp/batch': {
@@ -195,7 +220,8 @@ async function handlePost(path, body, ctx) {
 				const af = audioRouteToAudioFilter(String(audioRoute), resolveConfigProgramLayoutForChannel(ctx?.config, channel))
 				if (af) opts.audioFilter = af
 			}
-			const r = await amcp.load(channel, layer, resolvedClip, opts)
+			// WO-833: AmcpClient has no flat load() (only basic.load) — same TypeError class as swap.
+			const r = await amcp.basic.load(channel, layer, resolvedClip, opts)
 			notifyProgramMutationMayInvalidateLive(ctx, channel, {
 				transition: transition || 'CUT',
 				durationFrames: duration,
@@ -258,7 +284,8 @@ async function handlePost(path, body, ctx) {
 		}
 		case '/api/swap': {
 			const { channel2, layer2, transforms } = b
-			const r = await amcp.swap(channel, layer, channel2, layer2, !!transforms)
+			// WO-833 (3h): AmcpClient has no flat swap(); basic.swap is the real method (HTTP + WS dispatch share this case).
+			const r = await amcp.basic.swap(channel, layer, channel2, layer2, !!transforms)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		}
 		case '/api/add': {

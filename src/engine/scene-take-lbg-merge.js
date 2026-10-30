@@ -20,7 +20,8 @@ function resolveGlobalBorderPhysicalLayer(gb) {
 
 /**
  * Merge transition: outgoing-only logical layers (still on PGM, not replaced by a takeJob on this beat)
- * fade to opacity 0 on the **same** Caspar layer index as the look (no bank B / +100).
+ * fade to opacity 0 on the **same** physical Caspar layer they are playing on (`phys(ln, activeBank)`: ln on bank A,
+ * ln+100 on bank B — WO-833 3e).
  * WO-217 T217.1: Guard with incoming physical layers to prevent fading layers that the same take is playing.
  * @param {{ channel: number, exitMedia: object[], takeJobs: object[], fadeDur: number, fadeTw?: string, currentSceneLayers: object, fadeWatcher: object|null, activeBank?: string, phys?: function }} p
  * @returns {string[]}
@@ -42,7 +43,9 @@ function buildMergeOutgoingOpacityDeferLines(p) {
 			fadeWatcher.cancel(channel, ln)
 			fadeWatcher.cancel(channel, ln + PGM_BANK_B_OFFSET)
 		}
-		const cl = `${channel}-${ln}`
+		// WO-833 (3e): the fade must hit the layer that is actually on air — `pL`, not the logical `ln`. On bank B
+		// the look sits on ln+100, so fading `ln` made the removed layer pop instead of fade.
+		const cl = `${channel}-${pL}`
 		let tail = `0 ${fadeDur}`
 		if (fadeTw) tail += ` ${param(fadeTw)}`
 		lines.push(deferMixerAmcpLine(`MIXER ${cl} OPACITY ${tail}`))
@@ -50,7 +53,7 @@ function buildMergeOutgoingOpacityDeferLines(p) {
 			const nextL = nextPipContentLayerInScene(currentSceneLayers, layer.layerNumber)
 			const pipN = pipOverlaysFromLayer(layer).length
 			if (pipN > 0) {
-				lines.push(...buildPipOverlayOpacityFadeDeferLines(channel, ln, tail, nextL, pipN))
+				lines.push(...buildPipOverlayOpacityFadeDeferLines(channel, pL, tail, nextL, pipN))
 			}
 		} catch (_) {}
 	}

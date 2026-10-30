@@ -371,6 +371,16 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				`[scene-take-lbg] take Phase B (PLAY/crossfade/COMMIT) failed on ch${channel}: ${e?.message || e} — ` +
 					`jobs=${takeJobs.length} crossfadeLines=${crossfadeLines.length} fadeClockStarted=${fadeClockRef.start != null}`,
 			)
+			// WO-833 (3f): hand the failure to runSceneTakeLbg, which aborts the take (keeps the outgoing look on air,
+			// no bank flip, rejects) instead of tearing down and reporting ok.
+			// Coordinator: NOT when the payload already reached Caspar (a COMMIT-ack timeout, `amcpPayloadSent`) — the
+			// PLAY + DEFERred crossfade very likely ran, so STOPping the incoming layers would leave the faded-out
+			// outgoing look = black. Then the take carries on as before (teardown on the assumption it played).
+			if (e?.amcpPayloadSent !== true) fadeClockRef.phaseBError = e instanceof Error ? e : new Error(String(e))
+		}
+		if (fadeClockRef.phaseBError) {
+			settleRelativeSeekLead(self, channel)
+			return // no play-committed hook (it would start the PGM->PRV exchange), no CG/fade-watcher follow-ups
 		}
 		// WO-814: one timing line per take (prep = jobs + Phase A, then prebuffer wait, then the acked PLAY batch),
 		// then hand over to the caller (PGM→PRV exchange) — only now, after the PLAY batch is committed.

@@ -22,7 +22,9 @@ const repoRoot = path.join(__dirname, '..', '..')
 const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), 'utf8')
 
 test('WO-379 the two halves of the shader store are reconciled, never deleted', async (t) => {
-	const store = require('../../src/shaderfx/shader-store.js')
+	// WO-836: reconcile writes data/shaders + template/shaders — a temp root, not the box's Syncthing-synced dirs
+	const { store, cleanup: cleanupStoreRoot } = require('./lib/shader-store-tmp').loadShaderStoreInTempRoot()
+	t.after(cleanupStoreRoot)
 	const { buildShaderTemplateHtml } = require('../../src/shaderfx/shader-template-export.js')
 
 	await t.test('a config embedded in a template can be recovered from it', () => {
@@ -48,7 +50,7 @@ test('WO-379 the two halves of the shader store are reconciled, never deleted', 
 	})
 
 	await t.test('reconcile is best-effort and never throws on a hostile store', async () => {
-		// Real store on this box; it must be idempotent and quiet once healed.
+		// Temp copy of the tracked store; it must be idempotent and quiet once healed.
 		const first = await store.reconcileShaderStore()
 		assert.ok(Array.isArray(first.exported) && Array.isArray(first.recovered))
 		const second = await store.reconcileShaderStore()
@@ -84,8 +86,10 @@ test('WO-379 a stacked shader can be taken off air', () => {
 	assert.ok(/layerNumber < STACK_LAYER_MIN \|\| layerNumber > STACK_LAYER_MAX/.test(route))
 
 	// Fade THEN clear — a MIX that clears immediately loses the transition (WO-175's shape).
-	assert.ok(/MIXER \$\{channel\}-\$\{pLayer\} OPACITY 0 \$\{fadeFrames\}/.test(route))
-	assert.ok(/CLEAR \$\{channel\}-\$\{pLayer\}/.test(route))
+	// WO-833 (3g): typed AmcpClient methods (ctx.amcp.send never existed) — MIXER <ch>-<pLayer> OPACITY 0 <frames>, then CLEAR.
+	assert.ok(/ctx\.amcp\.mixerOpacity\(channel, pLayer, 0, fadeFrames\)/.test(route))
+	assert.ok(/ctx\.amcp\.clear\(channel, pLayer\)/.test(route))
+	assert.ok(!/ctx\.amcp\.send\(/.test(route), 'AmcpClient has no send()')
 	assert.ok(/await new Promise\(\(r\) => setTimeout\(r, Math\.min\(4000,/.test(route), 'the fade must finish first')
 
 	// The live scene must forget the layer, or the row still reads as occupied.

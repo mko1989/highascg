@@ -6,6 +6,10 @@ function jsonBody(o) {
 	return JSON.stringify(o)
 }
 
+/**
+ * Lenient parse: malformed JSON → `{}`. WO-833 (3m): NEVER use this on a route that can act destructively on defaults
+ * (clear/stop, mixer clear) — use {@link parseBodyStrict} and answer 400.
+ */
 function parseBody(body) {
 	if (body == null) return {}
 	if (typeof body === 'object' && !Buffer.isBuffer(body)) return body

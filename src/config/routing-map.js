@@ -476,9 +476,11 @@ function resolveStreamingChannelRouteForRole(config, role = 'video') {
 		const rawAudio = String(sc.audioSource == null || sc.audioSource === '' ? 'follow_video' : sc.audioSource).trim().toLowerCase()
 		src = (rawAudio === 'follow_video' || rawAudio === 'follow') ? rawVideo : rawAudio
 	}
-	if (src === 'multiview' && map.multiviewCh != null) return getRouteString(map.multiviewCh)
-	const pm = src.match(/^program[_-]?(\d+)$/); if (pm) { const i = parseInt(pm[1], 10); if (i >= 1 && i <= map.screenCount) return getRouteString(map.programCh(i)) }
-	const pr = src.match(/^preview[_-]?(\d+)$/); if (pr) { const i = parseInt(pr[1], 10); if (i >= 1 && i <= map.screenCount) return getRouteString(map.previewCh(i)) }
+	// WO-833 (3l): the shared WO-378 vocabulary (`channel_<N>` | program_N | preview_N | multiview) — this function
+	// carried its own copy of the program/preview regexes and did not know `channel_<N>`, so a stream fed by a host
+	// channel played route://1 (PGM). Out-of-range / unknown names still fall back to screen 1's PGM, as before.
+	const resolved = resolveOutputSourceToChannel(map, src)
+	if (resolved != null) return getRouteString(resolved)
 	return getRouteString(map.programCh(1))
 }
 

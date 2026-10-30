@@ -5,7 +5,7 @@
 
 'use strict'
 
-const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { JSON_HEADERS, jsonBody, parseBodyStrict } = require('./response')
 const { queryLayerContentRes, calcStretchFill } = require('./routes-mixer-stretch')
 const { applyInspectorEffect, updateProjectStateFromSelection } = require('./routes-mixer-inspector')
 
@@ -17,8 +17,16 @@ const { applyInspectorEffect, updateProjectStateFromSelection } = require('./rou
 async function handleMixer(path, body, ctx) {
 	const m = path.match(/^\/api\/mixer\/([^/]+)$/)
 	if (!m) return null
-	const b = parseBody(body)
-	
+	// WO-833 (3m): malformed JSON → 400 (it used to parse to {} and MIXER-clear / mutate channel 1).
+	const parsed = parseBodyStrict(body)
+	if (!parsed.ok || !parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value)) {
+		return {
+			status: 400,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: 'request body must be a JSON object' + (parsed.ok ? '' : ` (${parsed.error})`) }),
+		}
+	}
+	const b = parsed.value
 	const amcp = ctx.amcp
 	const cmd = m[1].toLowerCase()
 
@@ -53,6 +61,14 @@ async function handleMixer(path, body, ctx) {
 		}
 	}
 
+	// WO-833 (3m): `MIXER <ch> CLEAR` wipes every layer's mixer state — never on the channel-1 default.
+	if (cmd === 'clear' && !(channel != null && channel !== '' && Number.isInteger(Number(channel)) && Number(channel) >= 1)) {
+		return {
+			status: 400,
+			headers: JSON_HEADERS,
+			body: jsonBody({ error: 'mixer/clear: explicit "channel" (integer >= 1) required' }),
+		}
+	}
 	if (channel == null) channel = 1
 	let r
 	switch (cmd) {
@@ -213,10 +229,22 @@ async function handlePost(path, body, ctx) {
 	return handleMixerSafe(path, body, ctx)
 }
 
+/** Mixer commands with no query form — they only ever mutate. */
+const MUTATING_ONLY_COMMANDS = new Set(['clear', 'commit', 'effect'])
+
 async function handleGet(path, query, ctx) {
 	const m = path.match(/^\/api\/mixer\/([^/]+)$/)
 	if (!m) return null
 	if (!ctx.amcp) return null
+	// WO-833 (3m): GET is a query. These commands MUTATE (clear/commit/effect) and used to run through the POST
+	// handler with the query string as the body — `GET /api/mixer/clear` cleared channel 1.
+	if (MUTATING_ONLY_COMMANDS.has(m[1].toLowerCase())) {
+		return {
+			status: 405,
+			headers: { ...JSON_HEADERS, Allow: 'POST' },
+			body: jsonBody({ error: `GET /api/mixer/${m[1].toLowerCase()} is not allowed — use POST` }),
+		}
+	}
 	// Delegate to the same function but with query converted to body
 	// Our AmcpMixer methods are designed such that if arguments are undefined, it will send the query command
 	const surrogateBody = JSON.stringify({

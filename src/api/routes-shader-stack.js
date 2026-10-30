@@ -70,11 +70,12 @@ async function handlePost(body, ctx) {
 			 * operator asked for. Mirrors the FTB fade-then-clear shape (WO-175). */
 			const fadeFrames = loadOpts.duration || 0
 			if (fadeFrames > 0) {
-				await ctx.amcp.send(`MIXER ${channel}-${pLayer} OPACITY 0 ${fadeFrames}`)
+				// WO-833 (3g): AmcpClient has no send() — the typed helpers are mixerOpacity / clear.
+				await ctx.amcp.mixerOpacity(channel, pLayer, 0, fadeFrames)
 				const fps = Number(ctx.config?.project?.fps) || 50
 				await new Promise((r) => setTimeout(r, Math.min(4000, Math.round((fadeFrames / fps) * 1000) + 60)))
 			}
-			await ctx.amcp.send(`CLEAR ${channel}-${pLayer}`)
+			await ctx.amcp.clear(channel, pLayer)
 		} else {
 			await ctx.amcp.loadbg(channel, pLayer, value.toLowerCase(), loadOpts)
 			await ctx.amcp.play(channel, pLayer)

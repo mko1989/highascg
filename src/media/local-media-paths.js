@@ -183,6 +183,69 @@ function resolveMediaFileOnDisk(config, filename) {
 	return null
 }
 
+/**
+ * WO-833 (3i): resolve a media id for a DESTRUCTIVE or id-addressed file operation (delete / move / copy).
+ *
+ * {@link resolveMediaFileOnDisk} is built for READERS (scene refs, thumbnails, LOADBG): it tries the ACTIVE
+ * project's copy of a bare id before the id as given, and finally falls back to "any file anywhere whose stem
+ * matches, case-folded" — so deleting `B/INTRO` could remove `a/intro.mp4`, and deleting `intro.mp4` removed the
+ * project's copy instead of the root one the operator clicked. For the file manager the id the operator gave must
+ * be the file that is touched, so here:
+ *  - the id as given (and its `MEDIA/`-stripped form) is the only location tried — no project-scoped candidate,
+ *    no stem walk, no cross-folder or case-folded match;
+ *  - an extension-less id probes `SCAN_EXT` in the SAME folder and only succeeds when exactly one file matches;
+ *  - an id naming a directory returns null (the caller handles folders; a same-stem file must never stand in).
+ * @param {object} config
+ * @param {string} filename media id (root-relative, as listed by the media browser)
+ * @returns {string|null} absolute path of a regular file, or null
+ */
+function resolveMediaFileOnDiskExact(config, filename) {
+	const idNorm = normalizeMediaIdKey(filename).trim()
+	if (!idNorm || idNorm.includes('..')) return null
+	const cfg = config || {}
+	const rels = new Set()
+	for (const v of [idNorm, idNorm.normalize('NFC'), idNorm.normalize('NFD')]) {
+		if (!v || v.includes('..')) continue
+		rels.add(v)
+		if (/^MEDIA\//i.test(v)) rels.add(v.replace(/^MEDIA\//i, ''))
+	}
+	const bases = new Set()
+	const cfgPath = (cfg.local_media_path || '').trim()
+	if (cfgPath) bases.add(path.resolve(cfgPath))
+	bases.add(getMediaIngestBasePath(cfg))
+	bases.add(getMediaIngestBasePath({ ...cfg, local_media_path: '' }))
+	const statOf = (fp) => {
+		try {
+			return fs.statSync(fp)
+		} catch {
+			return null
+		}
+	}
+	for (const b of bases) {
+		for (const rel of rels) {
+			const fp = resolveSafe(b, rel)
+			if (!fp) continue
+			const st = statOf(fp)
+			if (st && st.isFile()) return fp
+			if (st && st.isDirectory()) return null
+		}
+	}
+	for (const b of bases) {
+		for (const rel of rels) {
+			if (path.extname(rel.split('/').pop() || '')) continue
+			const hits = []
+			for (const ext of SCAN_EXT) {
+				const fp = resolveSafe(b, rel + ext)
+				const st = fp ? statOf(fp) : null
+				if (st && st.isFile()) hits.push(fp)
+			}
+			if (hits.length === 1) return hits[0]
+			if (hits.length > 1) return null // ambiguous (INTRO.mov + INTRO.mp4): never guess on a destructive op
+		}
+	}
+	return null
+}
+
 function scanMediaRecursiveForBrowser(basePath, maxFiles = 2500) {
 	const out = []
 	if (!basePath || !fs.existsSync(basePath)) return out
@@ -222,5 +285,6 @@ module.exports = {
 	getMediaIngestBasePath,
 	normalizeMediaIdKey,
 	resolveMediaFileOnDisk,
+	resolveMediaFileOnDiskExact,
 	scanMediaRecursiveForBrowser,
 }

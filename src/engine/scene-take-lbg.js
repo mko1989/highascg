@@ -28,6 +28,7 @@ const { resolveGlobalBorderPhysicalLayer, buildMergeMixerExtrasForTake } = requi
 const { runSceneTakeLbgTeardown } = require('./scene-take-lbg-teardown')
 const { setupLayerPlaylists } = require('./scene-take-lbg-playlist')
 const { runSceneTakeLbgAmcpPipeline } = require('./scene-take-lbg-amcp-pipeline')
+const { abortFailedTake } = require('./scene-take-lbg-phase-b-abort')
 const { finalizeTakeBankState } = require('./scene-take-lbg-bank-finalize')
 const { sendExitAndTimelineFadeLines } = require('./scene-take-lbg-exit-fade')
 const { collectOrphanLookLogicalLayers, collectOrphanLookPhysicalLayers, clearPhysicalLookLayers } = require('./scene-exit-layers')
@@ -377,6 +378,19 @@ async function runSceneTakeLbg(amcp, opts) {
 		takeT0,
 	})
 	fadeClockStart = fadeClockRef.start
+	if (fadeClockRef.phaseBError) {
+		// WO-833 (3f): Phase B failed — keep the outgoing look, skip teardown/bank flip, reject the take.
+		if (activeTimelineIdToFadeOut) self.timelineEngine?.setOpacityExitHold?.(null) // it stays on air: let it write opacity again
+		throw await abortFailedTake(amcp, {
+			self,
+			channel,
+			takeJobs,
+			isMergeTransition,
+			activeBank,
+			inactiveBank,
+			error: fadeClockRef.phaseBError,
+		})
+	}
 
 	// WO-196 T196.1: build set of incoming template host layers to avoid clearing them on exit.
 	// This enables continuity: if a template layer carries the same identity on the next look,

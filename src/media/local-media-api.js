@@ -21,6 +21,7 @@ const {
 	getMediaIngestBasePath,
 	normalizeMediaIdKey,
 	resolveMediaFileOnDisk,
+	resolveMediaFileOnDiskExact,
 } = require('./local-media-paths')
 
 function contentTypeForFilename(filename) {
@@ -134,7 +135,8 @@ async function unlinkMediaById(config, rawId) {
 	if (rawId == null || String(rawId).trim() === '' || String(rawId).includes('..')) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid id' }) }
 	}
-	let filePath = resolveMediaFileOnDisk(config, rawId)
+	// WO-833 (3i): the id given wins — never the active project's copy or a same-stem file elsewhere.
+	let filePath = resolveMediaFileOnDiskExact(config, rawId)
 	if (!filePath) {
 		const base = getMediaIngestBasePath(config)
 		const safe = resolveSafe(base, rawId)
@@ -275,7 +277,7 @@ async function moveFileAcrossDevices(src, dest) {
 
 async function moveMediaFile(config, sourceId, targetId) {
 	const base = getMediaIngestBasePath(config)
-	const src = resolveMediaFileOnDisk(config, sourceId)
+	const src = resolveMediaFileOnDiskExact(config, sourceId) // WO-833 (3i): see local-media-paths
 	if (!src) return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Source not found' }) }
 
 	const invalid = validateFileTransfer(sourceId, targetId, src)
@@ -318,7 +320,7 @@ async function moveMediaFile(config, sourceId, targetId) {
 
 async function copyMediaFile(config, sourceId, targetId) {
 	const base = getMediaIngestBasePath(config)
-	const src = resolveMediaFileOnDisk(config, sourceId)
+	const src = resolveMediaFileOnDiskExact(config, sourceId) // WO-833 (3i): see local-media-paths
 	if (!src) return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Source not found' }) }
 
 	const invalid = validateFileTransfer(sourceId, targetId, src)
