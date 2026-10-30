@@ -137,8 +137,8 @@
 | 133 | tools/smoke | [tools-smoke--part12.md](tools-smoke--part12.md) | 6969 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 2 RISK, 12 QUALITY |
 | 134 | tools/smoke | [tools-smoke--part13.md](tools-smoke--part13.md) | 6817 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 1 RISK, 8 QUALITY |
 | 135 | tools/smoke | [tools-smoke--part14.md](tools-smoke--part14.md) | 2001 | done — 0 BUG-HIGH, 0 BUG, 10 DEAD, 12 RISK, 6 QUALITY |
-| 136 | tools/startup | [tools-startup.md](tools-startup.md) | 1488 | pending |
-| 137 | tools/sweep | [tools-sweep.md](tools-sweep.md) | 1241 | pending |
-| 138 | tools/tracking-detect | [tools-tracking-detect.md](tools-tracking-detect.md) | 1477 | pending |
-| 139 | tools/wiki | [tools-wiki.md](tools-wiki.md) | 468 | pending |
+| 136 | tools/startup | [tools-startup.md](tools-startup.md) | 1488 | done — 2 BUG-HIGH, 11 BUG, 2 DEAD, 14 RISK, 18 QUALITY |
+| 137 | tools/sweep | [tools-sweep.md](tools-sweep.md) | 1241 | done — 0 BUG-HIGH, 1 BUG, 2 DEAD, 6 RISK, 14 QUALITY |
+| 138 | tools/tracking-detect | [tools-tracking-detect.md](tools-tracking-detect.md) | 1477 | done — 0 BUG-HIGH, 1 BUG, 2 DEAD, 7 RISK, 6 QUALITY |
+| 139 | tools/wiki | [tools-wiki.md](tools-wiki.md) | 468 | done — 0 BUG-HIGH, 3 BUG, 3 DEAD, 2 RISK, 10 QUALITY |
 | 140 | late additions (files committed after the 29.10 batching; `tools/demo/build-demo-extras.py` is covered at the end of tools-demo.md) | [late-additions.md](late-additions.md) | 1021 | done — 0 BUG-HIGH, 0 BUG, 0 DEAD, 2 RISK, 6 QUALITY |

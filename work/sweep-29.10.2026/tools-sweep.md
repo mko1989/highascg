@@ -1,0 +1,34 @@
+# tools/sweep — sweep 29.10.2026 (batch 137)
+
+Files: 7 · lines: 1241 · findings: 0 BUG-HIGH, 1 BUG, 2 DEAD, 6 RISK, 14 QUALITY
+
+## tools/sweep/checks-app.js
+- `RISK` tools/sweep/checks-app.js:49 — `unitErrors` ignores a failed `journalctl` (no check of `r.code` / `r.err`). If the service user cannot read the system journal (not in `adm`/`systemd-journal`, e.g. a fresh stick) the output is empty → "error lines since start — server 0, Caspar 0" → pass. A silent false pass on the one check that looks for errors. Works here (the last report counted Caspar 1).
+- `RISK` tools/sweep/checks-app.js:208 — "following another server" is decided by `peer.startsWith('127.0.0.1')`; a kiosk on `[::1]:4200`, `localhost`, or the box's own LAN address is reported as following another server (RULES.md linked-servers rule 5 makes this note the only visible signal), while the check still returns `pass`.
+- `QUALITY` tools/sweep/checks-app.js:117 — only status 0 / ≥500 fail; a LIVE_ROUTES entry that starts answering 404/401/403 (route removed or renamed) stays green. All 16 answer 200 today (verified with GET).
+- `DEAD` tools/sweep/checks-app.js:273 `module.exports.LIVE_ROUTES` — export never used. grep: `rg -n "LIVE_ROUTES" tools src client godot scripts` → only the definition (:15), the loop (:114) and the export.
+- `QUALITY` tools/sweep/checks-app.js:203 — `/:4200\s/` and the `:4200` wording hard-code the port, while src/system/sweep-after-update.js passes `config.server.httpPort` to run-sweep (`--url=…`).
+## tools/sweep/checks-cluster.js
+- `RISK` tools/sweep/checks-cluster.js:77 — the automatic post-update sweep (documented "read only", sweep-after-update.js:8) sends a signed `look.take` POST to every online linked server. It is safe only because the scene id cannot exist (peer answers 404 "look … not found in the stored project", routes-scene-take-look.js:40); a peer on an older build with a different `look.take` guard would run the take handler. Header (:3-5) and run-sweep.js:13 should name this as the one write.
+- `QUALITY` tools/sweep/checks-cluster.js:40 — clock offset from a single ping sample (round-trip midpoint); one slow response gives a spurious ±1 s that only matters near the 5 s warn line.
+- `QUALITY` tools/sweep/checks-cluster.js:97 — one very long line (the media-key warning) beyond the repo's prettier width.
+## tools/sweep/checks-code.js
+- `QUALITY` tools/sweep/checks-code.js:79 — name "node_modules match package-lock (npm ls)" overstates: `npm ls --omit=dev --depth=0` validates installed versions against package.json ranges (and reports missing/invalid), it does not compare to the lock; dev dependencies are never checked.
+## tools/sweep/checks-sandbox.js
+- `QUALITY` tools/sweep/checks-sandbox.js:16 — `getRoutes` parses only `routes.get('/api/…')` in src/api/router.js (95 unique, 94 after the skip), so the claim "every GET route answers" (:3, check name) is overstated: another 26 `routes.get` registrations live outside router.js (/api/fixtures/*, /api/stage/mvr*, /api/vr/status, /api/server/duties, /api/client-prefs, …; `rg -o "routes\.get\('(/api/[^':*]+)'" -r '$1' src | sort -u` = 121 vs 95), plus `path === '/api/…'` handlers in routes-replication-get.js etc.
+- `QUALITY` tools/sweep/checks-sandbox.js:49 — only 5xx/timeouts fail; the last report shows `14×404` among the 94 probed routes, so a route that silently disappears (or a regex now matching a dead registration) is invisible.
+- `DEAD` tools/sweep/checks-sandbox.js:102 `module.exports.projectSlugs` — export unused (the function is used inside the file by sandbox.projects only). grep: `rg -n "projectSlugs" tools src scripts` → definition, one internal call, the export.
+## tools/sweep/checks-system.js
+- `QUALITY` tools/sweep/checks-system.js:107 — the UTC-time-zone hint hard-codes `sudo timedatectl set-timezone Europe/Warsaw` in a generic message.
+- `QUALITY` tools/sweep/checks-system.js:11 — fixed ports 4200/5250/8000 (the server's `httpPort` and `amcp` port are configurable, and src/system/sweep-after-update.js passes the configured port to run-sweep).
+- `RISK` tools/sweep/checks-system.js:35 — `plainReplicationKeys` only matches lines that START with `ssh-`/`ecdsa-`; a replication key with options but no forced command (`no-pty ssh-ed25519 … highascg-replication@x`) is treated as restricted although it still gives a shell.
+- `QUALITY` tools/sweep/checks-system.js:20 — `df -P` row split on whitespace: a mount point containing a space is truncated to its first word (and then merged with other mounts by that key).
+## tools/sweep/run-sweep.js
+- `RISK` tools/sweep/run-sweep.js:82 — no overall deadline: `runSweep` awaits every check and the request helper can hang forever (sweep-util.js:36 BUG), and src/system/sweep-after-update.js:74 spawns it without a timeout. A hung sweep leaves a node process plus a sandbox server child alive until reboot, and no report is written (next start retries because `lastReport().codeId` is unchanged). Add a global timer that saves what finished and exits.
+- `QUALITY` tools/sweep/run-sweep.js:136 — reimplements `has('xvfb-run')` via a second `sh -c` (sweep-util exports `has`).
+- `QUALITY` tools/sweep/run-sweep.js:13 — header says "Read only on this box … no restart"; the cluster signed-call check (checks-cluster.js:77) and `--peers` do write to peers (header mentions only `--peers`).
+## tools/sweep/sweep-util.js
+- `BUG` tools/sweep/sweep-util.js:36 — `request()` resolves only on `res 'end'` or `req 'error'`/`'timeout'`. If the peer closes the connection mid-body, `res` gets no `'end'` and the socket is already closed, so the idle timeout never fires and the promise stays pending forever. Failing input: the server being swept (or a linked peer) restarts or crashes while answering `GET /api/state` (the auto-sweep runs two minutes after a start, i.e. near an update restart). Verified with a loopback socket server that sends headers + 6 body bytes of `Content-Length: 1000` then destroys the socket: `request(..., 1500)` is still pending after 6 s. The sweep then never finishes (see run-sweep.js:82). Fix: add `res.on('aborted'|'error'|'close', …)` that resolves `{ status: 0, error }`.
+- `QUALITY` tools/sweep/sweep-util.js:33 — `has(cmd)` interpolates `cmd` into `sh -c` although the header (:4) says commands run without a shell, and a timed-out `sh` (`code === null`) reads as "found". All callers pass literals today.
+- `QUALITY` tools/sweep/sweep-util.js:97 — fallback `Date.parse(p.ExecMainStartTimestamp)` is NaN for systemd's zone-abbreviation format (`Thu 2026-10-29 10:12:57 CET`; verified `Date.parse(…CEST)` = NaN), so for a unit without a MainPID `startedMs` is 0 and `unitErrors` skips; the fallback only works in UTC/GMT.
+- `RISK` tools/sweep/sweep-util.js:130 — `fs.readdirSync(p)` in `newestMtime` is outside any try/catch: one unreadable directory under src/ or godot/client throws and the whole `code.restarted` check reports "check crashed".

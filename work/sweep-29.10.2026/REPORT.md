@@ -5,7 +5,7 @@ contract in [README.md](README.md). The per-file findings are in the batch MD fi
 [COVERAGE.md](COVERAGE.md). This report is the decision list. It covers the high-severity bugs first, then the
 notable bugs by area, then dead code and quality themes. Each entry carries a recommendation.
 
-<!-- TOTALS -->
+**Coverage: 140/140 batches done.** Totals across all batch files: 28 BUG-HIGH, 470 BUG, 721 DEAD, 766 RISK, 1643 QUALITY.
 
 **How to read the tags**
 
@@ -271,7 +271,30 @@ The unwired-exports baseline will shrink as a side effect.
 **d. Files at the 500-line limit:** `main.gd` (499, about 320 lines of inline probes) and `media_panel.gd`
 (498). The next change to either will need a split.
 
-<!-- BATCHES-130-139 -->
+**e. Last batches (130–139): tools/smoke, tools/startup, tools/sweep, tools/tracking-detect, tools/wiki.**
+
+- **BUG-HIGH [V]** `tools/startup/stick-boot-test/stick-test-lib.sh:45` and `tests/test-03-exfat-operator.sh:5` call
+  `findmnt -L`, which is not an option (`invalid option -- 'L'`; the filter is `-S LABEL=`). With the stick
+  mounted, test-03 exits under `set -e` and kills the stick QA run. `tools/eggs/live-usb/flash-stick-common.sh:300`
+  has the same flag.
+- **BUG** Stick tests: `grep -c … || echo 0` produces "0\n0", so test-05 reports FAIL on a healthy box. `test-12`
+  does `exit 0` in a sourced file, so FAILs go uncounted. test-06 counts the run.sh child as a second supervisor.
+- **BUG** `tools/sweep/sweep-util.js:36`: `request()` never settles when the peer drops mid-body, and the
+  after-update sweep is spawned with no timeout, so it can hang forever.
+- **BUG** `diagnose-screen-consumers.sh:82` reads the Vite dev port (4350) instead of the API port (4200).
+- **BUG** `tools/wiki/md-to-html.js:27,30`: link labels with code render as `&lt;code&gt;` on 25 pages. The
+  committed `docs/wiki-site` is stale (83 pages vs 91).
+- **Smokes:** all 50–63 files per batch are curated and their pins match. The weak spots are smokes that touch live
+  state, listed in 7b:
+  - wo577 and wo379 write `data/shaders`;
+  - wo670 opens real TCP connections to 10.0.0.6/7;
+  - wo796 binds :6454;
+  - ws-restart-reconnect spawns a second node with the live config.
+
+  Several assertions are vacuous:
+  - wo574, a stale pin where indexOf returns -1;
+  - zip-slip, whose fixture build fails so the guard is never exercised;
+  - wo737, which returns early on any box with `.git`.
 
 ## 8. Proposed work orders
 
