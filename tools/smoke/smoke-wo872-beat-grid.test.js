@@ -105,4 +105,10 @@ describe('WO-872: beat grid', () => {
 			assert.match(fs.readFileSync(path.join(dir, m + '.js'), 'utf8'), /fosfora/)
 		}
 	})
+
+	it('test music reaches the detectors at wall-clock rate (ffmpeg -re ran up to 0.57 s ahead)', () => {
+		const src = fs.readFileSync(path.join(__dirname, '../../src/audio/audio-capture-fft.js'), 'utf8')
+		assert.match(src, /t\.pace = pacePcm\(cfg\.sampleRate, /)
+		assert.match(src, /if \(test === t\) t\.pace\.write\(chunk\)/)
+	})
 })

@@ -96,6 +96,7 @@ Their own causal scores (`docs/BENCHMARKS.md`): Ballroom F .549 / Acc1 .689, Har
     - The 2:3 / 3:4 ratio cuts (−.01).
     - An onset pick ratio over the mean (−.01 to −.03).
   - **Silence** (below −60 dB for 0.5 s) drops the grid and the lock and keeps the tempo.
+  - **Test music paced by wall clock (`audio-capture-fft.js` `pacePcm`).** The first live probe disagreed with the offline tracker, and the gap was different for every clip. Measured on its own (`ffmpeg -re` into a pipe, bytes compared with elapsed time), ffmpeg's output ran **0.07 s ahead of real time at 1 s and 0.57 s ahead from about 10 s on**. `-readrate_initial_burst 0` left that unchanged. So test-music beats came out up to half a second early, and on reggae.00020 (period 469 ms) that landed them off the beat. The PCM now goes through a queue that releases `sampleRate` samples per second of wall time, on a 10 ms tick. A starved stretch is skipped rather than caught up, as a live input would drop it. `-re` stays, so the queue never grows beyond about 0.6 s.
   - **Licences.** `THIRD_PARTY_NOTICES` gains fosfora (MIT, used under MIT; design and constants, no code copied) and mir_eval (MIT, `beat-metrics.js`). The About credits list fosfora.
 ## 4. What was VERIFIED
 - `beat-metrics.js` against the real mir_eval 0.8.2 (wheel unpacked in the scratchpad, system numpy/scipy): **400 random cases, 0 mismatches, max diff 0**. The cases cover on-beat jitter, off-beat, double and half tempo, random clicks, dropped beats, and one pair exactly 70 ms apart (that edge case was the one difference before the edge-test fix). Seven of them are pinned in `smoke-wo872-beat-metrics.test.js` (curated, 10/10).
@@ -123,5 +124,18 @@ Their own causal scores (`docs/BENCHMARKS.md`): Ballroom F .549 / Acc1 .689, Har
   - `smoke-wo662-beat-detect` 14/14 unchanged on the new inside: synthetic 96/120/128/174 BPM lock, flywheel, noise gives no beats, a held bass note, silence stops the beat.
   - New `smoke-wo872-beat-grid` (curated): lock within 6 s with every beat on the kick grid (< 6 % of a period); a 4 s drum breakdown mutes the grid (≤ 2 beats), holds the tempo and keeps the published phase; the returning kicks land on the old grid. It also pins the three-stage split.
   - `smoke-wo616-about` 7/7.
+- **Live, end to end on the box (30.10).** Capture enabled in dev mode. GTZAN clips were copied to `media/beat-tests/` (media is gitignored and stays off sticks). For each clip: `POST /api/audio/test-music`, then 31 s of the `audio_fft` WS broadcast recorded, which is what Godot and the shaders receive. Beats are timed at frame time − `age`. The clip start is measured as the first frame with level > 0.05, not fitted. Each clip is also compared with the offline tracker on the same file.
+
+| clip | live F | CMLt | AMLt | offline F | live beats within ±30 ms of the offline beats (at one constant offset) |
+|---|---|---|---|---|---|
+| reggae.00020 | 1.0 | 1.0 | 1.0 | 1.0 | 49/49 (was 41/49 at a −500 ms-mod-period offset before the pacer; live F .08) |
+| hiphop.00012 | .976 | .952 | .952 | .976 | 38/38 |
+| rock.00003 | .775 | .90 | .90 | .825 | 36/36 |
+| disco.00010 | 0 | 0 | 1.0 | 0 | 41/41 (an off-beat lock, the same offline) |
+
+  - The constant offset is 70-80 ms. That is the measured clip start (~98 ms) minus the frame-time quantisation, so the live path adds nothing beyond the delay of the WS frames.
+  - The first probe after a node restart is degraded: 716 frames in 31 s instead of ~920, while the server warms up.
+  - The engine costs 8.5 % of one core (standalone probe, rock.00003).
+  - `smoke-wo872-beat-grid` 4/4 (adds a pin for the pacer); audio-capture, WO-333, WO-662 and WO-866 smokes pass, 60/60 in total.
 - **Cost.** 998 clips × 30 s in 16 s on 14 workers: about 135× real time per core.
 

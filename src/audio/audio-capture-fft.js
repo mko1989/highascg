@@ -109,6 +109,49 @@ function listCaptureDevices() {
  * @param {(level: string, msg: string) => void} opts.log
  * @param {(frame: { freq: Uint8Array, wave: Uint8Array, rms: number, device: string, beat?: object, bands?: number[], parts?: object }) => void} opts.onFrame
  */
+/**
+ * WO-872: release s16le mono PCM at wall-clock rate. ffmpeg -re runs up to 0.57 s ahead of real time (it grows over
+ * the first ~10 s), so test-music beats came out half a second early against what is heard. A starved
+ * stretch is skipped, not caught up, the way a live input drops it.
+ * @returns {{ write(chunk: Buffer): void, stop(): void }}
+ */
+function pacePcm(sampleRate, onPcm) {
+	const queue = []
+	let queued = 0
+	let released = 0
+	let t0 = 0
+	let timer = null
+	const tick = () => {
+		const due = Math.floor(((performance.now() - t0) / 1000) * sampleRate) * 2
+		let want = Math.min(due - released, queued)
+		while (want > 0) {
+			const c = queue[0]
+			const n = Math.min(want, c.length)
+			onPcm(c.subarray(0, n))
+			if (n === c.length) queue.shift()
+			else queue[0] = c.subarray(n)
+			queued -= n
+			released += n
+			want -= n
+		}
+		if (!queued && due > released) released = due
+	}
+	return {
+		write(chunk) {
+			queue.push(chunk)
+			queued += chunk.length
+			if (!timer) {
+				t0 = performance.now()
+				timer = setInterval(tick, 10)
+			}
+		},
+		stop() {
+			clearInterval(timer)
+			queue.length = queued = 0
+		},
+	}
+}
+
 function createAudioCaptureFft({ config, log, onFrame }) {
 	const cfg = config
 	/** @type {import('child_process').ChildProcess|null} */
@@ -321,6 +364,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 		testMusic(file) {
 			if (test) {
 				const p = test.proc
+				test.pace.stop()
 				test = null
 				try {
 					p.kill('SIGTERM')
@@ -356,8 +400,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 				{ stdio: ['ignore', 'pipe', 'ignore'] }
 			)
 			const t = { proc, file, pending: Buffer.alloc(0) }
-			test = t
-			proc.stdout.on('data', (chunk) => {
+			t.pace = pacePcm(cfg.sampleRate, (chunk) => {
 				if (test !== t) return
 				lastPcmAt = Date.now()
 				staleFrameSent = false
@@ -366,8 +409,13 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 				t.pending = buf.subarray(usable)
 				if (usable > 0) pushSamples(pcmS16leToMonoFloats(buf.subarray(0, usable), 1, 1))
 			})
+			test = t
+			proc.stdout.on('data', (chunk) => {
+				if (test === t) t.pace.write(chunk)
+			})
 			proc.on('exit', (code) => {
 				if (test !== t) return
+				t.pace.stop()
 				test = null
 				log('warn', `[AudioFFT] test music ended (ffmpeg exit ${code}) — back to the live input`)
 			})
