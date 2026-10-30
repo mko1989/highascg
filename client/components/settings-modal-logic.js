@@ -84,7 +84,6 @@ export function buildSettingsPayload(modal) {
 			oscFooterVu: true,
 			rundownPlaybackTimer: true,
 			nuclearRequirePassword: !!(modal.querySelector('#set-nuclear-require-pass') || {}).checked,
-			nuclearPassword: (modal.querySelector('#set-nuclear-password') || {}).value ?? '',
 			invertTouchpadScroll: !!(modal.querySelector('#set-invert-touchpad-scroll') || {}).checked,
 		},
 		companion: {
@@ -170,10 +169,7 @@ export function hydrateSettings(modal, cfg) {
 	const ui = cfg.ui || {}
 	const nr = modal.querySelector('#set-nuclear-require-pass'); if (nr) nr.checked = ui.nuclearRequirePassword === true || ui.nuclearRequirePassword === 'true'
 	const np = modal.querySelector('#set-nuclear-password')
-	if (np) {
-		const raw = String(ui.nuclearPassword || '')
-		np.value = raw === '[REDACTED]' ? '' : raw
-	}
+	if (np) np.value = '' // WO-830c: the stored password is never shown (GET masks it); this field only authorizes actions
 	syncNuclearPasswordVisibility(modal)
 	const its = modal.querySelector('#set-invert-touchpad-scroll'); if (its) its.checked = ui.invertTouchpadScroll === true
 	const cp = cfg.composePreview || {}

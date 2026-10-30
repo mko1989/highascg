@@ -6,6 +6,7 @@ const Placement := preload("res://app/window_placement.gd")
 const ScreenPicker := preload("res://app/operator_screen_picker.gd")
 const Form := preload("res://features/settings/settings_form.gd")
 const AboutModel := preload("res://features/settings/about_model.gd")
+const NuclearModel := preload("res://app/nuclear_model.gd")
 const T := preload("res://features/live/transitions.gd")
 const ConnectionMenu := preload("res://app/connection_menu.gd")
 
@@ -189,24 +190,41 @@ static func diagnostics(f: Form, bundle: Button, logs: Button, status: Label) ->
 
 
 ## Web Settings → Nuclear, password part (settings-modal-logic.js). GET /api/settings redacts the password and its hash;
-## the field stays empty ("[REDACTED]" is never shown or sent back); only typed text is posted, hashed server-side.
+## the fields stay empty ("[REDACTED]" is never shown or sent back); only text typed twice and confirmed with the
+## Set password button is posted, hashed server-side (WO-830c).
 static func nuclear(f: Form) -> void:
 	f.heading("Danger zone")
 	f.note("These actions can interrupt output immediately.")
 	var req := f.check("Require password for nuclear actions", "ui.nuclearRequirePassword", false)
 	var g := f.group()
 	f.target = g
+	# WO-830c: setting the password is an explicit action (new + repeat + button). It used to commit on Enter AND on
+	# focus-out, so a typo'd value replaced the stored password the moment the field lost focus.
 	var pw := LineEdit.new()
 	pw.secret = true
 	pw.custom_minimum_size.x = 320
-	pw.placeholder_text = "type to set or change (Enter)"
-	var commit := func() -> void:
-		if pw.text.strip_edges() != "":
-			Settings.patch({"ui": {"nuclearPassword": pw.text.strip_edges()}})
-			pw.text = ""
-	pw.text_submitted.connect(func(_t: String) -> void: commit.call())
-	pw.focus_exited.connect(commit)
-	f._row("Nuclear password", pw)
+	pw.placeholder_text = "new password"
+	var pw2 := LineEdit.new()
+	pw2.secret = true
+	pw2.custom_minimum_size.x = 320
+	pw2.placeholder_text = "repeat new password"
+	var set_btn := Button.new()
+	set_btn.text = "Set password"
+	var pw_status := Label.new()
+	pw_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	set_btn.pressed.connect(func() -> void:
+		var err := NuclearModel.new_password_error(pw.text, pw2.text)
+		if err != "":
+			pw_status.text = err
+			return
+		Settings.patch({"ui": {"nuclearPassword": pw.text.strip_edges()}})
+		pw.text = ""
+		pw2.text = ""
+		pw_status.text = "Password set.")
+	f._row("New password", pw)
+	f._row("Repeat", pw2)
+	g.add_child(set_btn)
+	g.add_child(pw_status)
 	f.note("Asked for by reboot / shut down / Caspar stop, updates, Tailscale, DeckLink and the dock while required.")
 	f.target = f
 	var sync := func() -> void:

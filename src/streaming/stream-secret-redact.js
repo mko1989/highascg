@@ -21,6 +21,18 @@
  */
 'use strict'
 
+// WO-830c: SRT `streamid` is the access token on most hosted ingests (`publish:<key>`), so it is a secret like the
+// passphrase; any other query param that names a key/token/secret/password gets the same treatment.
+const SECRET_QUERY_NAME_RE = /^(passphrase|streamid|pass|password|key|streamkey|token|secret|auth)$/i
+const SECRET_QUERY_FALLBACK_RE = /((?:^|[?&])(?:passphrase|streamid|password|key|streamkey|token|secret)=)[^&\s"]*/gi
+
+/** @param {URL} u mutated in place */
+function maskSecretQueryParams(u) {
+	for (const name of [...new Set([...u.searchParams.keys()])]) {
+		if (SECRET_QUERY_NAME_RE.test(name)) u.searchParams.set(name, '****')
+	}
+}
+
 /**
  * Mask an RTMP key (last URL path segment) or an SRT passphrase (query param). Server keeps the
  * full URL internally for AMCP REMOVE / reconnection — this is a DISPLAY-ONLY copy.
@@ -32,11 +44,11 @@ function redactStreamUrl(url) {
 	if (/^srt:\/\//i.test(s)) {
 		try {
 			const u = new URL(s.replace(/^srt:\/\//i, 'https://'))
-			if (u.searchParams.has('passphrase')) u.searchParams.set('passphrase', '****')
+			maskSecretQueryParams(u)
 			const path = u.pathname === '/' ? '' : u.pathname
 			return `srt://${u.host}${path}${u.search}`
 		} catch {
-			return s.replace(/(passphrase=)[^&]*/i, '$1****')
+			return s.replace(SECRET_QUERY_FALLBACK_RE, '$1****')
 		}
 	}
 	try {
@@ -45,7 +57,9 @@ function redactStreamUrl(url) {
 		if (parts.length >= 2) {
 			parts[parts.length - 1] = '****'
 			const scheme = /^rtmps:/i.test(s) ? 'rtmps' : 'rtmp'
-			return `${scheme}://${u.host}/${parts.join('/')}`
+			// WO-830c: some ingests carry the key in the query (?key=…) as well as / instead of the last segment.
+			maskSecretQueryParams(u)
+			return `${scheme}://${u.host}/${parts.join('/')}${u.search}`
 		}
 	} catch {
 		/* fall through */

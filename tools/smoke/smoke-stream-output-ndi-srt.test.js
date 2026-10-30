@@ -108,18 +108,20 @@ test('SRT url gets its own options — with ffmpeg microsecond conversion', () =
 })
 
 // WO-307
-test('SRT passphrase is added with pbkeylen, but only inside libsrt\'s valid 10-79 char range', () => {
+test('SRT passphrase is added with pbkeylen, but refuses outside libsrt\'s valid 10-79 char range', () => {
 	const withPass = buildSrtOutputUrl('srt://h:9000', { passphrase: 'a-real-passphrase-here' })
 	assert.match(withPass, /passphrase=a-real-passphrase-here/)
 	assert.match(withPass, /pbkeylen=16/, 'pbkeylen must accompany a passphrase')
 
-	// Too short (libsrt hard-rejects <10 chars) — omitted rather than sent broken, so the
-	// connection fails on an obviously-wrong length instead of a cryptic AMCP/libsrt error.
-	const tooShort = buildSrtOutputUrl('srt://h:9000', { passphrase: 'short' })
-	assert.ok(!/passphrase=/.test(tooShort), 'a too-short passphrase must not reach the URL at all')
-
-	const tooLong = buildSrtOutputUrl('srt://h:9000', { passphrase: 'x'.repeat(80) })
-	assert.ok(!/passphrase=/.test(tooLong), 'a too-long passphrase must not reach the URL at all')
+	// WO-830c: libsrt hard-rejects <10 / >79 chars. The old behaviour (silently omit it) started the stream UNENCRYPTED,
+	// so a bad length now REFUSES with a coded error that never echoes the passphrase.
+	for (const bad of ['short', 'x'.repeat(80)]) {
+		assert.throws(
+			() => buildSrtOutputUrl('srt://h:9000', { passphrase: bad }),
+			(e) => e.code === 'SRT_PASSPHRASE_INVALID' && /10-79/.test(e.message) && !e.message.includes(bad),
+			'an out-of-range passphrase must refuse, not be dropped',
+		)
+	}
 
 	const empty = buildSrtOutputUrl('srt://h:9000', {})
 	assert.equal(empty, 'srt://h:9000', 'no passphrase → no passphrase/pbkeylen params at all')

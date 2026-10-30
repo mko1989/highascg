@@ -5,7 +5,13 @@
 #   npm run release:github-server
 #   npm run release:github-server:dry
 #   ./tools/release/make-github-release-server.sh [--dry-run] [--replace] [--tag NAME] [--no-bump-package]
-#                                                  [--latest] [--no-starter-zips] [--no-godot-clients]
+#                                                  [--latest] [--no-starter-zips] [--no-godot-clients] [--allow-dirty]
+#
+# The tarball is packed from THIS tree, so it must be a clean checkout: on the playout box config/ is live runtime state
+# (keys, identities) that syncs back mid-session. Run it from a git worktree (WO-830c):
+#   git worktree add --detach ../highascg-release HEAD && cd ../highascg-release && npm ci && npm run build:client \
+#     && bash tools/release/make-github-release-server.sh
+# A dirty tracked tree is refused unless --allow-dirty (CI's fresh checkout never needs it).
 #
 # --latest            publish as a full release marked Latest (default: prerelease)
 # --no-starter-zips   skip the HIGHASCGEXF / HIGHASCGDAT starter layout zips (default: attach both,
@@ -28,6 +34,7 @@ ZIP_EXCLUDE_NODE_MODULES=0
 BUMP_PACKAGE=1
 STARTER_ZIPS=1
 GODOT_CLIENTS=1
+ALLOW_DIRTY=0
 BUILD_STAMP_FILE=""
 NOTES=""
 
@@ -60,6 +67,7 @@ while [[ $# -gt 0 ]]; do
 	--latest) export RELEASE_LIB_LATEST=1 ;;
 	--no-starter-zips) STARTER_ZIPS=0 ;;
 	--no-godot-clients) GODOT_CLIENTS=0 ;;
+	--allow-dirty) ALLOW_DIRTY=1 ;;
 	*)
 		echo "Unknown option: $1" >&2
 		usage 1
@@ -67,6 +75,25 @@ while [[ $# -gt 0 ]]; do
 	esac
 	shift || true
 done
+
+# WO-830c: refuse to pack a tree with uncommitted tracked changes (the 10.2026 local tarballs were built from the live
+# box tree and carried its TLS + device-identity private keys; WO-687 added the excludes, this is the second guard).
+if [[ "$ALLOW_DIRTY" -eq 0 ]] && git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+	DIRTY="$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no)"
+	if [[ -n "$DIRTY" ]]; then
+		if [[ "$DRY_RUN" -eq 1 ]]; then
+			echo "[dry-run] WARNING: working tree has uncommitted tracked changes - a real run would refuse:" >&2
+			printf '%s\n' "$DIRTY" | head -n 5 >&2
+		else
+			echo "ERROR: working tree has uncommitted tracked changes - refusing to build a release from it:" >&2
+			printf '%s\n' "$DIRTY" | head -n 10 >&2
+			echo "Build from a clean git worktree instead:" >&2
+			echo "  git worktree add --detach ../highascg-release HEAD && cd ../highascg-release && npm ci && npm run build:client && bash tools/release/make-github-release-server.sh" >&2
+			echo "(or pass --allow-dirty if you really mean it)" >&2
+			exit 1
+		fi
+	fi
+fi
 
 STAMP="$(release_lib_stamp)"
 BUILD_STAMP_FILE="${REPO_ROOT}/BUILD_STAMP"
@@ -130,6 +157,13 @@ build_server_archive() {
 	echo "==> BUILD_STAMP ${STAMP}"
 	echo "==> Server tarball → $ARCHIVE_PATH"
 	tar "${tar_args[@]}"
+	# WO-830c: last line of defence - no private key / device identity may be inside the tarball, whatever the excludes did.
+	if tar -tzf "$ARCHIVE_PATH" | grep -E '(^|/)(config/(certs|nginx)/|config/(device|hardware|replication-local)-identity\.json|config/tailscale\.json|\.private/)|\.(pem|key)$' >/dev/null; then
+		echo "ERROR: $ARCHIVE_PATH contains key/identity files - removing it" >&2
+		tar -tzf "$ARCHIVE_PATH" | grep -E '(^|/)(config/(certs|nginx)/|config/(device|hardware|replication-local)-identity\.json|config/tailscale\.json|\.private/)|\.(pem|key)$' | head -n 10 >&2
+		rm -f "$ARCHIVE_PATH"
+		exit 1
+	fi
 	archive_common_print_size_hints "$ARCHIVE_PATH"
 }
 

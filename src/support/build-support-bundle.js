@@ -4,7 +4,8 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const logBuffer = require('../utils/log-buffer')
-const { redactObject, listRedactedKeyPatterns } = require('./redact-settings')
+const { redactObject, redactValue, listRedactedKeyPatterns, listSupportExtraKeyPatterns } = require('./redact-settings')
+const { redactAmcpCommandForLog } = require('../streaming/stream-secret-redact')
 const { buildZipStore } = require('./zip-store')
 const { buildGpuDisplaySnapshot } = require('./gpu-display-snapshot')
 const { tailFileLines, resolveCasparLogPath } = require('../api/routes-logs')
@@ -140,7 +141,7 @@ async function buildSupportBundleFiles(ctx, opts = {}) {
 		buildStamp: readBuildStamp(),
 		packageVersion: require('../../package.json').version,
 		operatorNote: opts.operatorNote ? String(opts.operatorNote).slice(0, 2000) : null,
-		redactedKeyPatterns: listRedactedKeyPatterns(),
+		redactedKeyPatterns: [...listRedactedKeyPatterns(), ...listSupportExtraKeyPatterns()],
 		logBufferLineCount: records.length,
 		wsLogLineDropped: wsLogLineStats?.dropped ?? null,
 		files: [],
@@ -149,14 +150,15 @@ async function buildSupportBundleFiles(ctx, opts = {}) {
 
 	const files = {
 		'manifest.json': JSON.stringify(manifest, null, 2),
-		'logs/highascg.jsonl': records.map((r) => JSON.stringify(r)).join('\n'),
-		'logs/highascg-warn-error.txt': warnErrorText || '(no warn/error lines in buffer)',
-		'logs/caspar-tail.txt': tailFileLines(casparPath, casparLines, 1024 * 1024).join('\n'),
-		'config/highascg-redacted.json': JSON.stringify(redactObject(config), null, 2),
+		// WO-830c: stream URLs (RTMP key, SRT passphrase / streamid) in log text are masked like everywhere else.
+		'logs/highascg.jsonl': redactAmcpCommandForLog(records.map((r) => JSON.stringify(r)).join('\n')),
+		'logs/highascg-warn-error.txt': redactAmcpCommandForLog(warnErrorText || '(no warn/error lines in buffer)'),
+		'logs/caspar-tail.txt': redactAmcpCommandForLog(tailFileLines(casparPath, casparLines, 1024 * 1024).join('\n')),
+		'config/highascg-redacted.json': JSON.stringify(redactObject(config, { forSupport: true }), null, 2),
 		'config/caspar-server.xml': casparXml,
 		'project/project-summary.json': JSON.stringify(projectSummary, null, 2),
-		'system/inventory.json': JSON.stringify(inventory || { missing: true }, null, 2),
-		'system/network.json': JSON.stringify(network, null, 2),
+		'system/inventory.json': JSON.stringify(redactValue(inventory || { missing: true }, '', { forSupport: true }), null, 2),
+		'system/network.json': JSON.stringify(redactValue(network, '', { forSupport: true }), null, 2),
 		'system/gpu-display.json': JSON.stringify(gpuDisplay || { missing: true }, null, 2),
 		'runtime/status.json': JSON.stringify(runtime, null, 2),
 		'runtime/host-stats.json': JSON.stringify(hostStats || { missing: true }, null, 2),

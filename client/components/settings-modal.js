@@ -14,7 +14,8 @@ import * as SystemUpdates from './settings-modal-system-updates.js'
 import { wireDiagnosticsPanel } from './settings-modal-diagnostics.js'
 import { wireTailscalePanel } from './settings-modal-tailscale.js'
 import { mountLiveAudioSettingsPanel } from './settings-live-audio-panel.js'
-import { syncNuclearPasswordVisibility, getNuclearPasswordFromModal } from '../lib/settings-nuclear-shared.js'
+import { syncNuclearPasswordVisibility, getNuclearPasswordFromModal, validateNewNuclearPassword } from '../lib/settings-nuclear-shared.js'
+import { stripRedacted } from '../lib/settings-redacted.js'
 export function showSettingsModal(initialTab) {
 	if (document.getElementById('settings-modal')) return
 	const modal = document.createElement('div')
@@ -141,6 +142,19 @@ export function showSettingsModal(initialTab) {
 			return null
 		}
 	}
+	// WO-830c: changing the nuclear password is an explicit action - new + repeat + button - never a side effect of typing.
+	modal.querySelector('#set-nuclear-newpass-apply')?.addEventListener('click', async () => {
+		const first = modal.querySelector('#set-nuclear-newpass')
+		const again = modal.querySelector('#set-nuclear-newpass2')
+		const err = validateNewNuclearPassword(first?.value, again?.value)
+		if (err) { if (nuclearStatus) nuclearStatus.textContent = err; return }
+		try {
+			await api.post('/api/settings', { ui: { nuclearPassword: String(first.value).trim() } })
+			first.value = ''; again.value = ''
+			if (nuclearStatus) nuclearStatus.textContent = 'Nuclear password set.'
+			await settingsState.load()
+		} catch (e) { if (nuclearStatus) nuclearStatus.textContent = e?.message || String(e) }
+	})
 	const refreshNuclearSetup = async () => {
 		try {
 			const setup = await api.get('/api/system/setup')
@@ -234,7 +248,7 @@ export function showSettingsModal(initialTab) {
 		if (settings.composePreview) settingsState.settings.composePreview = { ...settings.composePreview }
 		settingsState.notify()
 		try {
-			const res = await api.post('/api/settings', settings)
+			const res = await api.post('/api/settings', stripRedacted(settings)) // WO-830c: never echo the GET mask
 			if (res.ok) {
 				await settingsState.load()
 				document.dispatchEvent(new CustomEvent('highascg-settings-applied', { detail: res }))
@@ -248,6 +262,9 @@ export function showSettingsModal(initialTab) {
 
 	const scheduleSave = () => { if (!autosaveSuspended) { clearTimeout(autosaveTimer); autosaveTimer = setTimeout(persistSettings, 600) } }
 	const onSettingsFieldChange = (e) => {
+		// WO-830c: the nuclear password fields are never autosaved (the typed value is the password for ACTIONS, or a
+		// new one that only the "Set password" button may apply).
+		if (e.target.closest('#set-nuclear-password-fields')) return
 		if (e.target.closest('#settings-pane-variables')) return
 		if (e.target.closest('#settings-pane-live-audio')) return
 		if (e.target.closest('#settings-pane-defaults')) Logic.syncEditorDefaultsFromModal(modal)

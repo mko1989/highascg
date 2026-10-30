@@ -24,7 +24,8 @@ const { normalizeNetworkSettings } = require('../config/network-settings')
 const { normalizeProjectFps, applyProjectFpsToInheritedOutputs, resolveProjectFps } = require('../config/project-fps')
 const { getSatellitePreviewClient } = require('../companion/satellite-preview-client')
 const { mergeCompanionSettings } = require('../companion/companion-config')
-const { mergeUiNuclearPasswordSettings } = require('../utils/nuclear-password')
+const { mergeUiNuclearPasswordSettings, REDACTED_PLACEHOLDER } = require('../utils/nuclear-password')
+const { stripRedactedMarkers } = require('../support/redact-settings')
 
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/settings') return null
@@ -36,9 +37,17 @@ async function handlePost(path, body, ctx) {
 			body: jsonBody({ error: 'Invalid JSON body', detail: parsed.error }),
 		}
 	}
-	const settings = parsed.value
-	if (!settings || typeof settings !== 'object') {
+	if (!parsed.value || typeof parsed.value !== 'object') {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid settings' }) }
+	}
+	// WO-830c: GET masks secrets as "[REDACTED]"; a client echoing its GET copy must not store the mask (it once became
+	// the nuclear-password hash). Masked values are dropped so the stored ones stay.
+	const settings = stripRedactedMarkers(parsed.value)
+	if (settings.ui && typeof settings.ui === 'object' && !Array.isArray(settings.ui)) {
+		// The hash is only ever derived here from `nuclearPassword`, never accepted from a client. An omitted
+		// `nuclearPassword` (a client that has nothing to say about it) keeps the stored hash, same as the explicit mask.
+		delete settings.ui.nuclearPasswordHash
+		if (settings.ui.nuclearPassword === undefined) settings.ui.nuclearPassword = REDACTED_PLACEHOLDER
 	}
 	const warnings = []; const sideEffects = []; const oldC = { ...ctx.config.caspar }; const oldS = { ...ctx.config.streaming }
 

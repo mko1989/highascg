@@ -7,6 +7,7 @@
 import { api } from './api-client.js'
 import { DEFAULT_EDITOR_DEFAULTS, mergeEditorDefaults } from './editor-defaults-constants.js'
 import { resolveEffectiveProgramLayout } from './program-audio-layouts.js'
+import { stripRedacted } from './settings-redacted.js'
 
 /**
  * Merge GET/POST settings onto the in-memory cache. Keeps `editorDefaults` when the server omits them (WO-33).
@@ -136,7 +137,8 @@ export const settingsState = {
 			Object.assign(this.settings, partial)
 		}
 		try {
-			await api.post('/api/settings', this.settings)
+			// WO-830c: this.settings is the (redacted) GET copy — never echo "[REDACTED]" back as a value.
+			await api.post('/api/settings', stripRedacted(this.settings))
 		} catch (e) {
 			console.error('[SettingsState] Save failed:', e)
 			throw e

@@ -10,10 +10,27 @@
 
 const LOGIN_PATH = '/login'
 
-/** Only same-site absolute paths: never `//host` or a scheme (open redirect). */
+// WO-830c: browsers strip TAB/CR/LF from URLs, so `/%09/evil.example` decodes to `/\t/evil.example` = `//evil.example`.
+// eslint-disable-next-line no-control-regex -- the control characters are the point
+const UNSAFE_NEXT_CHARS_RE = /[\u0000-\u001f\u007f\\]/
+
+/** @param {string} s one decoding level of `next` */
+function isSameOriginPath(s) {
+	return s.startsWith('/') && !s.startsWith('//') && !UNSAFE_NEXT_CHARS_RE.test(s)
+}
+
+/**
+ * Only same-site absolute paths: a single leading `/`, never `//host`, `/\host`, a scheme, or a control character
+ * (raw or after percent-decoding, the way the browser and the page's own redirect see it). Anything else -> '/'.
+ */
 function safeNext(next) {
 	const s = String(next || '')
-	if (!s.startsWith('/') || s.startsWith('//') || s.startsWith('/\\')) return '/'
+	if (!isSameOriginPath(s)) return '/'
+	try {
+		if (!isSameOriginPath(decodeURIComponent(s))) return '/'
+	} catch {
+		return '/'
+	}
 	return s
 }
 
@@ -59,8 +76,10 @@ button { width: 100%; padding: 10px; border: 0; border-radius: 4px; background: 
 </form>
 <script>
 (function () {
+	// WO-830c: same rule as safeNext() in login-page.js (searchParams.get already decoded once; check again for %25xx).
+	function ok(p) { return p.charAt(0) === '/' && p.charAt(1) !== '/' && !/[\\u0000-\\u001f\\u007f\\\\]/.test(p) }
 	var next = new URLSearchParams(location.search).get('next') || '/'
-	if (next.charAt(0) !== '/' || next.charAt(1) === '/' || next.charAt(1) === '\\\\') next = '/'
+	try { if (!ok(next) || !ok(decodeURIComponent(next))) next = '/' } catch (e) { next = '/' }
 	var err = document.getElementById('err')
 	document.getElementById('f').addEventListener('submit', function (ev) {
 		ev.preventDefault()

@@ -103,7 +103,8 @@ function main() {
 		config = applyAuthAndBindPolicy(config, cli)
 	}
 
-	logger.info('Config: ' + JSON.stringify(config, null, 2))
+	// WO-830c: the live config carries the API token, scrypt hashes, tailscale/stream secrets — it went verbatim into the journal AND the Logs WS.
+	logger.info('Config: ' + JSON.stringify(require('./src/support/redact-settings').redactObject(config, { forSupport: true }), null, 2))
 	if (cli.noHttp) { logger.info('Exiting (--no-http).'); process.exit(0) }
 
 	try {

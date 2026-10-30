@@ -1,6 +1,6 @@
 # WO-830 — LAN hardening: remote crash, injection, secrets (sweep §2, without the auth switch)
 
-**Status: IN PROGRESS (30.10) — 830a crash class DONE offline (26 new smoke tests; each crash reproduced on the old tree); 830b/830c in progress**
+**Status: IN PROGRESS (30.10) — 830a crash class, 830b injection, 830c secrets DONE offline (new smokes wo830a×3, wo830b, wo830c); root wrapper reinstall + live re-test after node restart pending**
 **Source:** the 29.10 code sweep, `work/sweep-29.10.2026/REPORT.md` §2 (items 1–24). Owner 30.10: *"yes we need better
 auth handling. im putting that off till last … id like it to be hardened"* and *"there are a lot of bugs to fix"*.
 **Related:** WO-811 (the auth switch itself stays there and comes last), REVIEW-2026-08-03, WO-418/419.
@@ -54,3 +54,63 @@ Results: all 26 new tests pass on the fixed tree. Against the pre-fix tree (`git
 Also run: the 52 existing smoke/test files that mention any touched module (393 tests, 0 fail), `eslint` on all changed files (0 new warnings; one pre-existing `broadcastLiveState` unused-var warning in ws-server.js), `check-max-file-lines` (nothing new over 500; ws-server.js is now exactly 500).
 
 Open: actual-bytes cap in safe-unzip; new test files still need adding to the curated list `tools/ci/offline-test-files.js`.
+
+## 2b. What was done (injection)
+
+REPORT §2b items 9-15 and 23. None of these depend on auth enforcement (WO-811); all hold with it OFF.
+
+- **9 Root command injection (vcam).** `src/virtual-output/v4l2-kernel-modules.js`: new `sanitizeCardLabel` (only `[A-Za-z0-9 ._-]`, max 64, everything else becomes `_`), `sanitizeAlsaId` (`[A-Za-z0-9_-]`) and `clampInt`; `writeVcamModulesConf` re-validates every value (VIDEO_NR 0-63, ALSA_INDEX 0-31, ALSA_PCM 1-8). `ALSA_ID` was also written unquoted from config, so it was a second injection point. `tools/runtime/highascg-vcam-modules-up.sh`: no longer `source`s the conf. It reads it line by line, requires `KEY=VALUE` with KEY from a fixed list, checks each value against a per-key regex and aborts on any unknown or odd line. Even the old root copy is safe against JS-written files now, because the JS only emits the safe charset.
+- **10 Arbitrary file write.** New `src/api/caspar-config-path-guard.js`. `POST /api/caspar-config/apply` rejects (400) a `body.path` or `body.casparServer.configPath` that is not a `*.config` file in a trusted dir (default config dir, `CASPAR_CONFIG_PATH` dir, saved path's dir). The check uses realpath, including dangling symlinks, and refuses `..` and NUL. It runs before the body is merged into `ctx.config`. `writeCasparConfigToDisk` also refuses any target that is not `*.config` after symlink resolution, so a hostile saved settings path cannot be used either.
+- **11 Server code replacement.** New `src/system/server-update-asset.js` (`resolveVerifiedAsset`, split out because `server-update.js` hit the 500-line limit). `startApplyJob` now installs only the asset the server resolved itself from the configured repo's release list. The name must match `highascg-server_[A-Za-z0-9._-]+.tar.gz`, and the URL must be `https://github.com/<repo>/releases/download/...` ending in that name. A body `assetUrl`/`assetName` is accepted only when it equals the verified asset, otherwise the call throws. The tar path is `basename(assetName)`.
+- **12 Plugin RCE.** `src/plugins/plugin-manager.js`: `setEntry` refuses an invalid id and drops an invalid `moduleName`; `listPlugins` skips stored entries with an invalid id or moduleName (this covers the boot reload via `loadEnabledPlugins`); `resolvePlugin` and `enablePluginNow` re-validate. The `routes-plugins.js` enable route writes the entry first and then enables it, so the guard has to live in the manager. No route edit was needed.
+- **13 authorized_keys injection.** `src/replication/replication-ssh-setup.js`: new `isValidPeerHost` (hostname, IPv4 or IPv6 literal only). `buildForcedCommandAuthorizedKeysEntry` returns null for an invalid `fromHost`, and `testReplicationSshToPeer` refuses one. `src/replication/connect-pair.js`: `registerFollowerOnLeader` rejects an invalid `followerHost` with 400, `connectToLeader` rejects an invalid `leaderHost`, and an invalid `followerCasparHost` falls back to `followerHost`.
+- **14 rsync wrapper.** `tools/runtime/highascg-replication-ssh.sh`: the old `-*` pass-through is gone. Allowed options are `--server`, `--sender`, `--mkpath` and the short cluster `^-[vnlogDtprRz]+e\.[A-Za-z]*$`. The list was captured from real rsync 3.4.1 for the push, pull and dry-run probe commands (`sync-project-media-rsync.js`, `testReplicationSshToPeer`). A path token may no longer start with `-`.
+- **15 Nuclear password fail-open.** `src/utils/nuclear-password.js`: `verifyNuclearPassword` requires an even-length hex salt of at least 8 bytes and a hex key of at least 16 bytes, and wraps scrypt in try/catch. `scrypt$ab$` and similar previously compared two 0-byte keys as equal.
+- **23 AMCP CR/LF and parentheses.**
+  - `src/caspar/amcp-utils.js`: `param()` now quotes on `[\s()]`. Bare tokens (`LINEAR`, `25`, `0.5`, `clip.mp4`, `folder/clip`) stay unquoted, so no wire string for normal commands changes. It already folded CR/LF and escaped `\` and `"`. `stripAmcpLineBreaks` is now exported.
+  - `src/caspar/amcp-template-credential.js` `prepareAmcpLine`: folds CR/LF into a space. This is the single choke point for the single-command transport (`_sendPrepare`) and for every line of a BEGIN..COMMIT batch.
+  - `src/engine/scene-template-cg.js`: the template name goes through `clipParamForPlay` (names with `/`, still always quoted) or `param()`.
+  - `src/engine/timeline-playback-helpers.js` `buildEffectAmcpLinesPlayback`: numbers are coerced with a finite check and strings go through `param()`.
+  - `src/api/routes-preview-nudge.js`: new `sanitizeEffectParams` runs on client effect params before they reach `buildEffectAmcpLines`.
+- Out of scope: `buildEffectAmcpLines` in `scene-take-lbg-helpers.js` (wo833's file) still interpolates raw. The transport strip covers it, but it should reuse `buildEffectAmcpLinesPlayback`.
+
+**Owner action (root copies are installed files, not mine to change):**
+```
+sudo install -m 0755 -o root -g root /home/casparcg/highascg/tools/runtime/highascg-vcam-modules-up.sh /usr/local/lib/highascg/highascg-vcam-modules-up.sh
+sudo install -m 0755 -o root -g root /home/casparcg/highascg/tools/runtime/highascg-replication-ssh.sh /usr/local/bin/highascg-replication-ssh
+```
+The first is also what `scripts/setup/12-passwordless-sudo.sh` does on setup. The second is refreshed by the update drop helper only if already installed. Until the vcam script is reinstalled the old `source` still runs, but the JS no longer writes anything shell-active into the conf.
+
+## 3b. Verified (injection)
+
+- New `tools/smoke/smoke-wo830b-injection-validation.test.js`: 25 tests, all pass.
+  - The vcam wrapper copy runs with a stubbed `modprobe` against `$(...)`, backtick, `;`, `PATH=` and `LD_PRELOAD=` confs: all refused, canary file never created. A valid conf still reaches `modprobe v4l2loopback ... card_label=Virtual cam`.
+  - Caspar-config path guard: traversal, wrong name, outside dir, symlink dir, dangling symlink. The apply route returns 400 and writes nothing; `writeCasparConfigToDisk` refuses an `authorized_keys` target.
+  - `resolveVerifiedAsset` cases, plugin id cases (including a stale stored entry on boot reload), host-validator cases, an `authorized_keys` entry with a newline `fromHost`, and `registerFollowerOnLeader` with a hostile host.
+  - The rsync wrapper is run with a stubbed `rsync`: the 4 real option sets pass, `--daemon`, `--config=`, `--log-file=`, `--rsh`, `-T`, `--files-from`, `--write-batch`, `--delete` and `-e` are refused.
+  - Nuclear-password broken-hash cases, `param()` cases, `prepareAmcpLine` CR/LF folding, `scene-template-cg`, timeline effect lines and the nudge sanitizer.
+- Existing suites run on my changes and still green: `smoke-wo724-media-send-paths` (real rsync through the real wrapper), `smoke-replication-ssh-setup`, `smoke-virtual-camera`, `smoke-wo455/501/423-424/737/499`, `smoke-server-update-retain`, and about 260 other smokes that mention AMCP, CG, MIXER, `param(`, nuclear, plugin, replication, vcam, timeline or nudge. Failures in that run were not from these changes:
+  - smoke-caspar-cls-id: `src/media/local-media-paths.js` is being changed by wo833.
+  - smoke-stream-key-redaction: `stream-secret-redact.js` was touched at 11:03.
+  - smoke-wo173-clip-start-batch: WO-837 `_layerChannels` is mid-edit.
+  - smoke-wo379: shader stack clear, in wo833's area.
+  - Sandbox smokes (wo725, wo730, wo753, ws-restart, wo749): `index.js` requires the missing `./src/sampling/dmx-sampling`, another agent's work in progress.
+- eslint on all changed files: 0 errors (2 pre-existing unused-var warnings). `check-max-file-lines.js`: my files are under 500 (the one reported file, `client/lib/math-input.js`, is not mine).
+- Not done live: no AMCP was sent, no API POST, no sudo. The root wrapper copies are unchanged (see the owner commands above).
+
+## 2c. What was done (secrets/UI)
+
+- **16 Nuclear password (web + Godot).** Web: `#set-nuclear-password` is now only the password that authorizes actions; `buildSettingsPayload` no longer sends it as `ui.nuclearPassword`, the password-field container is excluded from autosave (settings-modal.js `onSettingsFieldChange`), hydrate no longer prefills it. New explicit "Set a new password" block (new + repeat + "Set password" button, `validateNewNuclearPassword` in settings-nuclear-shared.js) that POSTs `{ui:{nuclearPassword}}`. Godot had the same flaw (settings_panes.gd `nuclear()` committed on Enter AND focus-out): now new + repeat + button, validation in `nuclear_model.gd new_password_error`.
+- **17 Redaction echo.** Client: new `client/lib/settings-redacted.js stripRedacted`, used by `settingsState.save()` and the modal autosave POST. Server: `settings-post.js` strips every `"[REDACTED]"` value from the body (`stripRedactedMarkers`), never accepts `ui.nuclearPasswordHash` from a client, and an omitted `ui.nuclearPassword` now means "keep the stored hash" (same as the explicit mask).
+- **18 Open redirect.** `login-page.js safeNext` checks raw and percent-decoded form (single leading `/`, no `//`, no backslash, no control chars); the served script applies the same rule before `location.replace`.
+- **19 Malformed cookie.** `auth.js parseCookies` try/catch around `decodeURIComponent` (covers routes-auth.js via `extractAuthTokenFromRequest`).
+- **20 Support-bundle redaction.** `redactObject(obj, {forSupport:true})` adds passphrase/passwd/psk/credential/streamkey/streamid/`*Key` keys and masks rtmp/srt URLs inside any string; the base regex is unchanged because GET /api/settings shares it (Devices round-trips `srtStreamId`). `redactStreamUrl` masks SRT `streamid` and `key|token|secret|password` query params (also RTMP query). `build-support-bundle.js` uses it for config/inventory/network and runs the three log files through `redactAmcpCommandForLog`.
+- **21 SRT passphrase.** `buildSrtOutputUrl` throws `SRT_PASSPHRASE_INVALID` (message never contains the passphrase) outside 10-79 chars; `routes-streaming-channel-rtmp.js` turns it into a 400 `{error}` + warn log + `lastError`, no ADD STREAM is sent.
+- **22 Config log.** `index.js` logs `redactObject(config, {forSupport:true})`.
+- **24 Release.** `make-github-release-server.sh`: refuses uncommitted tracked changes (`--allow-dirty` to override; dry-run warns), documents the git-worktree recipe, and after `tar` fails + deletes the archive if it holds key/identity files.
+
+## 3c. Verified
+
+- `node --test tools/smoke/smoke-wo830c-secrets.test.js` (11 tests: payload/autosave pins, stripRedacted, settings POST with/without stored hash, open-redirect table + served script in `vm`, malformed cookie, redaction table, support bundle, SRT 400 through `handlePostRtmp` with mocked AMCP, index.js pin, release guard in a temp git repo) all pass. Repointed (honestly) `smoke-stream-output-ndi-srt` (drop -> refuse) and `smoke-stream-key-redaction` (streamid now masked).
+- Related suites green (96 tests incl. wo261, wo244, wo611, log-record, api-auth, wo619, wo645, wo802...). eslint clean on changed files. Godot headless `run_tests.gd`: 23066 passed, 0 failed; `run-client.sh --check` boot OK.
+- Not verified here: web UI in a browser (needs `npm run build:client` by the coordinator), Godot pane visually.

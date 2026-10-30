@@ -116,7 +116,14 @@ function parseCookies(req) {
 		if (idx <= 0) continue
 		const k = part.slice(0, idx).trim()
 		const v = part.slice(idx + 1).trim()
-		if (k) out[k] = decodeURIComponent(v)
+		// WO-830c: a malformed %-escape throws URIError -> uncaught -> 502 on every gated route; treat it as "no token".
+		if (k) {
+			try {
+				out[k] = decodeURIComponent(v)
+			} catch {
+				/* unusable cookie value: skip it */
+			}
+		}
 	}
 	return out
 }

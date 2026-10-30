@@ -53,12 +53,13 @@ describe('WO-307 — SRT passphrase and the transport-layer log sites', () => {
 	const { redactStreamUrl: redact2, redactAmcpCommandForLog } = require('../../src/streaming/stream-secret-redact')
 	const TRANSPORT = path.join(REPO_ROOT, 'src/caspar/amcp-client-transport.js')
 
-	it('redactStreamUrl masks the SRT passphrase query param, keeps the rest', () => {
+	it('redactStreamUrl masks the SRT passphrase and streamid query params, keeps the rest', () => {
 		const out = redact2('srt://10.0.0.5:9000?latency=120000&streamid=pgm&mode=caller&passphrase=SUPERSECRET&pbkeylen=16')
 		assert.doesNotMatch(out, /SUPERSECRET/)
 		assert.match(out, /passphrase=\*\*\*\*/)
+		// WO-830c: the SRT streamid is the access token on hosted ingests (`publish:<key>`), so it is masked like the passphrase.
+		assert.match(out, /streamid=\*\*\*\*/)
 		assert.match(out, /latency=120000/, 'non-secret params must stay readable')
-		assert.match(out, /streamid=pgm/)
 	})
 
 	it('redactAmcpCommandForLog finds the secret whether quoted or bare, anywhere in the string', () => {

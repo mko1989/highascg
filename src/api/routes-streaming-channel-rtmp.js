@@ -2,7 +2,7 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { getChannelMap } = require('../config/routing')
-const { buildStreamingRtmpAddParams, buildStreamingSrtAddParams } = require('../streaming/streaming-channel-ffmpeg')
+const { buildStreamingRtmpAddParams, buildStreamingSrtAddParams, SRT_PASSPHRASE_INVALID } = require('../streaming/streaming-channel-ffmpeg')
 const { param } = require('../caspar/amcp-utils')
 const {
 	STREAMING_RTMP_CONSUMER_INDEX,
@@ -114,7 +114,9 @@ async function handlePostRtmp(body, ctx) {
 		// differ, and there is no stream-key credential. The bundled Caspar links libsrt (ldd-verified
 		// 2026-07-21) so ADD … STREAM srt:// runs in Caspar's own ffmpeg consumer.
 		const outType = String(outCfg?.type || b.type || 'rtmp').toLowerCase()
-		const built =
+		let built
+		try {
+			built =
 			outType === 'srt'
 				? buildStreamingSrtAddParams(String(b.srtUrl || outCfg?.srtUrl || '').trim(), quality, {
 						...encoderOpts,
@@ -126,6 +128,13 @@ async function handlePostRtmp(body, ctx) {
 						passphrase: resolved.srtPassphrase,
 					})
 				: buildStreamingRtmpAddParams(serverUrl, streamKey, quality, encoderOpts)
+		} catch (e) {
+			// WO-830c: an SRT passphrase libsrt would reject is refused, never dropped (it would go out unencrypted).
+			if (e?.code !== SRT_PASSPHRASE_INVALID) throw e
+			pushRtmpLog(ctx, 'warn', `RTMP/SRT start refused on ch${ch}: ${e.message}`, { channel: ch })
+			ctx.streamingChannelRtmp = { ...ctx.streamingChannelRtmp, active: false, lastError: e.message }
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: e.message }) }
+		}
 		if (!built) {
 			return {
 				status: 400,

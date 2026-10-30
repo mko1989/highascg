@@ -306,8 +306,12 @@ export function getMainModalHtml() {
 							<label><input type="checkbox" id="set-nuclear-require-pass" /> Require password for nuclear actions</label>
 						</div>
 						<div class="settings-group" id="set-nuclear-password-fields">
-							<label>Nuclear password</label>
-							<input type="password" id="set-nuclear-password" placeholder="Required for nuclear actions when enabled" autocomplete="new-password">
+							<label>Nuclear password (to run the actions below)</label>
+							<input type="password" id="set-nuclear-password" placeholder="Required for nuclear actions when enabled" autocomplete="current-password">
+							<label>Set a new password</label>
+							<input type="password" id="set-nuclear-newpass" placeholder="New password" autocomplete="new-password">
+							<input type="password" id="set-nuclear-newpass2" placeholder="Repeat new password" autocomplete="new-password">
+							<button type="button" class="btn btn--secondary" id="set-nuclear-newpass-apply">Set password</button>
 						</div>
 						<div class="settings-group">
 							<button type="button" class="btn btn--secondary" id="set-nuclear-restart-wm">Restart window manager (nodm)</button>

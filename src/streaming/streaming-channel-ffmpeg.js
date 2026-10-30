@@ -111,6 +111,18 @@ function buildStreamingRtmpFfmpegArgs(quality, opts = {}) {
 	].join(' ')
 }
 
+const SRT_PASSPHRASE_INVALID = 'SRT_PASSPHRASE_INVALID'
+
+/**
+ * @param {string} pass trimmed, non-empty passphrase
+ * @returns {string} '' when libsrt accepts it, else the operator-facing reason (never contains the passphrase)
+ */
+function validateSrtPassphrase(pass) {
+	const n = String(pass || '').length
+	if (n >= 10 && n <= 79) return ''
+	return `SRT passphrase must be 10-79 characters (saved one is ${n}) - fix or clear it; the stream was not started because it would go out unencrypted.`
+}
+
 /**
  * SRT output URL with ffmpeg/libsrt query options. The bundled Caspar binary links
  * libsrt-gnutls.so.1.5 (verified via ldd 2026-07-21), so `ADD … STREAM srt://…` goes through
@@ -120,7 +132,7 @@ function buildStreamingRtmpFfmpegArgs(quality, opts = {}) {
  * milliseconds — the owner-facing field is ms and converted here, in one place.
  * @param {string} srtUrl e.g. srt://host:9000 (existing query params are preserved)
  * @param {{ latencyMs?: number|string, streamId?: string, mode?: string }} [opts]
- * @returns {string|null}
+ * @returns {string|null} null when `srtUrl` is not srt://; throws (code SRT_PASSPHRASE_INVALID) on a passphrase libsrt would reject
  */
 function buildSrtOutputUrl(srtUrl, opts = {}) {
 	const base = String(srtUrl || '').trim()
@@ -132,12 +144,12 @@ function buildSrtOutputUrl(srtUrl, opts = {}) {
 	if (sid) params.push(`streamid=${encodeURIComponent(sid)}`)
 	const mode = String(opts.mode || '').trim().toLowerCase()
 	if (mode === 'listener' || mode === 'caller') params.push(`mode=${mode}`)
-	// WO-307: libsrt rejects a passphrase outside 10-79 chars outright — better to omit it and let
-	// the connection fail on an obviously-wrong length than hand Caspar a passphrase it will bounce
-	// with a cryptic AMCP error. Silent length-guard here, not upstream, because this is the single
-	// choke point every SRT URL (Start button AND any future caller) passes through.
+	// WO-830c: libsrt rejects a passphrase outside 10-79 chars. WO-307 used to DROP it silently, which started the
+	// stream UNENCRYPTED while the operator believed it was protected. Refuse instead; the caller surfaces the error.
 	const pass = String(opts.passphrase || '').trim()
-	if (pass.length >= 10 && pass.length <= 79) {
+	if (pass) {
+		const bad = validateSrtPassphrase(pass)
+		if (bad) throw Object.assign(new Error(bad), { code: SRT_PASSPHRASE_INVALID })
 		params.push(`passphrase=${encodeURIComponent(pass)}`, 'pbkeylen=16')
 	}
 	if (!params.length) return base
@@ -176,5 +188,6 @@ module.exports = {
 	buildStreamingRtmpAddParams,
 	buildSrtOutputUrl,
 	buildStreamingSrtAddParams,
+	SRT_PASSPHRASE_INVALID,
 	buildAudioDownmixFilterChain,
 }
