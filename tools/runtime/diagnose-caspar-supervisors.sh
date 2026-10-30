@@ -73,8 +73,8 @@ if [[ -f "$AUTOSTART" ]]; then
 		&& grep -vE '^\s*#' "$AUTOSTART" | grep -qE 'exec \./run\.sh|\./run\.sh >>'; then
 		echo "PROBLEM: autostart still starts run.sh while casparcg-server.service is enabled"
 	fi
-	nvidia_n="$(grep -c 'highascg-nvidia-x-apply' "$AUTOSTART" 2>/dev/null || echo 0)"
-	[[ "$nvidia_n" -gt 1 ]] && echo "NOTE: ${nvidia_n} nvidia-x-apply invocations in autostart (expected: 1 retry loop)"
+	nvidia_n="$(grep -c 'highascg-nvidia-x-apply' "$AUTOSTART" 2>/dev/null || true)"  # WO-832: grep -c prints 0 AND exits 1 — `|| echo 0` gave "0\n0"
+	[[ "${nvidia_n:-0}" -gt 1 ]] && echo "NOTE: ${nvidia_n} nvidia-x-apply invocations in autostart (expected: 1 retry loop)"
 else
 	echo "missing ${AUTOSTART}"
 fi
