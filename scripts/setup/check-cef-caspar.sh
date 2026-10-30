@@ -75,7 +75,7 @@ else
 	elif [ "$RUNPATH" = '$ORIGIN/../lib' ]; then
 		ok "RUNPATH \$ORIGIN/../lib (the bundle, wherever it is started from)"
 	else
-		warn "RUNPATH [${RUNPATH}] points outside the bundle$(case ":${RUNPATH}:" in *::*) echo ' and has an empty entry (= the working directory)' ;; esac); rebuild with ~/caspar-build/build-26.sh (WO-848)"
+		warn "RUNPATH [${RUNPATH}] points outside the bundle$(case ":${RUNPATH}:" in *::*) echo ' and has an empty entry (= the working directory)' ;; esac); rebuild with the fork build script (WO-848, docs/internal/CASPAR_CUSTOM_BUILD.md)"
 	fi
 	R_RUN=$(resolve "$LIB")
 	if [ "$(real "$R_RUN")" = "$(real "$BUNDLE_CEF")" ]; then
