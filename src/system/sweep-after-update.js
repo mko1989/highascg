@@ -17,6 +17,7 @@ const { spawn } = require('child_process')
 const { REPO_ROOT } = require('../repo-paths')
 
 const DELAY_MS = 120000
+const SWEEP_TIMEOUT_MS = 10 * 60000
 
 function sweepStateDir() {
 	return process.env.HIGHASCG_SWEEP_DIR || path.join(os.homedir(), '.local/state/highascg/sweep')
@@ -72,10 +73,23 @@ function startSweepAfterUpdate(ctx, { delayMs = DELAY_MS } = {}) {
 		const child = spawn(
 			process.execPath,
 			[path.join(REPO_ROOT, 'tools/sweep/run-sweep.js'), '--auto', `--url=http://127.0.0.1:${port}`],
-			{ cwd: REPO_ROOT, stdio: ['ignore', out, out] }
+			// WO-842: a hung sweep (stuck request, wedged Caspar) must not outlive its purpose — kill it after 10 min
+			{ cwd: REPO_ROOT, stdio: ['ignore', out, out], timeout: SWEEP_TIMEOUT_MS, killSignal: 'SIGKILL' }
 		)
-		child.on('exit', (code) => {
+		let closed = false
+		const closeOut = () => {
+			if (closed) return
+			closed = true
 			fs.closeSync(out)
+		}
+		child.on('error', (e) => {
+			closeOut()
+			log('warn', `after update ${id}: the sweep did not start (${e.message})`)
+		})
+		child.on('exit', (code, signal) => {
+			closeOut()
+			if (signal)
+				return log('warn', `after update ${id}: the sweep was killed (${signal}) after ${SWEEP_TIMEOUT_MS / 60000} min`)
 			const t = lastReport()?.totals
 			if (t)
 				log(

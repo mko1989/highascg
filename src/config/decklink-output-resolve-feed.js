@@ -2,6 +2,7 @@
 
 const { getModeDimensions } = require('./config-modes')
 const { destinationsFromConfig } = require('./screen-destinations')
+const { multiviewModeDimensions } = require('./config-generator-multiview-mode')
 
 function feedFromScreenConfig(config, screenN) {
 	const n = Math.max(1, parseInt(String(screenN), 10) || 1)
@@ -19,8 +20,8 @@ function feedFromScreenConfig(config, screenN) {
 
 function feedFromMultiviewConfig(config, mvN = 1) {
 	const n = Math.max(1, parseInt(String(mvN), 10) || 1)
-	const mode = String(config[`multiview_${n}_mode`] || config.multiview_mode || '1080p5000').trim() || '1080p5000'
-	const dims = getModeDimensions(mode, config, 1)
+	// WO-842: one rule with the channel plan — a custom multiview reads multiview_custom_*, not screen 1's keys
+	const dims = multiviewModeDimensions(config, n)
 	return {
 		sourceKind: 'multiview',
 		sourceLabel: n > 1 ? `Multiview ${n}` : 'Multiview',
@@ -72,11 +73,7 @@ function resolveTerminalSourceId(config, startSourceId) {
 		if (!cur || seen.has(cur)) continue
 		seen.add(cur)
 
-		if (
-			cur.startsWith('dst_in_') ||
-			cur.startsWith('dst_ch') ||
-			cur.startsWith('dst_mv')
-		) {
+		if (cur.startsWith('dst_in_') || cur.startsWith('dst_ch') || cur.startsWith('dst_mv')) {
 			return cur
 		}
 
@@ -97,9 +94,7 @@ function resolveTerminalSourceId(config, startSourceId) {
 
 		if (conn?.kind === 'pixel_map_out') {
 			const nodeId = String(conn.deviceId || '')
-			const nodeInputs = g.connectors.filter(
-				(c) => String(c?.deviceId || '') === nodeId && c?.kind === 'pixel_map_in'
-			)
+			const nodeInputs = g.connectors.filter((c) => String(c?.deviceId || '') === nodeId && c?.kind === 'pixel_map_in')
 			for (const ni of nodeInputs) {
 				for (const ie of edges.filter((e) => String(e?.sinkId || '') === String(ni?.id || ''))) {
 					queue.push(String(ie?.sourceId || ''))
