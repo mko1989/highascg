@@ -459,6 +459,9 @@ async function handlePost(path, body, ctx) {
 			const n = parseInt(String(b.audio_fft_source_slot), 10)
 			cs.audio_fft_source_slot = Number.isFinite(n) && n >= 1 && n <= 8 ? n : 0
 		}
+		// WO-845: a slot the save leaves without a device (removed) keeps no PGM selection — see the module.
+		const clearedPgm = require('../audio/live-audio-slot-prune').clearRemovedSlotPgmRoutes(cs)
+		if (clearedPgm.length) apiLog(ctx, 'info', `[Audio] live-inputs/config: cleared PGM route selection of removed slot(s) ${clearedPgm.join(', ')}`)
 		ctx.config.casparServer = { ...defaults.casparServer, ...cs }
 		if (ctx.configManager) {
 			ctx.configManager.save({ ...ctx.configManager.get(), casparServer: ctx.config.casparServer })

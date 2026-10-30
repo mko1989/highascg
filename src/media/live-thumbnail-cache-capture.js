@@ -24,6 +24,22 @@ const _captureLocks = new Map()
 const _refreshTimers = new Map()
 
 /**
+ * WO-845: Caspar's PRINT reply names no file — it drops a timestamp-named PNG (`YYYYMMDDTHHMMSS.png`, no channel in
+ * the name) into the media root and we find it as "the newest PNG since t0". The per-channel lock does not stop two
+ * channels capturing together (two DeckLink look cards): both PRINTs landed in the same window, both jobs picked
+ * the same newest PNG, so ch A's thumbnail showed ch B's picture and the first job to finish deleted the file under
+ * the other ("PRINT produced no PNG"). One PRINT + file pickup in flight at a time makes "newest since t0" mean
+ * "the one this channel just printed".
+ * @type {Promise<unknown>}
+ */
+let _printChain = Promise.resolve()
+function serializePrint(fn) {
+	const run = _printChain.then(fn, fn)
+	_printChain = run.catch(() => {})
+	return run
+}
+
+/**
  * Debounced cache invalidation after bus/scene activity (WO-110).
  * Does not run Caspar PRINT — use POST /api/thumbnail/live/capture or the Sources ↻ button.
  * @param {object} ctx
@@ -178,7 +194,7 @@ async function captureLiveThumbnailToCache(ctx, channel, opts = {}) {
 	const existing = _captureLocks.get(ch)
 	if (existing) return existing
 
-	const job = (async () => {
+	const job = serializePrint(async () => {
 		const mediaBase = getMediaIngestBasePath(cfg)
 		const t0 = Date.now() - 500
 		let printRes
@@ -209,16 +225,20 @@ async function captureLiveThumbnailToCache(ctx, channel, opts = {}) {
 		}
 
 		try {
-			await fs.promises.copyFile(srcAbs, dest)
-			const buf = await fs.promises.readFile(dest)
+			// WO-845: copy to a temp name, validate, then rename — a concurrent GET /api/thumbnail/live/:ch (size > 32)
+			// used to be able to serve a half-copied PNG, and a bad PRINT destroyed the previous good thumbnail.
+			const tmpDest = `${dest}.tmp`
+			await fs.promises.copyFile(srcAbs, tmpDest)
+			const buf = await fs.promises.readFile(tmpDest)
 			if (buf.length < 256) {
 				try {
-					await fs.promises.unlink(dest)
+					await fs.promises.unlink(tmpDest)
 				} catch {
 					/* ignore */
 				}
 				return { ok: false, error: 'PRINT PNG was empty or incomplete (retry capture)' }
 			}
+			await fs.promises.rename(tmpDest, dest)
 			const sha = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16)
 			const fileMeta = {
 				channel: ch,
@@ -226,7 +246,9 @@ async function captureLiveThumbnailToCache(ctx, channel, opts = {}) {
 				sha256: sha,
 				sourcePrint: path.basename(srcAbs),
 			}
-			await fs.promises.writeFile(metaDest, JSON.stringify(fileMeta, null, 0), 'utf8')
+			const tmpMeta = `${metaDest}.tmp`
+			await fs.promises.writeFile(tmpMeta, JSON.stringify(fileMeta, null, 0), 'utf8')
+			await fs.promises.rename(tmpMeta, metaDest)
 
 			const delScratch = cfg.live_thumbnail_delete_print_stills !== false
 			const mediaRoot = path.resolve(mediaBase)
@@ -246,7 +268,7 @@ async function captureLiveThumbnailToCache(ctx, channel, opts = {}) {
 		} catch (e) {
 			return { ok: false, error: e?.message || String(e) }
 		}
-	})()
+	})
 
 	_captureLocks.set(ch, job)
 	try {

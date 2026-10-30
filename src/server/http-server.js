@@ -300,7 +300,8 @@ function startHttpServer(options) {
 		try {
 			const rawPath = ((req.url || '').split('#')[0] || '/')
 			const reqPath = rawPath.split('?')[0]
-			const isIngestUpload = reqPath.endsWith('/api/ingest/upload')
+			// WO-845: the thumbnail upload reads its own PNG bytes (utf8 pre-read is lossy)
+			const isIngestUpload = reqPath.endsWith('/api/ingest/upload') || reqPath.endsWith('/api/thumbnail/live/upload')
 			// Skip body consumption on any multipart request so downstream handlers (busboy)
 			// can own the raw stream. Previously only `/api/ingest/upload` was exempt, which
 			// broke module routes like `/api/previs/models` that also upload binaries.

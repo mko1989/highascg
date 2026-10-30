@@ -118,7 +118,12 @@ function reconcileRegistry(reg, files, now = Date.now()) {
 	const relinked = []
 	let added = 0
 	for (const f of unmatched) {
-		let e = gone.find((g) => g.ino === f.ino && g.dev === f.dev)
+		// WO-845: a bare (dev, ino) match is not an identity — ext4 reuses inode numbers right after a delete, so a
+		// NEW upload could inherit a deleted clip's inode and media-links would rewrite every look/timeline reference
+		// from the old clip to it. A genuine move/rename keeps size and mtime; demand both agree.
+		let e = gone.find(
+			(g) => g.ino === f.ino && g.dev === f.dev && g.size === f.size && Math.abs((g.mtimeMs ?? NaN) - f.mtimeMs) <= 1,
+		)
 		if (!e) {
 			const same = gone.filter((g) => g.size === f.size && g.mtimeMs === f.mtimeMs)
 			if (same.length === 1) e = same[0]

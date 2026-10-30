@@ -316,7 +316,14 @@ function runBeginCommitBatch(client, lines, options) {
 						`AMCP batch COMMIT ack timeout (${batchTimeoutMs}ms): ${lines.length} cmds sent, ${got} response line(s) drained — clearing stale batch drain`,
 					)
 				}
-				connection._amcpSendQueue = Promise.resolve()
+				// WO-845: no `_amcpSendQueue = Promise.resolve()` here (reordering — see amcp-client-transport.js).
+				// Rejecting `p` below advances the chain. Reset the parser too: the late `2xx COMMIT` / per-command
+				// replies must not be matched by verb against the next single commands.
+				try {
+					if (typeof connection._resetAmcpProtocol === 'function') connection._resetAmcpProtocol()
+				} catch (_) {
+					/* non-fatal */
+				}
 				const err = new Error(`AMCP batch COMMIT ack timeout (${lines.length} cmds)`)
 				/* Review 03.08 engine §3: the payload had already hit the socket when this timer
 				 * armed — Caspar very likely executed the transaction and only the ack was lost/

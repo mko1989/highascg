@@ -3,11 +3,11 @@
 const { GLOBAL_BORDER_LAYER } = require('./artnet-constants')
 const { globalBorderSlotFromScenes, loadProjectScenesFromDisk } = require('./artnet-slot-config')
 
-function broadcastGlobalBorderToClient(appCtx, channel, targetScreenIndex, params, type) {
+/** @param {object|null} [knownSlot] WO-845: the receiver's cached slot — skips a per-flush project parse from disk. */
+function broadcastGlobalBorderToClient(appCtx, channel, targetScreenIndex, params, type, knownSlot) {
 	if (!appCtx?._wsBroadcast) return
 
-	const scenes = loadProjectScenesFromDisk()
-	const slot = globalBorderSlotFromScenes(scenes, targetScreenIndex)
+	const slot = knownSlot || globalBorderSlotFromScenes(loadProjectScenesFromDisk(), targetScreenIndex)
 	const slotSlices = Array.isArray(slot?.slices) ? slot.slices : []
 	const { enabled, type: _t, ...paramRest } = params
 	const runtimeBorder = {

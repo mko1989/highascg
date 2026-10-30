@@ -144,7 +144,10 @@ module.exports = {
 					} catch (_) {
 						/* non-fatal */
 					}
-					self._amcpSendQueue = Promise.resolve()
+					// WO-845: do NOT replace _amcpSendQueue here. The commands already queued behind this one are
+					// chained on the OLD promise and keep running; a fresh queue let every NEW command overtake
+					// them (STOP before an earlier CLEAR) and ran two commands in flight. Rejecting `p` below
+					// already advances the chain (the .catch in _send), so the reset added nothing but reordering.
 					if (typeof self.log === 'function') {
 						const isVersion = key === 'VERSION' || trimmed.toUpperCase().startsWith('VERSION')
 						const hint = isVersion

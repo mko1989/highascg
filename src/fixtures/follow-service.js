@@ -89,6 +89,9 @@ function inputUniverse(ctx) {
 	}
 }
 
+/** WO-845: how often the loop guard's inputs (input patch, box addresses) are re-compared. */
+const GUARD_RECHECK_MS = 5000
+
 const isMulticast = (host) => {
 	const first = Number(String(host).split('.')[0])
 	return first >= 224 && first <= 239
@@ -105,9 +108,10 @@ function createFollowService(ctx, hub, deps = {}) {
 	const consoleFrames = new ConsoleFrames({ log })
 	const sacnIn = new SacnFrames({ log }) // WO-615 T7 visualiser input
 	let targets = localTargets()
-	const reachesSelf = (to) => to.port === ARTNET_PORT && (to.host.startsWith('127.') || targets.has(to.host))
-	const sacnReachesSelf = (to) =>
-		isMulticast(to.host) || (to.port === SACN_PORT && (to.host.startsWith('127.') || targets.has(to.host)))
+	// WO-845: 0.0.0.0 (and 0.*) is delivered to the local host on Linux, so it loops into :6454/:5568 like 127.*
+	const isLocalHost = (host) => host.startsWith('127.') || host.startsWith('0.') || targets.has(host)
+	const reachesSelf = (to) => to.port === ARTNET_PORT && isLocalHost(to.host)
+	const sacnReachesSelf = (to) => isMulticast(to.host) || (to.port === SACN_PORT && isLocalHost(to.host))
 	const engine = new FollowEngine({
 		hub,
 		consoleFrames,
@@ -133,12 +137,22 @@ function createFollowService(ctx, hub, deps = {}) {
 	const pixelMap = createPixelMapService(ctx, engine, { log }) // WO-807: screen regions → fixture pixels (project.pixelMappings)
 	engine.pixelMap = pixelMap
 	let lastJson = ''
+	/**
+	 * WO-845: everything the self-loop guard (fx.noSend) reads that is NOT in the fixtures slice — the box's Art-Net /
+	 * sACN input address (config.dmx.artnetInput*, the global-border slot's artnetPatch) and its interface addresses.
+	 * It used to be evaluated only in engine.configure(), which `apply` skips for an unchanged slice, so changing the
+	 * input universe to a fixture's left the engine broadcasting into our own input (artnet-out-loops memory).
+	 */
+	const guardKey = () => JSON.stringify([inputPortAddress(ctx), inputUniverse(ctx), [...localTargets()].sort()])
+	let lastGuard = ''
 	let looks = {} // WO-615 T8: fixtures.looks — fixture states stored per look
 	const apply = (project) => {
 		const slice = project?.fixtures ?? null
-		const json = JSON.stringify(slice)
+		const guard = guardKey()
+		const json = JSON.stringify(slice) + '\n' + guard
 		if (json === lastJson) return
 		lastJson = json
+		lastGuard = guard
 		targets = localTargets()
 		engine.configure(slice)
 		sender.setInterface(engine.dmx.iface) // WO-698
@@ -175,6 +189,20 @@ function createFollowService(ctx, hub, deps = {}) {
 	// WO-807: LED wall edge → PixelLine proposal; after `apply` so it reads the patch the change just configured
 	pixelMap.proposal = createPixelMapProposalService(ctx, engine, pixelMap, { log })
 	// the duty changed: PSN starts / stops at once; Art-Net / sACN resume with the engine's own 1 s refresh
+	/** Re-run the loop guard when the input patch / box addresses changed under an unchanged fixtures slice. */
+	const reevaluateGuard = () => {
+		try {
+			if (guardKey() === lastGuard) return false
+			service.reload()
+			return true
+		} catch (e) {
+			log('warn', '[follow] self-loop re-check: ' + (e?.message || e))
+			return false
+		}
+	}
+	// Interfaces (DHCP, cable) and the input config have no event of their own here — poll the cheap key.
+	const guardTimer = setInterval(reevaluateGuard, GUARD_RECHECK_MS)
+	if (typeof guardTimer.unref === 'function') guardTimer.unref()
 	const offDuties =
 		duties.onChange?.(() =>
 			psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' && lightingOn() })
@@ -191,6 +219,7 @@ function createFollowService(ctx, hub, deps = {}) {
 				log('warn', '[follow] reload: ' + (e?.message || e))
 			}
 		},
+		reevaluateGuard,
 		sender,
 		psn,
 		pixelMap,
@@ -276,6 +305,7 @@ function createFollowService(ctx, hub, deps = {}) {
 		input: () => ({ visualise: engine.dmx.visualise, artnet: consoleFrames.status(), sacn: sacnIn.status() }),
 		stop() {
 			off()
+			clearInterval(guardTimer)
 			offDuties()
 			pixelMap.proposal.stop()
 			pixelMap.stop()

@@ -75,6 +75,8 @@ class DmxBorderReceiverBase {
 		this._channelMap = Array(PATCH_CHANNEL_COUNT).fill(true)
 		this._artnetListenEnabled = false
 		this._projectScenesCache = null
+		/** WO-845: `{ idx, slot }` resolved by init()/reconfigure() — the DMX hot path reads this, never the disk. */
+		this._slotCache = null
 		/** screenIndex values we already logged “no global border” for (avoid periodic reconfigure spam). */
 		this._warnedNoGlobalBorder = new Set()
 	}
@@ -164,6 +166,19 @@ class DmxBorderReceiverBase {
 		return globalBorderSlotFromScenes(this._projectScenesForLookup(), screenIdx)
 	}
 
+	/**
+	 * WO-845: the slot for the per-frame / per-WS-flush paths. `_globalBorderSlot` falls back to
+	 * `loadProjectScenes()` (13.96 ms of disk parse per call on the box; ~0.6 s/s of main thread at
+	 * 44 Hz while a fader moves) once `reconfigure()` has nulled `_projectScenesCache`. The slot only
+	 * changes with the project, and every project change calls reconfigure()/reconfigureFromProject().
+	 */
+	_cachedGlobalBorderSlot(screenIdx) {
+		if (this._slotCache && this._slotCache.idx === screenIdx) return this._slotCache.slot
+		const slot = this._globalBorderSlot(screenIdx)
+		this._slotCache = slot ? { idx: screenIdx, slot } : null
+		return slot
+	}
+
 	getInputStatus() {
 		return getInputStatus(this)
 	}
@@ -190,6 +205,7 @@ class DmxBorderReceiverBase {
 		const source = patch ? 'explicit' : this._projectScenesCache ? 'project' : 'disk'
 		const screenIdx = resolved.screenIndex ?? 0
 		const slot = this._globalBorderSlot(screenIdx)
+		this._slotCache = slot ? { idx: screenIdx, slot } : null
 		this._targetConfigured = !!slot
 		if (!slot) {
 			this._artnetListenEnabled = false
@@ -230,6 +246,7 @@ class DmxBorderReceiverBase {
 
 		const screenIdx = resolved.screenIndex ?? 0
 		const slot = this._globalBorderSlot(screenIdx)
+		this._slotCache = slot ? { idx: screenIdx, slot } : null
 		this._targetConfigured = !!slot
 		if (!slot) {
 			this.log(
@@ -279,7 +296,7 @@ class DmxBorderReceiverBase {
 		}
 
 		this._scheduleWsBroadcast(channel, params, type)
-		const slot = this._globalBorderSlot(this._targetScreenIndex)
+		const slot = this._cachedGlobalBorderSlot(this._targetScreenIndex)
 		const slices = Array.isArray(slot?.slices) ? slot.slices : []
 		this._scheduleCasparBorder(channel, payloadParams, needsAdd, slices, type)
 		this._addedTypeByChannel.set(channel, String(type))
@@ -312,6 +329,7 @@ class DmxBorderReceiverBase {
 			this._targetScreenIndex,
 			pending.params,
 			pending.type,
+			this._cachedGlobalBorderSlot(this._targetScreenIndex),
 		)
 	}
 

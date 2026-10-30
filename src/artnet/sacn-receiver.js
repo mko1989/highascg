@@ -77,13 +77,22 @@ class SacnReceiver extends DmxBorderReceiverBase {
 
 		this._bumpStat('dmx')
 
-		// Convert sACN payload object to a byte buffer
-		// sACN payload is { 1: value, 2: value, ... } where keys are 1-based channel numbers
+		// Convert the sACN packet to a 0-255 byte buffer.
+		// WO-845: `Packet.payload` of the sacn lib is PERCENT (0-100, `val / 2.55`, zero channels omitted) —
+		// storing it as 0-255 made DMX 255 read 100 (opacity 0.39, enable never above the sticky threshold
+		// so the border was always OFF). Prefer the raw bytes (`payloadAsBuffer`, parsed packets always
+		// carry it); the percent object is converted back as a fallback.
 		const buffer = Buffer.alloc(512, 0)
-		for (const [ch, val] of Object.entries(packet.payload)) {
-			const chNum = parseInt(ch, 10)
-			if (chNum >= 1 && chNum <= 512) {
-				buffer[chNum - 1] = Math.min(255, Math.max(0, Math.round(val)))
+		const raw = Buffer.isBuffer(packet.payloadAsBuffer) ? packet.payloadAsBuffer : null
+		if (raw) {
+			raw.copy(buffer, 0, 0, Math.min(512, raw.length))
+		} else {
+			// sACN payload is { 1: percent, 2: percent, ... } where keys are 1-based channel numbers
+			for (const [ch, pct] of Object.entries(packet.payload)) {
+				const chNum = parseInt(ch, 10)
+				if (chNum >= 1 && chNum <= 512) {
+					buffer[chNum - 1] = Math.min(255, Math.max(0, Math.round(Number(pct) * 2.55)))
+				}
 			}
 		}
 

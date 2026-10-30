@@ -21,6 +21,9 @@ const RETCODE = {
 	INTERNAL_SERVER_ERROR: 501,
 	MEDIAFILE_UNREADABLE: 502,
 	ACCESS_ERROR: 503,
+	// WO-845: AMCPCommandsImpl code table — both are ONE-line errors like 501-503.
+	QUEUE_OVERFLOW: 504,
+	COMMAND_FAILED: 600,
 }
 
 function swapObj(obj) {
@@ -123,6 +126,19 @@ class AmcpProtocol {
 			return
 		}
 
+		// WO-845: Caspar answers `PING [token]` with a bare `PONG [token]` — NO status code
+		// (AMCPProtocolStrategy.cpp parse()). It used to fall into "Protocol out of sync" and the PING
+		// waiter only ever settled by its 15 s timeout. It is only a PING reply between replies.
+		if (this._amcpState === ACMP_STATE.NEXT && /^PONG(\s|$)/i.test(line)) {
+			const waiting = self.response_callback.PING
+			if (waiting && waiting.length > 0) {
+				const cb = waiting.shift()
+				if (self._pendingResponseKey === 'PING') self._pendingResponseKey = undefined
+				if (typeof cb === 'function') cb(null, line)
+			}
+			return
+		}
+
 		let error = false
 		if (this._amcpState === ACMP_STATE.NEXT) {
 			const codeMatch = line.match(/^(\d+)\s+(\S*)/)
@@ -147,6 +163,8 @@ class AmcpProtocol {
 					case RETCODE.INTERNAL_SERVER_ERROR:
 					case RETCODE.MEDIAFILE_UNREADABLE:
 					case RETCODE.ACCESS_ERROR:
+					case RETCODE.QUEUE_OVERFLOW:
+					case RETCODE.COMMAND_FAILED:
 						error = true
 						this._errorCode = code
 						this._amcpState = ACMP_STATE.NEXT
@@ -157,10 +175,17 @@ class AmcpProtocol {
 						this._errorCode = undefined
 						break
 					case RETCODE.COMMAND_UNKNOWN_DATA:
-					case RETCODE.INTERNAL_SERVER_ERROR_DATA:
 						error = true
 						this._errorCode = code
 						this._amcpState = ACMP_STATE.SINGLE_LINE
+						break
+					case RETCODE.INTERNAL_SERVER_ERROR_DATA:
+						// WO-845: `500 FAILED` is ONE line (AMCPProtocolStrategy.cpp unknown_error). Treating it like
+						// `400 ERROR` (which echoes the command on a 2nd line) swallowed the NEXT command's reply as
+						// the error's "data", so the next command timed out. Consume exactly its own reply.
+						error = true
+						this._errorCode = code
+						this._amcpState = ACMP_STATE.NEXT
 						break
 					case RETCODE.INFODATA:
 					case RETCODE.OKDATA:

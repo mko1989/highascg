@@ -147,14 +147,18 @@ function parseControlBlock(block) {
 
 	for (const line of block.split('\n')) {
 		const trimmed = line.trim()
+		// WO-845: the `[on|off]` switch token is OPTIONAL — a volume control without a switch (card 0 `PCM`:
+		// `Front Left: Playback 255 [100%] [0.00dB]`, Capabilities: pvolume) matched no regex, `channels` stayed
+		// empty and the control fell through to the boolean branch as a switch that is OFF (slider lost).
+		// With no token the channel is simply not muted, so `anyOff` only trips when `[off]` is present.
 		const withDir = trimmed.match(
-			/^(\S+(?:\s+\S+)*):\s*(Playback|Capture)\s+(\d+)\s+\[(\d+)%\]\s+\[(-?[\d.]+)dB\]\s+\[(on|off)\]\s*$/
+			/^(\S+(?:\s+\S+)*):\s*(Playback|Capture)\s+(\d+)\s+\[(\d+)%\](?:\s+\[(-?[\d.]+)dB\])?(?:\s+\[(on|off)\])?\s*$/
 		)
 		if (withDir) {
 			channels.push(withDir[1].trim())
 			percents.push(parseInt(withDir[4], 10))
-			dBs.push(parseFloat(withDir[5]))
-			if (withDir[6].toLowerCase() === 'off') anyOff = true
+			if (withDir[5] !== undefined) dBs.push(parseFloat(withDir[5]))
+			if ((withDir[6] || '').toLowerCase() === 'off') anyOff = true
 			continue
 		}
 		const genericVol = trimmed.match(/^(\S+(?:\s+\S+)*):\s*(\d+)\s+\[(\d+)%\]\s+\[(-?[\d.]+)dB\]\s*$/)
@@ -165,13 +169,13 @@ function parseControlBlock(block) {
 			continue
 		}
 		const monoVol = trimmed.match(
-			/^Mono:\s*(Playback|Capture)\s+(\d+)\s+\[(\d+)%\]\s+\[(-?[\d.]+)dB\]\s+\[(on|off)\]\s*$/
+			/^Mono:\s*(Playback|Capture)\s+(\d+)\s+\[(\d+)%\](?:\s+\[(-?[\d.]+)dB\])?(?:\s+\[(on|off)\])?\s*$/
 		)
 		if (monoVol) {
 			channels.push('Mono')
 			percents.push(parseInt(monoVol[3], 10))
-			dBs.push(parseFloat(monoVol[4]))
-			if (monoVol[5].toLowerCase() === 'off') anyOff = true
+			if (monoVol[4] !== undefined) dBs.push(parseFloat(monoVol[4]))
+			if ((monoVol[5] || '').toLowerCase() === 'off') anyOff = true
 		}
 	}
 

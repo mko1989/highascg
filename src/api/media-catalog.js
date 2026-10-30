@@ -13,6 +13,7 @@ const {
 	normalizeMediaIdKey,
 } = require('../media/local-media')
 const { dedupeMediaList } = require('../utils/media-browser-dedupe')
+const { statStamp, recordProbeStamp, dropStaleProbeEntries } = require('../media/probe-cache')
 
 /** How long one /api/media call keeps starting new ffprobe batches of 120 (the batch in flight always finishes). */
 const PROBE_BUDGET_MS = 3000
@@ -80,6 +81,8 @@ async function enrichMediaListForHttp(ctx, media, opts = {}) {
 	if (basePath) {
 		ctx._mediaProbeCache = ctx._mediaProbeCache || {}
 		const tried = (ctx._mediaProbeTried = ctx._mediaProbeTried || new Set())
+		// WO-845: a replaced file (same id, new size/mtime) must be probed again, not served from the old answer.
+		await dropStaleProbeEntries(ctx, [...tried], (id) => resolveSafe(basePath, id))
 		// Skip ids already probed (WO-497 rule) — else every call re-probed the SAME first 120 and a large library's
 		// later files never got a resolution (owner 20.10: 225 of 345 clips, takes fell back to 16:9).
 		const pending = media.filter((m) => !m.isDir && !tried.has(m.id) && (!m.resolution || (m.fps == null && m.fps !== 0)))
@@ -94,7 +97,9 @@ async function enrichMediaListForHttp(ctx, media, opts = {}) {
 				pending.slice(i, i + 120).map(async (m) => {
 					const fp = resolveSafe(basePath, m.id)
 					if (fp) {
+						const stamp = await statStamp(fp)
 						const probed = await probeMedia(fp)
+						recordProbeStamp(ctx, m.id, stamp)
 						tried.add(m.id) // even when empty — "tried, nothing" is an answer too (a playback durationMs-only entry is not)
 						if (Object.keys(probed).length) ctx._mediaProbeCache[m.id] = { ...(ctx._mediaProbeCache[m.id] || {}), ...probed }
 					}

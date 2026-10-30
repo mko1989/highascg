@@ -174,6 +174,15 @@ class ConnectionManager extends EventEmitter {
 		if (conn._highascgPlainAmcpPatched) return
 		conn._highascgPlainAmcpPatched = true
 		const self = this
+		// WO-845: casparcg-connection re-arms its own 5 s reconnect on every socket `close`, and the
+		// library has no "stay down" switch — so stop()/destroy() could not stop the auto-reconnect and
+		// the socket silently came back (then start() saw `connected` already true and never ran
+		// _handleConnected). Veto the re-arm while this manager is stopped/destroyed.
+		const origTrigger = conn._triggerReconnect.bind(conn)
+		conn._triggerReconnect = function patchedTriggerReconnect() {
+			if (!self._started || self._destroyed) return
+			origTrigger()
+		}
 		const origSetup = conn._setupSocket.bind(conn)
 		conn._setupSocket = function patchedSetupSocket() {
 			origSetup()
@@ -325,13 +334,46 @@ class ConnectionManager extends EventEmitter {
 		}
 	}
 
+	/**
+	 * WO-845: kill the library's socket + pending reconnect timer outright. `_ccg.disconnect()` only
+	 * half-closes (`socket.end()`), and its `close` handler re-arms a 5 s reconnect.
+	 */
+	_haltLibraryConnection() {
+		const conn = this._ccg?._connection
+		if (!conn) return
+		if (conn._reconnectTimeout) {
+			clearTimeout(conn._reconnectTimeout)
+			conn._reconnectTimeout = undefined
+		}
+		try {
+			if (conn._socket && !conn._socket.destroyed) conn._socket.destroy()
+		} catch (_) {
+			/* non-fatal */
+		}
+	}
+
+	/**
+	 * WO-845: forget the previous connection's in-flight state (the library's own 'disconnect' is async
+	 * and, after stop()/reconnect(), no longer reaches {@link _handleDisconnected}).
+	 */
+	_dropConnectionState() {
+		this._rawCcgBuffer = ''
+		rejectAllPendingAmcpCallbacks(this._context)
+		if (this._protocol) this._protocol.reset()
+	}
+
 	/** Attach listeners and connect TCP (auto-reconnects until {@link stop}) */
 	start() {
 		if (this._destroyed || this._started) return
 		this._started = true
 		this._bindSocket()
 		if (this._useLegacy) this._tcp.connect(this._host, this._port)
-		else this._ccg.connect(this._host, this._port)
+		else {
+			// WO-845: a library that still believes it is connected would emit no 'connect' for the new
+			// socket, so _handleConnected (status + health timer) would never run. Make the flag honest.
+			if (this._ccg._connection._connected) this._ccg._connection._connected = false
+			this._ccg.connect(this._host, this._port)
+		}
 	}
 
 	/** Stop health timer, disconnect TCP, remove listeners */
@@ -340,7 +382,13 @@ class ConnectionManager extends EventEmitter {
 		this._started = false
 		this._clearHealthTimer()
 		if (this._useLegacy) this._tcp.disconnect()
-		else this._ccg.disconnect()
+		else {
+			this._ccg.disconnect()
+			this._haltLibraryConnection()
+			// The library's 'disconnect' fires after we unbind below, so settle waiters ourselves.
+			if (this._ccg._connection) this._ccg._connection._connected = false
+			this._dropConnectionState()
+		}
 		this._unbindSocket()
 	}
 
@@ -352,7 +400,12 @@ class ConnectionManager extends EventEmitter {
 		rejectAllPendingAmcpCallbacks(this._context)
 		this._unbindSocket()
 		if (this._useLegacy) this._tcp.destroy()
-		else this._ccg.discard()
+		else {
+			// WO-845: CasparCG.discard() is the AMCP DISCARD command, NOT BasicCasparCGAPI.discard() — the
+			// old call left the socket open and the library's timeout interval running.
+			this._haltLibraryConnection()
+			clearInterval(this._ccg._timeoutTimer)
+		}
 		this.removeAllListeners()
 	}
 
@@ -369,6 +422,10 @@ class ConnectionManager extends EventEmitter {
 				this._tcp.disconnect()
 				this._tcp.connect(this._host, this._port)
 			} else {
+				// WO-845: changeConnection destroys the old socket with its listeners removed → no 'disconnect',
+				// so waiters ran out their timeout and no 'connect' fired for the new socket.
+				this._dropConnectionState()
+				if (this._ccg._connection._connected) this._ccg._connection._connected = false
 				this._ccg.connect(this._host, this._port)
 			}
 		} else {
@@ -376,8 +433,12 @@ class ConnectionManager extends EventEmitter {
 				this._tcp.host = this._host
 				this._tcp.port = this._port
 			} else {
-				this._ccg.host = this._host
-				this._ccg.port = this._port
+				// WO-845: the `host`/`port` setters call changeConnection → open a socket on a manager that was
+				// never started (and in offline mode). Only record the target; start() connects.
+				this._ccg._host = this._host
+				this._ccg._port = this._port
+				this._ccg._connection.host = this._host
+				this._ccg._connection.port = this._port
 			}
 		}
 	}

@@ -14,9 +14,13 @@ function parseArtDmx(msg) {
 	if (msg.toString('ascii', 0, 8) !== ARTNET_HEADER) return null
 	const opcode = msg.readUInt16LE(8)
 	if (opcode !== OPCODE_ARTDMX) return null
-	const lengthField = msg.readUInt16LE(16)
+	// WO-845: Art-Net ArtDmx Length is big-endian (LengthHi, Length) — src/fixtures/artdmx.js decodeArtDmx
+	// already does this. Read little-endian, 24/100/18 channel universes decoded as huge lengths and
+	// the loop read past the end of the packet (ERR_OUT_OF_RANGE on every packet). Trust the smaller of
+	// the declared length and the bytes actually present.
+	const lengthField = msg.readUInt16BE(16)
 	const packetPayload = Math.max(0, msg.length - 18)
-	const payloadLen = Math.min(512, Math.max(lengthField, packetPayload))
+	const payloadLen = Math.min(512, lengthField, packetPayload)
 	const data = []
 	for (let i = 0; i < payloadLen; i++) {
 		data.push(msg.readUInt8(18 + i))

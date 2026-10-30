@@ -198,13 +198,38 @@ function listAudioDevices(opts = {}) {
 	return payload
 }
 
+/** WO-845: marker comments delimiting the only part of `~/.asoundrc` this module owns. */
+const ASOUNDRC_BEGIN = '# >>> HighAsCG default device (managed block, do not edit) >>>'
+const ASOUNDRC_END = '# <<< HighAsCG default device <<<'
+
+/**
+ * WO-845: merge `content` into an existing ~/.asoundrc as a marked block. Everything outside the block is kept
+ * verbatim (the box's hand-authored `pcm.sc60mon` 48 kHz plug, WO-406, lived in this file and was destroyed by a
+ * whole-file overwrite). A missing block is appended; an existing one is replaced in place.
+ * @param {string} existing
+ * @param {string} content  the `defaults.*` lines
+ * @returns {string}
+ */
+function mergeAsoundrcBlock(existing, content) {
+	const block = `${ASOUNDRC_BEGIN}\n${content.endsWith('\n') ? content : content + '\n'}${ASOUNDRC_END}\n`
+	const text = String(existing || '')
+	const b = text.indexOf(ASOUNDRC_BEGIN)
+	const e = b === -1 ? -1 : text.indexOf(ASOUNDRC_END, b)
+	if (b !== -1 && e !== -1) {
+		const after = text.slice(e + ASOUNDRC_END.length).replace(/^\r?\n/, '')
+		return text.slice(0, b) + block + after
+	}
+	const sep = text === '' || text.endsWith('\n\n') ? '' : text.endsWith('\n') ? '\n' : '\n\n'
+	return text + sep + block
+}
+
 /**
  * Write ALSA default PCM/CTL. Default is per-user `~/.asoundrc` (no sudo) so the Caspar user’s session picks it up.
  * Use `scope: 'system'` for `/etc/asound.conf` (root or passwordless sudo tee).
  *
  * @param {number} card
  * @param {number} device
- * @param {{ scope?: 'user' | 'system' }} [opts]
+ * @param {{ scope?: 'user' | 'system', home?: string }} [opts]  `home` overrides the user's home dir (tests)
  * @returns {{ ok: boolean, scope?: string, path?: string, error?: string }}
  */
 function setDefaultAlsaDevice(card, device, opts = {}) {
@@ -218,17 +243,34 @@ function setDefaultAlsaDevice(card, device, opts = {}) {
 		/* ignore */
 	}
 
+	// WO-845: the route only parseInt()s — NaN / negatives wrote `defaults.pcm.card NaN` into the file.
+	if (!Number.isInteger(card) || !Number.isInteger(device) || card < 0 || device < 0) {
+		return { ok: false, error: 'card and device must be non-negative integers' }
+	}
 	const scope = opts.scope === 'system' ? 'system' : 'user'
 	const content = `defaults.pcm.card ${card}\ndefaults.pcm.device ${device}\ndefaults.ctl.card ${card}\n`
 
 	if (scope === 'user') {
 		try {
-			const home = os.userInfo().homedir
+			const home = opts.home || os.userInfo().homedir
 			if (!home || typeof home !== 'string') {
 				return { ok: false, error: 'No user home directory (cannot write ~/.asoundrc)' }
 			}
 			const target = path.join(home, '.asoundrc')
-			fs.writeFileSync(target, content, 'utf8')
+			let existing = ''
+			try {
+				existing = fs.readFileSync(target, 'utf8')
+			} catch (e) {
+				if (e && e.code !== 'ENOENT') throw e
+			}
+			// WO-845: only our marked block is rewritten; keep a one-time backup of a hand-authored file.
+			if (existing && !existing.includes(ASOUNDRC_BEGIN)) {
+				const bak = `${target}.highascg.bak`
+				if (!fs.existsSync(bak)) fs.writeFileSync(bak, existing, 'utf8')
+			}
+			const tmp = `${target}.highascg.tmp`
+			fs.writeFileSync(tmp, mergeAsoundrcBlock(existing, content), 'utf8')
+			fs.renameSync(tmp, target)
 			return { ok: true, scope: 'user', path: target }
 		} catch (e) {
 			return { ok: false, error: e instanceof Error ? e.message : String(e) }
@@ -394,4 +436,5 @@ module.exports = {
 	parseAplayList,
 	parseAplayLongList,
 	setDefaultAlsaDevice,
+	mergeAsoundrcBlock,
 }

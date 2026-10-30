@@ -46,9 +46,12 @@ import time
 LOG_PATH = os.path.expanduser("~/.highascg/log/confine-pointer-barriers.log")
 PID_PATH = os.path.expanduser("~/.highascg/run/confine-pointer-barriers.pid")
 
+# WO-845: values straight from X11/extensions/xfixeswire.h — BarrierPositiveX (1L<<0), BarrierPositiveY (1L<<1),
+# BarrierNegativeX (1L<<2), BarrierNegativeY (1L<<3). NEGATIVE_X and POSITIVE_Y were swapped (2 and 4), so two
+# edges carried the wrong axis' bit.
 BARRIER_POSITIVE_X = 1
-BARRIER_NEGATIVE_X = 2
-BARRIER_POSITIVE_Y = 4
+BARRIER_POSITIVE_Y = 2
+BARRIER_NEGATIVE_X = 4
 BARRIER_NEGATIVE_Y = 8
 
 """Fallback re-read interval, used ONLY when RandR cannot deliver change events on this display
@@ -302,11 +305,16 @@ def create_edge_barriers(dpy, root, x, y, w, h):
     """
     m = CORNER_OVERLAP_PX
     barriers = []
+    # WO-845: XFixes `directions` name the directions pointer motion is ALLOWED to cross the barrier in
+    # (xserver: "Barriers define which way is ok, not which way is blocking"). To confine INTO the rect, each edge
+    # allows only the inward direction: left +X, right -X, top +Y, bottom -Y. The old table named the OUTWARD
+    # direction (and had two swapped constants), which let the pointer escape through the right and top edges —
+    # reproduced on a scratch Xvfb: relative motion +900 x / -600 y left the rect, left/bottom held by accident.
     specs = [
-        ("left", x, y - m, x, y + h + m, BARRIER_NEGATIVE_X),
-        ("right", x + w, y - m, x + w, y + h + m, BARRIER_POSITIVE_X),
-        ("top", x - m, y, x + w + m, y, BARRIER_NEGATIVE_Y),
-        ("bottom", x - m, y + h, x + w + m, y + h, BARRIER_POSITIVE_Y),
+        ("left", x, y - m, x, y + h + m, BARRIER_POSITIVE_X),
+        ("right", x + w, y - m, x + w, y + h + m, BARRIER_NEGATIVE_X),
+        ("top", x - m, y, x + w + m, y, BARRIER_POSITIVE_Y),
+        ("bottom", x - m, y + h, x + w + m, y + h, BARRIER_NEGATIVE_Y),
     ]
     for edge, x1, y1, x2, y2, directions in specs:
         bid = libXfixes.XFixesCreatePointerBarrier(
