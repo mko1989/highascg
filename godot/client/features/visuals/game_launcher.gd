@@ -38,6 +38,8 @@ static func games(dirs: Array = GAMES_DIRS) -> Array:
 	var out := []
 	for d in dirs:
 		var dir := expand(d)
+		if not DirAccess.dir_exists_absolute(dir):  # media/games is optional: no ERROR line on every list
+			continue
 		for f in DirAccess.get_files_at(dir):
 			if CORES.has(f.get_extension().to_lower()):
 				out.append({"name": f.get_basename(), "path": dir.path_join(f)})

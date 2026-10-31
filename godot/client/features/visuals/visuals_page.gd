@@ -5,6 +5,8 @@ extends VBoxContainer
 
 const M := preload("res://features/visuals/visuals_model.gd")
 const Show := preload("res://features/visuals/visuals_show.gd")
+const Catalog := preload("res://features/visuals/visuals_catalog.gd")
+const Icons := preload("res://app/ui_icons.gd")
 
 signal params_changed(params: Dictionary)
 signal output_changed(output: Dictionary)
@@ -14,8 +16,7 @@ signal sensitivity_changed(map: Dictionary)
 signal sync_changed(ms: float)
 signal scenes_changed(main: String, overlay: String)
 signal burst_pressed
-signal shader_changed(id: String)
-signal game_changed(path: String)
+signal visual_dropped(payload: Dictionary, overlay: bool)  # WO-885: a Sources ▸ Visuals row dropped on Scene / Layer 2
 signal game_play(on: bool)
 
 var _sliders := {}
@@ -30,19 +31,16 @@ var _quiet := false
 var _sens := {}
 var _sync: HSlider
 var _sync_label: Label
-var _scene: OptionButton
-var _overlay: OptionButton
-var _shader: OptionButton
-var _shader_row: HBoxContainer
+var _main_label: Label
+var _over_label: Label
+var _over_clear: Button
+var _main := "rings"
+var _shader_names := {}  # id → name (GET /api/shaders)
+var _slice := {}
 var _shader_note: Label
-var _shader_ids := []
-var _shader_want := ""
-var _game: OptionButton
 var _game_box: VBoxContainer
 var _game_play: Button
 var _game_note: Label
-var _game_paths := []
-var _game_want := ""
 var show_panel: Show  # WO-877: looks, fade, master — the tab wires its signals
 
 
@@ -52,40 +50,28 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 	show_panel = Show.new()
 	add_child(show_panel)
 	add_child(_heading("Visuals"))
-	_scene = OptionButton.new()
-	_scene.tooltip_text = "The visual (WO-873 scene library)"
-	_overlay = OptionButton.new()
-	_overlay.tooltip_text = "A second scene drawn over the first in the same world — e.g. Tunnel + Particles"
-	_overlay.add_item("None")
-	for s in M.SCENES:
-		_scene.add_item(s[1])
-		_overlay.add_item(s[1])
-	_scene.item_selected.connect(func(_i: int) -> void: _emit_scenes())
-	_overlay.item_selected.connect(func(_i: int) -> void: _emit_scenes())
-	add_child(_row("Scene", _scene))
-	add_child(_row("Layer 2", _overlay))
-	_shader = OptionButton.new()  # WO-874: the box's shader library, filled by set_shaders()
-	_shader.tooltip_text = "The library shader the Shader scene runs (the same shaders Caspar's shader templates play)"
-	_shader.fit_to_longest_item = false
-	_shader.item_selected.connect(func(i: int) -> void:
-		if not _quiet and i >= 0 and i < _shader_ids.size():
-			_shader_want = _shader_ids[i]
-			shader_changed.emit(_shader_want))
-	_shader_row = _row("Shader", _shader)
-	add_child(_shader_row)
+	var hint := Label.new()  # WO-885: the pickers moved to Sources ▸ Visuals (thumbnails, folders)
+	hint.text = "Pick in Sources ▸ Visuals: drag onto the canvas (Shift: layer 2) or onto Scene / Layer 2 here."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.modulate = Color(1, 1, 1, 0.6)
+	add_child(hint)
+	_main_label = Label.new()
+	_main_label.clip_text = true
+	_main_label.tooltip_text = "The main scene — drop a visual here to replace it"
+	add_child(_drop_row(_row("Scene", _main_label), false))
+	_over_label = Label.new()
+	_over_label.clip_text = true
+	_over_label.tooltip_text = "A second scene drawn over the first in the same world — drop a visual here"
+	var over_row := _row("Layer 2", _over_label)
+	_over_clear = Icons.button("close", "Remove layer 2")
+	_over_clear.pressed.connect(func() -> void: scenes_changed.emit(_main, ""))
+	over_row.add_child(_over_clear)
+	add_child(_drop_row(over_row, true))
 	_shader_note = Label.new()
 	_shader_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_shader_note.modulate = Color(1, 0.75, 0.6, 0.9)
 	add_child(_shader_note)
-	_game_box = VBoxContainer.new()  # WO-876: the ROM the Game scene shows; Play opens its window on this screen
-	_game = OptionButton.new()
-	_game.fit_to_longest_item = false
-	_game.tooltip_text = "Your games (ROM files in ~/.highascg/retro/games or media/games)"
-	_game.item_selected.connect(func(i: int) -> void:
-		if not _quiet and i >= 0 and i < _game_paths.size():
-			_game_want = _game_paths[i]
-			game_changed.emit(_game_want))
-	var game_row := _row("Game", _game)
+	_game_box = VBoxContainer.new()  # WO-876: Play opens the picked ROM's window on this screen
 	_game_play = Button.new()
 	_game_play.text = "Play"
 	_game_play.tooltip_text = "Open the game in its own window on this screen — play it there with the keyboard or a gamepad"
@@ -93,8 +79,7 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 	_game_play.toggled.connect(func(on: bool) -> void:
 		if not _quiet:
 			game_play.emit(on))
-	game_row.add_child(_game_play)
-	_game_box.add_child(game_row)
+	_game_box.add_child(_row("Game", _game_play))
 	_game_note = Label.new()
 	_game_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_game_note.modulate = Color(1, 1, 1, 0.7)
@@ -174,16 +159,9 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 
 func set_state(slice: Dictionary, cm: Variant) -> void:
 	_quiet = true
-	var ids := M.scene_ids()
-	_scene.select(maxi(0, ids.find(str(slice.get("scene", "rings")))))
-	_overlay.select(ids.find(str(slice.get("overlay", ""))) + 1)
-	_shader_want = str(slice.get("shader", ""))
-	_shader.select(_shader_ids.find(_shader_want))
-	_shader_row.visible = "shader" in [slice.get("scene"), slice.get("overlay")]
-	_shader_note.visible = _shader_row.visible
-	_game_want = str(slice.get("game", ""))
-	_game.select(_game_paths.find(_game_want))
-	_game_box.visible = "game" in [slice.get("scene"), slice.get("overlay")]
+	_slice = slice
+	_main = str(slice.get("scene", "rings"))
+	_show_layers()
 	for p in M.PARAMS:
 		_sliders[p].set_value_no_signal(float(slice.params[p]))
 	_screens = M.screens(cm)
@@ -203,29 +181,32 @@ func set_state(slice: Dictionary, cm: Variant) -> void:
 	_quiet = false
 
 
-## WO-874: the library ({id, name} rows of GET /api/shaders), sorted by name.
+## WO-874: the library ({id, name} rows of GET /api/shaders) — the Scene / Layer 2 lines name the shader.
 func set_shaders(list: Array) -> void:
-	var rows := list.filter(func(r: Variant) -> bool: return r is Dictionary and r.get("id") is String)
-	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return str(a.get("name", a.id)).naturalnocasecmp_to(str(b.get("name", b.id))) < 0)
-	_quiet = true
-	_shader.clear()
-	_shader_ids = rows.map(func(r: Dictionary) -> String: return r.id)
-	for r in rows:
-		_shader.add_item(str(r.get("name", r.id)))
-	_shader.select(_shader_ids.find(_shader_want))
-	_quiet = false
-
-
-## WO-876: the operator's ROMs ({name, path} rows, game_launcher.gd games()).
-func set_games(list: Array) -> void:
-	_quiet = true
-	_game.clear()
-	_game_paths = list.map(func(r: Dictionary) -> String: return r.path)
 	for r in list:
-		_game.add_item(str(r.name))
-	_game.select(_game_paths.find(_game_want))
-	_quiet = false
+		if r is Dictionary and r.get("id") is String:
+			_shader_names[r.id] = str(r.get("name", r.id))
+	_show_layers()
+
+
+## WO-885: the Scene / Layer 2 lines, and the shader / game rows for what they run.
+func _show_layers() -> void:
+	if _slice.is_empty():
+		return
+	var over := str(_slice.get("overlay", ""))
+	_main_label.text = Catalog.describe(_main, _slice, _shader_names)
+	_over_label.text = Catalog.describe(over, _slice, _shader_names)
+	_over_clear.visible = over != ""
+	_shader_note.visible = "shader" in [_main, over]
+	_game_box.visible = "game" in [_main, over]
+
+
+## A row that takes a Sources ▸ Visuals drop (as the main scene, or as layer 2).
+func _drop_row(row: HBoxContainer, overlay: bool) -> HBoxContainer:
+	row.mouse_filter = Control.MOUSE_FILTER_STOP
+	row.set_drag_forwarding(Callable(), func(_at: Vector2, data: Variant) -> bool: return Catalog.parse(data) != null,
+		func(_at: Vector2, data: Variant) -> void: visual_dropped.emit(data, overlay))
+	return row
 
 
 ## WO-876: the Play button's state and the line under it (how to play, or why it cannot).
@@ -276,18 +257,6 @@ func _emit_params() -> void:
 	for p in M.PARAMS:
 		out[p] = _sliders[p].value
 	params_changed.emit(out)
-
-
-func _emit_scenes() -> void:
-	if _quiet:
-		return
-	var ids := M.scene_ids()
-	var main: String = ids[maxi(0, _scene.selected)]
-	var over: String = ids[_overlay.selected - 1] if _overlay.selected > 0 else ""
-	_shader_row.visible = "shader" in [main, over]
-	_shader_note.visible = _shader_row.visible
-	_game_box.visible = "game" in [main, over]
-	scenes_changed.emit(main, over)
 
 
 func _on_sync(v: float) -> void:

@@ -9,7 +9,8 @@ extends VBoxContainer
 ## DeckLink / audio / USB inputs, saved live sources, all draggable onto the look editor). A DeckLink dropped on the
 ## Media tree switches to Live, which maps it and highlights the new source; the signals are Live's, re-emitted for
 ## the shell (Live workspace tab, Devices restart-dirty, device view re-read).
-## WO-623 C: the owner's four tabs — Media, Templates (Caspar TLS without the shader templates: shaders live in Visuals, WO-883), Live, Timelines (this
+## WO-623 C: the owner's tabs — Media, Templates (Caspar TLS without the shader templates: shaders live in Visuals, WO-883), Live, Visuals
+## (WO-885: what the Visuals canvas runs, visuals_sources_panel.gd), Timelines (this
 ## project's) — source_list_panel.gd rows drag the web payload ({type: "template" | "timeline", value, label}).
 ## WO-603 slice 1: files / folders dropped from the desktop onto this panel are copied by the server from their local
 ## paths into the folder under the cursor (media_ingest.gd; POST /api/media/ingest-local) with a progress line.
@@ -28,6 +29,7 @@ const MediaInspector := preload("res://features/live/media_inspector.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const Drop := preload("res://features/devices/decklink_drop_flow.gd")
 const LivePanel := preload("res://features/live/live_sources_panel.gd")
+const VisualsPanel := preload("res://features/live/visuals_sources_panel.gd")  # WO-885
 const ListPanel := preload("res://features/live/source_list_panel.gd")
 const Lists := preload("res://features/live/source_lists_model.gd")
 const Placeholders := preload("res://features/live/placeholders_panel.gd")
@@ -48,6 +50,7 @@ var _fx: Dictionary = {}  # GET /api/scene/effect-registry {effects, categories}
 var inspector: MediaInspector
 var _tabs: TabContainer
 var live: LivePanel
+var visuals: VisualsPanel
 var templates: ListPanel
 var timelines: ListPanel
 var _tls: Array = []  # GET /api/templates
@@ -87,6 +90,7 @@ func _ready() -> void:
 		return Lists.template_rows(_tls, {}, f).filter(func(r: Dictionary) -> bool: return r.kind != "shader")
 	templates.groups = Lists.GROUPS  # WO-661
 	_tabs.add_child(templates)
+	_tabs.set_tab_title(_tabs.get_tab_idx_from_control(templates), "CGs")  # owner 31.10 (WO-885); the node keeps its name (ui.cfg keys)
 	var ph := Placeholders.new()  # WO-603 row 26: offline / preshow only, like the web (dev: -- --placeholders)
 	ph.name = "Placeholders"
 	_tabs.add_child(ph)
@@ -100,6 +104,9 @@ func _ready() -> void:
 	live = LivePanel.new()
 	live.name = "Live"
 	_tabs.add_child(live)
+	visuals = VisualsPanel.new()  # WO-885: scenes, shaders and games with thumbnails, dragged onto the Visuals canvas
+	visuals.name = "Visuals"
+	_tabs.add_child(visuals)
 	timelines = ListPanel.new()
 	timelines.name = "Timelines"
 	timelines.empty_text = "No timelines in this project (Timeline tab → New)"
@@ -187,7 +194,7 @@ func _ready() -> void:
 			_on_selection.call_deferred())
 	if Config.args.has("sources-filter"):  # dev: preset the filter (tests)
 		_filter.text = str(Config.args["sources-filter"])
-	if Config.args.has("sources-tab"):  # dev: open on Media (0), Templates (1), Live (3) or Timelines (4) — 2 is the hidden Placeholders
+	if Config.args.has("sources-tab"):  # dev: Media (0), Templates (1), Live (3), Visuals (4), Timelines (5) — 2 is the hidden Placeholders
 		_tabs.current_tab = int(Config.args["sources-tab"])
 	load_media()
 
@@ -294,6 +301,7 @@ func _drop(at: Vector2, data: Variant) -> void:
 func _reload_current() -> void:
 	match _tabs.get_current_tab_control():
 		live: live.reload()
+		visuals: visuals.reload()
 		templates: load_templates()
 		timelines: timelines.rebuild()
 		_: load_media()

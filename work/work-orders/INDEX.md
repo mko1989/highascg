@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-796 live WOs (29 open, 123 in progress, 644 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+797 live WOs (29 open, 123 in progress, 645 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -360,7 +360,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (92)
+## godot-client — Godot client (93)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -453,6 +453,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 878 DONE [godot-client+audio] Visuals autopilot: looks on the beat, the next look every N bars and on drops → 878_WO_visuals_autopilot_beat_quantised_looks.md
 - 880 DONE [godot-client] Show safety: a crashed operator client relaunches, and the Visuals go back on a… → 880_WO_client_crash_relaunch_visuals_resume.md
 - 883 DONE [godot-client+engine] Shaders only in Visuals; the Visuals canvas as a Live source; a "Screen size" c… → 883_WO_shaders_only_in_visuals_live_source_screen_size.md
+- 885 DONE [godot-client] Sources ▸ Visuals: every visual with a thumbnail, in folders, dragged onto the… → 885_WO_sources_visuals_tab_thumbnails_drag_to_canvas.md
 - 886 DONE [godot-client+os-iso] MagicQ does not open from the operator dock: the launch ignored the .desktop Pa… → 886_WO_dock_magicq_ignored_desktop_path.md
 
 ## web-client — Web client (82)

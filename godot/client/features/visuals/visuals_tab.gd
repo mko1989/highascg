@@ -11,6 +11,7 @@ const Flow := preload("res://features/visuals/visuals_flow.gd")
 const Page := preload("res://features/visuals/visuals_page.gd")
 const Sync := preload("res://features/visuals/visuals_sync.gd")
 const Launcher := preload("res://features/visuals/game_launcher.gd")
+const Catalog := preload("res://features/visuals/visuals_catalog.gd")
 const Mixer := preload("res://features/visuals/visuals_mixer.gd")
 const Probes := preload("res://features/visuals/visuals_probes.gd")
 const ShowCtl := preload("res://features/visuals/visuals_show_ctl.gd")
@@ -58,8 +59,11 @@ func _ready() -> void:
 	_canvas.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_canvas.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_canvas.custom_minimum_size.y = 240
-	_canvas.tooltip_text = "The visual's output — Send (Inspector) puts it on the screen"
+	_canvas.tooltip_text = "The visual's output — drop a visual from Sources ▸ Visuals here (Shift: layer 2); Send (Inspector) puts it on the screen"
+	_canvas.set_drag_forwarding(Callable(), func(_at: Vector2, data: Variant) -> bool: return Catalog.parse(data) != null,
+		func(_at: Vector2, data: Variant) -> void: drop_visual(data, Input.is_key_pressed(KEY_SHIFT)))
 	add_child(_canvas)
+	add_to_group("visuals_canvas")  # WO-885: Sources ▸ Visuals double-click
 	var work := VBoxContainer.new()
 	add_child(work)
 	var bar := HBoxContainer.new()
@@ -111,19 +115,12 @@ func _ready() -> void:
 		slice.scene = main
 		slice.overlay = overlay if overlay != main else ""
 		_go(false)
-		_store())
-	page.shader_changed.connect(func(id: String) -> void:
-		slice.shader = id
-		_go(true)  # WO-877: another shader crossfades in too
-		_store())
+		_store()
+		page.set_state(slice, _cm()))  # WO-885: the Layer 2 line follows its ✕
+	page.visual_dropped.connect(drop_visual)
 	page.burst_pressed.connect(func() -> void: scene.fire())
 	show_ctl = ShowCtl.new(self)
 	add_child(show_ctl)
-	page.game_changed.connect(func(path: String) -> void:
-		slice.game = path
-		_store()
-		if launcher.running():
-			_play_game(true))
 	page.game_play.connect(_play_game)
 	var tick := Timer.new()  # WO-876: the game window's state (closed by hand, starting, on the ring)
 	tick.wait_time = 1.0
@@ -193,7 +190,6 @@ func _cm() -> Variant:
 
 func _load() -> void:
 	slice = M.slice_of(_project())
-	page.set_games(Launcher.games())
 	flow.set_graph(slice.graph)
 	show_ctl.from_slice()
 	_go(false)
@@ -226,6 +222,8 @@ func _game_status() -> void:
 ## WO-877: the slice's scenes on stage — a change crossfades over `fade` (visuals_mixer.gd); a shader is fetched first, so a
 ## look with one never fades in dark. `force`: fade even when the scenes match (a look with another shader or parameters).
 func _go(force := false) -> void:
+	if is_inside_tree():
+		get_tree().call_group("visuals_list", "mark_live", slice)  # WO-885: Sources ▸ Visuals highlights what runs
 	_shader_seq += 1
 	var seq := _shader_seq
 	var uses := "shader" in [slice.scene, slice.overlay]
@@ -237,6 +235,18 @@ func _go(force := false) -> void:
 	mixer.go(slice.scene, slice.overlay, cfg, slice.fade, force)
 	if uses:
 		_shader_status()
+
+
+## WO-885: a Sources ▸ Visuals row dropped on the canvas (Shift, or the Inspector's Layer 2 row: as layer 2) or
+## double-clicked there. Crossfades like a look (WO-877); an open game window follows a new ROM.
+func drop_visual(payload: Dictionary, overlay: bool) -> void:
+	var game := str(slice.get("game", ""))
+	slice = Catalog.apply_drop(slice, payload, overlay)
+	_go(true)
+	_store()
+	page.set_state(slice, _cm())
+	if launcher.running() and str(slice.get("game", "")) != game:
+		_play_game(true)
 
 
 ## WO-874: a library shader's config (GET /api/shaders/:id), cached; null without the box.
