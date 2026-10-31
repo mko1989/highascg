@@ -11,6 +11,7 @@ const SCENES := {
 	"tunnel": preload("res://features/visuals/scenes/tunnel.gd"),
 	"shader": preload("res://features/visuals/scenes/shader.gd"),  # WO-874
 	"spectrum": preload("res://features/visuals/scenes/spectrum.gd"),  # WO-875
+	"game": preload("res://features/visuals/scenes/game.gd"),  # WO-876
 }
 const Smooth := preload("res://features/visuals/spectrum_smooth.gd")
 const BURST_ON := 0.5

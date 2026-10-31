@@ -10,6 +10,7 @@ const Stage := preload("res://features/visuals/visuals_stage.gd")
 const Flow := preload("res://features/visuals/visuals_flow.gd")
 const Page := preload("res://features/visuals/visuals_page.gd")
 const Sync := preload("res://features/visuals/visuals_sync.gd")
+const Launcher := preload("res://features/visuals/game_launcher.gd")
 const Publisher := preload("res://features/shm_out/viewport_publisher.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const AUDIO_STALE_MS := 1000
@@ -36,6 +37,8 @@ var _mode := "flow"
 var _shader_list := []  # WO-874: GET /api/shaders rows, fetched once the Shader scene is first used
 var _shader_cfg := {}  # the config on stage
 var _shader_seq := 0
+var launcher := Launcher.new()  # WO-876: the Game scene's window
+var _game_error := ""
 
 
 func _ready() -> void:
@@ -106,6 +109,17 @@ func _ready() -> void:
 		_fetch_shader()
 		_store())
 	page.burst_pressed.connect(func() -> void: scene.fire())
+	page.game_changed.connect(func(path: String) -> void:
+		slice.game = path
+		_store()
+		if launcher.running():
+			_play_game(true))
+	page.game_play.connect(_play_game)
+	var tick := Timer.new()  # WO-876: the game window's state (closed by hand, starting, on the ring)
+	tick.wait_time = 1.0
+	tick.timeout.connect(_game_status)
+	add_child(tick)
+	tick.start()
 	page.sync_changed.connect(func(ms: float) -> void:
 		slice.sync = ms
 		_store())
@@ -137,6 +151,7 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	launcher.stop()
 	if page != null and not page.is_inside_tree():  # never adopted by the Inspector
 		page.free()
 
@@ -156,12 +171,34 @@ func _cm() -> Variant:
 
 func _load() -> void:
 	slice = M.slice_of(_project())
+	page.set_games(Launcher.games())
 	flow.set_graph(slice.graph)
 	scene.set_layers(slice.scene, slice.overlay)
 	page.set_state(slice, _cm())
 	_fetch_shader()
 	_resize()
 	_sync_send_ui("")
+
+
+## WO-876: open (or close) the picked game's window on the screen this client is on.
+func _play_game(on: bool) -> void:
+	_game_error = launcher.play(slice.game, get_window().current_screen) if on else ""
+	if not on:
+		launcher.stop()
+	_game_status()
+
+
+func _game_status() -> void:
+	if not "game" in [slice.get("scene"), slice.get("overlay")] and not launcher.running():
+		return
+	var live := scene.layers.any(func(l: Node3D) -> bool: return l.has_method("live") and l.live())
+	var text := _game_error if _game_error != "" else Launcher.ready_error(str(slice.get("game", "")))
+	if launcher.running():
+		text = ("Playing in its own window — arrows, X = A, Z = B, Enter = Start, Shift = Select; a gamepad works too"
+			if live else "Starting the game window…")
+	elif text == "":
+		text = "Play opens the game in its own window on this screen"
+	page.set_game_status(launcher.running(), text)
 
 
 ## WO-874: the Shader scene's code from the box's library (list once, then the picked config); the page shows why it is dark.
@@ -340,7 +377,8 @@ func _probe_shots(dir: String) -> void:
 	var r: Dictionary = await _g("DevicesTarget").box_api.get_json("/api/shaders/sh-sa-ribbons")  # WO-874 layer shots
 	scene.set_shader(r.data if r.get("ok") else null)
 	for pair in [["rings", ""], ["particles", ""], ["starfield", ""], ["tunnel", ""], ["tunnel", "particles"],
-			["shader", "particles"], ["tunnel", "shader"], ["spectrum", ""], ["spectrum", "shader"], ["tunnel", "spectrum"]]:
+			["shader", "particles"], ["tunnel", "shader"], ["spectrum", ""], ["spectrum", "shader"], ["tunnel", "spectrum"],
+			["game", ""], ["tunnel", "game"], ["game", "spectrum"]]:
 		scene.set_layers(pair[0], pair[1])
 		await get_tree().create_timer(1.0).timeout
 		var gpu := 0.0

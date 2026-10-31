@@ -13,6 +13,8 @@ signal sync_changed(ms: float)
 signal scenes_changed(main: String, overlay: String)
 signal burst_pressed
 signal shader_changed(id: String)
+signal game_changed(path: String)
+signal game_play(on: bool)
 
 var _sliders := {}
 var _screen: OptionButton
@@ -32,6 +34,12 @@ var _shader_row: HBoxContainer
 var _shader_note: Label
 var _shader_ids := []
 var _shader_want := ""
+var _game: OptionButton
+var _game_box: VBoxContainer
+var _game_play: Button
+var _game_note: Label
+var _game_paths := []
+var _game_want := ""
 
 
 func _init() -> void:  # built up front: the tab fills it before the Inspector adopts it
@@ -62,6 +70,29 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 	_shader_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_shader_note.modulate = Color(1, 0.75, 0.6, 0.9)
 	add_child(_shader_note)
+	_game_box = VBoxContainer.new()  # WO-876: the ROM the Game scene shows; Play opens its window on this screen
+	_game = OptionButton.new()
+	_game.fit_to_longest_item = false
+	_game.tooltip_text = "Your games (ROM files in ~/.highascg/retro/games or media/games)"
+	_game.item_selected.connect(func(i: int) -> void:
+		if not _quiet and i >= 0 and i < _game_paths.size():
+			_game_want = _game_paths[i]
+			game_changed.emit(_game_want))
+	var game_row := _row("Game", _game)
+	_game_play = Button.new()
+	_game_play.text = "Play"
+	_game_play.tooltip_text = "Open the game in its own window on this screen — play it there with the keyboard or a gamepad"
+	_game_play.toggle_mode = true
+	_game_play.toggled.connect(func(on: bool) -> void:
+		if not _quiet:
+			game_play.emit(on))
+	game_row.add_child(_game_play)
+	_game_box.add_child(game_row)
+	_game_note = Label.new()
+	_game_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_game_note.modulate = Color(1, 1, 1, 0.7)
+	_game_box.add_child(_game_note)
+	add_child(_game_box)
 	var burst := Button.new()
 	burst.text = "Burst"
 	burst.tooltip_text = "Fire the scenes' burst now (Flow: link a hit to the Burst parameter to fire it from the audio)"
@@ -135,6 +166,9 @@ func set_state(slice: Dictionary, cm: Variant) -> void:
 	_shader.select(_shader_ids.find(_shader_want))
 	_shader_row.visible = "shader" in [slice.get("scene"), slice.get("overlay")]
 	_shader_note.visible = _shader_row.visible
+	_game_want = str(slice.get("game", ""))
+	_game.select(_game_paths.find(_game_want))
+	_game_box.visible = "game" in [slice.get("scene"), slice.get("overlay")]
 	for p in M.PARAMS:
 		_sliders[p].set_value_no_signal(float(slice.params[p]))
 	_screens = M.screens(cm)
@@ -162,6 +196,26 @@ func set_shaders(list: Array) -> void:
 		_shader.add_item(str(r.get("name", r.id)))
 	_shader.select(_shader_ids.find(_shader_want))
 	_quiet = false
+
+
+## WO-876: the operator's ROMs ({name, path} rows, game_launcher.gd games()).
+func set_games(list: Array) -> void:
+	_quiet = true
+	_game.clear()
+	_game_paths = list.map(func(r: Dictionary) -> String: return r.path)
+	for r in list:
+		_game.add_item(str(r.name))
+	_game.select(_game_paths.find(_game_want))
+	_quiet = false
+
+
+## WO-876: the Play button's state and the line under it (how to play, or why it cannot).
+func set_game_status(playing: bool, text: String) -> void:
+	_quiet = true
+	_game_play.button_pressed = playing
+	_game_play.text = "Stop" if playing else "Play"
+	_quiet = false
+	_game_note.text = text
 
 
 ## WO-874: "" when the shader runs, else why not (compile error, not found, no box).
@@ -210,6 +264,7 @@ func _emit_scenes() -> void:
 	var over: String = ids[_overlay.selected - 1] if _overlay.selected > 0 else ""
 	_shader_row.visible = "shader" in [main, over]
 	_shader_note.visible = _shader_row.visible
+	_game_box.visible = "game" in [main, over]
 	scenes_changed.emit(main, over)
 
 

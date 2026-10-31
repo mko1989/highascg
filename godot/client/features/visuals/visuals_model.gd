@@ -6,7 +6,8 @@ const PARAMS := ["pulse", "spin", "hue", "glow", "flash", "speed", "amount", "bu
 const PARAM_DEFAULTS := {"pulse": 0.2, "spin": 0.15, "hue": 0.55, "glow": 0.3, "flash": 0.0, "speed": 0.3, "amount": 0.5, "burst": 0.0}
 ## WO-873 scene library (visuals_stage.gd SCENES): [id, label]. `burst` is the event parameter — its rising edge fires the scenes.
 const SCENES := [["rings", "Rings"], ["particles", "Particles"], ["starfield", "Starfield"], ["tunnel", "Tunnel"],
-	["shader", "Shader"], ["spectrum", "Spectrum"]]  # WO-874: a library shader (`shader` in the slice); WO-875 the live spectrum
+	["shader", "Shader"], ["spectrum", "Spectrum"], ["game", "Game"]]  # WO-874: a library shader (`shader` in the slice);
+	# WO-875 the live spectrum; WO-876 the operator's game (`game` in the slice: the ROM path)
 ## Bus names the Flow view offers, in menu order. Drum and drop buses are pulses (1 on the hit, decaying); the rest are levels.
 const BUSES := ["kick", "snare", "hats", "kick.level", "snare.level", "hats.level", "bass", "mid", "high", "tonal", "loudness",
 	"onset", "density", "arousal", "valence", "energy", "drop", "beat", "section.build", "section.peak", "section.quiet"]
@@ -176,7 +177,7 @@ static func params_of(v: Variant) -> Dictionary:
 ## `project.visuals` → {graph, params, output: {screen, layer, size}, sync, scene, overlay} with every field present. `sync`
 ## (WO-866): ms the drum pulses move against the room sound, −300..300 (visuals_sync.gd). `scene` / `overlay` (WO-873): the main
 ## scene and the second layer ("" = none, never the main scene twice). `shader` (WO-874): the library shader id the Shader scene
-## runs ("" = none picked).
+## runs ("" = none picked). `game` (WO-876): the ROM the Game scene's Play opens ("" = none).
 static func slice_of(project: Variant) -> Dictionary:
 	var v: Variant = project.get("visuals") if project is Dictionary else null
 	var d: Dictionary = v if v is Dictionary else {}
@@ -187,7 +188,8 @@ static func slice_of(project: Variant) -> Dictionary:
 		"output": {"screen": maxi(0, int(_num(o.get("screen")))), "layer": clampi(int(_num(o.get("layer", 1))), 1, 9999),
 			"size": clampi(int(_num(o.get("size"))), 0, RENDER_SIZES.size() - 1)},
 		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0), "scene": main, "overlay": over,
-		"shader": str(d.get("shader", "")) if d.get("shader") is String else ""}
+		"shader": str(d.get("shader", "")) if d.get("shader") is String else "",
+		"game": str(d.get("game", "")) if d.get("game") is String else ""}
 
 
 static func scene_ids() -> Array:
