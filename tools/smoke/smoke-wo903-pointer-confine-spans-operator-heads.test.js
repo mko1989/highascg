@@ -38,7 +38,13 @@ describe('WO-903 pointer confine spans the operator heads', () => {
 		assert.match(js, /const rect = spanOperatorHeads\(resolveOperatorMonitorRect\(config, layout\), layout\)/)
 		assert.match(js, /\/\^\[A-Za-z0-9\._-\]\+\(,\[A-Za-z0-9\._-\]\+\)\*\$\/\.test\(rect\.sysId\)/)
 		assert.match(js, /line\.trim\(\)\.split\(\/\\s\+\/\)\.pop\(\) === sysId/)
-		const py = fs.readFileSync(path.join(__dirname, '..', '..', 'tools', 'runtime', 'confine-pointer-barriers.py'), 'utf8')
-		assert.match(py, /if output_name and "," in output_name:\n\s+boxes = \[get_monitor_geometry\(n, dpy, root\)\[1\] for n in output_name\.split\(","\)\]/)
+		const py = fs.readFileSync(
+			path.join(__dirname, '..', '..', 'tools', 'runtime', 'confine-pointer-barriers.py'),
+			'utf8'
+		)
+		assert.match(
+			py,
+			/if output_name and "," in output_name:\n\s+boxes = \[get_monitor_geometry\(n, dpy, root\)\[1\] for n in output_name\.split\(","\)\]/
+		)
 	})
 })
