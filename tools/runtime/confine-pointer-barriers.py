@@ -278,7 +278,17 @@ def get_monitor_geometry(output_name=None, dpy=None, root=None):
 
     `dpy`/`root` are optional so the pre-display startup probe in main() still works before the
     display is open, and so tests can drive the parser directly.
+
+    WO-903: "DP-4,DP-6" = several operator heads side by side — the fence goes round their union (the server only
+    passes heads that share y and height and touch, so the union holds no off-screen area); one gone = None.
     """
+    if output_name and "," in output_name:
+        boxes = [get_monitor_geometry(n, dpy, root)[1] for n in output_name.split(",")]
+        if not all(boxes):
+            return None, None
+        x0, y0 = min(b[2] for b in boxes), min(b[3] for b in boxes)
+        x1, y1 = max(b[2] + b[0] for b in boxes), max(b[3] + b[1] for b in boxes)
+        return output_name, (x1 - x0, y1 - y0, x0, y0)
     if dpy:
         name, geom = monitor_geometry_via_xrandr_api(dpy, root, output_name)
         if geom:

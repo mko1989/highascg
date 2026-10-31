@@ -26,6 +26,7 @@ const {
 	displaySessionEnv,
 } = require('../utils/x-display-session')
 const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
+const { spanOperatorHeads } = require('./pointer-confine-span')
 const sandbox = require('../bootstrap/sandbox')
 
 /* WO-720: a `node --test` file process (NODE_TEST_CONTEXT) is as foreign to the operator's display as a sandbox.
@@ -118,7 +119,7 @@ async function isBarrierDaemonRunning(sysId, env) {
 		const { stdout } = await execFileAsync('pgrep', ['-af', 'confine-pointer-barriers.py'], { env, timeout: 2000 })
 		return String(stdout || '')
 			.split('\n')
-			.some((line) => line.includes('confine-pointer-barriers') && line.includes(sysId))
+			.some((line) => line.includes('confine-pointer-barriers') && line.trim().split(/\s+/).pop() === sysId) // WO-903: "DP-4" ⊂ "DP-4,DP-6"
 	} catch {
 		return false
 	}
@@ -226,7 +227,7 @@ function waitMs(ms) {
 
 async function tryBarrierConfine(rect, env, log) {
 	const script = resolveConfineBarriersScript()
-	if (!script || !rect.sysId || !/^[A-Za-z0-9._-]+$/.test(rect.sysId)) return null
+	if (!script || !rect.sysId || !/^[A-Za-z0-9._-]+(,[A-Za-z0-9._-]+)*$/.test(rect.sysId)) return null // WO-903: "DP-4,DP-6"
 	if (await isBarrierDaemonRunning(rect.sysId, env)) {
 		log?.('info', `[Pointer confine] XFixes barriers already running on ${rect.sysId}`)
 		activeConfineKey = confineKey(rect)
@@ -332,7 +333,7 @@ async function startPointerConfine(config, opts = {}) {
 		return { ok: true, rect: activeConfineRect, mode: 'unchanged' }
 	}
 	const layout = opts.layout || calculateLayoutPositions(config)
-	const rect = resolveOperatorMonitorRect(config, layout)
+	const rect = spanOperatorHeads(resolveOperatorMonitorRect(config, layout), layout)
 	if (!rect) {
 		opts.log?.('warn', '[Pointer confine] No operator monitor rect — not started')
 		return { ok: false, reason: 'no_operator_monitor' }
