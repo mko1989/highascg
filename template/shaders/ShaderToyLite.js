@@ -10,6 +10,8 @@
  * LOCAL PATCH (WO-662): beat reactivity — `iBeat` / `iAudioBands` uniforms every pass can read, `iBeatFx`
  * (per-shader flash / bump, applied around mainImage in the Image pass only), setBeat() to feed them and
  * addTime() for the "kick" knob (iTime surges on the beat). Marked "WO-662 patch" below.
+ *
+ * LOCAL PATCH (WO-580): addTime() also takes a negative step (player-live.js runs iTime slower than real time).
  */
 function ShaderToyLite(canvasId) {
 
@@ -446,8 +448,9 @@ function ShaderToyLite(canvasId) {
     }
 
     // WO-662 patch: push iTime forward by `sec` (the beat "kick"); play() keeps the offset.
+    // WO-580 patch: or back (a slower clock rate — the caller keeps the step above -iTimeDelta).
     this.addTime = (sec) => {
-        if (sec > 0) firstDrawTime -= sec * 1000;
+        if (sec) firstDrawTime -= sec * 1000;
     }
 
     this.time = () => {

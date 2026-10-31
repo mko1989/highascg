@@ -1,8 +1,8 @@
 # WO-580 — Shader Live: speed changes without a phase jump + smooth (gliding) param changes
 
 **Area:** engine
-**Status: OPEN** (2026-09-25; diagnosed on the box during a live show — nothing implemented for
-the real fix. Precursor wheel-apply fix IMPLEMENTED, see §2.1.)
+**Status: IN PROGRESS** (2026-10-31: phase A — Speed × rides the player's eased clock rate — implemented and
+proven offline (§2.3, §3); on-box check waits for the service. Phase B — eased non-time params — open.)
 
 Source: owner, `work/archive/todos/todos25.09.26` (on show):
 > why does scroll value changes does not register to output in shaders editor. only update after
@@ -55,7 +55,7 @@ kiosk was NOT reloaded by the agent (owner's call). Not committed.
 Side effect of building mid-show: lazy chunks renamed (`playlist-live-sync-*`, `device-view-*`,
 `scenes-*`) — an un-reloaded page 404s on those until F5.
 
-### 2.2 Real fix — TO DO (proposed approach)
+### 2.2 Proposed full approach (2026-09-25; phase A in §2.3 took a shorter road for the speed part)
 1. **Params → uniforms.** At export (`src/shaderfx/shader-template-export.js`) / hot-update time,
    rewrite each controllable literal to a uniform (`u_p<N>`) with its value, instead of baking the
    number. `ShaderToyLite` needs a hook to set extra uniforms per program (vendored + patched
@@ -77,8 +77,40 @@ Risks: rewrite must not touch literals inside `#define`/`const` initialisers tha
 compile-time constants (array sizes, loop bounds — GLSL ES loop bounds must be constant);
 the scanner's `intLiteral` / structural filters (WO-577) must gate which literals become uniforms.
 
+### 2.3 Phase A — Speed × as an eased clock rate (2026-10-31)
+The teleport (§1.2) only comes from the TIME multipliers, and all of them belong to one control: the `macro:speed`
+macro (`client/lib/shader-controls.js` macroRoles). Instead of substituting phase uniforms per literal (§2.2.3: a
+source rewrite at export, a uniform hook in ShaderToyLite, GLSL ES constant rules), the whole shader's clock runs at
+the ride: `iTime × k` at rate `r` is phase-continuous for any `k` as long as `iTime` itself never jumps.
+- `src/shaderfx/shader-live-ops.js` — the `macro` op on `macro:speed` returns `{ timeScale }` (k ÷ the factor the
+  literals already carry, clamped 0.05–10) and rewrites nothing; `reset` of that control and reset-all return
+  `timeScale: 1`; `randomize` rides the rate instead of the literals; `save` bakes the ride into a deep copy's
+  literals (`bakedSpeed`) so the child is a plain ShaderToy shader — the live session keeps its source and rate.
+- `src/shaderfx/shader-live-session.js` — `s.timeScale` (1 on open; a ride keeps the session like an edit);
+  `pushTimeScale` sends `CG ch-layer UPDATE 0 "{\"timeScale\":k}"` to every live instance; pass pushes carry the rate
+  while it is ≠ 1 (a 403 re-host CG ADD starts the template at 1); `view()` shows the macro factor × the ride, so the
+  Godot slider reads what the picture does.
+- `src/api/routes-shader-live.js` `handleOp` — stores the rate and pushes it after any source push.
+- `template/shaders/player-live.js` (new, loaded by `player.js` like player-smooth.js) — per rendered frame the rate
+  eases toward the last `timeScale` (exponential, τ 0.35 s, dt clamped to 0.1 s) and `toy.addTime((rate − 1)·dt)`.
+- `template/shaders/ShaderToyLite.js` — `addTime` accepts a negative step (WO-580 patch note in the header).
+- `template/shaders/player.js` — `window.update` takes `timeScale`; `initLive()` (not in thumbnail mode);
+  `liveClock.frame()` in the draw callback.
+Not changed: the web editor (`client/components/shader-controls-panel.js`) still computes the macro items itself and
+posts `/api/shader-live/push` — the Godot Shader Live panel (the show client) goes through the ops. A new take of the
+shader starts at rate 1 (as a mixer ride does).
+
 ## 3. What was verified
 - §1.1/§1.2 from source reading + the journal lines above (read-only on the live box).
 - §2.1: build clean, `_wheelApply` present in `dist-web/assets/main-*.js`. Owner confirmed after
   kiosk reload that wheel changes now reach the output (then reported the §1.2 jump).
-- §2.2: nothing — OPEN.
+- §2.2: phase B (eased non-time params) — OPEN.
+- §2.3 (2026-10-31), offline: `tools/smoke/smoke-wo580-shader-live-speed.test.js` 3/3 — the clock eases (≈63 % after
+  τ, snaps), 20 min on air then Speed 1 → 0.5 → 4 → 0.05: every frame's iTime step stays within dt × [0.05, 10] and
+  equals the current rate's step (no jump); the `macro:speed` op sends exactly one `{"timeScale":0.5}` CG UPDATE and
+  leaves the source alone; the view factor reads 0.5; a pass push while riding carries the rate; Save writes
+  `iTime * 0.25` / `iTime * 0.35` into the child while the session keeps 0.5 / 0.7; reset / reset-all → 1; randomize
+  leaves the time literals alone. All smokes pinning the touched files (wo266/268/333/344/376/606/662/811/875,
+  alpha+audio binding) 97/97.
+- On air: NOT yet — highascg.service has been inactive since the eggs build. To do: a shader with ≥ 2 time
+  multipliers on PGM, ride Speed × in the Godot Shader Live panel after a few minutes on air, watch for the jump.

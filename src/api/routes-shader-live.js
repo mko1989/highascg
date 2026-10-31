@@ -58,7 +58,12 @@ async function handleOp(id, op, body, ctx) {
 			if (r.manifest || r.curated) await S.persistCuration(s)
 			let passes = r.passes || []
 			if (r.items?.length) passes = await S.applyBatch(s, r.items)
-			const push = passes.length ? await S.pushLive(ctx, id, s, passes) : null
+			let push = passes.length ? await S.pushLive(ctx, id, s, passes) : null
+			if (r.timeScale != null) {
+				s.timeScale = r.timeScale // WO-580: the speed ride, eased by the player — no recompile
+				const t = await S.pushTimeScale(ctx, id, s)
+				push = push ? { ...push, errors: [...push.errors, ...t.errors] } : t
+			}
 			return reply(200, { ok: true, ...(r.extra || {}), push, view: await S.view(id, s) })
 		} catch (e) {
 			return reply(500, { ok: false, error: String(e?.message || e) })

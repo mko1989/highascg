@@ -47,6 +47,12 @@ function diffItems(params, target) {
 	return items
 }
 
+/** WO-580: the clock rate that shows Speed × `k` on top of what the time literals already carry. */
+function timeScaleFor(L, params, c, pristine, k) {
+	const lit = L.macroFactor(params, c, pristine) || 1
+	return Math.min(10, Math.max(0.05, k / lit))
+}
+
 function macroItems(c, k, byKey, pristine) {
 	const items = []
 	for (const key of c.keys) {
@@ -83,19 +89,23 @@ async function run(op, b, s, env) {
 			const c = controls().find((x) => x.id === String(b.control))
 			if (!c || c.widget !== 'macro') return { error: 'unknown macro control', status: 400 }
 			const k = Math.max(0.05, num(b.factor) ?? 1) // a divisor macro must never hit 0
+			// WO-580: Speed rides the player's clock rate — rewriting the iTime multipliers moved the phase by
+			// iTime × Δk (the picture teleported, worse the longer it had been on air) and recompiled every step.
+			if (c.id === S.SPEED_MACRO) return { timeScale: timeScaleFor(L, params, c, pristine, k) }
 			return { items: macroItems(c, k, byKey, pristine) }
 		}
 		case 'reset': {
 			if (b.key != null) return { items: diffItems(params, (p) => (p.key === String(b.key) ? pristine.get(p.key) : null)) }
 			if (b.control != null) {
 				const c = controls().find((x) => x.id === String(b.control))
-				return { items: c ? diffItems(params, (p) => (c.keys.includes(p.key) ? pristine.get(p.key) : null)) : [] }
+				const items = c ? diffItems(params, (p) => (c.keys.includes(p.key) ? pristine.get(p.key) : null)) : []
+				return c?.id === S.SPEED_MACRO ? { items, timeScale: 1 } : { items }
 			}
 			// Reset all: back to the library source verbatim (recovery for a broken shader), every pass pushed.
 			s.cfg.common = s.pristine.common
 			for (const [k, v] of Object.entries(s.pristine.passes)) if (v && s.cfg.passes?.[k]) s.cfg.passes[k].source = v.source
 			s.dirty = false
-			return { passes: ['common', ...L.PASS_KEYS.filter((k) => s.cfg.passes?.[k]?.source)] }
+			return { passes: ['common', ...L.PASS_KEYS.filter((k) => s.cfg.passes?.[k]?.source)], timeScale: 1 }
 		}
 		case 'preset': {
 			if (b.original) return { items: diffItems(params, (p) => pristine.get(p.key)) }
@@ -140,8 +150,10 @@ async function run(op, b, s, env) {
 		case 'randomize': {
 			const rnd = (lo, hi) => lo + Math.random() * (hi - lo)
 			const items = []
+			let timeScale
 			for (const c of controls()) {
-				if (c.widget === 'macro') items.push(...macroItems(c, rnd(0.6, 1.7), byKey, pristine))
+				if (c.id === S.SPEED_MACRO) timeScale = timeScaleFor(L, params, c, pristine, rnd(0.6, 1.7))
+				else if (c.widget === 'macro') items.push(...macroItems(c, rnd(0.6, 1.7), byKey, pristine))
 				const p = byKey.get(c.keys[0])
 				if (!p) continue
 				if (c.widget === 'color') items.push({ p, next: [...hueShift(p.values.slice(0, 3), rnd(0, 360)), ...p.values.slice(3)] })
@@ -150,7 +162,7 @@ async function run(op, b, s, env) {
 					items.push({ p, next: p.values.map((_, i) => Math.min(p.max, Math.max(p.min, Math.round((base[i] * rnd(0.6, 1.6)) / p.step) * p.step))) })
 				}
 			}
-			return { items }
+			return { items, timeScale }
 		}
 		case 'wiggle':
 			return wiggle(b, s, env, byKey, L)
@@ -196,10 +208,23 @@ async function saveChild(s) {
 	let n = 2
 	while (ids.has(`${rootId}-c${n}`)) n++
 	const baseName = String(s.cfg.name || rootId).replace(/ c\d+$/, '')
-	const child = { ...s.cfg, id: `${rootId}-c${n}`, name: `${baseName} c${n}`, parentId: rootId }
+	const child = { ...(await bakedSpeed(s)), id: `${rootId}-c${n}`, name: `${baseName} c${n}`, parentId: rootId }
 	await store.saveShader(child)
 	s.dirty = false
 	return { extra: { savedAs: child.id } }
+}
+
+/** WO-580: the config with the speed ride baked into the time literals (a saved shader is plain ShaderToy GLSL). */
+async function bakedSpeed(s) {
+	const k = S.timeScaleOf(s)
+	if (k === 1) return s.cfg
+	const { L, params, byKey, controls } = await context(s)
+	const c = controls().find((x) => x.id === S.SPEED_MACRO)
+	if (!c) return s.cfg
+	const copy = { cfg: JSON.parse(JSON.stringify(s.cfg)) }
+	const lit = L.macroFactor(params, c, s.pristineByKey) || 1
+	await S.applyBatch(copy, macroItems(c, lit * k, byKey, s.pristineByKey))
+	return copy.cfg
 }
 
 module.exports = { run, hueShift }

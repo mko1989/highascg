@@ -29,6 +29,7 @@ function libs() {
 
 /** @type {Map<string, { cfg: any, pristine: { common: string, passes: Record<string, any> }, pristineByKey: Map<string, number[]>, dirty: boolean }>} */
 const sessions = new Map()
+const SPEED_MACRO = 'macro:speed' // WO-580: shader-controls.js macroRoles id of "Speed ×"
 
 const same = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 1e-9)
 const clone = (o) => JSON.parse(JSON.stringify(o))
@@ -60,7 +61,7 @@ function edited(s) {
 async function open(id) {
 	const sid = String(id || '').toLowerCase()
 	const cur = sessions.get(sid)
-	if (cur && (cur.dirty || edited(cur))) return cur
+	if (cur && (cur.dirty || edited(cur) || timeScaleOf(cur) !== 1)) return cur // WO-580: a speed ride is a live edit too
 	const cfg = await store.getShader(sid)
 	if (!cfg) return null
 	const L = await libs()
@@ -72,6 +73,7 @@ async function open(id) {
 		},
 		pristineByKey: new Map(L.scanShaderCfg(cfg).map((p) => [p.key, [...p.values]])),
 		dirty: false,
+		timeScale: 1, // WO-580: the Speed × ride — player.js runs iTime at this rate (no recompile, no phase jump)
 	}
 	sessions.set(sid, s)
 	return s
@@ -112,7 +114,9 @@ async function view(id, s) {
 		parentId: s.cfg.parentId || null,
 		dirty: false,
 		sections: L.SECTION_ORDER,
-		controls: built.controls.map((c) => (c.widget === 'macro' ? { ...c, factor: L.macroFactor(params, c, s.pristineByKey) } : c)),
+		controls: built.controls.map((c) =>
+			c.widget === 'macro' ? { ...c, factor: L.macroFactor(params, c, s.pristineByKey) * (c.id === SPEED_MACRO ? timeScaleOf(s) : 1) } : c
+		),
 		hiddenCount: built.hiddenCount,
 		hiddenManual: m.hidden.length,
 		presets: m.presets.map((p) => p.name),
@@ -146,9 +150,19 @@ async function pushLive(ctx, id, s, passKeys) {
 	const errors = []
 	for (const passKey of passKeys) {
 		const payload = passKey === 'common' ? { common: s.cfg.common } : { passes: { [passKey]: { source: sourceOf(s.cfg, passKey) } } }
+		if (timeScaleOf(s) !== 1) payload.timeScale = timeScaleOf(s) // WO-580: a 403 re-host (CG ADD) starts at rate 1
 		errors.push(...(await pushPayload(ctx, targets, payload)))
 	}
 	return { targets: targets.length, errors }
+}
+
+/** WO-580: the session's speed ride (1 when none). */
+const timeScaleOf = (s) => (Number.isFinite(s?.timeScale) ? s.timeScale : 1)
+
+/** WO-580: the speed ride onto every live instance — `{ timeScale }`, eased by player-live.js; nothing recompiles. */
+async function pushTimeScale(ctx, id, s) {
+	const targets = liveShaderInstances(ctx).filter((i) => i.shaderId === id)
+	return { targets: targets.length, errors: await pushPayload(ctx, targets, { timeScale: timeScaleOf(s) }) }
 }
 
 /** AMCP quoted-string escaping: backslashes first, then quotes (web cgUpdateJson). */
@@ -207,4 +221,20 @@ async function persistCuration(s) {
 	await store.saveShader({ ...lib, controls: s.cfg.controls, paramLabels: s.cfg.paramLabels })
 }
 
-module.exports = { libs, open, view, pushLive, pushPayload, applyBatch, persistCuration, labelKeyOf, manifestOf, sourceOf, same, sessions }
+module.exports = {
+	libs,
+	open,
+	view,
+	pushLive,
+	pushPayload,
+	pushTimeScale,
+	timeScaleOf,
+	SPEED_MACRO,
+	applyBatch,
+	persistCuration,
+	labelKeyOf,
+	manifestOf,
+	sourceOf,
+	same,
+	sessions,
+}

@@ -65,6 +65,7 @@ module.exports = [
 	'tools/smoke/smoke-wo611-disk-size-text.test.js',
 	'tools/smoke/smoke-wo611-live-audio-settings.test.js',
 	'tools/smoke/smoke-wo606-shader-live-server.test.js',
+	'tools/smoke/smoke-wo580-shader-live-speed.test.js',
 	'tools/smoke/smoke-wo608-hardware-check.test.js',
 	'tools/smoke/smoke-wo608-missing-assets.test.js',
 	'tools/smoke/smoke-wo600-new-layer.test.js',

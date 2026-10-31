@@ -12,11 +12,8 @@
  *     mic — tier A must never shadow the WS feed (WO-333c).
  *  A) getUserMedia + AnalyserNode — fallback real spectrum. Works in the WO-258
  *     browser_display Firefox (pick an ALSA monitor/loopback device; `?audioDev=` overrides).
- *  B') WS OSC levels (`type:'osc'`, per-channel dBFS from src/osc/osc-state.js) — coarse
- *     synthesized spectrum when neither real source is live.
- *     `?ch=<caspar channel>` picks the OSC meter source (default 1), `?api=` overrides the API
- *     base (default: same origin, or http://127.0.0.1:4200 when loaded from file://).
- *  C) silence — shader still renders, texture stays zeroed.
+ *  B') WS OSC levels (src/osc/osc-state.js) — a coarse spectrum when no real source is live. `?ch=` = OSC meter
+ *     channel (1), `?api=` = API base (same origin; http://127.0.0.1:4200 from file://). C) silence — zeroed texture.
  *
  * Caspar template contract (docs/wiki/api/cg.md): window.update/play/stop/next. Autoplays on
  * load so `PLAY [HTML] <url>` (no CG handshake) also renders.
@@ -29,10 +26,8 @@
 	const config = window.__SHADERFX_CONFIG__ || { passes: {}, audio: { enabled: false }, opts: {} }
 	const canvas = document.getElementById('shaderfx-canvas')
 
-	// WO-268: the Caspar template contract MUST exist even when rendering can't start (no
-	// WebGL2 in CEF with <enable-gpu>false, missing canvas, shader compile throw…) — otherwise
-	// follow-up CG UPDATE/STOP calls raise ReferenceErrors. Defined first, inert until start()
-	// swaps in the real implementations.
+	// WO-268: the Caspar template contract MUST exist even when rendering can't start (no WebGL2, no canvas, a compile
+	// throw…) or later CG UPDATE/STOP raise ReferenceErrors. Defined first, inert until start() swaps them in.
 	let toyRef = null
 	document.body.style.transition = 'opacity 300ms ease'
 	window.play = () => {
@@ -57,6 +52,7 @@
 			if (!toyRef) return
 			if (data.paused === true) toyRef.pause()
 			else if (data.paused === false) toyRef.play()
+			if (data.timeScale != null) timeScale = Number(data.timeScale) // WO-580 Speed ×: player-live.js eases the clock
 			// WO-662: beat knobs { flash, bump, kick } — uniforms only, no recompile.
 			if (data.beat && typeof data.beat === 'object') {
 				config.audio = Object.assign({}, config.audio, { beat: data.beat })
@@ -70,6 +66,8 @@
 		}
 	}
 	let beatFeed = null // WO-662 player-beat.js companion
+	let timeScale = 1 // WO-580: the last CG UPDATE `{ timeScale }`; liveClock (player-live.js) runs iTime at it, eased
+	let liveClock = null
 	if (!canvas) return
 
 	const query = new URLSearchParams(location.search)
@@ -366,6 +364,14 @@
 		document.head.appendChild(el)
 	}
 
+	/* WO-580 — the eased clock rate (Speed ×). Missing file → iTime at real time, as before. */
+	function initLive() {
+		const el = document.createElement('script')
+		el.src = 'player-live.js'
+		el.onload = () => (liveClock = window.__SHADERFX_LIVE__ ? window.__SHADERFX_LIVE__.create({ toy, target: () => timeScale }) : null)
+		document.head.appendChild(el)
+	}
+
 	// --- wire passes -------------------------------------------------------------------------
 
 	/* todos28.07.26 (owner): "when audio reactive is ticked on a shader audio must be chosen in
@@ -387,21 +393,12 @@
 		if (free >= 0) img.channels[free] = 'audio'
 	}
 
-	/* todos28.07.26 (owner): "alpha doesnt work on shaders."
-	 *
-	 * The transparent PAGE and the alpha-claimed WebGL2 context were both already correct — what
-	 * is opaque is the shader itself. Shadertoy shaders are written for an opaque canvas and end
-	 * with `fragColor = vec4(col, 1.0)`; every alpha-enabled shader in this library does exactly
-	 * that (sh-matrix, sh-bubles, sh-mirrors), so there is nothing for the transparency to show
-	 * through. Alpha could never have worked without touching the shader source.
-	 *
-	 * So when the Alpha flag is on, the image pass is wrapped: the author's mainImage is renamed
-	 * and called by ours, which keys near-black to transparent and PREMULTIPLIES (the context is
-	 * claimed premultipliedAlpha:true). A shader that DOES author real alpha keeps it — the key
-	 * only applies where the author wrote a fully opaque pixel.
-	 *
-	 * Fail-safe: if the source does not contain exactly one `void mainImage(` the wrap is skipped
-	 * and behaviour is exactly as before. Turning the Alpha flag off also restores it. */
+	/* todos28.07.26 (owner): "alpha doesnt work on shaders." The page and the alpha-claimed context were already
+	 * transparent; the shaders are opaque — Shadertoy code ends `fragColor = vec4(col, 1.0)` (sh-matrix, sh-bubles,
+	 * sh-mirrors). With the Alpha flag on, the image pass is wrapped: the author's mainImage is renamed and called by
+	 * ours, which keys near-black to transparent and PREMULTIPLIES (premultipliedAlpha:true). Real authored alpha is
+	 * kept — the key only applies where the author wrote a fully opaque pixel. Fail-safe: without exactly one
+	 * `void mainImage(` the wrap is skipped (as before); the flag off restores it. */
 	const ALPHA_KEY_SOFT = 0.06
 	function alphaKeyImageSource(src) {
 		const decls = String(src).match(/\bvoid\s+mainImage\s*\(/g) || []
@@ -455,6 +452,7 @@
 			// something from frame 1, then fills it if the device opens.
 			await initCameraChannel()
 		}
+		if (!THUMB_MODE) initLive()
 		if (config.common) toy.setCommon(config.common)
 		const p = config.passes || {}
 		if (p.bufferA) toy.setBufferA(passConfig(p.bufferA))
@@ -466,6 +464,7 @@
 			updateAudio()
 			if (cameraFeed) cameraFeed.update()
 			if (beatFeed) beatFeed.update()
+			if (liveClock) liveClock.frame()
 		})
 		toy.play()
 	}

@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-789 live WOs (29 open, 124 in progress, 636 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+789 live WOs (28 open, 125 in progress, 636 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -128,7 +128,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 574 IN PROGRESS [engine+amcp] Multi-screen take (preset ▶ / global take) starts the screens at different times → 574_WO_MULTI_SCREEN_TAKE_SYNC_BARRIER.md
 - 576 DONE [engine+web-client] look clip start point two options → 576_WO_look_clip_start_point_two_options.md
 - 577 DONE [engine+web-client] shader live key controls → 577_WO_shader_live_key_controls.md
-- 580 OPEN [engine] Shader Live: speed changes without a phase jump + smooth (gliding) param changes → 580_WO_shader_live_seamless_speed_and_smooth_params.md
+- 580 IN PROGRESS [engine] Shader Live: speed changes without a phase jump + smooth (gliding) param changes → 580_WO_shader_live_seamless_speed_and_smooth_params.md
 - 581 DONE [engine+amcp] Playlist look taken to PGM always starts on item 1, not the item set in preview → 581_WO_playlist_take_starts_on_set_item.md
 - 582 IN PROGRESS [engine+amcp] relative start moves loop point → 582_WO_relative_start_moves_loop_point.md
 - 583 DONE [engine+mapping] Edge strip: live param edits without restarting the animation + alternating str… → 583_WO_edge_strip_live_edits_and_alternating_colors.md
