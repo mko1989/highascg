@@ -17,6 +17,7 @@ const Probes := preload("res://features/visuals/visuals_probes.gd")
 const ShowCtl := preload("res://features/visuals/visuals_show_ctl.gd")
 const ShaderMode := preload("res://features/visuals/visuals_shader_mode.gd")
 const CamCtl := preload("res://features/visuals/visuals_camera_ctl.gd")
+const Dj := preload("res://features/visuals/visuals_dj.gd")
 const Publisher := preload("res://features/shm_out/viewport_publisher.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const AUDIO_STALE_MS := 1000
@@ -50,6 +51,7 @@ var _shader_cache := {}  # WO-877: id → config, so a look's shader is ready be
 var show_ctl: ShowCtl  # WO-877/878: looks, autopilot, master, show keys
 var cam_ctl: CamCtl  # WO-896: the 3D view's orbit → the output camera ("Drive output"), saved per look
 var midi: Node  # WO-900: visuals_midi.gd
+var dj: Dj  # WO-908: A/B banks (the PRV view and the bar under the canvas)
 
 
 func _ready() -> void:
@@ -62,9 +64,9 @@ func _ready() -> void:
 	_canvas.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_canvas.custom_minimum_size.y = 240
 	_canvas.tooltip_text = "The visual's output — drop a visual from Sources ▸ Visuals here: a new layer on top (Shift: replaces the selected layer); Send (Inspector) puts it on the screen"
-	_canvas.set_drag_forwarding(Callable(), func(_at: Vector2, data: Variant) -> bool: return Catalog.parse(data) != null,
-		func(_at: Vector2, data: Variant) -> void: drop_visual(data, _target() if Input.is_key_pressed(KEY_SHIFT) else -1))
-	add_child(_canvas)
+	dj = Dj.new(self)  # (its drop targets: the canvas and the PRV view)
+	add_child(dj)
+	add_child(dj.wrap(_canvas))
 	add_to_group("visuals_canvas")  # WO-885: Sources ▸ Visuals double-click
 	work = WorkArea.new()
 	add_child(work)
@@ -97,7 +99,7 @@ func _ready() -> void:
 		sel = i
 		_orbit_world())
 	page.visual_dropped.connect(drop_visual)
-	page.burst_pressed.connect(func() -> void: scene.fire())
+	page.burst_pressed.connect(func() -> void: mixer.deck_of(mixer.air()).fire())  # WO-908: on the canvas
 	show_ctl = ShowCtl.new(self)
 	add_child(show_ctl)
 	work.add_mode("playlist", "Visual playlist", show_ctl.plist.panel, ShowCtl.PlaylistCtl.HINT)  # WO-895
@@ -184,6 +186,7 @@ func _load() -> void:
 	slice = M.slice_of(_project())
 	flow.set_graph(slice.graph)
 	show_ctl.from_slice()
+	dj.from_slice()
 	_go(false)
 	page.set_state(slice, _cm())
 	_resize()
@@ -325,6 +328,7 @@ func _process(delta: float) -> void:
 	_trace.clear()
 	var buses: Dictionary = Sync.apply(_sync_state, _buses, slice.sync, Time.get_ticks_msec()) if live else M.buses_of(null)
 	scene.params = M.evaluate(slice.graph, buses, slice.params, _env, delta, _trace)
+	dj.step(buses, delta)
 	mixer.step(delta)
 	show_ctl.step(delta)
 	if work.mode == "flow" and is_visible_in_tree():

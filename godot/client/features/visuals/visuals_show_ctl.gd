@@ -47,7 +47,7 @@ func audio(d: Variant) -> void:
 func step(delta: float) -> void:
 	var next := Auto.step(_st, plist.auto_cfg(tab.slice.auto), _live_beat(), _drop_n, delta * 1000.0, showing, looks.size())
 	if next >= 0:
-		recall(next)
+		recall(next, true)
 	plist.step(_live_beat(), _drop_n, delta * 1000.0)
 
 
@@ -125,17 +125,21 @@ func status() -> void:
 	tab.page.show_panel.set_auto_note(" · ".join(parts))
 
 
-## WO-877: look `i` on stage with the fade (its scenes, shader, game, parameters and Flow).
-func recall(i: int) -> void:
+## WO-877: look `i` on stage with the fade (its scenes, shader, game, parameters and Flow). WO-908 A/B: into the PRV
+## bank; `take` (the autopilot) then crossfades to it.
+func recall(i: int, take := false) -> void:
 	if i < 0 or i >= looks.size():
 		return
+	tab.dj.to_prv()
 	showing = i
 	tab.slice = Looks.apply(tab.slice, looks[i])
 	tab.flow.set_graph(tab.slice.graph)
 	tab.page.set_state(tab.slice, tab._cm())
 	tab.page.show_panel.set_looks(looks, i)
 	tab._store()
-	tab._go(true)
+	await tab._go(true)
+	if take:
+		tab.dj.take()
 
 
 func _looks_changed() -> void:
@@ -154,7 +158,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if i >= 0 and i < looks.size():
 		pick(i)
 	elif k.keycode == KEY_SPACE:
-		tab.scene.fire()
+		tab.mixer.deck_of(tab.mixer.air()).fire()
 	elif k.keycode == KEY_B:
 		tab.mixer.blackout = not tab.mixer.blackout
 		tab.page.show_panel.set_state(tab.slice.fade, tab.mixer.level, tab.mixer.blackout, tab.slice.auto)

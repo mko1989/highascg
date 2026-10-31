@@ -7,8 +7,8 @@ extends RefCounted
 ## the faders and knobs send absolute 7-bit values there, no init sysex needed).
 
 const ANY := -1
-const RANGES := ["layer", "master", "fade", "param"]  # continuous targets (a slider; picked up, midi_pickup.gd)
-const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto"]
+const RANGES := ["layer", "master", "fade", "param", "xfade"]  # continuous targets (a slider; picked up, midi_pickup.gd)
+const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut"]  # take / cut / xfade: WO-908 A/B
 const PARAM_LABELS := {"cam_yaw": "Camera yaw", "cam_pitch": "Camera pitch", "cam_zoom": "Camera zoom"}
 
 
@@ -103,6 +103,12 @@ static func target_label(target: String) -> String:
 			return "Tempo: Audio"
 		"auto":
 			return "Auto on/off"
+		"xfade":
+			return "A/B crossfader"
+		"take":
+			return "A/B AUTO"
+		"cut":
+			return "A/B CUT"
 	return target.capitalize()
 
 
@@ -160,4 +166,5 @@ static func apc40() -> Array:
 	m.append({"kind": "note", "ch": ANY, "num": 84, "target": "audio"})  # scene launch 3
 	m.append({"kind": "note", "ch": ANY, "num": 99, "target": "tap"})  # tap tempo
 	m.append({"kind": "note", "ch": ANY, "num": 81, "target": "blackout"})  # stop all clips
+	m.append({"kind": "cc", "ch": ANY, "num": 15, "target": "xfade"})  # WO-908: the crossfader → A/B banks
 	return m

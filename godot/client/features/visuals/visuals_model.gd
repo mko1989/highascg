@@ -203,6 +203,7 @@ static func slice_of(project: Variant) -> Dictionary:
 		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0), "layers": layers, "scene": c.scene, "overlay": c.overlay,
 		"shader": c.shader, "game": c.game, "fade": clampf(_num(d.get("fade", 1.0)), 0.0, 10.0),
 		"playlists": d.get("playlists") if d.get("playlists") is Array else [],  # WO-895: raw, like looks (visuals_playlist.gd normalize)
+		"dj": d.get("dj") if d.get("dj") is Dictionary else {},  # WO-908: raw, visuals_dj.gd normalizes
 		"looks": d.get("looks") if d.get("looks") is Array else [], "auto": Auto.cfg_of(d.get("auto")), "camera": Cam.normalize(d.get("camera"))}
 
 

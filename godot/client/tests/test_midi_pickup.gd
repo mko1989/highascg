@@ -155,6 +155,7 @@ func test_apc40_map() -> void:
 	t.eq([MM.find(m, MM.decode(note(0, 82, 127))).target, MM.find(m, MM.decode(note(0, 83, 127))).target,
 		MM.find(m, MM.decode(note(0, 84, 127))).target, MM.find(m, MM.decode(note(0, 99, 127))).target,
 		MM.find(m, MM.decode(note(0, 81, 127))).target], ["burst", "auto", "audio", "tap", "blackout"], "scene launch, tap, stop all")
+	t.eq(MM.find(m, MM.decode(cc(0, 15, 0))).target, "xfade", "the crossfader → the A/B banks (WO-908)")
 	t.eq([MM.describe(MM.decode(cc(2, 7, 0)), true), MM.describe(MM.decode(note(0, 32, 1)), true), MM.describe(MM.decode(note(0, 0, 1)), true),
 		MM.describe(MM.decode(cc(0, 14, 0)), true), MM.describe(MM.decode(cc(2, 7, 0)))],
 		["Fader 3", "Pad 1·1", "Pad 5·1", "Master fader", "CC 7 · ch 3"], "names: the APC's own, else CC / channel")

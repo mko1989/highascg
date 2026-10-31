@@ -67,7 +67,7 @@ func auto_changed() -> void:
 		_ran = id
 		var pl: Variant = running()
 		if pl != null and P.current(pl) != null:
-			_show(P.current(pl))
+			_show(P.current(pl), true)
 		_mark(true)
 	_show_ui()
 
@@ -88,7 +88,7 @@ func step(beat: Variant, drop_n: int, dt_ms: float) -> void:
 		return
 	if P.hold_done(hold, P.current(pl), beat, drop_n, dt_ms):
 		_put(P.next(pl, rng))
-		_show(P.current(running()))
+		_show(P.current(running()), true)
 		_mark(true)
 		_show_ui()
 
@@ -134,9 +134,11 @@ func _put(pl: Dictionary) -> void:
 	ctl.tab.slice.playlists = playlists
 
 
-## An entry's picture on stage with the fade, like a look recall (the stored look it equals lights up).
-func _show(e: Dictionary) -> void:
+## An entry's picture on stage with the fade, like a look recall (the stored look it equals lights up). WO-908 A/B: into
+## the PRV bank; `take` (a running playlist) crossfades to it, a double-click only prepares it.
+func _show(e: Dictionary, take := false) -> void:
 	var tab: Node = ctl.tab
+	tab.dj.to_prv()
 	tab.slice = P.apply(tab.slice, e)
 	tab.slice.playlists = playlists
 	ctl.showing = Looks.showing(Looks.normalize(ctl.looks), tab.slice)  # entries are normalized; a just-saved look is raw
@@ -144,7 +146,9 @@ func _show(e: Dictionary) -> void:
 	tab.page.set_state(tab.slice, tab._cm())
 	tab.page.show_panel.set_looks(ctl.looks, ctl.showing)
 	tab._store()
-	tab._go(true)
+	await tab._go(true)
+	if take:
+		tab.dj.take()
 
 
 ## The running position is known now; `restart` (or a position that moved) starts the hold over.

@@ -170,12 +170,14 @@ func control_of(target: String) -> Control:
 			return tab.page.control(target)
 		"look":
 			return tab.page.show_panel.look_button(n)
+		"xfade", "take", "cut":  # WO-908: only while A/B is on
+			return tab.dj.control(p[0])
 	return tab.page.show_panel.control(target)
 
 
 ## Every target Learn / Unmap can click.
 static func targets() -> Array:
-	var out_ := ["master", "fade", "burst", "tap", "audio", "blackout", "auto"]
+	var out_ := ["master", "fade", "burst", "tap", "audio", "blackout", "auto", "xfade", "take", "cut"]
 	for p in M.PARAMS:
 		out_.append("param:" + p)
 	for i in 8:
