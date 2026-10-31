@@ -11,7 +11,8 @@
  * (per-shader flash / bump, applied around mainImage in the Image pass only), setBeat() to feed them and
  * addTime() for the "kick" knob (iTime surges on the beat). Marked "WO-662 patch" below.
  *
- * LOCAL PATCH (WO-580): addTime() also takes a negative step (player-live.js runs iTime slower than real time).
+ * LOCAL PATCH (WO-580): addTime() also takes a negative step (player-live.js runs iTime slower than real time);
+ * setGlide() / compiled() for the parameter glide (float uniform arrays set every draw, a compile check).
  */
 function ShaderToyLite(canvasId) {
 
@@ -104,6 +105,7 @@ function ShaderToyLite(canvasId) {
     var iFrame = 0;
     var iMouse = {x: 0, y: 0, clickX: 0, clickY: 0};
     var beatU = {iBeat: [0, 0, 0, 0], iAudioBands: [0, 0, 0, 0], iBeatFx: [0, 0, 0, 0]}; // WO-662 patch
+    var glideU = {}; // WO-580 patch: name → Float32Array, uniform float arrays the player eases
     var noFx = new Float32Array(4);
     
     // shader common source 
@@ -230,6 +232,7 @@ function ShaderToyLite(canvasId) {
         }
     
         // uniform locations
+        location[key]["glide"]              = {}; // WO-580 patch: glide array locations, looked up on first draw
         location[key]["iResolution"]        = gl.getUniformLocation(program, "iResolution");
         location[key]["iTime"]              = gl.getUniformLocation(program, "iTime");
         location[key]["iTimeDelta"]         = gl.getUniformLocation(program, "iTimeDelta");
@@ -363,6 +366,11 @@ function ShaderToyLite(canvasId) {
                 gl.uniform4fv(location[key]["iBeat"], beatU.iBeat);             // WO-662 patch
                 gl.uniform4fv(location[key]["iAudioBands"], beatU.iAudioBands); // WO-662 patch
                 gl.uniform4fv(location[key]["iBeatFx"], key === "Image" ? beatU.iBeatFx : noFx);
+                for (const n in glideU) { // WO-580 patch
+                    const g = location[key]["glide"];
+                    if (!(n in g)) g[n] = gl.getUniformLocation(program[key], n);
+                    if (g[n]) gl.uniform1fv(g[n], glideU[n]);
+                }
     
                 // viewport
                 gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -446,6 +454,10 @@ function ShaderToyLite(canvasId) {
         beatU.iAudioBands = new Float32Array(bands);
         beatU.iBeatFx = new Float32Array(fx);
     }
+
+    // WO-580 patch: the glide's uniform arrays (null removes one) and whether a pass (or every pass) compiled.
+    this.setGlide = (name, values) => { if (values) glideU[name] = values; else delete glideU[name]; }
+    this.compiled = (key) => key ? program[key] != null : ['A', 'B', 'C', 'D', 'Image'].every((k) => !sourcecode[k] || program[k] != null);
 
     // WO-662 patch: push iTime forward by `sec` (the beat "kick"); play() keeps the offset.
     // WO-580 patch: or back (a slower clock rate — the caller keeps the step above -iTimeDelta).

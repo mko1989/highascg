@@ -2,7 +2,8 @@
 
 **Area:** engine
 **Status: IN PROGRESS** (2026-10-31: phase A — Speed × rides the player's eased clock rate — implemented and
-proven offline (§2.3, §3); on-box check waits for the service. Phase B — eased non-time params — open.)
+proven offline (§2.3, §3); phase B — literal-only edits glide through uniforms — implemented and proven in headless
+Chrome WebGL2 over the shader library (§2.4, §3); on-air checks wait for the service.)
 
 Source: owner, `work/archive/todos/todos25.09.26` (on show):
 > why does scroll value changes does not register to output in shaders editor. only update after
@@ -100,11 +101,49 @@ Not changed: the web editor (`client/components/shader-controls-panel.js`) still
 posts `/api/shader-live/push` — the Godot Shader Live panel (the show client) goes through the ops. A new take of the
 shader starts at rate 1 (as a mixer ride does).
 
+### 2.4 Phase B — the glide, in the player (2026-10-31)
+§2.2 put the literal → uniform rewrite in the export and a new `{ params }` CG UPDATE shape. Done in the player
+instead, nothing on the node or in the export changes: the node keeps sending the rewritten source (`{ passes }` /
+`{ common }`, every op, wiggle and preset alike) and `template/shaders/player-live.js` `createGlide` decides per update:
+- `diff(running, incoming)`: the same text between the float literals (comments included) → the changed literal
+  indices; anything else → null. Floats only (`1.5`, `.25`, `2.`, `1e2`): an int edit is structural.
+- `eligible`: inside a function body, not in a `const` declaration (GLSL needs constant initialisers there, globals
+  too). A `#define` value only when every use of the macro is eligible, through macros in macros (`TAU (2.0*PI)`):
+  the first library sweep put `#define PI` (used in a global `const`) into a uniform → 7 of 184 shaders failed the
+  variant compile (the hard fallback caught it, at the cost of a second compile); with the use check, none.
+- Changed literals that already have a slot → new targets only, NO compile (a slider drag or wheel burst after the
+  first step). New ones → one compile of the incoming source with every slotted literal as `_hgG_<pass>[slot]`
+  (`uniform float _hgG_<pass>[32]` on top), the new slots starting at their old values.
+- Per frame (`frame(dt)` from the existing liveClock call) the slots ease to their targets (τ 0.35 s, dt ≤ 0.1 s).
+- Hard path = exactly the old behaviour (`toy.setImage` / `setCommon` with the plain source, glide array dropped): a
+  structural or comment edit, an ineligible literal, more than 32 slots, or a variant that does not compile
+  (`toy.compiled()`).
+- `config` (what player.js re-reads) always holds the plain source.
+`template/shaders/ShaderToyLite.js` WO-580 patch: `setGlide(name, Float32Array|null)`, `compiled(key?)`, and every draw
+sets each glide array on each pass program (`uniform1fv`; locations cached per compile in `location[key].glide`).
+`template/shaders/player.js`: `window.update` → `liveClock.apply(data)` first (false = player-live not loaded → the old
+`applyLiveSourceUpdate`); `create()` gets `config` and `passConfig`.
+
 ## 3. What was verified
 - §1.1/§1.2 from source reading + the journal lines above (read-only on the live box).
 - §2.1: build clean, `_wheelApply` present in `dist-web/assets/main-*.js`. Owner confirmed after
   kiosk reload that wheel changes now reach the output (then reported the §1.2 jump).
-- §2.2: phase B (eased non-time params) — OPEN.
+- §2.4 phase B (2026-10-31), offline:
+  - Smoke (same file) 6/6: literal parsing (floats only; comments, ints and `vec2` digits skipped), diff (a structural
+    or comment edit → null), eligibility (const / global / macro-in-const no; function body / macro used in functions
+    yes), the variant source, and the glide state machine against a fake toy: one compile for the first edit, NO
+    compile for a drag on the same literal, ≈63 % after τ, a second literal adds a slot while slot 0 keeps its value,
+    const edit / failed variant / > 32 literals → the plain source, common gets `_hgG_common`.
+  - Headless Chrome 150 WebGL2 (SwiftShader) with the patched ShaderToyLite, read back from the canvas every frame:
+    `float a = 0.2` → 0.8 rises 51 → 169 (of 204) in ~0.5 s after ONE compile, the drag to 0.4 eases back down with
+    zero compiles, a `#define` value glides, a const edit and a structural edit take the hard path (compile count 4 in
+    all, as designed).
+  - `tools/dev/shader-glide-sweep.js` over the 184 exported library shaders, through the real player.js
+    `window.update`: up to 32 eligible literals per pass changed, then changed again: 184 / 184 with no compile error
+    (7 failed before the macro use check; 3 needed a longer page load in the sweep, re-run clean).
+  - Related smokes (wo266/268/333/344/376/606/662/811/875, alpha+audio binding) 122/122.
+- On air (Caspar's CEF): NOT yet — the service is down. To do: drag a Shader Live slider on a PGM shader and watch it
+  glide; wheel a value; Randomize; a structural edit in the web editor still recompiles as before.
 - §2.3 (2026-10-31), offline: `tools/smoke/smoke-wo580-shader-live-speed.test.js` 3/3 — the clock eases (≈63 % after
   τ, snaps), 20 min on air then Speed 1 → 0.5 → 4 → 0.05: every frame's iTime step stays within dt × [0.05, 10] and
   equals the current rate's step (no jump); the `macro:speed` op sends exactly one `{"timeScale":0.5}` CG UPDATE and

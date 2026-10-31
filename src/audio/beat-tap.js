@@ -66,7 +66,16 @@ function createTapTempo() {
 			if (active && t >= anchor) {
 				const k = Math.floor((t - anchor) / period)
 				const age = t - anchor - k * period
-				src = { ...det, n: base + k, age: Math.round(age), bpm: Math.round(600000 / period) / 10, conf: 1, phase: Math.round((age / period) * 1000) / 1000, locked: true, tap: true }
+				src = {
+					...det,
+					n: base + k,
+					age: Math.round(age),
+					bpm: Math.round(600000 / period) / 10,
+					conf: 1,
+					phase: Math.round((age / period) * 1000) / 1000,
+					locked: true,
+					tap: true,
+				}
 			}
 			const key = src === det ? 'det' : 'tap'
 			if (outN == null) outN = src.n

@@ -59,7 +59,7 @@
 				if (beatFeed) beatFeed.setFx(data.beat)
 			}
 			if (data.common != null || (data.passes && typeof data.passes === 'object')) {
-				applyLiveSourceUpdate(data)
+				if (!(liveClock && liveClock.apply(data))) applyLiveSourceUpdate(data) // WO-580 B: literal-only edits glide
 			}
 		} catch {
 			/* malformed update payloads are ignored */
@@ -364,11 +364,11 @@
 		document.head.appendChild(el)
 	}
 
-	/* WO-580 — the eased clock rate (Speed ×). Missing file → iTime at real time, as before. */
+	/* WO-580 — the eased clock rate (Speed ×) and the parameter glide. Missing file → as before. */
 	function initLive() {
 		const el = document.createElement('script')
 		el.src = 'player-live.js'
-		el.onload = () => (liveClock = window.__SHADERFX_LIVE__ ? window.__SHADERFX_LIVE__.create({ toy, target: () => timeScale }) : null)
+		el.onload = () => (liveClock = window.__SHADERFX_LIVE__ ? window.__SHADERFX_LIVE__.create({ toy, target: () => timeScale, config, passConfig }) : null)
 		document.head.appendChild(el)
 	}
 

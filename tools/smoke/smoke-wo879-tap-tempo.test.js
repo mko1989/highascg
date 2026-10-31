@@ -36,9 +36,17 @@ test('taps set the tempo, the beat follows them, n counts on', () => {
 	const st = tt.tap(1500)
 	assert.deepEqual(st, { tap: true, bpm: 120, taps: 2 }, 'two taps 500 ms apart → 120 BPM')
 	const first = tt.merge(det(4), 1510)
-	assert.deepEqual([first.n, first.locked, first.tap, first.bpm, first.level], [5, true, true, 120, 0.7], 'the second tap is a beat')
+	assert.deepEqual(
+		[first.n, first.locked, first.tap, first.bpm, first.level],
+		[5, true, true, 120, 0.7],
+		'the second tap is a beat'
+	)
 	const { beats, out } = run(tt, 1543, 5010)
-	assert.deepEqual(beats.map((b) => b.d), [1, 1, 1, 1, 1, 1, 1], 'one beat per 500 ms, never two at once')
+	assert.deepEqual(
+		beats.map((b) => b.d),
+		[1, 1, 1, 1, 1, 1, 1],
+		'one beat per 500 ms, never two at once'
+	)
 	for (const b of beats) assert.ok(b.age < 34, 'each beat lands within a frame of the grid')
 	assert.equal(out.n, 12)
 	const m = createTapTempo()
@@ -64,7 +72,14 @@ test('a single later tap re-phases without a double beat; a bounce is ignored; a
 	const on = tt.merge(det(4), 5281)
 	assert.deepEqual([on.n, on.age], [before + 1, 1], 'the beat is on the tap')
 	r = run(tt, 5281, 6300)
-	assert.deepEqual(r.beats.map((x) => [Math.abs(x.t - 5780) < 34 || Math.abs(x.t - 6280) < 34, x.d]), [[true, 1], [true, 1]], 'then 5780, 6280')
+	assert.deepEqual(
+		r.beats.map((x) => [Math.abs(x.t - 5780) < 34 || Math.abs(x.t - 6280) < 34, x.d]),
+		[
+			[true, 1],
+			[true, 1],
+		],
+		'then 5780, 6280'
+	)
 	assert.deepEqual(tt.tap(5320), { tap: true, bpm: 120, taps: 1 }, 'a bounce (< 125 ms after a tap) is not a tap')
 	tt.auto()
 	assert.equal(tt.state().tap, false)
@@ -93,10 +108,20 @@ test('a gap of more than 2 s starts a new tempo; limits', () => {
 test('the engine, route and Godot client carry it', () => {
 	const src = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8')
 	const eng = src('src/audio/audio-capture-fft.js')
-	assert.equal((eng.match(/beat: tapTempo\.merge\(beat\.snapshot\(\), Date\.now\(\)\)/g) || []).length, 2, 'both frame paths')
+	assert.equal(
+		(eng.match(/beat: tapTempo\.merge\(beat\.snapshot\(\), Date\.now\(\)\)/g) || []).length,
+		2,
+		'both frame paths'
+	)
 	assert.match(eng, /if \(staleFrameSent && !tapTempo\.state\(\)\.tap\) return/)
-	assert.match(src('src/api/router.js'), /routes\.post\('\/api\/audio\/tap', \(\{ body, ctx \}\) => routesAudioParts\.handleTap\(ctx, parseBody\(body\)\)/)
-	assert.match(src('src/bootstrap/audio-capture-lifecycle.js'), /appCtx\.audioTap = \(b\) => \(engine \? engine\.tap\(b\) : null\)/)
+	assert.match(
+		src('src/api/router.js'),
+		/routes\.post\('\/api\/audio\/tap', \(\{ body, ctx \}\) => routesAudioParts\.handleTap\(ctx, parseBody\(body\)\)/
+	)
+	assert.match(
+		src('src/bootstrap/audio-capture-lifecycle.js'),
+		/appCtx\.audioTap = \(b\) => \(engine \? engine\.tap\(b\) : null\)/
+	)
 	const R = require('../../src/api/routes-audio-parts-capture')
 	assert.equal(R.handleTap({}, {}).status, 503, 'no capture → 503')
 	const got = []
@@ -104,13 +129,20 @@ test('the engine, route and Godot client carry it', () => {
 	assert.equal(res.status, 200)
 	assert.deepEqual(JSON.parse(res.body), { ok: true, tap: false, bpm: 0, taps: 1 })
 	assert.deepEqual(got, [{}])
-	assert.match(src('godot/client/features/visuals/visuals_show_ctl.gd'), /api\.post_json\("\/api\/audio\/tap", \{"auto": true\} if auto else \{\}\)/)
+	assert.match(
+		src('godot/client/features/visuals/visuals_show_ctl.gd'),
+		/api\.post_json\("\/api\/audio\/tap", \{"auto": true\} if auto else \{\}\)/
+	)
 })
 
 test('engine: a tapped beat keeps coming on silent frames', async () => {
 	const { createAudioCaptureFft, normalizeAudioCaptureConfig } = require('../../src/audio/audio-capture-fft')
 	const frames = []
-	const config = { ...normalizeAudioCaptureConfig({ audioCapture: { emitHz: 60 } }), source: 'slot', udpPort: 40000 + Math.floor(Math.random() * 20000) }
+	const config = {
+		...normalizeAudioCaptureConfig({ audioCapture: { emitHz: 60 } }),
+		source: 'slot',
+		udpPort: 40000 + Math.floor(Math.random() * 20000),
+	}
 	const eng = createAudioCaptureFft({ config, onFrame: (f) => frames.push(f), log: () => {} })
 	eng.start()
 	try {
