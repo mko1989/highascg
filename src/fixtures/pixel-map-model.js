@@ -6,7 +6,9 @@
  * fixture. Pure.
  *
  *   pixelMappings: [{ id, enabled (default true), fixtureId (a patch id, follow-patch.js), pixel (1-based),
- *                     channelNo (Caspar channel), rect { x, y, w, h } (channel pixels), mode "average" | "point",
+ *                     channelNo (Caspar channel), role? (WO-915: bus pgmN / prvN — the mapping samples whichever channel
+ *                     the bus is on now; channelNo is then derived), rect { x, y, w, h } (channel pixels),
+ *                     mode "average" | "point",
  *                     colourOrder "auto" | letters of r g b w a c m y (one per DMX channel of the pixel, DMX order) }]
  *
  * Pixels of a fixture come from its GDTF mode (`fx.gdtf.channels`, gdtf-patch.js applyType): every geometry that carries
@@ -62,6 +64,24 @@ function slotsOf(fx, px) {
 }
 
 const int = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : NaN)
+const BUS_RE = /^(pgm|prv)[1-4]$/
+
+/** Surface role → Caspar channel through the channel map (pgmN / prvN = that bus's channel, chN = N), or null. */
+function channelForRole(role, map) {
+	const m = /^(pgm|prv|ch)(\d+)$/.exec(String(role || ''))
+	if (!m) return null
+	const n = Number(m[2])
+	if (m[1] === 'ch') return n > 0 ? n : null
+	const ch = Number((m[1] === 'pgm' ? map?.programChannels : map?.previewChannels)?.[n - 1])
+	return ch > 0 ? ch : null
+}
+
+/** WO-915: a bus-bound mapping (role pgmN / prvN) on the channel its bus has in `map` now (0 = the bus has none). */
+function bindRole(m, map) {
+	if (!m.role) return m
+	const ch = channelForRole(m.role, map) || 0
+	return ch === m.channelNo ? m : { ...m, channelNo: ch }
+}
 
 /** One raw entry → a normalized mapping (types coerced; validity is checkMapping's job). */
 function normalizeMapping(raw, i) {
@@ -74,6 +94,7 @@ function normalizeMapping(raw, i) {
 		fixtureId: String(o.fixtureId ?? ''),
 		pixel: int(o.pixel ?? 1),
 		channelNo: int(o.channelNo),
+		...(BUS_RE.test(String(o.role || '')) ? { role: String(o.role) } : {}),
 		rect: { x: int(r.x ?? 0), y: int(r.y ?? 0), w: int(r.w), h: int(r.h) },
 		mode: MODES.includes(o.mode) ? o.mode : o.mode == null ? 'average' : String(o.mode),
 		colourOrder: order || 'auto',
@@ -113,6 +134,7 @@ function checkMapping(m, { fixtures, resolutionOf }) {
 			return fail(`colourOrder "${m.colourOrder}" has ${m.colourOrder.length} letters, pixel ${m.pixel} has ${px.channels.length} channels`)
 		}
 	}
+	if (m.role && !(m.channelNo >= 1)) return fail(`bus ${m.role} has no Caspar channel`)
 	if (!(m.channelNo >= 1 && m.channelNo <= 99)) return fail(`channelNo ${m.channelNo} is not 1…99`)
 	const res = resolutionOf(m.channelNo)
 	if (!res) return fail(`channel ${m.channelNo} is not running in Caspar`)
@@ -135,6 +157,12 @@ function validateMappings(list, env) {
 	const targets = new Map()
 	const mappings = list.map((raw, i) => {
 		const m = normalizeMapping(raw, i)
+		if (m.role && env.channelMap) {
+			// WO-915: no channel → the bus's; another channel than the bus's current one = an operator's move off the bus
+			const ch = channelForRole(m.role, env.channelMap)
+			if (!Number.isInteger(m.channelNo)) m.channelNo = ch || 0
+			else if (ch !== m.channelNo) delete m.role
+		}
 		if (ids.has(m.id)) errors.push({ index: i, id: m.id, error: `duplicate id "${m.id}"` })
 		ids.add(m.id)
 		const { problem } = checkMapping(m, env)
@@ -179,5 +207,5 @@ function writePixel(buf, fx, px, rgb, order = 'auto') {
 	return out
 }
 
-module.exports = { MAX_MAPPINGS, compOf, pixelsOf, slotsOf, normalizeMapping, normalizeMappings, checkMapping,
-	validateMappings, componentValues, writePixel }
+module.exports = { MAX_MAPPINGS, compOf, pixelsOf, slotsOf, channelForRole, bindRole, normalizeMapping, normalizeMappings,
+	checkMapping, validateMappings, componentValues, writePixel }

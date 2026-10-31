@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 701,
+	"count": 700,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -462,7 +462,6 @@
 		"src/fixtures/gdtf-share-match.js: SURE_COVERAGE",
 		"src/fixtures/pixel-map-model.js: MAX_MAPPINGS",
 		"src/fixtures/pixel-map-model.js: compOf",
-		"src/fixtures/pixel-map-model.js: normalizeMapping",
 		"src/fixtures/pixel-map-propose.js: edgeDistance",
 		"src/fixtures/pixel-map-propose.js: nearestEdge",
 		"src/fixtures/pixel-map-propose.js: toLocal",

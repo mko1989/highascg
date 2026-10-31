@@ -21,7 +21,7 @@
  */
 
 const { onProjectChanged } = require('../engine/project-events')
-const { normalizeMappings, checkMapping, validateMappings, writePixel, slotsOf } = require('./pixel-map-model')
+const { normalizeMappings, checkMapping, validateMappings, writePixel, slotsOf, bindRole } = require('./pixel-map-model')
 const { createRegionSampler, peekSeq } = require('./pixel-map-frame')
 const smoothing = require('./pixel-map-smooth')
 
@@ -29,9 +29,12 @@ const LEASE_ID = 'wo807-pixelmap'
 const LEASE_EVERY_MS = 5000
 const HOLD_MS = 1000
 // sampling idles while no mapped head is on the wire (DMX master off, universe not listed, visualiser) unless a /live
-// reader (the Godot editor's swatches, 2 Hz) asked within WATCH_MS — 896 strips cost ~5 ms per frame on the box
+// reader (the Godot editor's swatches, 2 Hz) or the previs drawing the rig (WO-915, visual()) asked within WATCH_MS —
+// 896 strips cost ~5 ms per frame on the box
 const WATCH_MS = 5000
 const WATCH_POLL_MS = 3
+// WO-915: looked at with nothing on the wire → this often is enough for the eye (896 strips at 48/s took ~33 % of a core)
+const WATCH_SAMPLE_MS = 100
 
 /** Default channel map (as video-surfaces.js resolves roles): program / preview lists + the channels Caspar runs. */
 function liveChannelMap(ctx) {
@@ -81,8 +84,9 @@ function createPixelMapService(ctx, engine, deps = {}) {
 	let watchedAt = -Infinity
 	// a head whose universe the engine has not built yet (before its first tick) counts as on the wire
 	const onWire = (fx) => (typeof engine.frameOf === 'function' && !engine.frameOf(fx)) || engine.isLive(fx)
-	const wanted = (t) => t - watchedAt < WATCH_MS || typeof engine.isLive !== 'function' ||
-		[...resolved.byFixture.values()].some((list) => onWire(list[0].fx))
+	const onAir = () => typeof engine.isLive !== 'function' || [...resolved.byFixture.values()].some((list) => onWire(list[0].fx))
+	const wanted = (t) => t - watchedAt < WATCH_MS || onAir()
+	let sampledAt = -Infinity
 
 	const resolutionIn = (map) => (ch) => {
 		const r = map?.channelResolutionsByChannel?.[String(ch)]
@@ -99,7 +103,10 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		if (!recheck && resolved.forFixtures === engine.fixtures && resolved.forMappings === mappings) return resolved
 		const map = channelMap()
 		const env = { fixtures: engine.fixtures, resolutionOf: resolutionIn(map) }
-		const list = mappings.map((m) => ({ m, ...checkMapping(m, env) }))
+		const list = mappings.map((raw) => {
+			const m = bindRole(raw, map) // WO-915: a bus-bound mapping samples the bus's channel of now
+			return { m, ...checkMapping(m, env) }
+		})
 		const byFixture = new Map()
 		for (const r of list) {
 			if (!r.m.enabled || r.problem) continue
@@ -219,6 +226,8 @@ function createPixelMapService(ctx, engine, deps = {}) {
 			stepAt = null
 			return
 		}
+		if (t - sampledAt < WATCH_SAMPLE_MS && !onAir()) return smoothStep(t) // WO-915: only looked at
+		sampledAt = t
 		const t0 = process.hrtime.bigint()
 		for (const s of surfaces.values()) {
 			let res
@@ -260,9 +269,14 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		return res.list.map((r) => ({ ...r.m, problem: r.problem }))
 	}
 
+	/** Someone looks at the mapped colours (the editor's /live, WO-915: the previs drawing the rig) → sample WATCH_MS more. */
+	function watch(t = now()) {
+		watchedAt = t
+	}
+
 	/** GET /api/fixtures/pixelmap/live */
 	function live(t = now()) {
-		watchedAt = t
+		watch(t)
 		const res = resolve()
 		return {
 			at: t,
@@ -289,7 +303,8 @@ function createPixelMapService(ctx, engine, deps = {}) {
 	 * keys written in the same project write (the edge proposal's accept drops `pixelMappingProposal` with it).
 	 */
 	async function set(list, { extra } = {}) {
-		const check = validateMappings(list, { fixtures: engine.fixtures, resolutionOf: resolutionIn(channelMap()) })
+		const map = channelMap()
+		const check = validateMappings(list, { fixtures: engine.fixtures, resolutionOf: resolutionIn(map), channelMap: map })
 		if (!check.ok) return check
 		const persist = deps.persist || ((ms, ex) => persistToProject(ctx, ms, ex))
 		await persist(check.mappings, extra)
@@ -329,6 +344,7 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		settings: getSettings,
 		setSettings,
 		live,
+		watch,
 		mappings: view,
 		resolutionOf,
 		stop() {

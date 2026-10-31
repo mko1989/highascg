@@ -74,9 +74,10 @@ function normalizeOptions(o = {}) {
 /**
  * An led_wall stage object bound to channel `channelNo` (raster { w, h }) → the wall, or null.
  * @param {object} o project.previs.stage.objects entry
- * @param {{ channelNo: number, raster: { w: number, h: number } | null }} bind
+ * @param {{ channelNo: number, raster: { w: number, h: number } | null, role?: string }} bind role: the wall's bus (pgmN /
+ *   prvN) — its mappings carry it (WO-915) and keep sampling the bus when its channel number changes
  */
-function wallOf(o, { channelNo, raster } = {}) {
+function wallOf(o, { channelNo, raster, role } = {}) {
 	if (!o || o.type !== 'led_wall' || !(channelNo > 0) || !raster || !(raster.w > 0 && raster.h > 0)) return null
 	const pmm = Array.isArray(o.panel_mm) ? o.panel_mm : [500, 500]
 	const pn = Array.isArray(o.panels) ? o.panels : [1, 1]
@@ -94,7 +95,8 @@ function wallOf(o, { channelNo, raster } = {}) {
 	const notes = []
 	if (rot[0] || rot[2]) notes.push('pitch / roll ignored (treated as upright)')
 	if (num(o.curve_deg, 0)) notes.push('curve ignored (treated as flat)')
-	return { id: String(o.id || ''), name: String(o.name || o.id || 'LED wall'), channelNo, raster: { w: raster.w, h: raster.h },
+	return { id: String(o.id || ''), name: String(o.name || o.id || 'LED wall'), channelNo,
+		...(/^(pgm|prv)[1-4]$/.test(String(role || '')) ? { role } : {}), raster: { w: raster.w, h: raster.h },
 		rect, position: pos, yaw: rot[1], size_m: [r3(W), r3(H)], notes }
 }
 
@@ -274,7 +276,8 @@ function proposePixelMappings({ walls = [], fixtures = [] } = {}, options = {}) 
 		const r = rectsOnEdge(hit.wall, hit.edge, ts, cell, opts)
 		f.pixels.forEach((p, i) => {
 			mappings.push({ id: `auto-${f.id}-${p.pixel}`.slice(0, 64), enabled: true, fixtureId: f.id, pixel: p.pixel,
-				channelNo: hit.wall.channelNo, rect: r.rects[i], mode: opts.mode, colourOrder: 'auto' })
+				channelNo: hit.wall.channelNo, ...(hit.wall.role ? { role: hit.wall.role } : {}), rect: r.rects[i], mode: opts.mode,
+				colourOrder: 'auto' })
 		})
 		summaries.push({ ...base, ...where, mapped: true, rule, spacing_m: r3(cell), spacing_px: r.size, spacing_px_exact: r2(cell * r.ppm),
 			inset_px: r.inset, depth_px: r.depth, off_edge: r.offEdge, rects: r.rects,

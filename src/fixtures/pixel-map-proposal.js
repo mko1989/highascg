@@ -21,29 +21,22 @@
 const crypto = require('crypto')
 const { onProjectChanged } = require('../engine/project-events')
 const { proposePixelMappings, wallOf, fixtureOf, normalizeOptions } = require('./pixel-map-propose')
+// the inverse of pixel-map-service.js roleFor; lives in the model since WO-915 (bus-bound mappings resolve with it)
+const { channelForRole } = require('./pixel-map-model')
 
 const KEY = 'pixelMappingProposal'
 const DEBOUNCE_MS = 500
 const OPTION_KEYS = ['inset_px', 'depth_px', 'threshold_m', 'mode']
 
-/** Surface role → Caspar channel through the channel map (the inverse of pixel-map-service.js roleFor), or null. */
-function channelForRole(role, map) {
-	const m = /^(pgm|prv|ch)(\d+)$/.exec(String(role || ''))
-	if (!m) return null
-	const n = Number(m[2])
-	if (m[1] === 'ch') return n > 0 ? n : null
-	const ch = Number((m[1] === 'pgm' ? map?.programChannels : map?.previewChannels)?.[n - 1])
-	return ch > 0 ? ch : null
-}
-
 const sameRect = (a, b) => a && b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h
-/** Every proposed mapping is already stored (same fixture pixel, channel, rect, mode, enabled). */
+/** Every proposed mapping is already stored (same fixture pixel, bus — else channel —, rect, mode, enabled). */
 function isApplied(proposed, stored) {
 	if (!proposed.length) return false
 	const by = new Map((stored || []).map((m) => [`${m.fixtureId}#${m.pixel}`, m]))
 	return proposed.every((p) => {
 		const s = by.get(`${p.fixtureId}#${p.pixel}`)
-		return s && s.enabled !== false && s.channelNo === p.channelNo && s.mode === p.mode && sameRect(s.rect, p.rect)
+		const sameSource = p.role || s?.role ? s?.role === p.role : s?.channelNo === p.channelNo
+		return s && s.enabled !== false && sameSource && s.mode === p.mode && sameRect(s.rect, p.rect)
 	})
 }
 
@@ -105,7 +98,7 @@ function createPixelMapProposalService(ctx, engine, pixelMap, deps = {}) {
 			const role = o.source?.role || 'pgm1'
 			const ch = channelForRole(role, map)
 			const r = ch ? map?.channelResolutionsByChannel?.[String(ch)] : null
-			const w = wallOf(o, { channelNo: ch, raster: r && r.w > 0 && r.h > 0 ? { w: r.w, h: r.h } : null })
+			const w = wallOf(o, { channelNo: ch, raster: r && r.w > 0 && r.h > 0 ? { w: r.w, h: r.h } : null, role })
 			if (w) walls.push(w)
 			else skipped.push({ id: o.id, name: o.name, role, reason: ch ? `channel ${ch} is not running in Caspar` : `role "${role}" is not a screen destination` })
 		}

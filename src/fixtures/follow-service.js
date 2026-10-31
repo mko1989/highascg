@@ -257,6 +257,7 @@ function createFollowService(ctx, hub, deps = {}) {
 		 * ours, or in visualiser mode (T7) the console's (no fresh input = dark).
 		 */
 		visual: () => {
+			pixelMap.watch() // WO-915: the rig is being drawn → the mapped cells follow the picture with the DMX master off
 			const fixtures = []
 			const inputs = { artnet: consoleFrames, sacn: sacnIn }
 			for (const fx of engine.fixtures) {
