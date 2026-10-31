@@ -2,9 +2,11 @@ extends Node3D
 ## WO-874 scene "Shader": a library shader (the box's Shadertoy library, GET /api/shaders — the same code Caspar's HTML
 ## templates run, WO-266/586) rendered by shadertoy_rd.gd at the canvas size and shown on a quad that fills the stage camera.
 ## As the main scene it is the backdrop (far, opaque); as layer 2 it is added over the other scene (near, additive).
-## speed = the shader's clock (0.3 = real time; integrated, so changes never jump — WO-580), pulse / glow = gain, amount =
-## opacity, burst = a flash plus a short time surge. hue and spin are not used: a shader keeps its own palette (rotating it
-## by the hue parameter recoloured every shader — the graph's valence sits at 0.5 even in silence, WO-874 §1).
+## speed = the shader's clock (0.3 = real time; integrated, so changes never jump — WO-580), pulse / glow = gain, burst = a
+## flash plus a short time surge. hue and spin are not used: a shader keeps its own palette (rotating it by the hue parameter
+## recoloured every shader — the graph's valence sits at 0.5 even in silence, WO-874 §1). amount is not used either: the
+## layer's own opacity fader (WO-890) fades a shader — a bank's amount (another scene's density, often near 0) hid every
+## dropped shader (WO-910).
 
 const Runner := preload("res://features/visuals/shadertoy_rd.gd")
 const Cam := preload("res://features/visuals/visuals_camera.gd")
@@ -17,11 +19,10 @@ render_mode unshaded, cull_disabled, fog_disabled, shadows_disabled%s;
 uniform sampler2D tex : filter_linear, repeat_disable;
 uniform float gain = 1.0;
 uniform float flash;
-uniform float opacity = 1.0;
 void fragment() {
 	vec3 c = max(texture(tex, vec2(UV.x, 1.0 - UV.y)).rgb, 0.0);  // Shadertoy rows run bottom-up
 	c = mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));  // the shader wrote sRGB; the stage is linear
-	ALBEDO = (c * gain + flash) * opacity;
+	ALBEDO = c * gain + flash;
 }
 """
 
@@ -105,6 +106,5 @@ func step(p: Dictionary, delta: float, burst: bool) -> void:
 	# 1 at the defaults, at most ~1.7: shaders are already graded, a bright sky clips white well before 2×
 	_mat.set_shader_parameter("gain", 1.0 + 0.5 * (float(p.get("glow", 0.3)) - 0.3) + 0.4 * (float(p.get("pulse", 0.2)) - 0.2))
 	_mat.set_shader_parameter("flash", _kick * 0.5)
-	_mat.set_shader_parameter("opacity", clampf(float(p.get("amount", 0.5)) * 2.0, 0.0, 1.0))
 	if is_inside_tree():
 		runner.render(size, _time, delta, _audio)

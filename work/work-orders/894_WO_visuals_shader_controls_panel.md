@@ -1,7 +1,7 @@
 # WO-894 — Visuals ▸ Shader panel: the shader controls come back in the Visuals tab
 
 **Area:** godot-client
-**Status: IN PROGRESS (31.10.26, phase 1 implemented; verified by the Godot suite and a probe client on a private Xvfb against a stub node running the real Shader Live code; NOT yet on the live node: it needs a highascg restart for `?working=1`; no CG UPDATE journal line seen)**
+**Status: IN PROGRESS (31.10.26, phase 1 DONE: Godot suite, Xvfb probe on a stub node, and the live node — owner GUI recompiles through `?working=1`, Reset all clears dirty (WO-910 §3); phase 2 UBO uniforms open)**
 
 ## Owner request
 
@@ -118,3 +118,10 @@ File references are as found on 31.10.26; to re-verify at implementation.
 - No `CG UPDATE` journal line seen: needs the shader on air in a Caspar look and a Visuals edit (the push path is unchanged server code).
 - Owner QA on the box display; "preset save then reload restores values" is covered by the node smoke (WO-606), not re-run through the UI.
 - Phase 2 (UBO uniforms, no recompile per value) untouched.
+
+## Live node check (31.10.26, after the node restart at 14:33)
+- `GET /api/shader-live/shaders/sh-sa-3d-audio-visualizer?working=1` answers with `working`. Owner GUI, A/B PRV bank, layer
+  2 3D Audio Visualizer visible: Iterations 30 → 1.1 → 19.3 → server `dirty: true`, "edited, not saved", the PRV picture
+  recompiled each time (dimmer room at 19.3); Reset all → `dirty: false`. The shader first had to be made visible at all:
+  WO-910 (a bank's amount was a hidden opacity). Not on air in Caspar → still no `CG UPDATE` line (unchanged server path).
+

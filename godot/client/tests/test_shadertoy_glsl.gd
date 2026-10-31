@@ -77,4 +77,6 @@ func test_shader_scene_headless() -> void:
 	t.ok(s._time > 1.1, "a burst surges the clock")
 	s.set_overlay(true)
 	t.ok(s._mat.shader.code.contains("blend_add"), "layer 2 is additive")
+	s.step({"amount": 0.0}, 0.1, false)
+	t.ok(not s._mat.shader.code.contains("opacity"), "WO-910: a bank's amount never fades a shader (the layer's fader does)")
 	s.free()
