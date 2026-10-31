@@ -1,8 +1,8 @@
 # WO-880 — Show safety: a crashed operator client relaunches, and the Visuals go back on air by themselves
 
 **Area:** godot-client
-**Status: IN PROGRESS (31.10: built; relaunch loop proven with a fake Godot + a real Godot crash's exit code, marker
-test in the Godot suite, client boot with a marker on Xvfb; the on-air crash drill waits for the server)**
+**Status: DONE (31.10: loop with a fake Godot + a real crash's exit code, marker test in the Godot suite; the crash drill
+on the box — SEGV mid-Send → relaunch → back on air on Caspar ch 6 in ~8 s)**
 
 Loop task (owner 31.10): visuals "in a very good shape and ready for a show". Follows [WO-877](./877_WO_visuals_show_looks_crossfade_master.md).
 
@@ -43,6 +43,9 @@ Not covered: a client that hangs without crashing (the loop cannot see it), and 
   no marker → no resume).
 - The real client on Xvfb :377 with a marker in a scratch `XDG_DATA_HOME`: boots with no script errors, keeps waiting
   (no server), marker kept.
-- NOT yet (server down since the eggs build): the drill on the box — Send on, `kill -SEGV` the client started by
-  run-client.sh, watch it relaunch and the Caspar layer go live again. The owner's client running now (PID 326620)
-  was not started by run-client.sh, so the loop applies from its next start.
+- The drill on the box, 31.10, Caspar ch 6 checked by two PRINTs a second apart (live = the frames differ):
+  a client on Xvfb sending → live; marker `{"channel":6,"layer":1}`; TERM → marker kept, ch 6 frozen (the producer
+  holds the last frame); a client started by run-client.sh → `[visuals] on air before this client started — sending
+  again` → live; `kill -SEGV` it → frozen → `[run-client] crashed (exit 134) — relaunching in 2 s` → live again ~8 s
+  after the crash; TERM → the loop ends (no relaunch). Ch 6 layer 1 stopped after.
+- The owner's client running now (PID 326620) was not started by run-client.sh, so the loop applies from its next start.

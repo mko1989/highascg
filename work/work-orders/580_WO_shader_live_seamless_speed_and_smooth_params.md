@@ -3,7 +3,7 @@
 **Area:** engine
 **Status: IN PROGRESS** (2026-10-31: phase A — Speed × rides the player's eased clock rate — implemented and
 proven offline (§2.3, §3); phase B — literal-only edits glide through uniforms — implemented and proven in headless
-Chrome WebGL2 over the shader library (§2.4, §3); on-air checks wait for the service.)
+Chrome WebGL2 over the shader library (§2.4, §3); 31.10 phase A on air in Caspar's CEF (§3); phase B on air left.)
 
 Source: owner, `work/archive/todos/todos25.09.26` (on show):
 > why does scroll value changes does not register to output in shaders editor. only update after
@@ -151,5 +151,9 @@ sets each glide array on each pass program (`uniform1fv`; locations cached per c
   `iTime * 0.25` / `iTime * 0.35` into the child while the session keeps 0.5 / 0.7; reset / reset-all → 1; randomize
   leaves the time literals alone. All smokes pinning the touched files (wo266/268/333/344/376/606/662/811/875,
   alpha+audio binding) 97/97.
-- On air: NOT yet — highascg.service has been inactive since the eggs build. To do: a shader with ≥ 2 time
-  multipliers on PGM, ride Speed × in the Godot Shader Live panel after a few minutes on air, watch for the jump.
+- On air, 31.10, Caspar ch 6 layer 20 (no consumer), `sh-bg-auroras` by `CG ADD` + `PLAY`, two PRINTs per step: Speed 1
+  → live (frame diff 6.19) · `CG UPDATE {"timeScale":0.05}` → still live, slowed (0.62) · back to 1 → 5.75; luma 38 →
+  39 → 41 across the ride, never black. The audio shader `sh-sa-ribbons` with test music: live (diff 18.8). Needs
+  `<html><enable-gpu>true` — off on the factory config, so the XML was flipped for the test and restored after
+  ([WO-881](./881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md) §1). Left: the jump check from the Godot Shader Live
+  panel on a PGM shader with ≥ 2 time multipliers after minutes on air, and phase B's glide on air.

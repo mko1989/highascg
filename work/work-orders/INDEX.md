@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-791 live WOs (28 open, 127 in progress, 636 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+792 live WOs (29 open, 123 in progress, 640 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -189,7 +189,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 845 DONE [amcp+lighting] Sweep: AMCP client, Art-Net/sACN, audio and media bugs → 845_WO_sweep_amcp_dmx_audio_media.md
 - 867 DONE [amcp+os-iso] Caspar build: CasparCG/server#1762 effects (BLUR / SHARPEN / GRAIN) brought up… → 867_WO_caspar_pr1762_effects_fixes.md
 
-## caspar-build — CasparCG server build and binaries (10)
+## caspar-build — CasparCG server build and binaries (11)
 
 - 233 DONE [caspar-build] Caspar rebuild research: CasparCG_Enhanced base + improved-artnet + live-events… → 233_WO_CASPAR_REBUILD_RESEARCH.md
 - 234 DONE [caspar-build] Assemble + build the final (for now) CasparCG for highascg → 234_WO_CASPAR_FINAL_BUILD.md
@@ -201,6 +201,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 742 DONE [caspar-build+engine] Caspar shm producer: play a shared-memory ring written by another process (WO-7… → 742_WO_caspar_shm_producer.md
 - 820 DONE [caspar-build+media] NotchLC: native GPU decode in Caspar (spike + build) → 820_WO_notchlc_native_gpu_decode.md
 - 847 DONE [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
+- 881 OPEN [caspar-build+engine] Caspar came up without CEF after a supervisor tree-kill, and nothing said so → 881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md
 
 ## audio — Audio routing, devices, meters (44)
 
@@ -247,7 +248,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 866 DONE [audio+godot-client] Drum detection vs real music: measure against annotated drums, better detector,… → 866_WO_drum_detection_alignment.md
 - 872 DONE [audio] Beat tracking: compare with fosfora, adopt its grid/tempo/benchmark ideas → 872_WO_beat_tracking_fosfora_comparison.md
 - 875 IN PROGRESS [audio+engine,godot-client] Spectrum smoothing after GLava for every shader + a Spectrum scene in the Visua… → 875_WO_spectrum_smoothing_glava.md
-- 879 IN PROGRESS [audio+godot-client] Tap tempo: the operator's beat when the tracker cannot lock (and when the feed… → 879_WO_tap_tempo_beat_override.md
+- 879 DONE [audio+godot-client] Tap tempo: the operator's beat when the tracker cannot lock (and when the feed… → 879_WO_tap_tempo_beat_override.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (29)
 
@@ -446,9 +447,9 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 873 DONE [godot-client+engine,audio] Visuals engine: scene library with GPU particles, a second layer, burst triggers → 873_WO_visuals_scene_library_particles.md
 - 874 DONE [godot-client+engine] Visuals: the shader library as a scene (Shadertoy code on the Godot RenderingDe… → 874_WO_visuals_shader_scene_library.md
 - 876 IN PROGRESS [godot-client+engine] Visuals: a classic game as a scene / layer (libretro window → ring → effects) → 876_WO_visuals_game_scene_libretro.md
-- 877 IN PROGRESS [godot-client] Visuals show controls: looks (cues) with a crossfade, master fader + blackout,… → 877_WO_visuals_show_looks_crossfade_master.md
-- 878 IN PROGRESS [godot-client+audio] Visuals autopilot: looks on the beat, the next look every N bars and on drops → 878_WO_visuals_autopilot_beat_quantised_looks.md
-- 880 IN PROGRESS [godot-client] Show safety: a crashed operator client relaunches, and the Visuals go back on a… → 880_WO_client_crash_relaunch_visuals_resume.md
+- 877 DONE [godot-client] Visuals show controls: looks (cues) with a crossfade, master fader + blackout,… → 877_WO_visuals_show_looks_crossfade_master.md
+- 878 DONE [godot-client+audio] Visuals autopilot: looks on the beat, the next look every N bars and on drops → 878_WO_visuals_autopilot_beat_quantised_looks.md
+- 880 DONE [godot-client] Show safety: a crashed operator client relaunches, and the Visuals go back on a… → 880_WO_client_crash_relaunch_visuals_resume.md
 
 ## web-client — Web client (82)
 

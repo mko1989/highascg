@@ -177,6 +177,9 @@ func set_state(slice: Dictionary, cm: Variant) -> void:
 	for p in M.PARAMS:
 		_sliders[p].set_value_no_signal(float(slice.params[p]))
 	_screens = M.screens(cm)
+	var cfg := get_node_or_null("/root/Config")  # dev: --probe-visuals-channel=<ch> offers a bare Caspar channel as a screen
+	if cfg and cfg.args.has("probe-visuals-channel"):
+		_screens = [{"label": "Probe (ch %d)" % int(cfg.args["probe-visuals-channel"]), "channel": int(cfg.args["probe-visuals-channel"])}]
 	_screen.clear()
 	for s in _screens:
 		_screen.add_item(s.label)

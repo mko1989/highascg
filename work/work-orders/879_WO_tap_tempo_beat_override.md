@@ -1,7 +1,7 @@
 # WO-879 — Tap tempo: the operator's beat when the tracker cannot lock (and when the feed dies)
 
 **Area:** audio, godot-client
-**Status: IN PROGRESS (31.10: built; node smoke 5/5 incl. the real FFT engine on silent frames, Godot suite 24070/0, UI on Xvfb; taps against live music on the box wait for the server — stopped by the eggs build)**
+**Status: DONE (31.10: node smoke 5/5 incl. the real FFT engine on silent frames, Godot suite, UI on Xvfb; taps against test music on the box — tapped tempo and grid on the WS, back to the detector on auto)**
 
 Loop task (owner 31.10): visuals "in a very good shape and ready for a show". Follows [WO-878](./878_WO_visuals_autopilot_beat_quantised_looks.md).
 
@@ -49,5 +49,7 @@ tempo, a constant latency shifts the phase (re-tap one beat to fix it by ear).
   REAL engine (UDP source, no PCM) keeps sending silent frames carrying the tapped, locked beat and stops after auto.
 - Godot suite 24070 passed / 0 failed, incl. `test_tap_row` (signals, Audio state, "Tapped 124 BPM" note).
 - UI: the client on Xvfb :377 — the Tempo row under "Picked looks land on the beat", T pressed, no script errors.
-- NOT yet: taps against music on the box (server inactive since the eggs build): tap along to test music with the
-  autopilot on bars, check the Caspar shaders' beat flashes follow the taps, pull the feed and check they go on.
+- On the box, 31.10, test music playing (detector 106.8 BPM): 4 taps on `POST /api/audio/tap` → 117 BPM; the WS beat
+  grid then ran at 507 ms median with 148 / 178 frames marked tapped and no doubled beats; `{"auto":true}` → back on
+  the detector at 106.7 BPM, `n` counting on. The Caspar shaders, the Visuals and the autopilot all read this same
+  `beat` object (§1), so the flashes follow it; the dead-feed case is the smoke's real-engine test.

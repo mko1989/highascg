@@ -1,7 +1,7 @@
 # WO-877 — Visuals show controls: looks (cues) with a crossfade, master fader + blackout, show keys
 
 **Area:** godot-client
-**Status: IN PROGRESS (31.10: built, Godot suite + Xvfb canvas probe; on-air Send of a fade waits for the server — stopped by the eggs build)**
+**Status: DONE (31.10: Godot suite + Xvfb canvas probe; on air on Caspar ch 6 via PRINT — Send, master half, blackout, back, crossfade, Send off)**
 
 Loop task (owner 31.10): *"work on the visuals (shaders, audio reactivity, games etc) until you feel it's in a very good shape
 and ready for a show."*
@@ -58,4 +58,9 @@ and ready for a show."*
 - Xvfb, the real client (`--probe-visuals-shots`, scratchpad `w877/`): every scene as before (deck GPU 0.09–0.25 ms), then a
   2 s fade game+spectrum → tunnel+particles caught at x = 0.50 (both pictures on the canvas), and the master at 0.50 (the
   picture at half brightness, fade done).
-- Not yet (server down since the eggs build): Send during a fade and a blackout on a real screen; keys on the operator GUI.
+- On air, 31.10 07:0x: the real client on Xvfb :377 with `--probe-visuals-channel=6 --probe-visuals-onair=<dir>`
+  (`visuals_probes.gd` `onair`; ch 6 is a 1080p50 channel with no consumer, so nothing reached a wall). Each step
+  PRINTs Caspar's ch 6 through the node (`e2e_probe.gd` `print_once`) and reads the canvas at the same moment:
+  Send (tunnel+particles) air luma 48 / canvas 55 · master 0.5 → 20 / 22 · blackout → 0 · back → 34 / 32 · a 1 s
+  crossfade to rings → 6 / 6 · Send off → layer empty (alpha 0). Air follows the canvas within a frame or two.
+- Keys on the operator GUI (1–9, B, Space) are covered by the suite only: no key automation on the owner's :0.

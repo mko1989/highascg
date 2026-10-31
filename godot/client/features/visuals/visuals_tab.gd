@@ -153,6 +153,10 @@ func _ready() -> void:
 		_resume_send.call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-send"):  # dev: --probe-visuals-send=<screen index>:<seconds>
 		(func() -> void: Probes.send(self, str(_g("Config").args["probe-visuals-send"]))).call_deferred()
+	if _g("Config") and _g("Config").args.has("probe-visuals-onair"):  # dev: --probe-visuals-onair=<dir> (+ -channel)
+		(func() -> void: Probes.onair(self, str(_g("Config").args["probe-visuals-onair"]))).call_deferred()
+	if _g("Config") and _g("Config").args.has("probe-visuals-auto"):  # dev: --probe-visuals-auto=<seconds> (WO-878)
+		(func() -> void: Probes.autopilot(self, float(_g("Config").args["probe-visuals-auto"]))).call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-shots"):  # dev: --probe-visuals-shots=<dir> (WO-873)
 		(func() -> void: Probes.shots(self, str(_g("Config").args["probe-visuals-shots"]))).call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-shaders"):  # dev: --probe-visuals-shaders=<dir> (WO-874)

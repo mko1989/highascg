@@ -1,7 +1,7 @@
 # WO-878 — Visuals autopilot: looks on the beat, the next look every N bars and on drops
 
 **Area:** godot-client, audio
-**Status: IN PROGRESS (31.10: built, Godot suite incl. a tab-level beat → look → fade test; live music on the box waits for the server — stopped by the eggs build)**
+**Status: DONE (31.10: Godot suite incl. a tab-level beat → look → fade test; live on the box with test music — every 4 bars on the beat, a pick lands on the next beat)**
 
 Loop task (owner 31.10): visuals "in a very good shape and ready for a show". Follows [WO-877](./877_WO_visuals_show_looks_crossfade_master.md).
 
@@ -40,4 +40,9 @@ Loop task (owner 31.10): visuals "in a very good shape and ready for a show". Fo
   of 60 fps frames), and through the real tab: a pick waits, the next beat fades look 2 in on the mixer, 16 beats later the
   autopilot fades look 1 back; the status line reads "Tempo 128 BPM".
 - Xvfb screenshot of the Inspector's Show block (scratchpad `w877/ui.png`).
-- Not yet: real music on the box (POST /api/audio/test-music) watching looks change on beats and on a drop on the canvas.
+- Live, 31.10: `gtzan-disco.00010.wav` via `POST /api/audio/test-music` (beat locked 106.8 BPM, conf 0.99, 30 Hz, no
+  doubled beats on the WS). The real client on Xvfb with `--probe-visuals-auto=40` (`visuals_probes.gd` `autopilot`;
+  a probe client, `project_gone` so it never saves the box's project): three looks, 4 bars → look changes on beats
+  n 432 / 448 / 464 / 480 (every 16 beats, ~9 s), each 0 ms after that beat reached the client; then autopilot off and
+  a pick 0.25 s after a beat → not on stage at once, pending, landed on the next beat (n 496).
+- Drops: suite only (the test clip has no drop worth the name); the drop path reads the same beat frames.
