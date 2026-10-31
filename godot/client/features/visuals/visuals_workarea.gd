@@ -26,6 +26,9 @@ func _init() -> void:
 	add_child(_bar)
 	_hint = Label.new()
 	_hint.modulate = Color(1, 1, 1, 0.6)
+	_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_hint.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS  # never pins the tab's width (owner 31.10: Inspector pushed off)
+	_hint.mouse_filter = Control.MOUSE_FILTER_PASS  # the full hint as a tooltip
 	_bar.add_child(_hint)
 	var view3d := SubViewportContainer.new()
 	view3d.stretch = true
@@ -81,6 +84,7 @@ func set_mode(m: String) -> void:
 		_modes[id].control.visible = id == m
 		(_modes[id].button as Button).set_pressed_no_signal(id == m)
 	_hint.text = _modes[m].hint
+	_hint.tooltip_text = _hint.text
 	mode_changed.emit(m)
 
 
