@@ -1,7 +1,7 @@
 # WO-876 — Visuals: a classic game as a scene / layer (libretro window → ring → effects)
 
 **Area:** godot-client, engine
-**Status: IN PROGRESS (31.10: Game scene + launcher + core installer; real Nestopia core proven on Xvfb with a test cart incl. input and with three real ROMs; ROMs kept off the ISO; waits for Play on the operator screen, a gamepad and Send on air)**
+**Status: DONE (31.10.26 — Godot suite 25489/0; box: Contra from Sources ▸ Games into the A/B PRV bank, Play on the operator screen (DP-4), Start reaches the core, AUTO → in the visuals ring Caspar ch2 layer 1 reads at 50/s, window adopted across a GUI restart; gamepad untested: none connected)**
 
 Owner, 31.10: *"Also as part of the visuals I'd like to implement a classic games emulator, so I can run contra Mario or
 whatever use it as a layer in visuals with effects etc, but play normally on the operator monitor with keyboard/gamepad
@@ -74,4 +74,37 @@ input. Find open source projects that we can borrow from and start building it i
 - ISO: `~/.highascg/retro/games` was NOT excluded — the next produce would have shipped the ROMs. Now excluded in both
   lists (cores in `retro/cores` still ship), checked by `verify-iso-squashfs-excludes.sh` and pinned in
   `smoke-eggs-exclude-lists.test.js` (41 / 0). `media/games` is covered by the existing `media/*` line.
-- Not yet: Play from the GUI on the operator screen, a gamepad, the game on air through Send.
+- Not yet (then): Play from the GUI on the operator screen, a gamepad, the game on air through Send.
+
+## 4. Box test on the owner GUI (31.10.26, after WO-908 A/B) — two defects found and fixed
+
+**Investigation.** With A/B on (so the owner's bank A stayed on air), Contra dragged from Sources ▸ Visuals ▸ Games ▸ NES
+onto the PRV view became layer 3 "Game · Contra (USA)" at 100 % in bank B, and Play opened the Nestopia window on DP-4
+(`--screen 0`, 960×720, title "HighAsCG Retro — Nestopia 1.53.2 — source shm://visuals-game"); Enter skipped the intro to
+PLAY SELECT, the ring `/dev/shm/highascg-visuals-game` was rewritten. But:
+1. **PRV stayed black.** `scenes/game.gd step()` set `opacity = amount × 2`. `amount` is a bank parameter shared by every
+   layer (another scene's density) — this bank had it at ≈ 0.03 → the game drew at ≈ 6 %. It predates WO-890's per-layer
+   opacity faders, which now do that job; a dropped game must show at its layer's opacity.
+2. **A GUI restart orphans the window.** `kill -TERM` of the GUI left the game process running (PREDELETE `launcher.stop()`
+   does not run on a signal) and still writing the ring; the new GUI's launcher had `pid = 0` → the page offered Play,
+   which would start a second core on the same ring (`play()` → `stop()` only knows its own pid). (Keeping the game alive
+   across a GUI crash is right for a show — it must just be found again.)
+
+**Done.**
+- `scenes/game.gd`: `amount` no longer touches the game; the `opacity` uniform is gone (layer 2 keying: `ALPHA =
+  smoothstep(…)`). The layer's fader (visuals_deck.gd) is the game's opacity.
+- `game_launcher.gd`: `play()` notes `pid\nrom` in `pid_file` (`~/.highascg/run/visuals-game.pid`), `stop()` removes it;
+  `adopt()` takes a live window from it — checked by `/proc/<pid>/cmdline` containing `--ring visuals-game` (pids are
+  reused); an adopted pid is not our child, so `running()` checks `/proc` instead of `OS.is_process_running` (waitpid
+  says no for non-children). `visuals_tab.gd` sets `pid_file` + `adopt()` only in the operator's GUI — not in a test's tab
+  or a `--probe-*` / `--check` client, which would kill the operator's game when they quit.
+
+**Verified.**
+- Godot suite 25489 passed, 0 failed: `test_game_launcher` — a bank's amount never fades the game; adoption (none without a
+  pid file, a fake `--ring visuals-game` process adopted with its ROM, a live pid that is not a game window refused).
+- Box: after the fix PRV B showed Contra (attract demo, CRT lines, tilt, pulse zoom). GUI TERM'd and relaunched with the
+  window open → the page came back with **Stop** and "Playing in its own window…", one game process. AUTO → PGM B =
+  Contra; Caspar ch2 = layer 1 `visuals`, layer 10 the KV loop (covers it on DP-0 in this project); the visuals ring
+  (3840×1792, the slots Caspar reads, OSC: presented 50/s, shm 50/s, dropped steady at 53) holds the Contra picture.
+  CUT → A, Stop (process, ring and pid file gone), A/B off → stored project back to the owner's two layers at 0 %, no `dj`.
+- Not testable here: a gamepad (no `/dev/input/js*` on the box).

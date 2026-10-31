@@ -53,6 +53,30 @@ func test_why_not() -> void:
 	t.eq(launcher.running(), false, "nothing started")
 
 
+func test_adopt_window_left_by_a_restart() -> void:
+	var f := ProjectSettings.globalize_path("user://test-visuals-game.pid")
+	var fake := OS.create_process("/bin/sh", ["-c", "sleep 5", "x", "--ring", L.RING])
+	OS.delay_msec(100)
+	var w := FileAccess.open(f, FileAccess.WRITE)
+	w.store_string("%d\n/g/contra.nes" % fake)
+	w.close()
+	var l := L.new()
+	l.adopt()
+	t.eq(l.running(), false, "no pid file set (a test's or probe's tab) → nothing adopted")
+	l.pid_file = f
+	l.adopt()
+	t.eq([l.running(), l.playing], [true, "/g/contra.nes"], "a window from before this client → ours (Stop shows, Play replaces it)")
+	var other := L.new()
+	other.pid_file = f
+	w = FileAccess.open(f, FileAccess.WRITE)
+	w.store_string("%d\n/g/x.nes" % OS.get_process_id())
+	w.close()
+	other.adopt()
+	t.eq(other.running(), false, "a live pid that is no game window (pids are reused) → not adopted")
+	OS.kill(fake)  # not l.stop(): that unlinks the real ring, which the operator's game may be writing
+	DirAccess.remove_absolute(f)
+
+
 func test_game_scene() -> void:
 	t.eq(Game.source_lines(768, 720), 240, "NES ×3")
 	t.eq(Game.source_lines(800, 720), 144, "Game Boy ×5")
@@ -63,7 +87,10 @@ func test_game_scene() -> void:
 	t.eq(g.live(), false, "no ring → not live")
 	t.eq(g._quad.visible, false, "nothing drawn without a game")
 	g.set_overlay(true)
-	t.ok(g._mat.shader.code.contains("ALPHA = opacity * smoothstep"), "layer 2 keys black out")
+	t.ok(g._mat.shader.code.contains("ALPHA = smoothstep"), "layer 2 keys black out")
 	g.set_audio(PackedByteArray([0, 255, 255, 255, 255, 255, 255]))
 	t.eq(g._bass, 1.0, "the bass bins drive the split")
+	g.set_overlay(false)
+	g.step({"amount": 0.0}, 1.0 / 60.0, false)
+	t.ok(not g._mat.shader.code.contains("opacity"), "WO-876: a bank's amount never fades the game (the layer's fader does)")
 	g.free()

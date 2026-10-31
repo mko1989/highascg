@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-820 live WOs (31 open, 126 in progress, 663 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+820 live WOs (31 open, 125 in progress, 664 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -452,7 +452,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 865 DONE [godot-client+web-client] Demo display engine: moving PGM / PRV pictures, fades on take, live look edits,… → 865_WO_demo_display_engine_fades.md
 - 873 DONE [godot-client+engine,audio] Visuals engine: scene library with GPU particles, a second layer, burst triggers → 873_WO_visuals_scene_library_particles.md
 - 874 DONE [godot-client+engine] Visuals: the shader library as a scene (Shadertoy code on the Godot RenderingDe… → 874_WO_visuals_shader_scene_library.md
-- 876 IN PROGRESS [godot-client+engine] Visuals: a classic game as a scene / layer (libretro window → ring → effects) → 876_WO_visuals_game_scene_libretro.md
+- 876 DONE [godot-client+engine] Visuals: a classic game as a scene / layer (libretro window → ring → effects) → 876_WO_visuals_game_scene_libretro.md
 - 877 DONE [godot-client] Visuals show controls: looks (cues) with a crossfade, master fader + blackout,… → 877_WO_visuals_show_looks_crossfade_master.md
 - 878 DONE [godot-client+audio] Visuals autopilot: looks on the beat, the next look every N bars and on drops → 878_WO_visuals_autopilot_beat_quantised_looks.md
 - 880 DONE [godot-client] Show safety: a crashed operator client relaunches, and the Visuals go back on a… → 880_WO_client_crash_relaunch_visuals_resume.md

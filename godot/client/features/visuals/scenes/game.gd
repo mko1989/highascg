@@ -3,8 +3,9 @@ extends Node3D
 ## `visuals-game`) as a screen in the Visuals world, with effects. The game itself plays in its own window on the operator's
 ## monitor (keyboard / gamepad, sound); this only reads its pictures, so a crashing core never reaches the GUI.
 ## speed = CRT (scanlines on the game's own lines, curvature, vignette), pulse = zoom, spin = the screen floats and tilts,
-## amount = opacity, glow = brightness (whites bloom), burst = a glitch (row jitter + colour split); the bass splits the
-## colours a little all the time. hue is not used: a game keeps its palette. As layer 2 black is keyed out, so the sprites
+## glow = brightness (whites bloom), burst = a glitch (row jitter + colour split); the bass splits the colours a little all
+## the time. hue is not used: a game keeps its palette; nor is amount: the layer's own opacity fader (WO-890) fades a game —
+## a bank's amount (another scene's density, often near 0) made a dropped game near-invisible (WO-876 box test). As layer 2 black is keyed out, so the sprites
 ## float over the main scene. No game running = nothing drawn.
 
 const ShmNative := preload("res://video/shm_native.gd")
@@ -24,7 +25,6 @@ uniform float crt = 0.3;
 uniform float glitch = 0.0;
 uniform float split = 0.0;
 uniform float gain = 1.0;
-uniform float opacity = 1.0;
 uniform float t = 0.0;
 float hash(float n) { return fract(sin(n) * 43758.5453); }
 void fragment() {
@@ -76,9 +76,9 @@ func set_overlay(on: bool) -> void:
 	var sh := Shader.new()
 	if on:
 		sh.code = SRC % [", blend_mix, depth_draw_never", "1.0",
-			"ALPHA = opacity * smoothstep(0.015, 0.06, max(col.r, max(col.g, col.b)));"]
+			"ALPHA = smoothstep(0.015, 0.06, max(col.r, max(col.g, col.b)));"]
 	else:
-		sh.code = SRC % ["", "opacity", ""]
+		sh.code = SRC % ["", "1.0", ""]
 	_mat.shader = sh
 	_mat.render_priority = 10 if on else 0
 	_mat.set_shader_parameter("tex", _tex.texture)
@@ -132,7 +132,6 @@ func step(p: Dictionary, delta: float, burst: bool) -> void:
 	_mat.set_shader_parameter("glitch", _kick)
 	_mat.set_shader_parameter("split", 0.0006 + _bass * 0.004)
 	_mat.set_shader_parameter("gain", 0.85 + float(p.get("glow", 0.3)) * 0.8)
-	_mat.set_shader_parameter("opacity", clampf(float(p.get("amount", 0.5)) * 2.0, 0.0, 1.0))
 	_mat.set_shader_parameter("t", _t)
 
 

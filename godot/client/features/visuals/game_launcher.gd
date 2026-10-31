@@ -25,8 +25,12 @@ const CORES := {
 	"gg": ["genesis_plus_gx_libretro.so"],
 }
 
+const PID_FILE := "~/.highascg/run/visuals-game.pid"
+
 var pid := 0
 var playing := ""  # the ROM path the window was opened with
+var pid_file := ""  # where the open window is noted ("" = nowhere: tests); the tab sets expand(PID_FILE)
+var _adopted := false  # pid is not our child (a window left by a GUI that restarted)
 
 
 static func expand(p: String) -> String:
@@ -77,7 +81,34 @@ static func args_for(rom: String, screen: int) -> PackedStringArray:
 
 
 func running() -> bool:
+	if _adopted:  # not our child: is_process_running's waitpid says no for it
+		return pid > 0 and _is_window(pid)
 	return pid > 0 and OS.is_process_running(pid)
+
+
+## A game window still open from before this client started (a GUI restart or crash leaves it playing — WO-876 box test)
+## becomes this launcher's: the page shows Stop, and a Play replaces it instead of starting a second writer on the ring.
+func adopt() -> void:
+	if pid_file == "" or running() or not FileAccess.file_exists(pid_file):
+		return
+	var lines := FileAccess.get_file_as_string(pid_file).split("\n")
+	var p := int(lines[0])
+	if lines.size() >= 2 and p > 1 and _is_window(p):
+		pid = p
+		playing = lines[1]
+		_adopted = true
+
+
+## Whether process `p` is a game window on RING (its command line, not just a live pid: pids are reused).
+static func _is_window(p: int) -> bool:
+	var f := FileAccess.open("/proc/%d/cmdline" % p, FileAccess.READ)
+	if f == null:
+		return false
+	var b := f.get_buffer(16384)
+	for i in b.size():
+		if b[i] == 0:
+			b[i] = 32
+	return b.get_string_from_utf8().contains("--ring " + RING)
 
 
 ## Open the game window ("" or why not). A window already open is closed first: one core per process, one game per ring.
@@ -91,6 +122,11 @@ func play(rom: String, screen: int) -> String:
 		pid = 0
 		return "Could not start the game window"
 	playing = rom
+	if pid_file != "":
+		DirAccess.make_dir_recursive_absolute(pid_file.get_base_dir())
+		var f := FileAccess.open(pid_file, FileAccess.WRITE)
+		if f != null:
+			f.store_string("%d\n%s" % [pid, rom])
 	return ""
 
 
@@ -100,3 +136,6 @@ func stop() -> void:
 		DirAccess.remove_absolute("/dev/shm/highascg-" + RING)
 	pid = 0
 	playing = ""
+	_adopted = false
+	if pid_file != "" and FileAccess.file_exists(pid_file):
+		DirAccess.remove_absolute(pid_file)

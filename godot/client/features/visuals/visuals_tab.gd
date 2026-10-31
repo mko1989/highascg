@@ -108,6 +108,10 @@ func _ready() -> void:
 	midi = preload("res://features/visuals/visuals_midi.gd").new(self, _g("Config") != null)  # WO-900: MIDI controller
 	add_child(midi)
 	page.game_play.connect(_play_game)
+	if _g("Config") != null and not _g("Config").args.keys().any(func(k: String) -> bool: return k.begins_with("probe") or k == "check"):
+		# the operator's GUI (not a test's tab or a probe client, which would close it on quit): adopt a window left by a restart
+		launcher.pid_file = Launcher.expand(Launcher.PID_FILE)
+		launcher.adopt()
 	var tick := Timer.new()  # WO-876: the game window's state (closed by hand, starting, on the ring)
 	tick.wait_time = 1.0
 	tick.timeout.connect(_game_status)
