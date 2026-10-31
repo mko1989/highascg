@@ -180,11 +180,8 @@ function notifyProgramMutationMayInvalidateLive(ctx, channel, opts = {}) {
 	} catch {
 		/* WO-57 optional */
 	}
-	try {
-		require('../media/live-thumbnail-cache').scheduleLiveThumbnailRefresh(ctx, channel)
-	} catch {
-		/* optional */
-	}
+	// WO-887: no live-thumbnail invalidation here any more — live thumbs are captured once per node session
+	// (src/media/live-thumbnail-session.js); bus activity deleting ch-N.png left the tile empty for the session.
 	if (!invalidateIfProgramChannel(ctx?.config, channel)) return false
 	broadcastSceneLive(ctx)
 	return true

@@ -4,10 +4,12 @@ extends VBoxContainer
 ## media rows do. Rows come from live_sources_model.gd over the effective channel map, state.extraLiveSources, the
 ## device-view connectors and the live-audio / USB configs; the list is rebuilt only when what it shows changes
 ## (WO-401: status objects re-stamp on every routing retry). Thumbnails (/api/thumbnail/live/<ch>) are fetched once
-## per channel until ↻.
+## per channel per reload (the tab showing); the server captures each one once per session on a non-black frame and
+## says when that capture is still pending (WO-887) — then the row re-fetches a bounded number of times.
 ## A DeckLink port dragged off the Devices rear panel onto Sources is mapped here (WO-605 slice 12,
 ## decklink_drop_flow.gd): progress / errors show at the top of this tab, and the new source is highlighted in the list.
-## Not ported: per-row actions (Stop, Apply PLAY, ⛶ operator monitor, host inspectors, capture / upload thumbnail).
+## Not ported: per-row actions (Stop, Apply PLAY, ⛶ operator monitor, host inspectors, capture / upload thumbnail —
+## manual recapture is API-only by owner request: POST /api/thumbnail/live/recapture, WO-887).
 
 signal tab_requested(name: String)
 signal caspar_changed
@@ -21,6 +23,7 @@ const DropIo := preload("res://features/devices/decklink_drop_io.gd")
 const Shm := preload("res://features/live/shm_sources_model.gd")  # WO-744
 const STATE_KEYS := ["*", "channelMap", "extraLiveSources", "decklinkInputsStatus", "liveAudioInputsStatus", "v4l2InputsStatus"]
 const THUMB := Vector2(48, 27)
+const THUMB_REFETCH_MAX := 8  # WO-887: re-fetches per channel while the server's session capture is pending
 
 var _note: Label
 var _list: VBoxContainer
@@ -31,6 +34,8 @@ var _v4l2: Variant = null   # GET /api/v4l2-inputs
 var _shm: Variant = null    # GET /api/shm/sources (WO-744)
 var _key := ""
 var _thumbs := {}  # channel → Texture2D (null while fetching / when the fetch failed)
+var _thumb_rects := {}  # channel → Array[TextureRect] of the current rows (a re-fetch updates every one)
+var _thumb_gen := 0  # bumped by reload(): a pending re-fetch of an older generation drops out
 var _highlight := ""  # connector id of a DeckLink just dropped here
 var dropping := false
 
@@ -92,6 +97,7 @@ func reload() -> void:
 	var sh: Dictionary = await Api.get_json("/api/shm/sources")  # WO-744
 	_shm = sh.data if sh.ok else null
 	_thumbs.clear()
+	_thumb_gen += 1
 	_key = ""
 	_rebuild()
 
@@ -116,6 +122,7 @@ func _rebuild() -> void:
 	_key = key
 	for c in _list.get_children():
 		c.queue_free()
+	_thumb_rects.clear()
 	var focus: Control = null
 	for i in rows.size():
 		var row := _row(rows[i], view[i])
@@ -136,7 +143,7 @@ func _row(s: Dictionary, v: Array) -> Control:
 	sb.set_corner_radius_all(3)
 	panel.add_theme_stylebox_override("panel", sb)
 	panel.tooltip_text = "%s\n%s\nDrag onto the look editor to add a layer" % [str(v[1]), str(v[0])]
-	panel.mouse_default_cursor_shape = Control.CURSOR_DRAG
+	# WO-887: no CURSOR_DRAG (the move-arrows cross) — rows show the normal arrow like Media rows; drag still works.
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 8)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -174,14 +181,34 @@ func _row(s: Dictionary, v: Array) -> Control:
 
 
 func _thumb(ch: int, rect: TextureRect) -> void:
+	if not _thumb_rects.has(ch):
+		_thumb_rects[ch] = []
+	_thumb_rects[ch].append(rect)
 	if _thumbs.has(ch):
 		rect.texture = _thumbs[ch]
 		return
 	_thumbs[ch] = null
+	_fetch_thumb(ch, _thumb_gen, 0)
+
+
+## WO-887: while the server's once-per-session capture is pending (Retry-Ms header) re-fetch a bounded number of
+## times; the server's retry schedule is bounded too, so this ends. A reload() starts a new generation.
+func _fetch_thumb(ch: int, gen: int, tries: int) -> void:
 	var r: Dictionary = await Api.get_bytes("/api/thumbnail/live/%d" % ch)
-	_thumbs[ch] = LookThumb.decode(r.bytes) if r.ok else null
-	if is_instance_valid(rect):
-		rect.texture = _thumbs[ch]
+	if gen != _thumb_gen:
+		return
+	var tex: Texture2D = LookThumb.decode(r.bytes) if r.ok else null
+	if tex != null or _thumbs.get(ch) == null:
+		_thumbs[ch] = tex
+	for rect in _thumb_rects.get(ch, []):
+		if is_instance_valid(rect):
+			rect.texture = _thumbs[ch]
+	var wait_ms := M.thumb_retry_ms(r.get("headers", PackedStringArray()))
+	if wait_ms < 0 or tries >= THUMB_REFETCH_MAX or not is_inside_tree():
+		return
+	await get_tree().create_timer(wait_ms / 1000.0).timeout
+	if gen == _thumb_gen and is_visible_in_tree():
+		_fetch_thumb(ch, gen, tries + 1)
 
 
 func can_drop_connector(_at: Vector2, data: Variant) -> bool:

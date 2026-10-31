@@ -53,3 +53,17 @@ func test_helpers() -> void:
 	t.eq(M.thumb_channel({"type": "ndi", "value": "ndi://X", "useDirect": true, "thumbnailChannel": 3}), null, "direct NDI: no thumbnail")
 	t.eq(M.thumb_channel({"value": "http://x", "liveThumbChannel": "7"}), 7, "saved thumbnail channel")
 	t.eq(M.drag_payload({"type": "route", "value": "route://1", "label": ""}).label, "route://1", "empty label → value")
+
+
+## WO-887: session-capture re-fetch hint and the plain arrow cursor on Live rows.
+func test_thumb_session_refetch() -> void:
+	t.eq(M.thumb_retry_ms(PackedStringArray(["Content-Type: image/png", "X-Live-Thumb-Session: waiting",
+		"X-Live-Thumb-Retry-Ms: 9500"])), 10500, "pending capture → re-fetch after the server's retry + 1 s")
+	t.eq(M.thumb_retry_ms(PackedStringArray(["x-live-thumb-retry-ms: 0"])), 1000, "header name is case-insensitive")
+	t.eq(M.thumb_retry_ms(PackedStringArray(["X-Live-Thumb-Session: fresh"])), -1, "fresh: final for the session")
+	t.eq(M.thumb_retry_ms(PackedStringArray(["X-Live-Thumb-Retry-Ms: soon"])), -1, "garbage → no re-fetch")
+	t.eq(M.thumb_retry_ms(PackedStringArray()), -1, "no headers → no re-fetch")
+	var src := FileAccess.get_file_as_string("res://features/live/live_sources_panel.gd")
+	t.ok(not src.contains("mouse_default_cursor_shape = Control.CURSOR_DRAG"), "rows keep the normal arrow cursor")
+	t.ok(src.contains("tries >= THUMB_REFETCH_MAX"), "re-fetches are bounded")
+	t.ok(src.contains("panel.set_drag_forwarding("), "rows still drag")

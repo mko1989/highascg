@@ -4,7 +4,6 @@
 'use strict'
 
 const fs = require('fs')
-const path = require('path')
 const crypto = require('crypto')
 const { JSON_HEADERS, jsonBody } = require('../api/response')
 const { defaultProgramChannel } = require('../config/operator-gui-first')
@@ -15,10 +14,39 @@ const {
 	readMeta,
 } = require('./live-thumbnail-cache-store')
 const { captureLiveThumbnailToCache } = require('./live-thumbnail-cache-capture')
-const { ensureInputLiveThumbnail } = require('./live-thumbnail-input-capture')
+const {
+	ensureSessionLiveThumbnail,
+	recaptureLiveThumbnails,
+	markSessionThumbnailFresh,
+} = require('./live-thumbnail-session')
 
 /**
- * GET /api/thumbnail/live/:channel — PNG bytes or triggers lazy capture once.
+ * WO-887 response headers: which session state the served bytes are in.
+ *   X-Live-Thumb-Session  fresh | custom | capturing | waiting | gave_up | idle | no_picture
+ *   X-Live-Thumb-Retry-Ms (capturing / waiting only) when a re-fetch may see this session's capture.
+ * @param {{ phase: string, retryInMs?: number } | null} session
+ */
+function sessionHeaders(session) {
+	if (!session) return {}
+	const h = { 'X-Live-Thumb-Session': session.phase }
+	if (Number.isFinite(session.retryInMs)) h['X-Live-Thumb-Retry-Ms'] = String(Math.round(session.retryInMs))
+	return h
+}
+
+/** @param {string} dest */
+async function statPng(dest) {
+	try {
+		const st = await fs.promises.stat(dest)
+		return st.size > 32 ? st : null
+	} catch {
+		return null
+	}
+}
+
+/**
+ * GET /api/thumbnail/live/:channel — PNG bytes. The first GET of a node session starts that channel's one
+ * session capture (WO-887, live-thumbnail-session.js); until it lands the previous session's PNG is served
+ * as a placeholder. `?refresh=1` / `?force=1` is a raw manual PRINT (stored even when black).
  * @param {object} ctx
  * @param {number} channel
  * @param {Record<string, string>} query
@@ -28,109 +56,71 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
 	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
 	const cfg = ctx.config || {}
 	const force = query.refresh === '1' || query.refresh === 'true' || query.force === '1' || query.force === 'true'
-	const lazy = false
-
 	const dest = cachePngPath(cfg, ch)
-
-	let stat
-	try {
-		stat = fs.existsSync(dest) ? await fs.promises.stat(dest) : null
-	} catch {
-		stat = null
-	}
-
-	// Dedicated capture inputs (DeckLink / V4L2) have no media file behind them, so a look card's
-	// only possible thumbnail is a PRINT of the input channel. Capture lazily here ONLY when no
-	// cached PNG exists (WO-392: capture-once — bus invalidation deletes the PNG, explicit
-	// capture uses the force paths); backoff-gated, so a powered-off camera degrades to the 404
-	// placeholder below instead of retrying per render. PGM/PRV buses are excluded and keep
-	// their cache-or-404 behaviour.
-	if (!force) {
-		const hasCache = !!stat && stat.size > 32
-		const r = await ensureInputLiveThumbnail(ctx, ch, { hasCache })
-		if (r.captured) {
-			try {
-				stat = fs.existsSync(dest) ? await fs.promises.stat(dest) : stat
-			} catch {
-				/* fall through to whatever we already had */
-			}
-		}
-	}
-
-	const etag =
-		stat && stat.size > 32 ? `W/"${Math.floor(stat.mtimeMs)}-${stat.size}"` : null
-
-	if (stat && stat.size > 32 && !force) {
-		// WO-392: clients use STABLE (un-busted) URLs now, so the browser must revalidate on
-		// each use — `no-cache` + ETag/304 keeps that cheap and picks up recaptures immediately.
-		const inm = String(query?.ifNoneMatch || '').trim()
-		if (etag && inm && inm === etag) {
-			return {
-				status: 304,
-				headers: { 'Cache-Control': 'private, no-cache', ETag: etag },
-				body: '',
-			}
-		}
-		const buf = await fs.promises.readFile(dest)
-		return {
-			status: 200,
-			headers: {
-				'Content-Type': 'image/png',
-				'Cache-Control': 'private, no-cache',
-				...(etag ? { ETag: etag } : {}),
-			},
-			body: buf,
-		}
-	}
-
-	if (!lazy && (!stat || stat.size <= 32)) {
-		return {
-			status: 404,
-			headers: { ...JSON_HEADERS, 'X-Live-Thumb-No-Signal': '1', 'Cache-Control': 'no-store' },
-			body: jsonBody({
-				error: 'No cached live thumbnail',
-				hint: 'POST /api/thumbnail/live/capture with { "channel": N } or use the ↻ button in Sources → Live',
-				channel: ch,
-			}),
-		}
-	}
 
 	if (force) {
 		const cap = await captureLiveThumbnailToCache(ctx, ch, { force: true })
 		if (!cap.ok || !cap.path) {
-			return {
-				status: 502,
-				headers: JSON_HEADERS,
-				body: jsonBody({ error: cap.error || 'Capture failed', channel: ch }),
-			}
+			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: cap.error || 'Capture failed', channel: ch }) }
 		}
-		const buf = await fs.promises.readFile(cap.path)
+		markSessionThumbnailFresh(ch)
 		const st2 = await fs.promises.stat(cap.path)
-		const etag2 = `W/"${Math.floor(st2.mtimeMs)}-${st2.size}"`
 		return {
 			status: 200,
 			headers: {
 				'Content-Type': 'image/png',
 				'Cache-Control': 'private, no-cache',
-				ETag: etag2,
+				ETag: `W/"${Math.floor(st2.mtimeMs)}-${st2.size}"`,
+				...sessionHeaders({ phase: 'fresh' }),
 			},
-			body: buf,
+			body: await fs.promises.readFile(cap.path),
 		}
 	}
 
-	return {
-		status: 404,
-		headers: JSON_HEADERS,
-		body: jsonBody({
-			error: 'No cached live thumbnail',
-			hint: 'POST /api/thumbnail/live/capture with { "channel": N }',
-			channel: ch,
-		}),
+	const before = await statPng(dest)
+	const session = await ensureSessionLiveThumbnail(ctx, ch, { customCache: !!before && readMeta(cfg, ch)?.isCustom === true })
+	const stat = await statPng(dest)
+	if (!stat) {
+		return {
+			status: 404,
+			headers: { ...JSON_HEADERS, 'X-Live-Thumb-No-Signal': '1', 'Cache-Control': 'no-store', ...sessionHeaders(session) },
+			body: jsonBody({
+				error: 'No cached live thumbnail',
+				hint: 'POST /api/thumbnail/live/recapture with { "channel": N } (or {} for every live channel)',
+				channel: ch,
+				session: session.phase,
+			}),
+		}
 	}
+
+	// WO-392: clients use STABLE (un-busted) URLs, so the browser must revalidate on each use — `no-cache` +
+	// ETag/304 keeps that cheap and picks up the session capture / a manual recapture immediately.
+	const etag = `W/"${Math.floor(stat.mtimeMs)}-${stat.size}"`
+	const headers = { 'Cache-Control': 'private, no-cache', ETag: etag, ...sessionHeaders(session) }
+	const inm = String(query?.ifNoneMatch || '').trim()
+	if (inm && inm === etag) return { status: 304, headers, body: '' }
+	return { status: 200, headers: { 'Content-Type': 'image/png', ...headers }, body: await fs.promises.readFile(dest) }
 }
 
 /**
- * POST /api/thumbnail/live/capture
+ * POST /api/thumbnail/live/recapture — WO-887 manual recapture (API only, no GUI control by owner request):
+ * `{ "channel": N }`, `{ "channels": [N, …] }` or `{}` for every live channel. Re-runs the session flow
+ * (non-black frame, bounded retries); answers once the captures settle or after a bounded wait.
+ * @param {object} bodyObj
+ * @param {object} ctx
+ */
+async function handleLiveThumbnailRecapturePost(bodyObj, ctx) {
+	const raw = Array.isArray(bodyObj?.channels) ? bodyObj.channels : bodyObj?.channel != null ? [bodyObj.channel] : null
+	const channels = raw ? raw.map((c) => parseInt(String(c), 10)).filter((c) => Number.isFinite(c) && c > 0) : null
+	if (raw && !channels.length) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'channel: positive integer required' }) }
+	}
+	const results = await recaptureLiveThumbnails(ctx, channels)
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, channels: results }) }
+}
+
+/**
+ * POST /api/thumbnail/live/capture — raw PRINT into the cache (stored even when black).
  * @param {object} bodyObj
  * @param {object} ctx
  */
@@ -146,6 +136,7 @@ async function handleLiveThumbnailCapturePost(bodyObj, ctx) {
 			body: jsonBody({ ok: false, channel: ch, error: r.error || 'capture failed' }),
 		}
 	}
+	markSessionThumbnailFresh(ch) // WO-887: a manual capture wins for the rest of the session
 	const bust = meta?.capturedAt ? String(new Date(meta.capturedAt).getTime() || Date.now()) : String(Date.now())
 	return {
 		status: 200,
@@ -235,6 +226,7 @@ async function handleLiveThumbnailUploadPost(req, query, ctx) {
 		isCustom: true,
 	}
 	await fs.promises.writeFile(metaDest, JSON.stringify(fileMeta, null, 0), 'utf8')
+	markSessionThumbnailFresh(ch) // WO-887: the session capture never replaces an upload
 
 	const meta = readMeta(cfg, ch)
 	const bust = meta?.capturedAt ? String(new Date(meta.capturedAt).getTime() || Date.now()) : String(Date.now())
@@ -255,5 +247,6 @@ async function handleLiveThumbnailUploadPost(req, query, ctx) {
 module.exports = {
 	handleLiveThumbnailGet,
 	handleLiveThumbnailCapturePost,
+	handleLiveThumbnailRecapturePost,
 	handleLiveThumbnailUploadPost,
 }

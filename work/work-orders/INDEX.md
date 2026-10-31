@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-797 live WOs (29 open, 123 in progress, 645 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+798 live WOs (29 open, 124 in progress, 645 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -739,7 +739,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 830 DONE [network] LAN hardening: remote crash, injection, secrets (sweep §2, without the auth swi… → 830_WO_lan_hardening_crash_and_injection.md
 - 842 DONE [network+devices-config] Sweep: data loss, replication boot and server-side ops bugs → 842_WO_sweep_data_loss_and_server_ops.md
 
-## media — Media library, thumbnails, ingest, transcode (21)
+## media — Media library, thumbnails, ingest, transcode (22)
 
 - 29 DONE [media] USB Drive Media Ingest → 29_WO_USB_MEDIA_INGEST.md
 - 42 OPEN [media+web-client] Sources browser — live thumbnails (channel/layer, wait-for-play) + thumbnail/PR… → 42_WO_SOURCES_LIVE_THUMBNAILS_AND_MEDIA_THUMB_FOLDER.md
@@ -762,6 +762,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 759 DONE [media+godot-client] Media browser quick-look info: codec · resolution · fps · duration → 759_WO_media_browser_quick_look_column.md
 - 775 DONE [media] media versions: a new version may change the container (previz .mp4 → show .mov) → 775_WO_media_version_container_change.md
 - 818 DONE [media] ⚠ warning mark next to NotchLC files in the media lists (Godot + web) → 818_WO_notchlc_warning_mark.md
+- 887 IN PROGRESS [media+godot-client] Live-source thumbnails months old: capture once per session on a non-black fram… → 887_WO_live_thumbnails_once_per_session.md
 
 ## tracking-vr — Tracking, previs, VR (30)
 

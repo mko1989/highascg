@@ -315,6 +315,18 @@ static func thumb_channel(s: Dictionary) -> Variant:
 	return n if n != null and n > 0 else null
 
 
+## WO-887: the server captures each live thumbnail once per session; while that capture is pending it answers with
+## `X-Live-Thumb-Retry-Ms` (the old placeholder or a 404 meanwhile). The re-fetch delay in ms, or -1 when the served
+## bytes are final for this session (no header). +1 s so the re-fetch lands after the server's attempt.
+static func thumb_retry_ms(headers: PackedStringArray) -> int:
+	for h in headers:
+		var i := h.find(":")
+		if i > 0 and h.substr(0, i).strip_edges().to_lower() == "x-live-thumb-retry-ms":
+			var v := h.substr(i + 1).strip_edges()
+			return clampi(int(v), 0, 600000) + 1000 if v.is_valid_int() else -1
+	return -1
+
+
 ## The drag payload (makeDraggable + the Live tab's extras).
 static func drag_payload(s: Dictionary) -> Dictionary:
 	var out := {"type": s.get("type"), "value": s.get("value"),

@@ -70,26 +70,6 @@ function readMeta(config, channel) {
 	}
 }
 
-/**
- * @param {object} [config]
- * @param {number} channel
- */
-function invalidateLiveThumbnailCache(config, channel) {
-	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
-	const dest = cachePngPath(config || {}, ch)
-	const metaDest = cacheMetaPath(config || {}, ch)
-	try {
-		if (fs.existsSync(dest)) fs.unlinkSync(dest)
-	} catch {
-		/* ok */
-	}
-	try {
-		if (fs.existsSync(metaDest)) fs.unlinkSync(metaDest)
-	} catch {
-		/* ok */
-	}
-}
-
 module.exports = {
 	getLiveThumbnailCacheDir,
 	cachePngPath,
@@ -97,5 +77,4 @@ module.exports = {
 	readMeta,
 	resolveLiveThumbnailTtlMs,
 	isLiveThumbnailMetaStale,
-	invalidateLiveThumbnailCache,
 }

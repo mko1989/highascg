@@ -127,9 +127,6 @@ function coreDefaults() {
 			companionThumbIntervalMs: 1000,
 		},
 		live_thumbnail_ttl_ms: 30000,
-		/** Invalidate cached live thumbs after PGM/PRV activity (no automatic Caspar PRINT). */
-		live_thumbnail_refresh_on_bus: true,
-		live_thumbnail_refresh_delay_ms: 600,
 		editorDefaults: editorDefaultsDefaults(),
 		audioRouting: {
 			programLayout: 'stereo',

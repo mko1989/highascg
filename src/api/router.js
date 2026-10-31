@@ -363,6 +363,7 @@ routes.post('/api/media/ingest-local/cancel', ({ ctx }) => routesMediaIngestLoca
 routes.get('/api/media/ingest-local', ({ ctx }) => routesMediaIngestLocal.handleState(ctx), { requireCaspar: false })
 routes.post('/api/media/cinf', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: false })
 routes.post('/api/thumbnail/live/capture', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: false })
+routes.post('/api/thumbnail/live/recapture', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: false }) // WO-887
 routes.post('/api/thumbnail/live/upload', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: false })
 routes.post('/api/compose-preview/refresh', ({ path, body, ctx }) => routesComposePreview.handlePost(path, body, ctx), { requireCaspar: false })
 routes.get('/api/virtual-camera/status', ({ path, ctx }) => routesVirtualCamera.handleGet(path, ctx), { requireCaspar: false })

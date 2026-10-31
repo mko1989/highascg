@@ -25,6 +25,7 @@ const { resolveCasparCinfMediaId } = require('../media/caspar-cls-id')
 const {
 	handleLiveThumbnailGet,
 	handleLiveThumbnailCapturePost,
+	handleLiveThumbnailRecapturePost,
 } = require('../media/live-thumbnail-cache')
 const { runMediaClsTlsRefresh } = require('../utils/periodic-sync')
 function cinfResponseToStr(data) {
@@ -387,6 +388,10 @@ async function handlePost(path, body, ctx, req, query) {
 	if (path === '/api/thumbnail/live/capture') {
 		const b = parseBody(body)
 		return handleLiveThumbnailCapturePost(b && typeof b === 'object' ? b : {}, ctx)
+	}
+	if (path === '/api/thumbnail/live/recapture') {
+		const b = parseBody(body) // WO-887: manual session recapture, API only
+		return handleLiveThumbnailRecapturePost(b && typeof b === 'object' ? b : {}, ctx)
 	}
 	if (path === '/api/thumbnail/live/upload') {
 		const { handleLiveThumbnailUploadPost } = require('../media/live-thumbnail-cache')

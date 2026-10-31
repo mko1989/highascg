@@ -64,7 +64,7 @@ describe('scenes deck thumbnails', () => {
 
 describe('server serve path supports stable URLs', () => {
 	const handlers = read('src/media/live-thumbnail-cache-handlers.js')
-	const capture = read('src/media/live-thumbnail-input-capture.js')
+	const session = read('src/media/live-thumbnail-session.js')
 
 	it('cached PNGs are served no-cache with ETag so stable URLs revalidate', () => {
 		assert.match(handlers, /'Cache-Control': 'private, no-cache'/, 'stable URLs need revalidation, not max-age')
@@ -72,8 +72,10 @@ describe('server serve path supports stable URLs', () => {
 		assert.doesNotMatch(handlers, /max-age=86400/, 'a long max-age would pin day-old thumbs on stable URLs')
 	})
 
-	it('a GET never PRINTs while a cached PNG exists (capture-once)', () => {
-		assert.match(capture, /if \(hasCache\) return \{ attempt: false, reason: 'has_cache' \}/)
-		assert.doesNotMatch(capture, /stale_cache/, 'TTL-stale recapture must stay deleted (WO-392)')
+	it('a GET PRINTs at most once per node session — never on a timer (WO-887 supersedes WO-392 capture-once)', () => {
+		assert.match(session, /if \(phase\) return \{ attempt: false, reason: `session_\$\{phase\}` \}/, 'one session capture per channel')
+		assert.doesNotMatch(session, /setInterval/, 'no periodic capture loop')
+		assert.doesNotMatch(session, /stale_cache/, 'TTL-stale recapture must stay deleted (WO-392)')
+		assert.doesNotMatch(handlers, /isLiveThumbnailMetaStale/, 'the GET path never recaptures on age')
 	})
 })

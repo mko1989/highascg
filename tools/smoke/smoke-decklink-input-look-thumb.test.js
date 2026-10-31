@@ -5,21 +5,15 @@
  *
  * A look layer whose source is a DeckLink input has no media file, so the deck card used to
  * render nothing. It now resolves to the input channel's live (PRINT) thumbnail, captured
- * lazily server-side ONCE per cache lifetime (WO-392) under a capped backoff.
+ * lazily server-side once per node session on a non-black frame (WO-887; was once per cache lifetime, WO-392).
  *
  * Pure logic + stubs: no Caspar, no ffmpeg, no network, no disk writes.
  */
 
-const { describe, it, beforeEach } = require('node:test')
+const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 
-const {
-	listInputCaptureChannels,
-	isInputCaptureChannel,
-	decideInputThumbnailCapture,
-	ensureInputLiveThumbnail,
-	_gate,
-} = require('../../src/media/live-thumbnail-input-capture')
+const { listInputCaptureChannels, isInputCaptureChannel } = require('../../src/media/live-thumbnail-input-capture')
 
 /** Shape produced by `src/config/routing-map.js` getChannelMap(): PGM 1/2, DeckLink inputs 4..7. */
 const CHANNEL_MAP = {
@@ -35,14 +29,11 @@ const CHANNEL_MAP = {
 	],
 }
 
-/** Silences the once-per-transition warn so a failing-input test does not spam the runner. */
-const CTX = { config: {}, amcp: {}, log: () => {} }
-
 describe('input capture channel classification', () => {
 	it('lists DeckLink (and v4l2) input channels, never program buses', () => {
 		assert.deepEqual(listInputCaptureChannels(CHANNEL_MAP), [4, 5, 6, 7])
 		assert.equal(isInputCaptureChannel(CHANNEL_MAP, 7), true)
-		assert.equal(isInputCaptureChannel(CHANNEL_MAP, 1), false, 'PGM 1 must never PRINT from a GET')
+		assert.equal(isInputCaptureChannel(CHANNEL_MAP, 1), false, 'PGM 1 is a bus, not a capture input')
 		assert.equal(isInputCaptureChannel(CHANNEL_MAP, 8), false, 'audio-only input has no picture')
 	})
 
@@ -53,159 +44,9 @@ describe('input capture channel classification', () => {
 	})
 })
 
-describe('decideInputThumbnailCapture', () => {
-	const base = { isInputChannel: true, hasCache: false, gateAllows: true, amcpReady: true }
-
-	it('captures when an input channel has no cache', () => {
-		assert.deepEqual(decideInputThumbnailCapture(base), { attempt: true, reason: 'no_cache' })
-	})
-
-	it('never captures while ANY cached frame exists — capture-once (WO-392)', () => {
-		assert.deepEqual(decideInputThumbnailCapture({ ...base, hasCache: true }), {
-			attempt: false,
-			reason: 'has_cache',
-		})
-	})
-
-	it('never captures for a non-input channel', () => {
-		assert.deepEqual(decideInputThumbnailCapture({ ...base, isInputChannel: false }), {
-			attempt: false,
-			reason: 'not_input_channel',
-		})
-	})
-
-	it('does not attempt while the backoff window is open, or with Caspar down', () => {
-		assert.deepEqual(decideInputThumbnailCapture({ ...base, gateAllows: false }), {
-			attempt: false,
-			reason: 'backoff',
-		})
-		assert.deepEqual(decideInputThumbnailCapture({ ...base, amcpReady: false }), {
-			attempt: false,
-			reason: 'amcp_disconnected',
-		})
-	})
-})
-
-describe('ensureInputLiveThumbnail', () => {
-	beforeEach(() => _gate.clear())
-
-	it('captures a DeckLink input channel and reports success', async () => {
-		let calls = 0
-		const r = await ensureInputLiveThumbnail(CTX, 7, {
-			channelMap: CHANNEL_MAP,
-			hasCache: false,
-			capture: async () => {
-				calls += 1
-				return { ok: true, path: '/tmp/ch-7.png' }
-			},
-		})
-		assert.deepEqual(r, { captured: true, reason: 'no_cache' })
-		assert.equal(calls, 1)
-		assert.equal(_gate.failures(7), 0)
-	})
-
-	it('leaves the program bus alone', async () => {
-		let calls = 0
-		const r = await ensureInputLiveThumbnail(CTX, 1, {
-			channelMap: CHANNEL_MAP,
-			hasCache: false,
-			capture: async () => {
-				calls += 1
-				return { ok: true }
-			},
-		})
-		assert.equal(r.captured, false)
-		assert.equal(r.reason, 'not_input_channel')
-		assert.equal(calls, 0, 'PGM must not PRINT from a thumbnail GET')
-	})
-
-	it('no-signal input backs off instead of hot-retrying, then recovers', async () => {
-		let calls = 0
-		const failing = async () => {
-			calls += 1
-			return { ok: false, error: 'PRINT produced no PNG (check media path / Caspar logs)' }
-		}
-		const t0 = 1_000_000
-
-		// Camera powered off: DeckLink 4 fails once...
-		const first = await ensureInputLiveThumbnail(CTX, 7, {
-			channelMap: CHANNEL_MAP,
-			hasCache: false,
-			now: t0,
-			capture: failing,
-		})
-		assert.equal(first.captured, false)
-		assert.equal(first.reason, 'capture_failed')
-		assert.equal(calls, 1)
-		assert.equal(_gate.failures(7), 1)
-
-		// ...and the next few deck renders inside the backoff window do NOT re-PRINT.
-		for (const dt of [0, 10, 500, 2000]) {
-			const again = await ensureInputLiveThumbnail(CTX, 7, {
-				channelMap: CHANNEL_MAP,
-				hasCache: false,
-				now: t0 + dt,
-				capture: failing,
-			})
-			assert.equal(again.reason, 'backoff')
-		}
-		assert.equal(calls, 1, 'no hot retry loop while the input is dead')
-
-		// Backoff grows on each real retry (3s → 6s), so a permanently dead input idles down.
-		const retry = await ensureInputLiveThumbnail(CTX, 7, {
-			channelMap: CHANNEL_MAP,
-			hasCache: false,
-			now: t0 + 3000,
-			capture: failing,
-		})
-		assert.equal(retry.reason, 'capture_failed')
-		assert.equal(calls, 2)
-		assert.equal(_gate.failures(7), 2)
-		assert.equal(_gate.delayMs(7), 6000)
-
-		// Camera comes back: one success clears the gate entirely.
-		const ok = await ensureInputLiveThumbnail(CTX, 7, {
-			channelMap: CHANNEL_MAP,
-			hasCache: false,
-			now: t0 + 9000,
-			capture: async () => ({ ok: true, path: '/tmp/ch-7.png' }),
-		})
-		assert.equal(ok.captured, true)
-		assert.equal(_gate.failures(7), 0)
-	})
-
-	it('never hangs on a capture that never settles', async () => {
-		const started = Date.now()
-		const r = await ensureInputLiveThumbnail(CTX, 4, {
-			channelMap: CHANNEL_MAP,
-			hasCache: false,
-			timeoutMs: 300,
-			capture: () => new Promise(() => {}),
-		})
-		assert.equal(r.captured, false)
-		assert.equal(r.reason, 'capture_failed')
-		assert.equal(r.error, 'capture timed out')
-		assert.ok(Date.now() - started < 3000, 'GET must not block on a wedged PRINT')
-	})
-
-	it('does nothing when Caspar is disconnected', async () => {
-		let calls = 0
-		const r = await ensureInputLiveThumbnail(
-			{ config: {}, amcp: null, log: () => {} },
-			7,
-			{
-				channelMap: CHANNEL_MAP,
-				hasCache: false,
-				capture: async () => {
-					calls += 1
-					return { ok: true }
-				},
-			},
-		)
-		assert.equal(r.reason, 'amcp_disconnected')
-		assert.equal(calls, 0)
-	})
-})
+// WO-887 replaced the per-GET backoff gate (`decideInputThumbnailCapture` / `ensureInputLiveThumbnail`) with
+// one non-black capture per node session — its decide / retry / no-hot-loop cases live in
+// smoke-wo887-live-thumb-session.test.js.
 
 describe('deck thumbnail URL resolution for DeckLink-input layers', () => {
 	it('resolves a DeckLink-input layer to its input channel live thumbnail', async () => {

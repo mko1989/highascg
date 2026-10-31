@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-543 routes.
+544 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -494,6 +494,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | * | `/api/thumbnail` | handler | `src/api/routes-media.js` |
 | GET | `/api/thumbnail/*` | registry | `src/api/router.js` |
 | POST | `/api/thumbnail/live/capture` | registry | `src/api/router.js`, `src/api/routes-media.js` |
+| POST | `/api/thumbnail/live/recapture` | registry | `src/api/router.js`, `src/api/routes-media.js` |
 | POST | `/api/thumbnail/live/upload` | registry | `src/api/router.js`, `src/api/routes-media.js` |
 | * | `/api/thumbnails` | handler | `src/api/routes-media.js` |
 | POST | `/api/thumbnails/generate` | handler | `src/api/routes-media.js` |

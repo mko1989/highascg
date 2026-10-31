@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 707,
+	"count": 704,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -486,9 +486,6 @@
 		"src/media/cg-look-thumb-render.js: captureCgThumbPng",
 		"src/media/cg-look-thumb-render.js: deriveLtTemplateId",
 		"src/media/cg-look-thumb-render.js: waitForCgThumbSettle",
-		"src/media/live-thumbnail-input-capture.js: INPUT_CAPTURE_BACKOFF_BASE_MS",
-		"src/media/live-thumbnail-input-capture.js: INPUT_CAPTURE_BACKOFF_MAX_MS",
-		"src/media/live-thumbnail-input-capture.js: INPUT_CAPTURE_TIMEOUT_MS",
 		"src/media/local-ingest.js: MAX_FILES",
 		"src/media/local-ingest.js: isInside",
 		"src/media/local-media-api.js: normalizeTargetFolderId",

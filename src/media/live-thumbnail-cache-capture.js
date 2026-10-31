@@ -15,13 +15,9 @@ const {
 	resolveLiveThumbnailTtlMs,
 	isLiveThumbnailMetaStale,
 } = require('./live-thumbnail-cache-store')
-const { swallow } = require('../utils/swallow')
 
 /** @type {Map<number, Promise<{ ok: boolean, error?: string }>>} */
 const _captureLocks = new Map()
-
-/** @type {Map<number, ReturnType<typeof setTimeout>>} */
-const _refreshTimers = new Map()
 
 /**
  * WO-845: Caspar's PRINT reply names no file — it drops a timestamp-named PNG (`YYYYMMDDTHHMMSS.png`, no channel in
@@ -37,30 +33,6 @@ function serializePrint(fn) {
 	const run = _printChain.then(fn, fn)
 	_printChain = run.catch(() => {})
 	return run
-}
-
-/**
- * Debounced cache invalidation after bus/scene activity (WO-110).
- * Does not run Caspar PRINT — use POST /api/thumbnail/live/capture or the Sources ↻ button.
- * @param {object} ctx
- * @param {number} channel
- * @param {number} [delayMs]
- */
-function scheduleLiveThumbnailRefresh(ctx, channel, delayMs) {
-	const cfg = ctx?.config || {}
-	if (cfg.live_thumbnail_refresh_on_bus === false) return
-	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
-	const delay = Math.max(150, parseInt(String(delayMs ?? cfg.live_thumbnail_refresh_delay_ms ?? 600), 10) || 600)
-	const prev = _refreshTimers.get(ch)
-	if (prev) clearTimeout(prev)
-	_refreshTimers.set(
-		ch,
-		setTimeout(() => {
-			_refreshTimers.delete(ch)
-			const { invalidateLiveThumbnailCache } = require('./live-thumbnail-cache-store')
-			invalidateLiveThumbnailCache(cfg, ch)
-		}, delay),
-	)
 }
 
 /**
@@ -160,10 +132,26 @@ function isLikelyPrintScratchFile(basename) {
 }
 
 /**
+ * Delete Caspar's PRINT scratch PNG from the media root (kept when it is not a recognisable PRINT still).
+ * @param {object} cfg
+ * @param {string} mediaBase
+ * @param {string} srcAbs
+ * @param {boolean} resolvedFromPrintReply
+ */
+async function removePrintStill(cfg, mediaBase, srcAbs, resolvedFromPrintReply) {
+	if (cfg.live_thumbnail_delete_print_stills === false) return
+	const mediaRoot = path.resolve(mediaBase)
+	const underMedia = srcAbs === mediaRoot || srcAbs.startsWith(mediaRoot + path.sep)
+	if (!underMedia || !(resolvedFromPrintReply || isLikelyPrintScratchFile(path.basename(srcAbs)))) return
+	await fs.promises.unlink(srcAbs).catch(() => {})
+}
+
+/**
  * @param {object} ctx
  * @param {number} channel
- * @param {{ force?: boolean }} [opts]
- * @returns {Promise<{ ok: boolean, error?: string, path?: string }>}
+ * @param {{ force?: boolean, accept?: (png: Buffer) => boolean | Promise<boolean> }} [opts] — WO-887: `accept`
+ *   vetoes a frame (black) BEFORE it replaces the cached PNG; a vetoed frame leaves the previous thumbnail in place.
+ * @returns {Promise<{ ok: boolean, error?: string, path?: string, rejected?: boolean }>}
  */
 async function captureLiveThumbnailToCache(ctx, channel, opts = {}) {
 	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
@@ -238,6 +226,11 @@ async function captureLiveThumbnailToCache(ctx, channel, opts = {}) {
 				}
 				return { ok: false, error: 'PRINT PNG was empty or incomplete (retry capture)' }
 			}
+			if (typeof opts.accept === 'function' && !(await opts.accept(buf))) {
+				await fs.promises.unlink(tmpDest).catch(() => {})
+				await removePrintStill(cfg, mediaBase, srcAbs, resolvedFromPrintReply)
+				return { ok: false, rejected: true, error: 'black frame (no picture on the channel yet)' }
+			}
 			await fs.promises.rename(tmpDest, dest)
 			const sha = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16)
 			const fileMeta = {
@@ -250,20 +243,7 @@ async function captureLiveThumbnailToCache(ctx, channel, opts = {}) {
 			await fs.promises.writeFile(tmpMeta, JSON.stringify(fileMeta, null, 0), 'utf8')
 			await fs.promises.rename(tmpMeta, metaDest)
 
-			const delScratch = cfg.live_thumbnail_delete_print_stills !== false
-			const mediaRoot = path.resolve(mediaBase)
-			const underMedia = srcAbs === mediaRoot || srcAbs.startsWith(mediaRoot + path.sep)
-			const shouldRemovePrintStill =
-				delScratch &&
-				underMedia &&
-				(resolvedFromPrintReply || isLikelyPrintScratchFile(path.basename(srcAbs)))
-			if (shouldRemovePrintStill) {
-				try {
-					await fs.promises.unlink(srcAbs)
-				} catch {
-					/* non-fatal */
-				}
-			}
+			await removePrintStill(cfg, mediaBase, srcAbs, resolvedFromPrintReply)
 			return { ok: true, path: dest }
 		} catch (e) {
 			return { ok: false, error: e?.message || String(e) }
@@ -280,7 +260,6 @@ async function captureLiveThumbnailToCache(ctx, channel, opts = {}) {
 
 module.exports = {
 	captureLiveThumbnailToCache,
-	scheduleLiveThumbnailRefresh,
 	/* WO-272: reused by routes-pgm-capture.js (operator capture button). */
 	parsePrintFilenameFromAmcpData,
 }

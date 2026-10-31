@@ -198,10 +198,11 @@ Delete by URL path (encoding pitfalls — prefer `POST /api/media/delete`).
 | GET | `/api/thumbnails` | Caspar thumbnail index |
 | GET | `/api/thumbnail?filename=` | One image (query) |
 | GET | `/api/thumbnail/{filename}` | One image (path) |
-| GET | `/api/thumbnail/live/{channel}` | Cached PRINT still |
+| GET | `/api/thumbnail/live/{channel}` | PRINT still — captured once per node session on a non-black frame (WO-887) |
 | POST | `/api/thumbnails/generate` | Generate one |
 | POST | `/api/thumbnails/generate-all` | Generate all |
-| POST | `/api/thumbnail/live/capture` | Capture from PRINT |
+| POST | `/api/thumbnail/live/capture` | Raw capture from PRINT (stored even when black) |
+| POST | `/api/thumbnail/live/recapture` | Manual session recapture: `{channel}`, `{channels:[…]}` or `{}` = all live channels (WO-887, API only) |
 | POST | `/api/thumbnail/live/upload` | Upload still |
 
 Thumbnail GET tries **local ffmpeg cache** first (`hq=1` default); Caspar retrieve with `?fallback=1`.
