@@ -50,6 +50,7 @@ var _reader: Variant  # ShmNative or ShmReader (same interface)
 var _native := false
 var _tex := ShmTexture.new()
 var _live := false
+var _fresh := 0  # frames seen since the signal came (back): a ring left by a closed window yields one, a running game many
 var _t := 0.0
 var _kick := 0.0
 var _bass := 0.0
@@ -103,11 +104,14 @@ static func source_lines(w: int, h: int) -> int:
 
 func step(p: Dictionary, delta: float, burst: bool) -> void:
 	if _reader.poll():
+		_fresh += 1
 		if _native:
 			_tex.update_native(_reader.src)
 		else:
 			_tex.update(_reader.frame, _reader.width, _reader.height)
-	_live = _reader.width > 0 and not _reader.signal_lost
+	if _reader.signal_lost:
+		_fresh = 0
+	_live = _reader.width > 0 and not _reader.signal_lost and _fresh >= 2  # a stale ring's last frame never flashes up
 	_quad.visible = _live
 	if burst:
 		_kick = 1.0

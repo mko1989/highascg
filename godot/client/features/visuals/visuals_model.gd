@@ -177,7 +177,8 @@ static func params_of(v: Variant) -> Dictionary:
 ## `project.visuals` → {graph, params, output: {screen, layer, size}, sync, scene, overlay} with every field present. `sync`
 ## (WO-866): ms the drum pulses move against the room sound, −300..300 (visuals_sync.gd). `scene` / `overlay` (WO-873): the main
 ## scene and the second layer ("" = none, never the main scene twice). `shader` (WO-874): the library shader id the Shader scene
-## runs ("" = none picked). `game` (WO-876): the ROM the Game scene's Play opens ("" = none).
+## runs ("" = none picked). `game` (WO-876): the ROM the Game scene's Play opens ("" = none). `fade` (WO-877): seconds a scene
+## change crossfades (0 = cut); `looks`: the stored looks, raw (visuals_looks.gd normalize() makes them safe).
 static func slice_of(project: Variant) -> Dictionary:
 	var v: Variant = project.get("visuals") if project is Dictionary else null
 	var d: Dictionary = v if v is Dictionary else {}
@@ -189,7 +190,8 @@ static func slice_of(project: Variant) -> Dictionary:
 			"size": clampi(int(_num(o.get("size"))), 0, RENDER_SIZES.size() - 1)},
 		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0), "scene": main, "overlay": over,
 		"shader": str(d.get("shader", "")) if d.get("shader") is String else "",
-		"game": str(d.get("game", "")) if d.get("game") is String else ""}
+		"game": str(d.get("game", "")) if d.get("game") is String else "",
+		"fade": clampf(_num(d.get("fade", 1.0)), 0.0, 10.0), "looks": d.get("looks") if d.get("looks") is Array else []}
 
 
 static func scene_ids() -> Array:

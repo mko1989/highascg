@@ -96,7 +96,8 @@ func test_slice_screens_and_bodies() -> void:
 func test_tab_builds_headless() -> void:
 	var tab: Control = Tab.new()
 	tab._ready()  # the runner's root is not inside a tree yet (test_inspector_panel.gd does the same)
-	t.ok(tab.out_vp.get_child(0) == tab.scene, "the scene renders in the output viewport")
+	t.ok(tab.scene.get_parent() == tab.mixer.decks[tab.mixer.live], "the scene renders in the live deck (WO-877)")
+	t.ok(tab.out_vp == tab.mixer.out_vp, "the canvas is the mixer's output")
 	t.eq(tab.flow.get_children().filter(func(c: Node) -> bool: return c is GraphNode).size(), M.default_graph().nodes.size(),
 		"Flow view shows the starter graph")
 	t.ok(tab.can_send() != "" or tab.page.screen_channel() > 0, "send refuses with a reason when it cannot")

@@ -13,6 +13,7 @@ const MAX_IN_FLIGHT := 2
 
 var _in_flight := 0
 var _rd: RenderingDevice
+var _fps := 50
 
 
 static func available() -> bool:
@@ -25,6 +26,7 @@ func start(vp: SubViewport, ring_name: String, fps := 50) -> String:
 	if not available():
 		return "libhshm_sink is not loaded"
 	viewport = vp
+	_fps = fps
 	sink = ClassDB.instantiate("HshmSink")
 	if not sink.open(ring_name, vp.size.x, vp.size.y, fps):
 		var err: String = sink.get_error()
@@ -47,7 +49,7 @@ func _process(_delta: float) -> void:
 	if sink == null or viewport == null:
 		return
 	if viewport.size != Vector2i(sink.get_width(), sink.get_height()):
-		var err := start(viewport, sink.get_name())  # resized: re-open, Caspar picks up the new geometry
+		var err := start(viewport, sink.get_name(), _fps)  # resized: re-open (same rate), Caspar picks up the new geometry
 		if err != "":
 			push_warning("shm_out: %s" % err)
 		return

@@ -4,6 +4,7 @@ extends VBoxContainer
 ## per-drum detector sensitivity (the box's `/api/audio/parts-sensitivity`, 0.5 = the measured tuning) and Sync.
 
 const M := preload("res://features/visuals/visuals_model.gd")
+const Show := preload("res://features/visuals/visuals_show.gd")
 
 signal params_changed(params: Dictionary)
 signal output_changed(output: Dictionary)
@@ -40,10 +41,14 @@ var _game_play: Button
 var _game_note: Label
 var _game_paths := []
 var _game_want := ""
+var show_panel: Show  # WO-877: looks, fade, master — the tab wires its signals
 
 
 func _init() -> void:  # built up front: the tab fills it before the Inspector adopts it
 	add_theme_constant_override("separation", 6)
+	add_child(_heading("Show"))
+	show_panel = Show.new()
+	add_child(show_panel)
 	add_child(_heading("Visuals"))
 	_scene = OptionButton.new()
 	_scene.tooltip_text = "The visual (WO-873 scene library)"

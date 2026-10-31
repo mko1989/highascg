@@ -94,6 +94,7 @@ func play(rom: String, screen: int) -> String:
 
 func stop() -> void:
 	if running():
-		OS.kill(pid)  # the window cannot unlink its ring when killed; the next start reuses it (WO-745)
+		OS.kill(pid)  # the window cannot unlink its ring when killed: unlink it here, or its last frame lingers (WO-877)
+		DirAccess.remove_absolute("/dev/shm/highascg-" + RING)
 	pid = 0
 	playing = ""

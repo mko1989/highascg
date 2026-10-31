@@ -11,13 +11,19 @@ const Flow := preload("res://features/visuals/visuals_flow.gd")
 const Page := preload("res://features/visuals/visuals_page.gd")
 const Sync := preload("res://features/visuals/visuals_sync.gd")
 const Launcher := preload("res://features/visuals/game_launcher.gd")
+const Mixer := preload("res://features/visuals/visuals_mixer.gd")
+const Looks := preload("res://features/visuals/visuals_looks.gd")
+const Probes := preload("res://features/visuals/visuals_probes.gd")
 const Publisher := preload("res://features/shm_out/viewport_publisher.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const AUDIO_STALE_MS := 1000
 
 var slice := {}
-var out_vp: SubViewport
-var scene: Stage
+var out_vp: SubViewport  # the canvas: the mixer's two decks mixed (WO-877)
+var mixer: Mixer
+var scene: Stage:  # the live deck's stage
+	get:
+		return mixer.stage()
 var flow: Flow
 var page: Page
 var publisher: Publisher
@@ -35,20 +41,17 @@ var _orbit := Vector3(0.0, 0.25, 16.0)  # yaw, pitch, distance
 var _view3d: SubViewportContainer
 var _mode := "flow"
 var _shader_list := []  # WO-874: GET /api/shaders rows, fetched once the Shader scene is first used
-var _shader_cfg := {}  # the config on stage
 var _shader_seq := 0
 var launcher := Launcher.new()  # WO-876: the Game scene's window
 var _game_error := ""
+var _shader_cache := {}  # WO-877: id → config, so a look's shader is ready before its fade starts
+var _looks := []
 
 
 func _ready() -> void:
-	var world := World3D.new()
-	out_vp = SubViewport.new()
-	out_vp.world_3d = world
-	out_vp.size = M.RENDER_SIZES[0]
-	add_child(out_vp)
-	scene = Stage.new()
-	out_vp.add_child(scene)
+	mixer = Mixer.new()
+	add_child(mixer)
+	out_vp = mixer.out_vp
 	_canvas = TextureRect.new()
 	_canvas.texture = out_vp.get_texture()
 	_canvas.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -77,7 +80,8 @@ func _ready() -> void:
 	_view3d.stretch = true
 	_view3d.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var vp3 := SubViewport.new()
-	vp3.world_3d = world
+	vp3.world_3d = scene.get_parent().world_3d
+	mixer.switched.connect(func(s: Node3D) -> void: vp3.world_3d = s.get_parent().world_3d)  # the orbit follows the live deck
 	_orbit_cam = Camera3D.new()
 	vp3.add_child(_orbit_cam)
 	_view3d.add_child(vp3)
@@ -101,14 +105,14 @@ func _ready() -> void:
 	page.scenes_changed.connect(func(main: String, overlay: String) -> void:
 		slice.scene = main
 		slice.overlay = overlay if overlay != main else ""
-		scene.set_layers(slice.scene, slice.overlay)
-		_fetch_shader()
+		_go(false)
 		_store())
 	page.shader_changed.connect(func(id: String) -> void:
 		slice.shader = id
-		_fetch_shader()
+		_go(true)  # WO-877: another shader crossfades in too
 		_store())
 	page.burst_pressed.connect(func() -> void: scene.fire())
+	_wire_show(page.show_panel)
 	page.game_changed.connect(func(path: String) -> void:
 		slice.game = path
 		_store()
@@ -129,7 +133,7 @@ func _ready() -> void:
 	if _g("Ws"):
 		_g("Ws").on("audio_fft", func(d: Variant) -> void:
 			_buses = M.buses_of(d)
-			scene.audio_frame(d)
+			mixer.audio_frame(d)
 			_audio_at = Time.get_ticks_msec()
 			Sync.observe(_sync_state, d, _buses, _audio_at))
 	if _g("Store"):
@@ -143,11 +147,11 @@ func _ready() -> void:
 	_set_mode(_mode)
 	_on_shown()
 	if _g("Config") and _g("Config").args.has("probe-visuals-send"):  # dev: --probe-visuals-send=<screen index>:<seconds>
-		_probe_send.call_deferred(str(_g("Config").args["probe-visuals-send"]))
+		(func() -> void: Probes.send(self, str(_g("Config").args["probe-visuals-send"]))).call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-shots"):  # dev: --probe-visuals-shots=<dir> (WO-873)
-		_probe_shots.call_deferred(str(_g("Config").args["probe-visuals-shots"]))
+		(func() -> void: Probes.shots(self, str(_g("Config").args["probe-visuals-shots"]))).call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-shaders"):  # dev: --probe-visuals-shaders=<dir> (WO-874)
-		_probe_shaders.call_deferred(str(_g("Config").args["probe-visuals-shaders"]))
+		(func() -> void: Probes.shaders(self, str(_g("Config").args["probe-visuals-shaders"]))).call_deferred()
 
 
 func _exit_tree() -> void:
@@ -173,9 +177,12 @@ func _load() -> void:
 	slice = M.slice_of(_project())
 	page.set_games(Launcher.games())
 	flow.set_graph(slice.graph)
-	scene.set_layers(slice.scene, slice.overlay)
+	_looks = Looks.normalize(slice.looks)
+	slice.looks = _looks
+	_go(false)
 	page.set_state(slice, _cm())
-	_fetch_shader()
+	page.show_panel.set_state(slice.fade, mixer.level, mixer.blackout)
+	page.show_panel.set_looks(_looks, Looks.showing(_looks, slice))
 	_resize()
 	_sync_send_ui("")
 
@@ -201,12 +208,38 @@ func _game_status() -> void:
 	page.set_game_status(launcher.running(), text)
 
 
-## WO-874: the Shader scene's code from the box's library (list once, then the picked config); the page shows why it is dark.
-func _fetch_shader() -> void:
-	if not "shader" in [slice.scene, slice.overlay]:
-		return
+## WO-877: the slice's scenes on stage — a change crossfades over `fade` (visuals_mixer.gd); a shader is fetched first, so a
+## look with one never fades in dark. `force`: fade even when the scenes match (a look with another shader or parameters).
+func _go(force := false) -> void:
 	_shader_seq += 1
 	var seq := _shader_seq
+	var uses := "shader" in [slice.scene, slice.overlay]
+	var cfg: Variant = null
+	if uses and str(slice.shader) != "":
+		cfg = await _shader_config(str(slice.shader))
+		if seq != _shader_seq:
+			return  # a newer pick is on its way
+	mixer.go(slice.scene, slice.overlay, cfg, slice.fade, force)
+	if uses:
+		_shader_status()
+
+
+## WO-874: a library shader's config (GET /api/shaders/:id), cached; null without the box.
+func _shader_config(id: String) -> Variant:
+	if _shader_cache.has(id):
+		return _shader_cache[id]
+	var api: Variant = _g("DevicesTarget").box_api if _g("DevicesTarget") else null
+	if api == null:
+		return null
+	var r: Dictionary = await api.get_json("/api/shaders/" + id.uri_encode())
+	if not r.get("ok") or not r.get("data") is Dictionary:
+		return {"id": id}
+	_shader_cache[id] = r.data
+	return r.data
+
+
+## WO-874: the picker's list (fetched once) and why the Shader scene is dark, if it is.
+func _shader_status() -> void:
 	var api: Variant = _g("DevicesTarget").box_api if _g("DevicesTarget") else null
 	if api == null:
 		page.set_shader_status("No box connection: the shader library lives on the box.")
@@ -216,18 +249,70 @@ func _fetch_shader() -> void:
 		if l.get("ok") and l.get("data") is Dictionary and l.data.get("shaders") is Array:
 			_shader_list = l.data.shaders
 			page.set_shaders(_shader_list)
-	var id := str(slice.shader)
-	if id == "":
-		scene.set_shader(null)
+	if str(slice.shader) == "":
 		page.set_shader_status("Pick a shader.")
+	else:
+		page.set_shader_status("" if scene.shader_error == "" else "Shader: " + scene.shader_error)
+
+
+func _wire_show(sp: Node) -> void:
+	sp.recall.connect(recall)
+	sp.save.connect(func(i: int) -> void:
+		var l := Looks.capture(slice, str(_looks[i].name) if i >= 0 and i < _looks.size() else "")
+		if i >= 0 and i < _looks.size():
+			_looks[i] = l
+		elif _looks.size() < Looks.MAX:
+			_looks.append(l)
+		_looks_changed())
+	sp.rename.connect(func(i: int, n: String) -> void:
+		if i >= 0 and i < _looks.size():
+			_looks[i].name = n.strip_edges().left(40) if n.strip_edges() != "" else Looks.auto_name(_looks[i])
+			_looks_changed())
+	sp.remove.connect(func(i: int) -> void:
+		if i >= 0 and i < _looks.size():
+			_looks.remove_at(i)
+			_looks_changed())
+	sp.fade_changed.connect(func(v: float) -> void:
+		slice.fade = v
+		_store())
+	sp.level_changed.connect(func(v: float) -> void: mixer.level = v)
+	sp.blackout_toggled.connect(func(on: bool) -> void: mixer.blackout = on)
+
+
+## WO-877: look `i` on stage with the fade (its scenes, shader, game, parameters and Flow).
+func recall(i: int) -> void:
+	if i < 0 or i >= _looks.size():
 		return
-	if _shader_cfg.get("id") != id:
-		var r: Dictionary = await api.get_json("/api/shaders/" + id.uri_encode())
-		if seq != _shader_seq:
-			return  # a newer pick is on its way
-		_shader_cfg = r.data if r.get("ok") and r.get("data") is Dictionary else {"id": id}
-	var e := scene.set_shader(_shader_cfg)
-	page.set_shader_status("" if e == "" else "Shader: " + e)
+	slice = Looks.apply(slice, _looks[i])
+	flow.set_graph(slice.graph)
+	page.set_state(slice, _cm())
+	page.show_panel.set_looks(_looks, i)
+	_store()
+	_go(true)
+
+
+func _looks_changed() -> void:
+	slice.looks = _looks
+	page.show_panel.set_looks(_looks, Looks.showing(_looks, slice))
+	_store()
+
+
+## Show keys while the Visuals are shown (text fields take their own keys first): 1–9 recall a look, Space bursts, B blackout.
+func _unhandled_key_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k == null or not k.pressed or k.echo or not is_visible_in_tree() or k.is_command_or_control_pressed() or k.alt_pressed:
+		return
+	var i := Looks.key_index(k.keycode)
+	if i >= 0 and i < _looks.size():
+		recall(i)
+	elif k.keycode == KEY_SPACE:
+		scene.fire()
+	elif k.keycode == KEY_B:
+		mixer.blackout = not mixer.blackout
+		page.show_panel.set_state(slice.fade, mixer.level, mixer.blackout)
+	else:
+		return
+	get_viewport().set_input_as_handled()
 
 
 func _store() -> void:
@@ -244,7 +329,7 @@ func _resize() -> void:
 	var res: Array = cm.get("programResolutions", []) if cm is Dictionary and cm.get("programResolutions") is Array else []
 	var i := int(slice.output.screen)
 	var r: Dictionary = res[i] if i < res.size() and res[i] is Dictionary else {}
-	out_vp.size = M.render_size(int(slice.output.size), float(r.get("w", 0)), float(r.get("h", 0)))
+	mixer.resize(M.render_size(int(slice.output.size), float(r.get("w", 0)), float(r.get("h", 0))))
 
 
 func _process(delta: float) -> void:
@@ -252,6 +337,7 @@ func _process(delta: float) -> void:
 	_trace.clear()
 	var buses: Dictionary = Sync.apply(_sync_state, _buses, slice.sync, Time.get_ticks_msec()) if live else M.buses_of(null)
 	scene.params = M.evaluate(slice.graph, buses, slice.params, _env, delta, _trace)
+	mixer.step(delta)
 	if _mode == "flow" and is_visible_in_tree():
 		flow.show_levels(_trace)
 	if _mode == "3d":
@@ -298,7 +384,7 @@ func _orbit_input(e: InputEvent) -> void:
 ## Shown or on air → render every frame; otherwise the canvas sleeps (the publisher keeps it on while sending).
 func _on_shown() -> void:
 	var shown := is_visible_in_tree()
-	out_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if shown or not sending.is_empty() else SubViewport.UPDATE_DISABLED
+	mixer.set_running(shown or not sending.is_empty())
 	set_process(shown or not sending.is_empty())
 	if InspectorPanel.current == null:
 		return
@@ -352,83 +438,3 @@ func _sync_send_ui(why: String) -> void:
 	elif note == "":
 		note = can_send()
 	page.set_sending(on, can_send() == "", note)
-
-
-## dev probe (no pointer on the owner's screen): send to a screen for some seconds, print each step, stop.
-func _probe_send(arg: String) -> void:
-	var p := arg.split(":")
-	await get_tree().create_timer(4.0).timeout
-	slice.output.screen = int(p[0])
-	page.set_state(slice, _cm())
-	_resize()
-	await send(true)
-	print("[probe-visuals] send: ", sending, " · ", page._note.text)
-	await get_tree().create_timer(float(p[1]) if p.size() > 1 else 10.0).timeout
-	await send(false)
-	print("[probe-visuals] stopped: ", sending.is_empty())
-
-
-## dev probe (WO-873): each scene (and tunnel + particles) with a burst, the canvas saved as <dir>/<scene>.png, then quit.
-func _probe_shots(dir: String) -> void:
-	await get_tree().create_timer(3.0).timeout
-	out_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	set_process(true)
-	RenderingServer.viewport_set_measure_render_time(out_vp.get_viewport_rid(), true)
-	var r: Dictionary = await _g("DevicesTarget").box_api.get_json("/api/shaders/sh-sa-ribbons")  # WO-874 layer shots
-	scene.set_shader(r.data if r.get("ok") else null)
-	for pair in [["rings", ""], ["particles", ""], ["starfield", ""], ["tunnel", ""], ["tunnel", "particles"],
-			["shader", "particles"], ["tunnel", "shader"], ["spectrum", ""], ["spectrum", "shader"], ["tunnel", "spectrum"],
-			["game", ""], ["tunnel", "game"], ["game", "spectrum"]]:
-		scene.set_layers(pair[0], pair[1])
-		await get_tree().create_timer(1.0).timeout
-		var gpu := 0.0
-		for i in 30:  # GPU ms of the canvas viewport, mean over 30 frames
-			await get_tree().process_frame
-			gpu += RenderingServer.viewport_get_measured_render_time_gpu(out_vp.get_viewport_rid()) / 30.0
-		if pair[0] != "spectrum":  # WO-875: the spectrum shots show the music, not a burst
-			scene.fire()
-		await get_tree().create_timer(0.25).timeout
-		var shot: String = str(pair[0]) + ("+" + str(pair[1]) if pair[1] != "" else "")
-		var err := out_vp.get_texture().get_image().save_png("%s/%s.png" % [dir, shot])
-		print("[probe-visuals] shot %s → %s · canvas %dx%d GPU %.2f ms" % [shot, error_string(err), out_vp.size.x, out_vp.size.y, gpu])
-	get_tree().quit()
-
-
-## dev probe (WO-874): every library shader as the main scene for 1 s — compile result, canvas GPU ms (mean of 20 frames),
-## mean brightness — and a 320-wide shot <dir>/<id>.png; then quit.
-func _probe_shaders(dir: String) -> void:
-	await get_tree().create_timer(3.0).timeout
-	out_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	set_process(true)
-	RenderingServer.viewport_set_measure_render_time(out_vp.get_viewport_rid(), true)
-	slice.scene = "shader"
-	slice.overlay = ""
-	scene.set_layers("shader", "")
-	var api: Variant = _g("DevicesTarget").box_api
-	var l: Dictionary = await api.get_json("/api/shaders")
-	var list: Array = l.data.shaders if l.get("ok") else []
-	print("[probe-shaders] %d shaders, canvas %dx%d" % [list.size(), out_vp.size.x, out_vp.size.y])
-	for row in list:
-		var r: Dictionary = await api.get_json("/api/shaders/" + str(row.id).uri_encode())
-		var e := scene.set_shader(r.data if r.get("ok") else {})
-		await get_tree().create_timer(0.8).timeout
-		var gpu := 0.0
-		for i in 20:
-			await get_tree().process_frame
-			gpu += RenderingServer.viewport_get_measured_render_time_gpu(out_vp.get_viewport_rid()) / 20.0
-		var img := out_vp.get_texture().get_image()
-		img.resize(320, maxi(1, 320 * img.get_height() / img.get_width()))
-		var lum := 0.0
-		for y in range(0, img.get_height(), 4):
-			for x in range(0, img.get_width(), 4):
-				lum += img.get_pixel(x, y).get_luminance()
-		lum /= ceilf(img.get_height() / 4.0) * ceilf(img.get_width() / 4.0)
-		img.save_png("%s/%s.png" % [dir, row.id])
-		var st := 0.0
-		for layer in scene.layers:
-			if layer.has_method("set_shader"):
-				st = float(layer.get("runner").gpu_ms)
-		print("[probe-shaders] %s · %s · canvas GPU %.2f ms · shader GPU %.2f ms · lum %.3f" % [row.id, "OK" if e == "" else e,
-			gpu, st, lum])
-	get_tree().quit()
-

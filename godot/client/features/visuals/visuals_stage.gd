@@ -33,6 +33,7 @@ var _audio_at := -AUDIO_STALE_MS
 var _smoother := Smooth.new()
 var _smooth_cfg: Variant = null  # WO-875: the node's audioCapture.spectrum, from each frame
 var _shown := PackedByteArray()
+var start_scene := "rings"  # WO-877: "" for the mixer's idle deck
 
 
 func _ready() -> void:
@@ -49,34 +50,48 @@ func _ready() -> void:
 	_env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 	we.environment = _env
 	add_child(we)
-	if _ids.is_empty():
-		set_layers("rings", "")
+	if _ids.is_empty() and start_scene != "":
+		set_layers(start_scene, "")
 	_process(0.0)
+
+
+## The ids set_layers puts on stage: unknown main → rings, a second layer only when known and not the main again.
+static func want(main: String, overlay: String) -> Array:
+	var w := [main if SCENES.has(main) else "rings"]
+	if SCENES.has(overlay) and overlay != w[0]:
+		w.append(overlay)
+	return w
 
 
 ## Main scene and second layer by id ("" = none); unknown ids fall back to rings / none. Rebuilds only what changed.
 func set_layers(main: String, overlay: String) -> void:
-	var want := [main if SCENES.has(main) else "rings"]
-	if SCENES.has(overlay) and overlay != want[0]:
-		want.append(overlay)
-	if want == _ids:
+	var w := want(main, overlay)
+	if w == _ids:
 		return
-	for l in layers:
-		l.queue_free()
-	layers.clear()
-	for id in want:
+	clear()
+	for id in w:
 		var s: Node3D = SCENES[id].new()
 		s.name = id
 		if s.has_method("set_overlay"):
 			s.set_overlay(not layers.is_empty())
 		add_child(s)
 		layers.append(s)
-	_ids = want
+	_ids = w
 	_apply_shader()
+
+
+## WO-877: no scenes (the mixer's idle deck) — nothing renders, nothing reads a ring.
+func clear() -> void:
+	for l in layers:
+		l.queue_free()
+	layers.clear()
+	_ids = []
 
 
 ## WO-874: the library shader the Shader scene runs (GET /api/shaders/:id; null = none). Its compile error, or "".
 func set_shader(cfg: Variant) -> String:
+	if typeof(cfg) == typeof(_shader_cfg) and cfg == _shader_cfg:
+		return shader_error  # WO-877: the same shader again (a reload, a look with the same one) is no recompile, no time jump
 	_shader_cfg = cfg
 	return _apply_shader()
 
