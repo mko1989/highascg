@@ -323,6 +323,9 @@ home/casparcg/.highascg/run/*
 # WO-870 31.10: the WO-868 switch backups (projects incl. _trash, a config snapshot with the box identity) — box-local.
 home/casparcg/.highascg/backup
 home/casparcg/.highascg/backup/*
+# WO-876 31.10: the owner's game ROMs are personal files — box-local (the libretro cores in retro/cores ship).
+home/casparcg/.highascg/retro/games
+home/casparcg/.highascg/retro/games/*
 home/casparcg/.config/Ultralytics
 home/casparcg/.config/Ultralytics/*
 home/casparcg/.config/google-chrome-for-testing

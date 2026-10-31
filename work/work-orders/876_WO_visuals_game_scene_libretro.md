@@ -1,7 +1,7 @@
 # WO-876 — Visuals: a classic game as a scene / layer (libretro window → ring → effects)
 
 **Area:** godot-client, engine
-**Status: IN PROGRESS (31.10: Game scene + launcher + core installer; real Nestopia core proven on Xvfb with a test cart incl. input; waits for a real ROM, Play on the operator screen, a gamepad and Send on air)**
+**Status: IN PROGRESS (31.10: Game scene + launcher + core installer; real Nestopia core proven on Xvfb with a test cart incl. input and with three real ROMs; ROMs kept off the ISO; waits for Play on the operator screen, a gamepad and Send on air)**
 
 Owner, 31.10: *"Also as part of the visuals I'd like to implement a classic games emulator, so I can run contra Mario or
 whatever use it as a layer in visuals with effects etc, but play normally on the operator monitor with keyboard/gamepad
@@ -66,5 +66,12 @@ input. Find open source projects that we can borrow from and start building it i
     An `xdotool key` tap (down+up inside one frame) is missed — the core polls once per frame; a human press is longer.
   - Visuals probe (second client on :377, scratch `XDG_DATA_HOME`, the live server): game, tunnel+game (keyed layer 2),
     game+spectrum, and a crossfade out of game+spectrum all show the Nestopia picture; canvas GPU 0.11–0.12 ms.
-- Not yet: a real game ROM (owner: ROMs in `~/.highascg/retro/games`), Play from the GUI
-  on the operator screen, a gamepad, the game on air through Send.
+- Real ROMs, 31.10 (owner's files: Super Mario Bros. + Duck Hunt, Contra, Super C — mappers 66, 2, 4/MMC3, so three
+  different cartridge boards), unzipped into `~/.highascg/retro/games`. Each on the real Nestopia core on a private
+  Xvfb with `run-retro.sh --ring retrotest`: title screen → Start (Enter, held) → in game (SMB World 1-1, Contra
+  stage 1, Super C Area 1 with its MMC3 palette cycling) → Right held 2 s (Mario walks, the level scrolls); the ring
+  (6.6 MB) changed between every two samples. Screenshots in the session scratchpad.
+- ISO: `~/.highascg/retro/games` was NOT excluded — the next produce would have shipped the ROMs. Now excluded in both
+  lists (cores in `retro/cores` still ship), checked by `verify-iso-squashfs-excludes.sh` and pinned in
+  `smoke-eggs-exclude-lists.test.js` (41 / 0). `media/games` is covered by the existing `media/*` line.
+- Not yet: Play from the GUI on the operator screen, a gamepad, the game on air through Send.

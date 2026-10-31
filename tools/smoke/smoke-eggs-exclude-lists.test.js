@@ -266,6 +266,8 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 				'home/casparcg/.highascg/run/caspar-screens-ready',
 				// WO-870 31.10: the WO-868 switch backup rode in (projects incl. _trash + a config snapshot)
 				'home/casparcg/.highascg/backup/wo868-2026-10-30T17-12-06-237Z/projects/_trash/x.json',
+				// WO-876 31.10: the owner's ROMs stay box-local
+				'home/casparcg/.highascg/retro/games/Contra (USA).nes',
 				'home/casparcg/highascg/bin/casparcg.prev',
 				'home/casparcg/highascg/godot/extensions/hshm/build/CMakeCache.txt',
 				'home/casparcg/bridge/media',
@@ -279,6 +281,7 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 			for (const p of [
 				'home/casparcg/.highascg/log',
 				'home/casparcg/.highascg/run',
+				'home/casparcg/.highascg/retro/cores/nestopia_libretro.so',
 				'home/casparcg/highascg/bin/casparcg',
 				'home/casparcg/highascg/godot/extensions/hshm/bin/libhshm.so',
 				'home/casparcg/.config/openbox/rc.xml',
