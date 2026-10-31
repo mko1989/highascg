@@ -1,8 +1,9 @@
 extends RefCounted
 ## WO-885 — Sources ▸ Visuals: the catalog (folders, themes, filter, drag payload, what a drop does to the slice), the
-## thumbnail beat, the Inspector's Scene / Layer 2 lines, and the canvas taking a drop.
+## thumbnail beat, the Inspector's layer list (WO-890), and the canvas taking a drop.
 
 const C := preload("res://features/visuals/visuals_catalog.gd")
+const L := preload("res://features/visuals/visuals_layers.gd")
 const M := preload("res://features/visuals/visuals_model.gd")
 const Thumbs := preload("res://features/visuals/visuals_thumbs.gd")
 const Tab := preload("res://features/visuals/visuals_tab.gd")
@@ -54,27 +55,25 @@ func test_filter() -> void:
 func test_parse_and_drop() -> void:
 	t.eq(C.parse({"type": "media", "value": "x"}), null, "a media row is not a visual")
 	t.eq(C.parse({"type": "visual", "scene": ""}), null, "no scene")
-	var s := M.slice_of({"visuals": {"scene": "tunnel", "overlay": "particles", "shader": "a"}})
-	var d := C.apply_drop(s, {"type": "visual", "scene": "shader", "shader": "b"}, false)
-	t.eq([d.scene, d.overlay, d.shader], ["shader", "particles", "b"], "main ← shader b, layer 2 kept")
-	t.eq(s.scene, "tunnel", "the slice passed in is not changed")
-	d = C.apply_drop(s, {"type": "visual", "scene": "particles"}, false)
-	t.eq([d.scene, d.overlay], ["particles", ""], "the main scene never also sits on layer 2")
-	d = C.apply_drop(s, {"type": "visual", "scene": "rings"}, true)
-	t.eq([d.scene, d.overlay], ["tunnel", "rings"], "Shift / Layer 2 → layer 2")
-	d = C.apply_drop(M.slice_of({"visuals": {"scene": "shader", "shader": "a"}}), {"type": "visual", "scene": "shader", "shader": "c"}, true)
-	t.eq([d.scene, d.overlay, d.shader], ["shader", "", "c"], "a shader as layer 2 over a Shader main swaps the one shader")
-	d = C.apply_drop(s, {"type": "visual", "scene": "game", "game": "/g/x.nes"}, false)
-	t.eq([d.scene, d.game], ["game", "/g/x.nes"], "a ROM")
+	var s := M.slice_of({"visuals": {"scene": "tunnel", "overlay": "particles"}})
+	var r := C.apply_drop(s, {"type": "visual", "label": "Ribbons", "scene": "shader", "shader": "b"}, -1)
+	var d: Dictionary = r.slice
+	t.eq(d.layers.map(func(l: Dictionary) -> String: return l.scene), ["tunnel", "particles", "shader"], "WO-890: a drop adds on top")
+	t.eq([r.index, d.shader, d.scene, d.overlay], [2, "b", "tunnel", "particles"], "the derived fields follow")
+	t.eq(s.layers.size(), 2, "the slice passed in is not changed")
+	r = C.apply_drop(d, {"type": "visual", "scene": "rings"}, 0)
+	t.eq([r.slice.layers[0].scene, r.slice.scene, r.index], ["rings", "rings", 0], "a target replaces that layer")
+	r = C.apply_drop(s, {"type": "visual", "scene": "game", "game": "/g/x.nes"}, -1)
+	t.eq([r.slice.layers[2].scene, r.slice.game], ["game", "/g/x.nes"], "a ROM")
 
 
 func test_describe() -> void:
-	var s := {"shader": "sh-sa-ribbons", "game": "/g/Contra (USA).nes"}
-	t.eq(C.describe("shader", s, {"sh-sa-ribbons": "Ribbons"}), "Shader · Ribbons", "")
-	t.eq(C.describe("shader", {"shader": ""}, {}), "Shader · none picked", "")
-	t.eq(C.describe("game", s, {}), "Game · Contra (USA)", "")
-	t.eq(C.describe("tunnel", s, {}), "Tunnel", "")
-	t.eq(C.describe("", s, {}), "None", "")
+	var names := {"sh-sa-ribbons": "Ribbons"}
+	t.eq(L.describe({"scene": "shader", "shader": "sh-sa-ribbons"}, names), "Shader · Ribbons", "")
+	t.eq(L.describe({"scene": "shader", "shader": "sh-x", "label": "X ray"}, {}), "Shader · X ray", "the row's label before the list")
+	t.eq(L.describe({"scene": "shader", "shader": ""}, {}), "Shader · none picked", "")
+	t.eq(L.describe({"scene": "game", "game": "/g/Contra (USA).nes"}, {}), "Game · Contra (USA)", "")
+	t.eq(L.describe({"scene": "tunnel"}, {}), "Tunnel", "")
 
 
 func test_beat_frame() -> void:
@@ -90,19 +89,25 @@ func test_page_and_canvas_take_drops() -> void:
 	var tab: Control = Tab.new()
 	tab._ready()
 	var got := []
-	tab.page.visual_dropped.connect(func(p: Dictionary, o: bool) -> void: got.append([p.scene, o]))
-	tab.drop_visual({"type": "visual", "scene": "tunnel"}, false)
-	t.eq(tab.slice.scene, "tunnel", "a drop sets the main scene")
-	tab.drop_visual({"type": "visual", "scene": "particles"}, true)
-	t.eq([tab.slice.scene, tab.slice.overlay], ["tunnel", "particles"], "Shift → layer 2")
-	t.eq(tab.page._main_label.text, "Tunnel", "the Inspector names the main scene")
-	t.eq(tab.page._over_label.text, "Particles", "and layer 2")
-	t.ok(tab.page._over_clear.visible, "layer 2 can be removed")
-	tab.page._over_clear.pressed.emit()
-	t.eq(tab.slice.overlay, "", "✕ removes layer 2")
-	t.eq([tab.page._over_label.text, tab.page._over_clear.visible], ["None", false], "and the line says so")
-	var row: Control = tab.page._main_label.get_parent()
-	t.eq(row.mouse_filter, Control.MOUSE_FILTER_STOP, "the Scene row takes drops")
+	tab.page.visual_dropped.connect(func(p: Dictionary, target: int) -> void: got.append([p.scene, target]))
+	M.with_layers(tab.slice, [])
+	tab.drop_visual({"type": "visual", "scene": "tunnel"})
+	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["tunnel"], "a drop on an empty stack adds a layer")
+	tab.drop_visual({"type": "visual", "scene": "particles"})
+	t.eq([tab.slice.scene, tab.slice.overlay, tab.sel], ["tunnel", "particles", 1], "a second drop: a layer on top, selected")
+	var list: Control = tab.page.layer_list
+	t.eq(list.rows.size(), 2, "the Inspector lists both layers")
+	t.eq([list.rows[0].name.text, list.rows[1].name.text], ["Tunnel", "Particles"], "named")
+	t.eq(list._box.get_child(0), list.rows[1].panel, "top layer first")
+	tab.run_visual({"type": "visual", "scene": "rings"})
+	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["tunnel", "rings"], "double-click replaces the selected layer")
+	list.rows[1].del.pressed.emit()
+	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["tunnel"], "✕ removes it")
+	t.eq(list.rows.size(), 1, "and the list follows")
+	t.eq(list.rows[0].panel.mouse_filter, Control.MOUSE_FILTER_STOP, "a layer row takes drops")
+	list.dropped.emit({"type": "visual", "scene": "starfield"}, 0)  # what a row's drop forwarding emits
+	t.eq(got, [["starfield", 0]], "a row drop reaches the page with its layer")
+	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["starfield"], "and replaces that layer")
 	tab.free()
 
 

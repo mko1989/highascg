@@ -1,10 +1,12 @@
 extends VBoxContainer
 ## WO-885 — the Sources "Visuals" tab (owner 31.10): every visual the Visuals canvas can run — the built-in scenes, the box's
 ## shader library, the operator's ROMs — in folders (visuals_catalog.gd), each row with a thumbnail rendered on this client
-## (visuals_thumbs.gd, only for open folders). Drag a row onto the Visuals canvas (Shift: layer 2) or onto the Inspector's
-## Scene / Layer 2 rows; double-click runs it as the main scene. What is on the canvas is highlighted.
+## (visuals_thumbs.gd, only for open folders). WO-890: drag a row onto the Visuals canvas or the Inspector's layer list = a new
+## layer on top, onto a layer row (or the canvas with Shift) = that layer replaced; double-click replaces the selected layer.
+## Every visual running on any layer is highlighted.
 
 const Catalog := preload("res://features/visuals/visuals_catalog.gd")
+const Layers := preload("res://features/visuals/visuals_layers.gd")
 const Thumbs := preload("res://features/visuals/visuals_thumbs.gd")
 const Launcher := preload("res://features/visuals/game_launcher.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -20,7 +22,7 @@ var _tree: Tree
 var _shaders := []  # GET /api/shaders rows
 var _items := {}  # thumb key → [TreeItem]
 var _all := []  # every row item (for the live highlight)
-var _live := {}  # the canvas's slice (scene, overlay, shader, game)
+var _live := []  # the canvas's layers (WO-890)
 var _loaded := false
 var _blank: Texture2D
 
@@ -49,7 +51,7 @@ func _ready() -> void:
 	_tree.item_activated.connect(func() -> void:
 		var it := _tree.get_selected()
 		if it != null and it.get_metadata(0) is Dictionary:
-			get_tree().call_group("visuals_canvas", "drop_visual", it.get_metadata(0), false))
+			get_tree().call_group("visuals_canvas", "run_visual", it.get_metadata(0)))
 	add_child(_tree)
 	thumbs = Thumbs.new()
 	thumbs.fetch = _shader_config
@@ -118,7 +120,7 @@ func rebuild() -> void:
 	for path in folders:
 		folders[path].set_text(0, "%s  %d" % [path.get_file(), counts[path]])
 	_note.text = ("No visuals match" if filtering else "No visuals: the shader library is on the box") if rows.is_empty() else \
-		"Drag onto the Visuals canvas (Shift: layer 2) · double-click runs it"
+		"Drag onto the Visuals canvas: a new layer (Shift: replaces the selected one) · double-click replaces the selected layer"
 	_request_open()
 
 
@@ -126,7 +128,7 @@ func _row(parent: TreeItem, r: Dictionary) -> void:
 	var it := _tree.create_item(parent)
 	it.set_text(0, r.name)
 	it.set_metadata(0, r.payload)
-	it.set_tooltip_text(0, r.tip + "\n\nDrag onto the Visuals canvas (Shift: layer 2) · double-click runs it")
+	it.set_tooltip_text(0, r.tip + "\n\nDrag onto the Visuals canvas or a layer · double-click replaces the selected layer")
 	var tex: Texture2D = thumbs.texture(r.thumb)
 	it.set_icon(0, tex if tex != null else (Icons.texture("play", 24) if r.thumb == "" else _blank))
 	it.set_icon_max_width(0, ICON_W)
@@ -193,9 +195,9 @@ func _on_collapsed(it: TreeItem) -> void:
 	cfg.save(UI_CFG)
 
 
-## visuals_tab.gd (group call): what the canvas runs now — those rows are highlighted.
+## visuals_tab.gd (group call): what the canvas runs now — the rows of every layer's visual are highlighted.
 func mark_live(slice: Dictionary) -> void:
-	_live = slice.duplicate()
+	_live = (slice.get("layers") as Array).duplicate(true) if slice.get("layers") is Array else []
 	for it in _all:
 		if is_instance_valid(it):
 			_mark(it)
@@ -203,11 +205,7 @@ func mark_live(slice: Dictionary) -> void:
 
 func _mark(it: TreeItem) -> void:
 	var p: Dictionary = it.get_metadata(0)
-	var on := false
-	for layer in [_live.get("scene"), _live.get("overlay")]:
-		if layer == p.scene and (p.scene != "shader" or _live.get("shader") == p.get("shader")) \
-				and (p.scene != "game" or _live.get("game") == p.get("game")):
-			on = true
+	var on := Layers.runs(_live, p)
 	it.set_custom_color(0, ThemeBuilder.ACCENT if on else ThemeBuilder.TEXT)
 
 

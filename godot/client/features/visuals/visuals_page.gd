@@ -5,8 +5,7 @@ extends VBoxContainer
 
 const M := preload("res://features/visuals/visuals_model.gd")
 const Show := preload("res://features/visuals/visuals_show.gd")
-const Catalog := preload("res://features/visuals/visuals_catalog.gd")
-const Icons := preload("res://app/ui_icons.gd")
+const LayerList := preload("res://features/visuals/visuals_layer_list.gd")
 
 signal params_changed(params: Dictionary)
 signal output_changed(output: Dictionary)
@@ -14,9 +13,10 @@ signal send_toggled(on: bool)
 signal ring_toggled(on: bool)
 signal sensitivity_changed(map: Dictionary)
 signal sync_changed(ms: float)
-signal scenes_changed(main: String, overlay: String)
+signal layers_changed(layers: Array)  # WO-890: a fader, mute, blend, order or removal in the layer list
+signal layer_selected(i: int)
 signal burst_pressed
-signal visual_dropped(payload: Dictionary, overlay: bool)  # WO-885: a Sources ▸ Visuals row dropped on Scene / Layer 2
+signal visual_dropped(payload: Dictionary, target: int)  # WO-890: a Sources ▸ Visuals row on the list (-1 = add on top) or a layer
 signal game_play(on: bool)
 
 var _sliders := {}
@@ -31,10 +31,8 @@ var _quiet := false
 var _sens := {}
 var _sync: HSlider
 var _sync_label: Label
-var _main_label: Label
-var _over_label: Label
-var _over_clear: Button
-var _main := "rings"
+var layer_list: LayerList  # WO-890
+var _errors := {}  # layer index → why that shader layer is dark
 var _shader_names := {}  # id → name (GET /api/shaders)
 var _slice := {}
 var _shader_note: Label
@@ -51,22 +49,15 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 	add_child(show_panel)
 	add_child(_heading("Visuals"))
 	var hint := Label.new()  # WO-885: the pickers moved to Sources ▸ Visuals (thumbnails, folders)
-	hint.text = "Pick in Sources ▸ Visuals: drag onto the canvas (Shift: layer 2) or onto Scene / Layer 2 here."
+	hint.text = "Layers, top first. Drag from Sources ▸ Visuals onto the canvas or this list to add one on top, onto a layer to replace it (canvas: Shift replaces the selected layer)."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.modulate = Color(1, 1, 1, 0.6)
 	add_child(hint)
-	_main_label = Label.new()
-	_main_label.clip_text = true
-	_main_label.tooltip_text = "The main scene — drop a visual here to replace it"
-	add_child(_drop_row(_row("Scene", _main_label), false))
-	_over_label = Label.new()
-	_over_label.clip_text = true
-	_over_label.tooltip_text = "A second scene drawn over the first in the same world — drop a visual here"
-	var over_row := _row("Layer 2", _over_label)
-	_over_clear = Icons.button("close", "Remove layer 2")
-	_over_clear.pressed.connect(func() -> void: scenes_changed.emit(_main, ""))
-	over_row.add_child(_over_clear)
-	add_child(_drop_row(over_row, true))
+	layer_list = LayerList.new()
+	layer_list.changed.connect(func(ls: Array) -> void: layers_changed.emit(ls))
+	layer_list.dropped.connect(func(p: Dictionary, target: int) -> void: visual_dropped.emit(p, target))
+	layer_list.selected.connect(func(i: int) -> void: layer_selected.emit(i))
+	add_child(layer_list)
 	_shader_note = Label.new()
 	_shader_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_shader_note.modulate = Color(1, 0.75, 0.6, 0.9)
@@ -160,7 +151,6 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 func set_state(slice: Dictionary, cm: Variant) -> void:
 	_quiet = true
 	_slice = slice
-	_main = str(slice.get("scene", "rings"))
 	_show_layers()
 	for p in M.PARAMS:
 		_sliders[p].set_value_no_signal(float(slice.params[p]))
@@ -181,7 +171,7 @@ func set_state(slice: Dictionary, cm: Variant) -> void:
 	_quiet = false
 
 
-## WO-874: the library ({id, name} rows of GET /api/shaders) — the Scene / Layer 2 lines name the shader.
+## WO-874: the library ({id, name} rows of GET /api/shaders) — the layer rows name the shader.
 func set_shaders(list: Array) -> void:
 	for r in list:
 		if r is Dictionary and r.get("id") is String:
@@ -189,24 +179,14 @@ func set_shaders(list: Array) -> void:
 	_show_layers()
 
 
-## WO-885: the Scene / Layer 2 lines, and the shader / game rows for what they run.
+## WO-890: the layer list, and the shader / game rows for what the layers run.
 func _show_layers() -> void:
 	if _slice.is_empty():
 		return
-	var over := str(_slice.get("overlay", ""))
-	_main_label.text = Catalog.describe(_main, _slice, _shader_names)
-	_over_label.text = Catalog.describe(over, _slice, _shader_names)
-	_over_clear.visible = over != ""
-	_shader_note.visible = "shader" in [_main, over]
-	_game_box.visible = "game" in [_main, over]
-
-
-## A row that takes a Sources ▸ Visuals drop (as the main scene, or as layer 2).
-func _drop_row(row: HBoxContainer, overlay: bool) -> HBoxContainer:
-	row.mouse_filter = Control.MOUSE_FILTER_STOP
-	row.set_drag_forwarding(Callable(), func(_at: Vector2, data: Variant) -> bool: return Catalog.parse(data) != null,
-		func(_at: Vector2, data: Variant) -> void: visual_dropped.emit(data, overlay))
-	return row
+	var ls: Array = _slice.get("layers", [])
+	layer_list.set_layers(ls, _shader_names, _errors)
+	_shader_note.visible = ls.any(func(l: Dictionary) -> bool: return l.scene == "shader")
+	_game_box.visible = ls.any(func(l: Dictionary) -> bool: return l.scene == "game")
 
 
 ## WO-876: the Play button's state and the line under it (how to play, or why it cannot).
@@ -218,9 +198,13 @@ func set_game_status(playing: bool, text: String) -> void:
 	_game_note.text = text
 
 
-## WO-874: "" when the shader runs, else why not (compile error, not found, no box).
-func set_shader_status(text: String) -> void:
+## WO-874: "" when the shaders run, else why not (compile error, not found, no box). WO-890: `errors` = layer index → error,
+## a ⚠ on those rows.
+func set_shader_status(text: String, errors := {}) -> void:
 	_shader_note.text = text
+	if errors != _errors:
+		_errors = errors
+		_show_layers()
 
 
 ## `ring` / `can_ring` (WO-883): the Live source switch's state — off with a reason in `note` where it cannot publish.

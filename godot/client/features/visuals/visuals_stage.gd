@@ -34,6 +34,9 @@ var _smoother := Smooth.new()
 var _smooth_cfg: Variant = null  # WO-875: the node's audioCapture.spectrum, from each frame
 var _shown := PackedByteArray()
 var start_scene := "rings"  # WO-877: "" for the mixer's idle deck
+## WO-890: false = an upper layer of a deck (visuals_deck.gd): its world renders over the layers below, so the background is
+## black (no tint, no flash — the bottom layer has them) and a game keys its black out like the old layer 2.
+var base := true
 
 
 func _ready() -> void:
@@ -73,11 +76,20 @@ func set_layers(main: String, overlay: String) -> void:
 		var s: Node3D = SCENES[id].new()
 		s.name = id
 		if s.has_method("set_overlay"):
-			s.set_overlay(not layers.is_empty())
+			s.set_overlay(not layers.is_empty() or (not base and id == "game"))
 		add_child(s)
 		layers.append(s)
 	_ids = w
 	_apply_shader()
+
+
+## WO-890: bottom of its deck (tinted background) or an upper layer (black, a game keyed).
+func set_base(on: bool) -> void:
+	if on == base:
+		return
+	base = on
+	if not layers.is_empty() and layers[0].has_method("set_overlay") and _ids[0] == "game":
+		layers[0].set_overlay(not on)
 
 
 ## WO-877: no scenes (the mixer's idle deck) — nothing renders, nothing reads a ring.
@@ -169,4 +181,4 @@ func _process(delta: float) -> void:
 	var glow := float(p.get("glow", 0.3))
 	var flash := maxf(float(p.get("flash", 0.0)), _flash * 0.4)
 	_env.glow_intensity = 0.4 + glow * 1.6
-	_env.background_color = Color.from_hsv(fposmod(hue + 0.5, 1.0), 0.6, 0.02 + flash * 0.25)
+	_env.background_color = Color.from_hsv(fposmod(hue + 0.5, 1.0), 0.6, 0.02 + flash * 0.25) if base else Color.BLACK

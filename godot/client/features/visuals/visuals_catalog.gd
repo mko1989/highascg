@@ -1,9 +1,11 @@
 extends RefCounted
 ## WO-885 — the Sources ▸ Visuals list's pure half: every visual the canvas can run (the built-in scenes, the box's shader library,
 ## the operator's ROMs) as rows in folders, the drag payload a row carries onto the Visuals canvas, and what a drop does to the
-## `project.visuals` slice. The library has no categories of its own (GET /api/shaders rows are {id, name, audio, alpha,
+## `project.visuals` slice (WO-890: a layer added on top, or one layer's picture replaced). The library has no categories of its own (GET /api/shaders rows are {id, name, audio, alpha,
 ## updatedAt}), so shaders are filed by audio (Audio-reactive / Backgrounds) and then by a theme read off their id and name.
 
+const M := preload("res://features/visuals/visuals_model.gd")
+const Layers := preload("res://features/visuals/visuals_layers.gd")
 const SCENES := [["rings", "Rings"], ["particles", "Particles"], ["starfield", "Starfield"], ["tunnel", "Tunnel"],
 	["spectrum", "Spectrum"]]  # visuals_model.gd SCENES without the two hosts (shader, game): their rows are the shaders / ROMs
 ## [folder, keywords] — a keyword matches the start of a word of the id or name; first match wins, so the narrow themes come
@@ -103,37 +105,8 @@ static func parse(data: Variant) -> Variant:
 	return null
 
 
-## The slice after `payload` lands as the main scene, or as layer 2 (`overlay`). The slice keeps one shader and one game, so a
-## shader dropped as layer 2 over a Shader main scene (or the reverse) swaps the shader both run; a scene dropped where the
-## other layer already shows it moves it there (no scene twice).
-static func apply_drop(slice: Dictionary, payload: Dictionary, overlay: bool) -> Dictionary:
-	var s := slice.duplicate(true)
-	var id := str(payload.scene)
-	if payload.get("shader") is String:
-		s.shader = payload.shader
-	if payload.get("game") is String:
-		s.game = payload.game
-	if overlay:
-		if id != str(s.get("scene", "")):
-			s.overlay = id
-	else:
-		s.scene = id
-		if str(s.get("overlay", "")) == id:
-			s.overlay = ""
-	return s
-
-
-## The Inspector's line for one layer: "Tunnel", "Shader · Ribbons", "Game · Contra (USA)", or "None".
-static func describe(scene: String, slice: Dictionary, shader_names: Dictionary) -> String:
-	if scene == "":
-		return "None"
-	if scene == "shader":
-		var id := str(slice.get("shader", ""))
-		return "Shader · " + (str(shader_names.get(id, id)) if id != "" else "none picked")
-	if scene == "game":
-		var g := str(slice.get("game", ""))
-		return "Game · " + (g.get_file().get_basename() if g != "" else "none picked")
-	for s in SCENES:
-		if s[0] == scene:
-			return s[1]
-	return scene.capitalize()
+## WO-890: the slice after `payload` lands — `target` -1 = a new layer on top, else layer `target`'s picture replaced
+## (visuals_layers.gd drop()). Returns {slice, index, note}; the slice passed in is not changed.
+static func apply_drop(slice: Dictionary, payload: Dictionary, target: int) -> Dictionary:
+	var r := Layers.drop(slice.get("layers", []), payload, target)
+	return {"slice": M.with_layers(slice.duplicate(true), r.layers), "index": r.index, "note": r.note}

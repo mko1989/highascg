@@ -1,6 +1,6 @@
 extends RefCounted
 ## WO-877 the Visuals' show controls: looks (capture → apply round trip, stored looks made safe, which one is showing, keys
-## 1–9), the mixer (a change fades in on the idle deck and the old deck is emptied after, same scenes = no fade, 0 s = cut,
+## 1–9), the mixer (a look fades in on the idle deck and the old deck is emptied after, an edit stays in place, 0 s = cut,
 ## master / blackout fade) and the stage keeping an unchanged shader (no recompile, no time jump).
 
 const Looks := preload("res://features/visuals/visuals_looks.gd")
@@ -24,7 +24,7 @@ func test_capture_apply() -> void:
 	t.eq(Looks.showing([Looks.capture(other), Looks.capture(back)], back), 1, "which stored look is on the canvas")
 	t.eq(Looks.showing([Looks.capture(other)], back), -1, "none")
 	var sh := Looks.capture(M.slice_of({"visuals": {"scene": "shader", "shader": "sh-sa-ribbons"}}), "  ")
-	t.eq(sh.name, "Shader · ribbons", "a blank name → from the scenes and the shader")
+	t.eq(sh.name, "ribbons", "a blank name → from the layers (a shader by its id)")
 
 
 func test_normalize() -> void:
@@ -44,27 +44,31 @@ func test_keys() -> void:
 	t.eq([Looks.key_index(KEY_0), Looks.key_index(KEY_A)], [-1, -1], "anything else")
 
 
+func _st(ids: Array) -> Array:
+	return ids.map(func(id: String) -> Dictionary: return {"scene": id, "opacity": 1.0, "visible": true, "blend": "normal"})
+
+
 func test_mixer_fades() -> void:
 	var m: Node = Mixer.new()
-	m.stage_of(0).set_layers("rings", "")
+	m.go(_st(["rings"]), {}, 0.0)
 	t.eq(m.decks.size(), 2, "two decks")
-	m.go("rings", "", null, 1.0)
-	t.eq([m.live, m.fading()], [0, false], "same scenes on air → no fade")
-	m.go("tunnel", "particles", null, 1.0)
-	t.eq([m.live, m.fading(), m.stage().ids()], [1, true, ["tunnel", "particles"]], "a change loads the idle deck and fades")
-	t.eq(m.decks[0].render_target_update_mode, SubViewport.UPDATE_ALWAYS, "both decks render while fading")
+	m.go(_st(["rings"]), {}, 1.0)
+	t.eq([m.live, m.fading()], [0, false], "an edit (not a look) stays on the live deck")
+	m.go(_st(["tunnel", "particles"]), {}, 1.0, true)
+	t.eq([m.live, m.fading(), m.deck().ids()], [1, true, ["tunnel", "particles"]], "a look loads the idle deck and fades")
+	t.eq(m.decks[0].out.render_target_update_mode, SubViewport.UPDATE_ALWAYS, "both decks render while fading")
 	m.step(0.5)
 	t.eq(m.x, 0.5, "halfway after half the fade")
 	m.step(0.6)
 	t.eq([m.x, m.fading()], [1.0, false], "done")
-	t.eq([m.stage_of(0).ids(), m.decks[0].render_target_update_mode], [[], SubViewport.UPDATE_DISABLED],
+	t.eq([m.deck_of(0).ids(), m.decks[0].out.render_target_update_mode], [[], SubViewport.UPDATE_DISABLED],
 		"the old deck is emptied and sleeps")
-	m.go("starfield", "", null, 0.0)
+	m.go(_st(["starfield"]), {}, 0.0, true)
 	t.eq([m.live, m.x, m.fading()], [0, 0.0, false], "0 s cuts")
-	m.go("starfield", "", null, 1.0, true)
-	t.eq([m.live, m.fading()], [1, true], "force fades even with the same scenes (a look with other parameters)")
+	m.go(_st(["starfield"]), {}, 1.0, true)
+	t.eq([m.live, m.fading()], [1, true], "force fades even with the same layers (a look with other parameters)")
 	m.set_running(false)
-	t.eq([m.decks[0].render_target_update_mode, m.out_vp.render_target_update_mode],
+	t.eq([m.decks[0].out.render_target_update_mode, m.out_vp.render_target_update_mode],
 		[SubViewport.UPDATE_DISABLED, SubViewport.UPDATE_DISABLED], "asleep: nothing renders")
 	m.free()
 

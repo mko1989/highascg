@@ -6,7 +6,6 @@ extends VSplitContainer
 ## Sync (WO-866, visuals_sync.gd); the page's sensitivity sliders set the box's detectors.
 
 const M := preload("res://features/visuals/visuals_model.gd")
-const Stage := preload("res://features/visuals/visuals_stage.gd")
 const Flow := preload("res://features/visuals/visuals_flow.gd")
 const Page := preload("res://features/visuals/visuals_page.gd")
 const Sync := preload("res://features/visuals/visuals_sync.gd")
@@ -22,9 +21,10 @@ const AUDIO_STALE_MS := 1000
 var slice := {}
 var out_vp: SubViewport  # the canvas: the mixer's two decks mixed (WO-877)
 var mixer: Mixer
-var scene: Stage:  # the live deck's stage
+var scene: Node:  # the live deck (visuals_deck.gd, WO-890: the layer stack): params, fire(), errors()
 	get:
-		return mixer.stage()
+		return mixer.deck()
+var sel := -1  # WO-890: the selected layer (Shift-drops and Sources double-clicks replace it; the 3D view looks into it)
 var flow: Flow
 var page: Page
 var publisher: Publisher
@@ -41,6 +41,7 @@ var _canvas: TextureRect
 var _orbit_cam: Camera3D
 var _orbit := Vector3(0.0, 0.25, 16.0)  # yaw, pitch, distance
 var _view3d: SubViewportContainer
+var _vp3: SubViewport
 var _mode := "flow"
 var _shader_list := []  # WO-874: GET /api/shaders rows, fetched once the Shader scene is first used
 var _shader_seq := 0
@@ -59,9 +60,9 @@ func _ready() -> void:
 	_canvas.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_canvas.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_canvas.custom_minimum_size.y = 240
-	_canvas.tooltip_text = "The visual's output — drop a visual from Sources ▸ Visuals here (Shift: layer 2); Send (Inspector) puts it on the screen"
+	_canvas.tooltip_text = "The visual's output — drop a visual from Sources ▸ Visuals here: a new layer on top (Shift: replaces the selected layer); Send (Inspector) puts it on the screen"
 	_canvas.set_drag_forwarding(Callable(), func(_at: Vector2, data: Variant) -> bool: return Catalog.parse(data) != null,
-		func(_at: Vector2, data: Variant) -> void: drop_visual(data, Input.is_key_pressed(KEY_SHIFT)))
+		func(_at: Vector2, data: Variant) -> void: drop_visual(data, _target() if Input.is_key_pressed(KEY_SHIFT) else -1))
 	add_child(_canvas)
 	add_to_group("visuals_canvas")  # WO-885: Sources ▸ Visuals double-click
 	var work := VBoxContainer.new()
@@ -84,9 +85,9 @@ func _ready() -> void:
 	_view3d = SubViewportContainer.new()
 	_view3d.stretch = true
 	_view3d.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var vp3 := SubViewport.new()
-	vp3.world_3d = scene.get_parent().world_3d
-	mixer.switched.connect(func(s: Node3D) -> void: vp3.world_3d = s.get_parent().world_3d)  # the orbit follows the live deck
+	_vp3 = SubViewport.new()
+	var vp3 := _vp3
+	mixer.switched.connect(func(_d: Node) -> void: _orbit_world())  # the orbit follows the live deck
 	_orbit_cam = Camera3D.new()
 	vp3.add_child(_orbit_cam)
 	_view3d.add_child(vp3)
@@ -111,12 +112,15 @@ func _ready() -> void:
 		slice.output.ring = on
 		_store()
 		_sync_send_ui(_sync_ring()))
-	page.scenes_changed.connect(func(main: String, overlay: String) -> void:
-		slice.scene = main
-		slice.overlay = overlay if overlay != main else ""
+	page.layers_changed.connect(func(ls: Array) -> void:  # WO-890: fader, mute, blend, order, ✕ — in place on the live deck
+		M.with_layers(slice, ls)
+		sel = page.layer_list.sel
 		_go(false)
 		_store()
-		page.set_state(slice, _cm()))  # WO-885: the Layer 2 line follows its ✕
+		page.set_state(slice, _cm()))
+	page.layer_selected.connect(func(i: int) -> void:
+		sel = i
+		_orbit_world())
 	page.visual_dropped.connect(drop_visual)
 	page.burst_pressed.connect(func() -> void: scene.fire())
 	show_ctl = ShowCtl.new(self)
@@ -207,9 +211,9 @@ func _play_game(on: bool) -> void:
 
 
 func _game_status() -> void:
-	if not "game" in [slice.get("scene"), slice.get("overlay")] and not launcher.running():
+	if not slice.layers.any(func(l: Dictionary) -> bool: return l.scene == "game") and not launcher.running():
 		return
-	var live := scene.layers.any(func(l: Node3D) -> bool: return l.has_method("live") and l.live())
+	var live: bool = scene.scenes().any(func(l: Node3D) -> bool: return l.has_method("live") and l.live())
 	var text := _game_error if _game_error != "" else Launcher.ready_error(str(slice.get("game", "")))
 	if launcher.running():
 		text = ("Playing in its own window — arrows, X = A, Z = B, Enter = Start, Shift = Select; a gamepad works too"
@@ -219,34 +223,58 @@ func _game_status() -> void:
 	page.set_game_status(launcher.running(), text)
 
 
-## WO-877: the slice's scenes on stage — a change crossfades over `fade` (visuals_mixer.gd); a shader is fetched first, so a
-## look with one never fades in dark. `force`: fade even when the scenes match (a look with another shader or parameters).
+## WO-877: the slice's layers on stage. Not `force` (WO-890: an edit, a drop): the live deck takes it in place, new and
+## removed layers fading over `fade`; `force` (a look): the decks crossfade (visuals_mixer.gd). Shaders are fetched first, so a
+## layer never fades in dark.
 func _go(force := false) -> void:
 	if is_inside_tree():
 		get_tree().call_group("visuals_list", "mark_live", slice)  # WO-885: Sources ▸ Visuals highlights what runs
 	_shader_seq += 1
 	var seq := _shader_seq
-	var uses := "shader" in [slice.scene, slice.overlay]
-	var cfg: Variant = null
-	if uses and str(slice.shader) != "":
-		cfg = await _shader_config(str(slice.shader))
-		if seq != _shader_seq:
-			return  # a newer pick is on its way
-	mixer.go(slice.scene, slice.overlay, cfg, slice.fade, force)
-	if uses:
+	var cfgs := {}
+	for l in slice.layers:
+		if l.scene == "shader" and str(l.get("shader", "")) != "" and not cfgs.has(l.shader):
+			cfgs[l.shader] = await _shader_config(str(l.shader))
+			if seq != _shader_seq:
+				return  # a newer pick is on its way
+	mixer.go(slice.layers, cfgs, slice.fade, force)
+	_orbit_world()
+	if slice.layers.any(func(l: Dictionary) -> bool: return l.scene == "shader"):
 		_shader_status()
 
 
-## WO-885: a Sources ▸ Visuals row dropped on the canvas (Shift, or the Inspector's Layer 2 row: as layer 2) or
-## double-clicked there. Crossfades like a look (WO-877); an open game window follows a new ROM.
-func drop_visual(payload: Dictionary, overlay: bool) -> void:
+## WO-885/890: a Sources ▸ Visuals row dropped on the canvas or the layer list: `target` -1 = a new layer on top, else that
+## layer's picture replaced. In place like any edit (unchanged layers keep running); an open game window follows a new ROM.
+func drop_visual(payload: Dictionary, target := -1) -> void:
 	var game := str(slice.get("game", ""))
-	slice = Catalog.apply_drop(slice, payload, overlay)
-	_go(true)
+	var r := Catalog.apply_drop(slice, payload, target)
+	page.layer_list.set_note(r.note)
+	if r.index < 0:
+		return
+	slice = r.slice
+	sel = r.index
+	page.layer_list.sel = sel
+	_go(false)
 	_store()
 	page.set_state(slice, _cm())
 	if launcher.running() and str(slice.get("game", "")) != game:
 		_play_game(true)
+
+
+## WO-890: a Sources ▸ Visuals double-click: replaces the selected layer (the top one when none is), or the first layer.
+func run_visual(payload: Dictionary) -> void:
+	drop_visual(payload, _target())
+
+
+func _target() -> int:
+	return sel if sel >= 0 and sel < slice.layers.size() else slice.layers.size() - 1
+
+
+## WO-890: the 3D view's orbit camera looks into the selected layer's world (each layer has its own).
+func _orbit_world() -> void:
+	var w: World3D = scene.world_of(sel) if _vp3 != null else null
+	if w != null and _vp3.world_3d != w:
+		_vp3.world_3d = w
 
 
 ## WO-874: a library shader's config (GET /api/shaders/:id), cached; null without the box.
@@ -274,10 +302,11 @@ func _shader_status() -> void:
 		if l.get("ok") and l.get("data") is Dictionary and l.data.get("shaders") is Array:
 			_shader_list = l.data.shaders
 			page.set_shaders(_shader_list)
-	if str(slice.shader) == "":
-		page.set_shader_status("Pick a shader.")
+	if slice.layers.any(func(l: Dictionary) -> bool: return l.scene == "shader" and str(l.get("shader", "")) == ""):
+		page.set_shader_status("Pick a shader: drop one from Sources ▸ Visuals on the layer.")
 	else:
-		page.set_shader_status("" if scene.shader_error == "" else "Shader: " + scene.shader_error)
+		var e: Dictionary = scene.errors()
+		page.set_shader_status("" if e.is_empty() else "Shader on layer %d: %s" % [e.keys()[0] + 1, e.values()[0]], e)
 
 
 func _store() -> void:

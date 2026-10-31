@@ -1,6 +1,18 @@
 extends RefCounted
 ## Dev probes of the Visuals tab (no pointer on the owner's screen; `--probe-visuals-*` flags, visuals_tab.gd _ready). Split
-## out of the tab in WO-877. GPU figures are the live deck's (visuals_mixer.gd), the scenes' own render.
+## out of the tab in WO-877. GPU figures are the live deck's (visuals_deck.gd: every layer's render + the composite).
+
+const L := preload("res://features/visuals/visuals_layers.gd")
+const M := preload("res://features/visuals/visuals_model.gd")
+
+
+## WO-890: a layer stack from scene ids (bottom first); a shader layer runs `shader`, a layer after the first is added
+## when it is a shader (the old layer 2 look).
+static func stack(ids: Array, shader := "sh-sa-ribbons") -> Array:
+	var out := []
+	for id in ids:
+		out.append(L.layer_of({"scene": id, "shader": shader, "blend": "add" if id == "shader" and not out.is_empty() else "normal"}))
+	return out
 
 
 ## dev probe (no pointer on the owner's screen): send to a screen for some seconds, print each step, stop.
@@ -23,26 +35,26 @@ static func shots(tab: Node, dir: String) -> void:
 	tab.mixer.set_running(true)
 	tab.set_process(true)
 	for d in tab.mixer.decks:
-		RenderingServer.viewport_set_measure_render_time(d.get_viewport_rid(), true)
+		d.measure = true
 	var r: Dictionary = await tab._g("DevicesTarget").box_api.get_json("/api/shaders/sh-sa-ribbons")  # WO-874 layer shots
-	tab.scene.set_shader(r.data if r.get("ok") else null)
-	for pair in [["rings", ""], ["particles", ""], ["starfield", ""], ["tunnel", ""], ["tunnel", "particles"],
-			["shader", "particles"], ["tunnel", "shader"], ["spectrum", ""], ["spectrum", "shader"], ["tunnel", "spectrum"],
-			["game", ""], ["tunnel", "game"], ["game", "spectrum"]]:
-		tab.scene.set_layers(pair[0], pair[1])
+	var cfgs := {"sh-sa-ribbons": r.data if r.get("ok") else null}
+	for ids in [["rings"], ["particles"], ["starfield"], ["tunnel"], ["tunnel", "particles"], ["shader", "particles"],
+			["tunnel", "shader"], ["spectrum"], ["spectrum", "shader"], ["tunnel", "spectrum"], ["game"], ["tunnel", "game"],
+			["game", "spectrum"], ["shader", "tunnel", "particles", "spectrum"]]:  # WO-890: four layers
+		tab.mixer.go(stack(ids), cfgs, 0.0, true)
 		await tab.get_tree().create_timer(1.0).timeout
 		var gpu := 0.0
-		for i in 30:  # GPU ms of the canvas viewport, mean over 30 frames
+		for i in 30:  # GPU ms of the live deck (every layer + the composite), mean over 30 frames
 			await tab.get_tree().process_frame
-			gpu += RenderingServer.viewport_get_measured_render_time_gpu(tab.scene.get_viewport().get_viewport_rid()) / 30.0
-		if pair[0] != "spectrum":  # WO-875: the spectrum shots show the music, not a burst
+			gpu += tab.scene.gpu_ms() / 30.0
+		if ids[0] != "spectrum":  # WO-875: the spectrum shots show the music, not a burst
 			tab.scene.fire()
 		await tab.get_tree().create_timer(0.25).timeout
-		var shot: String = str(pair[0]) + ("+" + str(pair[1]) if pair[1] != "" else "")
+		var shot := "+".join(ids)
 		var err: int = tab.out_vp.get_texture().get_image().save_png("%s/%s.png" % [dir, shot])
 		print("[probe-visuals] shot %s → %s · canvas %dx%d GPU %.2f ms" % [shot, error_string(err), tab.out_vp.size.x, tab.out_vp.size.y, gpu])
 	# WO-877: halfway through a 2 s crossfade (both decks on the canvas), then the master at half on the new look
-	tab.mixer.go("tunnel", "particles", null, 2.0)
+	tab.mixer.go(stack(["tunnel", "particles"]), {}, 2.0, true)
 	await tab.get_tree().create_timer(1.0).timeout
 	print("[probe-visuals] fade x %.2f live %d" % [tab.mixer.x, tab.mixer.live])
 	tab.out_vp.get_texture().get_image().save_png("%s/fade-mid.png" % dir)
@@ -61,22 +73,20 @@ static func shaders(tab: Node, dir: String) -> void:
 	tab.mixer.set_running(true)
 	tab.set_process(true)
 	for d in tab.mixer.decks:
-		RenderingServer.viewport_set_measure_render_time(d.get_viewport_rid(), true)
-	tab.slice.scene = "shader"
-	tab.slice.overlay = ""
-	tab.scene.set_layers("shader", "")
+		d.measure = true
 	var api: Variant = tab._g("DevicesTarget").box_api
 	var l: Dictionary = await api.get_json("/api/shaders")
 	var list: Array = l.data.shaders if l.get("ok") else []
 	print("[probe-shaders] %d shaders, canvas %dx%d" % [list.size(), tab.out_vp.size.x, tab.out_vp.size.y])
 	for row in list:
 		var r: Dictionary = await api.get_json("/api/shaders/" + str(row.id).uri_encode())
-		var e: String = tab.scene.set_shader(r.data if r.get("ok") else {})
+		tab.mixer.go(stack(["shader"], str(row.id)), {str(row.id): r.data if r.get("ok") else {}}, 0.0, true)
+		var e: String = str(tab.scene.errors().get(0, ""))
 		await tab.get_tree().create_timer(0.8).timeout
 		var gpu := 0.0
 		for i in 20:
 			await tab.get_tree().process_frame
-			gpu += RenderingServer.viewport_get_measured_render_time_gpu(tab.scene.get_viewport().get_viewport_rid()) / 20.0
+			gpu += tab.scene.gpu_ms() / 20.0
 		var img: Image = tab.out_vp.get_texture().get_image()
 		img.resize(320, maxi(1, 320 * img.get_height() / img.get_width()))
 		var lum := 0.0
@@ -86,7 +96,7 @@ static func shaders(tab: Node, dir: String) -> void:
 		lum /= ceilf(img.get_height() / 4.0) * ceilf(img.get_width() / 4.0)
 		img.save_png("%s/%s.png" % [dir, row.id])
 		var st := 0.0
-		for layer in tab.scene.layers:
+		for layer in tab.scene.scenes():
 			if layer.has_method("set_shader"):
 				st = float(layer.get("runner").gpu_ms)
 		print("[probe-shaders] %s · %s · canvas GPU %.2f ms · shader GPU %.2f ms · lum %.3f" % [row.id, "OK" if e == "" else e,
@@ -114,7 +124,7 @@ static func onair(tab: Node, dir: String) -> void:
 		var s: Dictionary = P.stats(p.img)
 		print("[probe-onair] %s: air %s · canvas luma %.0f" % [name, P.fmt(s), canvas.luma])
 		return s
-	tab.mixer.go("tunnel", "particles", null, 0.0, true)
+	tab.mixer.go(stack(["tunnel", "particles"]), {}, 0.0, true)
 	await tab.send(true)
 	print("[probe-onair] send ch %d: %s · %s" % [ch, tab.sending, tab.page._note.text])
 	await tab.get_tree().create_timer(2.0).timeout
@@ -129,7 +139,7 @@ static func onair(tab: Node, dir: String) -> void:
 	tab.mixer.blackout = false
 	await tab.get_tree().create_timer(1.2).timeout
 	await shot.call("4-back")
-	tab.mixer.go("rings", "", null, 1.0)
+	tab.mixer.go(stack(["rings"]), {}, 1.0, true)
 	await tab.get_tree().create_timer(1.6).timeout
 	await shot.call("5-crossfaded")
 	await tab.send(false)
@@ -173,7 +183,7 @@ static func autopilot(tab: Node, secs: float) -> void:
 	var ctl: Node = tab.show_ctl
 	var looks := []
 	for s in ["tunnel", "rings", "particles"]:
-		tab.slice.scene = s
+		M.with_layers(tab.slice, stack([s]))
 		looks.append(Looks.capture(tab.slice, s))
 	ctl.looks = looks
 	tab.slice.looks = looks
@@ -217,11 +227,9 @@ static func autopilot(tab: Node, secs: float) -> void:
 static func ring(tab: Node, arg: String) -> void:
 	var a := arg.split(":")
 	await tab.get_tree().create_timer(3.0).timeout
-	tab.slice.output.size = int(a[2]) if a.size() > 2 else preload("res://features/visuals/visuals_model.gd").SIZE_SCREEN
+	tab.slice.output.size = int(a[2]) if a.size() > 2 else M.SIZE_SCREEN
 	tab.slice.output.ring = true
-	tab.slice.scene = a[1] if a.size() > 1 else "shader"
-	tab.slice.overlay = ""
-	tab.slice.shader = a[3] if a.size() > 3 else "sh-sa-ribbons"
+	M.with_layers(tab.slice, stack([a[1] if a.size() > 1 else "shader"], a[3] if a.size() > 3 else "sh-sa-ribbons"))
 	await tab._go(true)
 	tab._resize()
 	tab._sync_send_ui(tab._sync_ring())
