@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-825 live WOs (28 open, 121 in progress, 676 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+825 live WOs (28 open, 120 in progress, 677 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -647,7 +647,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 869 DONE [devices-config+amcp,godot-client] Mapping node slices: cut a screen destination's output into slices and place th… → 869_WO_mapping_node_slices.md
 - 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
-- 906 IN PROGRESS [devices-config+os-iso,mapping] Playout outputs on a second X screen (:0.1) of the same X server, operator head… → 906_WO_outputs_on_second_x_screen.md
+- 906 DONE [devices-config+os-iso,mapping] Playout outputs on a second X screen (:0.1) of the same X server, operator head… → 906_WO_outputs_on_second_x_screen.md
 
 ## os-iso — ISO, sticks, kernel, NVIDIA, boot (72)
 

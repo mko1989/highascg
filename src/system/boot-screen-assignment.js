@@ -198,7 +198,9 @@ function planDestinationCables(config, lit, opId) {
  * PURE. The output a timeout settles on: the saved operator jack when it is lit, else the first lit
  * jack that no destination cable keeps, else the first lit jack.
  */
-function defaultOperator(config, lit, flagPort) {
+function defaultOperator(config, allLit, flagPort) {
+	const { isOperatorPickable } = require('../utils/x-screens') // WO-906: never a playout X screen output
+	const lit = allLit.filter((p) => isOperatorPickable(p.name))
 	const saved = lit.find((p) => p.port === flagPort)
 	if (saved) return saved
 	const opSrc = operatorSourceId(config)
@@ -355,6 +357,8 @@ async function resolve(ctx, pick, deps = {}) {
 	const lit = litPorts(d.gpuMap(config))
 	const flagPort = d.flagPort(config)
 	const how = name ? 'clicked' : HOW_DEFAULT[pick?.how] || 'timeout'
+	if (name && !(deps.isOperatorPickable || require('../utils/x-screens').isOperatorPickable)(name))
+		return { ok: false, status: 409, error: `${name} is on the playout X screen (WO-906)` }
 	const op = name ? lit.find((p) => p.name === name) : defaultOperator(config, lit, flagPort)
 	if (!op && how === 'headless') {
 		d.store.set(STATE_KEY, { bootId: id, name: null, port: null, how, at: new Date().toISOString() })

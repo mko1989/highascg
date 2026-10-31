@@ -26,10 +26,12 @@ function assertSafeXrandrModeToken(mode) {
 
 /**
  * @param {Array<{ output: string, x: number, y: number, mode: string, rate?: number|null }>} heads
+ * @param {string} [display] X display / screen (WO-906: `:0.0` / `:0.1` with the playout X screen)
  * @returns {string[]}
  */
-function buildXrandrLayoutArgv(heads) {
-	const args = ['--display', ':0']
+function buildXrandrLayoutArgv(heads, display = ':0') {
+	if (!/^:\d+(\.\d+)?$/.test(display)) throw new Error(`Invalid X display ${display}`)
+	const args = ['--display', display]
 	for (const h of heads) {
 		const output = assertSafeXrandrOutputName(h.output)
 		const mode = assertSafeXrandrModeToken(h.mode)
@@ -62,7 +64,7 @@ function shellQuoteArg(arg) {
  */
 function formatXrandrLayoutShellCommand(argv) {
 	const parts = ['xrandr', ...argv].map(shellQuoteArg)
-	return `DISPLAY=:0 ${parts.join(' ')}`
+	return `DISPLAY=${argv[0] === '--display' ? argv[1] : ':0'} ${parts.join(' ')}`
 }
 
 /** @param {string[]} argv */

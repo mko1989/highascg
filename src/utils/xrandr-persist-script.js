@@ -62,13 +62,21 @@ class CustomXrandrModeRegistry {
 function buildCustomModeBootstrapShellLines(customModes) {
 	if (!Array.isArray(customModes) || customModes.length === 0) return []
 	const lines = ['# Custom xrandr modes (recreate before layout — WO-80)']
+	const xs = require('./x-screens')
+	const screens = xs.installedScreens()
 	for (const m of customModes) {
 		const modeName = assertSafeXrandrToken(m.modeName, 'modeName')
 		const timingArgs = m.timings.map((t) => assertSafeXrandrToken(t, 'timing')).join(' ')
-		lines.push(`xrandr --display :0 --newmode ${modeName} ${timingArgs} 2>/dev/null || true`)
+		/* WO-906: modes are per X screen — define it on each screen one of its outputs is on */
+		const byDisplay = new Map(m.outputs.length ? [] : [[':0', []]])
 		for (const out of m.outputs) {
 			const output = assertSafeXrandrToken(out, 'output')
-			lines.push(`xrandr --display :0 --addmode ${output} ${modeName} 2>/dev/null || true`)
+			const d = xs.screenOfOutput(output, screens)?.display || ':0'
+			byDisplay.set(d, [...(byDisplay.get(d) || []), output])
+		}
+		for (const [d, outs] of byDisplay) {
+			lines.push(`xrandr --display ${d} --newmode ${modeName} ${timingArgs} 2>/dev/null || true`)
+			for (const output of outs) lines.push(`xrandr --display ${d} --addmode ${output} ${modeName} 2>/dev/null || true`)
 		}
 	}
 	return lines

@@ -34,8 +34,11 @@ for _g in 0 1 2 3; do
 	nvidia-settings -q "[gpu:${_g}]/SyncToVBlank" &>/dev/null || continue
 	nvidia-settings -a "[gpu:${_g}]/SyncToVBlank=0" 2>/dev/null || true
 done
+# WO-906: the X screen of DISPLAY (:0.1 = the playout screen of the two-screen layout); CurrentMetaMode below is its own.
+_screen="${DISPLAY##*.}"
+case "$_screen" in '' | *[!0-9]*) _screen=0 ;; esac
 nvidia-settings -a "[gpu:0]/SyncToVBlank=0" 2>/dev/null || true
-nvidia-settings -a "[screen:0]/SyncToVBlank=0" 2>/dev/null || true
+nvidia-settings -a "[screen:${_screen}]/SyncToVBlank=0" 2>/dev/null || true
 
 _apply_sync_to_display() {
 	_out="${HIGHASCG_NVIDIA_SYNC_OUTPUT:-}"
@@ -54,7 +57,7 @@ for line in sys.stdin:
         break
 ' "$_out") || true
 	[ -n "$_dpy" ] || return 0
-	nvidia-settings -a "[screen:0]/XVideoSyncToDisplayID=${_dpy}" 2>/dev/null || true
+	nvidia-settings -a "[screen:${_screen:-0}]/XVideoSyncToDisplayID=${_dpy}" 2>/dev/null || true
 	nvidia-settings --save 2>/dev/null || true
 }
 

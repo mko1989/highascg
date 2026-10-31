@@ -34,7 +34,12 @@ source_caspar_env() {
 	# Clear first so a line REMOVED from the file also clears the exported var.
 	unset CASPAR_GL_SYNC_DISPLAY CASPAR_DISPLAY
 	[ -r "${HOME:-/home/casparcg}/.config/highascg/caspar-env" ] && . "${HOME:-/home/casparcg}/.config/highascg/caspar-env"
-	# WO-906: the playout X screen (x11.playoutScreen on → CASPAR_DISPLAY=:0.1); unset = the unit's DISPLAY, as before.
+	# WO-906: the playout X screen (casparServer.playout_x_screen → CASPAR_DISPLAY=:0.1); unset = the unit's DISPLAY,
+	# as before. A screen X does not have (layout switched off, X not restarted onto it yet) → the unit's DISPLAY.
+	if [ -n "${CASPAR_DISPLAY:-}" ] && ! xrandr --display "$CASPAR_DISPLAY" --current >/dev/null 2>&1; then
+		echo "[run.sh] caspar-env CASPAR_DISPLAY=$CASPAR_DISPLAY: no such X screen — using $CASPAR_BASE_DISPLAY" >&2
+		unset CASPAR_DISPLAY
+	fi
 	export DISPLAY="${CASPAR_DISPLAY:-$CASPAR_BASE_DISPLAY}"
 	if [ -n "${CASPAR_GL_SYNC_DISPLAY:-}" ]; then
 		export __GL_SYNC_DISPLAY_DEVICE="$CASPAR_GL_SYNC_DISPLAY"

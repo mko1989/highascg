@@ -37,11 +37,14 @@ function buildNvidiaDisplayPolicyShellLines() {
 	const script = resolveNvidiaXApplyScript()
 	if (!script) return []
 	const q = script.replace(/'/g, `'\\''`)
+	/* WO-906: MetaMode is per X screen — with the playout X screen installed, one run per screen */
+	const screens = require('./x-screens').installedScreens()
+	const runs = screens.length ? screens.map((sc) => `DISPLAY=${sc.display} '${q}'`) : [`'${q}'`]
 	return [
 		`if [ -x '${q}' ]; then`,
-		`  '${q}'`,
-		`  ( sleep 6; '${q}' ) &`,
-		`  ( sleep 18; '${q}' ) &`,
+		...runs.map((r) => `  ${r}`),
+		...runs.map((r) => `  ( sleep 6; ${r} ) &`),
+		...runs.map((r) => `  ( sleep 18; ${r} ) &`),
 		`fi`,
 	]
 }
@@ -58,12 +61,24 @@ async function applyNvidiaDisplayPolicy(env, opts = {}) {
 		log('warn', '[NVIDIA] highascg-nvidia-x-apply.sh not found — skip Force Composition Pipeline')
 		return { ok: false, reason: 'script_missing' }
 	}
+	/* WO-906: MetaMode is per X screen — with the playout X screen installed, one run per screen (DISPLAY=:0.N); the
+	 * sync-to-display output only on the screen that drives it. */
+	const screens = require('./x-screens').installedScreens()
+	const runs = screens.length
+		? screens.map((sc) => {
+				const e = { ...env, DISPLAY: sc.display }
+				if (e.HIGHASCG_NVIDIA_SYNC_OUTPUT && !sc.outputs.includes(e.HIGHASCG_NVIDIA_SYNC_OUTPUT)) delete e.HIGHASCG_NVIDIA_SYNC_OUTPUT
+				return e
+			})
+		: [env]
 	try {
-		await execFileAsync(script, [], {
-			env,
-			timeout: opts.timeoutMs ?? 15_000,
-		})
-		log('info', '[NVIDIA] SyncToVBlank off + Force Composition Pipeline on all outputs')
+		for (const e of runs) {
+			await execFileAsync(script, [], {
+				env: e,
+				timeout: opts.timeoutMs ?? 15_000,
+			})
+		}
+		log('info', `[NVIDIA] SyncToVBlank off + Force Composition Pipeline on all outputs${screens.length ? ` (${screens.length} X screens)` : ''}`)
 		return { ok: true, script }
 	} catch (e) {
 		log('warn', `[NVIDIA] display policy failed: ${e?.message || e}`)

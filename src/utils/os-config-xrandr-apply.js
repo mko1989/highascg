@@ -19,6 +19,7 @@ const {
 	formatXrandrArgvForLog,
 } = require('./xrandr-safety')
 const { persistLayoutScript } = require('./os-config-persist')
+const { installedScreens, screenOfOutput } = require('./x-screens')
 
 /** WO-337: async now — the sync sleep + sync xrandr execs froze the whole API/WS server. */
 function sleepMs(ms) {
@@ -39,6 +40,42 @@ function readXrandrApplyRetryDelayMs(config) {
 	const n = parseInt(String(raw ?? ''), 10)
 	if (Number.isFinite(n) && n >= 0) return Math.min(n, 5000)
 	return 600
+}
+
+/**
+ * One xrandr layout call (one X screen), retried: NVIDIA RandR often rejects the first combined CRTC reconfig with
+ * BadMatch when transitioning from a wedged/narrower canvas, then accepts the *identical* command on retry (observed on
+ * highascg-nvidia-595).
+ * @returns {Promise<boolean>} applied
+ */
+async function runXrandrWithRetries(xrandrArgv, { config, env }) {
+	const xrandrLog = formatXrandrArgvForLog(xrandrArgv)
+	const maxAttempts = readXrandrApplyAttempts(config)
+	const retryDelayMs = readXrandrApplyRetryDelayMs(config)
+	let lastErr = null
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			logger.info(`[OS-Config] Applying (xrandr) attempt ${attempt}/${maxAttempts}: ${xrandrLog}`)
+			const { stdout: out } = await execFileAsync('xrandr', xrandrArgv, { env, encoding: 'utf8', maxBuffer: 1024 * 1024 })
+			const trimmed = String(out || '').trim()
+			if (trimmed) {
+				const cap = 8000
+				logger.info(`[OS-Config] xrandr stdout (${trimmed.length} chars): ${trimmed.length > cap ? trimmed.slice(0, cap) + '…' : trimmed}`)
+			} else {
+				logger.info('[OS-Config] xrandr stdout: (empty)')
+			}
+			return true
+		} catch (e) {
+			lastErr = e
+			const stderr = e.stderr ? String(e.stderr).trim() : ''
+			logger.warn(`[OS-Config] xrandr apply attempt ${attempt}/${maxAttempts} failed: ${e.message}`)
+			if (stderr) logger.warn(`[OS-Config] xrandr stderr: ${stderr}`)
+			if (e.stdout) logger.warn(`[OS-Config] xrandr stdout (on error): ${String(e.stdout).trim().slice(0, 8000)}`)
+			if (attempt < maxAttempts && retryDelayMs > 0) await sleepMs(retryDelayMs)
+		}
+	}
+	logger.error(`[OS-Config] xrandr apply failed after ${maxAttempts} attempts: ${lastErr?.message}`)
+	return false
 }
 
 /**
@@ -112,6 +149,10 @@ async function applyX11Layout(config, opts = {}) {
 	}
 
 	const connectorInventory = getGpuConnectorInventory()
+	/* WO-906: with the playout X screen installed each head is set on its own screen (`:0.0` / `:0.1`), at its plan
+	 * position minus the screen's origin; [] = one X screen, everything on :0 as before. */
+	const xScreens = installedScreens()
+	const displayOf = (output) => screenOfOutput(output, xScreens)?.display || ':0'
 
 	const processHead = (info) => {
 		const rawSysId = String(info.sysId).trim()
@@ -155,7 +196,7 @@ async function applyX11Layout(config, opts = {}) {
 					const cw = parseInt(wm[1], 10)
 					const ch = parseInt(wm[2], 10)
 					const timingKind = readOsTimingSourceForOutput(config, safeSysId)
-					const xEnv = { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }
+					const xEnv = { ...process.env, DISPLAY: displayOf(safeSysId), XAUTHORITY: getXAuthority() }
 					const modelinePlan = computeModelineForWxH({
 						width: cw,
 						height: ch,
@@ -237,16 +278,18 @@ async function applyX11Layout(config, opts = {}) {
 		})
 	}
 
-	try {
-		const q = await execFileAsync(
-			'xrandr',
-			['--display', ':0', '--query'],
-			{ env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }, encoding: 'utf8' },
-		)
-		xrandrQueryOut = String(q.stdout || '')
-		const parsed = parseOutputModes(xrandrQueryOut)
-		for (const [out, modes] of parsed.entries()) availableModesByOutput.set(out, modes)
-	} catch (e) { logger.warn(`[OS-Config] Failed to query connected outputs: ${e.message}`) }
+	xrandrQueryOut = ''
+	for (const display of xScreens.length ? xScreens.map((s) => s.display) : [':0']) {
+		try {
+			const q = await execFileAsync(
+				'xrandr',
+				['--display', display, '--query'],
+				{ env: { ...process.env, DISPLAY: display, XAUTHORITY: getXAuthority() }, encoding: 'utf8' },
+			)
+			xrandrQueryOut += String(q.stdout || '')
+		} catch (e) { logger.warn(`[OS-Config] Failed to query connected outputs on ${display}: ${e.message}`) }
+	}
+	for (const [out, modes] of parseOutputModes(xrandrQueryOut).entries()) availableModesByOutput.set(out, modes)
 
 	const seenSysIds = new Set()
 	const processHeadDeduped = (info) => {
@@ -267,14 +310,23 @@ async function applyX11Layout(config, opts = {}) {
 	let persisted = false
 	/** @type {string|null} */
 	let xrandrCommand = null
-	/** @type {string[]|null} */
-	let xrandrArgv = null
+	/** @type {string[][]} one argv per X screen (WO-906) */
+	let xrandrArgvs = []
 	if (xrandrHeads.length > 0) {
 		try {
-			xrandrArgv = buildXrandrLayoutArgv(xrandrHeads)
-			xrandrCommand = formatXrandrLayoutShellCommand(xrandrArgv)
+			const groups = xScreens.length
+				? xScreens.map((sc) => ({
+						display: sc.display,
+						heads: xrandrHeads
+							.filter((h) => displayOf(h.output) === sc.display)
+							.map((h) => ({ ...h, x: h.x - sc.x, y: h.y - sc.y })),
+					}))
+				: [{ display: ':0', heads: xrandrHeads }]
+			xrandrArgvs = groups.filter((g) => g.heads.length).map((g) => buildXrandrLayoutArgv(g.heads, g.display))
+			xrandrCommand = xrandrArgvs.map(formatXrandrLayoutShellCommand).join('\n')
 		} catch (e) {
 			logger.warn(`[OS-Config] xrandr layout argv rejected: ${e.message}`)
+			xrandrArgvs = []
 		}
 	}
 
@@ -282,38 +334,10 @@ async function applyX11Layout(config, opts = {}) {
 		persisted = persistLayoutScript(xrandrCommand, config, layout, customModeRegistry.toArray())
 	}
 
-	if (live && xrandrArgv) {
-		const xrandrLog = formatXrandrArgvForLog(xrandrArgv)
-		// NVIDIA RandR often rejects the first combined CRTC reconfig with BadMatch when
-		// transitioning from a wedged/narrower canvas, then accepts the *identical* command on
-		// retry (observed on highascg-nvidia-595). Retry on failure before giving up.
-		const maxAttempts = readXrandrApplyAttempts(config)
-		const retryDelayMs = readXrandrApplyRetryDelayMs(config)
-		let lastErr = null
-		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-			try {
-				logger.info(`[OS-Config] Applying (xrandr) attempt ${attempt}/${maxAttempts}: ${xrandrLog}`)
-				const { stdout: out } = await execFileAsync('xrandr', xrandrArgv, { env, encoding: 'utf8', maxBuffer: 1024 * 1024 })
-				const trimmed = String(out || '').trim()
-				if (trimmed) {
-					const cap = 8000
-					logger.info(
-						`[OS-Config] xrandr stdout (${trimmed.length} chars): ${trimmed.length > cap ? trimmed.slice(0, cap) + '…' : trimmed}`
-					)
-				} else {
-					logger.info('[OS-Config] xrandr stdout: (empty)')
-				}
-				applied = true
-				lastErr = null
-				break
-			} catch (e) {
-				lastErr = e
-				const stderr = e.stderr ? String(e.stderr).trim() : ''
-				logger.warn(`[OS-Config] xrandr apply attempt ${attempt}/${maxAttempts} failed: ${e.message}`)
-				if (stderr) logger.warn(`[OS-Config] xrandr stderr: ${stderr}`)
-				if (e.stdout) logger.warn(`[OS-Config] xrandr stdout (on error): ${String(e.stdout).trim().slice(0, 8000)}`)
-				if (attempt < maxAttempts && retryDelayMs > 0) await sleepMs(retryDelayMs)
-			}
+	if (live && xrandrArgvs.length) {
+		applied = true
+		for (const xrandrArgv of xrandrArgvs) {
+			applied = (await runXrandrWithRetries(xrandrArgv, { config, env: { ...env, DISPLAY: xrandrArgv[1] } })) && applied
 		}
 		if (applied) {
 			try {
@@ -345,8 +369,6 @@ async function applyX11Layout(config, opts = {}) {
 					logger.warn(`[OS-Config] Operator display session failed: ${e?.message || e}`)
 				})
 			}
-		} else if (lastErr) {
-			logger.error(`[OS-Config] xrandr apply failed after ${maxAttempts} attempts: ${lastErr.message}`)
 		}
 	} else if (!live && xrandrCommand) {
 		logger.info('[OS-Config] Skipping live xrandr push (persist-only)')

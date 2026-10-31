@@ -98,6 +98,14 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		message: '',
 	}
 
+	/* WO-906: the X screen layout (playout outputs on :0.1) follows the config — installed BEFORE the config is written, so
+	 * a refused install never leaves a casparcg.config placed for a screen X does not have. A change = nodm restart. */
+	const xScreens = await require('./x-screens-sync').syncPlayoutXScreens(ctx, { log })
+	if (!xScreens.ok) {
+		log('error', `[Full apply] ${xScreens.error}`)
+		return { ...out, ok: false, step: 'x_screens', message: xScreens.error }
+	}
+
 	log('info', '[Full apply] Step 1 — writing casparcg.config')
 	const writeResult = await writeCasparConfig(ctx)
 	out.caspar = writeResult.ok ? { ok: true, path: writeResult.path } : writeResult
@@ -119,9 +127,20 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		return { ...out, step: 'sandbox', message: 'Config written (sandbox: no display or Caspar restart).' }
 	}
 
+	// WO-407: refresh the machine-owned caspar-env (GL swaps gate on the PGM display's
+	// vblank) so the value tracks layout changes — run.sh sources it at every launch.
+	// WO-906: written before any nodm restart / Caspar kill — a Caspar relaunched by run.sh in between must already
+	// read the new X screen (CASPAR_DISPLAY).
+	try {
+		const { writeCasparGlSyncEnvFile } = require('./caspar-gl-sync-env')
+		writeCasparGlSyncEnvFile({ config: ctx.config, log })
+	} catch (e) {
+		log('warn', `[Full apply] caspar-env GL sync write failed: ${e?.message || e}`)
+	}
+
 	log('info', '[Full apply] Step 2 — persisting apply-layout.sh')
 	const canvasCheck = needsNodmRestartForLayout(ctx.config)
-	const needsNodm = opts.forceNodmRestart === true || canvasCheck.needed
+	const needsNodm = opts.forceNodmRestart === true || canvasCheck.needed || xScreens.changed
 	out.layout.needsNodmRestart = needsNodm
 	out.layout.plannedCanvas = canvasCheck.plannedCanvas || null
 	out.layout.currentCanvas = canvasCheck.currentCanvas || null
@@ -140,7 +159,9 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		)
 	}
 
-	if (needsNodm) {
+	if (xScreens.changed) {
+		log('info', `[Full apply] X screen layout changed (playout X screen ${xScreens.on ? 'on' : 'off'}) — nodm restart will run`)
+	} else if (needsNodm) {
 		log(
 			'info',
 			`[Full apply] Desktop canvas expansion required (planned ${canvasCheck.plannedCanvas?.width}x${canvasCheck.plannedCanvas?.height} > current ${canvasCheck.currentCanvas?.width}x${canvasCheck.currentCanvas?.height}) — nodm restart will run`,
@@ -235,15 +256,6 @@ async function applyFullServerConfig(ctx, opts = {}) {
 			log,
 			skipNvidia: true, // WO-805: ~1.4 s per Apply; the deferred run below is the one that sticks
 		}).catch((e) => log('warn', `[Full apply] Operator display session: ${e?.message || e}`))
-	}
-
-	// WO-407: refresh the machine-owned caspar-env (GL swaps gate on the PGM display's
-	// vblank) so the value tracks layout changes — run.sh sources it at every launch.
-	try {
-		const { writeCasparGlSyncEnvFile } = require('./caspar-gl-sync-env')
-		writeCasparGlSyncEnvFile({ config: ctx.config, log })
-	} catch (e) {
-		log('warn', `[Full apply] caspar-env GL sync write failed: ${e?.message || e}`)
 	}
 
 	if (opts.skipCasparRestart) {

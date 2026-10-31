@@ -28,6 +28,55 @@ const execFileAsync = promisify(execFile)
 const XRANDR_TIMEOUT_MS = 3000
 
 /**
+ * WO-906: `xrandr <args>` text. With the playout X screen installed, run on each X screen and merge the outputs back onto
+ * the layout plan's canvas (x-screens.js) — every reader keeps seeing ONE desktop; a screen that does not answer (X not
+ * restarted onto the new layout yet) is left out. Throws like execSync when screen 0 / :0 fails.
+ */
+function xrandrTextSync(args) {
+	const { installedScreens, mergeScreensXrandrText } = require('./x-screens')
+	const run = (display) =>
+		execSync(`xrandr ${args}`, {
+			stdio: ['ignore', 'pipe', 'ignore'],
+			env: { ...process.env, DISPLAY: display, XAUTHORITY: getXAuthority() },
+			timeout: XRANDR_TIMEOUT_MS,
+		}).toString()
+	const screens = installedScreens()
+	if (!screens.length) return run(':0')
+	const parts = []
+	for (const sc of screens) {
+		try {
+			parts.push({ screen: sc, text: run(sc.display) })
+		} catch (e) {
+			if (sc.n === 0) throw e
+		}
+	}
+	return mergeScreensXrandrText(parts)
+}
+
+/** Async sibling of {@link xrandrTextSync} (execFile, never blocks the server). */
+async function xrandrTextAsync(args) {
+	const { installedScreens, mergeScreensXrandrText } = require('./x-screens')
+	const run = async (display) =>
+		(
+			await execFileAsync('xrandr', args, {
+				env: { ...process.env, DISPLAY: display, XAUTHORITY: getXAuthority() },
+				timeout: XRANDR_TIMEOUT_MS,
+			})
+		).stdout.toString()
+	const screens = installedScreens()
+	if (!screens.length) return run(':0')
+	const parts = []
+	for (const sc of screens) {
+		try {
+			parts.push({ screen: sc, text: await run(sc.display) })
+		} catch (e) {
+			if (sc.n === 0) throw e
+		}
+	}
+	return mergeScreensXrandrText(parts)
+}
+
+/**
  * Parse `xrandr --query` into connected outputs with geometry, current refresh, and listed modes.
  * @returns {Array<{
  *   name: string,
@@ -56,11 +105,7 @@ function getDisplaysXrandrVerboseRaw() {
 		return _xrandrVerboseCache.value
 	}
 	try {
-		const out = execSync('xrandr --verbose', {
-			stdio: ['ignore', 'pipe', 'ignore'],
-			env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
-			timeout: XRANDR_TIMEOUT_MS,
-		}).toString()
+		const out = xrandrTextSync('--verbose')
 		_xrandrVerboseCache = { at: Date.now(), value: out, failed: !String(out || '').trim() }
 		return out
 	} catch (e) {
@@ -86,11 +131,7 @@ async function getDisplaysXrandrVerboseRawAsync() {
 		return _xrandrVerboseCache.value
 	}
 	try {
-		const { stdout } = await execFileAsync('xrandr', ['--verbose'], {
-			env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
-			timeout: XRANDR_TIMEOUT_MS,
-		})
-		const out = stdout.toString()
+		const out = await xrandrTextAsync(['--verbose'])
 		_xrandrVerboseCache = { at: Date.now(), value: out, failed: !String(out || '').trim() }
 		return out
 	} catch (e) {
@@ -270,11 +311,7 @@ function readBootXrandrSnapshotParsed() {
  */
 function getDisplaysXrandrDetailedUncached() {
 	try {
-		const stdout = execSync('xrandr --query', {
-			stdio: ['ignore', 'pipe', 'ignore'],
-			env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
-			timeout: XRANDR_TIMEOUT_MS,
-		}).toString()
+		const stdout = xrandrTextSync('--query')
 		if (String(stdout || '').trim()) {
 			return { value: parseXrandrQueryRaw(stdout), failed: false }
 		}
@@ -308,11 +345,8 @@ async function getDisplaysXrandrDetailedAsync() {
 	_xrandrDetailedInFlight = (async () => {
 		let value = null
 		try {
-			const { stdout } = await execFileAsync('xrandr', ['--query'], {
-				env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() },
-				timeout: XRANDR_TIMEOUT_MS,
-			})
-			if (String(stdout || '').trim()) value = parseXrandrQueryRaw(stdout.toString())
+			const stdout = await xrandrTextAsync(['--query'])
+			if (String(stdout || '').trim()) value = parseXrandrQueryRaw(stdout)
 		} catch (e) {
 			console.error(`[Hardware-Info] getDisplaysXrandrDetailedAsync failed:`, e.message)
 		}

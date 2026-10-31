@@ -1,7 +1,7 @@
 # WO-906 — Playout outputs on a second X screen (:0.1) of the same X server, operator heads alone on :0.0
 
 **Area:** devices-config, os-iso, mapping
-**Status: IN PROGRESS (31.10.26 — helper installed by the owner; run.sh `CASPAR_DISPLAY` plumbing in; box experiment done and rolled back (§5): two screens work, but an operator modeset still stalls playout — generator waits for the owner's go)**
+**Status: DONE (31.10.26, generator + switch built; live on the box: 2 X screens, Caspar on :0.1 at 50/s, pointer can't cross, misactions drop 0, off/on rollback proven; smokes 8/8 + full offline suite. Open: ISO sudoers wiring, see §6)**
 
 ## Owner request (31.10.26)
 "would it be possible to move the screen consumer outputs to another x display like display:1 so they are separate
@@ -100,5 +100,81 @@ DP-4, DP-6; metamodes DP-4 +0+0, DP-6 +1920+0) and Screen 1 "Playout" RightOf it
 - **Why not left on:** until the generator exists an Apply rewrites `<x>3840</x>` (off-screen on :0.1) and node's xrandr
   verify (`os-layout-watchdog.js`, 12 re-applies at node start) would chase DP-0 on :0 — each re-apply a modeset.
 
-Remaining (owner decision, given the modeset finding): the generator (`x11.playoutScreen`), per-screen layout plan and
-xrandr verify/apply, capture paths on :0.1, the ISO sudoers line.
+Remaining at that point: the generator, per-screen layout plan and xrandr verify/apply, the ISO sudoers line. The owner
+then asked for it to be built (31.10.26: "WO-906 build this. Have a backup ready to go back if it's not sustainable. But
+the idea is exactly what I need, screens that are detached from the gui, operator etc meaning they are undisturbed by any
+user misaction.") — §6.
+
+## 6. Generator, switch and live use (31.10.26, 18:03 on)
+### What was done
+- **Switch** `casparServer.playout_x_screen` (machine-local `config/caspar_server.json`, as WO-868's `operator_gui_first`;
+  the plan's `x11.playoutScreen` name was dropped for that precedent). Off / missing = one X screen, as before.
+- **`src/utils/x-screens.js`** — one virtual canvas, two X screens: the layout plan is unchanged (operator heads left,
+  playout heads right); `splitScreens` puts the operator GUI heads on screen 0 and every PGM / PRV / multiview /
+  mapping head on screen 1, each screen's origin = the min x/y of its heads. `buildXorgScreensConf` writes the conf the
+  §4 helper accepts (ASCII only: an em dash made the helper call it binary): Screen 1 `Absolute` below-right of screen 0
+  with no shared edge (the pointer can never cross), Xinerama off, both Devices on the NVIDIA BusID with
+  ForceCompositionPipeline, metamodes per screen from the plan, `# highascg-x-screen n display x y outputs` lines.
+  The runtime truth is that installed file (`installedScreens`): every consumer asks it which screen an output is on.
+  `mergeScreensXrandrText` folds both screens' xrandr back onto the canvas (positions + origin, primary only from
+  screen 0, union `current`) so inventory / verify / watchdog / Device View read the same canvas as before.
+  `isOperatorPickable`: under two screens only screen 0 outputs can be the operator screen.
+- **`src/utils/x-screens-sync.js`** — at the start of every full Apply (`full-config-apply.js`): wanted conf vs
+  installed → `sudo -n helper install <staged>` / `off`; a change adds the nodm restart (logged), caspar-env is now written
+  before Step 2 so Caspar's next launch already has its display. Sandbox and the test runner never touch the box.
+- **Per-screen runtime:** `os-config-xrandr-apply.js` (one xrandr argv per screen, positions minus the screen origin,
+  `runXrandrWithRetries`), `xrandr-safety.js` (display arg validated `:N[.N]`), `xrandr-custom-mode.js` and
+  `xrandr-persist-script.js` (newmode / addmode on the output's screen), `hardware-info-xrandr.js` (the 4 probes query
+  every installed screen and merge; a failing screen 1 is skipped), `nvidia-display-policy.js` +
+  `tools/runtime/highascg-nvidia-x-apply.sh` (`[screen:N]` targets, the sync output only on its screen),
+  `screen-consumer-placement.js` (`:0.1`).
+- **Caspar:** `build-caspar-generator-layout-sync.js` `toPlayoutScreen` subtracts the playout origin from the screen /
+  PRV / multiview / slice window positions (DP-0 at canvas 3840 → `<x>0</x>`); `caspar-gl-sync-env.js` writes
+  `CASPAR_DISPLAY=:0.1` only while the flag is on AND the conf is installed; `run.sh` falls back to the base display
+  when `xrandr --display $CASPAR_DISPLAY` fails (a conf removed behind its back cannot leave Caspar windowless).
+- **Operator screen guard:** `routes-operator-screen.js` (409) and `boot-screen-assignment.js` (`resolve` 409,
+  `defaultOperator` skips screen 1) — a GUI pick, a boot answer or a stale flag can never put the operator on DP-0. The
+  Godot boot prompts match screens by position and only see screen 0, so they never offer DP-0 either.
+- **The switch:** `GET/POST /api/system/playout-screen` (`src/api/routes-playout-screen.js`): POST `{enable}` first
+  writes a backup (`~/.highascg/backup/wo906-<ts>/`: casparcg.config, caspar-env, casparServer), sets / deletes the flag,
+  then the standard forced full apply. Shell: `scripts/runtime/playout-screen.sh status | on | off | off --emergency`.
+
+### Way back
+- `scripts/runtime/playout-screen.sh off` (server up): flag off → Apply removes the conf (kept as `.prev`), nodm +
+  Caspar restart → one X screen. Measured 16 s.
+- `scripts/runtime/playout-screen.sh off --emergency` (server not answering): helper off, flag deleted in
+  `config/caspar_server.json`, nodm restart, node restart, forced Apply once it answers.
+- By hand: `sudo -n /usr/local/lib/highascg/highascg-xorg-screens-apply.sh off && sudo -n systemctl restart nodm`
+  (run.sh's fallback then starts Caspar on `:0`), and the backup dir for the previous casparcg.config.
+
+### Verified
+- **Offline:** `smoke-wo906-playout-x-screen.test.js` 8/8 (switch, split, conf through the real helper `check`, merge,
+  per-screen xrandr / NVIDIA / custom modes, Caspar positions + caspar-env, sync on/off/refusal, operator guard);
+  `smoke-wo444-caspar-env-per-launch` 3/3 (new: screen 1 missing → base display); timeout smoke repointed. Clean
+  worktree at 1edf261c + this change: lint 0 errors / 205 warnings, max-lines 0, unwired-exports clean, API contract
+  regenerated, `test:ci` 5119 tests, 18 failures, all in 6 files that resolve sysIds against the box's REAL xrandr
+  (`smoke-mapping-gpu-os-layout`, `smoke-os-layout-w40`, `smoke-wo439-…`, `smoke-wo868-…golden`, `smoke-wo869-…` ×2):
+  identical 18 at the base commit, and 47/0 with `HIGHASCG_XORG_SCREENS_CONF` pointed at the real conf. They fail only on
+  this box while it runs two screens (the test runner deliberately never reads the installed conf, so they see screen 0
+  alone); CI has no X.
+- **Box, `playout-screen.sh on` (18:03, 8 s):** `xdpyinfo` 2 screens (`:0.0` 3840x1080 = DP-4 + DP-6, `:0.1` 3840x1792
+  = DP-0 at its EDID mode); Caspar `DISPLAY=:0.1`, `__GL_SYNC_DISPLAY_DEVICE=DP-0`, casparcg.config `<x>0</x><y>0</y>`;
+  journal "xrandr verify OK", "NVIDIA … (2 X screens)"; `apply-layout.sh` has one xrandr + NVIDIA run per screen; the
+  GUI came back by itself on :0.0. Grabs: the GUI alone on :0.0, the ch2 `visuals` ring alone on :0.1.
+- **Pointer:** `xdotool` pushes past x=3839 and past the bottom-right corner stay on screen 0 (`screen:0`, 3839).
+- **Misactions on :0.0** (alt-tab ×6, super ×3, Escape, F11 on/off) with OSC :6250 watched for 20 s: presented 50/s,
+  shm 49–50/s, **drop 0**.
+- **Node restart:** watchdog "xrandr layout matches config", no re-apply, Caspar pid unchanged. **Plain Apply:**
+  `no_changes`, nodm pid unchanged, Caspar not restarted.
+- **Operator API:** GET lists DP-0 with `caspar: true`; POST `{name: "DP-0"}` against the installed conf → 409.
+- **Rollback proven:** `off` (16 s) → 1 screen 7680x1792, Caspar `DISPLAY=:0`, 50/s (4 drops at start, then flat);
+  `on` again (8.6 s) → 2 screens, Caspar `:0.1`, 50/s, drop 1 at start then flat, GUI back, ring on DP-0. Left ON
+  (owner's wish). Backups: `~/.highascg/backup/wo906-2026-10-31T17-03-18-240Z` (before the first on) and one per switch.
+
+### Still true / open
+- §5's modeset finding stands: an operator xrandr mode change stalls the GPU display engine for BOTH screens (NVIDIA);
+  two screens isolate windows, focus, pointer and the X layout, not a modeset.
+- ISO: the helper + sudoers line are not installed by the ISO setup yet (a fresh install answers the switch with the
+  helper's install hint). No GUI toggle (API + script only).
+- WO-258 `browser_display` (unused on this box) computes its off-screen region on the merged canvas; under two screens it
+  would need screen 0's root.

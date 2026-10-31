@@ -3,6 +3,7 @@
 const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
 const { resolveMultiviewConsumerX } = require('./config-generator-channels')
 const { resolvePixelMapFeedToProgramScreen } = require('./pixel-mapping-config')
+const { playoutOrigin } = require('../utils/x-screens')
 
 function copyLegacyScreenAndMultiviewSettings(merged, appConfig) {
 	if (!appConfig) return
@@ -103,10 +104,36 @@ function applyLayoutPositionsToMerged(merged) {
 				}
 			}
 		}
+		toPlayoutScreen(merged, layout)
 	} catch (_) {}
+}
+
+/**
+ * WO-906: with the playout X screen Caspar runs on :0.1, whose desktop starts at the playout heads' origin on the
+ * layout canvas — every Caspar window position moves by minus that origin (the GUI heads keep screen 0).
+ * @param {Record<string, any>} merged flat generator config
+ * @param {object} layout calculateLayoutPositions(merged)
+ */
+function toPlayoutScreen(merged, layout) {
+	const origin = playoutOrigin(merged, layout)
+	if (!origin || (!origin.x && !origin.y)) return
+	const { x: ox, y: oy } = origin
+	const shift = (kx, ky) => {
+		if (Number.isFinite(merged[kx])) merged[kx] -= ox
+		if (Number.isFinite(merged[ky])) merged[ky] -= oy
+	}
+	for (let n = 1; n <= 16; n++) {
+		shift(`screen_${n}_x`, `screen_${n}_y`)
+		shift(`screen_${n}_prv_x`, `screen_${n}_prv_y`)
+		shift(`multiview_${n}_x`, `multiview_${n}_y`)
+		const k = `screen_${n}_slice_windows`
+		if (Array.isArray(merged[k])) merged[k] = merged[k].map((w) => ({ ...w, x: (Number(w.x) || 0) - ox, y: (Number(w.y) || 0) - oy }))
+	}
+	shift('multiview_x', 'multiview_y')
 }
 
 module.exports = {
 	copyLegacyScreenAndMultiviewSettings,
 	applyLayoutPositionsToMerged,
+	toPlayoutScreen,
 }

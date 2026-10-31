@@ -140,6 +140,9 @@ function handlePost(raw, ctx, deps = {}) {
 	if (hit.port == null) {
 		return reply(422, { error: `${name} maps to no GPU port slot (1..${picker.MAX_OPERATOR_PORT})` })
 	}
+	if (!(deps.isOperatorPickable || require('../utils/x-screens').isOperatorPickable)(name)) {
+		return reply(409, { error: `${name} is on the playout X screen (WO-906) — the operator GUI stays on :0.0` })
+	}
 	const cm = ctx?.configManager
 	const next = picker.applyOperatorMonitorChoice(cm?.get ? cm.get() : config, hit.port)
 	if (cm?.save) cm.save(next)
