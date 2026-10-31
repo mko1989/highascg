@@ -147,12 +147,12 @@ function validateMappings(list, env) {
 	return errors.length ? { ok: false, errors } : { ok: true, mappings }
 }
 
-/** [r, g, b] 0–255 → one 8-bit value per component letter. */
+/** [r, g, b] 0–255 (floats welcome) → one 0–255 value per component letter, unrounded (WO-893: writePixel's scaling rounds). */
 function componentValues(rgb, comps) {
 	const [r, g, b] = rgb
 	const extract = comps.includes('w') && /[rgb]/.test(comps)
 	const w = Math.min(r, g, b)
-	const v = { r: extract ? r - w : r, g: extract ? g - w : g, b: extract ? b - w : b, w, a: Math.round(Math.min(r, g) * 0.5),
+	const v = { r: extract ? r - w : r, g: extract ? g - w : g, b: extract ? b - w : b, w, a: Math.min(r, g) * 0.5,
 		c: 255 - r, m: 255 - g, y: 255 - b, 0: 0, '-': 0 }
 	return [...comps].map((k) => v[k] ?? 0)
 }

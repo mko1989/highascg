@@ -20,8 +20,9 @@ const CLIENT_OWNED_SLICES = ['previs', 'fixtures', 'operatorCompose', 'visuals']
  * project (Save As to a new name) the client's copy is kept.
  * `pixelMappingProposal`: the pending LED wall edge proposal (src/fixtures/pixel-map-proposal.js), written by the server
  * when an MVR / wall binding changes, dropped by accept / dismiss.
+ * WO-893: `pixelMapSettings` ({ smooth: { attack_ms, release_ms, snap } }, POST /api/fixtures/pixelmap/settings).
  */
-const SERVER_OWNED_SLICES = ['pixelMappings', 'pixelMappingProposal']
+const SERVER_OWNED_SLICES = ['pixelMappings', 'pixelMappingProposal', 'pixelMapSettings']
 
 /**
  * @param {object} project incoming payload (mutated)

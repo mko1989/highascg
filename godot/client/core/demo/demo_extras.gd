@@ -21,6 +21,13 @@ static func route(s: RefCounted, verb: String, path: String, query: Dictionary, 
 			return s.reply({"ok": true, "mappings": s.pixelmap})
 		["POST", "/api/fixtures/pixelmap"]:
 			return save_pixelmap(s, body.get("mappings"))
+		["GET", "/api/fixtures/pixelmap/settings"]:
+			return s.reply({"ok": true, "settings": {"smooth": s.project.get("pixelMapSettings", {}).get("smooth", {"attack_ms": 0, "release_ms": 0, "snap": 0})}})
+		["POST", "/api/fixtures/pixelmap/settings"]:
+			if not (body.get("smooth") is Dictionary):
+				return s.refuse(400, "smooth must be an object")
+			s.project["pixelMapSettings"] = {"smooth": body.smooth}  # WO-893: stored as sent (the node clamps)
+			return s.reply({"ok": true, "settings": s.project["pixelMapSettings"]})
 		["GET", "/api/fixtures/pixelmap/pixels"]:
 			return s.reply(s.files.get("pixelmap_pixels", {}))
 		["GET", "/api/fixtures/pixelmap/live"]:

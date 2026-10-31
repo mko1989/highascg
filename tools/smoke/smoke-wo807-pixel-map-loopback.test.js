@@ -148,6 +148,22 @@ describe('WO-807 loopback: screen region → Pixel Line pixel 1 → ArtDMX on 12
 		assert.equal(pm.live(t).channels[0].state, 'stalled')
 	})
 
+	it('WO-893 smoothing on the wire: attack 0 / release 1000 ms → a cut to black falls over ~1 s, a rise goes in at once', async () => {
+		const smooth = (release_ms) => ({ pixelMappings: pm.mappings().map(({ problem: _p, ...m }) => m), pixelMapSettings: { smooth: { attack_ms: 0, release_ms, snap: 0 } } })
+		pm.load(smooth(1000))
+		writeSegment(file, picture(640, 360, [{ ...REGION, rgb: [200, 100, 50] }]), 5)
+		assert.deepEqual([...(await tick()).data.subarray(424, 427)], [200, 100, 50], 'rising: at once')
+		writeSegment(file, picture(640, 360, []), 6)
+		const first = (await tick()).data[424]
+		assert.ok(first > 190 && first < 200, `one tick after the cut: ${first}`)
+		let last = first
+		for (let i = 0; i < 42; i++) last = (await tick())?.data[424] ?? last
+		assert.ok(last > 60 && last < 90, `~1 s later ≈ 200·e^-1: ${last}`)
+		pm.load(smooth(0))
+		writeSegment(file, picture(640, 360, [{ ...REGION, rgb: [9, 9, 9] }]), 7)
+		assert.deepEqual([...(await tick()).data.subarray(424, 427)], [9, 9, 9])
+	})
+
 	it('the DMX master off → nothing is sent (the engine rules apply to mapped pixels)', async () => {
 		engine.configure(slice(false))
 		writeSegment(file, picture(640, 360, [{ ...REGION, rgb: [9, 9, 9] }]), 4)

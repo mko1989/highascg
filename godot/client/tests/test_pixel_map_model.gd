@@ -148,6 +148,7 @@ func test_live_and_fixture_label() -> void:
 	t.eq(by.a1.color, Color8(255, 128, 0))
 	t.eq([by.a1.on_wire, by.a2.color, by.a2.problem], [false, null, "channel 3 is not running in Caspar"])
 	t.eq(P.live_by_id({}), {})
+	t.eq(by.a1.raw, null, "no raw in the reply → null")
 	t.eq(P.fixture_label(FX), "Pixel Line IP 1042 · U18.421 · 3 px")
 
 
@@ -162,3 +163,29 @@ func test_label_cells_detect_overlap() -> void:
 	t.ok(not below.any(func(k: Vector2i) -> bool: return a.has(k)), "a label one row below is free")
 	var src := FileAccess.get_file_as_string("res://features/previs/fixtures/pixel_map_view.gd")
 	t.ok(src.contains("labels.push_front(l)"), "the selected region's label is placed first, so it always shows")
+
+
+## WO-893: /live carries the smoothed colour (rgb, as written) and the region's raw mean (raw).
+func test_live_raw_beside_smoothed() -> void:
+	var by := P.live_by_id({"mappings": [{"id": "a1", "rgb": [100, 50, 20], "raw": [200, 0, 40], "on_wire": true},
+		{"id": "a2", "rgb": [0, 0, 0], "raw": null}]})
+	t.eq(by.a1.color, Color8(100, 50, 20))
+	t.eq(by.a1.raw, Color8(200, 0, 40))
+	t.eq(by.a2.raw, null)
+
+
+## WO-893: the settings reply → the three spin values, clamped like the server (attack 0-5000, release 0-10000, snap 0-255).
+func test_smooth_from_clamps() -> void:
+	t.eq(P.smooth_from({"ok": true, "settings": {"smooth": {"attack_ms": 60, "release_ms": 250.0, "snap": 0}}}), {"attack_ms": 60, "release_ms": 250, "snap": 0})
+	t.eq(P.smooth_from({"settings": {"smooth": {"attack_ms": 99999, "release_ms": -3, "snap": 300}}}), {"attack_ms": 5000, "release_ms": 0, "snap": 255})
+	t.eq(P.smooth_from({"settings": {"smooth": {"attack_ms": "x", "release_ms": null}}}), {"attack_ms": 0, "release_ms": 0, "snap": 0})
+	t.eq(P.smooth_from({}), {"attack_ms": 0, "release_ms": 0, "snap": 0}, "no reply → off")
+	t.eq(P.smooth_from(null), {"attack_ms": 0, "release_ms": 0, "snap": 0})
+
+
+## WO-893: the Smoothing row exists, its spin boxes follow RULES.md 1 (focus selects the value) and Save posts them first.
+func test_window_has_smoothing_row() -> void:
+	var src := FileAccess.get_file_as_string("res://features/previs/fixtures/pixel_map_window.gd")
+	t.ok(src.contains("\"Attack ms\"") and src.contains("\"Release ms\"") and src.contains("\"Snap on cut\""), "labels like the Visuals Shape node")
+	t.ok(src.contains("s.select_all_on_focus = true  # RULES.md 1; SpinBox evaluates + - * / on commit (RULES.md 2)\n\t\ts.tooltip_text = str(sp[3])"), "the smoothing spin boxes select on focus")
+	t.ok(src.find("post_json(\"/api/fixtures/pixelmap/settings\"") > 0 and src.find("post_json(\"/api/fixtures/pixelmap/settings\"") < src.find("post_json(\"/api/fixtures/pixelmap\", {"), "settings are saved before the mappings")

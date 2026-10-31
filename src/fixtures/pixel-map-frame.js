@@ -81,7 +81,7 @@ function averageBgra(pixels, stride, s) {
 
 /**
  * A sampler for a fixed list of regions ({ x, y, w, h, mode }); the plan is rebuilt only when the surface size changes.
- * read(file, { since }) → { state: 'frame', seq, width, height, colours: ([r, g, b] | null)[], reads } or
+ * read(file, { since }) → { state: 'frame', seq, width, height, colours: ([r, g, b] | null)[], means: unrounded, reads } or
  * { state: 'missing' | 'invalid' | 'none' | 'lapped' }.
  */
 function createRegionSampler(regions, { fsImpl = fs } = {}) {
@@ -139,8 +139,10 @@ function createRegionSampler(regions, { fsImpl = fs } = {}) {
 				}
 			}
 			if (!seqOk()) return { state: 'lapped' }
-			const colours = sums.map((a) => (a[3] ? [Math.round(a[0] / a[3]), Math.round(a[1] / a[3]), Math.round(a[2] / a[3])] : null))
-			return { state: 'frame', seq, width, height, colours, reads }
+			// WO-893: the unrounded means feed the smoothing (pixel-map-smooth.js); `colours` stays the rounded ints of WO-807
+			const means = sums.map((a) => (a[3] ? [a[0] / a[3], a[1] / a[3], a[2] / a[3]] : null))
+			const colours = means.map((m) => (m ? [Math.round(m[0]), Math.round(m[1]), Math.round(m[2])] : null))
+			return { state: 'frame', seq, width, height, colours, means, reads }
 		} finally {
 			fsImpl.closeSync(fd)
 		}

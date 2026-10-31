@@ -4,7 +4,8 @@ extends AcceptDialog
 ## live picture (pixel_map_view.gd) where the operator draws, moves and resizes regions in whole channel pixels.
 ## Right: the selected region's x / y / w / h, and the chosen fixture's pixels (pixel_map_rows.gd) with region, mode
 ## and colour order per pixel and the live colour the server samples (GET /api/fixtures/pixelmap/live, polled at 2 Hz
-## only while this window is open). Save POSTs the whole list to /api/fixtures/pixelmap (phase 1; the server checks
+## only while this window is open). WO-893: a "Smoothing" row (attack / release in ms, snap on cut) sets how the server
+## smooths the colours it sends (GET / POST /api/fixtures/pixelmap/settings; 0 / 0 = off). Save POSTs the whole list to /api/fixtures/pixelmap (phase 1; the server checks
 ## it and keeps it in the project); a 400's errors land on their rows. Never sends DMX itself.
 
 const P := preload("res://features/previs/fixtures/pixel_map_model.gd")
@@ -34,6 +35,8 @@ var _note: Label
 var _poll: Timer
 var _busy := false
 var _live_line := ""
+var _smooth_spins := {}  # "attack_ms" | "release_ms" | "snap" → SpinBox (WO-893)
+var _smooth_dirty := false
 
 
 func _init() -> void:
@@ -135,6 +138,7 @@ func _build_side() -> Control:
 	_rows.changed.connect(_on_rows_changed)
 	scroll.add_child(_rows)
 	side.add_child(scroll)
+	side.add_child(_build_smoothing())
 	var foot := HBoxContainer.new()
 	_save = Button.new()
 	_save.text = "Save"
@@ -147,6 +151,43 @@ func _build_side() -> Control:
 	foot.add_child(_note)
 	side.add_child(foot)
 	return side
+
+
+## WO-893: "Smoothing" — the server smooths each mapped pixel's colour after the region average (attack when it gets
+## brighter, release when darker); Snap on cut jumps a whole channel at once when the picture cuts (0 = off).
+func _build_smoothing() -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var title := Label.new()
+	title.text = "Smoothing"
+	title.tooltip_text = "Calms erratic colour changes of the mapped pixels. 0 / 0 = off. Try attack 60, release 250."
+	row.add_child(title)
+	var specs := [["attack_ms", "Attack ms", 5, "How fast a pixel follows a brighter picture (time constant; 0 = at once)"],
+		["release_ms", "Release ms", 10, "How fast a pixel follows a darker picture (time constant; 0 = at once)"],
+		["snap", "Snap on cut", 1, "A new frame that changes this channel's regions by this much on average (0-255) jumps to the picture at once, no smoothing. 0 = off"]]
+	for sp in specs:
+		var l := Label.new()
+		l.text = str(sp[1])
+		row.add_child(l)
+		var s := SpinBox.new()
+		s.min_value = 0
+		s.max_value = P.SMOOTH_MAX[sp[0]]
+		s.step = int(sp[2])
+		s.rounded = true
+		s.select_all_on_focus = true  # RULES.md 1; SpinBox evaluates + - * / on commit (RULES.md 2)
+		s.tooltip_text = str(sp[3])
+		s.value_changed.connect(func(_v: float) -> void:
+			_smooth_dirty = true
+			_set_dirty(true))
+		row.add_child(s)
+		_smooth_spins[sp[0]] = s
+	return row
+
+
+func _show_smooth(sm: Dictionary) -> void:
+	for k in _smooth_spins:
+		(_smooth_spins[k] as SpinBox).set_value_no_signal(int(sm.get(k, 0)))
+	_smooth_dirty = false
 
 
 ## Show the window; unsaved edits from the last time it was open are kept, else the saved list is read.
@@ -165,6 +206,8 @@ func reload() -> void:
 		_status.text = "Pixel map not available: %s" % a.error
 		return
 	work = _clean(a.data.get("mappings", []))
+	var st: Dictionary = await Api.get_json("/api/fixtures/pixelmap/settings")
+	_show_smooth(P.smooth_from(st.data if st.ok else {}))
 	regions = P.regions_from(work)
 	fixtures = b.data.get("fixtures", []) if b.ok and b.data is Dictionary else []
 	_errors = {}
@@ -361,6 +404,16 @@ func _show_status() -> void:
 func _save_all() -> void:
 	var posted := work.duplicate(true)
 	_save.disabled = true
+	if _smooth_dirty:  # settings first, then the mappings
+		var body := {}
+		for k in _smooth_spins:
+			body[k] = int((_smooth_spins[k] as SpinBox).value)
+		var sres: Dictionary = await Api.post_json("/api/fixtures/pixelmap/settings", {"smooth": body})
+		if not sres.ok:
+			_save.disabled = false
+			_set_note("Not saved: smoothing settings: %s" % sres.error, true)
+			return
+		_show_smooth(P.smooth_from(sres.data))
 	var res: Dictionary = await Api.post_json("/api/fixtures/pixelmap", {"mappings": posted})
 	_save.disabled = false
 	var data: Dictionary = res.data if res.data is Dictionary else {}

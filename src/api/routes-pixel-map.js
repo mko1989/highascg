@@ -10,6 +10,12 @@
  *   GET  /api/fixtures/pixelmap/live    → { ok, at, stats, channels: [{ channelNo, role, state, width, height, age_ms }],
  *                                          mappings: [{ id, fixtureId, pixel, rgb [r, g, b] | null, age_ms, protocol,
  *                                          universe, slots [1-based DMX], order, dmx [{ slot, value }], on_wire, problem }] }
+ *                                          WO-893: rgb = the smoothed colour as written (rounded), raw = the last frame's mean;
+ *                                          `smooth` = the active settings
+ *   GET  /api/fixtures/pixelmap/settings → { ok, settings: { smooth: { attack_ms 0–5000, release_ms 0–10000, snap 0–255 } } }
+ *                                          (WO-893 smoothing after the region average; 0 / 0 = off, snap 0 = off)
+ *   POST /api/fixtures/pixelmap/settings {smooth: {attack_ms?, release_ms?, snap?}}  → clamps, keeps omitted fields, saves it
+ *                                          in project.pixelMapSettings (server-owned): 200 { ok, settings } | 400 { ok: false, error }
  *   GET  /api/fixtures/pixelmap/pixels  → { ok, fixtures: [{ id, name, protocol, universe, address, problem,
  *                                          pixels: [{ pixel, geometry, order, slots }] }] } — what can be mapped
  *   GET  /api/fixtures/pixelmap/proposal[?fresh=1&inset_px&depth_px&threshold_m&mode]  → the LED wall edge proposal
@@ -51,6 +57,15 @@ async function handleSet(body, pm) {
 	}
 }
 
+async function handleSettings(body, pm) {
+	try {
+		const r = await pm.setSettings(parseBody(body))
+		return r.ok ? reply(200, r) : reply(400, r)
+	} catch (e) {
+		return reply(500, { ok: false, error: e?.message || String(e) })
+	}
+}
+
 async function handleProposal(fn, ...args) {
 	try {
 		const r = await fn(...args)
@@ -67,6 +82,8 @@ function register(routes) {
 	routes.get('/api/fixtures/pixelmap', ({ ctx }) => (svc(ctx) ? reply(200, { ok: true, mappings: svc(ctx).pixelMap.mappings() }) : reply(503, NO_ENGINE)), opt)
 	routes.post('/api/fixtures/pixelmap', ({ ctx, body }) => (svc(ctx) ? handleSet(body, svc(ctx).pixelMap) : reply(503, NO_ENGINE)), opt)
 	routes.get('/api/fixtures/pixelmap/live', ({ ctx }) => (svc(ctx) ? reply(200, { ok: true, ...svc(ctx).pixelMap.live() }) : reply(503, NO_ENGINE)), opt)
+	routes.get('/api/fixtures/pixelmap/settings', ({ ctx }) => (svc(ctx) ? reply(200, { ok: true, settings: svc(ctx).pixelMap.settings() }) : reply(503, NO_ENGINE)), opt)
+	routes.post('/api/fixtures/pixelmap/settings', ({ ctx, body }) => (svc(ctx) ? handleSettings(body, svc(ctx).pixelMap) : reply(503, NO_ENGINE)), opt)
 	routes.get('/api/fixtures/pixelmap/pixels', ({ ctx }) => (svc(ctx) ? reply(200, { ok: true, fixtures: pixelFixtures(svc(ctx).engine) }) : reply(503, NO_ENGINE)), opt)
 	const prop = (ctx) => svc(ctx)?.pixelMap?.proposal || null
 	routes.get('/api/fixtures/pixelmap/proposal', ({ ctx, query }) => (prop(ctx) ? handleProposal(prop(ctx).get, query || {}) : reply(503, NO_ENGINE)), opt)

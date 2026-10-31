@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-804 live WOs (33 open, 123 in progress, 648 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+805 live WOs (33 open, 123 in progress, 649 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -285,7 +285,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 521 OPEN [video-io+engine] Zoom meeting module: per-participant channels, strictly opt-in → 521_WO_ZOOM_MODULE_OPT_IN.md
 - 716 DONE [video-io+caspar-build] Screen consumers: vsync always off, gpu-texture on every channel → 716_WO_vsync_always_off_gpu_texture_every_screen.md
 
-## mapping — Pixel map, screens, multiview, destinations (38)
+## mapping — Pixel map, screens, multiview, destinations (39)
 
 - 18 IN PROGRESS [mapping] Pixel & Output Mapping — Unified Node-Based System → 18_WO_OUTPUT_SLICER.md
 - 40 IN PROGRESS [mapping+devices-config] Device View — GPU xrandr sync with screen destinations and override → 40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md
@@ -324,6 +324,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 634 DONE [mapping+godot-client] Make an LED screen from an MVR object (map a destination onto the MVR's wall) → 634_WO_mvr_object_to_led_screen.md
 - 769 IN PROGRESS [mapping+engine] Multiview PRV cells listed the PGM look's layers (no running times); playlist d… → 769_WO_mv_prv_cells_read_pgm_look_playlist_drop_hint.md
 - 807 DONE [mapping+lighting] Region-to-fixture-pixel mapping: average a screen area into one pixel of a ligh… → 807_WO_region_to_fixture_pixel_mapping.md
+- 893 DONE [mapping+godot-client] Pixel-map smoothing: attack / release (and snap on cut) after the region average → 893_WO_pixel_map_smoothing.md
 - 897 OPEN [mapping] Pixel-map tick matches the channel rate: 50 fps frames are all sampled → 897_WO_pixel_map_tick_matches_channel_rate.md
 
 ## lighting — DMX, Art-Net, sACN, fixtures, consoles (33)

@@ -126,7 +126,8 @@ func set_live(by_id: Dictionary) -> void:
 			sw.tooltip_text = "Not saved yet — no live colour" if str(rows[i].region) != "" else "Not mapped"
 		elif l.color is Color:
 			sw.color = l.color
-			sw.tooltip_text = "RGB %d, %d, %d%s" % [l.color.r8, l.color.g8, l.color.b8,
+			var raw: String = "" if not (l.get("raw") is Color) or l.raw == l.color else " (raw %d, %d, %d)" % [l.raw.r8, l.raw.g8, l.raw.b8]
+			sw.tooltip_text = "RGB %d, %d, %d%s%s" % [l.color.r8, l.color.g8, l.color.b8, raw,
 				" · on the wire" if l.on_wire else " · not sent (DMX output off, universe not under Send, or console input on)"]
 		else:
 			sw.color = ThemeBuilder.BG_DARK

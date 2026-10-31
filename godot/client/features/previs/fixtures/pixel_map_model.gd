@@ -308,7 +308,22 @@ static func _perms(s: String) -> Array:
 	return out
 
 
-## GET /api/fixtures/pixelmap/live → {mapping id: {color: Color | null, problem, on_wire}}.
+## WO-893: GET /api/fixtures/pixelmap/settings → {attack_ms, release_ms, snap}, clamped to the server's ranges (junk → 0).
+const SMOOTH_MAX := {"attack_ms": 5000, "release_ms": 10000, "snap": 255}
+
+
+static func smooth_from(data: Variant) -> Dictionary:
+	var src: Variant = (data as Dictionary).get("settings", data) if data is Dictionary else {}
+	var sm: Variant = (src as Dictionary).get("smooth") if src is Dictionary else null
+	var out := {}
+	for k in SMOOTH_MAX:
+		var v: Variant = (sm as Dictionary).get(k) if sm is Dictionary else null
+		out[k] = clampi(roundi(float(v)), 0, int(SMOOTH_MAX[k])) if (v is float or v is int) and is_finite(float(v)) else 0
+	return out
+
+
+## GET /api/fixtures/pixelmap/live → {mapping id: {color: Color | null, raw: Color | null, problem, on_wire}}.
+## color = the smoothed colour as written to the fixture, raw = the region's mean of the last frame (WO-893).
 static func live_by_id(live: Variant) -> Dictionary:
 	var out := {}
 	var list: Variant = (live as Dictionary).get("mappings") if live is Dictionary else null
@@ -316,10 +331,14 @@ static func live_by_id(live: Variant) -> Dictionary:
 		if not (m is Dictionary):
 			continue
 		var rgb: Variant = m.get("rgb")
+		var raw: Variant = m.get("raw")
 		var c: Variant = null
+		var rc: Variant = null
 		if rgb is Array and rgb.size() >= 3:
 			c = Color8(int(rgb[0]), int(rgb[1]), int(rgb[2]))
-		out[str(m.get("id", ""))] = {"color": c, "problem": m.get("problem"), "on_wire": m.get("on_wire") == true}
+		if raw is Array and raw.size() >= 3:
+			rc = Color8(int(raw[0]), int(raw[1]), int(raw[2]))
+		out[str(m.get("id", ""))] = {"color": c, "raw": rc, "problem": m.get("problem"), "on_wire": m.get("on_wire") == true}
 	return out
 
 
