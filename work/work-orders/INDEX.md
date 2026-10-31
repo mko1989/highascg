@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-825 live WOs (29 open, 122 in progress, 674 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+825 live WOs (29 open, 121 in progress, 675 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -463,7 +463,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 890 DONE [godot-client] Visuals: dynamic layer stack with a per-layer opacity fader → 890_WO_visuals_dynamic_layers_opacity.md
 - 891 DONE [godot-client+mapping] Second operator monitor: a second Godot window that workspace tabs move to → 891_WO_second_operator_monitor_window.md
 - 892 DONE [godot-client] Previs render quality setting (Low / Medium / High / Ultra) → 892_WO_previs_quality_setting.md
-- 894 IN PROGRESS [godot-client] Visuals ▸ Shader panel: the shader controls come back in the Visuals tab → 894_WO_visuals_shader_controls_panel.md
+- 894 DONE [godot-client] Visuals ▸ Shader panel: the shader controls come back in the Visuals tab → 894_WO_visuals_shader_controls_panel.md
 - 895 DONE [godot-client] Visuals playlists: an ordered list of looks and visuals that runs unattended → 895_WO_visuals_playlists.md
 - 896 DONE [godot-client] Visuals 3D view drives the output: the orbit camera reaches the program → 896_WO_visuals_3d_view_drives_output.md
 - 899 DONE [godot-client] Sources column: every sub-tab always fits (shrink the font, then trim the label) → 899_WO_sources_tabs_always_fit_shrink_then_trim.md

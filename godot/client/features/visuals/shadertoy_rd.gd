@@ -6,16 +6,19 @@ extends RefCounted
 ## broken shader reports at once; every GPU object is made, drawn and freed on the render thread.
 
 const G := preload("res://features/visuals/shadertoy_glsl.gd")
+const Glide := preload("res://features/visuals/shadertoy_glide.gd")
 const AUDIO_W := 512
 
 var texture := Texture2DRD.new()
 var error := ""
+var compiles := 0  # glslang runs (WO-894 probe: a slider drag on a mapped literal adds none)
 var gpu_ms := 0.0  # the passes' GPU time, from the RD timestamps of a recent frame (they arrive a few frames late)
 var _rd: RenderingDevice
-var _spirv := []  # per pass: {name, letter, channels, spirv}
+var _spirv := []  # per pass: {name, letter, channels, alpha, spirv}
 var _dirty := false
 var _size := Vector2i.ZERO
 var _frame := 0
+var _glide := Glide.new()  # WO-894 phase 2: a value change moves a UBO slot instead of recompiling
 var _gpu := {}  # render-thread objects: passes [{shader, pipeline, ubo, fb[2], sets[2]}], bufs {letter: [tex, tex]}, image…
 
 
@@ -23,7 +26,8 @@ func _init() -> void:
 	_rd = RenderingServer.get_rendering_device()  # null headless (the test runner): use() says so, render() no-ops
 
 
-## Compile a config; "" on success, else the first error (line numbers are the pass's own).
+## Compile a config; "" on success, else the first error (line numbers are the pass's own). A config that differs from the
+## running one only in literals the glide already maps compiles nothing (the values ease in through the UBO).
 func use(cfg: Variant) -> String:
 	error = ""
 	var ps := G.passes(cfg)
@@ -31,23 +35,43 @@ func use(cfg: Variant) -> String:
 		error = "no image pass"
 	elif _rd == null:
 		error = "no GPU (headless)"
-	var out := []
-	var common := str(cfg.get("common", "")) if cfg is Dictionary else ""
-	for p in ps if error == "" else []:
-		var src := RDShaderSource.new()
-		src.source_vertex = G.VERTEX
-		src.source_fragment = G.fragment(common, p.source, p.alpha)
-		var sp := _rd.shader_compile_spirv_from_source(src)
-		var e := (sp.compile_error_fragment + sp.compile_error_vertex).strip_edges()
-		if e != "":
-			error = "%s: %s" % [p.name, e.split("\n").slice(0, 3)]
-			break
-		out.append({"name": p.name, "letter": G.letter(p.name), "channels": p.channels, "spirv": sp})
 	if error != "":
+		return error
+	var plain := {Glide.COMMON: str(cfg.get("common", ""))}
+	for p in ps:
+		plain[p.name] = p.source
+	var saved := _glide.save()
+	var plan := _glide.plan(plain)
+	var shape := func(p: Dictionary) -> Array: return [p.name, p.channels, p.alpha]
+	if not plan.compile and not _spirv.is_empty() and _spirv.map(shape) == ps.map(shape):
+		return ""
+	var out := _compile(ps, plan.sources)
+	if error != "" and plan.sources != plain:  # the glided variant did not compile: the plain sources
+		_glide.reset()
+		out = _compile(ps, _glide.plan(plain).sources)
+	if error != "":
+		_glide.restore(saved)
 		return error
 	_spirv = out
 	_dirty = true
 	return ""
+
+
+func _compile(ps: Array, sources: Dictionary) -> Array:
+	error = ""
+	compiles += 1
+	var out := []
+	for p in ps:
+		var src := RDShaderSource.new()
+		src.source_vertex = G.VERTEX
+		src.source_fragment = G.fragment(sources[Glide.COMMON], sources[p.name], p.alpha)
+		var sp := _rd.shader_compile_spirv_from_source(src)
+		var e := (sp.compile_error_fragment + sp.compile_error_vertex).strip_edges()
+		if e != "":
+			error = "%s: %s" % [p.name, e.split("\n").slice(0, 3)]
+			return []
+		out.append({"name": p.name, "letter": G.letter(p.name), "channels": p.channels, "alpha": p.alpha, "spirv": sp})
+	return out
 
 
 ## Draw one frame at `size`. `audio` is 1024 bytes (FFT row then wave row).
@@ -57,19 +81,22 @@ func render(size: Vector2i, time: float, delta: float, audio: PackedByteArray) -
 	var rebuild := _dirty or size != _size
 	_dirty = false
 	_size = size
-	RenderingServer.call_on_render_thread(_draw.bind(rebuild, _spirv, size, time, delta, audio))
+	_glide.frame(delta)
+	var glide := _spirv.map(func(p: Dictionary) -> PackedFloat32Array: return _glide.values(p.name))
+	RenderingServer.call_on_render_thread(_draw.bind(rebuild, _spirv, size, time, delta, audio, glide))
 
 
 ## Free everything (the scene leaves the stage).
 func release() -> void:
 	_spirv = []
+	_glide.reset()
 	texture.texture_rd_rid = RID()
 	if _rd != null:
 		RenderingServer.call_on_render_thread(_free_gpu.bind(_gpu))
 	_gpu = {}
 
 
-func _draw(rebuild: bool, spirv: Array, size: Vector2i, time: float, delta: float, audio: PackedByteArray) -> void:
+func _draw(rebuild: bool, spirv: Array, size: Vector2i, time: float, delta: float, audio: PackedByteArray, glide: Array) -> void:
 	if rebuild:  # the new set is live before the old one is freed
 		var old := _gpu
 		_gpu = _build(spirv, size)
@@ -84,8 +111,9 @@ func _draw(rebuild: bool, spirv: Array, size: Vector2i, time: float, delta: floa
 	_read_gpu_time()
 	var par := _frame & 1
 	_rd.capture_timestamp("shadertoy begin")
-	for p in g.passes:
-		_rd.buffer_update(p.ubo, 0, G.UBO_SIZE, _ubo_bytes(size, time, delta, p.res))
+	for i in g.passes.size():
+		var p: Dictionary = g.passes[i]
+		_rd.buffer_update(p.ubo, 0, G.UBO_SIZE, _ubo_bytes(size, time, delta, p.res, glide[i]))
 		var dl := _rd.draw_list_begin(p.fb[par], RenderingDevice.DRAW_CLEAR_COLOR_ALL if _frame == 0 else RenderingDevice.DRAW_DEFAULT_ALL,
 			PackedColorArray([Color(0, 0, 0, 0)]))
 		_rd.draw_list_bind_render_pipeline(dl, p.pipeline)
@@ -123,7 +151,8 @@ func _build(spirv: Array, size: Vector2i) -> Dictionary:
 		if p.letter != "":
 			g.bufs[p.letter] = [_tex(size, RenderingDevice.DATA_FORMAT_R32G32B32A32_SFLOAT, target, PackedByteArray()),
 				_tex(size, RenderingDevice.DATA_FORMAT_R32G32B32A32_SFLOAT, target, PackedByteArray())]
-	g.image = _tex(size, RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT, target, PackedByteArray())
+	g.image = _tex(size, RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT, target | RenderingDevice.TEXTURE_USAGE_CAN_COPY_FROM_BIT,
+		PackedByteArray())  # copy-from: the WO-894 probe reads it back
 	var drawn := {}
 	for p in spirv:
 		var shader := _rd.shader_create_from_spirv(p.spirv, "shadertoy " + p.name)
@@ -194,8 +223,8 @@ func _uniform(type: int, binding: int, ids: Array) -> RDUniform:
 	return u
 
 
-## The std140 ShaderToy block (shadertoy_glsl.gd HEADER): 48 floats, iFrame an int at float 14.
-func _ubo_bytes(size: Vector2i, time: float, delta: float, res: Array) -> PackedByteArray:
+## The std140 ShaderToy block (shadertoy_glsl.gd HEADER): 48 floats, iFrame an int at float 14, then the 64 glide slots.
+func _ubo_bytes(size: Vector2i, time: float, delta: float, res: Array, glide: PackedFloat32Array) -> PackedByteArray:
 	var f := PackedFloat32Array()
 	f.resize(48)
 	f[0] = size.x
@@ -216,6 +245,7 @@ func _ubo_bytes(size: Vector2i, time: float, delta: float, res: Array) -> Packed
 		f[17 + i * 4] = r.y
 		f[18 + i * 4] = 1.0
 		f[32 + i * 4] = time
+	f.append_array(glide)
 	var b := f.to_byte_array()
 	b.encode_s32(14 * 4, _frame)
 	return b

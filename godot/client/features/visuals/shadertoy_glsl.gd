@@ -7,8 +7,8 @@ extends RefCounted
 
 const BUFFERS := ["bufferA", "bufferB", "bufferC", "bufferD"]
 
-## The std140 block below, byte for byte (shadertoy_rd.gd packs it).
-const UBO_SIZE := 192
+## The std140 block below, byte for byte (shadertoy_rd.gd packs it). `_hgG`: the glide slots (shadertoy_glide.gd, WO-894).
+const UBO_SIZE := 448
 
 const HEADER := """#version 450
 #define HW_PERFORMANCE 1
@@ -23,6 +23,7 @@ layout(set = 0, binding = 0, std140) uniform ShaderToy {
 	float iSampleRate;
 	vec3 iChannelResolution[4];
 	float iChannelTime[4];
+	vec4 _hgG[16];
 };
 layout(set = 0, binding = 1) uniform sampler2D iChannel0;
 layout(set = 0, binding = 2) uniform sampler2D iChannel1;

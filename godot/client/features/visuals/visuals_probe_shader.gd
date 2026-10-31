@@ -32,6 +32,7 @@ static func run(tab: Node, arg: String) -> void:
 	var span := float(prm.get("max", 1.0)) - float(prm.get("min", 0.0))
 	var to := 2.5 if macro else (float(was[0]) + span * 0.5 if float(was[0]) + span * 0.5 <= float(prm.get("max", 1.0)) else float(was[0]) - span * 0.5)
 	var before: int = mode.sync.compiles
+	var glsl0 := _glsl(tab)
 	for i in 20:  # a drag: 20 changes in a second
 		var v := lerpf(float(was[0]), to, (i + 1) / 20.0)
 		if macro:
@@ -41,7 +42,7 @@ static func run(tab: Node, arg: String) -> void:
 		await tab.get_tree().create_timer(0.05).timeout
 	await tab.get_tree().create_timer(1.5).timeout
 	print("[probe-visuals-shader] control ", c.get("label"), " (", key if not macro else c.id, ") ", was, " → ", to, " · 20 changes = ",
-		mode.sync.compiles - before, " compiles · status '", mode._status.text, "' · error '", tab.scene.errors(), "'")
+		mode.sync.compiles - before, " updates, ", _glsl(tab) - glsl0, " glslang runs (WO-894 glide) · status '", mode._status.text, "' · error '", tab.scene.errors(), "'")
 	_shot(tab, dir + "/shader-2-control.png")
 	mode.post_op("randomize", {})
 	await tab.get_tree().create_timer(2.0).timeout
@@ -58,5 +59,18 @@ static func run(tab: Node, arg: String) -> void:
 	tab.get_tree().quit()
 
 
+static func _glsl(tab: Node) -> int:  # the shader scenes' runner compiles
+	return tab.scene.scenes().reduce(func(n: int, s: Node) -> int: return n + (s.runner.compiles if "runner" in s else 0), 0)
+
+
 static func _shot(tab: Node, path: String) -> void:
+	for sc in tab.scene.scenes().filter(func(s: Node) -> bool: return "runner" in s):  # the runner's own output (WO-894 glide)
+		var g: Dictionary = sc.runner._gpu
+		var sz: Vector2i = sc.runner._size
+		var img: Image = null if g.is_empty() else Image.create_from_data(sz.x, sz.y, false, Image.FORMAT_RGBAH,
+			RenderingServer.get_rendering_device().texture_get_data(g.image, 0))
+		print("[probe-visuals-shader] runner gpu ", not g.is_empty(), " size ", sz)
+		if img != null:
+			img.convert(Image.FORMAT_RGB8)
+			print("[probe-visuals-shader] runner ", img.get_size(), " → ", error_string(img.save_png(path.replace(".png", "-runner.png"))))
 	print("[probe-visuals-shader] ", path, " → ", error_string(tab.get_viewport().get_texture().get_image().save_png(path)))

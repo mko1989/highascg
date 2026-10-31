@@ -4,8 +4,8 @@ extends VBoxContainer
 ## section, presets, Randomize, Advanced (every detected value), Reset, Save as child — drawn by the widgets of the old
 ## Shader Live panel (features/live/shader_live_controls.gd + _model.gd, unreached since WO-883). The node keeps the working GLSL and
 ## rewrites its literals per control (src/shaderfx/shader-live-session.js); visuals_shader_sync.gd sends the ops and recompiles
-## the layer's runner (shadertoy_rd.gd) from the result, throttled while a control is dragged. Phase 1: a value is a recompile
-## (phase 2 would make the scanned literals UBO uniforms). Left out of the old panel on purpose: Take, the PGM stack and the
+## the layer's runner (shadertoy_rd.gd) from the result, throttled while a control is dragged. Phase 2: the runner compiles a
+## changed literal once as a UBO slot, then a drag only moves the value (shadertoy_glide.gd). Left out of the old panel on purpose: Take, the PGM stack and the
 ## Caspar-mixer rides (a Caspar PRV/PGM deck — the Visuals have the layer list's fader and Send), and Caspar's `wiggle` op (it
 ## needs a PRV instance) — ≋ here wiggles through the same `set` ops.
 ## The host is the Visuals tab (sel, slice.layers, _g(), set_shader_cfg()); tests set layer_cb / sync.api_cb / compile_cb instead.

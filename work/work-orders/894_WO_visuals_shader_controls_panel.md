@@ -1,7 +1,7 @@
 # WO-894 — Visuals ▸ Shader panel: the shader controls come back in the Visuals tab
 
 **Area:** godot-client
-**Status: IN PROGRESS (31.10.26, phase 1 DONE: Godot suite, Xvfb probe on a stub node, and the live node — owner GUI recompiles through `?working=1`, Reset all clears dirty (WO-910 §3); phase 2 UBO uniforms open)**
+**Status: DONE (31.10.26 — phase 1: Godot suite, Xvfb probe on a stub node, live node (owner GUI recompiles through `?working=1`, Reset all clears dirty); phase 2: a drag on a value = 1 glslang run instead of one per update, same picture as the hard path — suite 25567/0, Xvfb probe with the runner's own frames)**
 
 ## Owner request
 
@@ -117,7 +117,7 @@ File references are as found on 31.10.26; to re-verify at implementation.
   mode says to restart the highascg service instead of recompiling. Not done here (other agents probing).
 - No `CG UPDATE` journal line seen: needs the shader on air in a Caspar look and a Visuals edit (the push path is unchanged server code).
 - Owner QA on the box display; "preset save then reload restores values" is covered by the node smoke (WO-606), not re-run through the UI.
-- Phase 2 (UBO uniforms, no recompile per value) untouched.
+- Phase 2 (UBO uniforms, no recompile per value): done below.
 
 ## Live node check (31.10.26, after the node restart at 14:33)
 - `GET /api/shader-live/shaders/sh-sa-3d-audio-visualizer?working=1` answers with `working`. Owner GUI, A/B PRV bank, layer
@@ -125,3 +125,40 @@ File references are as found on 31.10.26; to re-verify at implementation.
   recompiled each time (dimmer room at 19.3); Reset all → `dirty: false`. The shader first had to be made visible at all:
   WO-910 (a bank's amount was a hidden opacity). Not on air in Caspar → still no `CG UPDATE` line (unchanged server path).
 
+## Phase 2 — values without a recompile (31.10.26, owner: "continue")
+
+### Investigation
+- A value change reached the runner as a whole new config (`recompile()` → `visuals_stage.gd set_shader` → `scenes/shader.gd
+  set_shader` → `shadertoy_rd.gd use()`), and `use()` ran glslang on every pass every time: the 350 ms throttle capped a drag at
+  ~3 compiles/s, each one a hitch on the render thread's pipeline rebuild. The Caspar player solved the same problem in WO-580
+  phase B (`template/shaders/player-live.js`: diff the literals, compile once with the changed ones as uniforms, then only move
+  the targets) — ported, not reinvented.
+- The runner has one std140 UBO per pass (`shadertoy_glsl.gd` HEADER, 192 bytes) already bound in every pass's set, so the slots go
+  at its end: no new binding, nothing for a pass that does not read them.
+
+### What was done
+- `godot/client/features/visuals/shadertoy_glide.gd` (new): `mask / parse / diff / eligible / build` ported 1:1 from
+  player-live.js (floats only; comments masked; a literal in a `const` or a global initialiser never glides; a `#define` only when
+  every use may), plus `plan(sources)` per key (common + each pass) → `{compile, sources}`, `frame(dt)` easing (τ 0.35 s, as the
+  player) and `values(pass)` = the pass's 32 slots then common's 32. A changed literal reads `_hgG[slot>>2][slot&3]`.
+- `shadertoy_glsl.gd`: `vec4 _hgG[16]` at the end of the ShaderToy block, `UBO_SIZE` 192 → 448.
+- `shadertoy_rd.gd`: `use()` plans first; nothing to compile and the same passes/channels/alpha → returns at once (the values ease
+  in through the UBO). A glided variant that fails to compile → the plain sources; a plain failure → the glide state is restored
+  (the running SPIR-V keeps its slots). `render()` eases and passes each pass's slots to `_ubo_bytes`. `compiles` counts glslang
+  runs; the output image gets COPY_FROM so the probe can read it back.
+- `visuals_probe_shader.gd`: prints the glslang runs of the drag and saves each runner frame (`*-runner.png`).
+- `tests/test_shadertoy_glide.gd` (new, 7 tests): parsing, eligibility (const / global / macro), diff, the plan (first = plain,
+  new literal = 1 compile from the old value, same literal = none, eased onto the target, a 2nd literal = 1 more slot), hard paths
+  (structural, a const value), common's slots at 32, save/restore, the header/UBO size.
+
+### Verified
+- Godot suite `[tests] 25567 passed, 0 failed`; `check-max-file-lines` 0 over; `run-client.sh --check` boot OK.
+- Probe client (Xvfb :93, `--visuals-ring=probe894`, scratchpad `stub894.js` on :4299: the real shader-live routes, store writes in
+  memory, POSTs elsewhere swallowed), 20-step drag of the first key control in 1 s, glide on vs the glide forced off (a temporary
+  env switch, removed):
+  - `sh-bg-auroras` P scale 0.06 → 0.18: **6 updates, 1 glslang run** vs 5 updates, 5 runs. Runner frame means after the drag
+    14.8/47.2/52.0 vs 14.7/46.7/51.7; side by side the same picture (`p894g-a/glide-cmp.png`: before / glide / hard).
+  - `sh-chillwave-planet` Zoom × 1 → 2.5: 5 updates, 1 run vs 5 and 5. Its runner frames are black until Randomize in BOTH modes
+    (the shader's own state, not this change).
+  - Randomize / Original / Reset all still recompile (structural or > slots) and draw.
+- Not verified: the owner GUI on the box display (needs a relaunch; next GUI start picks it up).
