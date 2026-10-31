@@ -8,6 +8,11 @@ const { listConfiguredV4l2Slots } = require('../capture/v4l2-input-config')
 const { playV4l2ClipWithRecovery } = require('../capture/v4l2-input-health')
 
 async function setupLiveAudioInputs(self) {
+	try {
+		self._audioCaptureLifecycle?.syncAudioCapture?.() // WO-884: the FFT listener follows the routed slot before the tee starts
+	} catch (e) {
+		self.log?.('warn', `[AudioFFT] sync before live-audio setup: ${e?.message || e}`)
+	}
 	const { count, slots } = listConfiguredLiveAudioSlots(self.config)
 	const playable = slots.filter((s) => Number.isFinite(Number(s.channel)))
 	if (!self.amcp || count <= 0 || playable.length === 0) {

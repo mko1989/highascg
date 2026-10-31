@@ -17,6 +17,7 @@ const { normalizeAudioCaptureConfig, createAudioCaptureFft } = require('../audio
 function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 	/** @type {ReturnType<typeof createAudioCaptureFft>|null} */
 	let engine = null
+	let boundKey = '' // the resolved config the engine runs (or skipped) with
 
 	function warnOnLiveAudioClash(cfg) {
 		// Plain hw devices are single-open: an on-air live-audio bridge slot on the same card
@@ -37,7 +38,8 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 		}
 	}
 
-	function startAudioCapture() {
+	/** The capture config to run now: config.audioCapture, or the routed live-audio slot's tee. */
+	function resolveCaptureConfig() {
 		const cfg = normalizeAudioCaptureConfig(config)
 		// WO-333b: a live-audio slot routed as the FFT source (inspector toggle →
 		// caspar setting audio_fft_source_slot) wins over the standalone-device mode —
@@ -54,11 +56,18 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 			const { audioFftPcmUdpPort } = require('../audio/live-audio-bridge')
 			cfg.enabled = true
 			cfg.source = 'slot'
+			cfg.fftSlot = fftSlot
 			cfg.udpPort = audioFftPcmUdpPort(fftSlot)
 			cfg.sampleRate = 48000
 			cfg.channels = 2
-			logger.info(`[AudioFFT] source: live-audio slot ${fftSlot} bridge tee`)
 		}
+		return cfg
+	}
+
+	function startAudioCapture() {
+		const cfg = resolveCaptureConfig()
+		boundKey = JSON.stringify(cfg)
+		if (cfg.source === 'slot') logger.info(`[AudioFFT] source: live-audio slot ${cfg.fftSlot} bridge tee`)
 		if (!cfg.enabled) {
 			logger.info(
 				'[AudioFFT] no source routed (live-audio inspector) and config.audioCapture disabled — shaders fall back to OSC-level reactivity'
@@ -109,7 +118,17 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 		startAudioCapture()
 	}
 
-	return { startAudioCapture, stopAudioCapture, restartAudioCapture, onShutdown: stopAudioCapture }
+	/** WO-884: rebind only when the resolved source changed since the last start — called each time the live-audio
+	 * bridges (re)start (Caspar connect / apply, project load, apply-hardware), so a source routed by anything but
+	 * the inspector's own apply (e.g. a project's casparServer.audio_fft_source_slot) is not left without a listener. */
+	function syncAudioCapture() {
+		if (JSON.stringify(resolveCaptureConfig()) === boundKey) return false
+		logger.info('[AudioFFT] source changed — rebinding')
+		restartAudioCapture()
+		return true
+	}
+
+	return { startAudioCapture, stopAudioCapture, restartAudioCapture, syncAudioCapture, onShutdown: stopAudioCapture }
 }
 
 module.exports = { createAudioCaptureLifecycle }
