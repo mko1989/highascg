@@ -108,7 +108,8 @@ func _take(list: Array, with_media: bool) -> void:
 		elif c.get("rect") is Dictionary:
 			cells.append(c.duplicate(true))
 	queue_redraw()
-	_retile_soon()
+	if with_media:  # WO-902: our own fetch only — re-tiling another client's broadcast posts OUR panel's tiling over theirs
+		_retile_soon()
 
 
 func _on_ws(type: String, data: Variant) -> void:

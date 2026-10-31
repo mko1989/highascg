@@ -61,4 +61,5 @@ module.exports = [
 	'tools/smoke/smoke-wo888-caspar-sync-follows-pgm.test.js',
 	'tools/smoke/smoke-wo893-pixel-map-smooth.test.js',
 	'tools/smoke/smoke-wo898-audio-only-tiny-mode.test.js',
+	'tools/smoke/smoke-wo902-compose-no-foreign-retile.test.js',
 ]

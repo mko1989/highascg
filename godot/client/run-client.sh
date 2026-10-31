@@ -29,6 +29,9 @@ if [[ "${1:-}" == "--test" || "${1:-}" == "--check" ]]; then
 	XDG_DATA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/highascg-client-${1#--}-XXXXXX")"
 	export XDG_DATA_HOME
 	trap 'rm -rf "$XDG_DATA_HOME"' EXIT
+	# WO-902: …and no server. A --check booted the Live tab against the box's own server and posted its 4-second
+	# headless tiling as the shared compose layout (plus a project autosave). HIGHASCG_TEST_SERVER opts in on purpose.
+	export HIGHASCG_SERVER="${HIGHASCG_TEST_SERVER:-http://127.0.0.1:9}"
 fi
 if [[ "${1:-}" == "--test" ]]; then
 	"$GODOT" --headless --path "$HERE" --script res://tests/run_tests.gd && exit 0 || exit $?

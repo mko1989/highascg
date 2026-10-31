@@ -67,8 +67,9 @@ func _ready() -> void:
 	stage3d.set_lights(lit)
 	tiles.times = bool(cfg.get_value("live", "times", false))
 	(_view_btns["times"] as Button).set_pressed_no_signal(tiles.times)
-	(_view_btns["auto"] as Button).set_pressed_no_signal(bool(cfg.get_value("live", "auto", true)))
-	tiles.set_auto(bool(cfg.get_value("live", "auto", true)))
+	var auto_on := bool(cfg.get_value("live", "auto", false))  # WO-902: off until pressed — a fresh client (probe, new laptop) must not re-tile the shared layout
+	(_view_btns["auto"] as Button).set_pressed_no_signal(auto_on)
+	tiles.set_auto(auto_on)
 	set_view(str(Config.args.get("live-view", cfg.get_value("live", "view", "standard"))), false)
 
 
