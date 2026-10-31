@@ -10,14 +10,32 @@ const Model := preload("res://core/project_undo_model.gd")
 
 signal applied(what: String)  # "undo" | "redo"
 
+## WO-904: an edit is snapshotted once the edits settle, off the main thread — a whole-show snapshot on every edit
+## (~38 ms for 600 KB) stalled the frame on each fader tick: the Visuals output froze while a value moved.
+const SETTLE_S := 0.3
+
 var history := Model.new()
 var _doc: Dictionary = {}  # the Store.project instance history.cur describes (set_project swaps the instance)
 var _restoring := false
+var _pending := false  # edited since the last snapshot
+var _edit_ms := 0  # the first edit since then: the step's time for the history's coalescing (not the late snapshot)
+var _settle: Timer
+var _gen := 0  # bumped by every rebase: a snapshot taken before it is dropped
+var _task := -1  # WorkerThreadPool task canon()ing a detached copy
+var _task_out: Array = []  # [snapshot] written by the worker
+var _task_ms := 0
+var _task_gen := 0
 
 
 func _ready() -> void:
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _on_project())
 	ProjectSync.edited.connect(_on_edit)
+	_settle = Timer.new()
+	_settle.one_shot = true
+	_settle.wait_time = SETTLE_S
+	_settle.timeout.connect(_snap_async)
+	add_child(_settle)
+	set_process(false)
 	_doc = Store.project
 	history.rebase(Model.snapshot(Store.project))
 
@@ -30,6 +48,8 @@ func _on_project() -> void:
 		history.clear()
 	_doc = Store.project
 	if not _restoring:
+		_gen += 1
+		_pending = false
 		history.rebase(Model.snapshot(Store.project))
 
 
@@ -38,15 +58,62 @@ func _on_edit() -> void:
 		return
 	if not is_same(Store.project, _doc):
 		_on_project()
-	history.record(Model.snapshot(Store.project), Time.get_ticks_msec())
+	if not _pending:
+		_edit_ms = Time.get_ticks_msec()
+	_pending = true
+	_settle.start()  # restarted by every edit: a fader move is one snapshot when it stops
+
+
+func _snap_async() -> void:
+	if not _pending:
+		return
+	_collect()
+	_pending = false
+	var d := Model.detached(Store.project)
+	var out := []
+	_task_out = out
+	_task_ms = _edit_ms
+	_task_gen = _gen
+	_task = WorkerThreadPool.add_task(func() -> void: out.append(Model.canon(d)), false, "undo snapshot")
+	set_process(true)
+
+
+func _process(_delta: float) -> void:
+	if _task < 0:
+		set_process(false)
+	elif WorkerThreadPool.is_task_completed(_task):
+		_collect()
+
+
+## The worker's snapshot into the history (waits for it — only Ctrl+Z / a newer snapshot ever has to).
+func _collect() -> void:
+	if _task < 0:
+		return
+	WorkerThreadPool.wait_for_task_completion(_task)
+	_task = -1
+	set_process(false)
+	if _task_gen == _gen and not _task_out.is_empty():
+		history.record(_task_out[0], _task_ms)
+
+
+## Everything edited so far in the history now (Ctrl+Z / Ctrl+Y must not miss the last edit).
+func _flush() -> void:
+	_settle.stop()
+	_collect()
+	if _pending and not _restoring:
+		_pending = false
+		if not is_same(Store.project, _doc):
+			_on_project()
+		history.record(Model.snapshot(Store.project), _edit_ms)
 
 
 func undo() -> bool:
-	_on_edit()  # an edit not yet marked still counts
+	_flush()  # an edit not yet snapshotted still counts
 	return _restore(history.undo(), "undo")
 
 
 func redo() -> bool:
+	_flush()  # an edit after the undo leaves nothing to redo
 	return _restore(history.redo(), "redo")
 
 

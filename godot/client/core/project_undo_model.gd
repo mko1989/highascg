@@ -19,6 +19,15 @@ static func snapshot(p: Dictionary) -> String:
 	return canon(d)
 
 
+## WO-904: a deep copy without bookkeeping (~5 ms for a 600 KB show) that a worker thread may canon() while the
+## document is edited on — snapshot() itself is ~38 ms, too slow for every fader tick.
+static func detached(p: Dictionary) -> Dictionary:
+	var d := p.duplicate(true)
+	for k in BOOKKEEPING:
+		d.erase(k)
+	return d
+
+
 ## JSON after one parse round trip: every number a float, as a restored (parsed) document has them — so a local int
 ## and the same value restored compare equal.
 static func canon(v: Variant) -> String:

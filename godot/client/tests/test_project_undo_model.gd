@@ -60,3 +60,15 @@ func test_ints_and_restored_floats_are_the_same_document() -> void:
 	var local := Model.snapshot({"previs": {"stage": {"objects": [{"panels": [4, 2]}]}}})
 	var restored: Dictionary = Model.document(local, {})
 	t.eq(Model.snapshot(restored), local, "no phantom edit after a restore")
+
+
+## WO-904: the edit path snapshots a detached copy on a worker — it must be the same string snapshot() gives.
+func test_detached_snapshot_on_a_worker_matches() -> void:
+	var p := {"name": "x", "rev": 7, "savedAt": "t", "visuals": {"layers": [{"opacity": 0.5, "n": 3}]}}
+	var d := Model.detached(p)
+	(p.visuals.layers[0] as Dictionary)["opacity"] = 0.9  # the show keeps changing while the worker runs
+	var out := []
+	var id := WorkerThreadPool.add_task(func() -> void: out.append(Model.canon(d)))
+	WorkerThreadPool.wait_for_task_completion(id)
+	(p.visuals.layers[0] as Dictionary)["opacity"] = 0.5
+	t.eq(out[0], Model.snapshot(p), "same document, bookkeeping dropped, unaffected by later edits")
