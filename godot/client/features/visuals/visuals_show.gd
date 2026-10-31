@@ -1,6 +1,9 @@
 extends VBoxContainer
 ## WO-877 — the Visuals page's Show block: the looks (click recalls with the fade; right-click saves the current picture over it,
-## renames or deletes; keys 1–9), Save look, the fade time, the master fader and Blackout (B).
+## renames or deletes; keys 1–9), Save look, the fade time, the master fader and Blackout (B). WO-878: Auto — the next look
+## every N bars and/or on a drop — and "on the beat" (a picked look waits for the next beat).
+
+const Auto := preload("res://features/visuals/visuals_autopilot.gd")
 
 signal recall(i: int)
 signal save(i: int)  # -1 = a new look
@@ -9,6 +12,7 @@ signal remove(i: int)
 signal fade_changed(seconds: float)
 signal level_changed(v: float)
 signal blackout_toggled(on: bool)
+signal auto_changed(cfg: Dictionary)
 
 var _grid: GridContainer
 var _fade: HSlider
@@ -19,6 +23,10 @@ var _menu: PopupMenu
 var _menu_for := -1
 var _name: LineEdit
 var _quiet := false
+var _auto: OptionButton
+var _drops: CheckBox
+var _quant: CheckBox
+var _auto_note: Label
 
 
 func _init() -> void:
@@ -74,6 +82,27 @@ func _init() -> void:
 		if not _quiet:
 			blackout_toggled.emit(on))
 	add_child(_row("Master", [_level, _black]))
+	_auto = OptionButton.new()
+	for b in Auto.BARS:
+		_auto.add_item("Off" if b == 0 else "Every %d bars" % b)
+	_auto.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_auto.tooltip_text = "Go to the next look by itself every N bars of the music's beat (120 BPM when no tempo is locked)"
+	_auto.item_selected.connect(func(_i: int) -> void: _emit_auto())
+	_drops = CheckBox.new()
+	_drops.text = "Drops"
+	_drops.tooltip_text = "Also go to the next look on every drop"
+	_drops.toggled.connect(func(_on: bool) -> void: _emit_auto())
+	add_child(_row("Auto", [_auto, _drops]))
+	_quant = CheckBox.new()
+	_quant.text = "Picked looks land on the beat"
+	_quant.tooltip_text = "A look you pick waits for the next beat (at once while no tempo is locked)"
+	_quant.toggled.connect(func(_on: bool) -> void: _emit_auto())
+	add_child(_quant)
+	_auto_note = Label.new()
+	_auto_note.modulate = Color(1, 1, 1, 0.6)
+	add_child(_auto_note)
+	for c in [save_b, _black, _drops, _quant]:  # clicked, they would keep the focus and take Space / B from the show keys
+		c.focus_mode = Control.FOCUS_NONE
 
 
 ## The look buttons: "N name", the one on the canvas pressed. Keys 1–9 match the first nine.
@@ -102,13 +131,28 @@ func set_looks(looks: Array, showing: int) -> void:
 		_grid.add_child(b)
 
 
-func set_state(fade: float, level: float, blackout: bool) -> void:
+func set_state(fade: float, level: float, blackout: bool, auto := {}) -> void:
 	_quiet = true
+	var a := Auto.cfg_of(auto)
+	_auto.select(Auto.BARS.find(a.bars))
+	_drops.button_pressed = a.drops
+	_quant.button_pressed = a.quantise
 	_fade.value = fade
 	_fade_label.text = "%.1f s" % fade
 	_level.value = level
 	_black.button_pressed = blackout
 	_quiet = false
+
+
+## The line under Auto: the tempo and what comes next.
+func set_auto_note(text: String) -> void:
+	_auto_note.text = text
+
+
+func _emit_auto() -> void:
+	if not _quiet:
+		auto_changed.emit({"bars": Auto.BARS[maxi(0, _auto.selected)], "drops": _drops.button_pressed,
+			"quantise": _quant.button_pressed})
 
 
 func _on_menu(id: int) -> void:

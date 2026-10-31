@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-788 live WOs (29 open, 123 in progress, 636 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+789 live WOs (29 open, 124 in progress, 636 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -356,7 +356,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (88)
+## godot-client — Godot client (89)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -446,6 +446,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 874 DONE [godot-client+engine] Visuals: the shader library as a scene (Shadertoy code on the Godot RenderingDe… → 874_WO_visuals_shader_scene_library.md
 - 876 IN PROGRESS [godot-client+engine] Visuals: a classic game as a scene / layer (libretro window → ring → effects) → 876_WO_visuals_game_scene_libretro.md
 - 877 IN PROGRESS [godot-client] Visuals show controls: looks (cues) with a crossfade, master fader + blackout,… → 877_WO_visuals_show_looks_crossfade_master.md
+- 878 IN PROGRESS [godot-client+audio] Visuals autopilot: looks on the beat, the next look every N bars and on drops → 878_WO_visuals_autopilot_beat_quantised_looks.md
 
 ## web-client — Web client (82)
 

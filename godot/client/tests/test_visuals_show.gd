@@ -96,3 +96,79 @@ func test_same_shader_is_kept() -> void:
 	s.set_shader({"id": "y"})
 	t.eq(s.layers[0]._time, 0.0, "another shader restarts")
 	s.free()
+
+
+# WO-878 autopilot: picked looks land on the next beat, the next look every N bars and on drops, a 120 BPM clock without lock.
+const Auto := preload("res://features/visuals/visuals_autopilot.gd")
+
+
+func _b(n: int, locked := true) -> Dictionary:
+	return {"n": n, "bpm": 128.0, "locked": locked, "phase": 0.0}
+
+
+func test_autopilot_quantise() -> void:
+	var st := Auto.new_state()
+	var cfg := Auto.cfg_of({})
+	t.eq([cfg.bars, cfg.drops, cfg.quantise], [0, false, true], "defaults: no timed changes, picks on the beat")
+	Auto.step(st, cfg, _b(10), 0, 16.0, 0, 4)
+	t.eq(Auto.pick(st, 2, cfg, _b(10)), false, "a tempo is locked → the pick waits")
+	t.eq(Auto.step(st, cfg, _b(10), 0, 16.0, 0, 4), -1, "same beat → still waiting")
+	t.eq(Auto.step(st, cfg, _b(11), 0, 16.0, 0, 4), 2, "the next beat → look 2")
+	t.eq(Auto.step(st, cfg, _b(12), 0, 16.0, 2, 4), -1, "once")
+	t.eq(Auto.pick(st, 1, cfg, _b(12, false)), true, "no lock → at once")
+	t.eq(Auto.pick(st, 1, Auto.cfg_of({"quantise": false}), _b(12)), true, "quantise off → at once")
+	Auto.pick(st, 3, cfg, _b(12))
+	t.eq(Auto.step(st, cfg, _b(12, false), 0, 16.0, 1, 4), 3, "the lock goes while waiting → the look goes at once")
+
+
+func test_autopilot_bars_and_drops() -> void:
+	var st := Auto.new_state()
+	var cfg := Auto.cfg_of({"bars": 4, "drops": true})
+	t.eq(Auto.cfg_of({"bars": 5}).bars, 0, "only the offered bar counts")
+	var got := []
+	for n in range(0, 40):
+		var r := Auto.step(st, cfg, _b(n), 0, 16.0, 1, 3)
+		if r >= 0:
+			got.append([n, r])
+	t.eq(got, [[16, 2], [32, 2]], "every 16 beats (4 bars) → the next look after the current one")
+	t.eq(Auto.bars_left(st, cfg), 3, "7 beats into the next 16: 2¼ bars left → 3")
+	t.eq(Auto.step(st, cfg, _b(40), 0, 16.0, 2, 3), -1, "the drop count starts")
+	t.eq(Auto.step(st, cfg, _b(40), 1, 16.0, 2, 3), 0, "a drop → the next look, wrapping")
+	t.eq(Auto.bars_left(st, cfg), 4, "a change restarts the bar count")
+	t.eq(Auto.step(st, cfg, _b(41), 2, 16.0, 0, 1), -1, "one look: nothing to go to")
+	var free := Auto.new_state()
+	var c8 := Auto.cfg_of({"bars": 4})
+	var at := -1
+	for f in 600:  # 10 s of frames without a tempo
+		if Auto.step(free, c8, null, -1, 1000.0 / 60.0, 0, 2) >= 0:
+			at = f
+			break
+	t.ok(at > 470 and at < 490, "no tempo: 4 bars on the 120 BPM clock ≈ 8 s (frame %d)" % at)
+
+
+func test_tab_autopilot_drives_the_mixer() -> void:
+	var tab: Control = preload("res://features/visuals/visuals_tab.gd").new()
+	tab._ready()
+	var a := Looks.capture(M.slice_of({"visuals": {"scene": "tunnel"}}))
+	var b := Looks.capture(M.slice_of({"visuals": {"scene": "starfield", "overlay": "particles"}}))
+	tab._looks = [a, b]
+	tab.slice.auto = Auto.cfg_of({"bars": 4})
+	tab.recall(0)
+	t.eq(tab.scene.ids(), ["tunnel"], "look 1 on stage")
+	tab._audio_at = Time.get_ticks_msec()
+	tab._beat = _b(100)
+	tab._process(0.02)
+	tab.pick(1)
+	tab._process(0.02)
+	t.eq(tab._showing, 0, "a picked look waits for the beat")
+	tab._beat = _b(101)
+	tab._process(0.02)
+	t.eq([tab._showing, tab.scene.ids(), tab.mixer.fading()], [1, ["starfield", "particles"], true], "on the beat: look 2 fades in")
+	for n in range(102, 118):
+		tab._beat = _b(n)
+		tab._audio_at = Time.get_ticks_msec()
+		tab._process(0.1)
+	t.eq([tab._showing, tab.scene.ids()], [0, ["tunnel"]], "4 bars later the autopilot goes back to look 1")
+	tab._auto_status()
+	t.ok(tab.page.show_panel._auto_note.text.begins_with("Tempo 128 BPM"), "the page shows the tempo")
+	tab.free()

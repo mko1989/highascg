@@ -2,6 +2,7 @@ extends RefCounted
 ## WO-863 — the Visuals tab's pure half: the WO-861 audio parts as flat 0..1 buses, the Flow graph (WO-858 §6.2 binding table
 ## as nodes: Audio bus → Shape → Parameter), its per-frame evaluation, the scene parameters and the `project.visuals` slice.
 
+const Auto := preload("res://features/visuals/visuals_autopilot.gd")
 const PARAMS := ["pulse", "spin", "hue", "glow", "flash", "speed", "amount", "burst"]
 const PARAM_DEFAULTS := {"pulse": 0.2, "spin": 0.15, "hue": 0.55, "glow": 0.3, "flash": 0.0, "speed": 0.3, "amount": 0.5, "burst": 0.0}
 ## WO-873 scene library (visuals_stage.gd SCENES): [id, label]. `burst` is the event parameter — its rising edge fires the scenes.
@@ -178,7 +179,8 @@ static func params_of(v: Variant) -> Dictionary:
 ## (WO-866): ms the drum pulses move against the room sound, −300..300 (visuals_sync.gd). `scene` / `overlay` (WO-873): the main
 ## scene and the second layer ("" = none, never the main scene twice). `shader` (WO-874): the library shader id the Shader scene
 ## runs ("" = none picked). `game` (WO-876): the ROM the Game scene's Play opens ("" = none). `fade` (WO-877): seconds a scene
-## change crossfades (0 = cut); `looks`: the stored looks, raw (visuals_looks.gd normalize() makes them safe).
+## change crossfades (0 = cut); `looks`: the stored looks, raw (visuals_looks.gd normalize() makes them safe). `auto` (WO-878):
+## {bars, drops, quantise} — looks changing by themselves and landing on the beat (visuals_autopilot.gd).
 static func slice_of(project: Variant) -> Dictionary:
 	var v: Variant = project.get("visuals") if project is Dictionary else null
 	var d: Dictionary = v if v is Dictionary else {}
@@ -191,7 +193,8 @@ static func slice_of(project: Variant) -> Dictionary:
 		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0), "scene": main, "overlay": over,
 		"shader": str(d.get("shader", "")) if d.get("shader") is String else "",
 		"game": str(d.get("game", "")) if d.get("game") is String else "",
-		"fade": clampf(_num(d.get("fade", 1.0)), 0.0, 10.0), "looks": d.get("looks") if d.get("looks") is Array else []}
+		"fade": clampf(_num(d.get("fade", 1.0)), 0.0, 10.0), "looks": d.get("looks") if d.get("looks") is Array else [],
+		"auto": Auto.cfg_of(d.get("auto"))}
 
 
 static func scene_ids() -> Array:
