@@ -1,7 +1,7 @@
 # WO-912 — Visuals MIDI: APC40 knobs are endless encoders — they never picked up; now relative, rings always sent
 
 **Area:** godot-client
-**Status: IN PROGRESS (31.10.26 — Godot suite 25498/0, owner GUI relaunched; the physical knobs are untested by me)**
+**Status: DONE (31.10.26 — Godot suite 25498/0; owner physical QA on the APC40 knobs: good)**
 
 ## Owner report (31.10.26)
 "the encoders show that they recive values but dont drive the encoders."
@@ -32,3 +32,7 @@
   own position, never waiting, jump re-prime, clamp), `test_rings_only`.
 - Owner GUI relaunched with the change. **Open:** turning the physical knobs (track knobs → Pulse…Fade time, device
   knobs → the selected layer's page) and whether Generic mode draws the rings the app sends.
+
+## Owner QA
+
+Owner 31.10.26: "good" — physical QA on the real hardware passed.

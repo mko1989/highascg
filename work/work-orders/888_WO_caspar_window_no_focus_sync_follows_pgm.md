@@ -1,7 +1,7 @@
 # WO-888 — PGM micro stutter on alt-tab: Caspar's window never takes focus; frame sync sticks to the PGM screen
 
 **Area:** caspar-build, os-iso
-**Status: DONE (31.10.26 — smoke 5/5 + WO-407/439/805 smokes green; live: caspar relaunched with `__GL_SYNC_DISPLAY_DEVICE=DP-0`, NVIDIA XVideoSyncToDisplayID 4→0 (DP-0), Caspar window SKIP_TASKBAR/SKIP_PAGER; alt-tab proven to skip it on a private Xvfb with the box rc.xml. the on-air stutter itself is not yet measured — needs real alt-tabs on :0 with the frame-drop probe)**
+**Status: DONE (31.10.26 — smoke 5/5; live: GL sync on DP-0, Caspar window out of alt-tab; on air: 10 real alt-tabs on :0 → ch2 presented 50/s, OSC drop counter flat; owner: done)**
 
 ## Owner request (31.10.26)
 "there is a micro stutter of the caspar's screen consumer with pgm when alt tabing between different windows." —
@@ -59,3 +59,9 @@ pgm screen consumer. ofcourse the user should be able to change it to another sc
   GUI1, GUI2 — five alt-tabs went GUI1 ↔ GUI2 only, never CASPAR.
 - Not yet measured: the stutter itself on air (needs real alt-tabs on :0 with the frame-drop probe
   `alttab-probe.py`); no input automation on the owner's display.
+
+## On-air measurement (31.10.26)
+
+10 alt-tabs (5 pairs, 1 s apart) on :0 in the owner GUI while sniffing Caspar OSC on :6250 (memory: caspar-osc-output-health):
+ch2 `presented` 50/s and shm 50/s in every second of 16:27:30–16:27:44, screen drop counter flat at 2829 throughout.
+Owner 31.10.26: done.

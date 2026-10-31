@@ -1,7 +1,7 @@
 # WO-891 — Second operator monitor: a second Godot window that workspace tabs move to
 
 **Area:** godot-client, mapping
-**Status: IN PROGRESS (31.10.26, built and tested: Godot suite 24245/0, smoke 6/6, Xvfb three-screen probe with screenshots; still needs owner QA on two real monitors)**
+**Status: DONE (31.10.26 — Godot suite 24245/0, smoke 6/6, Xvfb three-screen probe; owner QA on real monitors: good)**
 
 ## Owner request
 
@@ -160,3 +160,7 @@ tab, only visible when inside that tab, not always."
   - Cross-window drag and drop, for example Sources onto a tab in window 2.
   - Real two-monitor behaviour on the box, including Openbox maximize on a real second head.
   - The WO-638 boot screen gate when a second lit monitor has no destination.
+
+## Owner QA
+
+Owner 31.10.26: "good" — physical QA on the real hardware passed.

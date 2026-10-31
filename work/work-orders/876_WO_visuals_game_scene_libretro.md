@@ -1,7 +1,7 @@
 # WO-876 — Visuals: a classic game as a scene / layer (libretro window → ring → effects)
 
 **Area:** godot-client, engine
-**Status: DONE (31.10.26 — Godot suite 25489/0; box: Contra from Sources ▸ Games into the A/B PRV bank, Play on the operator screen (DP-4), Start reaches the core, AUTO → in the visuals ring Caspar ch2 layer 1 reads at 50/s, window adopted across a GUI restart; gamepad untested: none connected)**
+**Status: DONE (31.10.26 — Godot suite 25489/0; box: Contra from Sources ▸ Games into the A/B PRV bank, Play on DP-4, AUTO → ring ch2 layer 1 at 50/s; gamepad test deferred to the future by the owner)**
 
 Owner, 31.10: *"Also as part of the visuals I'd like to implement a classic games emulator, so I can run contra Mario or
 whatever use it as a layer in visuals with effects etc, but play normally on the operator monitor with keyboard/gamepad
@@ -108,3 +108,7 @@ PLAY SELECT, the ring `/dev/shm/highascg-visuals-game` was rewritten. But:
   (3840×1792, the slots Caspar reads, OSC: presented 50/s, shm 50/s, dropped steady at 53) holds the Contra picture.
   CUT → A, Stop (process, ring and pid file gone), A/B off → stored project back to the owner's two layers at 0 %, no `dj`.
 - Not testable here: a gamepad (no `/dev/input/js*` on the box).
+
+## Gamepad (future)
+
+Owner 31.10.26: "mark pads tests as future" — no gamepad on the box; a gamepad test is a future item, not a blocker.

@@ -1,7 +1,7 @@
 # WO-900 — Visuals: MIDI controller (APC40 mkII map, Learn, fader pickup / soft takeover, opt-in pad lights)
 
 **Area:** godot-client
-**Status: IN PROGRESS (31.10: built + 25290-test runner + --check boot + Xvfb :97 probes incl. the real APC40 on hw:4,0,0; owner physical fader QA outstanding)**
+**Status: DONE (31.10.26 — 25290-test runner, Xvfb probes with the real APC40; owner physical fader QA: good)**
 **Source:** owner 31.10: *"for visuals id like to be able to connect a midi device for control. i have and connect soon an akai
 apc40 (mk2 i think). the thing that is a must is a fader sync. meaning that a physical fader doesnt move the in app fader until
 the irl fader is brought to the current value of the digital one."*
@@ -127,3 +127,7 @@ Tests: `tests/test_midi_pickup.gd`, `tests/test_visuals_midi.gd` (auto-discovere
 - `sudo apt install poppler-utils` to read the Akai protocol PDF on the box.
 - Run `node tools/wo/build-index.js` and `node tools/wo/check-wos.js` for this WO (not run by the implementing agent: INDEX.md
   was off-limits).
+
+## Owner QA
+
+Owner 31.10.26: "good" — physical QA on the real hardware passed.

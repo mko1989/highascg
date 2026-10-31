@@ -1,7 +1,7 @@
 # WO-913 — Visuals Controller: drop a visual on an APC40 pad → the pad loads it into PRV, lit in the visual's colour
 
 **Area:** godot-client
-**Status: IN PROGRESS (31.10.26 — §4 owner follow-up done: suite 25533/0, probe-client clicks; the physical pads / arrows / colours on the APC untested)**
+**Status: DONE (31.10.26 — suite 25533/0, probe-client clicks; owner physical QA of pads / arrows / Stop / colours: good)**
 
 ## Owner request (31.10.26)
 "in the controller in visuals it should be possible to drop different visuals onto the buttons/pads to load them
@@ -69,3 +69,7 @@ the left right arrows should change which slot a/b is edited, with possibility t
   pad → layer 1 Tunnel (its fader / eye kept); Clear layer → gone.
 - Note: a replaced layer keeps its mute (eye) and fader, as every drop-replace does (WO-890) — a pad into a muted layer
   loads it unseen.
+
+## Owner QA
+
+Owner 31.10.26: "good" — physical QA on the real hardware passed.

@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-824 live WOs (30 open, 127 in progress, 667 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+824 live WOs (30 open, 123 in progress, 671 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -461,13 +461,13 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 886 DONE [godot-client+os-iso] MagicQ does not open from the operator dock: the launch ignored the .desktop Pa… → 886_WO_dock_magicq_ignored_desktop_path.md
 - 889 DONE [godot-client] Device View GPU-port inspector: drop the "Confine" select → 889_WO_gpu_inspector_drop_confine_select.md
 - 890 DONE [godot-client] Visuals: dynamic layer stack with a per-layer opacity fader → 890_WO_visuals_dynamic_layers_opacity.md
-- 891 IN PROGRESS [godot-client+mapping] Second operator monitor: a second Godot window that workspace tabs move to → 891_WO_second_operator_monitor_window.md
+- 891 DONE [godot-client+mapping] Second operator monitor: a second Godot window that workspace tabs move to → 891_WO_second_operator_monitor_window.md
 - 892 DONE [godot-client] Previs render quality setting (Low / Medium / High / Ultra) → 892_WO_previs_quality_setting.md
 - 894 IN PROGRESS [godot-client] Visuals ▸ Shader panel: the shader controls come back in the Visuals tab → 894_WO_visuals_shader_controls_panel.md
 - 895 DONE [godot-client] Visuals playlists: an ordered list of looks and visuals that runs unattended → 895_WO_visuals_playlists.md
 - 896 DONE [godot-client] Visuals 3D view drives the output: the orbit camera reaches the program → 896_WO_visuals_3d_view_drives_output.md
 - 899 DONE [godot-client] Sources column: every sub-tab always fits (shrink the font, then trim the label) → 899_WO_sources_tabs_always_fit_shrink_then_trim.md
-- 900 IN PROGRESS [godot-client] Visuals: MIDI controller (APC40 mkII map, Learn, fader pickup / soft takeover,… → 900_WO_visuals_midi_controller_apc40_pickup.md
+- 900 DONE [godot-client] Visuals: MIDI controller (APC40 mkII map, Learn, fader pickup / soft takeover,… → 900_WO_visuals_midi_controller_apc40_pickup.md
 - 901 DONE [godot-client] Lockscreen: hidden mouse pointer + "Bounce" style (one bouncing character) → 901_WO_lockscreen_hidden_pointer_and_bounce_style.md
 - 902 DONE [godot-client+testing-ci] Live preview windows shrink on their own: run-client.sh --check re-tiled the sh… → 902_WO_live_compose_layout_no_foreign_retile.md
 - 904 DONE [godot-client] Changing any Visuals value froze the output: a whole-show undo snapshot on ever… → 904_WO_visuals_freeze_undo_snapshot_per_edit.md
@@ -477,8 +477,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 909 DONE [godot-client] APC40 profile: the controller drawn with what every control does now, device kn… → 909_WO_visuals_apc40_profile.md
 - 910 DONE [godot-client] Visuals: a bank's Amount hid every dropped shader (and game) — the layer fader… → 910_WO_visuals_amount_never_fades_shader_or_game.md
 - 911 DONE [godot-client] Visuals: the work-area mode hint pinned the tab's width — Inspector pushed off-… → 911_WO_visuals_mode_hint_pinned_tab_width.md
-- 912 IN PROGRESS [godot-client] Visuals MIDI: APC40 knobs are endless encoders — they never picked up; now rela… → 912_WO_visuals_apc_knobs_are_encoders.md
-- 913 IN PROGRESS [godot-client] Visuals Controller: drop a visual on an APC40 pad → the pad loads it into PRV,… → 913_WO_visuals_apc_pads_load_visuals.md
+- 912 DONE [godot-client] Visuals MIDI: APC40 knobs are endless encoders — they never picked up; now rela… → 912_WO_visuals_apc_knobs_are_encoders.md
+- 913 DONE [godot-client] Visuals Controller: drop a visual on an APC40 pad → the pad loads it into PRV,… → 913_WO_visuals_apc_pads_load_visuals.md
 
 ## web-client — Web client (82)
 

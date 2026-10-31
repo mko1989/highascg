@@ -860,3 +860,7 @@ dry-run `/home/eggs/isodir` boot files. The first full build (Phase 7) runs both
 **What was done.** Both fragments exclude `home/casparcg/.highascg/backup` + `/*`. The squashfs verifier's dev-box absence loop gains the path. The `smoke-eggs-exclude-lists` pin uses the real backup path.
 
 **Verified.** Smokes 68/68 (`smoke-eggs-exclude-lists`, `smoke-wo870-phase5-verify`). The verifier now FAILS the 00:33 ISO on exactly that line, as it should. A real `mksquashfs -wildcards -ef <fragment>` on a temp tree drops `backup/…/_trash/a.json` and keeps `gdtf-share.json` plus the `log` / `run` dirs. Takes effect after the owner's next `sudo bash tools/eggs/live-usb/install-eggs-config.sh --apply` + build. The 00:33 ISO is fine to flash as it is.
+
+## Owner 31.10.26
+
+The owner ran a first full build on 30.10. Further tests wait for a better version of eggs 26.10 — nothing to do here until then.
