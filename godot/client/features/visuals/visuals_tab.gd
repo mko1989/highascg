@@ -149,6 +149,8 @@ func _ready() -> void:
 	_get_sensitivity.call_deferred()
 	_set_mode(_mode)
 	_on_shown()
+	if _g("Config"):  # not under the test runner (it shares user://)
+		_resume_send.call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-send"):  # dev: --probe-visuals-send=<screen index>:<seconds>
 		(func() -> void: Probes.send(self, str(_g("Config").args["probe-visuals-send"]))).call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-shots"):  # dev: --probe-visuals-shots=<dir> (WO-873)
@@ -359,6 +361,7 @@ func send(on: bool) -> void:
 			var r: Dictionary = await _g("DevicesTarget").box_api.post_json("/api/play", M.play_body(ch, int(slice.output.layer)))
 			if r.ok:
 				sending = {"channel": ch, "layer": int(slice.output.layer)}
+				_on_air_mark(sending)
 			else:
 				publisher.stop()
 				why = "PLAY failed: %s" % str(r.get("error", r.get("status", "")))
@@ -367,8 +370,38 @@ func send(on: bool) -> void:
 		await _g("DevicesTarget").box_api.post_json("/api/stop", M.stop_body(sending.channel, sending.layer))
 		publisher.stop()
 		sending = {}
+		_on_air_mark({})
 		_sync_send_ui("")
 	_on_shown()
+
+
+## WO-880: "on air" survives the client. Send writes on_air_path, Send off removes it; a client started while it exists (a
+## crash relaunch by run-client.sh, or a restart) sends again once the box answers — Caspar's shm producer holds the last
+## frame meanwhile and takes the new ring on its own. Only Send off ends it.
+var on_air_path := "user://visuals_on_air.json"  # a test points it elsewhere
+
+
+func _on_air_mark(on: Dictionary) -> void:
+	if on.is_empty():
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(on_air_path))
+		return
+	var f := FileAccess.open(on_air_path, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(on))
+
+
+func _resume_send() -> void:
+	if not FileAccess.file_exists(on_air_path):
+		return
+	for i in 60:  # the server may still be starting: up to ~2 min
+		if not is_inside_tree() or not sending.is_empty():
+			return
+		if can_send() == "" and _g("Store") and not (_project() as Dictionary).is_empty():
+			print("[visuals] on air before this client started — sending again")
+			await send(true)
+			if not sending.is_empty():
+				return
+		await get_tree().create_timer(2.0).timeout
 
 
 func _sync_send_ui(why: String) -> void:

@@ -198,3 +198,17 @@ func test_tap_row() -> void:
 	t.eq([tab.page.show_panel._audio.button_pressed, tab.page.show_panel._auto_note.text.begins_with("Tempo 128")], [true, true],
 		"the music's beat again")
 	tab.free()
+
+
+# WO-880: the on-air marker Send writes and Send off removes; a client without it does not resume.
+func test_on_air_marker() -> void:
+	var tab: Control = preload("res://features/visuals/visuals_tab.gd").new()
+	tab._ready()
+	tab.on_air_path = "user://test_wo880_on_air_%d.json" % Time.get_ticks_usec()
+	tab._on_air_mark({"channel": 4, "layer": 20})
+	t.eq(JSON.parse_string(FileAccess.get_file_as_string(tab.on_air_path)), {"channel": 4.0, "layer": 20.0}, "Send writes it")
+	tab._on_air_mark({})
+	t.eq(FileAccess.file_exists(tab.on_air_path), false, "Send off removes it")
+	await tab._resume_send()
+	t.eq(tab.sending, {}, "no marker: nothing resumes")
+	tab.free()

@@ -43,4 +43,22 @@ if [[ "${1:-}" == "--check" ]]; then
 	if [[ -n "$errs" ]]; then echo "$errs" >&2; echo "[check] FAILED" >&2; exit 1; fi
 	echo "[check] boot OK (no script errors)"; exit 0
 fi
-exec "$GODOT" --path "$HERE" -- "$@"
+# WO-880: a crash relaunches the client (show safety: the Visuals resume Send by themselves). Only a crash signal
+# (SIGILL/ABRT/BUS/FPE/SEGV → 132/134/135/136/139) — a quit, an error exit or a kill (TERM/INT/KILL) ends it — and at
+# most 5 times in 5 min. HIGHASCG_CLIENT_NO_RELAUNCH=1 = the old single run.
+[[ -n "${HIGHASCG_CLIENT_NO_RELAUNCH:-}" ]] && exec "$GODOT" --path "$HERE" -- "$@"
+crashes=()
+while :; do
+	"$GODOT" --path "$HERE" -- "$@" && rc=0 || rc=$?
+	case $rc in 132 | 134 | 135 | 136 | 139) ;; *) exit "$rc" ;; esac
+	now=$(date +%s)
+	recent=()
+	for t in "${crashes[@]}"; do ((now - t < 300)) && recent+=("$t"); done
+	crashes=("${recent[@]}" "$now")
+	if ((${#crashes[@]} > 5)); then
+		echo "[run-client] $(date '+%F %T') crashed (exit $rc) 6 times in 5 min — not relaunching" >&2
+		exit "$rc"
+	fi
+	echo "[run-client] $(date '+%F %T') crashed (exit $rc) — relaunching in 2 s" >&2
+	sleep 2
+done
