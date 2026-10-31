@@ -416,9 +416,11 @@ else
 	ok "HIGHASCG_ISO_FORBID_DECKLINK=0 — skip DeckLink squashfs absence checks"
 fi
 
-# WO-870 30.10 (owner): dev-box tools and data stay off the ISO — MagicQ and its shows, Godot exports for other OSes.
+# WO-870 30.10 (owner): dev-box tools and data stay off the ISO — MagicQ and its shows, Godot exports for other OSes;
+# 31.10: the WO-868 switch backups in ~/.highascg/backup.
 for needle in 'opt/magicq' 'home/casparcg/Documents/MagicQ' 'home/casparcg/show' \
-	'home/casparcg/highascg/godot/export/windows' 'home/casparcg/highascg/godot/export/web-demo'; do
+	'home/casparcg/highascg/godot/export/windows' 'home/casparcg/highascg/godot/export/web-demo' \
+	'home/casparcg/.highascg/backup'; do
 	if squash_has_tree "$needle"; then
 		bad "dev-box path in squashfs: ${needle} — re-apply install-eggs-config.sh (WO-870 excludes)"
 	else

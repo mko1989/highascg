@@ -847,3 +847,16 @@ dry-run `/home/eggs/isodir` boot files. The first full build (Phase 7) runs both
 - The verifier's sed reads `15` from the host's real `/usr/src/linux-headers-7.0.0-38-generic/.config`.
 - `smoke-eggs-exclude-lists` (new trim test, both embed modes) and `smoke-wo870-phase5-verify`: 68/68.
 - Expected next ISO: about 4.8 GB minus about 3.7 GB of trim → around 3.3 to 3.6 GB, to be confirmed by the owner's rebuild.
+
+### Phase 7c — second full build (31.10 00:33, run by the owner): good; one box-local leftover found
+
+**Investigation.** `/home/eggs/highascg-nvidia-615-2026-10-31_0033.iso`: 3683778560 B (3.43 GiB), built in 3:27, `Successes: 21, Errors: 0` (`/var/log/penguins-eggs.log`).
+- `sha256sum -c` on the `.sha256` next to it: OK.
+- `verify-iso-boot-branding.sh` → "All boot branding checks passed"; `verify-iso-squashfs-excludes.sh` → passed (squashfs 3279 MiB), both rc 0, no WARN lines.
+- Size: inside the Phase 6 criterion (3.46 GB baseline ±10 %) and the Phase 7b estimate. The 8.58 GB of build 1 was the leaked backup ISO plus the dev-box weight trimmed in 7b.
+- Leak list read from `unsquashfs -lls` (158650 entries) for what the verifier does not check by name: nothing under `home/eggs`, no `media/` files, `bin/casparcg` present, `config/security.json` with an empty `apiToken`, `~/.highascg/{log,run}` empty dirs (no stale `caspar-screens-ready`), `gdtf-share.json` present (ships on purpose, owner 22.10).
+- **Found:** `~/.highascg/backup/wo868-2026-10-30T17-12-06-237Z/` (65 MB, ~2100 files). This is the WO-868 operator-first switch backup (`src/system/operator-first-switch.js:7`, kept by design): the whole `projects/` incl. `_trash` (1889 files, otherwise excluded), `state.json` and a config snapshot with `device-identity` / `replication-local-identity`. No secret in it (its `security.json` token is empty), and live `projects/` ships anyway, so this was not a blocker for the ISO. It is still box-local and not wanted on a clone.
+
+**What was done.** Both fragments exclude `home/casparcg/.highascg/backup` + `/*`. The squashfs verifier's dev-box absence loop gains the path. The `smoke-eggs-exclude-lists` pin uses the real backup path.
+
+**Verified.** Smokes 68/68 (`smoke-eggs-exclude-lists`, `smoke-wo870-phase5-verify`). The verifier now FAILS the 00:33 ISO on exactly that line, as it should. A real `mksquashfs -wildcards -ef <fragment>` on a temp tree drops `backup/…/_trash/a.json` and keeps `gdtf-share.json` plus the `log` / `run` dirs. Takes effect after the owner's next `sudo bash tools/eggs/live-usb/install-eggs-config.sh --apply` + build. The 00:33 ISO is fine to flash as it is.

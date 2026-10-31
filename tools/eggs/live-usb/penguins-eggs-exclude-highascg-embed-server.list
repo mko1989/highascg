@@ -287,6 +287,9 @@ home/casparcg/.highascg/cache
 home/casparcg/.highascg/cache/*
 home/casparcg/.highascg/log/*
 home/casparcg/.highascg/run/*
+# WO-870 31.10: the WO-868 switch backups (projects incl. _trash, a config snapshot with the box identity) — box-local.
+home/casparcg/.highascg/backup
+home/casparcg/.highascg/backup/*
 home/casparcg/.config/Ultralytics
 home/casparcg/.config/Ultralytics/*
 home/casparcg/.config/google-chrome-for-testing

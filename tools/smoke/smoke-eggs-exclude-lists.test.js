@@ -264,6 +264,8 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 				'home/casparcg/.highascg/cache/list.json',
 				'home/casparcg/.highascg/log/godot-client.log',
 				'home/casparcg/.highascg/run/caspar-screens-ready',
+				// WO-870 31.10: the WO-868 switch backup rode in (projects incl. _trash + a config snapshot)
+				'home/casparcg/.highascg/backup/wo868-2026-10-30T17-12-06-237Z/projects/_trash/x.json',
 				'home/casparcg/highascg/bin/casparcg.prev',
 				'home/casparcg/highascg/godot/extensions/hshm/build/CMakeCache.txt',
 				'home/casparcg/bridge/media',
