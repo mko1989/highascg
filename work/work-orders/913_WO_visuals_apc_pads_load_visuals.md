@@ -1,7 +1,7 @@
 # WO-913 — Visuals Controller: drop a visual on an APC40 pad → the pad loads it into PRV, lit in the visual's colour
 
 **Area:** godot-client
-**Status: IN PROGRESS (31.10.26 — Godot suite 25522/0; drop + colours proven in a probe client; the physical pad press and its colour on the APC are untested)**
+**Status: IN PROGRESS (31.10.26 — §4 owner follow-up done: suite 25533/0, probe-client clicks; the physical pads / arrows / colours on the APC untested)**
 
 ## Owner request (31.10.26)
 "in the controller in visuals it should be possible to drop different visuals onto the buttons/pads to load them
@@ -49,3 +49,23 @@ backlight of the button."
   (purple), "Spectrum" (yellow), "Rings" (cyan) with the hover line.
 - **Open (owner, physical):** a pad press loading into PRV; the APC pads lit in the colours (pad lights switch on with
   the first drop — Ableton mode, host-lit buttons).
+
+## 4. Owner follow-up (31.10.26): selected layer, a clear button, ◀ / ▶ pick the edited bank (PGM too)
+"the visuals from the pads should go into selected layer/fader. there should aslo be a clear layer/fader button. clicking
+the left right arrows should change which slot a/b is edited, with possibility to edit live on pgm too"
+- **Pads → the selected layer** of the bank being edited (`tab._target()`: the selected layer, else the top one, no layers
+  = a new one) — replaces §2's column = layer; no `dj.to_prv()` any more, so the pad follows the edited bank.
+- **◀ / ▶ (notes 97 / 96) = Edit A / Edit B** (`edit:1` / `edit:2` → `dj.focus()`), the bank on air included — the MIDI
+  line says "ON AIR: changes are live". Lights: the edited bank's arrow on, blinking while that bank is on air (the
+  drawing: green / red). A/B off: not there.
+- **Stop (note 92) = Clear layer** (`clear` → the selected row's ✕: the layer is removed, the ones above move down a fader).
+- A stored map gains these (`MidiMap.with_new_defaults`, only where the control is still free) — the box's ui.cfg had a
+  saved map since the first pad drop.
+- **Clicks on the drawing press** (`apc40_surface.gd clicked`): a mapped button or pad does what the hardware would; a
+  knob, fader or unmapped control still Learns; right-click Learns anything. Hint text updated.
+- Verified: suite 25533 / 0 (`test_arrows_pick_the_edited_bank`, `test_stored_map_gains_the_new_buttons`,
+  `test_click_on_the_drawing_presses_a_pad`, selected-layer + Stop asserts); smokes WO-900/908/909 8/8. Probe client
+  (Xvfb :93, read-only proxy): click Edit B on the drawing → "PGM B ✎", its arrow red; Edit A; Sel Particles; the Tunnel
+  pad → layer 1 Tunnel (its fader / eye kept); Clear layer → gone.
+- Note: a replaced layer keeps its mute (eye) and fader, as every drop-replace does (WO-890) — a pad into a muted layer
+  loads it unseen.

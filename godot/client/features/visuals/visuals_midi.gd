@@ -85,8 +85,12 @@ func _input(event: InputEvent) -> void:
 
 func handle(e: InputEventMIDI) -> void:
 	var msg := MidiMap.decode(e)
-	if msg.is_empty():
-		return
+	if not msg.is_empty():
+		handle_msg(msg)
+
+
+## A decoded message ({kind, ch, num, val}) — from the controller, or a click on the Controller mode's drawing (WO-913).
+func handle_msg(msg: Dictionary) -> void:
 	apc_view.surface.touch(msg)
 	if mode != "":
 		if msg.kind != "off":
@@ -154,6 +158,11 @@ func _button(b: Dictionary, msg: Dictionary, c: Control) -> void:
 			apc_view.select(b.target)
 		"clip":
 			clips.fire(int(b.target.get_slice(":", 1)))
+		"edit":
+			tab.dj.focus(int(b.target.get_slice(":", 1)) - 1)
+			_say("Editing bank %s%s" % [b.target.get_slice(":", 1).replace("1", "A").replace("2", "B"),
+				" — ON AIR: changes are live" if tab.mixer.live == tab.mixer.air() else " (PRV)"])
+			return
 		_:
 			(c as BaseButton).pressed.emit()
 	_say("%s → %s" % [_name(msg), MidiMap.target_label(b.target)])
@@ -190,6 +199,11 @@ func control_of(target: String) -> Control:
 			return apc_view.control_of(target)
 		"clip":  # WO-913: a visual pad is there while it holds a visual
 			return apc_view.surface if clips.has(n + 1) else null
+		"edit":  # WO-913: Edit A / B (A/B on only)
+			return tab.dj.control(target)
+		"clear":  # WO-913: the selected layer's ✕
+			var rs: Array = tab.page.layer_list.rows
+			return rs[tab._target()].del if not rs.is_empty() and tab._target() >= 0 and tab._target() < rs.size() else null
 	return tab.page.show_panel.control(target)
 
 
@@ -324,6 +338,12 @@ func led_state(target: String) -> int:
 			return Leds.OFF if c == null else (Leds.ON if int(target.get_slice(":", 1)) - 1 == tab.sel else Leds.AVAIL)
 		"clip":
 			return Leds.OFF if c == null else Leds.ON
+		"edit":  # the edited bank lit; blinking (ALERT) while that is the bank on air
+			if c == null:
+				return Leds.OFF
+			if int(target.get_slice(":", 1)) - 1 != tab.mixer.live:
+				return Leds.AVAIL
+			return Leds.ALERT if tab.mixer.live == tab.mixer.air() else Leds.ON
 		"auto":
 			return Leds.ON if c != null and (c as OptionButton).selected > 0 else Leds.AVAIL
 		"audio":
@@ -409,7 +429,7 @@ func _load() -> void:
 	if cfg_path == "" or c.load(cfg_path) != OK or not c.has_section_key(SECTION, "map"):
 		map = MidiMap.apc40()
 	else:
-		map = MidiMap.normalize(c.get_value(SECTION, "map"))
+		map = MidiMap.with_new_defaults(MidiMap.normalize(c.get_value(SECTION, "map")), ["edit", "clear"])  # WO-913
 	leds = cfg_path != "" and c.get_value(SECTION, "leds", false) == true
 	clips.load_from(c)
 

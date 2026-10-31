@@ -1,7 +1,8 @@
 extends RefCounted
 ## WO-913 — visual pads: the APC palette (red / green / grey, a thumbnail's main colour), a visual dropped on a clip-grid pad
-## (binding replaced, colour kept, the pad's light = its palette colour), the pad pressed (the column's layer replaced, a
-## column past the layers adds one, A/B on: into the PRV bank, the bank on air untouched), what the surface accepts.
+## (binding replaced, colour kept, the pad's light = its palette colour), the pad pressed (into the selected layer, the top
+## one when none is; A/B on: into the bank being edited, PGM included), ◀ / ▶ = edit bank A / B (lit, blinking on air),
+## Stop = clear the selected layer, a stored map gaining them, a click on the drawing pressing a pad, what the surface takes.
 ## WO-912: an APC knob is an encoder (relative steps, no pickup).
 
 const Tab := preload("res://features/visuals/visuals_tab.gd")
@@ -51,27 +52,62 @@ func test_drop_and_fire() -> void:
 	t.eq(midi.leds, false, "the test runner keeps no lights (no ui.cfg)")
 	t.eq(Leds.frame(midi.map, midi.led_state, midi.clips.velocity)["144:33"], 5, "its light is its colour (red = 5)")
 	t.eq(midi.apc_view.label("clip:33"), "Rings", "the surface names the visual")
+	tab.sel = -1
 	midi.handle(T.note(0, 33, 127))
-	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["tunnel", "rings", "rings"],
-		"pressed: column 2 → layer 2 replaced")
-	t.eq(tab.slice.layers[1].opacity, 0.6, "its fader kept")
-	midi.clips.drop(37, {"type": "visual", "scene": "tunnel", "label": "Tunnel"})
+	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["tunnel", "particles", "rings"],
+		"nothing selected: the top layer takes it (rings onto rings)")
+	midi.clips.drop(37, {"type": "visual", "scene": "starfield", "label": "Starfield"})
+	midi.handle(T.note(0, 51, 127))  # track select 1
 	midi.handle(T.note(0, 37, 127))
-	t.eq(tab.slice.layers.size(), 4, "column 6 of 3 layers: a new layer on top")
+	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["starfield", "particles", "rings"],
+		"track select 1, then the pad: layer 1 replaced, whatever the pad's column")
+	t.eq(tab.slice.layers[0].opacity, 0.6, "its fader kept")
+	midi.handle(T.note(0, 92, 127))  # Stop = clear
+	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["particles", "rings"], "Stop clears the selected layer")
 
 
-func test_fire_loads_into_prv() -> void:
+func test_arrows_pick_the_edited_bank() -> void:
 	var tab := _tab()
 	var midi: Node = tab.midi
+	t.eq(midi.control_of("edit:1"), null, "A/B off: no banks to pick")
 	tab.dj.set_on(true)
 	var air: int = tab.mixer.air()
-	tab.dj.focus(air)  # editing the bank on air
-	var on_air: Array = tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene)
-	midi.clips.drop(32, {"type": "visual", "scene": "rings", "label": "Rings"})
+	var prv := 1 - air
+	t.eq(tab.mixer.live, prv, "A/B on: editing PRV")
+	var arrow := [97, 96]  # ◀ = A, ▶ = B
+	t.eq(Leds.frame(midi.map, midi.led_state)["144:%d" % arrow[prv]], 1, "the edited bank's arrow is lit")
+	midi.handle(T.note(0, arrow[air], 127))
+	t.eq(tab.mixer.live, air, "the other arrow: editing the bank on air")
+	t.ok(midi.note.contains("ON AIR"), "the MIDI line says edits are live: " + midi.note)
+	t.eq(Leds.frame(midi.map, midi.led_state)["144:%d" % arrow[air]], 2, "its arrow blinks while the bank on air is edited")
+	var prv_layers: Array = tab.slice.dj.other.layers.map(func(l: Dictionary) -> String: return l.scene)
+	midi.clips.drop(32, {"type": "visual", "scene": "starfield", "label": "Starfield"})
+	tab.sel = 0
 	midi.handle(T.note(0, 32, 127))
-	t.eq(tab.mixer.live, 1 - air, "A/B on: the pad edits the PRV bank")
-	t.eq(tab.slice.layers[0].scene, "rings", "layer 1 of PRV holds the visual")
-	t.eq(tab.slice.dj.other.layers.map(func(l: Dictionary) -> String: return l.scene), on_air, "the bank on air is untouched")
+	t.eq([tab.mixer.live, tab.slice.layers[0].scene], [air, "starfield"], "the pad loads into the bank on air (live)")
+	t.eq(tab.slice.dj.other.layers.map(func(l: Dictionary) -> String: return l.scene), prv_layers, "PRV untouched")
+	midi.handle(T.note(0, arrow[prv], 127))
+	t.eq(tab.mixer.live, prv, "back to PRV")
+
+
+func test_stored_map_gains_the_new_buttons() -> void:
+	var stored := [{"kind": "note", "ch": -1, "num": 92, "target": "blackout"}]
+	var m := T.MM.with_new_defaults(stored, ["edit", "clear"])
+	t.eq(m.map(func(b: Dictionary) -> String: return b.target), ["blackout", "edit:1", "edit:2"],
+		"◀ / ▶ added; Stop kept what the operator put on it, so no clear")
+	t.eq(T.MM.with_new_defaults(m, ["edit", "clear"]).size(), 3, "no duplicates on the next load")
+
+
+func test_click_on_the_drawing_presses_a_pad() -> void:
+	var tab := _tab()
+	var midi: Node = tab.midi
+	var s: Control = midi.apc_view.surface
+	midi.clips.drop(20, {"type": "visual", "scene": "starfield", "label": "Starfield"})
+	tab.sel = 2
+	s.clicked.emit(s.controls.filter(func(c: Dictionary) -> bool: return c.kind == "note" and int(c.num) == 20)[0])
+	t.eq([tab.slice.layers[2].scene, midi.mode], ["starfield", ""], "a click on the visual pad loads it, no Learn")
+	s.clicked.emit(s.controls.filter(func(c: Dictionary) -> bool: return c.kind == "cc" and int(c.num) == 48)[0])
+	t.eq(midi.mode, "learn", "a click on a knob still Learns")
 
 
 func test_surface_accepts_visuals_on_grid_pads() -> void:

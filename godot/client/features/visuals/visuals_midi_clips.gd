@@ -2,9 +2,9 @@ extends RefCounted
 ## WO-913 — visual pads (owner 31.10: "drop different visuals onto the buttons/pads to load them instantly to prv a or b";
 ## "the button should show the visuals main color as the backlight"). A visual from Sources ▸ Visuals dropped on a clip-grid
 ## pad of the Controller mode binds that pad ("clip:<note>", replacing what it drove) to the visual, with the visual's main
-## colour (its thumbnail, apc40_palette.gd). Pressing the pad loads the visual into the PRV bank (A/B on: editing moves to
-## the bank off the canvas first, as a look does) — into the layer of the pad's column, the APC's track = layer convention
-## of its faders, mutes and selects; a column past the bank's layers adds one on top. Kept with the mapping (ui.cfg [midi]).
+## colour (its thumbnail, apc40_palette.gd). Pressing the pad loads the visual into the selected layer (track select / a
+## click in the layer list; none = the top one, no layers = a new one) of the bank being edited — A/B on: the one ◀ / ▶ or
+## Edit A / B picked, PRV or, on purpose, the bank on air. Kept with the mapping (ui.cfg [midi]).
 
 const Palette := preload("res://features/midi/apc40_palette.gd")
 const MidiMap := preload("res://features/midi/midi_map.gd")
@@ -45,18 +45,15 @@ func drop(num: int, payload: Dictionary) -> void:
 		midi.leds = true
 		UiCfg.save_value(midi.SECTION, "leds", true, midi.cfg_path)
 		midi._leds_changed()
-	midi._say("%s → pad %s: press it to load it into PRV (layer %d)" % [label(num), midi._name({"kind": "note", "ch": 0, "num": num}), num % 8 + 1])
+	midi._say("%s → pad %s: press it to load it into the selected layer" % [label(num), midi._name({"kind": "note", "ch": 0, "num": num})])
 
 
-## Pad `num` pressed: its visual into the PRV bank, the column's layer.
+## Pad `num` pressed: its visual into the edited bank's selected layer.
 func fire(num: int) -> void:
 	var c: Variant = clips.get(str(num))
 	if not c is Dictionary:
 		return
-	var tab: Node = midi.tab
-	tab.dj.to_prv()
-	var col := num % 8
-	tab.drop_visual(c.payload, col if col < tab.slice.get("layers", []).size() else -1)
+	midi.tab.drop_visual(c.payload, midi.tab._target())
 
 
 func has(num: int) -> bool:

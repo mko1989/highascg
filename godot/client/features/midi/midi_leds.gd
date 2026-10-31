@@ -35,7 +35,7 @@ static func frame(map: Array, state: Callable, vel := Callable()) -> Dictionary:
 			var s := clampi(int(state.call(b.target)), OFF, ALERT)
 			var ch := 0 if rgb(num) else maxi(0, int(b.ch))
 			var own := int(vel.call(b.target)) if rgb(num) and vel.is_valid() else -1
-			out["%d:%d" % [0x90 | ch, num]] = own if own >= 0 else (RGB_VEL[s] if rgb(num) else [0, 0, 1, 2 if num == 52 else 1][s])
+			out["%d:%d" % [0x90 | ch, num]] = own if own >= 0 else (RGB_VEL[s] if rgb(num) else [0, 0, 1, 2 if num in [52, 96, 97] else 1][s])
 		elif b.kind == "cc" and ring(num):
 			out["%d:%d" % [0xB0, num]] = clampi(int(state.call(b.target)), 0, 127)
 	return out

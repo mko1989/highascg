@@ -3,7 +3,8 @@ extends Control
 ## faders and knobs at their app value (an amber tick where a waiting fader physically is, midi_pickup.gd), pads and
 ## buttons lit like their target (the midi_leds.gd states: there / showing / alert), unmapped controls dim. A control
 ## flashes when it is touched, so moving anything on the unit shows where it is and what it drove. Hover = the full line;
-## a click asks `picked` (the controller starts Learn for that control). Pure drawing: the host answers `info_cb`.
+## a click asks `clicked` (WO-913: the host presses a mapped button / pad, else Learns it), a right-click `picked` (Learn).
+## Pure drawing: the host answers `info_cb`.
 ##   info_cb(control) → {label: String ("" = unmapped), value: float (0..1, -1 = none), lit: int (0..3), waiting: bool,
 ##                       hw: float (the physical position while waiting, -1 = unknown), line: String (the tooltip),
 ##                       color: Color or null (WO-913: a visual pad's own colour)}
@@ -17,6 +18,7 @@ const TEXT := Color(0.86, 0.88, 0.9)
 const DIM := Color(0.45, 0.47, 0.5)
 
 signal picked(control: Dictionary)
+signal clicked(control: Dictionary)
 signal dropped(control: Dictionary, data: Variant)
 
 var info_cb: Callable
@@ -90,10 +92,10 @@ func _get_tooltip(at: Vector2) -> String:
 
 func _gui_input(e: InputEvent) -> void:
 	var mb := e as InputEventMouseButton
-	if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+	if mb and mb.pressed and mb.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
 		var c := control_at(mb.position)
 		if not c.is_empty():
-			picked.emit(c)
+			(clicked if mb.button_index == MOUSE_BUTTON_LEFT else picked).emit(c)
 			accept_event()
 
 

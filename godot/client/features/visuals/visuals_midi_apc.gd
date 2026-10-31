@@ -15,7 +15,7 @@ const Surface := preload("res://features/midi/apc40_surface.gd")
 const Layers := preload("res://features/visuals/visuals_layers.gd")
 const Catalog := preload("res://features/visuals/visuals_catalog.gd")
 const FALLBACK := ["param:cam_yaw", "param:cam_pitch", "param:cam_zoom", "param:burst"]
-const HINT := "Controller: what every APC40 control does now — move one to see it light up · click a control to Learn it · device knobs follow the selected layer"
+const HINT := "Controller: what every APC40 control does now — move one to see it light up · click a button or pad to press it, a knob / fader (or right-click anything) to Learn it · drop a visual on a pad · ◀ ▶ = edit bank A / B"
 
 var midi: Node
 var surface: Surface
@@ -28,6 +28,7 @@ func _init(m: Node) -> void:
 	surface = Surface.new()
 	surface.info_cb = info
 	surface.picked.connect(_learn)
+	surface.clicked.connect(_click)
 	surface.can_drop_cb = func(c: Dictionary, data: Variant) -> bool: return midi.clips.is_grid(int(c.num)) and c.shape == "pad" and Catalog.parse(data) != null
 	surface.dropped.connect(func(c: Dictionary, data: Variant) -> void: midi.clips.drop(int(c.num), data))
 
@@ -102,6 +103,10 @@ func label(target: String) -> String:
 			return "A/B AUTO"
 		"cut":
 			return "A/B CUT"
+		"edit":
+			return "Edit " + ("A" if n == 0 else "B")
+		"clear":
+			return "Clear layer"
 		"fade":
 			return "Fade time"
 		"clip":
@@ -122,7 +127,7 @@ func info(c: Dictionary) -> Dictionary:
 	var waiting: bool = st is Dictionary and Pickup.waiting(st)
 	var line := "%s → %s" % [c.name, MidiMap.target_label(t) if t.begins_with("dev:") or t.begins_with("layer:") else label(t)]
 	if t.begins_with("clip:"):
-		line = "%s → %s: press = into PRV, layer %d (drop another visual to replace it)" % [c.name, label(t), int(c.num) % 8 + 1]
+		line = "%s → %s: press = into the selected layer of the edited bank (drop another visual to replace it)" % [c.name, label(t)]
 	elif t.begins_with("dev:") or t.begins_with("layer:") or t.begins_with("look:"):
 		line += ": " + label(t)
 	if ctl == null:
@@ -136,7 +141,16 @@ func info(c: Dictionary) -> Dictionary:
 		"color": midi.clips.color(int(c.num)) if t.begins_with("clip:") and ctl != null else null}
 
 
-## A click on a control: Learn for it — the next click in the Inspector picks what it drives.
+## WO-913: a click on a mapped button or pad presses it (as the hardware would); on a knob, fader or unmapped control it Learns.
+func _click(c: Dictionary) -> void:
+	var b := MidiMap.find(midi.map, L.msg_of(c))
+	if b.is_empty() or MidiMap.is_range(b.target) or c.kind != "note":
+		_learn(c)
+		return
+	midi.handle_msg({"kind": "note", "ch": maxi(0, int(c.ch)), "num": int(c.num), "val": 127})
+
+
+## A right-click (or a click on a knob / fader / unmapped control): Learn for it — the next click in the Inspector picks what it drives.
 func _learn(c: Dictionary) -> void:
 	midi._set_mode("learn")
 	midi._captured(L.msg_of(c))

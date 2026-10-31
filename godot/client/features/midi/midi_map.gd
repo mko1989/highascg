@@ -8,7 +8,7 @@ extends RefCounted
 
 const ANY := -1
 const RANGES := ["layer", "master", "fade", "param", "xfade", "dev"]  # dev: WO-909 device knobs · continuous targets (a slider; picked up, midi_pickup.gd)
-const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select", "clip"]  # take / cut / xfade: WO-908 A/B · clip: WO-913 visual pads
+const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select", "clip", "edit", "clear"]  # take / cut / xfade: WO-908 A/B · clip / edit / clear: WO-913
 const PARAM_LABELS := {"cam_yaw": "Camera yaw", "cam_pitch": "Camera pitch", "cam_zoom": "Camera zoom"}
 
 
@@ -114,7 +114,11 @@ static func target_label(target: String) -> String:
 		"cut":
 			return "A/B CUT"
 		"clip":
-			return "Visual pad (loads into PRV)"
+			return "Visual pad (into the selected layer)"
+		"edit":
+			return "Edit bank %s" % ("A" if p.size() > 1 and p[1] == "1" else "B")
+		"clear":
+			return "Clear the selected layer"
 	return target.capitalize()
 
 
@@ -177,4 +181,16 @@ static func apc40() -> Array:
 	m.append({"kind": "cc", "ch": ANY, "num": 15, "target": "xfade"})  # WO-908: the crossfader → A/B banks
 	m.append({"kind": "note", "ch": ANY, "num": 85, "target": "take"})  # scene launch 4 → A/B AUTO
 	m.append({"kind": "note", "ch": ANY, "num": 86, "target": "cut"})  # scene launch 5 → A/B CUT
+	m.append({"kind": "note", "ch": ANY, "num": 97, "target": "edit:1"})  # WO-913: ◀ / ▶ = edit bank A / B (PGM too)
+	m.append({"kind": "note", "ch": ANY, "num": 96, "target": "edit:2"})
+	m.append({"kind": "note", "ch": ANY, "num": 92, "target": "clear"})  # WO-913: Stop = clear the selected layer
 	return m
+
+
+## WO-913: a stored map gains the default bindings of target kinds newer than it (`kinds`) whose control it leaves free.
+static func with_new_defaults(map: Array, kinds: Array) -> Array:
+	var out := map.duplicate(true)
+	for d in apc40():
+		if d.target.get_slice(":", 0) in kinds and find(out, d).is_empty() and not out.any(func(b: Dictionary) -> bool: return b.target == d.target):
+			out.append(d)
+	return out

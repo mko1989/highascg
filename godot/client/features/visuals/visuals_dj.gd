@@ -126,7 +126,8 @@ func _btn(text: String, tip: String, toggle: bool) -> Button:
 
 ## WO-900 MIDI targets: "xfade" (the crossfader), "take" (AUTO), "cut".
 func control(id: String) -> Control:
-	return {"xfade": _fader, "take": _take, "cut": _cut}.get(id) if on else null
+	return {"xfade": _fader, "take": _take, "cut": _cut, "edit:1": _edit[0] if _edit.size() > 0 else null,
+		"edit:2": _edit[1] if _edit.size() > 1 else null}.get(id) if on else null
 
 
 ## The bank off the canvas (the smaller share while mixed).
