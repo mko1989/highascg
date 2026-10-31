@@ -42,6 +42,23 @@ static func move(st: Dictionary, hw: float, app: float, tol := TOL) -> float:
 	return hw
 
 
+## WO-912 — an APC40 knob is an endless encoder that keeps its own 0..127 position (Generic mode: the app never sets it), so
+## it is never picked up: each message moves the target by the knob's step from the last message (`hw` - previous), from
+## wherever the target is. The first message only primes the position; a jump of more than JUMP (the APC took a ring value
+## the app sent, or the knob was turned while nothing listened) primes again instead of moving. Always live (no ghost).
+const JUMP := 10.0 / 127.0
+
+
+static func turn(st: Dictionary, hw: float, app: float) -> float:
+	var prev := float(st.hw)
+	st.hw = hw
+	st.live = true
+	st.sent = app
+	if prev < 0.0 or absf(hw - prev) > JUMP:
+		return -1.0
+	return clampf(app + hw - prev, 0.0, 1.0)
+
+
 ## A position reported, not moved (the APC40 sends every fader's position when it is greeted): remembered, nothing set.
 ## Already at the target's value → live; else waiting, and the UI can show where it is.
 static func seen(st: Dictionary, hw: float, app: float, tol := TOL) -> void:

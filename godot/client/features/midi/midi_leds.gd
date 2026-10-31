@@ -39,6 +39,15 @@ static func frame(map: Array, state: Callable) -> Dictionary:
 	return out
 
 
+## Only the knob rings of a frame (WO-912: sent with the pad lights off too — the APC stays in its Generic mode).
+static func rings(f: Dictionary) -> Dictionary:
+	var out := {}
+	for k in f:
+		if (int(k.get_slice(":", 0)) & 0xF0) == 0xB0:
+			out[k] = f[k]
+	return out
+
+
 ## The bytes that turn `prev` into `next` (a light gone from `next` goes off) as amidi hex ("90 20 15 B0 30 40").
 static func diff(prev: Dictionary, next: Dictionary) -> String:
 	var out := PackedStringArray()

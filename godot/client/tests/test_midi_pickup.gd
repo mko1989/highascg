@@ -208,3 +208,19 @@ func test_seen_report() -> void:
 	t.eq(P.waiting(back), true, "WO-909: the value moving elsewhere keeps it waiting")
 	P.observe(back, 0.005)
 	t.eq([back.live, P.waiting(back), back.sent], [true, false, 0.005], "WO-909: the value coming to the control's position = in sync")
+
+
+func test_encoder_turn() -> void:
+	var st := P.new_state()
+	t.eq(P.turn(st, 1.0, 0.5), -1.0, "WO-912: the first message of an APC knob only primes (even at the top of its own range)")
+	t.eq(P.turn(st, 126 / 127.0, 0.5), 0.5 - 1 / 127.0, "a step down from there moves the value down from where IT is")
+	t.ok(absf(P.turn(st, 1.0, 0.4) - (0.4 + 1 / 127.0)) < 1e-6, "a step up moves it up: the knob's own position never matters")
+	t.eq([st.live, P.waiting(st)], [true, false], "an encoder is never waiting (no ghost)")
+	t.eq(P.turn(st, 0.5, 0.4), -1.0, "a jump > 10 steps (the APC took a ring value) primes again")
+	t.ok(absf(P.turn(st, 0.5 + 2 / 127.0, 0.4) - (0.4 + 2 / 127.0)) < 1e-6, "and the next step moves")
+	t.eq(P.turn(st, 0.5 + 9 / 127.0, 0.99), 1.0, "clamped at 1")
+
+
+func test_rings_only() -> void:
+	var f := {"144:32": 21, "176:48": 64, "176:16": 3, "151:50": 1}
+	t.eq(Leds.rings(f), {"176:48": 64, "176:16": 3}, "WO-912: with the pad lights off only the knob rings are sent")

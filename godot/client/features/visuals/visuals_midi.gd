@@ -117,7 +117,7 @@ func _move(b: Dictionary, msg: Dictionary, c: Range, hello := false) -> void:
 		Pickup.seen(st, msg.val / 127.0, c.ratio)
 		_ghost(b.target, st, c)
 		return
-	var v := Pickup.move(st, msg.val / 127.0, c.ratio)
+	var v := Pickup.turn(st, msg.val / 127.0, c.ratio) if _encoder(b) else Pickup.move(st, msg.val / 127.0, c.ratio)
 	if v >= 0.0:
 		var before := c.value
 		c.ratio = v  # value_changed: the same path as a drag
@@ -279,13 +279,15 @@ func _menu(id: int) -> void:
 func tick() -> void:
 	for b in map:
 		var k := MidiMap.key(b)
-		if pick.has(k):
+		if pick.has(k) and not _encoder(b):  # an encoder is never waiting (WO-912)
 			var c := control_of(b.target) as Range
 			if c != null:
 				Pickup.observe(pick[k], c.ratio)
 				_ghost(b.target, pick[k], c)
-	if leds and out.port != "":
+	if out.port != "":  # the knob rings always (WO-912: the APC then turns on from the app's value); the pad lights when on
 		var f := Leds.frame(map, led_state)
+		if not leds:
+			f = Leds.rings(f)
 		out.send(Leds.diff(_lit, f))
 		_lit = f
 	out.pump()
@@ -346,6 +348,10 @@ func _port(listing: String) -> void:
 func _hello() -> void:
 	out.send(Leds.SYSEX_GENERIC)
 	_hello_until = Time.get_ticks_msec() + 1500
+
+
+func _encoder(b: Dictionary) -> bool:
+	return apc and b.kind == "cc" and Leds.ring(int(b.num))
 
 
 func _devices(names: PackedStringArray) -> void:
