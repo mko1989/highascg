@@ -1,9 +1,9 @@
 extends Node
 ## WO-891 — two operator monitors: moves workspace tabs between the main window's strip and the second operator window
-## (app/second_window.gd). A movable tab carries a strip button (arrow + "2"); pressing it moves THAT tab instance there —
-## same node, so its state, signals and Inspector pages (InspectorPanel.current, the main window's) stay as they were —
-## and it is gone from the main strip. In the second window the button (arrow + "1") sends it back; closing the window
-## sends all back. Which tabs live there, the screen pick and the plain window's rect persist in ui.cfg [second_window].
+## (app/second_window.gd). One button in the top-right corner of the main workspace (arrow + "2", owner 31.10: shown only
+## while the current tab can move) moves THAT tab instance there — same node, so its state, signals and Inspector pages
+## (InspectorPanel.current, the main window's) stay as they were — and it is gone from the main strip. The second
+## window's corner button (arrow + "1") sends its current tab back; closing the window sends all back. Which tabs live there, the screen pick and the plain window's rect persist in ui.cfg [second_window].
 ## A tab is hidden before it leaves its strip and shown once it is in the other one, so views that read a video surface
 ## only while visible (WO-617) let go and take it again; tabs' teardown runs at PREDELETE, not _exit_tree (a move leaves
 ## the tree and enters it again).
@@ -34,6 +34,8 @@ var _screen := -1  # the operator's screen pick (ui.cfg), -1 automatic
 var _sig := ""
 var _save_t: Timer
 var _poll_t: Timer
+var _main_btn: Button  # the main workspace's corner: send the current tab to the second monitor
+var _win_btn: Button  # the second window's corner: send its current tab back
 
 
 func _ready() -> void:
@@ -52,7 +54,11 @@ func setup(tabs: TabContainer) -> void:
 	main_tabs = tabs
 	for c in tabs.get_children():
 		pages[str(c.name)] = c
-	tabs.tab_button_pressed.connect(func(i: int) -> void: move_to_second(str(tabs.get_tab_control(i).name)))
+	_main_btn = _corner(tabs, "send_to_2", "Send this tab to the second operator monitor", func() -> void:
+		var c := tabs.get_current_tab_control()
+		if c != null:
+			move_to_second(str(c.name)))
+	tabs.tab_changed.connect(func(_i: int) -> void: _refresh_buttons())
 	_refresh_buttons()
 
 
@@ -140,13 +146,25 @@ func _move(p: Control, to: TabContainer, pick: bool) -> void:
 	moved.emit(p, to != main_tabs)
 
 
-## The strip buttons: arrow + "2" on every movable main tab, arrow + "1" on every tab of the second window.
+## The corner buttons follow the current tab: arrow + "2" while the main window shows a movable tab, arrow + "1" while
+## the second window shows any.
 func _refresh_buttons() -> void:
-	for i in main_tabs.get_tab_count():
-		main_tabs.set_tab_button_icon(i, UiIcons.texture("send_to_2", ICON_PX) if M.movable(str(main_tabs.get_tab_control(i).name)) else null)
+	var c := main_tabs.get_current_tab_control()
+	_main_btn.visible = c != null and M.movable(str(c.name))
 	if win != null:
-		for i in win.tabs.get_tab_count():
-			win.tabs.set_tab_button_icon(i, UiIcons.texture("send_to_1", ICON_PX))
+		_win_btn.visible = win.tabs.get_current_tab_control() != null
+
+
+## An icon button over the right end of a tab container's strip — a child of its TabBar (spans the full width): a child
+## of the container itself would count as a tab, and its visibility would switch tabs.
+static func _corner(tc: TabContainer, icon: String, tip: String, on_press: Callable) -> Button:
+	var b := UiIcons.button(icon, tip, ICON_PX)
+	b.flat = true
+	b.pressed.connect(on_press)
+	tc.get_tab_bar().add_child(b)
+	b.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	b.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	return b
 
 
 func _open_window() -> void:
@@ -154,6 +172,11 @@ func _open_window() -> void:
 		return
 	win = SecondWindow.new()
 	win.send_back.connect(func(p: Control) -> void: move_to_main(str(p.name)))
+	_win_btn = _corner(win.tabs, "send_to_1", "Send this tab back to the main operator monitor", func() -> void:
+		var c := win.tabs.get_current_tab_control()
+		if c != null:
+			win.send_back.emit(c))
+	win.tabs.tab_changed.connect(func(_i: int) -> void: _refresh_buttons())
 	win.close_requested.connect(close_window)
 	win.menu_opening.connect(_fill_menu)
 	win.menu_chosen.connect(_on_menu)

@@ -102,6 +102,23 @@
     kept, close returns every tab, restore works from ui.cfg, Multiview never moves, and the menu rows are correct.
   - `tests/test_source_lists.gd` is repointed to `show_tab(tab_node("Visuals"))`.
 
+## Follow-up (owner 31.10): one corner button instead of per-tab strip buttons
+
+Owner: "the send to second monitor should be in the top right corner of the whole main center space. one button per
+tab, only visible when inside that tab, not always."
+- `app/tab_undock.gd` — the per-tab `set_tab_button_icon` buttons are gone. `_corner()` puts one flat icon button at the
+  top-right of a TabContainer's strip; it is a child of the container's TabBar (which spans the full width): as a child of
+  the TabContainer itself — even an internal one — its visibility toggling re-ran `tab_changed` → `_refresh_buttons`
+  in an endless loop (the first try, caught by `--check`). The main window's arrow-2 sends the current tab and shows only
+  while the current tab can move (hidden on Multiview); the second window's arrow-1 sends its current tab back.
+- `app/second_window.gd` — the strip's `tab_button_pressed` hook removed (the corner button emits `send_back`).
+- `tests/test_tab_undock.gd` — asserts no strip icons, corner visibility per tab (Multiview hidden), the corner is not a
+  tab, and both buttons move the current tab.
+- Verified: Godot suite — `test_tab_undock` green (the only failures in that run were WO-896's in-progress
+  `test_visuals_camera`); `--check` boot OK; a probe client on a private Xvfb `:95` (isolated XDG_DATA_HOME) shows the
+  arrow at the top-right of the centre workspace on the Visuals tab:
+  `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/corner95.png`.
+
 ## What was verified
 
 - `./run-client.sh --check` passed after every edit. `./run-client.sh --test` reports **24245 passed, 0 failed**.

@@ -1,8 +1,8 @@
 extends Window
 ## WO-891 — the second operator window (owner 31.10: "a secondary gui for the secondary monitor … empty gray at first
 ## with only the logo title in top left"). A native OS window (force_native: the root embeds its dialogs) holding its
-## own tab strip; app/tab_undock.gd moves workspace tabs into it and back. Each tab's strip button (arrow + "1") sends
-## it back; the monitor button picks the screen or closes the window, and closing returns every tab.
+## own tab strip; app/tab_undock.gd moves workspace tabs into it and back. Its corner button (arrow + "1", app/tab_undock.gd)
+## sends the current tab back; the monitor button picks the screen or closes the window, and closing returns every tab.
 ## While the main window is locked (WO-838) a cover hides this one and swallows its input.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -68,7 +68,6 @@ func _build() -> void:
 	col.add_child(_header())
 	tabs = TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tabs.tab_button_pressed.connect(func(i: int) -> void: send_back.emit(tabs.get_tab_control(i)))
 	col.add_child(tabs)
 	var keys := _Keys.new()
 	keys.key.connect(key_unhandled.emit)
