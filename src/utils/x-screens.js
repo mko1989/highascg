@@ -176,14 +176,6 @@ function screenOfOutput(output, screens = installedScreens()) {
 	return s ? { display: s.display, x: s.x, y: s.y } : screens.length ? { display: screens[0].display, x: screens[0].x, y: screens[0].y } : null
 }
 
-/**
- * Can this output carry the operator GUI? Under the two-screen layout only screen 0's outputs can (the GUI and the
- * pointer never reach :0.1); with one X screen any output can.
- */
-function isOperatorPickable(output, screens = installedScreens()) {
-	return screens.length < 2 || screens[0].outputs.includes(String(output || ''))
-}
-
 const OUT_LINE = /^(\S+) (connected|disconnected)( primary)?( (\d+)x(\d+)\+(-?\d+)\+(-?\d+))?/
 
 /** `xrandr` text → { header, blocks: [{ name, connected, lines }] } */
@@ -271,7 +263,6 @@ module.exports = {
 	buildXorgScreensConf,
 	installedScreens,
 	screenOfOutput,
-	isOperatorPickable,
 	mergeScreensXrandrText,
 	nvidiaBusId,
 	stagedConfPath,

@@ -198,9 +198,7 @@ function planDestinationCables(config, lit, opId) {
  * PURE. The output a timeout settles on: the saved operator jack when it is lit, else the first lit
  * jack that no destination cable keeps, else the first lit jack.
  */
-function defaultOperator(config, allLit, flagPort) {
-	const { isOperatorPickable } = require('../utils/x-screens') // WO-906: never a playout X screen output
-	const lit = allLit.filter((p) => isOperatorPickable(p.name))
+function defaultOperator(config, lit, flagPort) {
 	const saved = lit.find((p) => p.port === flagPort)
 	if (saved) return saved
 	const opSrc = operatorSourceId(config)
@@ -278,9 +276,15 @@ function liveDeps(deps) {
 			(async (ctx) => {
 				const w = await require('../api/routes-caspar-config').writeCasparConfigToDisk(ctx)
 				if (!w.ok) throw new Error(w.error || 'casparcg.config write failed')
+				// WO-906: the playout X screen the answer implies (nodm restart when it changed), then Caspar's display
+				await require('../utils/x-screens-sync').settleAfterBootAnswer(ctx, { log: ctx?.log })
 				await require('../utils/os-config-xrandr-apply').applyX11Layout(ctx.config, { live: true, persist: true })
+				require('../utils/caspar-gl-sync-env').writeCasparGlSyncEnvFile({ config: ctx.config, log: ctx?.log })
 				return { status: 200 }
 			}),
+		/** WO-906: one X screen while the question is open (every screen gets a prompt); true = it was two. */
+		dropScreens: deps.dropScreens || ((log) => require('../utils/x-screens-sync').dropForBootQuestion({ log })),
+		closeScreens: deps.closeScreens || (() => require('../utils/x-screens-sync').closeBootQuestion()),
 		/** Caspar is up: lay X out per the (new) plan; its consumers move with the full apply when cables changed. */
 		relayout:
 			deps.relayout ||
@@ -357,12 +361,11 @@ async function resolve(ctx, pick, deps = {}) {
 	const lit = litPorts(d.gpuMap(config))
 	const flagPort = d.flagPort(config)
 	const how = name ? 'clicked' : HOW_DEFAULT[pick?.how] || 'timeout'
-	if (name && !(deps.isOperatorPickable || require('../utils/x-screens').isOperatorPickable)(name))
-		return { ok: false, status: 409, error: `${name} is on the playout X screen (WO-906)` }
 	const op = name ? lit.find((p) => p.name === name) : defaultOperator(config, lit, flagPort)
 	if (!op && how === 'headless') {
 		d.store.set(STATE_KEY, { bootId: id, name: null, port: null, how, at: new Date().toISOString() })
 		ctx?.log?.('info', '[Boot screens] run headless (no lit GPU jack)')
+		await d.closeScreens()
 		d.openGate(id, (level, msg) => ctx?.log?.(level, msg))
 		return { ok: true, status: 200, name: null, port: null, how }
 	}
@@ -399,6 +402,8 @@ async function resolve(ctx, pick, deps = {}) {
 	// Held = run.sh is still waiting: no gate for this boot AND no Caspar on AMCP (it may have started on its own backstop).
 	const held = !d.gateOpen(id) && ctx?._casparStatus?.connected !== true
 	const log = (level, msg) => ctx?.log?.(level, msg)
+	// WO-906: Caspar already up on the one boot-question screen → the full apply below re-splits X (+ nodm, Caspar)
+	const resplit = !held && (await d.closeScreens())
 	// X is laid out per the plan BEFORE the answer goes back (the client then moves onto the operator screen by name)
 	// and before Caspar is released — even when nothing moved, the spread in prepare() may not match the plan.
 	try {
@@ -408,7 +413,7 @@ async function resolve(ctx, pick, deps = {}) {
 		log('warn', `[Boot screens] ${held ? 'pre-start write' : 'layout'} failed: ${e?.message || e}`)
 	}
 	d.openGate(id, log)
-	if (changed && !held) {
+	if ((changed || resplit) && !held) {
 		// Caspar is already up with the old cables: the full apply moves its screen consumers (restart).
 		Promise.resolve()
 			.then(() => d.apply(ctx))
@@ -423,7 +428,7 @@ async function resolve(ctx, pick, deps = {}) {
 		how,
 		moves: plan.moves,
 		unplaced: plan.unplaced,
-		applying: changed && !held,
+		applying: (changed || resplit) && !held,
 		casparHeld: held,
 	}
 }
@@ -442,6 +447,7 @@ function startBootScreenGate(ctx, deps = {}) {
 	} catch (e) {
 		st = { pending: false, reason: `error: ${e?.message || e}` }
 	}
+	if (st.launcher || st.pending) d.dropScreens(log).catch((e) => log('warn', `[Boot screens] ${e?.message || e}`))
 	if (st.launcher) {
 		log('info', '[Boot screens] start-up launcher on every screen (startup.mode ask); Caspar held until it is answered')
 		d.holdGate(d.bootId(), log)

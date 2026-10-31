@@ -95,18 +95,39 @@ describe('WO-906 playout X screen', () => {
 		assert.throws(() => xs.buildXorgScreensConf(xs.splitScreens(LAYOUT), { busId: 'PCI:1:0:0"; x' }), /invalid BusID/)
 	})
 
-	it('the operator screen can never be a playout X screen output (GUI picker, boot answer, boot default)', async () => {
-		assert.deepEqual(['DP-4', 'DP-6', 'DP-0'].map((n) => xs.isOperatorPickable(n)), [true, true, false])
-		assert.equal(xs.isOperatorPickable('DP-0', []), true, 'one X screen: any output')
-		const { handlePost } = require('../../src/api/routes-operator-screen')
-		const listOutputs = () => [{ name: 'DP-0', port: 1, x: 3840, y: 0, width: 3840, height: 1792 }]
-		const r = handlePost(JSON.stringify({ name: 'DP-0' }), { config: {} }, { listOutputs, confine: { isActive: () => false } })
-		assert.equal(r.status, 409)
+	it('the switch is machine-local: a saved project never carries it (so a project load never sets / clears it)', () => {
+		const { buildHardwareConfigFromConfig } = require('../../src/engine/project-hardware-config')
+		const hc = buildHardwareConfigFromConfig({ casparServer: { [xs.FLAG_KEY]: true, operator_gui_first: true, screen_count: 1 } }, { get: () => null })
+		assert.equal(xs.FLAG_KEY in hc.casparServer, false)
+		assert.equal('operator_gui_first' in hc.casparServer, false)
+		assert.equal(hc.casparServer.screen_count, 1)
+	})
+
+	it('boot question: any screen can become the operator (DP-0 too) — one X screen while it is open, the split after', async () => {
 		const boot = require('../../src/system/boot-screen-assignment')
-		const deps = { bootId: () => 'b1', store: { get: () => null, set: () => {} }, invalidate: () => {}, gpuMap: () => ({}) }
-		assert.equal((await boot.resolve({ config: {} }, { name: 'DP-0' }, deps)).status, 409)
 		const lit = [{ id: 'gpu_p0', name: 'DP-0', port: 1 }, { id: 'gpu_p2', name: 'DP-4', port: 3 }]
-		assert.equal(boot.defaultOperator({}, lit, 1).name, 'DP-4', 'a saved flag on the playout jack falls back to screen 0')
+		assert.equal(boot.defaultOperator({}, lit, 1).name, 'DP-0', 'no guard: the saved flag on the playout jack stands')
+		const xss = require('../../src/utils/x-screens-sync')
+		const calls = []
+		const run = async (cmd, args) => calls.push(args.slice(2).join(' '))
+		const restart = async () => calls.push('nodm')
+		const installed = fs.readFileSync(CONF, 'utf8')
+		assert.deepEqual(await xss.dropForBootQuestion({ run, restart }), { dropped: true })
+		assert.deepEqual(calls, ['off', 'nodm'])
+		assert.equal(xss.bootQuestion.open, true)
+		fs.renameSync(CONF, `${CONF}.boot`) // what the helper's off does
+		const on = { config: { casparServer: { [xs.FLAG_KEY]: true } } }
+		const r = await xss.syncPlayoutXScreens(on, { run })
+		assert.deepEqual([r.ok, r.changed, calls.length], [true, false, 2], 'an Apply during the question keeps one screen')
+		assert.equal(await xss.closeBootQuestion(), true)
+		assert.equal(xss.bootQuestion.open, false)
+		assert.equal(await xss.closeBootQuestion(), false, 'closed once')
+		fs.renameSync(`${CONF}.boot`, CONF)
+		assert.equal(fs.readFileSync(CONF, 'utf8'), installed)
+		fs.writeFileSync(CONF, '# one\n')
+		assert.deepEqual(await xss.dropForBootQuestion({ run, restart }), { dropped: false }, 'one screen: nothing to drop')
+		assert.equal(xss.bootQuestion.open, false)
+		fs.writeFileSync(CONF, installed)
 	})
 
 	it('both screens\' xrandr merge onto the plan canvas: positions + origin, one primary, union canvas, no ghost rows', () => {

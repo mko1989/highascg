@@ -1,7 +1,7 @@
 # WO-906 — Playout outputs on a second X screen (:0.1) of the same X server, operator heads alone on :0.0
 
 **Area:** devices-config, os-iso, mapping
-**Status: DONE (31.10.26, generator + switch built; live on the box: 2 X screens, Caspar on :0.1 at 50/s, pointer can't cross, misactions drop 0, off/on rollback proven; smokes 8/8 + full offline suite. Open: ISO sudoers wiring, see §6)**
+**Status: DONE (31.10.26, generator + switch built; live on the box: 2 X screens, Caspar on :0.1 at 50/s, pointer can't cross, misactions drop 0, off/on rollback proven; boot launcher on every screen §7; perf A/B §8 not positive → per-box switch, not the factory default. Open: ISO sudoers wiring, §6)**
 
 ## Owner request (31.10.26)
 "would it be possible to move the screen consumer outputs to another x display like display:1 so they are separate
@@ -132,9 +132,8 @@ user misaction.") — §6.
   PRV / multiview / slice window positions (DP-0 at canvas 3840 → `<x>0</x>`); `caspar-gl-sync-env.js` writes
   `CASPAR_DISPLAY=:0.1` only while the flag is on AND the conf is installed; `run.sh` falls back to the base display
   when `xrandr --display $CASPAR_DISPLAY` fails (a conf removed behind its back cannot leave Caspar windowless).
-- **Operator screen guard:** `routes-operator-screen.js` (409) and `boot-screen-assignment.js` (`resolve` 409,
-  `defaultOperator` skips screen 1) — a GUI pick, a boot answer or a stale flag can never put the operator on DP-0. The
-  Godot boot prompts match screens by position and only see screen 0, so they never offer DP-0 either.
+- **Operator screen guard (240512e7) — removed, see §7:** it refused DP-0 as the operator screen everywhere; the owner
+  needs "Start operator here" on every screen at boot (a new show, a new setup).
 - **The switch:** `GET/POST /api/system/playout-screen` (`src/api/routes-playout-screen.js`): POST `{enable}` first
   writes a backup (`~/.highascg/backup/wo906-<ts>/`: casparcg.config, caspar-env, casparServer), sets / deletes the flag,
   then the standard forced full apply. Shell: `scripts/runtime/playout-screen.sh status | on | off | off --emergency`.
@@ -166,7 +165,7 @@ user misaction.") — §6.
   shm 49–50/s, **drop 0**.
 - **Node restart:** watchdog "xrandr layout matches config", no re-apply, Caspar pid unchanged. **Plain Apply:**
   `no_changes`, nodm pid unchanged, Caspar not restarted.
-- **Operator API:** GET lists DP-0 with `caspar: true`; POST `{name: "DP-0"}` against the installed conf → 409.
+- **Operator API:** GET lists DP-0 with `caspar: true` (the 409 guard of that commit is gone, §7).
 - **Rollback proven:** `off` (16 s) → 1 screen 7680x1792, Caspar `DISPLAY=:0`, 50/s (4 drops at start, then flat);
   `on` again (8.6 s) → 2 screens, Caspar `:0.1`, 50/s, drop 1 at start then flat, GUI back, ring on DP-0. Left ON
   (owner's wish). Backups: `~/.highascg/backup/wo906-2026-10-31T17-03-18-240Z` (before the first on) and one per switch.
@@ -178,3 +177,63 @@ user misaction.") — §6.
   helper's install hint). No GUI toggle (API + script only).
 - WO-258 `browser_display` (unused on this box) computes its off-screen region on the merged canvas; under two screens it
   would need screen 0's root.
+
+## 7. Boot question on every screen; machine-local switch (31.10.26, owner: "This guard can't exist in it's current state. Next boot might be a new show with new setup etc etc so I need a start gui here at boot.")
+### Investigation
+- The §6 guard made DP-0 un-pickable, and with two X screens the Godot client (on :0.0) cannot open a prompt on :0.1 nor
+  can the pointer reach it — so the WO-645 launcher could never offer the playout screen.
+- `config/device_graph.json` / `caspar_server.json` are what a boot answer rewrites (`applyOperatorMonitorChoice` +
+  `planDestinationCables`), and the split follows the cables — so the split has to be recomputed AFTER the answer anyway.
+- `buildHardwareConfigFromConfig` (`project-hardware-config.js`) stripped only `operator_gui_first`: a project saved with
+  the switch on carried `playout_x_screen` and its load (merge) would set it on another box.
+### What was done
+- Guard removed (`routes-operator-screen.js`, `boot-screen-assignment.js` resolve + `defaultOperator`, `x-screens.js`).
+- `x-screens-sync.js`: `dropForBootQuestion` — node start-up with a boot question pending (launcher or WO-638 ask) and
+  two screens installed → helper `off` + nodm restart + xrandr cache invalidated → the question runs on ONE X screen,
+  exactly the pre-WO-906 flow (prompts on every head, `prepare` spreads stacked outputs). While it is open a full Apply
+  does not re-install the split. `settleAfterBootAnswer` (in the held `prestart`): after the answer's cables are saved,
+  install the split they imply (nodm restart when it changed), lay out xrandr per screen, write caspar-env, then release
+  Caspar. Caspar already up (backstop / node restart mid-question) → `closeBootQuestion` and the full apply re-splits.
+- `restartX` invalidates the 60 s xrandr cache: without it the prompts were labelled from the two-screen positions
+  (DP-0's prompt said "DP-6") and `prepare` missed X's fresh overlap (DP-0 and DP-6 both at +1920).
+- `MACHINE_LOCAL_CASPAR_KEYS = ['operator_gui_first', 'playout_x_screen']` in `project-hardware-config.js`.
+### Verified (box, simulated boots: boot record cleared while node was down, gate file emptied, Caspar restarted)
+- Run 1: "[X screens] boot question: playout X screen off …" → 1 X screen, Caspar held; launcher on all three heads but
+  mislabelled (cache) → fixed. Clicked DP-4: "two-screen layout installed … nodm restart", "Caspar start released",
+  Caspar `DISPLAY=:0.1`, 2 screens. (The answer also dropped the DP-6 operator_gui_2 cable — WO-638's one-operator
+  re-cabling, unchanged by this WO; restored from the backup.)
+- Run 2 (with the cache fix): "stacked outputs laid out left to right: DP-0, DP-4, DP-6"; prompts "Screen 1 — DP-0",
+  "DP-4 (operator screen now)", "DP-6", each with Start operator here. **Clicked DP-0**: cables gpu_p0→gpu_p2, conf
+  `:0.0 = DP-0`, `:0.1 = DP-4`, GUI on DP-0, Caspar `:0.1` with `__GL_SYNC_DISPLAY_DEVICE=DP-4`, 50/s. Then the owner's
+  setup restored (config backup + forced Apply): `:0.0` DP-4,DP-6 / `:0.1` DP-0, casparcg.config identical, 0 drops.
+- `smoke-wo906-playout-x-screen` 9/9 (boot drop / close / Apply held during the question; machine-local strip);
+  wo638 / wo645 / wo599 smokes pass.
+
+## 8. Performance: one X screen vs two (31.10.26, owner: "Run performance tests … If the tests are positive you can permanently add this as the default")
+**Method** (scratchpad `perf/sample.py` + `perf/run.sh`): the same four 40 s scenarios per mode, two rounds, alternating
+two → one → two → one (switch via `playout-screen.sh`, 40 s settle). Sampler: ch2 screen consumer presented / dropped and
+the visuals shm frames from OSC :6250 (read-only), the interval between presented-counter updates (pacing proxy), CPU of
+casparcg / Xorg / godot from /proc, GPU util from nvidia-smi. Scenarios: idle (Live tab); previs (Godot's 3D Previs tab
+open, GUI GPU load); misaction (alt-tab ×10, super ×5, Escape, F11 on/off, openbox move-window); modeset (operator DP-6
+50 → 60 → 50 Hz).
+
+| scenario | one screen (r1 / r2) | two screens (r1 / r2) |
+|---|---|---|
+| idle | 50.0 / 50.0 fps, 0 / 0 drops | 50.0 / 50.1 fps, 0 / 0 drops |
+| previs | 50.0 / 50.0, 0 / 0 | 50.0 / 50.0, 0 / 0 |
+| misaction | 50.0 / 50.0, 0 / 0 | 50.0 / 50.0, 0 / 0 |
+| modeset (2 changes) | **3 / 2 drops** (≈570 ms stall, caught up) | **35 / 33 drops** (≈425 ms stall, frames lost) |
+| Caspar CPU idle / previs / modeset | 151–156 / 117–122 / 108 % | 142–232 / 165–208 / 178–180 % |
+
+- Presentation is identical in normal operation: 50 fps, 0 drops in both modes for idle, GUI GPU load and misactions
+  (one screen is already immune to these since WO-888, so the misaction test cannot show the isolation benefit).
+- **Operator mode change: ~10× more dropped frames on two screens** — §5's finding reproduced with the final code.
+- **CPU:** on two screens one unnamed Caspar thread spun at ~80 % (user time, wchan 0) in some runs — gone on one
+  screen. Caspar total up to +90 % in those runs. In the same runs the OSC presented-counter updates arrived paired (+2
+  per message, 40 ms gaps) while shm still delivered 50 new frames/s (no repeats/skips) → an OSC send coalescing
+  artifact under that CPU load, not output judder; output pacing unaffected (0 drops).
+- **Verdict: not positive** (equal at best, worse on modesets and CPU) → NOT made the factory default
+  (`factory-starter.js` untouched). The box stays ON per the owner's choice; it is a per-box switch.
+- Follow-up candidates: the spinning thread (NVIDIA swap wait on screen 1 — try `__GL_YIELD=USLEEP` for Caspar),
+  then re-run `perf/run.sh` before revisiting the default.
+
