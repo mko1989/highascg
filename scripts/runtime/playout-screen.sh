@@ -20,7 +20,7 @@ import json, sys
 d = json.load(sys.stdin)
 print("switch:", "on" if d.get("enabled") else "off")
 for s in d.get("installed") or []:
-    print(f"X screen {s[\"n\"]} {s[\"display\"]} origin {s[\"x\"]},{s[\"y\"]}: {\",\".join(s[\"outputs\"])}")
+    print("X screen %s %s origin %s,%s: %s" % (s["n"], s["display"], s["x"], s["y"], ",".join(s["outputs"])))
 if not d.get("installed"):
     print("X: one screen")
 if d.get("warning"):

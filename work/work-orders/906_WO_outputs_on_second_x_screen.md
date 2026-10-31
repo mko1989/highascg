@@ -1,7 +1,7 @@
 # WO-906 — Playout outputs on a second X screen (:0.1) of the same X server, operator heads alone on :0.0
 
 **Area:** devices-config, os-iso, mapping
-**Status: DONE (31.10.26, generator + switch built; live on the box: 2 X screens, Caspar on :0.1 at 50/s, pointer can't cross, misactions drop 0, off/on rollback proven; boot launcher on every screen §7; perf A/B §8 not positive → per-box switch, not the factory default. Open: ISO sudoers wiring, §6)**
+**Status: DONE (31.10.26; switch built + proven, boot launcher on every screen §7; perf A/B §8 not positive → owner: "the two screen is not worth it. Revert to the standard one x screen" — box back on ONE X screen 31.10 19:29, switch off; code kept as an off-by-default per-box switch, §9)**
 
 ## Owner request (31.10.26)
 "would it be possible to move the screen consumer outputs to another x display like display:1 so they are separate
@@ -236,4 +236,12 @@ open, GUI GPU load); misaction (alt-tab ×10, super ×5, Escape, F11 on/off, ope
   (`factory-starter.js` untouched). The box stays ON per the owner's choice; it is a per-box switch.
 - Follow-up candidates: the spinning thread (NVIDIA swap wait on screen 1 — try `__GL_YIELD=USLEEP` for Caspar),
   then re-run `perf/run.sh` before revisiting the default.
+
+## 9. Reverted to one X screen (31.10.26 19:29, owner: "Seems the two screen is not worth it. Revert to the standard one x screen for all outputs")
+- `scripts/runtime/playout-screen.sh off`: flag removed, conf moved to `98-highascg-screens.conf.prev`, nodm + Caspar
+  restarted. Verified: `xdpyinfo` 1 screen 7680x1792 (DP-4 0, DP-6 1920, DP-0 3840); Caspar `DISPLAY=:0`,
+  `__GL_SYNC_DISPLAY_DEVICE=DP-0`; casparcg.config `<x>3840</x>` again; GUI up; OSC 50/s, 2 drops at the Caspar
+  restart, then flat.
+- The code stays, inert while the switch is off (no conf installed → every per-screen path takes the one-screen branch;
+  default off, not in factory-starter). `playout-screen.sh status` fixed (an f-string with escaped quotes did not parse).
 
