@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 704,
+	"count": 701,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -395,7 +395,6 @@
 		"src/config/screen-consumer-port-resolve.js: PHYSICAL_PORT_CONSUMER_FIELDS",
 		"src/config/screen-consumer-port-resolve.js: WINDOW_CHROME_FIELDS",
 		"src/config/screen-consumer-port-resolve.js: resolveGpuOutConnectorFromSource",
-		"src/config/server-info-config.js: resolutionFromVideoModeString",
 		"src/engine/caspar-channel-clear.js: isMultiviewCasparChannel",
 		"src/engine/cg-routing.js: TEMPLATE_CG_OVERLAY_LAYER_MAX",
 		"src/engine/cg-routing.js: isSceneTemplateCgName",
@@ -478,7 +477,6 @@
 		"src/fixtures/rig-infer.js: ROW_SPREAD_M",
 		"src/fixtures/rig-infer.js: predict",
 		"src/fixtures/rig-infer.js: rigFit",
-		"src/lighting-console/actions.js: NUM_RE",
 		"src/lighting-console/console-store.js: consolesFile",
 		"src/media/caspar-cls-id.js: normalizeCasparMediaPath",
 		"src/media/cg-look-thumb-cache.js: RENDER_PROFILE_VERSION",
@@ -526,7 +524,6 @@
 		"src/preview/compose-preview-ffmpeg-args.js: COMPOSE_PREVIEW_FPS_MAX",
 		"src/preview/compose-preview-ffmpeg-args.js: COMPOSE_PREVIEW_FPS_MIN",
 		"src/preview/compose-preview-ffmpeg-args.js: buildCompanionThumbScaleFilter",
-		"src/preview/compose-preview-mode.js: collectComposePreviewChannelsFromMap",
 		"src/previs/routes-models.js: getStorageRoot",
 		"src/ptz/ptz-service.js: DEADBAND_DEG",
 		"src/ptz/ptz-service.js: MIN_INTERVAL_MS",

@@ -47,4 +47,4 @@ function startCasparCefHealthWatch(ctx, { file = healthFile(), pollMs = POLL_MS 
 	return () => clearInterval(t)
 }
 
-module.exports = { startCasparCefHealthWatch, readCefFailed, healthFile }
+module.exports = { startCasparCefHealthWatch, readCefFailed }
