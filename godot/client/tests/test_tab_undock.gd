@@ -116,15 +116,15 @@ func test_move_to_second_and_back() -> void:
 	var tabs: TabContainer = r.tabs
 	var u: Undock = r.u
 	var previs: Control = u.page("Previs")
+	tabs.current_tab = tabs.get_tab_idx_from_control(u.page("Multiview"))
+	await t.process_frame
+	t.ok(not u._main_btn.visible, "the corner arrow-2 is hidden on Multiview (it never moves)")
 	tabs.current_tab = tabs.get_tab_idx_from_control(previs)
 	await t.process_frame
 	r.probe.flips.clear()
-	t.ok(u._main_btn.visible, "the corner arrow-2 shows on a movable tab")
+	t.ok(u._main_btn.visible, "it shows on a movable tab")
 	t.eq(tabs.get_tab_button_icon(0), null, "no per-tab strip buttons (owner 31.10: one corner button)")
 	t.eq(tabs.get_tab_count(), tabs.get_children().size(), "the corner button is not a tab")
-	tabs.current_tab = tabs.get_tab_idx_from_control(u.page("Multiview"))
-	t.ok(not u._main_btn.visible, "hidden on Multiview (it never moves)")
-	tabs.current_tab = tabs.get_tab_idx_from_control(previs)
 	u.set_title(u.page("Devices"), "Devices (1)")
 	u._main_btn.pressed.emit()  # the current tab (Previs)
 	t.ok(u.win != null and u.win is SecondWindow, "the second window opened")
