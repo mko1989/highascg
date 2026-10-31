@@ -216,3 +216,31 @@ func test_on_air_marker() -> void:
 	await tab._resume_send()
 	t.eq(tab.sending, {}, "no marker: nothing resumes")
 	tab.free()
+
+
+class _PlayApi:
+	var posts: Array = []
+
+	func post_json(path: String, body: Dictionary) -> Dictionary:
+		posts.append([path, body])
+		return {"ok": true}
+
+
+# WO-914: the AMCP link coming back PLAYs the ring again while sending; not on a first connect, not when not sending.
+func test_caspar_reconnect_resends() -> void:
+	var tab: Control = preload("res://features/visuals/visuals_tab.gd").new()
+	tab._ready()
+	var api := _PlayApi.new()
+	tab.replay_api = api
+	await tab.caspar_link(true)
+	t.eq(api.posts.size(), 0, "already up: nothing")
+	tab.caspar_link(false)
+	await tab.caspar_link(true)
+	t.eq(api.posts.size(), 0, "not sending: nothing")
+	tab.sending = {"channel": 2, "layer": 1}
+	tab.caspar_link(false)
+	await tab.caspar_link(true)
+	t.eq(api.posts, [["/api/play", {"channel": 2, "layer": 1, "clip": "shm://" + tab.ring_name, "loop": false}]], "back: PLAY again")
+	await tab.caspar_link(true)
+	t.eq(api.posts.size(), 1, "still up: no repeat")
+	tab.free()

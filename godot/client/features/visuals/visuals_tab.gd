@@ -135,9 +135,11 @@ func _ready() -> void:
 			Sync.observe(_sync_state, d, _buses, _audio_at))
 	if _g("Store"):
 		_g("Store").project_changed.connect(func(_p: Dictionary) -> void: _load())
-		_g("Store").changed.connect(func(path: String, _v: Variant) -> void:
+		_g("Store").changed.connect(func(path: String, v: Variant) -> void:
 			if path == "*" or path == "channelMap":
-				_load())
+				_load()
+			elif path == "caspar.connection" and v is Dictionary:
+				caspar_link(bool(v.get("connected", false))))
 	visibility_changed.connect(_on_shown)
 	_load()
 	_get_sensitivity.call_deferred()
@@ -462,6 +464,28 @@ func _resume_send() -> void:
 			if not sending.is_empty():
 				return
 		await get_tree().create_timer(2.0).timeout
+
+
+## WO-914: a Caspar restart (a crash, an Apply, the supervisor's CEF retry) drops the PLAY of the shm layer while this client
+## still sends, and nothing played it again: the output stayed dark until Send was toggled. When the AMCP link comes back,
+## PLAY it again after node's own restore of the looks (REPLAY_S) — the ring never stopped, Caspar takes it at once.
+const REPLAY_S := 3.0
+var _caspar_up := true
+var replay_api: Variant = null  # tests: stands in for DevicesTarget.box_api
+
+
+func caspar_link(up: bool) -> void:
+	var back := up and not _caspar_up
+	_caspar_up = up
+	if not back or sending.is_empty():
+		return
+	if is_inside_tree():
+		await get_tree().create_timer(REPLAY_S).timeout
+	if sending.is_empty() or not _caspar_up:
+		return
+	var api: Variant = replay_api if replay_api != null else _g("DevicesTarget").box_api
+	var r: Dictionary = await api.post_json("/api/play", M.play_body(int(sending.channel), int(sending.layer), ring_name))
+	print("[visuals] Caspar reconnected: Send again to %d-%d — %s" % [sending.channel, sending.layer, "ok" if r.ok else str(r)])
 
 
 func _sync_send_ui(why: String) -> void:
