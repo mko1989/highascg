@@ -1,7 +1,7 @@
 # WO-906 — Playout outputs on a second X screen (:0.1) of the same X server, operator heads alone on :0.0
 
 **Area:** devices-config, os-iso, mapping
-**Status: IN PROGRESS (31.10.26 — root helper + installer written and smoke-tested; generator, DISPLAY plumbing and box test still open)**
+**Status: IN PROGRESS (31.10.26 — helper installed by the owner; run.sh `CASPAR_DISPLAY` plumbing in; box experiment done and rolled back (§5): two screens work, but an operator modeset still stalls playout — generator waits for the owner's go)**
 
 ## Owner request (31.10.26)
 "would it be possible to move the screen consumer outputs to another x display like display:1 so they are separate
@@ -75,3 +75,30 @@ screen. it was already possible through mapping nodes."
   layout validates / installs / turns off / restores in a temp dir (`HIGHASCG_XORG_DIR`, ignored for root); Files, Module,
   other drivers, unknown options, a BusID with `;`, `$(id)`, an unclosed section, no layout and the default-device
   identifier all exit 2 with the installed file untouched and no temp file left; symlinks refused.
+
+## 5. Box experiment (31.10.26, 17:16–17:20, rolled back)
+Hand-written conf (scratchpad `wo906/98-highascg-screens.conf`): ServerLayout with Screen 0 "Operator" (`UseDisplayDevice`
+DP-4, DP-6; metamodes DP-4 +0+0, DP-6 +1920+0) and Screen 1 "Playout" RightOf it (DP-0 +0+0), two Device sections on
+`PCI:1:0:0` (`Screen 0` / `Screen 1`, ForceCompositionPipeline On), Xinerama 0. `helper check` OK → `install` →
+`sudo systemctl restart nodm`.
+- **X:** `xdpyinfo` 2 screens. `xrandr -d :0.0` = DP-4 + DP-6 (3840x1080), `-d :0.1` = DP-0 3840x1792@50 (its EDID mode —
+  the NovaStar relit at once). No (EE) in Xorg.0.log. The session autostart brought the GUI back on :0.0 by itself.
+- **Caspar:** `run.sh` now exports `DISPLAY=${CASPAR_DISPLAY:-<unit DISPLAY>}` per launch from caspar-env (this WO); with
+  `CASPAR_DISPLAY=:0.1` in caspar-env and the screen consumer at `<x>0</x>` the process ran with `DISPLAY=:0.1`,
+  `__GL_SYNC_DISPLAY_DEVICE=DP-0`; window "Screen consumer [2|3840x1792]" 3840x1792+0+0 on screen 1; OSC presented 50/s,
+  drop 1; the visuals ring back at 50/s (WO-914). Grabs: `wo906/screen0.png` (the GUI alone), `wo906/screen1.png` (Dioda).
+- **Alt-tab ×6 on :0.0:** 50/s throughout, drop flat (38 → 38). Same as single-screen since WO-888.
+- **Operator modeset** (DP-6 50 → 60 → 50 Hz, `xrandr -d :0.0`): **each one cost the playout ~18 dropped frames**
+  (pres/s 32 / 31, drop 1 → 20 → 38, no catch-up). Same op on the single screen after rollback: a stall of the same length
+  (pres/s 37 / 27) but caught up (62 / 72 in the next second), drop 1 → 3. An NVIDIA modeset stalls the GPU's whole
+  display engine whichever X screen it is on, so a second X screen does NOT isolate playout from operator mode changes;
+  it only turns the late frames into dropped ones.
+- **What a second screen does give:** windows can never cross (the Caspar window cannot bury the GUI after a NovaStar
+  replug, the GUI cannot cover DP-0), per-screen xrandr, and the GL sync head is the only head of its screen.
+- **Rollback:** `helper off` (file kept as `.prev`), caspar-env and casparcg.config restored from the backups (config
+  byte-identical), nodm + Caspar restarted: 1 screen, Caspar `DISPLAY=:0`, 50/s.
+- **Why not left on:** until the generator exists an Apply rewrites `<x>3840</x>` (off-screen on :0.1) and node's xrandr
+  verify (`os-layout-watchdog.js`, 12 re-applies at node start) would chase DP-0 on :0 — each re-apply a modeset.
+
+Remaining (owner decision, given the modeset finding): the generator (`x11.playoutScreen`), per-screen layout plan and
+xrandr verify/apply, capture paths on :0.1, the ISO sudoers line.

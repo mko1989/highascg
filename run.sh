@@ -21,6 +21,7 @@ CASPAR_LIB="${CASPAR_LIB:-$CASPAR_ROOT/lib}"
 export LD_LIBRARY_PATH="$CASPAR_LIB"
 unset LD_PRELOAD
 export DISPLAY="${DISPLAY:-:0}"
+CASPAR_BASE_DISPLAY="$DISPLAY"
 export XAUTHORITY="${XAUTHORITY:-/home/casparcg/.Xauthority}"
 
 # WO-407/WO-444: optional BOX-LOCAL caspar env (not in the repo — Syncthing peers unaffected).
@@ -31,8 +32,10 @@ export XAUTHORITY="${XAUTHORITY:-/home/casparcg/.Xauthority}"
 # reached the relaunched binary until the whole service restarted (WO-444).
 source_caspar_env() {
 	# Clear first so a line REMOVED from the file also clears the exported var.
-	unset CASPAR_GL_SYNC_DISPLAY
+	unset CASPAR_GL_SYNC_DISPLAY CASPAR_DISPLAY
 	[ -r "${HOME:-/home/casparcg}/.config/highascg/caspar-env" ] && . "${HOME:-/home/casparcg}/.config/highascg/caspar-env"
+	# WO-906: the playout X screen (x11.playoutScreen on → CASPAR_DISPLAY=:0.1); unset = the unit's DISPLAY, as before.
+	export DISPLAY="${CASPAR_DISPLAY:-$CASPAR_BASE_DISPLAY}"
 	if [ -n "${CASPAR_GL_SYNC_DISPLAY:-}" ]; then
 		export __GL_SYNC_DISPLAY_DEVICE="$CASPAR_GL_SYNC_DISPLAY"
 	else
