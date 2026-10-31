@@ -151,4 +151,21 @@ function createRegionSampler(regions, { fsImpl = fs } = {}) {
 	return { read, plan: () => plan }
 }
 
-module.exports = { MAX_SAMPLES, samplingOf, buildPlan, averageBgra, createRegionSampler }
+const peekBuf = Buffer.alloc(8)
+
+/** WO-897: a surface's latest frame seq from its header alone (0 = none / no segment) — the watcher's cheap per-poll check. */
+function peekSeq(file, { fsImpl = fs } = {}) {
+	let fd
+	try {
+		fd = fsImpl.openSync(file, 'r')
+	} catch {
+		return 0
+	}
+	try {
+		return readFully(fsImpl, fd, peekBuf, ABI.OFF_LATEST) ? Number(peekBuf.readBigUInt64LE(0) >> 8n) : 0
+	} finally {
+		fsImpl.closeSync(fd)
+	}
+}
+
+module.exports = { MAX_SAMPLES, samplingOf, buildPlan, averageBgra, createRegionSampler, peekSeq }

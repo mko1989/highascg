@@ -4,7 +4,7 @@
  * WO-616 T11 — follow engine: tracking hub markers → moving-head pan / tilt (follow-ik) → Art-Net (artdmx),
  * server-side so the rig keeps following with no client open.
  *
- *   44 Hz tick. Per fixture: its marker live → aim at (x, y, z + aim_z); stale or missing → HOLD the last aim
+ *   ≈43.5 Hz tick (23 ms; a pixel map ticks it per Caspar frame instead, WO-897). Per fixture: its marker live → aim at (x, y, z + aim_z); stale or missing → HOLD the last aim
  *   (the hub's 1 s rule); never aimed → pan / tilt centre. Unreachable inside the ranges → hold.
  *   One packet per (destination, universe) when its bytes change, else a 1 s refresh (nodes time out).
  *   Master off (`project.fixtures.output.enabled` false, the default) → nothing is transmitted; a fixture with a
@@ -39,7 +39,12 @@ const { encodeE131, boxCid } = require('./sacn')
 const { snapshotChannels, blendChannels } = require('./fixture-looks')
 const { AUTO_MARKER_ID } = require('../tracking/auto-follow')
 
+// WO-897: the engine's own clock, 23 ms ≈ 43.5 Hz (under the DMX512 line rate) — it was "44 Hz" in the comments. A pixel
+// map kicks a tick per new Caspar frame (kick()): every 50 fps frame is sampled and sent once (the 23 ms clock skipped ~6.5
+// frames/s → a 6.5 Hz judder). The clock then skips (a tick ran within TICK_MS) and only runs while no frame comes.
+// MIN_TICK_MS coalesces frames of several channels that land close together into one tick (one packet per universe).
 const TICK_MS = Math.round(1000 / 44)
+const MIN_TICK_MS = 12
 const REFRESH_MS = 1000
 const HOLD_TTL_MS = 10 * 60 * 1000
 
@@ -207,13 +212,29 @@ class FollowEngine {
 
 	start() {
 		this.stop()
-		this._timer = setInterval(() => this.tick(), TICK_MS)
+		this._timer = setInterval(() => {
+			if (!this._lastTick || this.now() - this._lastTick >= TICK_MS - 1) this.tick() // WO-897: frames drive it
+		}, TICK_MS)
 		if (typeof this._timer.unref === 'function') this._timer.unref()
 	}
 
 	stop() {
 		if (this._timer) clearInterval(this._timer)
 		this._timer = null
+		if (this._kickTimer) clearTimeout(this._kickTimer)
+		this._kickTimer = null
+	}
+
+	/** WO-897: a new Caspar frame of a mapped channel — tick now, or MIN_TICK_MS after the last tick (coalesced). */
+	kick() {
+		if (!this._timer || this._kickTimer) return
+		const wait = this._lastTick ? MIN_TICK_MS - (this.now() - this._lastTick) : 0
+		if (wait <= 0) return void this.tick()
+		this._kickTimer = setTimeout(() => {
+			this._kickTimer = null
+			if (this._timer) this.tick()
+		}, wait)
+		if (typeof this._kickTimer.unref === 'function') this._kickTimer.unref()
 	}
 
 	/** One frame: aim every fixture, then (master on) transmit changed / due universes. → packets sent. */
@@ -326,4 +347,4 @@ class FollowEngine {
 	}
 }
 
-module.exports = { FollowEngine, TICK_MS, REFRESH_MS, HOLD_TTL_MS }
+module.exports = { FollowEngine, TICK_MS, MIN_TICK_MS, REFRESH_MS, HOLD_TTL_MS }

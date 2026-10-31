@@ -4,7 +4,7 @@
  * WO-807 — region-to-fixture-pixel mapping, wired into the follow engine (follow-service.js creates it):
  *   project.pixelMappings (pixel-map-model.js) → for each Caspar channel used, a leased shm surface of its output
  *   (src/system/video-surfaces.js; role pgmN / prvN when the channel is one, so a Godot previs lease shares the
- *   consumer, else chN) → each engine tick (44 Hz) the regions of every NEW frame are averaged (pixel-map-frame.js) →
+ *   consumer, else chN) → each engine tick the regions of every NEW frame are averaged (pixel-map-frame.js) →
  *   `write(buf, fx)` puts the colours into the engine's universe buffer right after the head's own channels, so the
  *   ArtDMX / sACN packet the engine already sends carries them, under all of its rules (DMX master + universe list,
  *   visualiser, self-loop guard, WO-712 lighting duty). The map writes colour channels only: dimmer / shutter stay
@@ -15,11 +15,14 @@
  * key `pixelMapSettings`, 0 / 0 = off) after the averaging, once per tick; write() puts the smoothed value on the wire.
  * While no mapped head is on the wire and nobody read /live for WATCH_MS, ticks skip the sampling (state "idle"; the
  * lease stays, so the first frame after the DMX master opens is sampled on the next tick).
+ * WO-897: a watcher reads only the surfaces' header seq every WATCH_POLL_MS and kicks the engine (engine.kick) when a
+ * frame lands, so each frame is sampled once (the engine's own 23 ms clock skipped ~6.5 of 50 frames/s); `missed` counts
+ * frames that still went by unsampled (seq gaps).
  */
 
 const { onProjectChanged } = require('../engine/project-events')
 const { normalizeMappings, checkMapping, validateMappings, writePixel, slotsOf } = require('./pixel-map-model')
-const { createRegionSampler } = require('./pixel-map-frame')
+const { createRegionSampler, peekSeq } = require('./pixel-map-frame')
 const smoothing = require('./pixel-map-smooth')
 
 const LEASE_ID = 'wo807-pixelmap'
@@ -28,6 +31,7 @@ const HOLD_MS = 1000
 // sampling idles while no mapped head is on the wire (DMX master off, universe not listed, visualiser) unless a /live
 // reader (the Godot editor's swatches, 2 Hz) asked within WATCH_MS — 896 strips cost ~5 ms per frame on the box
 const WATCH_MS = 5000
+const WATCH_POLL_MS = 3
 
 /** Default channel map (as video-surfaces.js resolves roles): program / preview lists + the channels Caspar runs. */
 function liveChannelMap(ctx) {
@@ -70,9 +74,10 @@ function createPixelMapService(ctx, engine, deps = {}) {
 	let settings = smoothing.normalizeSettings(null) // project.pixelMapSettings
 	let stepAt = null // time of the last smoothing step (null: the next one starts fresh)
 	let leaseTimer = null
+	let pollTimer = null // WO-897: the frame watcher
 	let leasedRoles = ''
 	let lastWritten = new Map() // mapping id → [{ slot, value }]
-	const stats = { frames: 0, sampleMs: 0, lastSampleUs: 0, idleTicks: 0 }
+	const stats = { frames: 0, missed: 0, sampleMs: 0, lastSampleUs: 0, idleTicks: 0 }
 	let watchedAt = -Infinity
 	// a head whose universe the engine has not built yet (before its first tick) counts as on the wire
 	const onWire = (fx) => (typeof engine.frameOf === 'function' && !engine.frameOf(fx)) || engine.isLive(fx)
@@ -124,6 +129,27 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		}
 		surfaces = next
 		renewLease()
+		watchFrames()
+	}
+
+	/** WO-897: poll the surfaces' seq; a new frame (not sampled yet, not kicked yet) kicks one engine tick. */
+	function watchFrames() {
+		if (surfaces.size && !pollTimer && typeof engine.kick === 'function') {
+			pollTimer = setInterval(() => {
+				if (!wanted(now())) return
+				for (const s of surfaces.values()) {
+					const seq = peekSeq(s.file, { fsImpl: deps.fsImpl })
+					if (seq && seq !== s.since && seq !== s.kicked) {
+						s.kicked = seq
+						engine.kick()
+					}
+				}
+			}, WATCH_POLL_MS)
+			if (typeof pollTimer.unref === 'function') pollTimer.unref()
+		} else if (!surfaces.size && pollTimer) {
+			clearInterval(pollTimer)
+			pollTimer = null
+		}
 	}
 
 	function renewLease() {
@@ -202,6 +228,7 @@ function createPixelMapService(ctx, engine, deps = {}) {
 				res = { state: 'invalid', error: e?.message || String(e) }
 			}
 			if (res.state === 'frame') {
+				if (s.since && res.seq > s.since + 1) stats.missed += res.seq - s.since - 1 // WO-897: frames that went by
 				s.since = res.seq
 				s.at = t
 				s.width = res.width
@@ -240,7 +267,7 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		return {
 			at: t,
 			smooth: settings.smooth,
-			stats: { frames: stats.frames, sample_ms_total: Math.round(stats.sampleMs * 10) / 10, last_sample_us: stats.lastSampleUs, idle_ticks: stats.idleTicks },
+			stats: { frames: stats.frames, missed: stats.missed, sample_ms_total: Math.round(stats.sampleMs * 10) / 10, last_sample_us: stats.lastSampleUs, idle_ticks: stats.idleTicks },
 			channels: [...surfaces.entries()].map(([ch, s]) => ({ channelNo: ch, role: s.role, state: s.state, width: s.width, height: s.height,
 				age_ms: s.at ? t - s.at : null, mappings: s.ids.length })),
 			mappings: res.list.map((r) => {
@@ -308,6 +335,8 @@ function createPixelMapService(ctx, engine, deps = {}) {
 			off()
 			if (leaseTimer) clearInterval(leaseTimer)
 			leaseTimer = null
+			if (pollTimer) clearInterval(pollTimer)
+			pollTimer = null
 			if (leasedRoles) Promise.resolve().then(() => lease([])).catch(() => {})
 			leasedRoles = ''
 			surfaces = new Map()
