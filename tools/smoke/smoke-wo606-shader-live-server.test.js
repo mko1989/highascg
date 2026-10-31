@@ -197,3 +197,25 @@ test('push: web working copy lands on every instance (prvOnly → PRV only), 403
 	}
 	assert.equal(JSON.parse((await push({ body: JSON.stringify({ shaderId: 'sh-none', payload: { common: '' } }), ctx: makeCtx() })).body).targets, 0)
 })
+
+test('WO-894: GET …/shaders/:id?working=1 adds the rewritten GLSL (the Godot Visuals tab recompiles it); plain GET does not', async () => {
+	S.sessions.clear()
+	const h = {}
+	const routes = { get: (p, fn) => (h[`GET ${p}`] = fn), post: (p, fn) => (h[`POST ${p}`] = fn) }
+	require('../../src/api/routes-shader-live').register(routes)
+	const ctx = makeCtx()
+	const s = await S.open('sh-test')
+	const key = (await S.view('sh-test', s)).params.find((p) => p.name === 'SPEED').key
+	const op = (name, body) => h['POST /api/shader-live/shaders/*']({ path: `/api/shader-live/shaders/sh-test/${name}`, body: JSON.stringify(body), ctx })
+	assert.equal((await op('set', { key, values: [0.9] })).status, 200)
+	const get = (query) => h['GET /api/shader-live/shaders/*']({ path: '/api/shader-live/shaders/sh-test', query })
+	assert.equal(JSON.parse((await get({})).body).working, undefined, 'opt-in only')
+	const w = JSON.parse((await get({ working: '1' })).body).working
+	assert.deepEqual(Object.keys(w.passes), ['image'])
+	assert.equal(w.common, '')
+	assert.match(w.passes.image.source, /SPEED = 0\.9;/, 'the edit is in the working GLSL')
+	assert.equal(lib['sh-test'].passes.image.source, SRC, 'the library source is untouched')
+	await op('reset', {})
+	assert.match(JSON.parse((await get({ working: '1' })).body).working.passes.image.source, /SPEED = 0\.5;/, 'reset puts the library GLSL back')
+	S.sessions.clear()
+})

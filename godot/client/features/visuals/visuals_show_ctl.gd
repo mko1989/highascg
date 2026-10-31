@@ -6,9 +6,11 @@ extends Node
 
 const Looks := preload("res://features/visuals/visuals_looks.gd")
 const Auto := preload("res://features/visuals/visuals_autopilot.gd")
+const PlaylistCtl := preload("res://features/visuals/visuals_playlist_ctl.gd")
 const AUDIO_STALE_MS := 1000
 
 var tab: Node
+var plist: PlaylistCtl  # WO-895: the visual playlists Auto runs (its editor: plist.panel, the work area's mode)
 var looks := []
 var showing := -1  # the look on the canvas
 var _st := Auto.new_state()
@@ -19,6 +21,7 @@ var _drop_n := -1
 
 func _init(t: Node) -> void:
 	tab = t
+	plist = PlaylistCtl.new(self)
 	_wire(tab.page.show_panel)
 
 
@@ -26,6 +29,7 @@ func _init(t: Node) -> void:
 func from_slice() -> void:
 	looks = Looks.normalize(tab.slice.looks)
 	tab.slice.looks = looks
+	plist.from_slice()
 	tab.page.show_panel.set_state(tab.slice.fade, tab.mixer.level, tab.mixer.blackout, tab.slice.auto)
 	showing = Looks.showing(looks, tab.slice)
 	tab.page.show_panel.set_looks(looks, showing)
@@ -39,17 +43,19 @@ func audio(d: Variant) -> void:
 	_drop_n = int(drop.get("n", -1)) if drop is Dictionary else -1
 
 
-## One frame: the autopilot may recall a look.
+## One frame: the autopilot may recall a look; a running visual playlist (WO-895) goes on to its next entry.
 func step(delta: float) -> void:
-	var next := Auto.step(_st, tab.slice.auto, _live_beat(), _drop_n, delta * 1000.0, showing, looks.size())
+	var next := Auto.step(_st, plist.auto_cfg(tab.slice.auto), _live_beat(), _drop_n, delta * 1000.0, showing, looks.size())
 	if next >= 0:
 		recall(next)
+	plist.step(_live_beat(), _drop_n, delta * 1000.0)
 
 
 func _wire(sp: Node) -> void:
 	sp.recall.connect(pick)
 	sp.auto_changed.connect(func(cfg: Dictionary) -> void:
 		tab.slice.auto = Auto.cfg_of(cfg)
+		plist.auto_changed()
 		status()
 		tab._store())
 	sp.save.connect(func(i: int) -> void:
@@ -115,6 +121,7 @@ func status() -> void:
 	var left := Auto.bars_left(_st, tab.slice.auto)
 	if left >= 0 and looks.size() > 1:
 		parts.append("next look in %d bar%s" % [left, "" if left == 1 else "s"])
+	parts.append_array(plist.status_parts(b))
 	tab.page.show_panel.set_auto_note(" · ".join(parts))
 
 

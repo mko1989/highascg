@@ -4,8 +4,11 @@ extends RefCounted
 
 const Auto := preload("res://features/visuals/visuals_autopilot.gd")
 const Layers := preload("res://features/visuals/visuals_layers.gd")
-const PARAMS := ["pulse", "spin", "hue", "glow", "flash", "speed", "amount", "burst"]
-const PARAM_DEFAULTS := {"pulse": 0.2, "spin": 0.15, "hue": 0.55, "glow": 0.3, "flash": 0.0, "speed": 0.3, "amount": 0.5, "burst": 0.0}
+const Cam := preload("res://features/visuals/visuals_camera.gd")
+const PARAMS := ["pulse", "spin", "hue", "glow", "flash", "speed", "amount", "burst",
+	"cam_yaw", "cam_pitch", "cam_zoom"]  # WO-896: the last three orbit the output camera (0.5 = no offset, visuals_camera.gd)
+const PARAM_DEFAULTS := {"pulse": 0.2, "spin": 0.15, "hue": 0.55, "glow": 0.3, "flash": 0.0, "speed": 0.3, "amount": 0.5, "burst": 0.0,
+	"cam_yaw": 0.5, "cam_pitch": 0.5, "cam_zoom": 0.5}
 ## WO-873 scene library (visuals_stage.gd SCENES): [id, label]. `burst` is the event parameter — its rising edge fires the scenes.
 const SCENES := [["rings", "Rings"], ["particles", "Particles"], ["starfield", "Starfield"], ["tunnel", "Tunnel"],
 	["shader", "Shader"], ["spectrum", "Spectrum"], ["game", "Game"]]  # WO-874: a library shader (`shader` in the slice);
@@ -185,7 +188,9 @@ static func params_of(v: Variant) -> Dictionary:
 ## change crossfades (0 = cut); `looks`: the stored looks, raw (visuals_looks.gd normalize() makes them safe). `auto` (WO-878):
 ## {bars, drops, quantise} — looks changing by themselves and landing on the beat (visuals_autopilot.gd). `layers` (WO-890):
 ## the layer stack, bottom → top (visuals_layers.gd); an older slice without it migrates from scene / overlay / shader / game,
-## and those four are always derived back from the layers (what an older client still reads).
+## and those four are always derived back from the layers (what an older client still reads). `camera` (WO-896): {drive, yaw,
+## pitch, dist} — the output stage camera's orbit pose and whether the 3D view drives it (visuals_camera.gd).
+## `playlists` (WO-895): the visual playlists, raw (visuals_playlist.gd); `auto.playlist` names the one Auto runs.
 static func slice_of(project: Variant) -> Dictionary:
 	var v: Variant = project.get("visuals") if project is Dictionary else null
 	var d: Dictionary = v if v is Dictionary else {}
@@ -197,7 +202,8 @@ static func slice_of(project: Variant) -> Dictionary:
 			"size": clampi(int(_num(o.get("size"))), 0, SIZE_SCREEN), "ring": o.get("ring") is bool and o.ring},
 		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0), "layers": layers, "scene": c.scene, "overlay": c.overlay,
 		"shader": c.shader, "game": c.game, "fade": clampf(_num(d.get("fade", 1.0)), 0.0, 10.0),
-		"looks": d.get("looks") if d.get("looks") is Array else [], "auto": Auto.cfg_of(d.get("auto"))}
+		"playlists": d.get("playlists") if d.get("playlists") is Array else [],  # WO-895: raw, like looks (visuals_playlist.gd normalize)
+		"looks": d.get("looks") if d.get("looks") is Array else [], "auto": Auto.cfg_of(d.get("auto")), "camera": Cam.normalize(d.get("camera"))}
 
 
 ## WO-890: `slice` (changed in place, and returned) with the layer stack `layers` and the fields derived from it.

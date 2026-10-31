@@ -15,6 +15,8 @@ const Catalog := preload("res://features/visuals/visuals_catalog.gd")
 const Mixer := preload("res://features/visuals/visuals_mixer.gd")
 const Probes := preload("res://features/visuals/visuals_probes.gd")
 const ShowCtl := preload("res://features/visuals/visuals_show_ctl.gd")
+const ShaderMode := preload("res://features/visuals/visuals_shader_mode.gd")
+const CamCtl := preload("res://features/visuals/visuals_camera_ctl.gd")
 const Publisher := preload("res://features/shm_out/viewport_publisher.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const AUDIO_STALE_MS := 1000
@@ -46,6 +48,7 @@ var launcher := Launcher.new()  # WO-876: the Game scene's window
 var _game_error := ""
 var _shader_cache := {}  # WO-877: id → config, so a look's shader is ready before its fade starts
 var show_ctl: ShowCtl  # WO-877/878: looks, autopilot, master, show keys
+var cam_ctl: CamCtl  # WO-896: the 3D view's orbit → the output camera ("Drive output"), saved per look
 
 
 func _ready() -> void:
@@ -64,6 +67,7 @@ func _ready() -> void:
 	add_to_group("visuals_canvas")  # WO-885: Sources ▸ Visuals double-click
 	work = WorkArea.new()
 	add_child(work)
+	work.add_mode("shader", "Shader", ShaderMode.new(self), "Shader: the selected layer's shader controls · a change recompiles it")  # WO-894
 	mixer.switched.connect(func(_d: Node) -> void: _orbit_world())  # the orbit follows the live deck
 	flow = work.flow
 	flow.changed.connect(func(g: Dictionary) -> void:
@@ -95,6 +99,9 @@ func _ready() -> void:
 	page.burst_pressed.connect(func() -> void: scene.fire())
 	show_ctl = ShowCtl.new(self)
 	add_child(show_ctl)
+	work.add_mode("playlist", "Visual playlist", show_ctl.plist.panel, ShowCtl.PlaylistCtl.HINT)  # WO-895
+	cam_ctl = CamCtl.new(self)
+	add_child(cam_ctl)
 	page.game_play.connect(_play_game)
 	var tick := Timer.new()  # WO-876: the game window's state (closed by hand, starting, on the ring)
 	tick.wait_time = 1.0
@@ -140,6 +147,12 @@ func _ready() -> void:
 		(func() -> void: Probes.ring(self, str(_g("Config").args["probe-visuals-ring"]))).call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-shaders"):  # dev: --probe-visuals-shaders=<dir> (WO-874)
 		(func() -> void: Probes.shaders(self, str(_g("Config").args["probe-visuals-shaders"]))).call_deferred()
+	if _g("Config") and _g("Config").args.has("probe-visuals-shader"):  # dev: --probe-visuals-shader=<dir>[:<shader id>] (WO-894)
+		(func() -> void: load("res://features/visuals/visuals_probe_shader.gd").run(self, str(_g("Config").args["probe-visuals-shader"]))).call_deferred()
+	if _g("Config") and _g("Config").args.has("probe-visuals-playlist"):  # dev: --probe-visuals-playlist=<dir> (WO-895)
+		(func() -> void: load("res://features/visuals/visuals_playlist_probe.gd").run(self, str(_g("Config").args["probe-visuals-playlist"]))).call_deferred()
+	if _g("Config") and _g("Config").args.has("probe-visuals-orbit"):  # dev: --probe-visuals-orbit=<dir> (WO-896)
+		(func() -> void: preload("res://features/visuals/visuals_probe_orbit.gd").run(self, str(_g("Config").args["probe-visuals-orbit"]))).call_deferred()
 
 
 func _notification(what: int) -> void:  # WO-891: PREDELETE, not _exit_tree — moving the tab to the second window re-parents it
@@ -207,7 +220,8 @@ func _go(force := false) -> void:
 			cfgs[l.shader] = await _shader_config(str(l.shader))
 			if seq != _shader_seq:
 				return  # a newer pick is on its way
-	mixer.go(slice.layers, cfgs, slice.fade, force)
+	mixer.go(slice.layers, cfgs, slice.fade, force, cam_ctl.pose())  # WO-896: the camera pose goes with the stack
+	cam_ctl.from_slice()
 	_orbit_world()
 	if slice.layers.any(func(l: Dictionary) -> bool: return l.scene == "shader"):
 		_shader_status()
@@ -244,6 +258,12 @@ func _target() -> int:
 func _orbit_world() -> void:
 	if work != null:
 		work.look_into(scene.world_of(sel))
+
+
+## WO-894: the Shader mode's recompile of library shader `id` from its working GLSL; "" or the compile error.
+func set_shader_cfg(id: String, cfg: Dictionary) -> String:
+	_shader_cache[id] = cfg
+	return ShaderMode.recompile(scene, slice.layers, id, cfg)
 
 
 ## WO-874: a library shader's config (GET /api/shaders/:id), cached; null without the box.

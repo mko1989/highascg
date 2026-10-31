@@ -8,8 +8,9 @@ const M := preload("res://features/live/shader_live_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 
-## A slider that commits on drag end, or 150 ms after the last wheel/key/click step.
-static func slider(lo: float, hi: float, step: float, v: float, commit: Callable, readout: Label = null) -> HSlider:
+## A slider that commits on drag end, or 150 ms after the last wheel/key/click step. `live_ms` > 0 (WO-894: the Visuals' Shader
+## mode, whose preview is local) also commits WHILE dragging, at most every `live_ms`; the release always commits the last value.
+static func slider(lo: float, hi: float, step: float, v: float, commit: Callable, readout: Label = null, live_ms := 0) -> HSlider:
 	var s := HSlider.new()
 	s.min_value = minf(lo, v)
 	s.max_value = maxf(hi, v)
@@ -18,7 +19,7 @@ static func slider(lo: float, hi: float, step: float, v: float, commit: Callable
 	s.custom_minimum_size.x = 150
 	s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var st := {"drag": false}
+	var st := {"drag": false, "at": -1000000}
 	var t := Timer.new()
 	t.one_shot = true
 	t.wait_time = 0.15
@@ -33,7 +34,10 @@ static func slider(lo: float, hi: float, step: float, v: float, commit: Callable
 		if readout != null:
 			readout.text = M.fmt(nv, s.step)
 		if not st.drag:
-			t.start())
+			t.start()
+		elif live_ms > 0 and Time.get_ticks_msec() - int(st.at) >= live_ms:
+			st.at = Time.get_ticks_msec()
+			commit.call(nv))
 	return s
 
 
@@ -70,6 +74,12 @@ static func tools(ui: Object, p: Dictionary, key_control: bool) -> HBoxContainer
 	return row
 
 
+## The panel's `live_ms` (0 when it has none): slider() commits while dragging.
+static func _live(ui: Object) -> int:
+	var v: Variant = ui.get("live_ms")
+	return int(v) if v != null else 0
+
+
 ## The value widget(s) of one param: colour picker (+ alpha for vec4) or one slider per component.
 static func value_widgets(ui: Object, p: Dictionary) -> Control:
 	var box := VBoxContainer.new()
@@ -100,7 +110,7 @@ static func value_widgets(ui: Object, p: Dictionary) -> Control:
 			var next: Array = (ui.current_values(key) as Array).duplicate()
 			if idx < next.size():
 				next[idx] = v
-				ui.post_op("set", {"key": key, "values": next}, false), out))
+				ui.post_op("set", {"key": key, "values": next}, false), out, _live(ui)))
 		row.add_child(out)
 		box.add_child(row)
 	return box
@@ -125,7 +135,7 @@ static func key_control(ui: Object, c: Dictionary, by_key: Dictionary) -> Contro
 		head.add_child(out)
 		var id := str(c.id)
 		head.add_child(tool_btn("↺", "Revert to the library values", func() -> void: ui.post_op("reset", {"control": id})))
-		var s := slider(0.0, 3.0, 0.05, k, func(v: float) -> void: ui.post_op("macro", {"control": id, "factor": v}, false))
+		var s := slider(0.0, 3.0, 0.05, k, func(v: float) -> void: ui.post_op("macro", {"control": id, "factor": v}, false), null, _live(ui))
 		s.value_changed.connect(func(nv: float) -> void: out.text = "×%.2f" % nv)
 		card.add_child(s)
 		return card

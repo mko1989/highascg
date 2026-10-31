@@ -4,7 +4,7 @@
  * WO-606 — Shader Live endpoints (the node owns the working copy; client/components/shader-live-editor.js
  * did all of this in the browser):
  *   GET  /api/shader-live                      → { instances }   every shader live on any channel, PGM first
- *   GET  /api/shader-live/shaders/:id          → view            key controls, params, advanced order, dirty
+ *   GET  /api/shader-live/shaders/:id          → view            key controls, params, advanced order, dirty (?working=1: + working GLSL)
  *   POST /api/shader-live/shaders/:id/:op      → { ok, view, push }   op = set | macro | reset | preset |
  *        preset-save | preset-delete | pin | hide | unhide | label | randomize | wiggle | save
  *   POST /api/shader-live/mixer { channel, layer, cmd, value }   universal Caspar-mixer rides
@@ -40,10 +40,17 @@ function serialized(id, fn) {
 	return next
 }
 
-async function handleView(id) {
+/**
+ * WO-894: `?working=1` adds `working` — the session's rewritten GLSL ({ common, passes: { key: { source } } }) — so a client
+ * that renders the shader itself (the Godot Visuals tab, shadertoy_rd.gd) can recompile what the controls edited. Opt-in:
+ * the sources are tens of KB and the op replies (which carry `view`) never need them.
+ */
+async function handleView(id, withWorking) {
 	const s = await S.open(id)
 	if (!s) return reply(404, { ok: false, error: 'Shader not found' })
-	return reply(200, await S.view(id, s))
+	const v = await S.view(id, s)
+	if (withWorking) v.working = S.workingOf(s)
+	return reply(200, v)
 }
 
 async function handleOp(id, op, body, ctx) {
@@ -152,9 +159,9 @@ function register(routes) {
 		return 'error' in r ? reply(400, { ok: false, error: r.error }) : reply(200, { ok: true, ...r })
 	}, { requireCaspar: false })
 	routes.post('/api/shader-live/audition', ({ body, ctx }) => handleAudition(body, ctx), { requireCaspar: true })
-	routes.get('/api/shader-live/shaders/*', ({ path }) => {
+	routes.get('/api/shader-live/shaders/*', ({ path, query }) => {
 		const m = String(path).match(/^\/api\/shader-live\/shaders\/([^/]+)$/)
-		return m ? handleView(decodeURIComponent(m[1]).toLowerCase()) : reply(404, { ok: false, error: 'not found' })
+		return m ? handleView(decodeURIComponent(m[1]).toLowerCase(), query?.working === '1') : reply(404, { ok: false, error: 'not found' })
 	}, { requireCaspar: false })
 	routes.post('/api/shader-live/push', ({ body, ctx }) => handlePush(body, ctx), { requireCaspar: true })
 	routes.post('/api/shader-live/mixer', ({ body, ctx }) => handleMixer(body, ctx), { requireCaspar: true })

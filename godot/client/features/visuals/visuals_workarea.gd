@@ -4,12 +4,15 @@ extends VBoxContainer
 ## the panel of the picked mode below it.
 
 const Flow := preload("res://features/visuals/visuals_flow.gd")
+const Cam := preload("res://features/visuals/visuals_camera.gd")
 
 signal mode_changed(mode: String)
+signal orbit_changed  # WO-896: the user moved the orbit, flipped "Drive output" or pressed Home (visuals_camera_ctl.gd listens)
 
 var flow: Flow
 var mode := "flow"
 var orbit := Vector3(0.0, 0.25, 16.0)  # yaw, pitch, distance
+var drive: CheckBox  # WO-896: "Drive output" — the orbit is also the output stage's camera
 var orbit_cam: Camera3D
 var vp3: SubViewport
 var _bar: HBoxContainer
@@ -28,10 +31,29 @@ func _init() -> void:
 	view3d.stretch = true
 	vp3 = SubViewport.new()
 	orbit_cam = Camera3D.new()
+	orbit_cam.fov = 60.0  # the output stage's (visuals_stage.gd), so the view frames like the output
+	orbit_cam.far = 400.0
 	vp3.add_child(orbit_cam)
 	view3d.add_child(vp3)
 	view3d.gui_input.connect(_orbit_input)
-	add_mode("3d", "3D", view3d, "3D: drag orbits · the wheel zooms")
+	view3d.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var p3 := VBoxContainer.new()  # WO-896: the 3D view under its small bar
+	var bar3 := HBoxContainer.new()
+	drive = CheckBox.new()
+	drive.text = "Drive output"
+	drive.tooltip_text = "On: the output (every layer) follows this orbit and a saved look keeps the framing. Off: orbiting only moves this view"
+	drive.toggled.connect(func(_on: bool) -> void: orbit_changed.emit())
+	bar3.add_child(drive)
+	var home := Button.new()
+	home.text = "Home"
+	home.tooltip_text = "Back to the straight-on view the output had before it could orbit"
+	home.pressed.connect(func() -> void:
+		orbit = Cam.HOME
+		orbit_changed.emit())
+	bar3.add_child(home)
+	p3.add_child(bar3)
+	p3.add_child(view3d)
+	add_mode("3d", "3D", p3, "3D: drag orbits · the wheel zooms")
 	flow = Flow.new()
 	add_mode("flow", "Flow", flow, "Flow: right-click adds a node · drag an output dot to an input · Delete removes")
 
@@ -71,15 +93,16 @@ func look_into(w: World3D) -> void:
 ## Per frame: the orbit camera follows `orbit` while the 3D view shows.
 func step() -> void:
 	if mode == "3d":
-		var b := Basis.from_euler(Vector3(-orbit.y, orbit.x, 0.0))
-		orbit_cam.transform = Transform3D(b, b * Vector3(0, 0, orbit.z))
+		orbit_cam.transform = Cam.transform_of(orbit)
 
 
 func _orbit_input(e: InputEvent) -> void:
+	var was := orbit
 	var mm := e as InputEventMouseMotion
 	if mm and mm.button_mask & MOUSE_BUTTON_MASK_LEFT:
-		orbit.x -= mm.relative.x * 0.01
-		orbit.y = clampf(orbit.y + mm.relative.y * 0.01, -1.4, 1.4)
+		orbit = Cam.clamp_pose(Vector3(orbit.x - mm.relative.x * 0.01, orbit.y + mm.relative.y * 0.01, orbit.z))
 	var mb := e as InputEventMouseButton
 	if mb and mb.pressed and mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-		orbit.z = clampf(orbit.z * (0.9 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 2.0, 80.0)
+		orbit = Cam.clamp_pose(Vector3(orbit.x, orbit.y, orbit.z * (0.9 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1)))
+	if orbit != was:
+		orbit_changed.emit()

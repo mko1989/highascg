@@ -8,7 +8,7 @@ extends RefCounted
 const M := preload("res://features/visuals/visuals_model.gd")
 const Layers := preload("res://features/visuals/visuals_layers.gd")
 const MAX := 12
-const KEYS := ["layers", "params", "graph"]
+const KEYS := ["layers", "params", "graph", "camera"]  # WO-896: camera = the output pose + whether the 3D view drives it
 
 
 ## The look `slice` shows now, named `name` ("" = from its scenes).

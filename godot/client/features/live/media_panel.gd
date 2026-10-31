@@ -38,6 +38,7 @@ const Ingest := preload("res://features/live/media_ingest.gd")
 const SelectionBar := preload("res://features/live/media_selection_bar.gd")
 const Ops := preload("res://features/live/media_ops.gd")
 const INFO_FONT := 11
+const FitTabs := preload("res://app/fit_tabs.gd")  # WO-899
 const ProjectBar := preload("res://features/live/project_media_bar.gd")
 const Download := preload("res://features/live/media_download.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
@@ -60,6 +61,7 @@ var _bar: SelectionBar
 var _select_queued := false
 var project_bar: ProjectBar
 var _dl: Download
+var _fit: RefCounted  # WO-899: every sub-tab always visible (shrink the font, then trim the titles)
 
 
 func _ready() -> void:
@@ -99,6 +101,8 @@ func _ready() -> void:
 		_tabs.set_tab_hidden(i, not ph.M.tab_visible(Settings.get_setting("offline_mode", false) == true, Config.args.has("placeholders")))
 		if _tabs.is_tab_hidden(i) and _tabs.current_tab == i:
 			_tabs.current_tab = 0
+		if _fit != null:
+			_fit.refit()
 	Settings.changed.connect(ph_vis)
 	ph_vis.call()
 	live = LivePanel.new()
@@ -115,6 +119,7 @@ func _ready() -> void:
 		return Lists.timeline_rows((tl as Dictionary).get("timelines", []) if tl is Dictionary else [], f)
 	_tabs.add_child(timelines)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: timelines.rebuild())
+	_fit = FitTabs.attach(_tabs)
 	_tabs.tab_changed.connect(func(_i: int) -> void:
 		if _tabs.get_current_tab_control() == timelines:
 			timelines.rebuild()

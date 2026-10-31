@@ -13,11 +13,13 @@ static func new_state() -> Dictionary:
 	return {"n": -1, "beats": 0, "free_ms": 0.0, "drop_n": -1, "pending": -1}
 
 
-## `project.visuals.auto` made safe: {bars (one of BARS), drops, quantise}.
+## `project.visuals.auto` made safe: {bars (one of BARS), drops, quantise, playlist (WO-895: the visual playlist Auto runs
+## instead of cycling the looks, visuals_playlist_ctl.gd; "" = none)}.
 static func cfg_of(v: Variant) -> Dictionary:
 	var d: Dictionary = v if v is Dictionary else {}
 	var bars := int(d.get("bars", 0)) if d.get("bars") is float or d.get("bars") is int else 0
-	return {"bars": bars if bars in BARS else 0, "drops": d.get("drops") == true, "quantise": d.get("quantise", true) != false}
+	return {"bars": bars if bars in BARS else 0, "drops": d.get("drops") == true, "quantise": d.get("quantise", true) != false,
+		"playlist": str(d.playlist).left(64) if d.get("playlist") is String else ""}
 
 
 static func locked(beat: Variant) -> bool:

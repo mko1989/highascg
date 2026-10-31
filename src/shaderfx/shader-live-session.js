@@ -144,6 +144,13 @@ async function view(id, s) {
 	return out
 }
 
+/** WO-894: the working copy's GLSL, for a client that compiles it itself (GET …/shaders/:id?working=1). */
+function workingOf(s) {
+	const passes = {}
+	for (const [k, v] of Object.entries(s.cfg.passes || {})) if (v) passes[k] = { source: v.source || '' }
+	return { common: s.cfg.common || '', passes }
+}
+
 /** CG UPDATE one pass onto every live instance of the shader; a 403 (PLAY-hosted html) re-hosts via CG ADD once. */
 async function pushLive(ctx, id, s, passKeys) {
 	const targets = liveShaderInstances(ctx).filter((i) => i.shaderId === id)
@@ -225,6 +232,7 @@ module.exports = {
 	libs,
 	open,
 	view,
+	workingOf,
 	pushLive,
 	pushPayload,
 	pushTimeScale,

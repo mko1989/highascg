@@ -5,6 +5,7 @@ extends VBoxContainer
 ## operator's tempo when the music's beat cannot be locked — and Audio, the detector's beat again.
 
 const Auto := preload("res://features/visuals/visuals_autopilot.gd")
+const Playlist := preload("res://features/visuals/visuals_playlist.gd")
 
 signal recall(i: int)
 signal save(i: int)  # -1 = a new look
@@ -26,6 +27,7 @@ var _menu_for := -1
 var _name: LineEdit
 var _quiet := false
 var _auto: OptionButton
+var _pl_ids := []  # WO-895: the visual playlists offered after the bar counts in Auto
 var _drops: CheckBox
 var _quant: CheckBox
 var _auto_note: Label
@@ -90,7 +92,8 @@ func _init() -> void:
 	for b in Auto.BARS:
 		_auto.add_item("Off" if b == 0 else "Every %d bars" % b)
 	_auto.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_auto.tooltip_text = "Go to the next look by itself every N bars of the music's beat (120 BPM when no tempo is locked)"
+	_auto.tooltip_text = ("Go to the next look by itself every N bars of the music's beat (120 BPM when no tempo is locked)"
+		+ " — or run a visual playlist (Visuals ▸ Visual playlist): each entry for its hold")
 	_auto.item_selected.connect(func(_i: int) -> void: _emit_auto())
 	_drops = CheckBox.new()
 	_drops.text = "Drops"
@@ -140,6 +143,12 @@ func set_looks(looks: Array, showing: int) -> void:
 		b.pressed.connect(func() -> void:
 			b.set_pressed_no_signal(true)
 			recall.emit(i))
+		var drag := func(_at: Vector2) -> Variant:  # WO-895: a look dragged into a visual playlist
+			var pv := Label.new()
+			pv.text = str(looks[i].name)
+			b.set_drag_preview(pv)
+			return Playlist.look_drag(looks[i], i)
+		b.set_drag_forwarding(drag, Callable(), Callable())
 		b.gui_input.connect(func(e: InputEvent) -> void:
 			var mb := e as InputEventMouseButton
 			if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
@@ -152,7 +161,9 @@ func set_looks(looks: Array, showing: int) -> void:
 func set_state(fade: float, level: float, blackout: bool, auto := {}) -> void:
 	_quiet = true
 	var a := Auto.cfg_of(auto)
-	_auto.select(Auto.BARS.find(a.bars))
+	var pl := _pl_ids.find(a.playlist)
+	_auto.select(Auto.BARS.size() + pl if pl >= 0 else Auto.BARS.find(a.bars))
+	_drops.disabled = pl >= 0  # a playlist entry's own hold says when it ends
 	_drops.button_pressed = a.drops
 	_quant.button_pressed = a.quantise
 	_fade.value = fade
@@ -172,10 +183,22 @@ func set_tapped(on: bool) -> void:
 	_audio.set_pressed_no_signal(not on)
 
 
+## WO-895: the visual playlists, offered in Auto after the bar counts ("Visual playlist · name").
+func set_playlists(pls: Array) -> void:
+	_pl_ids = pls.map(func(p: Dictionary) -> String: return str(p.id))
+	while _auto.item_count > Auto.BARS.size():
+		_auto.remove_item(_auto.item_count - 1)
+	for p in pls:
+		_auto.add_item("Visual playlist · %s" % p.name)
+
+
 func _emit_auto() -> void:
 	if not _quiet:
-		auto_changed.emit({"bars": Auto.BARS[maxi(0, _auto.selected)], "drops": _drops.button_pressed,
-			"quantise": _quant.button_pressed})
+		var s := maxi(0, _auto.selected)
+		var pl: String = _pl_ids[s - Auto.BARS.size()] if s >= Auto.BARS.size() else ""
+		_drops.disabled = pl != ""
+		auto_changed.emit({"bars": Auto.BARS[s] if pl == "" else 0, "drops": _drops.button_pressed,
+			"quantise": _quant.button_pressed, "playlist": pl})
 
 
 func _on_menu(id: int) -> void:

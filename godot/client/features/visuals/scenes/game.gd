@@ -11,7 +11,7 @@ const ShmNative := preload("res://video/shm_native.gd")
 const ShmReader := preload("res://video/shm_reader.gd")
 const ShmTexture := preload("res://video/shm_texture.gd")
 const Launcher := preload("res://features/visuals/game_launcher.gd")
-const CAM_Z := 14.0  # the stage camera (visuals_stage.gd): z 14 looking down −z, fov 60
+const Cam := preload("res://features/visuals/visuals_camera.gd")  # WO-896: the screen rides on the stage camera (visuals_stage.gd)
 const FOV := 60.0
 const DIST := 20.0
 const CONSOLE_LINES := [240, 239, 224, 192, 160, 144]
@@ -54,6 +54,7 @@ var _fresh := 0  # frames seen since the signal came (back): a ring left by a cl
 var _t := 0.0
 var _kick := 0.0
 var _bass := 0.0
+var _cam := Cam.transform_of(Cam.HOME)  # the stage camera's transform (set_camera)
 
 
 func _init() -> void:  # built up front: the stage may step a scene before it enters the tree
@@ -121,10 +122,11 @@ func step(p: Dictionary, delta: float, burst: bool) -> void:
 	var h := maxf(1.0, _reader.height)
 	var zoom := clampf(1.0 + (float(p.get("pulse", 0.2)) - 0.2) * 0.3, 0.8, 1.3)
 	var view_h := 2.0 * DIST * tan(deg_to_rad(FOV * 0.5)) * 0.92 * zoom
-	_quad.scale = Vector3(view_h * w / h, view_h, 1.0)
-	_quad.position.z = CAM_Z - DIST
 	var spin := float(p.get("spin", 0.15))
-	_quad.rotation = Vector3(cos(_t * 0.37) * spin * 0.3, sin(_t * 0.5) * spin * 0.7, sin(_t * 0.23) * spin * 0.08)
+	var tilt := Basis.from_euler(Vector3(cos(_t * 0.37) * spin * 0.3, sin(_t * 0.5) * spin * 0.7, sin(_t * 0.23) * spin * 0.08))
+	var tf := Cam.attach(_cam, DIST)  # camera-attached (WO-896): in front of the camera at any orbit angle
+	tf.basis = tf.basis * tilt * Basis.from_scale(Vector3(view_h * w / h, view_h, 1.0))
+	_quad.transform = tf
 	_mat.set_shader_parameter("lines", float(source_lines(int(w), int(h))))
 	_mat.set_shader_parameter("crt", clampf(float(p.get("speed", 0.3)), 0.0, 1.0))
 	_mat.set_shader_parameter("glitch", _kick)
@@ -132,6 +134,11 @@ func step(p: Dictionary, delta: float, burst: bool) -> void:
 	_mat.set_shader_parameter("gain", 0.85 + float(p.get("glow", 0.3)) * 0.8)
 	_mat.set_shader_parameter("opacity", clampf(float(p.get("amount", 0.5)) * 2.0, 0.0, 1.0))
 	_mat.set_shader_parameter("t", _t)
+
+
+## WO-896: the stage camera's transform this frame (visuals_stage.gd).
+func set_camera(tf: Transform3D) -> void:
+	_cam = tf
 
 
 ## Whether a game is on the ring now (the page's status line).

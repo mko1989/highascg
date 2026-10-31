@@ -75,8 +75,10 @@ func resize(size: Vector2i) -> void:
 ## The layer stack (visuals_layers.gd, bottom → top) with the configs of its shaders (id → GET /api/shaders/:id).
 ## Not `force`: the live deck edits in place (new / removed layers fade over `seconds`). `force` (a look): the idle deck
 ## loads the whole stack and the decks crossfade over `seconds`. Seconds <= 0 cut.
-func go(layers: Array, cfgs: Dictionary, seconds: float, force := false) -> void:
+func go(layers: Array, cfgs: Dictionary, seconds: float, force := false, cam: Variant = null) -> void:
 	if not force:
+		if cam is Vector3:  # WO-896: the camera pose of the stack (a look carries its own; the outgoing deck keeps its pose)
+			deck().cam = cam
 		deck().apply(layers, cfgs, seconds)
 		_apply()
 		return
@@ -84,6 +86,7 @@ func go(layers: Array, cfgs: Dictionary, seconds: float, force := false) -> void
 	var d := deck_of(next)
 	d.clear()
 	d.params = deck().params.duplicate()
+	d.cam = cam if cam is Vector3 else deck().cam
 	d.apply(layers, cfgs, 0.0)
 	live = next
 	fade_s = seconds

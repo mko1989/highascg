@@ -59,7 +59,7 @@ func _ready() -> void:
 	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(cols)
 	sources = MediaPanel.new()
-	sources.custom_minimum_size.x = 280
+	sources.custom_minimum_size.x = int(Config.args.get("sources-w", 280))  # dev (WO-899): probe the Sources fit at a narrower column
 	cols.add_child(sources)
 	var right := HSplitContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL

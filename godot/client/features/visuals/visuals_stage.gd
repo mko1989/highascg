@@ -14,6 +14,7 @@ const SCENES := {
 	"game": preload("res://features/visuals/scenes/game.gd"),  # WO-876
 }
 const Smooth := preload("res://features/visuals/spectrum_smooth.gd")
+const Cam := preload("res://features/visuals/visuals_camera.gd")
 const BURST_ON := 0.5
 const BURST_REARM := 0.3
 const AUDIO_STALE_MS := 1000
@@ -37,11 +38,18 @@ var start_scene := "rings"  # WO-877: "" for the mixer's idle deck
 ## WO-890: false = an upper layer of a deck (visuals_deck.gd): its world renders over the layers below, so the background is
 ## black (no tint, no flash — the bottom layer has them) and a game keys its black out like the old layer 2.
 var base := true
+## WO-896: the orbit pose (yaw, pitch, dist; visuals_camera.gd) of this stage's camera — the deck sets it on every layer, so a stack
+## stays aligned; Flow's cam_* params offset it each frame. HOME = the old fixed camera at (0, 0, 14).
+var pose := Cam.HOME:
+	set(v):
+		pose = v
+		if camera != null:
+			_aim()
 
 
 func _ready() -> void:
 	camera = Camera3D.new()
-	camera.position = Vector3(0, 0, 14)
+	_aim()
 	camera.fov = 60
 	camera.far = 400.0
 	add_child(camera)
@@ -80,6 +88,8 @@ func set_layers(main: String, overlay: String) -> void:
 		add_child(s)
 		layers.append(s)
 	_ids = w
+	if camera != null:
+		_aim()
 	_apply_shader()
 
 
@@ -90,6 +100,15 @@ func set_base(on: bool) -> void:
 	base = on
 	if not layers.is_empty() and layers[0].has_method("set_overlay") and _ids[0] == "game":
 		layers[0].set_overlay(not on)
+
+
+## WO-896: the camera at `pose` + Flow's offsets, and the scenes that draw a screen-filling quad (Shader, Game) told where it is
+## so the quad rides on it and covers the frame from any angle.
+func _aim() -> void:
+	camera.transform = Cam.transform_of(Cam.offset(pose, params))
+	for l in layers:
+		if l.has_method("set_camera"):
+			l.set_camera(camera.transform)
 
 
 ## WO-877: no scenes (the mixer's idle deck) — nothing renders, nothing reads a ring.
@@ -170,6 +189,7 @@ func _process(delta: float) -> void:
 	if burst:
 		_flash = 1.0
 	_flash = maxf(0.0, _flash - delta * 6.0)
+	_aim()
 	var audio := PackedByteArray()
 	if layers.any(func(l: Node3D) -> bool: return l.has_method("set_audio")):
 		audio = _audio_shown(delta)

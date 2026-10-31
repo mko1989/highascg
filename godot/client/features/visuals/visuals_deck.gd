@@ -31,6 +31,13 @@ var params := {}:  # the evaluated parameters (visuals_tab.gd, every frame) → 
 		params = v
 		for s in slots + leaving:
 			s.stage.params = v
+## WO-896: the camera pose (visuals_camera.gd) of every layer on this deck, so a stack stays aligned. Per deck: a crossfade
+## between looks with different poses keeps the outgoing deck where it was while the incoming one starts at its own.
+var cam := Vector3(0.0, 0.0, 14.0):
+	set(v):
+		cam = v
+		for s in slots + leaving:
+			s.stage.pose = v
 var _size := Vector2i(1280, 720)
 var _back: ColorRect
 
@@ -194,6 +201,7 @@ func _slot(l: Dictionary, cfgs: Dictionary) -> Dictionary:
 	if l.scene == "shader":
 		st.set_shader(cfgs.get(str(l.get("shader", ""))))
 	st.params = params
+	st.pose = cam
 	if measure:
 		RenderingServer.viewport_set_measure_render_time(vp.get_viewport_rid(), true)
 	var mat := ShaderMaterial.new()

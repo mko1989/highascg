@@ -7,8 +7,8 @@ extends Node3D
 ## by the hue parameter recoloured every shader — the graph's valence sits at 0.5 even in silence, WO-874 §1).
 
 const Runner := preload("res://features/visuals/shadertoy_rd.gd")
-const CAM_Z := 14.0  # the stage camera (visuals_stage.gd): at z 14, looking down −z, fov 60
-const FOV := 60.0
+const Cam := preload("res://features/visuals/visuals_camera.gd")
+const FOV := 60.0  # the stage camera's (visuals_stage.gd)
 const FAR := 300.0  # behind every other scene (the tunnel ends 194 away)
 const NEAR := 2.0
 const SRC := """
@@ -31,7 +31,10 @@ var _quad: MeshInstance3D
 var _mat: ShaderMaterial
 var _audio := PackedByteArray()
 var _time := 0.0
+var _cfg_id := ""
 var _kick := 0.0
+var _dist := FAR  # the quad's distance in front of the camera
+var _cam := Cam.transform_of(Cam.HOME)  # WO-896: the stage camera (set_camera) — the quad rides on it, whatever its angle
 
 
 func _init() -> void:  # built up front: the stage may step a scene before it enters the tree
@@ -59,13 +62,21 @@ func set_overlay(on: bool) -> void:
 	_mat.shader = sh
 	_mat.render_priority = 10 if on else 0
 	_mat.set_shader_parameter("tex", runner.texture)
-	_quad.position.z = CAM_Z - (NEAR if on else FAR)
+	_dist = NEAR if on else FAR
+
+
+## WO-896: the stage camera's transform this frame (visuals_stage.gd); the quad follows it in step().
+func set_camera(tf: Transform3D) -> void:
+	_cam = tf
 
 
 ## A shader config (GET /api/shaders/:id); "" or the compile error.
 func set_shader(cfg: Variant) -> String:
 	var e := runner.use(cfg)
-	_time = 0.0
+	var id := str(cfg.get("id", "")) if cfg is Dictionary else ""
+	if id == "" or id != _cfg_id:  # WO-894: the same shader recompiled with edited values (Visuals ▸ Shader) keeps its clock
+		_time = 0.0
+	_cfg_id = id
 	return e
 
 
@@ -87,9 +98,10 @@ func step(p: Dictionary, delta: float, burst: bool) -> void:
 	var size := Vector2i(1280, 720)
 	if is_inside_tree():
 		size = get_viewport().size
-	var dist := absf(CAM_Z - _quad.position.z)
-	var h := 2.0 * dist * tan(deg_to_rad(FOV * 0.5))
-	_quad.scale = Vector3(h * size.x / maxf(1.0, size.y), h, 1.0)
+	var h := Cam.frustum_h(_dist, FOV)
+	var tf := Cam.attach(_cam, _dist)  # camera-attached: covers the frame at any orbit angle
+	tf.basis = tf.basis * Basis.from_scale(Vector3(h * size.x / maxf(1.0, size.y), h, 1.0))
+	_quad.transform = tf
 	# 1 at the defaults, at most ~1.7: shaders are already graded, a bright sky clips white well before 2×
 	_mat.set_shader_parameter("gain", 1.0 + 0.5 * (float(p.get("glow", 0.3)) - 0.3) + 0.4 * (float(p.get("pulse", 0.2)) - 0.2))
 	_mat.set_shader_parameter("flash", _kick * 0.5)
