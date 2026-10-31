@@ -49,6 +49,7 @@ var _game_error := ""
 var _shader_cache := {}  # WO-877: id → config, so a look's shader is ready before its fade starts
 var show_ctl: ShowCtl  # WO-877/878: looks, autopilot, master, show keys
 var cam_ctl: CamCtl  # WO-896: the 3D view's orbit → the output camera ("Drive output"), saved per look
+var midi: Node  # WO-900: visuals_midi.gd
 
 
 func _ready() -> void:
@@ -102,6 +103,8 @@ func _ready() -> void:
 	work.add_mode("playlist", "Visual playlist", show_ctl.plist.panel, ShowCtl.PlaylistCtl.HINT)  # WO-895
 	cam_ctl = CamCtl.new(self)
 	add_child(cam_ctl)
+	midi = preload("res://features/visuals/visuals_midi.gd").new(self, _g("Config") != null)  # WO-900: MIDI controller
+	add_child(midi)
 	page.game_play.connect(_play_game)
 	var tick := Timer.new()  # WO-876: the game window's state (closed by hand, starting, on the ring)
 	tick.wait_time = 1.0
@@ -153,6 +156,8 @@ func _ready() -> void:
 		(func() -> void: load("res://features/visuals/visuals_playlist_probe.gd").run(self, str(_g("Config").args["probe-visuals-playlist"]))).call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-orbit"):  # dev: --probe-visuals-orbit=<dir> (WO-896)
 		(func() -> void: preload("res://features/visuals/visuals_probe_orbit.gd").run(self, str(_g("Config").args["probe-visuals-orbit"]))).call_deferred()
+	if _g("Config") and _g("Config").args.has("probe-midi"):  # dev: --probe-midi=<dir>[:real] (WO-900)
+		(func() -> void: load("res://features/visuals/visuals_midi_probe.gd").run(self, str(_g("Config").args["probe-midi"]))).call_deferred()
 
 
 func _notification(what: int) -> void:  # WO-891: PREDELETE, not _exit_tree — moving the tab to the second window re-parents it

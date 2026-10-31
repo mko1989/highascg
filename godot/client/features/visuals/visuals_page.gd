@@ -6,6 +6,7 @@ extends VBoxContainer
 const M := preload("res://features/visuals/visuals_model.gd")
 const Show := preload("res://features/visuals/visuals_show.gd")
 const LayerList := preload("res://features/visuals/visuals_layer_list.gd")
+const MidiPanel := preload("res://features/midi/midi_panel.gd")
 
 signal params_changed(params: Dictionary)
 signal output_changed(output: Dictionary)
@@ -40,6 +41,8 @@ var _game_box: VBoxContainer
 var _game_play: Button
 var _game_note: Label
 var show_panel: Show  # WO-877: looks, fade, master — the tab wires its signals
+var midi_panel: MidiPanel  # WO-900: the MIDI controller block (visuals_midi.gd drives it)
+var _burst: Button
 
 
 func _init() -> void:  # built up front: the tab fills it before the Inspector adopts it
@@ -81,6 +84,7 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 	burst.tooltip_text = "Fire the scenes' burst now (Flow: link a hit to the Burst parameter to fire it from the audio)"
 	burst.pressed.connect(func() -> void: burst_pressed.emit())
 	add_child(burst)
+	_burst = burst
 	for p in M.PARAMS:
 		var row := HBoxContainer.new()
 		var l := Label.new()
@@ -146,6 +150,14 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note.modulate = Color(1, 1, 1, 0.7)
 	add_child(_note)
+	add_child(_heading("MIDI"))  # WO-900
+	midi_panel = MidiPanel.new()
+	add_child(midi_panel)
+
+
+## WO-900: the page's controls MIDI drives — "param:<name>" (a base parameter's slider) and "burst"; null otherwise.
+func control(id: String) -> Control:
+	return _burst if id == "burst" else _sliders.get(id.trim_prefix("param:")) if id.begins_with("param:") else null
 
 
 func set_state(slice: Dictionary, cm: Variant) -> void:

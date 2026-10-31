@@ -183,6 +183,17 @@ func set_tapped(on: bool) -> void:
 	_audio.set_pressed_no_signal(not on)
 
 
+## WO-900: the controls MIDI drives (visuals_midi.gd) — "master", "fade", "tap", "audio", "blackout", "auto"; null otherwise.
+func control(id: String) -> Control:
+	return {"master": _level, "fade": _fade, "tap": _tap, "audio": _audio, "blackout": _black, "auto": _auto}.get(id)
+
+
+## WO-900: look `i`'s button (null when there is no such look).
+func look_button(i: int) -> Button:
+	var bs := _grid.get_children().filter(func(c: Node) -> bool: return not c.is_queued_for_deletion())
+	return bs[i] if i >= 0 and i < bs.size() else null
+
+
 ## WO-895: the visual playlists, offered in Auto after the bar counts ("Visual playlist · name").
 func set_playlists(pls: Array) -> void:
 	_pl_ids = pls.map(func(p: Dictionary) -> String: return str(p.id))
