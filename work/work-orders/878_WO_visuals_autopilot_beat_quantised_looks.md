@@ -29,6 +29,8 @@ Loop task (owner 31.10): visuals "in a very good shape and ready for a show". Fo
 - `visuals_tab.gd`: the WS handler keeps the newest `beat` and drop count; buttons and keys 1–9 go through `pick()`;
   `_process` steps the autopilot and recalls with the look's fade; the 1 s tick refreshes the status line.
 - `visuals_model.gd`: the slice carries `auto`.
+- 31.10 later: the show logic (looks, autopilot, master, keys) moved out of `visuals_tab.gd` (485 lines, near the CI limit)
+  into `visuals_show_ctl.gd`, a child node of the tab (`tab.show_ctl`); the tab is 381 lines.
 
 ## 3. What was VERIFIED
 

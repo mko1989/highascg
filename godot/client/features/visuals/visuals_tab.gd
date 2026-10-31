@@ -12,9 +12,8 @@ const Page := preload("res://features/visuals/visuals_page.gd")
 const Sync := preload("res://features/visuals/visuals_sync.gd")
 const Launcher := preload("res://features/visuals/game_launcher.gd")
 const Mixer := preload("res://features/visuals/visuals_mixer.gd")
-const Looks := preload("res://features/visuals/visuals_looks.gd")
 const Probes := preload("res://features/visuals/visuals_probes.gd")
-const Auto := preload("res://features/visuals/visuals_autopilot.gd")
+const ShowCtl := preload("res://features/visuals/visuals_show_ctl.gd")
 const Publisher := preload("res://features/shm_out/viewport_publisher.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const AUDIO_STALE_MS := 1000
@@ -46,11 +45,7 @@ var _shader_seq := 0
 var launcher := Launcher.new()  # WO-876: the Game scene's window
 var _game_error := ""
 var _shader_cache := {}  # WO-877: id → config, so a look's shader is ready before its fade starts
-var _looks := []
-var _showing := -1  # the look on the canvas
-var _auto := Auto.new_state()  # WO-878
-var _beat: Variant = null  # the newest frame's beat grid and drop count
-var _drop_n := -1
+var show_ctl: ShowCtl  # WO-877/878: looks, autopilot, master, show keys
 
 
 func _ready() -> void:
@@ -117,7 +112,8 @@ func _ready() -> void:
 		_go(true)  # WO-877: another shader crossfades in too
 		_store())
 	page.burst_pressed.connect(func() -> void: scene.fire())
-	_wire_show(page.show_panel)
+	show_ctl = ShowCtl.new(self)
+	add_child(show_ctl)
 	page.game_changed.connect(func(path: String) -> void:
 		slice.game = path
 		_store()
@@ -127,7 +123,7 @@ func _ready() -> void:
 	var tick := Timer.new()  # WO-876: the game window's state (closed by hand, starting, on the ring)
 	tick.wait_time = 1.0
 	tick.timeout.connect(_game_status)
-	tick.timeout.connect(_auto_status)
+	tick.timeout.connect(func() -> void: show_ctl.status())
 	add_child(tick)
 	tick.start()
 	page.sync_changed.connect(func(ms: float) -> void:
@@ -141,9 +137,7 @@ func _ready() -> void:
 			_buses = M.buses_of(d)
 			mixer.audio_frame(d)
 			_audio_at = Time.get_ticks_msec()
-			_beat = d.get("beat") if d is Dictionary else null
-			var drop: Variant = d.parts.get("drop") if d is Dictionary and d.get("parts") is Dictionary else null
-			_drop_n = int(drop.get("n", -1)) if drop is Dictionary else -1
+			show_ctl.audio(d)
 			Sync.observe(_sync_state, d, _buses, _audio_at))
 	if _g("Store"):
 		_g("Store").project_changed.connect(func(_p: Dictionary) -> void: _load())
@@ -186,13 +180,9 @@ func _load() -> void:
 	slice = M.slice_of(_project())
 	page.set_games(Launcher.games())
 	flow.set_graph(slice.graph)
-	_looks = Looks.normalize(slice.looks)
-	slice.looks = _looks
+	show_ctl.from_slice()
 	_go(false)
 	page.set_state(slice, _cm())
-	page.show_panel.set_state(slice.fade, mixer.level, mixer.blackout, slice.auto)
-	_showing = Looks.showing(_looks, slice)
-	page.show_panel.set_looks(_looks, _showing)
 	_resize()
 	_sync_send_ui("")
 
@@ -265,98 +255,6 @@ func _shader_status() -> void:
 		page.set_shader_status("" if scene.shader_error == "" else "Shader: " + scene.shader_error)
 
 
-func _wire_show(sp: Node) -> void:
-	sp.recall.connect(pick)
-	sp.auto_changed.connect(func(cfg: Dictionary) -> void:
-		slice.auto = Auto.cfg_of(cfg)
-		_auto_status()
-		_store())
-	sp.save.connect(func(i: int) -> void:
-		var l := Looks.capture(slice, str(_looks[i].name) if i >= 0 and i < _looks.size() else "")
-		if i >= 0 and i < _looks.size():
-			_looks[i] = l
-		elif _looks.size() < Looks.MAX:
-			_looks.append(l)
-		_looks_changed())
-	sp.rename.connect(func(i: int, n: String) -> void:
-		if i >= 0 and i < _looks.size():
-			_looks[i].name = n.strip_edges().left(40) if n.strip_edges() != "" else Looks.auto_name(_looks[i])
-			_looks_changed())
-	sp.remove.connect(func(i: int) -> void:
-		if i >= 0 and i < _looks.size():
-			_looks.remove_at(i)
-			_looks_changed())
-	sp.fade_changed.connect(func(v: float) -> void:
-		slice.fade = v
-		_store())
-	sp.level_changed.connect(func(v: float) -> void: mixer.level = v)
-	sp.blackout_toggled.connect(func(on: bool) -> void: mixer.blackout = on)
-
-
-## WO-878: a look picked by hand (button, key): now, or on the next beat when "on the beat" is on and a tempo is locked.
-func pick(i: int) -> void:
-	if i < 0 or i >= _looks.size():
-		return
-	if Auto.pick(_auto, i, slice.auto, _live_beat()):
-		recall(i)
-	else:
-		page.show_panel.set_looks(_looks, i)
-		_auto_status()
-
-
-func _live_beat() -> Variant:
-	return _beat if Time.get_ticks_msec() - _audio_at < AUDIO_STALE_MS else null
-
-
-## WO-878: the tempo, a look waiting for its beat, and the bars until the next timed change.
-func _auto_status() -> void:
-	var b: Variant = _live_beat()
-	var parts := ["Tempo %d BPM" % roundi(float(b.bpm)) if Auto.locked(b) else "No tempo locked (120 BPM clock)"]
-	if _auto.pending >= 0:
-		parts.append("look %d on the next beat" % (_auto.pending + 1))
-	var left := Auto.bars_left(_auto, slice.auto)
-	if left >= 0 and _looks.size() > 1:
-		parts.append("next look in %d bar%s" % [left, "" if left == 1 else "s"])
-	page.show_panel.set_auto_note(" · ".join(parts))
-
-
-## WO-877: look `i` on stage with the fade (its scenes, shader, game, parameters and Flow).
-func recall(i: int) -> void:
-	if i < 0 or i >= _looks.size():
-		return
-	_showing = i
-	slice = Looks.apply(slice, _looks[i])
-	flow.set_graph(slice.graph)
-	page.set_state(slice, _cm())
-	page.show_panel.set_looks(_looks, i)
-	_store()
-	_go(true)
-
-
-func _looks_changed() -> void:
-	slice.looks = _looks
-	page.show_panel.set_looks(_looks, Looks.showing(_looks, slice))
-	_store()
-
-
-## Show keys while the Visuals are shown (text fields take their own keys first): 1–9 recall a look, Space bursts, B blackout.
-func _unhandled_key_input(event: InputEvent) -> void:
-	var k := event as InputEventKey
-	if k == null or not k.pressed or k.echo or not is_visible_in_tree() or k.is_command_or_control_pressed() or k.alt_pressed:
-		return
-	var i := Looks.key_index(k.keycode)
-	if i >= 0 and i < _looks.size():
-		pick(i)
-	elif k.keycode == KEY_SPACE:
-		scene.fire()
-	elif k.keycode == KEY_B:
-		mixer.blackout = not mixer.blackout
-		page.show_panel.set_state(slice.fade, mixer.level, mixer.blackout, slice.auto)
-	else:
-		return
-	get_viewport().set_input_as_handled()
-
-
 func _store() -> void:
 	var p: Variant = _project()
 	if not p is Dictionary or _g("ProjectSync") == null:
@@ -380,9 +278,7 @@ func _process(delta: float) -> void:
 	var buses: Dictionary = Sync.apply(_sync_state, _buses, slice.sync, Time.get_ticks_msec()) if live else M.buses_of(null)
 	scene.params = M.evaluate(slice.graph, buses, slice.params, _env, delta, _trace)
 	mixer.step(delta)
-	var next := Auto.step(_auto, slice.auto, _live_beat(), _drop_n, delta * 1000.0, _showing, _looks.size())
-	if next >= 0:
-		recall(next)
+	show_ctl.step(delta)
 	if _mode == "flow" and is_visible_in_tree():
 		flow.show_levels(_trace)
 	if _mode == "3d":
