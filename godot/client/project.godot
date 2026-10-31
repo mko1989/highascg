@@ -6,6 +6,7 @@ config_version=5
 
 config/name="HighAsCG Operator"
 run/main_scene="res://app/main.tscn"
+run/max_fps=100
 config/features=PackedStringArray("4.6", "Forward Plus")
 
 [autoload]
@@ -26,7 +27,7 @@ Lockscreen="*res://app/lockscreen.gd"
 window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/size/resizable=true
-window/vsync/vsync_mode=1
+window/vsync/vsync_mode=0
 
 [rendering]
 

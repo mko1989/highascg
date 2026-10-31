@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-816 live WOs (30 open, 126 in progress, 660 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+818 live WOs (31 open, 126 in progress, 661 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -364,7 +364,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (106)
+## godot-client — Godot client (107)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -472,6 +472,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 902 DONE [godot-client+testing-ci] Live preview windows shrink on their own: run-client.sh --check re-tiled the sh… → 902_WO_live_compose_layout_no_foreign_retile.md
 - 904 DONE [godot-client] Changing any Visuals value froze the output: a whole-show undo snapshot on ever… → 904_WO_visuals_freeze_undo_snapshot_per_edit.md
 - 905 DONE [godot-client] Live deck: each screen's looks scroll on their own; its header bar always stays… → 905_WO_live_deck_per_screen_scroll.md
+- 907 DONE [godot-client+video-io] Visuals stutter (and alt-tab hitches): the Godot client's render loop was paced… → 907_WO_client_render_not_vsync_paced.md
 
 ## web-client — Web client (82)
 
@@ -583,7 +584,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 791 DONE [companion] Companion: recall look presets to PRV, to PGM, or to PGM with auto take → 791_WO_companion_look_preset_recall.md
 - 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
 
-## devices-config — Devices tab, settings, config generation (54)
+## devices-config — Devices tab, settings, config generation (55)
 
 - 33 IN PROGRESS [devices-config+web-client] Device view (program): index & dependency order → 33_WO_DEVICE_VIEW_INDEX.md
 - 33a OPEN [devices-config+web-client] Device view: data model, persistence, and HTTP API → 33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md
@@ -639,6 +640,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 869 DONE [devices-config+amcp,godot-client] Mapping node slices: cut a screen destination's output into slices and place th… → 869_WO_mapping_node_slices.md
 - 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
+- 906 OPEN [devices-config+os-iso,mapping] Playout outputs on a second X screen (:0.1) of the same X server, operator head… → 906_WO_outputs_on_second_x_screen.md
 
 ## os-iso — ISO, sticks, kernel, NVIDIA, boot (72)
 

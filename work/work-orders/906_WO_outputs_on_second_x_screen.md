@@ -1,0 +1,60 @@
+# WO-906 — Playout outputs on a second X screen (:0.1) of the same X server, operator heads alone on :0.0
+
+**Area:** devices-config, os-iso, mapping
+**Status: OPEN**
+
+## Owner request (31.10.26)
+"would it be possible to move the screen consumer outputs to another x display like display:1 so they are separate
+from the operator from the start. if yes what about sync?" → "make a work order for the second x screen on the same x
+server. passwordless sudo might have been already granted for the x edits. each change in channels, outputs etc needs
+a caspar restart so that's not an issue. would also need a config for multi head outputs so they land on the same
+screen. it was already possible through mapping nodes."
+
+## 1. Investigation (31.10.26, before any change)
+- **Why not `:1`:** a second X *server* cannot drive heads of the GPU the first one owns (one NVIDIA X driver instance
+  per GPU in practice). A second X *screen* of the same server can: `Screen 0` and `Screen 1` sections on the one
+  `Device` (BusID `PCI:1:0:0`, RTX PRO 4000 Blackwell, driver 615.71.09), each with its own metamodes, Xinerama OFF.
+  Apps choose with `DISPLAY=:0.0` / `:0.1`; windows can never cross, the pointer can (the WO-903 fence keeps it on
+  the operator heads).
+- **Today:** one X screen (`xdpyinfo`: `number of screens: 1`, XINERAMA present). xrandr DP-4 0,0 (primary, operator 1),
+  DP-6 1920,0 (operator 2), DP-0 3840x1792 +3840,0 (Dioda PGM, Caspar's only `<screen>` consumer, ch2). The operator
+  GUI channel (ch1) has no screen consumer (shm / video surfaces), so the whole of Caspar can run on `:0.1`.
+- **X restart:** nodm (`NODM_X_OPTIONS='-s 0 -dpms -nolisten tcp'`); sudo allows `systemctl restart nodm` (WO-315
+  restarts it on canvas growth). **Not allowed:** writing `/etc/X11/xorg.conf.d/` — only
+  `99-highascg-force-composition.conf` (ForceCompositionPipeline On, Device section) is there. A root helper must be
+  added to the allowlist once by the owner (§2.1).
+- **Sync:** with one playout X screen, `__GL_SYNC_DISPLAY_DEVICE` / `CASPAR_GL_SYNC_DISPLAY` (run.sh, WO-407) names a
+  head of that screen only — no ambiguity with operator heads, and operator-side xrandr / GUI work can no longer
+  disturb Caspar's swap. All heads still flip on the same GPU clock; no frame lock needed between the two screens.
+  Several playout heads on screen 1 keep today's rule: the GL sync device is the PGM head (mapping-rig auto, WO-437).
+- **Single-desktop assumptions that must learn "screen":** `src/utils/os-config.js` + `xrandr-layout-verify.js`
+  (xrandr on :0 → per screen), `os-layout-calculator*` (positions in one canvas → per-screen canvases, each from 0,0),
+  `x-display-session-runtime-env.js` (`DISPLAY: ':0'`), `run.sh` (`DISPLAY=${DISPLAY:-:0}`) / caspar-env, the pixel-
+  map slice windows (`config-generator-slice-windows.js`), screen consumer `<x>/<y>` (`config-generator-screen-xml.js`),
+  `caspar-window-sync.js`, compose-preview / browser-source capture (`src/capture/browser-source-region.js`: x11grab
+  `:0.0+x,y` → `:0.1+…`), pointer confine (stays :0.0), the WO-638 boot screen gate, NoMachine (probably shows :0.0 only
+  — owner check).
+
+## 2. Plan
+1. **Root helper** `/usr/local/lib/highascg/highascg-xorg-screens-apply.sh <generated.conf|--off>`: validates the file
+   (only `Screen` / `ServerLayout` / `Device` sections, our BusID), installs it as
+   `/etc/X11/xorg.conf.d/98-highascg-screens.conf` (or removes it), keeps the previous copy; sudoers line shipped in the
+   ISO setup and given to the owner as one command for this box.
+2. **Config:** `x11.playoutScreen` = off | on (default off = today). On: generator writes the two-screen layout —
+   screen 0 = every head cabled to an operator GUI destination, screen 1 = every other GPU head (PGM / PRV / multiview /
+   mapping outputs) — with each screen's metamodes from the existing layout plan, ForceCompositionPipeline kept.
+3. **Multi-head outputs on the playout screen:** the mapping-node path (WO-40a, mapping GPU outputs + bbox) already
+   places several heads side by side in one canvas; on screen 1 that canvas starts at 0,0 and every head of it lands
+   there. Screen destinations without mapping nodes follow the same placement (left → right in destination order).
+4. **Runtime:** Caspar (run.sh / caspar-env) gets `DISPLAY=:0.1`; xrandr verify / apply per screen (`xrandr -d :0.1`);
+   capture paths take the screen of the region; the GUI, pointer confine, boot gate stay on :0.0.
+5. **Apply:** a change of the screen split = write conf + nodm restart (+ Caspar restart, as any channel / output
+   change already needs); a mode / position change inside a screen stays an xrandr apply.
+6. **Rollback:** `--off` removes the conf + nodm restart → today's single screen.
+
+## 3. Verification plan
+- Box: `xdpyinfo` 2 screens; `xrandr -d :0.0` = DP-4 + DP-6 only, `-d :0.1` = DP-0 (+ mapping heads); Caspar window on
+  DP-0 fullscreen at the EDID mode (NovaStar memory: DP-0 relights only at its EDID mode); alt-tab / GUI moves / operator
+  xrandr changes during playback leave the Dioda output untouched (ring + screen capture of :0.1).
+- Offline: generator smoke for the conf (screen split from a device graph, BusID, Xinerama off), per-screen layout plan
+  from 0,0, DISPLAY plumbing.

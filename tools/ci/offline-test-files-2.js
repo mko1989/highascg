@@ -65,4 +65,5 @@ module.exports = [
 	'tools/smoke/smoke-wo903-pointer-confine-spans-operator-heads.test.js',
 	'tools/smoke/smoke-wo904-undo-snapshot-off-edit-path.test.js',
 	'tools/smoke/smoke-wo905-live-deck-per-screen-scroll.test.js',
+	'tools/smoke/smoke-wo907-client-free-running-render.test.js',
 ]
