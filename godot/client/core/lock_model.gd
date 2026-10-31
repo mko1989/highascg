@@ -4,11 +4,14 @@ extends RefCounted
 ## Pure helpers — the overlay (app/lock_overlay.gd) and the Settings pane (features/settings/lockscreen_pane.gd) call
 ## these; tests/test_lock_model.gd covers them. The locked state itself is never stored: the client starts unlocked.
 
+const BounceModel := preload("res://core/bounce_model.gd")
+
 const UI_CFG := "user://ui.cfg"
 const SECTION := "lockscreen"
 const DEFAULT_TEXT := "LOCKED"
 const DEFAULT_BG := Color(0.0, 0.0, 0.0, 0.6)
 const DEFAULT_KEY := "Ctrl+Shift+L"
+const STYLES := ["plain", "bounce"]  # WO-901: plain = logo + text; bounce = one character bouncing DVD-style
 const LOGO_PREFIX := "lockscreen_logo."
 const LOGO_EXTS := ["png", "jpg", "jpeg", "svg"]
 const LOGO_FILTER := "*.png, *.jpg, *.jpeg, *.svg ; Images"
@@ -17,7 +20,8 @@ const SVG_TARGET_PX := 256.0  # an SVG has no pixel size: rasterise it about thi
 
 
 static func defaults() -> Dictionary:
-	return {"enabled": true, "text": DEFAULT_TEXT, "logo": "", "bg": DEFAULT_BG, "key": DEFAULT_KEY}
+	return {"enabled": true, "text": DEFAULT_TEXT, "logo": "", "bg": DEFAULT_BG, "key": DEFAULT_KEY,
+		"style": "plain", "bounce_size": BounceModel.SIZE_DEFAULT, "bounce_speed": BounceModel.SPEED_DEFAULT}
 
 
 ## The stored prefs, every value validated (a hand-edited or stale cfg falls back to the default per key).
@@ -35,6 +39,10 @@ static func load_prefs(path := UI_CFG) -> Dictionary:
 	out.bg = Color.html(bg) if bg is String and Color.html_is_valid(bg) else DEFAULT_BG
 	var k: Variant = cfg.get_value(SECTION, "key", DEFAULT_KEY)
 	out.key = chord_string(parse_chord(k)) if k is String and not parse_chord(k).is_empty() else DEFAULT_KEY
+	var st: Variant = cfg.get_value(SECTION, "style", "plain")
+	out.style = st if st is String and STYLES.has(st) else "plain"
+	out.bounce_size = BounceModel.clamp_size(cfg.get_value(SECTION, "bounce_size", BounceModel.SIZE_DEFAULT))
+	out.bounce_speed = BounceModel.clamp_speed(cfg.get_value(SECTION, "bounce_speed", BounceModel.SPEED_DEFAULT))
 	return out
 
 

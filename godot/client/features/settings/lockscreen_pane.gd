@@ -7,6 +7,7 @@ extends VBoxContainer
 const K := preload("res://features/settings/pane_kit.gd")
 const LockModel := preload("res://core/lock_model.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
+const BounceModel := preload("res://core/bounce_model.gd")
 
 var _prefs := LockModel.defaults()
 var _enabled: CheckBox
@@ -17,6 +18,11 @@ var _bg: ColorPickerButton
 var _key: Label
 var _set: Button
 var _key_note: Label
+var _style: OptionButton
+var _size: HSlider
+var _size_l: Label
+var _speed: HSlider
+var _speed_l: Label
 
 
 func _ready() -> void:
@@ -24,12 +30,23 @@ func _ready() -> void:
 	K.heading(self, "Lockscreen")
 	K.note(self, "Locks this client against stray input: a translucent screen with a logo and a message covers the "
 		+ "window and every key, click, wheel turn and touch is swallowed — except the key combination, which locks "
-		+ "and unlocks. Kept on this screen only; a restart always starts unlocked.")
+		+ "and unlocks. The mouse pointer is hidden while locked. Kept on this screen only; a restart always starts unlocked.")
 	_enabled = CheckBox.new()
 	_enabled.text = "Lockscreen enabled"
 	_enabled.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_enabled.toggled.connect(func(on: bool) -> void: _store("enabled", on))
 	add_child(_enabled)
+	_style = OptionButton.new()
+	_style.add_item("Logo and text", 0)
+	_style.add_item("Bounce — one character, eyes change on every bounce", 1)
+	_style.item_selected.connect(func(i: int) -> void:
+		_store("style", LockModel.STYLES[i])
+		_refresh_bounce_rows())
+	_row("Style", _style)
+	_size = _slider(BounceModel.SIZE_MIN, BounceModel.SIZE_MAX, 1, func(v: float) -> void: _store("bounce_size", int(v)))
+	_size_l = _row("Bounce size (% of screen height)", _size, true)
+	_speed = _slider(BounceModel.SPEED_MIN, BounceModel.SPEED_MAX, 0.05, func(v: float) -> void: _store("bounce_speed", BounceModel.clamp_speed(v)))
+	_speed_l = _row("Bounce speed (heights per s)", _speed, true)
 	_text = LineEdit.new()
 	_text.custom_minimum_size.x = 320
 	_text.select_all_on_focus = true  # RULES.md: focus selects the value
@@ -81,14 +98,41 @@ func _ready() -> void:
 			Lockscreen.overlay.cancel_capture())
 
 
-func _row(label: String, c: Control) -> void:
+## A labelled row; `with_value` adds a trailing value label and returns it.
+func _row(label: String, c: Control, with_value := false) -> Label:
 	var row := HBoxContainer.new()
 	var l := Label.new()
 	l.text = label
 	l.custom_minimum_size.x = 280
 	row.add_child(l)
 	row.add_child(c)
+	var v: Label = null
+	if with_value:
+		v = Label.new()
+		v.custom_minimum_size.x = 60
+		row.add_child(v)
 	add_child(row)
+	return v
+
+
+func _slider(lo: float, hi: float, step: float, on_change: Callable) -> HSlider:
+	var s := HSlider.new()
+	s.min_value = lo
+	s.max_value = hi
+	s.step = step
+	s.custom_minimum_size.x = 240
+	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	s.value_changed.connect(on_change)
+	return s
+
+
+## Size and speed only matter (and only show their value) in the Bounce style; the logo rows are for the plain one.
+func _refresh_bounce_rows() -> void:
+	var bounce: bool = _prefs.style == "bounce"
+	for c in [_size, _speed]:
+		(c as Control).get_parent().modulate.a = 1.0 if bounce else 0.45
+	_size_l.text = "%d %%" % int(_size.value)
+	_speed_l.text = "× %.2f" % _speed.value
 
 
 ## Show what is stored (LockModel.load_prefs) in every control.
@@ -98,6 +142,10 @@ func _refresh() -> void:
 	if not _text.has_focus():
 		_text.text = _prefs.text
 	_bg.color = _prefs.bg
+	_style.select(maxi(0, LockModel.STYLES.find(_prefs.style)))
+	_size.set_value_no_signal(_prefs.bounce_size)
+	_speed.set_value_no_signal(_prefs.bounce_speed)
+	_refresh_bounce_rows()
 	_key.text = _prefs.key
 	_preview.texture = LockModel.fit_texture(LockModel.logo_image(_prefs), 64, 128)
 	_logo_note.text = ("Custom logo: " + str(_prefs.logo).get_file()) if str(_prefs.logo) != "" else "Default logo."
@@ -106,6 +154,8 @@ func _refresh() -> void:
 func _store(key: String, value: Variant) -> void:
 	LockModel.save_pref(key, value)
 	_prefs[key] = value
+	if _size_l != null:
+		_refresh_bounce_rows()
 	if Lockscreen.overlay:
 		Lockscreen.overlay.reload()
 

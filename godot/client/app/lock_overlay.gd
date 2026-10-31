@@ -7,8 +7,12 @@ extends CanvasLayer
 ## `_input`: they are hidden on lock (and re-shown on unlock) so they can neither be used nor drawn over the overlay.
 ## The chord is also polled (Input.is_key_pressed) so it works when such a window had the keyboard focus.
 ## Not covered: Input.is_key_pressed polling by code (previs fly-through) and extra OS windows (the dock bubble).
+## WO-901: the mouse pointer is hidden while locked (Input.mouse_mode HIDDEN is application-wide: X11 blanks the cursor
+## on every native window, the second operator window included) and the previous mode comes back on unlock. Style
+## "bounce" swaps the logo for one bouncing character (app/bounce_character.gd); the second window keeps its plain cover.
 
 const LockModel := preload("res://core/lock_model.gd")
+const BounceCharacter := preload("res://app/bounce_character.gd")
 
 signal state_changed(locked: bool)
 signal capture_note(text: String)  # why a recorded chord was refused
@@ -31,6 +35,8 @@ var _bg: ColorRect
 var _logo: TextureRect
 var _label: Label
 var _chord := {}
+var _bounce: BounceCharacter
+var _mouse_before := Input.MOUSE_MODE_VISIBLE
 
 
 func _ready() -> void:
@@ -45,6 +51,9 @@ func _ready() -> void:
 	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_bg)
+	_bounce = BounceCharacter.new()
+	_bounce.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_root.add_child(_bounce)  # under the text, which stays readable when the character passes
 	var centre := CenterContainer.new()
 	centre.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -83,6 +92,10 @@ func reload() -> void:
 	_label.visible = str(prefs.text) != ""
 	_logo.texture = LockModel.fit_texture(LockModel.logo_image(prefs), LOGO_H, LOGO_MAX_W)
 	_logo.custom_minimum_size = Vector2(_logo.texture.get_size() / _scale()) if _logo.texture else Vector2.ZERO
+	var bouncing: bool = prefs.style == "bounce"
+	_logo.visible = not bouncing
+	_bounce.visible = bouncing
+	_bounce.configure(prefs.bounce_size, prefs.bounce_speed)
 	if _locked and not prefs.enabled:
 		unlock()
 
@@ -106,6 +119,8 @@ func lock() -> void:
 	_hide_windows()
 	get_parent().move_child(self, -1)  # last child → first _input
 	_root.visible = true
+	_mouse_before = Input.mouse_mode
+	_hide_pointer()
 	state_changed.emit(true)
 
 
@@ -114,6 +129,7 @@ func unlock() -> void:
 		return
 	_locked = false
 	_root.visible = false
+	Input.mouse_mode = _mouse_before
 	for w in _hidden:
 		if is_instance_valid(w):
 			w.show()
@@ -122,6 +138,10 @@ func unlock() -> void:
 		_focus.grab_focus.call_deferred()
 	_focus = null
 	state_changed.emit(false)
+
+
+func _hide_pointer() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 
 
 func toggle() -> void:
@@ -194,6 +214,8 @@ func _process(delta: float) -> void:
 		toggle()  # the chord went to an embedded window's focus instead of _input
 	_poll_down = down
 	if _locked:
+		if Input.mouse_mode != Input.MOUSE_MODE_HIDDEN:
+			_hide_pointer()  # something else (a view's capture, a window re-created) changed it: stay invisible
 		_scan += delta
 		if _scan >= SCAN_S:
 			_scan = 0.0

@@ -14,6 +14,13 @@ func _ready() -> void:
 func _attach() -> void:
 	overlay = Overlay.new()
 	get_tree().root.add_child(overlay)
+	if Config.args.has("probe-lock"):  # dev (WO-901): --probe-lock=plain|bounce locks 4 s after boot. Stores the style in
+		# ui.cfg [lockscreen] — run it with its own XDG_DATA_HOME, never on the owner's.
+		var LockModel := preload("res://core/lock_model.gd")
+		LockModel.save_pref("style", "bounce" if str(Config.args["probe-lock"]) == "bounce" else "plain")
+		overlay.reload()
+		await get_tree().create_timer(4.0).timeout
+		overlay.lock()
 
 
 func is_locked() -> bool:
