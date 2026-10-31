@@ -1,12 +1,13 @@
 extends VSplitContainer
 ## WO-863 — the Visuals tab (owner 30.10): the canvas (the visual's output, at the chosen screen's aspect) centred at the top,
-## under it the work area — 3D (an orbit camera into the same world) or Flow (the audio → parameter graph). The Inspector page
+## under it the work area (visuals_workarea.gd) — 3D (an orbit camera into the same world) or Flow (the audio → parameter graph). The Inspector page
 ## holds the base parameters and Output; Send publishes the canvas into shm ring `visuals` (WO-743) and plays it on the screen's
 ## PGM channel (`PLAY ch-layer SHM NAME visuals`, WO-742). Audio: the WO-861 parts in every `audio_fft` WS frame, moved by
 ## Sync (WO-866, visuals_sync.gd); the page's sensitivity sliders set the box's detectors.
 
 const M := preload("res://features/visuals/visuals_model.gd")
 const Flow := preload("res://features/visuals/visuals_flow.gd")
+const WorkArea := preload("res://features/visuals/visuals_workarea.gd")
 const Page := preload("res://features/visuals/visuals_page.gd")
 const Sync := preload("res://features/visuals/visuals_sync.gd")
 const Launcher := preload("res://features/visuals/game_launcher.gd")
@@ -25,7 +26,8 @@ var scene: Node:  # the live deck (visuals_deck.gd, WO-890: the layer stack): pa
 	get:
 		return mixer.deck()
 var sel := -1  # WO-890: the selected layer (Shift-drops and Sources double-clicks replace it; the 3D view looks into it)
-var flow: Flow
+var flow: Flow  # work.flow
+var work: WorkArea  # under the canvas: the mode bar (3D, Flow, …) and the picked mode's panel
 var page: Page
 var publisher: Publisher
 var ring_name := M.RING  # dev: --visuals-ring=<name>, so a probe client never writes the operator's ring
@@ -38,11 +40,6 @@ var _sens_post: SceneTreeTimer
 var _sens_want := {}
 var _trace := {}
 var _canvas: TextureRect
-var _orbit_cam: Camera3D
-var _orbit := Vector3(0.0, 0.25, 16.0)  # yaw, pitch, distance
-var _view3d: SubViewportContainer
-var _vp3: SubViewport
-var _mode := "flow"
 var _shader_list := []  # WO-874: GET /api/shaders rows, fetched once the Shader scene is first used
 var _shader_seq := 0
 var launcher := Launcher.new()  # WO-876: the Game scene's window
@@ -65,40 +62,13 @@ func _ready() -> void:
 		func(_at: Vector2, data: Variant) -> void: drop_visual(data, _target() if Input.is_key_pressed(KEY_SHIFT) else -1))
 	add_child(_canvas)
 	add_to_group("visuals_canvas")  # WO-885: Sources ▸ Visuals double-click
-	var work := VBoxContainer.new()
+	work = WorkArea.new()
 	add_child(work)
-	var bar := HBoxContainer.new()
-	work.add_child(bar)
-	var group := ButtonGroup.new()
-	for m in [["3d", "3D"], ["flow", "Flow"]]:
-		var b := Button.new()
-		b.text = m[1]
-		b.toggle_mode = true
-		b.button_group = group
-		b.button_pressed = m[0] == _mode
-		b.pressed.connect(func() -> void: _set_mode(m[0]))
-		bar.add_child(b)
-	var hint := Label.new()
-	hint.text = "Flow: right-click adds a node · drag an output dot to an input · Delete removes"
-	hint.modulate = Color(1, 1, 1, 0.6)
-	bar.add_child(hint)
-	_view3d = SubViewportContainer.new()
-	_view3d.stretch = true
-	_view3d.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_vp3 = SubViewport.new()
-	var vp3 := _vp3
 	mixer.switched.connect(func(_d: Node) -> void: _orbit_world())  # the orbit follows the live deck
-	_orbit_cam = Camera3D.new()
-	vp3.add_child(_orbit_cam)
-	_view3d.add_child(vp3)
-	_view3d.gui_input.connect(_orbit_input)
-	work.add_child(_view3d)
-	flow = Flow.new()
-	flow.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	flow = work.flow
 	flow.changed.connect(func(g: Dictionary) -> void:
 		slice.graph = M.normalize_graph(g)
 		_store())
-	work.add_child(flow)
 	page = Page.new()
 	page.params_changed.connect(func(p: Dictionary) -> void:
 		slice.params = M.params_of(p)
@@ -155,7 +125,6 @@ func _ready() -> void:
 	visibility_changed.connect(_on_shown)
 	_load()
 	_get_sensitivity.call_deferred()
-	_set_mode(_mode)
 	_on_shown()
 	if _g("Config"):  # not under the test runner (it shares user://)
 		_resume_send.call_deferred()
@@ -273,9 +242,8 @@ func _target() -> int:
 
 ## WO-890: the 3D view's orbit camera looks into the selected layer's world (each layer has its own).
 func _orbit_world() -> void:
-	var w: World3D = scene.world_of(sel) if _vp3 != null else null
-	if w != null and _vp3.world_3d != w:
-		_vp3.world_3d = w
+	if work != null:
+		work.look_into(scene.world_of(sel))
 
 
 ## WO-874: a library shader's config (GET /api/shaders/:id), cached; null without the box.
@@ -334,11 +302,9 @@ func _process(delta: float) -> void:
 	scene.params = M.evaluate(slice.graph, buses, slice.params, _env, delta, _trace)
 	mixer.step(delta)
 	show_ctl.step(delta)
-	if _mode == "flow" and is_visible_in_tree():
+	if work.mode == "flow" and is_visible_in_tree():
 		flow.show_levels(_trace)
-	if _mode == "3d":
-		var b := Basis.from_euler(Vector3(-_orbit.y, _orbit.x, 0.0))
-		_orbit_cam.transform = Transform3D(b, b * Vector3(0, 0, _orbit.z))
+	work.step()
 
 
 func _get_sensitivity() -> void:
@@ -359,22 +325,6 @@ func _post_sensitivity(map: Dictionary) -> void:
 	await _sens_post.timeout
 	_sens_post = null
 	await _g("DevicesTarget").box_api.post_json("/api/audio/parts-sensitivity", _sens_want)
-
-
-func _set_mode(m: String) -> void:
-	_mode = m
-	_view3d.visible = m == "3d"
-	flow.visible = m == "flow"
-
-
-func _orbit_input(e: InputEvent) -> void:
-	var mm := e as InputEventMouseMotion
-	if mm and mm.button_mask & MOUSE_BUTTON_MASK_LEFT:
-		_orbit.x -= mm.relative.x * 0.01
-		_orbit.y = clampf(_orbit.y + mm.relative.y * 0.01, -1.4, 1.4)
-	var mb := e as InputEventMouseButton
-	if mb and mb.pressed and mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-		_orbit.z = clampf(_orbit.z * (0.9 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 2.0, 80.0)
 
 
 ## Shown or publishing (on air or a Live source) → render every frame; otherwise the canvas sleeps.
