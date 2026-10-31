@@ -22,7 +22,7 @@ whatever you do should not affect the windows position/size … just to investig
 - **`run-client.sh --check`** (run before every commit by me, every agent and the gate script) boots the real app
   headless for 4 s with `--tab=1` (= Live), a fresh `XDG_DATA_HOME` (WO-753 — no ui.cfg → Auto ON) and the default
   server, i.e. **the box's live server**. Its headless panel is tiny → `_retile()` → POST.
-- **Proof** (`scratchpad/wo902/proxy.js`: GET + WS passed to :4200, every POST logged and swallowed, GET layout served
+- **Proof** (`tools/dev/readonly-proxy.js`: GET + WS passed to :4200, every POST logged and swallowed, GET layout served
   from the owner's 13:23 cells): one `--check` of HEAD posted, in order, the layout unchanged (atlas opt-in), a
   partly re-tiled one, then `pgm_1 {x 0.22896984, y 0.42450236, w 0.04341566, h 0.03601892}` … — the live values to 8
   digits — plus `POST /api/project/autosave` (598 KB), `/api/media/preview`, `/api/video-surfaces/lease`,
