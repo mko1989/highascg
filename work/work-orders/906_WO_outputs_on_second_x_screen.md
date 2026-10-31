@@ -1,7 +1,7 @@
 # WO-906 — Playout outputs on a second X screen (:0.1) of the same X server, operator heads alone on :0.0
 
 **Area:** devices-config, os-iso, mapping
-**Status: OPEN**
+**Status: IN PROGRESS (31.10.26 — root helper + installer written and smoke-tested; generator, DISPLAY plumbing and box test still open)**
 
 ## Owner request (31.10.26)
 "would it be possible to move the screen consumer outputs to another x display like display:1 so they are separate
@@ -58,3 +58,20 @@ screen. it was already possible through mapping nodes."
   xrandr changes during playback leave the Dioda output untouched (ring + screen capture of :0.1).
 - Offline: generator smoke for the conf (screen split from a device graph, BusID, Xinerama off), per-screen layout plan
   from 0,0, DISPLAY plumbing.
+
+## 4. Done so far (31.10.26)
+- **Root helper** `tools/runtime/highascg-xorg-screens-apply.sh` — `check <file> | install <file> | off | restore | status`.
+  Validates before writing: only Device / Monitor / Screen / ServerLayout sections (+ SubSection "Display" in Screen), a
+  keyword and NVIDIA-option whitelist, values = quoted strings / numbers / screen position words, `Driver "nvidia"`,
+  `BusID "PCI:b:d:f"`, no "NVIDIA Default Device" (that identifier is 99-highascg-force-composition.conf's), a
+  ServerLayout required, ≤ 16 KiB, no symlink / control chars. Install copies the content to a temp file in the target
+  dir, re-validates it, keeps the current file as `98-highascg-screens.conf.prev` (not `*.conf`: X never loads it),
+  then renames. `off` moves it to `.prev`, `restore` swaps `.prev` back. Nothing touches X until nodm restarts.
+- **Installer** `scripts/runtime/install-xorg-screens-apply.sh` (as `install-network-apply.sh`): the helper to
+  `/usr/local/lib/highascg/` (755 root) + `/etc/sudoers.d/highascg-xorg-screens` (one NOPASSWD line, 440, `visudo -cf`).
+  On this box, once: `sudo bash ~/highascg/scripts/runtime/install-xorg-screens-apply.sh`.
+  Not yet in the ISO setup (no ISO caller of the network helper's installer either — to wire with the generator).
+- **Verified:** shellcheck clean; `tools/smoke/smoke-wo906-xorg-screens-helper.test.js` (4/4, curated CI) — a two-screen
+  layout validates / installs / turns off / restores in a temp dir (`HIGHASCG_XORG_DIR`, ignored for root); Files, Module,
+  other drivers, unknown options, a BusID with `;`, `$(id)`, an unclosed section, no layout and the default-device
+  identifier all exit 2 with the installed file untouched and no temp file left; symlinks refused.
