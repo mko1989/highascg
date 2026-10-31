@@ -6,6 +6,7 @@ const { resolveGpuConnectorLabelForChannel } = require('../utils/gpu-connector-l
 const { parseServerChannels } = require('../config/config-compare')
 const { responseToStr } = require('../utils/query-cycle')
 const persistence = require('../utils/persistence')
+const { readCefFailed } = require('../system/caspar-cef-health')
 
 /* WO-492 B: layer-999 clearing + the "is the card even there?" probe live in their own module
  * (500-line limit); the layer constant is defined there so the two cannot require each other. */
@@ -26,6 +27,11 @@ let retryTimer = null
 let webUiClearRetryTimer = null
 /** CEF “catch-up” replays (must be cancelled if layer 999 is cleared for Web UI) */
 let cefReplayTimeouts = []
+
+/** WO-881: AMCP failures of the card in a row (back-off ×2 to LED_RETRY_CAP_MS, give up at LED_RETRY_MAX). */
+let amcpFails = 0
+const LED_RETRY_CAP_MS = 60000
+const LED_RETRY_MAX = 12
 
 const WEB_UI_CLEAR_RETRY_MS = 400
 const WEB_UI_CLEAR_RETRY_MAX_MS = 60000
@@ -222,13 +228,24 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 	try {
 		await amcp.batchSendChunked(flat, { skipMixerPreCommit: true })
 	} catch (e) {
-		appCtx.log(
-			'warn',
-			`[Startup LED test] AMCP: ${e?.message || e} (deploy templates/${TEMPLATE_NAME}.html to Caspar template-path)`,
-		)
-		scheduleRetry(appCtx, startupLedTestFastMode() ? 2500 : 5000)
+		// WO-881: a Caspar without CEF answered 404 to every try, every 2.5 s, for 6 h 40 min, and the hint blamed the
+		// template. Back off ×2 to 60 s, stop after LED_RETRY_MAX, and name the HTML producer when that is the cause.
+		amcpFails++
+		const msg = String(e?.message || e)
+		const cef = readCefFailed()
+		const why = cef
+			? `Caspar's HTML producer (CEF) did not start — ${cef}`
+			: `deploy templates/${TEMPLATE_NAME}.html to Caspar template-path, or Caspar's HTML producer is unavailable`
+		if (amcpFails >= LED_RETRY_MAX) {
+			appCtx.log('warn', `[Startup LED test] AMCP: ${msg} (${why}) — gave up after ${amcpFails} tries`)
+			return
+		}
+		const delay = Math.min(LED_RETRY_CAP_MS, (startupLedTestFastMode() ? 2500 : 5000) * 2 ** (amcpFails - 1))
+		appCtx.log('warn', `[Startup LED test] AMCP: ${msg} (${why}) — retry ${amcpFails} in ${Math.round(delay / 1000)} s`)
+		scheduleRetry(appCtx, delay)
 		return
 	}
+	amcpFails = 0
 
 	for (const ch of withTarget) {
 		try {

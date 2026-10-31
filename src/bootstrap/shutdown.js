@@ -69,6 +69,7 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 			if (typeof appCtx._stopUsbAutoMount === 'function') appCtx._stopUsbAutoMount()
 			if (typeof appCtx._stopOsLayoutWatchdog === 'function') appCtx._stopOsLayoutWatchdog()
 			if (typeof appCtx._stopCasparAmcpWatchdog === 'function') appCtx._stopCasparAmcpWatchdog()
+			if (typeof appCtx._stopCasparCefHealth === 'function') appCtx._stopCasparCefHealth()
 			if (typeof appCtx._stopReplicationService === 'function') appCtx._stopReplicationService()
 			try {
 				const { stopPointerConfine } = require('../system/pointer-confine')

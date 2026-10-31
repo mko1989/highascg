@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-824 live WOs (30 open, 123 in progress, 671 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+824 live WOs (29 open, 124 in progress, 671 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -202,7 +202,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 742 DONE [caspar-build+engine] Caspar shm producer: play a shared-memory ring written by another process (WO-7… → 742_WO_caspar_shm_producer.md
 - 820 DONE [caspar-build+media] NotchLC: native GPU decode in Caspar (spike + build) → 820_WO_notchlc_native_gpu_decode.md
 - 847 DONE [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
-- 881 OPEN [caspar-build+engine] Caspar came up without CEF after a supervisor tree-kill, and nothing said so → 881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md
+- 881 IN PROGRESS [caspar-build+engine] Caspar came up without CEF after a supervisor tree-kill, and nothing said so → 881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md
 - 888 DONE [caspar-build+os-iso] PGM micro stutter on alt-tab: Caspar's window never takes focus; frame sync sti… → 888_WO_caspar_window_no_focus_sync_follows_pgm.md
 
 ## audio — Audio routing, devices, meters (46)

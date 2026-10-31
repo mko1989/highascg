@@ -208,6 +208,79 @@ caspar_clear_cef_cache() {
 	return 0
 }
 
+# WO-881: a relaunch 5 s after a tree-kill came up with "[html] Failed to initialize CEF" — Caspar, channels and AMCP
+# fine, every HTML layer 404 for hours. The KILL sweep signalled once and started again after a fixed 1 s; a CEF child
+# still exiting or the KILLed main's SingletonLock (→ "<host>-<pid>") can make the new CEF see its profile in use.
+caspar_wait_tree_gone() {
+	_n=0
+	while caspar_any_process_running && [ "$_n" -lt $((${CASPAR_TREE_GONE_WAIT_SEC:-5} * 10)) ]; do
+		sleep 0.1
+		_n=$((_n + 1))
+	done
+	caspar_any_process_running && caspar_supervisor_log "[supervisor] casparcg tree still present after ${CASPAR_TREE_GONE_WAIT_SEC:-5}s"
+	caspar_drop_stale_cef_lock
+}
+
+# The lock names the main that held the profile; dropped only when that pid is gone or is no casparcg.
+caspar_drop_stale_cef_lock() {
+	_cache="${CASPAR_CEF_CACHE:-$CASPAR_ROOT/cef-cache}"
+	_lock="$(readlink "$_cache/SingletonLock" 2>/dev/null)" || return 0
+	_lpid="${_lock##*-}"
+	case "$_lpid" in '' | *[!0-9]*) return 0 ;; esac
+	case "$(caspar_cmdline "$_lpid")" in *casparcg*) return 0 ;; esac
+	rm -f "$_cache/SingletonLock" "$_cache/SingletonSocket" "$_cache/SingletonCookie"
+	caspar_supervisor_log "[supervisor] dropped a stale CEF profile lock (pid $_lpid gone)"
+}
+
+# Caspar's own log (config <log-path> log/, relative to CASPAR_ROOT): the newest file and its size before a launch …
+# (find, not a glob: run.sh runs with `set -f`)
+caspar_newest_log() {
+	find "${CASPAR_LOG_DIR:-$CASPAR_ROOT/log}" -maxdepth 1 -name 'caspar_*.log' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | cut -d' ' -f2-
+}
+
+caspar_log_mark() {
+	_f="$(caspar_newest_log)"
+	[ -n "$_f" ] && printf '%s:%s\n' "$_f" "$(wc -c <"$_f")"
+}
+
+# … and whether that launch logged the CEF failure since the mark (a new day's file is read whole).
+caspar_cef_failed_since() {
+	_f="$(caspar_newest_log)"
+	[ -n "$_f" ] || return 1
+	_from=1
+	[ "${1%:*}" = "$_f" ] && _from=$((${1##*:} + 1))
+	tail -c +"$_from" "$_f" | grep -q 'Failed to initialize CEF'
+}
+
+caspar_cef_state_file() { printf '%s\n' "${CASPAR_CEF_STATE:-${TMPDIR:-/tmp}/caspar-cef-state.$$}"; }
+caspar_cef_health_file() { printf '%s\n' "${CASPAR_CEF_HEALTH_FILE:-${HOME:-/home/casparcg}/.highascg/run/caspar-cef-failed}"; }
+
+# The watcher saw the failure: the first time → state "relaunch" (return 0: the caller stops the tree, run.sh relaunches
+# at once); after that relaunch failed too → the health file node shows in the GUI, Caspar keeps running (return 1).
+caspar_cef_on_fail() {
+	if [ "$(cat "$(caspar_cef_state_file)" 2>/dev/null)" != "retried" ]; then
+		echo relaunch >"$(caspar_cef_state_file)"
+		caspar_supervisor_log "[supervisor] CEF failed to initialize (HTML layers dead) — restarting Caspar once"
+		return 0
+	fi
+	mkdir -p "$(dirname "$(caspar_cef_health_file)")"
+	printf '%s Caspar HTML (CEF) failed to start twice: shader, template and test-card layers are dead. Restart Caspar.\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S')" >"$(caspar_cef_health_file)"
+	caspar_supervisor_log "[supervisor] CEF failed again after a restart — health warning raised, Caspar left running"
+	return 1
+}
+
+caspar_cef_ok() {
+	rm -f "$(caspar_cef_state_file)" "$(caspar_cef_health_file)"
+}
+
+# run.sh after a stop: the watcher asked for the one CEF relaunch → consume it (0 = relaunch now, no crash damping).
+caspar_cef_relaunch_pending() {
+	[ "$(cat "$(caspar_cef_state_file)" 2>/dev/null)" = "relaunch" ] || return 1
+	echo retried >"$(caspar_cef_state_file)"
+	return 0
+}
+
 # WO-398 hang detector, run BESIDE Caspar since WO-805 (it used to be run.sh's foreground loop, so an
 # exit was only noticed when its 10 s healthy-poll `sleep` ended: 0-10 s, ~8.9 s on the 29.10 Apply).
 # Polls 1 s during boot / while a stall is counted, 10 s while AMCP is up; `_stuck` counts SECONDS.
@@ -222,11 +295,27 @@ caspar_hang_watch() {
 	_saw_amcp=0
 	_stuck=0
 	_poll=1
+	_cef=0 # WO-881: the CEF check runs when AMCP first answers and once more at the next healthy poll (log flush)
 	while kill -0 "$_child" 2>/dev/null; do
 		if caspar_amcp_listening; then
 			_saw_amcp=1
 			_stuck=0
 			_poll=10
+			if [ "$_cef" -lt 2 ] && [ -n "${CASPAR_LOG_MARK+x}" ]; then
+				_cef=$((_cef + 1))
+				if caspar_cef_failed_since "$CASPAR_LOG_MARK"; then
+					_cef=2
+					if caspar_cef_on_fail; then
+						: >"$_flag"
+						caspar_kill_all_processes TERM
+						sleep 2
+						caspar_kill_all_processes KILL
+						return 0
+					fi
+				elif [ "$_cef" -eq 2 ]; then
+					caspar_cef_ok
+				fi
+			fi
 		else
 			_stuck=$((_stuck + _poll))
 			_poll=1
@@ -275,13 +364,14 @@ caspar_wait_child_or_hang() {
 caspar_ensure_fully_stopped() {
 	caspar_wait_amcp_port_free
 	if ! caspar_any_process_running; then
+		caspar_drop_stale_cef_lock
 		return 0
 	fi
 	caspar_supervisor_log "[supervisor] casparcg still running without AMCP — killing process tree"
 	caspar_kill_all_processes TERM
 	sleep 2
 	caspar_kill_all_processes KILL
-	sleep 1
+	caspar_wait_tree_gone # WO-881: was a fixed `sleep 1`
 }
 
 # Wait until AMCP port is free before the next casparcg start.

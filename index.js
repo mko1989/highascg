@@ -362,6 +362,7 @@ function main() {
 			appCtx._stopCasparAmcpWatchdog = startCasparAmcpWatchdog(appCtx)
 		}
 
+		appCtx._stopCasparCefHealth = require('./src/system/caspar-cef-health').startCasparCefHealthWatch(appCtx) // WO-881
 		if (casparConn) {
 			let wasConnected = false; casparConn.on('status', payload => {
 				appCtx._casparStatus = { ...appCtx._casparStatus, ...payload }

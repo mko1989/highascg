@@ -1,7 +1,7 @@
 # WO-881 — Caspar came up without CEF after a supervisor tree-kill, and nothing said so
 
 **Area:** caspar-build, engine
-**Status: OPEN** (31.10: found during the WO-877..880 on-air checks; investigated, not fixed)
+**Status: IN PROGRESS** (31.10.26: the three to-dos built — supervisor smoke 5/5 against a stub Caspar, node smoke 2/2, Godot suite 25535/0; live box deploy below)
 
 Found while running the on-air checks for [WO-580](./580_WO_shader_live_seamless_speed_and_smooth_params.md) /
 [WO-877](./877_WO_visuals_show_looks_crossfade_master.md). A show-day failure mode: every HTML layer (shader looks,
@@ -39,7 +39,32 @@ lower thirds, the LED test card) is dead for hours while PLAY/AMCP look healthy.
 3. LED test card retry: back off (×2 to 60 s) and stop after N; word the 404 as "Caspar HTML producer unavailable"
    when the template file exists.
 
-## 3. What was verified
+## 3. What was done (31.10.26, owner: "check it out")
 
-- Nothing fixed yet. Evidence above from the box logs; the clean restarts at 07:16 / 07:20 / 07:22 show the failure
-  is not deterministic.
+1. **Tree gone + stale lock** — `tools/runtime/casparcg-supervisor-lib.sh`: `caspar_ensure_fully_stopped` waits
+   (`caspar_wait_tree_gone`, ≤ `CASPAR_TREE_GONE_WAIT_SEC` 5 s, 100 ms polls) instead of the fixed `sleep 1` after the
+   KILL sweep; `caspar_drop_stale_cef_lock` removes `cef-cache/Singleton{Lock,Socket,Cookie}` when the lock's pid
+   (`<host>-<pid>`) is gone or is no casparcg (a pid reused after a power cut). Also run before every launch (`run.sh`).
+2. **Detect + one retry + warning** — `run.sh` marks Caspar's newest log (`caspar_log_mark`: file + size) right before
+   the launch; the hang watcher (`caspar_hang_watch`) greps the log from that mark for `Failed to initialize CEF` when
+   AMCP first answers and again at the next healthy poll (10 s, log flush). First failure → state `relaunch`, the tree
+   is stopped like a hang (TERM, 2 s, KILL), `run.sh` sees `caspar_cef_relaunch_pending` → fast relaunch (no grace, no
+   crash damping), state `retried`. Second failure → `~/.highascg/run/caspar-cef-failed` (the reason) and Caspar is
+   LEFT RUNNING (AMCP, video layers still work). A clean check clears both.
+   Found on the way: `run.sh` runs with `set -f`, so a `caspar_*.log` glob never expands — `caspar_newest_log` uses find.
+3. **Surfaced** — `src/system/caspar-cef-health.js` polls the file (5 s) into `caspar.connection.cefFailed` (WS
+   broadcast on change; started in `index.js`, stopped in `shutdown.js`). Godot `app/shell.gd` `_refresh_eye`: the
+   connection eye turns red with the reason in its tooltip while AMCP is up but CEF is dead.
+4. **LED test card** — `src/bootstrap/startup-led-test-pattern.js`: AMCP failures back off ×2 from 2.5 / 5 s to 60 s and
+   stop after 12 tries; the message names the HTML producer (the health file's text when present) instead of blaming
+   the template only.
+
+## 4. What was verified
+
+- `tools/smoke/smoke-wo881-cef-init-retry.test.js` 5/5 — run.sh under /bin/sh against a stub casparcg that writes the
+  CEF line on chosen launches: fail once → exactly one fast relaunch, no backoff, no warning, state cleared; fail twice
+  → two launches, warning file, Caspar left running; old CEF lines from before the launch mark (and yesterday's file)
+  ignored and an old warning cleared; a dead-pid / reused-pid lock dropped; sources parse under /bin/sh.
+- `tools/smoke/smoke-wo881-cef-health-node.test.js` 2/2 — file → `cefFailed` broadcast once per change, removed →
+  cleared, AMCP state kept; eye + LED back-off pinned. Supervisor smokes wo805 / wo400 green with it (19/19).
+- Godot suite 25535/0.

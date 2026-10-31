@@ -268,9 +268,14 @@ func _refresh_eye() -> void:
 		return
 	var caspar: Variant = Store.get_value("caspar.connection", Store.get_value("caspar", {}))
 	var caspar_ok := false
+	var cef_failed := ""  # WO-881: Caspar up without its HTML producer (src/system/caspar-cef-health.js)
 	if caspar is Dictionary:
 		caspar_ok = bool((caspar as Dictionary).get("connected", false))
+		cef_failed = str((caspar as Dictionary).get("cefFailed", ""))
 	var state := "server offline" if not Ws.is_open else ("server ok · Caspar offline" if not caspar_ok else "connected")
+	if caspar_ok and cef_failed != "":
+		caspar_ok = false  # red: shaders, templates and the test card are dead while AMCP looks fine
+		state = "Caspar connected · " + cef_failed
 	if Config.demo:  # WO-815
 		state = Config.DEMO_LABEL + " (simulated server)"
 	_eye.set_state(Ws.is_open and caspar_ok, Settings.get_setting("offline_mode", false) == true,

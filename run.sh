@@ -135,6 +135,10 @@ run_caspar() {
 		caspar_supervisor_log "[run.sh] REFUSING to launch — a casparcg main process is already running (pid(s): ${_stray% }). Only one instance may run; stop it first (systemctl stop casparcg-server) or kill it by hand."
 		exit 3
 	fi
+	# WO-881: a lock left by a KILLed main (or a power cut) must not make this start's CEF fail; the watcher reads
+	# Caspar's log from here on for "Failed to initialize CEF".
+	caspar_drop_stale_cef_lock
+	CASPAR_LOG_MARK="$(caspar_log_mark)"
 	"$CASPAR_BIN" "$CONFIG_PATH" "$@" </dev/null &
 	_child=$!
 	# WO-805: wait on the child (exit noticed at once); the WO-398 hang detector (1 s / 10 s polls,
@@ -194,6 +198,13 @@ while :; do
 	# drifted from the lib's 134/139/136/11.
 	if caspar_crash_is_hard_fail_code "$ec"; then
 		caspar_clear_cef_cache
+	fi
+
+	# WO-881: the watcher stopped a Caspar whose CEF failed to initialise — one fast relaunch, not a crash.
+	if caspar_cef_relaunch_pending; then
+		caspar_supervisor_log "[run.sh] CEF retry — fast relaunch"
+		CASPAR_SKIP_GRACE_ONCE=1
+		continue
 	fi
 
 	# WO-337 #3: an operator-initiated apply (node writes the marker just before its kill/RESTART)
