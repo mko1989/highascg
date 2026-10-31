@@ -64,5 +64,5 @@ module.exports = [
 	'tools/smoke/smoke-wo902-compose-no-foreign-retile.test.js',
 	'tools/smoke/smoke-wo903-pointer-confine-spans-operator-heads.test.js',
 	'tools/smoke/smoke-wo904-undo-snapshot-off-edit-path.test.js',
-	'tools/smoke/smoke-wo905-live-deck-sticky-heads.test.js',
+	'tools/smoke/smoke-wo905-live-deck-per-screen-scroll.test.js',
 ]

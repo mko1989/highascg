@@ -17,7 +17,6 @@ const BlankClear := preload("res://features/live/deck_blank_clear.gd")
 const DeckHead := preload("res://features/live/deck_head.gd")
 const Destinations := preload("res://features/live/destinations.gd")
 const DeckOverlay := preload("res://features/live/deck_overlay.gd")
-const StickyHeads := preload("res://features/live/deck_sticky_heads.gd")
 const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
@@ -27,7 +26,6 @@ signal border_requested(main: int, label: String)  # WO-601: global border inspe
 signal look_deleted(scene_id: String)  # WO-623 B: the live tab closes the editor if it shows this look
 
 var _columns: HBoxContainer
-var _heads: StickyHeads  # the screens' header bars, kept visible while the deck scrolls
 var _dirty := true
 var _main_for_card := 0
 var _press_id := ""  # the card a left press landed on (WO-762: PRV on release, not on a drag)
@@ -40,11 +38,12 @@ var show_looks := true:  # WO-781: deck toolbar "Looks" — the columns keep the
 
 func _ready() -> void:
 	horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED  # WO-905: each screen's looks scroll on their own
 	_columns = HBoxContainer.new()
 	_columns.add_theme_constant_override("separation", 12)
 	_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_columns.size_flags_vertical = Control.SIZE_EXPAND_FILL  # columns reach the bottom: all of it is drop space
-	_heads = StickyHeads.mount(self, _columns)
+	add_child(_columns)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _dirty = true)
 	Store.changed.connect(_on_store_changed)
 
@@ -58,13 +57,11 @@ func _process(_delta: float) -> void:
 	if _dirty:
 		_dirty = false
 		rebuild()
-	_heads.follow(scroll_vertical)
 
 
 func rebuild() -> void:
 	for c in _columns.get_children():
 		c.queue_free()
-	_heads.clear()
 	var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
 	var live: Dictionary = Store.get_value("scene.live", {}) if Store.get_value("scene.live") is Dictionary else {}
 	var ps: Dictionary = Store.project.get("scenes", {}) if Store.project.get("scenes") is Dictionary else {}
@@ -90,7 +87,7 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	col.mouse_filter = Control.MOUSE_FILTER_PASS
 	col.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))  # WO-623 B: blank deck space
 	var head_row := DeckHead.build(self, title, looks.size(), bus, main, cm)  # WO-781: title = destination toggle
-	col.add_child(_heads.slot(head_row, col, _can_drop_new.bind(main), _drop_new.bind(main)))
+	col.add_child(head_row)
 	var timer := TimerView.new()
 	timer.setup(osc_mirror, main)
 	col.add_child(timer)
@@ -99,7 +96,14 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	grid.add_theme_constant_override("v_separation", 12)
 	grid.mouse_filter = Control.MOUSE_FILTER_PASS
 	grid.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))
-	col.add_child(grid)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var scroll := ScrollContainer.new()  # WO-905: the header and timer stay put; blank space below the cards stays drop space
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	scroll.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))
+	scroll.add_child(grid)
+	col.add_child(scroll)
 	grid.visible = show_looks
 	for s in (looks if show_looks else []):
 		grid.add_child(_card(s, bus))

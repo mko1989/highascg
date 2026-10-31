@@ -471,7 +471,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 901 DONE [godot-client] Lockscreen: hidden mouse pointer + "Bounce" style (one bouncing character) → 901_WO_lockscreen_hidden_pointer_and_bounce_style.md
 - 902 DONE [godot-client+testing-ci] Live preview windows shrink on their own: run-client.sh --check re-tiled the sh… → 902_WO_live_compose_layout_no_foreign_retile.md
 - 904 DONE [godot-client] Changing any Visuals value froze the output: a whole-show undo snapshot on ever… → 904_WO_visuals_freeze_undo_snapshot_per_edit.md
-- 905 DONE [godot-client] Live deck: each screen's header bar stays visible while the deck scrolls → 905_WO_live_deck_sticky_screen_headers.md
+- 905 DONE [godot-client] Live deck: each screen's looks scroll on their own; its header bar always stays… → 905_WO_live_deck_per_screen_scroll.md
 
 ## web-client — Web client (82)
 
