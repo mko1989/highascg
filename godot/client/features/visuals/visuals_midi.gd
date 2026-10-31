@@ -17,6 +17,7 @@ const UiCfg := preload("res://core/ui_cfg.gd")
 const M := preload("res://features/visuals/visuals_model.gd")
 const Auto := preload("res://features/visuals/visuals_autopilot.gd")
 const Looks := preload("res://features/visuals/visuals_looks.gd")
+const Apc := preload("res://features/visuals/visuals_midi_apc.gd")
 const SECTION := "midi"
 
 var tab: Node
@@ -37,6 +38,7 @@ var _lit := {}  # the lights as last sent
 var _cc_last := {}  # source key → last CC value: a CC on a button target presses on its rising edge
 var _ghosts := {}  # target → its Ghost
 var _auto_back := 2  # Auto switched on from a button goes back to this item (8 bars)
+var apc_view: Apc  # WO-909: the Controller mode (the APC40 drawn) and the device-knob auto page
 var _hello_until := 0  # msec: until then CCs are the APC's position report (_hello)
 
 
@@ -49,6 +51,10 @@ func _init(t: Node, persist := false) -> void:
 	panel.learn_toggled.connect(func(on: bool) -> void: _set_mode("learn" if on else ""))
 	panel.unmap_toggled.connect(func(on: bool) -> void: _set_mode("unmap" if on else ""))
 	panel.menu_picked.connect(_menu)
+	apc_view = Apc.new(self)
+	add_child(apc_view)
+	if tab.work != null:
+		tab.work.add_mode("controller", "Controller", apc_view.surface, Apc.HINT)
 	_load()
 	inputs = MidiInput.new()
 	inputs.devices_changed.connect(_devices)
@@ -78,6 +84,7 @@ func handle(e: InputEventMIDI) -> void:
 	var msg := MidiMap.decode(e)
 	if msg.is_empty():
 		return
+	apc_view.surface.touch(msg)
 	if mode != "":
 		if msg.kind != "off":
 			_captured(msg)
@@ -140,6 +147,8 @@ func _button(b: Dictionary, msg: Dictionary, c: Control) -> void:
 			(c as BaseButton).button_down.emit()  # the Tap button taps on the press
 		"auto":
 			_auto(c as OptionButton)
+		"select":
+			apc_view.select(b.target)
 		_:
 			(c as BaseButton).pressed.emit()
 	_say("%s → %s" % [_name(msg), MidiMap.target_label(b.target)])
@@ -172,6 +181,8 @@ func control_of(target: String) -> Control:
 			return tab.page.show_panel.look_button(n)
 		"xfade", "take", "cut":  # WO-908: only while A/B is on
 			return tab.dj.control(p[0])
+		"dev", "select":  # WO-909: the device knob page, the layer rows
+			return apc_view.control_of(target)
 	return tab.page.show_panel.control(target)
 
 
@@ -300,6 +311,8 @@ func led_state(target: String) -> int:
 			return Leds.OFF if c == null else (Leds.ON if (c as BaseButton).button_pressed else Leds.ALERT)
 		"blackout":
 			return Leds.ALERT if tab.mixer.blackout else Leds.AVAIL
+		"select":
+			return Leds.OFF if c == null else (Leds.ON if int(target.get_slice(":", 1)) - 1 == tab.sel else Leds.AVAIL)
 		"auto":
 			return Leds.ON if c != null and (c as OptionButton).selected > 0 else Leds.AVAIL
 		"audio":

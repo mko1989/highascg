@@ -7,8 +7,8 @@ extends RefCounted
 ## the faders and knobs send absolute 7-bit values there, no init sysex needed).
 
 const ANY := -1
-const RANGES := ["layer", "master", "fade", "param", "xfade"]  # continuous targets (a slider; picked up, midi_pickup.gd)
-const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut"]  # take / cut / xfade: WO-908 A/B
+const RANGES := ["layer", "master", "fade", "param", "xfade", "dev"]  # dev: WO-909 device knobs · continuous targets (a slider; picked up, midi_pickup.gd)
+const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select"]  # take / cut / xfade: WO-908 A/B
 const PARAM_LABELS := {"cam_yaw": "Camera yaw", "cam_pitch": "Camera pitch", "cam_zoom": "Camera zoom"}
 
 
@@ -103,6 +103,10 @@ static func target_label(target: String) -> String:
 			return "Tempo: Audio"
 		"auto":
 			return "Auto on/off"
+		"dev":
+			return "Device knob %s (follows the selected layer)" % p[1]
+		"select":
+			return "Select layer %s" % p[1]
 		"xfade":
 			return "A/B crossfader"
 		"take":
@@ -157,8 +161,10 @@ static func apc40() -> Array:
 	for i in knobs.size():
 		m.append({"kind": "cc", "ch": ANY, "num": 48 + i, "target": "param:" + knobs[i]})  # track knobs 1–7
 	m.append({"kind": "cc", "ch": ANY, "num": 55, "target": "fade"})  # track knob 8
-	for i in 3:
-		m.append({"kind": "cc", "ch": ANY, "num": 16 + i, "target": "param:" + ["cam_yaw", "cam_pitch", "cam_zoom"][i]})
+	for i in 8:  # WO-909: the device knobs follow the selected layer (its shader's key controls, else camera + burst)
+		m.append({"kind": "cc", "ch": ANY, "num": 16 + i, "target": "dev:%d" % (i + 1)})
+	for t in 8:
+		m.append({"kind": "note", "ch": t, "num": 51, "target": "select:%d" % (t + 1)})  # track select → selects layer t
 	for i in 12:  # clip grid, top row = looks 1–8, then the second row's first four = looks 9–12
 		m.append({"kind": "note", "ch": ANY, "num": 32 + i if i < 8 else 24 + i - 8, "target": "look:%d" % (i + 1)})
 	m.append({"kind": "note", "ch": ANY, "num": 82, "target": "burst"})  # scene launch 1
@@ -167,4 +173,6 @@ static func apc40() -> Array:
 	m.append({"kind": "note", "ch": ANY, "num": 99, "target": "tap"})  # tap tempo
 	m.append({"kind": "note", "ch": ANY, "num": 81, "target": "blackout"})  # stop all clips
 	m.append({"kind": "cc", "ch": ANY, "num": 15, "target": "xfade"})  # WO-908: the crossfader → A/B banks
+	m.append({"kind": "note", "ch": ANY, "num": 85, "target": "take"})  # scene launch 4 → A/B AUTO
+	m.append({"kind": "note", "ch": ANY, "num": 86, "target": "cut"})  # scene launch 5 → A/B CUT
 	return m

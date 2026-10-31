@@ -34,6 +34,7 @@ var _main: VBoxContainer
 var _adv_btn: Button
 var _adv: VBoxContainer
 var _adv_open := false
+var _key_cards := []  # WO-909: [{label, card}] the key controls in order (the APC40 device knobs follow them)
 
 
 func _init(host: Node = null) -> void:
@@ -136,6 +137,26 @@ static func recompile(deck: Node, layers: Array, id: String, cfg: Dictionary) ->
 	return err
 
 
+## WO-909: the key controls a MIDI knob can drive, in panel order: [{label, control (its slider)}] (toggles and colours left out).
+func key_controls() -> Array:
+	var out := []
+	for k in _key_cards:
+		var w: Control = _knob_of(k.card) if is_instance_valid(k.card) else null
+		if w != null:
+			out.append({"label": k.label, "control": w})
+	return out
+
+
+static func _knob_of(n: Node) -> Control:
+	for c in n.get_children():
+		if c is Range:
+			return c
+		var d := _knob_of(c)
+		if d != null:
+			return d
+	return null
+
+
 func current_values(key: String) -> Array:
 	return _values.get(key, [])
 
@@ -215,6 +236,7 @@ func _render() -> void:
 	for c in _main.get_children():
 		c.queue_free()
 	_adv_btn.visible = not _view.is_empty()
+	_key_cards.clear()
 	_dirty.visible = bool(_view.get("dirty", false))
 	_save.disabled = not _dirty.visible
 	if not _view.is_empty():
@@ -224,7 +246,9 @@ func _render() -> void:
 			var flow := HFlowContainer.new()
 			flow.add_theme_constant_override("h_separation", 18)
 			for c in sec.controls:
-				flow.add_child(W.key_control(self, c, by))
+				var card := W.key_control(self, c, by)
+				flow.add_child(card)
+				_key_cards.append({"label": str(c.get("label", "")), "card": card})
 			_main.add_child(W.group(str(sec.title), flow))
 		var sum := HBoxContainer.new()
 		sum.add_child(W.muted(M.summary(_view)))

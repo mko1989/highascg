@@ -1,0 +1,133 @@
+extends Node
+## WO-909 — the APC40 profile of the Visuals' MIDI controller (visuals_midi.gd): the work area's "Controller" mode draws the
+## unit (features/midi/apc40_surface.gd) with what each fader, knob, pad and button does right now — the live names (layer
+## 2 = "Particles", pad 3 = the look's name), values, pickup ticks and lights — and flashes whatever is touched. Clicking a
+## control starts Learn for it. The auto mapping: the 8 device knobs ("dev:N") follow the selected layer — a shader layer's
+## key controls (the Shader mode's sliders, in its order and names), any other layer the camera and burst page — and the
+## track select buttons ("select:N") pick that layer, so the knobs re-label themselves as the selection or the shader
+## changes. A knob that lands on a new parameter waits for pickup like any fader (midi_pickup.gd).
+
+const MidiMap := preload("res://features/midi/midi_map.gd")
+const Pickup := preload("res://features/midi/midi_pickup.gd")
+const L := preload("res://features/midi/apc40_layout.gd")
+const Surface := preload("res://features/midi/apc40_surface.gd")
+const Layers := preload("res://features/visuals/visuals_layers.gd")
+const FALLBACK := ["param:cam_yaw", "param:cam_pitch", "param:cam_zoom", "param:burst"]
+const HINT := "Controller: what every APC40 control does now — move one to see it light up · click a control to Learn it · device knobs follow the selected layer"
+
+var midi: Node
+var surface: Surface
+var _page := []  # the device knob page: [{label, control}] — refreshed at most every 0.1 s
+var _page_at := -1000
+
+
+func _init(m: Node) -> void:
+	midi = m
+	surface = Surface.new()
+	surface.info_cb = info
+	surface.picked.connect(_learn)
+
+
+## The device knob page now: the selected shader layer's key sliders, else the camera / burst sliders.
+func page() -> Array:
+	var now := Time.get_ticks_msec()
+	if now - _page_at < 100:
+		return _page
+	_page_at = now
+	var tab: Node = midi.tab
+	var sm: Variant = tab.work._modes.get("shader", {}).get("control") if tab.work != null else null
+	var out := []
+	if sm != null:
+		sm.refresh()  # (cheap when the shader is unchanged; loads a newly selected one)
+		var l: Dictionary = tab.slice.layers[tab.sel] if tab.sel >= 0 and tab.sel < tab.slice.layers.size() else {}
+		if l.get("scene") == "shader":
+			for k in sm.key_controls():
+				out.append({"label": str(k.label), "control": k.control})
+	if out.is_empty():
+		for t in FALLBACK:
+			out.append({"label": label(t), "control": tab.page.control(t)})
+	_page = out.slice(0, 8)
+	return _page
+
+
+## "dev:N" / "select:N" → the control (null = not there now).
+func control_of(target: String) -> Control:
+	var n := int(target.get_slice(":", 1)) - 1
+	if target.begins_with("dev:"):
+		var p := page()
+		return p[n].control if n >= 0 and n < p.size() and is_instance_valid(p[n].control) else null
+	var rows: Array = midi.tab.page.layer_list.rows
+	return rows[n].panel if n >= 0 and n < rows.size() else null
+
+
+## Track select N: layer N becomes the selected one (the device knobs follow it).
+func select(target: String) -> void:
+	var n := int(target.get_slice(":", 1)) - 1
+	var list: Node = midi.tab.page.layer_list
+	if n >= 0 and n < list.rows.size():
+		list.select(n)
+		list.selected.emit(n)
+		_page_at = -1000
+
+
+## What a target is called right now: the layer's, look's or parameter's own name.
+func label(target: String) -> String:
+	var tab: Node = midi.tab
+	var kind := target.get_slice(":", 0)
+	var n := int(target.get_slice(":", 1)) - 1
+	var layers: Array = tab.slice.get("layers", [])
+	var lay := Layers.short(layers[n]) if n >= 0 and n < layers.size() else ""
+	match kind:
+		"layer":
+			return "%d %s" % [n + 1, lay] if lay != "" else "Layer %d" % (n + 1)
+		"mute":
+			return "Mute %s" % (lay if lay != "" else str(n + 1))
+		"select":
+			return "Sel %s" % (lay if lay != "" else str(n + 1))
+		"look":
+			var looks: Array = tab.show_ctl.looks
+			return str(looks[n].name) if n >= 0 and n < looks.size() else "Look %d" % (n + 1)
+		"dev":
+			var p := page()
+			return str(p[n].label) if n >= 0 and n < p.size() else "—"
+		"param":
+			return MidiMap.target_label(target).replace("Camera ", "Cam ")
+		"xfade":
+			return "A ↔ B"
+		"take":
+			return "A/B AUTO"
+		"cut":
+			return "A/B CUT"
+		"fade":
+			return "Fade time"
+	return MidiMap.target_label(target)
+
+
+## The surface's view of one control (apc40_surface.gd info_cb).
+func info(c: Dictionary) -> Dictionary:
+	var b := MidiMap.find(midi.map, L.msg_of(c))
+	if b.is_empty():
+		return {"label": "", "value": -1.0, "lit": 0, "waiting": false, "hw": -1.0, "line": ""}
+	var t: String = b.target
+	var ctl: Control = midi.control_of(t)
+	var rng := MidiMap.is_range(t)
+	var value := (ctl as Range).ratio if rng and ctl is Range else -1.0
+	var st: Variant = midi.pick.get(MidiMap.key(b))
+	var waiting: bool = st is Dictionary and Pickup.waiting(st)
+	var line := "%s → %s" % [c.name, MidiMap.target_label(t) if t.begins_with("dev:") or t.begins_with("layer:") else label(t)]
+	if t.begins_with("dev:") or t.begins_with("layer:") or t.begins_with("look:"):
+		line += ": " + label(t)
+	if ctl == null:
+		line += " (not there now)"
+	elif value >= 0.0:
+		line += " · %d %%" % roundi(value * 100.0)
+	if waiting:
+		line += " · waiting: bring the control to the app value (amber tick = where it is)"
+	return {"label": label(t), "value": value, "lit": 0 if rng else (midi.led_state(t) if ctl != null else 0), "waiting": waiting,
+		"hw": float(st.hw) if st is Dictionary else -1.0, "line": line}
+
+
+## A click on a control: Learn for it — the next click in the Inspector picks what it drives.
+func _learn(c: Dictionary) -> void:
+	midi._set_mode("learn")
+	midi._captured(L.msg_of(c))

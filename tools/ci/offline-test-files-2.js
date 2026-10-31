@@ -67,4 +67,5 @@ module.exports = [
 	'tools/smoke/smoke-wo905-live-deck-per-screen-scroll.test.js',
 	'tools/smoke/smoke-wo907-client-free-running-render.test.js',
 	'tools/smoke/smoke-wo908-visuals-ab-banks.test.js',
+	'tools/smoke/smoke-wo909-apc40-profile.test.js',
 ]

@@ -19,9 +19,14 @@ static func new_state() -> Dictionary:
 
 
 ## The target's value now, from anywhere: a value other than the one this binding last set → waiting for pickup again.
-static func observe(st: Dictionary, app: float) -> void:
+## WO-909: a waiting control whose physical position the app value has come to (a recall, a drag, a load after the APC's
+## position report) is in sync → live.
+static func observe(st: Dictionary, app: float, tol := TOL) -> void:
 	if st.live and absf(app - float(st.sent)) > EPS:
 		st.live = false
+	elif not st.live and float(st.hw) >= 0.0 and absf(float(st.hw) - app) <= tol:
+		st.live = true
+		st.sent = app
 
 
 ## A physical move to `hw` against the target's current value `app`: the value to set it to, or -1.0 (still waiting).

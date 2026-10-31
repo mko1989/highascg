@@ -109,13 +109,15 @@ Tests: `tests/test_midi_pickup.gd`, `tests/test_visuals_midi.gd` (auto-discovere
 | Master fader | CC 14 | Master (pickup) |
 | Track knobs 1–7 | CC 48–54 | Pulse, Spin, Hue, Glow, Flash, Speed, Amount (pickup) |
 | Track knob 8 | CC 55 | Fade time (pickup) |
-| Device knobs 1–3 | CC 16–18, any ch | Cam yaw, pitch, zoom (pickup) |
+| Device knobs 1–8 | CC 16–23, any ch | `dev:1–8`: the selected layer's page — a shader's key controls, else Cam yaw, pitch, zoom, Burst (pickup; WO-909) |
+| Track select 1–8 | note 51, ch 1–8 | Select layer 1–8 (the device knobs follow; WO-909) |
 | Clip pads top row | notes 32–39 | Looks 1–8 |
 | Clip pads row 2, 1–4 | notes 24–27 | Looks 9–12 |
-| Scene launch 1 / 2 / 3 | notes 82 / 83 / 84 | Burst / Auto on-off / Tempo Audio |
+| Scene launch 1 / 2 / 3 / 4 / 5 | notes 82 / 83 / 84 / 85 / 86 | Burst / Auto on-off / Tempo Audio / A/B AUTO / A/B CUT (4, 5: WO-908/909) |
 | Tap tempo | note 99 | Tap |
 | Stop all clips | note 81 | Blackout |
-| Crossfader, cue level, tempo | CC 15 / 47 / 13 | unmapped (47/13 are relative encoders: not supported) |
+| Crossfader | CC 15 | A/B crossfader (pickup; only while A/B is on, WO-908) |
+| Cue level, tempo | CC 47 / 13 | unmapped (relative encoders: not supported) |
 
 ## 5. Follow-ups / known limits
 - Relative encoders (cue level, tempo knob) are not supported by Learn.
