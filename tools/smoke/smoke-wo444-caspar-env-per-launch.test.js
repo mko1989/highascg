@@ -32,29 +32,3 @@ test('WO-444: sourcing clears stale values so a removed line also clears the exp
 	assert.match(fn[1], /unset __GL_SYNC_DISPLAY_DEVICE/, 'no line in the file → the export must go away (auto=off)')
 	assert.match(fn[1], /export __GL_SYNC_DISPLAY_DEVICE="\$CASPAR_GL_SYNC_DISPLAY"/)
 })
-
-test('WO-906: CASPAR_DISPLAY in caspar-env moves the launch to the playout X screen; removed → the unit DISPLAY again', () => {
-	const { execFileSync } = require('child_process')
-	const os = require('os')
-	const fn = /source_caspar_env\(\) \{\n[\s\S]*?\n\}/.exec(RUN_SH)[0]
-	const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wo906-env-'))
-	fs.mkdirSync(path.join(home, '.config', 'highascg'), { recursive: true })
-	fs.mkdirSync(path.join(home, 'bin'))
-	/* an xrandr that knows the X screens listed in $SCREENS (the guard probes `xrandr --display <screen> --current`) */
-	fs.writeFileSync(path.join(home, 'bin', 'xrandr'), '#!/bin/sh\ncase " $SCREENS " in *" $2 "*) exit 0;; esac\nexit 1\n', { mode: 0o755 })
-	const envFile = path.join(home, '.config', 'highascg', 'caspar-env')
-	const run = (screens = ':0 :0.0 :0.1') =>
-		execFileSync('/bin/sh', ['-c', `CASPAR_BASE_DISPLAY="$DISPLAY"\n${fn}\nsource_caspar_env 2>/dev/null; printf %s "$DISPLAY"`], {
-			env: { HOME: home, DISPLAY: ':0', PATH: `${path.join(home, 'bin')}:${process.env.PATH}`, SCREENS: screens },
-		}).toString()
-	try {
-		fs.writeFileSync(envFile, 'CASPAR_GL_SYNC_DISPLAY=DP-0\nCASPAR_DISPLAY=:0.1\n')
-		assert.equal(run(), ':0.1')
-		assert.equal(run(':0 :0.0'), ':0', 'X has no screen 1 (switched off, not restarted yet) → the unit DISPLAY')
-		fs.writeFileSync(envFile, 'CASPAR_GL_SYNC_DISPLAY=DP-0\n')
-		assert.equal(run(), ':0', 'no line → the unit DISPLAY')
-	} finally {
-		fs.rmSync(home, { recursive: true, force: true })
-	}
-	assert.match(RUN_SH, /export DISPLAY="\$\{DISPLAY:-:0\}"\nCASPAR_BASE_DISPLAY="\$DISPLAY"/)
-})

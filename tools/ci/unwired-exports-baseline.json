@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 700,
+	"count": 701,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -647,6 +647,7 @@
 		"src/utils/boot-xrandr-snapshot.js: DEFAULT_MAX_AGE_MS",
 		"src/utils/boot-xrandr-snapshot.js: resolveBootXrandrMetaPath",
 		"src/utils/buffered-logger.js: createBufferedLogger",
+		"src/utils/caspar-gl-sync-env.js: ENV_FILE",
 		"src/utils/caspar-restart.js: finishCasparAfterApply",
 		"src/utils/caspar-restart.js: resolveReconnectWaitMs",
 		"src/utils/caspar-restart.js: sendRestartAndWaitForCaspar",

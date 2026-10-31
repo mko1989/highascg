@@ -96,10 +96,7 @@ async function placeScreenConsumers(ctx = {}) {
 
 	const env = {
 		...process.env,
-		/* WO-906: with the playout X screen installed every Caspar window lives on :0.1 (rects are screen-relative) */
-		DISPLAY: require('../utils/x-screens').installedScreens().length
-			? require('../utils/x-screens').PLAYOUT_DISPLAY
-			: process.env.DISPLAY || ':0',
+		DISPLAY: process.env.DISPLAY || ':0',
 		XAUTHORITY: process.env.XAUTHORITY || `${process.env.HOME || '/home/casparcg'}/.Xauthority`,
 	}
 	const opts = { env, timeout: 4000 }

@@ -4,9 +4,6 @@ const { execFileSync } = require('child_process')
 const { runTimingGenerator, parseModelineFromGeneratorOutput } = require('./modeline-timings')
 const { resolveEffectiveOsModeSource } = require('./os-mode-source')
 
-/** WO-906: the X screen of the output (the caller's env — `:0.1` for a playout head on the second screen). */
-const xDisplay = (env) => String(env?.DISPLAY || ':0')
-
 /** @param {string} text */
 function parseModelineFromCvtOutput(text) {
 	return parseModelineFromGeneratorOutput(text)
@@ -130,12 +127,12 @@ function stripExistingXrandrModeByName(p) {
 	const { output, modeName, env, logger, availableModes } = p
 	if (p.attached === false) {
 		try {
-			execFileSync('xrandr', ['--display', xDisplay(env), '--rmmode', modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
+			execFileSync('xrandr', ['--display', ':0', '--rmmode', modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
 		} catch (_) {}
 		return
 	}
 	const fallback = pickStripFallbackMode(availableModes)
-	const base = ['--display', xDisplay(env), '--output', output]
+	const base = ['--display', ':0', '--output', output]
 	try {
 		if (fallback) {
 			execFileSync('xrandr', [...base, '--mode', fallback], { env, encoding: 'utf8', maxBuffer: 65536 })
@@ -148,10 +145,10 @@ function stripExistingXrandrModeByName(p) {
 		}
 	}
 	try {
-		execFileSync('xrandr', ['--display', xDisplay(env), '--delmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
+		execFileSync('xrandr', ['--display', ':0', '--delmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
 	} catch (_) {}
 	try {
-		execFileSync('xrandr', ['--display', xDisplay(env), '--rmmode', modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
+		execFileSync('xrandr', ['--display', ':0', '--rmmode', modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
 	} catch (_) {}
 }
 
@@ -239,7 +236,7 @@ function tryAddXrandrModeFromCvt({ output, width, height, refreshHz, env, logger
 
 function createXrandrMode({ output, plan, env, logger, availableModes, attached }) {
 	const { modeName, timings } = plan
-	const newmodeArgs = ['--display', xDisplay(env), '--newmode', modeName, ...timings]
+	const newmodeArgs = ['--display', ':0', '--newmode', modeName, ...timings]
 	let didReplace = false
 	try {
 		execFileSync('xrandr', newmodeArgs, { env, encoding: 'utf8', maxBuffer: 65536 })
@@ -259,11 +256,11 @@ function createXrandrMode({ output, plan, env, logger, availableModes, attached 
 		}
 	}
 	try {
-		execFileSync('xrandr', ['--display', xDisplay(env), '--addmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
+		execFileSync('xrandr', ['--display', ':0', '--addmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
 	} catch {
 		try {
-			execFileSync('xrandr', ['--display', xDisplay(env), '--delmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
-			execFileSync('xrandr', ['--display', xDisplay(env), '--addmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
+			execFileSync('xrandr', ['--display', ':0', '--delmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
+			execFileSync('xrandr', ['--display', ':0', '--addmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
 		} catch (e2) {
 			if (logger && logger.warn) {
 				logger.warn(`[OS-Config] xrandr --addmode failed for ${output} ${modeName}: ${e2.message}`)

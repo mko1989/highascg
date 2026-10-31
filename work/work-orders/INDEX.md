@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-825 live WOs (28 open, 120 in progress, 677 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+824 live WOs (28 open, 120 in progress, 676 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -591,7 +591,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 791 DONE [companion] Companion: recall look presets to PRV, to PGM, or to PGM with auto take → 791_WO_companion_look_preset_recall.md
 - 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
 
-## devices-config — Devices tab, settings, config generation (55)
+## devices-config — Devices tab, settings, config generation (54)
 
 - 33 IN PROGRESS [devices-config+web-client] Device view (program): index & dependency order → 33_WO_DEVICE_VIEW_INDEX.md
 - 33a OPEN [devices-config+web-client] Device view: data model, persistence, and HTTP API → 33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md
@@ -647,7 +647,6 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 869 DONE [devices-config+amcp,godot-client] Mapping node slices: cut a screen destination's output into slices and place th… → 869_WO_mapping_node_slices.md
 - 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
-- 906 DONE [devices-config+os-iso,mapping] Playout outputs on a second X screen (:0.1) of the same X server, operator head… → 906_WO_outputs_on_second_x_screen.md
 
 ## os-iso — ISO, sticks, kernel, NVIDIA, boot (72)
 
@@ -881,7 +880,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 831 DONE [process] Dead code removal (sweep §6) → 831_WO_dead_code_removal.md
 - 846 DONE [process] Work-order housekeeping: categorize, index, deprecate → 846_WO_work_order_housekeeping_index.md
 
-## Deprecated (47)
+## Deprecated (48)
 
 - 11 DEPRECATED [os-iso+devices-config] Boot Orchestrator & OS Setup → deprecated/11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md
 - 19 DEPRECATED [tracking-vr] Person Tracking — Stage Performer Detection from Camera Inputs & 3D Previs → deprecated/19_WO_PERSON_TRACKING.md
@@ -930,3 +929,4 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 788 DEPRECATED [engine] Live picture in the timeline editor → deprecated/788_WO_timeline_editor_live_monitor.md
 - 853 DEPRECATED [companion+mapping] Work order: PixelHue API integration & tandem multi-screen control → deprecated/853_WO_pixelhue_companion_and_tandem_looks.md
 - 854 DEPRECATED [mapping+web-client] Work order: PixelHue API in HighAsCG — Caspar + PixelHue layer mixing in the we… → deprecated/854_WO_pixelhue_highascg_webui_mixing.md
+- 906 DEPRECATED [devices-config+os-iso,mapping] Playout outputs on a second X screen (:0.1) of the same X server, operator head… → deprecated/906_WO_outputs_on_second_x_screen.md

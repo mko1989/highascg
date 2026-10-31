@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-548 routes.
+546 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -462,8 +462,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/system/operator-helper-icon` | registry | `src/api/router.js` |
 | GET | `/api/system/operator-screen` | registry | `src/api/routes-operator-screen.js` |
 | POST | `/api/system/operator-screen` | registry | `src/api/routes-operator-screen.js` |
-| GET | `/api/system/playout-screen` | registry | `src/api/router.js` |
-| POST | `/api/system/playout-screen` | registry | `src/api/router.js` |
 | * | `/api/system/pointer-confine` | handler | `src/api/routes-system-hardware.js` |
 | POST | `/api/system/pointer-confine` | registry | `src/api/router.js` |
 | GET | `/api/system/setup` | registry | `src/api/router.js` |

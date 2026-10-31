@@ -23,16 +23,13 @@ const ROUTING_EXTRA_KEYS = [
 
 /**
  * WO-868: "Operator GUI first" is a property of THIS box (its Caspar channel order and X layout), never of a show:
- * a project neither carries it nor sets / clears it on load. WO-906: the playout X screen likewise.
+ * a project neither carries it nor sets / clears it on load.
+ * @param {unknown} cs
  */
-const MACHINE_LOCAL_CASPAR_KEYS = ['operator_gui_first', 'playout_x_screen']
-
-/** @param {unknown} cs */
 function withoutMachineLocalCasparKeys(cs) {
-	if (!cs || typeof cs !== 'object' || !MACHINE_LOCAL_CASPAR_KEYS.some((k) => Object.prototype.hasOwnProperty.call(cs, k)))
-		return cs
-	const rest = { ...cs }
-	for (const k of MACHINE_LOCAL_CASPAR_KEYS) delete rest[k]
+	if (!cs || typeof cs !== 'object' || !Object.prototype.hasOwnProperty.call(cs, 'operator_gui_first')) return cs
+	const { operator_gui_first: _local, ...rest } = cs
+	void _local
 	return rest
 }
 

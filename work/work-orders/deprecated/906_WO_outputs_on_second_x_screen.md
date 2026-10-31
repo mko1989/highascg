@@ -1,7 +1,7 @@
 # WO-906 — Playout outputs on a second X screen (:0.1) of the same X server, operator heads alone on :0.0
 
 **Area:** devices-config, os-iso, mapping
-**Status: DONE (31.10.26; switch built + proven, boot launcher on every screen §7; perf A/B §8 not positive → owner: "the two screen is not worth it. Revert to the standard one x screen" — box back on ONE X screen 31.10 19:29, switch off; code kept as an off-by-default per-box switch, §9)**
+**Status: DEPRECATED (31.10.26 — built and A/B-tested, perf not positive (§8); owner reverted to ONE X screen (§9), then: "I want it gone. No need to keep dead code." — all code removed (§10). No successor: one X screen for all outputs stays the model.)**
 
 ## Owner request (31.10.26)
 "would it be possible to move the screen consumer outputs to another x display like display:1 so they are separate
@@ -245,3 +245,21 @@ open, GUI GPU load); misaction (alt-tab ×10, super ×5, Escape, F11 on/off, ope
 - The code stays, inert while the switch is off (no conf installed → every per-screen path takes the one-screen branch;
   default off, not in factory-starter). `playout-screen.sh status` fixed (an f-string with escaped quotes did not parse).
 
+## 10. Code removed (31.10.26)
+Owner: "I want it gone. No need to keep dead code." The five WO-906 commits (c113eeb3, 962b26f5, 240512e7, a0754b39,
+1446a37f) were reverted as code; only this record stays. The intervening WO-881 / WO-897 / CI changes in the same files
+(run.sh, tools/ci/offline-test-files-2.js, tools/ci/unwired-exports-baseline.json) are kept — the reverted tree matches
+c113eeb3^ plus those.
+- Gone: src/utils/x-screens.js, src/utils/x-screens-sync.js, src/api/routes-playout-screen.js (+ router entry, HTTP
+  contract row), scripts/runtime/playout-screen.sh, scripts/runtime/install-xorg-screens-apply.sh,
+  tools/runtime/highascg-xorg-screens-apply.sh, both smoke-wo906-* files; run.sh no longer reads CASPAR_DISPLAY;
+  the `:0.1` branches in xrandr apply/persist/safety/custom-mode, hardware-info-xrandr, nvidia-display-policy,
+  full-config-apply, screen-consumer-placement, caspar-gl-sync-env, the generator layout sync and the boot gate
+  (dropScreens/closeScreens/settleAfterBootAnswer) are back to their pre-WO-906 form. `playout_x_screen` is no longer a
+  machine-local key (only `operator_gui_first`). The §7 rule stays: the boot launcher offers every screen (the guard
+  never shipped in the final code).
+- Box: config has no `playout_x_screen`, caspar-env has no CASPAR_DISPLAY. Root-owned leftovers need the owner (no
+  sudo for rm): `/usr/local/lib/highascg/highascg-xorg-screens-apply.sh`, `/etc/sudoers.d/highascg-xorg-screens`,
+  `/etc/X11/xorg.conf.d/98-highascg-screens.conf.prev` — inert (the sudoers line only allows that helper).
+- Verified: node restarted on the reverted code, `GET /api/system/playout-screen` → 404, no require errors in the
+  journal; CI gates + offline suite in a clean worktree (see commit).

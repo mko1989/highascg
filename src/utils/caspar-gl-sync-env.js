@@ -123,15 +123,10 @@ function writeCasparGlSyncEnvFile(ctx) {
 		'# Override: casparServer.caspar_gl_sync_display = auto | off | <connector>',
 	]
 	if (display) lines.push(`CASPAR_GL_SYNC_DISPLAY=${display}`)
-	/* WO-906: the playout X screen is installed and switched on → Caspar's windows open on :0.1 (run.sh exports it as
-	 * DISPLAY at launch; it falls back to the unit's DISPLAY when that screen does not exist). */
-	const xs = require('./x-screens')
-	const casparDisplay = xs.isPlayoutXScreen(ctx?.config) && xs.installedScreens().length ? xs.PLAYOUT_DISPLAY : null
-	if (casparDisplay) lines.push(`CASPAR_DISPLAY=${casparDisplay}`)
 	fs.mkdirSync(ENV_FILE_DIR, { recursive: true })
 	fs.writeFileSync(ENV_FILE, lines.join('\n') + '\n')
-	ctx?.log?.('info', `[Caspar GL sync] caspar-env written: ${display ? `sync display ${display}` : 'no sync display (off/unresolved)'}${casparDisplay ? `, X screen ${casparDisplay}` : ''}`)
-	return { display, casparDisplay, file: ENV_FILE }
+	ctx?.log?.('info', `[Caspar GL sync] caspar-env written: ${display ? `sync display ${display}` : 'no sync display (off/unresolved)'}`)
+	return { display, file: ENV_FILE }
 }
 
 module.exports = { resolveGlSyncDisplay, writeCasparGlSyncEnvFile, ENV_FILE }

@@ -46,14 +46,7 @@ test('every execSync in hardware-info.js + hardware-info-xrandr.js passes a time
 		calls.push(src.slice(i, end + 1))
 	}
 
-	/* WO-906: both sync xrandr probes now run through ONE exec site (xrandrTextSync — per X screen with the playout
-	 * screen installed), so the known probes are getGpuModel's + that one; both probes must still go through it. */
-	assert.ok(calls.length >= 2, `expected the known execSync probes, found ${calls.length}`)
-	for (const fn of ['getDisplaysXrandrVerboseRaw', 'getDisplaysXrandrDetailedUncached']) {
-		const start = src.indexOf(`function ${fn}(`)
-		assert.notEqual(start, -1, `${fn} must exist`)
-		assert.match(src.slice(start, src.indexOf('\n}', start)), /xrandrTextSync\(/, `${fn} must exec through xrandrTextSync`)
-	}
+	assert.ok(calls.length >= 3, `expected the known execSync probes, found ${calls.length}`)
 	for (const call of calls) {
 		const cmd = (call.match(/execSync\(\s*['"`]([^'"`]+)/) || [])[1] || call.slice(0, 60)
 		assert.match(
@@ -76,15 +69,12 @@ test('the xrandr timeout leaves headroom over the measured healthy cost', () => 
 
 test('the async xrandr probes also carry the timeout (execFileAsync, same options)', () => {
 	const src = fs.readFileSync(XR_SRC, 'utf8')
-	const bodyOf = (fn) => {
+	for (const fn of ['getDisplaysXrandrVerboseRawAsync', 'getDisplaysXrandrDetailedAsync']) {
 		const start = src.indexOf(`async function ${fn}`)
 		assert.notEqual(start, -1, `${fn} must exist`)
-		return src.slice(start, src.indexOf('\n}', start))
-	}
-	/* WO-906: the async probes exec through ONE helper (per X screen); the timeout lives there */
-	assert.match(bodyOf('xrandrTextAsync'), /execFileAsync\('xrandr'[\s\S]*timeout\s*:\s*XRANDR_TIMEOUT_MS/)
-	for (const fn of ['getDisplaysXrandrVerboseRawAsync', 'getDisplaysXrandrDetailedAsync']) {
-		assert.match(bodyOf(fn), /await xrandrTextAsync\(/, `${fn} must exec through xrandrTextAsync (same timeout as the sync version)`)
+		const end = src.indexOf('\n}', start)
+		const body = src.slice(start, end)
+		assert.match(body, /timeout\s*:\s*XRANDR_TIMEOUT_MS/, `${fn} must pass the same timeout as the sync version`)
 	}
 })
 
