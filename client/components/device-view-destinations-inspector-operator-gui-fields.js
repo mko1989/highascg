@@ -58,7 +58,7 @@ export function buildOperatorGuiFields({ d, patchDestination }) {
 	const note = document.createElement('p')
 	note.className = 'device-view__note'
 	note.textContent =
-		'Route layers (10-49) mirror routed compose/timeline/mv-edit preview cells, shaped above fullscreen Firefox via X SHAPE. Regenerate + restart Caspar to apply the channel/screen consumer.'
+		'Route layers (10-49) mirror the compose windows of the Live preview. Regenerate + restart Caspar to apply the channel.'
 
 	return [field('Physical GPU port (optional)', physicalPortIn), field('Video output', videoOutputIn), note]
 }

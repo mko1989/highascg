@@ -10,7 +10,7 @@ const H := preload("res://features/devices/host_channels.gd")
 const TYPE_OPTIONS := [["pgm_prv", "PGM/PRV"], ["pgm_only", "PGM only"], ["multiview", "Multiview"],
 	["pixelmap", "Pixel Map"], ["operator_gui", "Operator GUI"]]
 const MODE_OPTIONS := [["pgm_prv", "PGM/PRV"], ["pgm_only", "PGM only"], ["multiview", "Multiview"],
-	["pixelmap", "Pixel Map (native Art-Net)"], ["operator_gui", "Operator GUI (Firefox + shaped overlay)"]]
+	["pixelmap", "Pixel Map (native Art-Net)"], ["operator_gui", "Operator GUI (Godot client)"]]
 const LAYOUT_OPTIONS := [["stereo", "2 channels"], ["4ch", "4 channels"], ["8ch", "8 channels"], ["16ch", "16 channels"]]
 const STANDARD_VIDEO_MODES := ["PAL", "NTSC", "576p2500", "720p2398", "720p2400", "720p2500", "720p2997", "720p3000",
 	"720p5000", "720p5994", "720p6000", "1080i5000", "1080i5994", "1080i6000", "1080p2398", "1080p2400", "1080p2500",

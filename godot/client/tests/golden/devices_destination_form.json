@@ -95,7 +95,7 @@
             ],
             [
               "operator_gui",
-              "Operator GUI (Firefox + shaped overlay)"
+              "Operator GUI (Godot client)"
             ]
           ]
         },
@@ -1255,7 +1255,7 @@
         ],
         [
           "Mode",
-          "Operator GUI (Firefox + shaped overlay)"
+          "Operator GUI (Godot client)"
         ],
         [
           "Main index",
@@ -1696,7 +1696,7 @@
       ],
       [
         "operator_gui",
-        "Operator GUI (Firefox + shaped overlay)"
+        "Operator GUI (Godot client)"
       ]
     ],
     "3 Number of audio output channels for this destination (program bus width)": [
