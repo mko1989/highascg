@@ -2,8 +2,9 @@ extends VBoxContainer
 ## WO-916 — the pixel map window's "Console" rows: the mapped pixels' colours go to the lighting console all the time
 ## (colour only, independent of this box's DMX master; the LD decides what reaches the fixtures). Send on / off,
 ## Art-Net or sACN, the console's address, the fixtures' own universes or an own block from a first universe, and the
-## rate the server samples + sends at. Part of GET / POST /api/fixtures/pixelmap/settings (`console`, `rate_hz`); the
-## window saves it with the smoothing. The status line comes from /live (`console`).
+## rate the server samples + sends at. WO-917: the "Intensity" row — override the mapped heads' dimmer (+ their unmapped
+## pixels dark) to play with the map in the previs. Part of GET / POST /api/fixtures/pixelmap/settings (`console`,
+## `rate_hz`, `intensity`); the window saves it with the smoothing. The status line comes from /live (`console`).
 
 const RATE_MAX := 60
 const PROTOCOLS := ["artnet", "sacn"]
@@ -19,6 +20,8 @@ var _layout: OptionButton
 var _universe: SpinBox
 var _rate: SpinBox
 var _status: Label
+var _override: CheckBox
+var _level: SpinBox
 
 
 func _init() -> void:
@@ -71,6 +74,20 @@ func _init() -> void:
 	_status.clip_text = true
 	b.add_child(_status)
 	add_child(b)
+	var c := HBoxContainer.new()
+	c.add_theme_constant_override("separation", 8)
+	var il := Label.new()
+	il.text = "Intensity"
+	c.add_child(il)
+	_override = CheckBox.new()
+	_override.text = "Override"
+	_override.tooltip_text = "Open every mapped head's dimmer at this level and keep its unmapped pixels (the white segments) dark, to see the map in the previs. Also on the wire when this box's DMX output sends the head's universe; the console output stays colour only."
+	_override.toggled.connect(func(_on: bool) -> void: _changed())
+	c.add_child(_override)
+	_level = _spin(0, 100, "The mapped heads' dimmer while Override is on, in %")
+	_level.suffix = "%"
+	c.add_child(_level)
+	add_child(c)
 
 
 func _spin(lo: int, hi: int, tip: String) -> SpinBox:
@@ -87,6 +104,7 @@ func _spin(lo: int, hi: int, tip: String) -> SpinBox:
 
 func _changed() -> void:
 	_universe.editable = _layout.selected == 1
+	_level.editable = _override.button_pressed
 	dirty = true
 	edited.emit()
 
@@ -102,12 +120,15 @@ func show_settings(data: Variant) -> void:
 	_universe.set_value_no_signal(int(c.universe))
 	_universe.editable = c.layout == "block"
 	_rate.set_value_no_signal(int(s.rate_hz))
+	_override.set_pressed_no_signal(bool(s.intensity.override))
+	_level.set_value_no_signal(int(s.intensity.level))
+	_level.editable = bool(s.intensity.override)
 	dirty = false
 
 
-## What Save posts: {rate_hz, console}.
+## What Save posts: {rate_hz, console, intensity}.
 func body() -> Dictionary:
-	return {"rate_hz": int(_rate.value), "console": {"enabled": _send.button_pressed, "protocol": PROTOCOLS[maxi(0, _protocol.selected)],
+	return {"rate_hz": int(_rate.value), "intensity": {"override": _override.button_pressed, "level": int(_level.value)}, "console": {"enabled": _send.button_pressed, "protocol": PROTOCOLS[maxi(0, _protocol.selected)],
 		"dest": _dest.text.strip_edges(), "layout": LAYOUTS[maxi(0, _layout.selected)], "universe": int(_universe.value)}}
 
 
@@ -116,15 +137,19 @@ func show_live(live: Variant) -> void:
 	_status.text = status_line(live)
 
 
-## The server's settings → {rate_hz, console} with its defaults for anything missing (25 Hz, on, Art-Net, fixture universes).
+## The server's settings → {rate_hz, console, intensity} with its defaults for anything missing (25 Hz, on, Art-Net,
+## fixture universes; intensity not overridden, 100 %).
 static func settings_from(data: Variant) -> Dictionary:
 	var src: Variant = (data as Dictionary).get("settings", data) if data is Dictionary else {}
 	var s: Dictionary = src if src is Dictionary else {}
 	var c: Dictionary = s.get("console") if s.get("console") is Dictionary else {}
 	var rate: Variant = s.get("rate_hz")
 	var uni: Variant = c.get("universe")
-	return {"rate_hz": clampi(int(rate), 0, RATE_MAX) if rate is float or rate is int else 25,
-		"console": {"enabled": c.get("enabled") != false, "protocol": c.protocol if PROTOCOLS.has(c.get("protocol")) else "artnet",
+	var i: Dictionary = s.get("intensity") if s.get("intensity") is Dictionary else {}
+	var lvl: Variant = i.get("level")
+	return {"intensity": {"override": i.get("override") is bool and i.override, "level": clampi(int(lvl), 0, 100) if lvl is float or lvl is int else 100},
+		"rate_hz": clampi(int(rate), 0, RATE_MAX) if rate is float or rate is int else 25,
+		"console": {"enabled": not (c.get("enabled") is bool) or c.enabled, "protocol": c.protocol if PROTOCOLS.has(c.get("protocol")) else "artnet",
 			"dest": str(c.get("dest", "")) if c.get("dest") is String else "", "layout": c.layout if LAYOUTS.has(c.get("layout")) else "fixture",
 			"universe": int(uni) if uni is float or uni is int else 1}}
 

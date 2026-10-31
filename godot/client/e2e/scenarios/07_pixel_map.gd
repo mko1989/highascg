@@ -405,6 +405,36 @@ func run() -> void:
 		print("[e2e] console u%d 1-6 = %s; status %s" % [CONSOLE_UNIVERSE, Array(wire.console.slice(0, 6)), (st as Label).text if st else "—"])
 		return expect(st != null, "the Console status line does not show where it sends")
 	)
+	await step("Intensity: Override at 100 %, Save → the head's Dimmer (ch1) 255 + white segments 0 on u18; off again → its own", func() -> String:
+		var sw: CheckBox = ui.find("CheckBox", "Override", win)
+		if sw == null:
+			return "no Intensity Override switch"
+		await ui.reveal(sw)
+		var why: String = await ui.click(sw)
+		if why == "":
+			why = await ui.click(ui.button("Save *", win))
+		if why != "":
+			return why
+		var base := int(fx.address) - 1  # WO-917: ch1 Dimmer, ch53–68 the W segments (GDTF default 255)
+		var on: Variant = await ui.wait_for(func() -> bool:
+			_drain()
+			var d: PackedByteArray = wire.get("data", PackedByteArray())
+			return d.size() > base + 67 and d[base] == 255 and d[base + 52] == 0 and d[base + 67] == 0, 4.0)
+		if not on:
+			var d: PackedByteArray = wire.get("data", PackedByteArray())
+			return "override on: u%d dimmer %s, W %s, want 255 / 0" % [UNIVERSE, d[base] if d.size() > base else "—", d[base + 52] if d.size() > base + 52 else "—"]
+		why = await ui.click(sw)
+		if why == "":
+			why = await ui.click(ui.button("Save *", win))
+		if why != "":
+			return why
+		var off: Variant = await ui.wait_for(func() -> bool:
+			_drain()
+			var d: PackedByteArray = wire.get("data", PackedByteArray())
+			return d.size() > base + 52 and d[base] == 0 and d[base + 52] == 255, 4.0)
+		print("[e2e] intensity override u%d: on → dimmer 255 / W 0, off → %s" % [UNIVERSE, "dimmer 0 / W 255" if off else "not restored"])
+		return expect(off, "override off: the head's own dimmer / white did not come back")
+	)
 	await step("Unmap both, Save → no pixelMappings in the project", func() -> String:
 		for n in [1, 2]:
 			var why := await _pick(_row(n).get("region"), "—")

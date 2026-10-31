@@ -23,7 +23,7 @@
  */
 
 const { onProjectChanged } = require('../engine/project-events')
-const { normalizeMappings, checkMapping, validateMappings, writePixel, slotsOf, bindRole } = require('./pixel-map-model')
+const { normalizeMappings, checkMapping, validateMappings, writePixel, slotsOf, bindRole, intensityPlan, writeIntensity } = require('./pixel-map-model')
 const { createRegionSampler, peekSeq } = require('./pixel-map-frame')
 const smoothing = require('./pixel-map-smooth')
 const pmSettings = require('./pixel-map-settings')
@@ -269,11 +269,19 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		stats.sampleMs += us / 1000
 	}
 
+	const plans = new WeakMap() // WO-917: a fixture's resolved mapping list → its intensity plan
+	function planOf(fx, list) {
+		let p = plans.get(list)
+		if (!p) plans.set(list, (p = intensityPlan(fx, new Set(list.map((r) => r.m.pixel)))))
+		return p
+	}
+
 	/** Engine, per fixture after its own channels: the mapped pixels' colours (black when the channel has no signal). */
 	function write(buf, fx, _t = now()) {
 		if (!mappings.length) return
 		const list = resolve().byFixture.get(fx.id)
 		if (!list) return
+		if (settings.intensity.override) writeIntensity(buf, fx, planOf(fx, list), settings.intensity.level / 100) // WO-917
 		for (const r of list) {
 			lastWritten.set(r.m.id, writePixel(buf, fx, r.px, smoother.get(r.m.id), r.m.colourOrder)) // WO-893: the smoothed colour
 		}
@@ -291,6 +299,7 @@ function createPixelMapService(ctx, engine, deps = {}) {
 			at: t,
 			smooth: settings.smooth,
 			rate_hz: settings.rate_hz,
+			intensity: settings.intensity,
 			console: consoleOut.status(t),
 			stats: { frames: stats.frames, missed: stats.missed, skipped: stats.skipped, sample_ms_total: Math.round(stats.sampleMs * 10) / 10, last_sample_us: stats.lastSampleUs },
 			channels: [...surfaces.entries()].map(([ch, s]) => ({ channelNo: ch, role: s.role, state: s.state, width: s.width, height: s.height,

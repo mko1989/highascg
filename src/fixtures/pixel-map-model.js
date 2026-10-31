@@ -207,5 +207,29 @@ function writePixel(buf, fx, px, rgb, order = 'auto') {
 	return out
 }
 
+/**
+ * WO-917 — the intensity override of a mapped head: its Dimmer channels and every pixel no mapping drives (Pixel Line's
+ * white segments default to full and would wash the bars out). mapped = Set of mapped pixel numbers.
+ */
+function intensityPlan(fx, mapped) {
+	return {
+		dimmers: (fx?.gdtf?.channels || []).filter((c) => c.attribute === 'Dimmer' && c.offsets?.length),
+		dark: pixelsOf(fx).filter((p) => !mapped.has(p.pixel)),
+	}
+}
+
+/** Dimmers at level (0…1, 16-bit big-endian as the channel has it), the unmapped pixels black. */
+function writeIntensity(buf, fx, plan, level) {
+	for (const c of plan.dimmers) {
+		const n = c.offsets.length
+		const dmx = Math.round(Math.max(0, Math.min(1, level)) * (256 ** n - 1))
+		c.offsets.forEach((o, k) => {
+			const at = fx.address - 1 + o - 1
+			if (at >= 0 && at < 512) buf[at] = Math.floor(dmx / 256 ** (n - 1 - k)) & 0xff
+		})
+	}
+	for (const px of plan.dark) writePixel(buf, fx, px, null)
+}
+
 module.exports = { MAX_MAPPINGS, compOf, pixelsOf, slotsOf, channelForRole, bindRole, normalizeMapping, normalizeMappings,
-	checkMapping, validateMappings, componentValues, writePixel }
+	checkMapping, validateMappings, componentValues, writePixel, intensityPlan, writeIntensity }

@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-826 live WOs (28 open, 120 in progress, 678 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+827 live WOs (28 open, 120 in progress, 679 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -286,7 +286,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 521 OPEN [video-io+engine] Zoom meeting module: per-participant channels, strictly opt-in → 521_WO_ZOOM_MODULE_OPT_IN.md
 - 716 DONE [video-io+caspar-build] Screen consumers: vsync always off, gpu-texture on every channel → 716_WO_vsync_always_off_gpu_texture_every_screen.md
 
-## mapping — Pixel map, screens, multiview, destinations (41)
+## mapping — Pixel map, screens, multiview, destinations (42)
 
 - 18 IN PROGRESS [mapping] Pixel & Output Mapping — Unified Node-Based System → 18_WO_OUTPUT_SLICER.md
 - 40 IN PROGRESS [mapping+devices-config] Device View — GPU xrandr sync with screen destinations and override → 40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md
@@ -329,6 +329,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 897 DONE [mapping] Pixel-map tick matches the channel rate: 50 fps frames are all sampled → 897_WO_pixel_map_tick_matches_channel_rate.md
 - 915 DONE [mapping+lighting] PixelLines on the Dioda wall's edges: mappings follow the bus, the previs shows… → 915_WO_pixeline_edges_follow_the_dioda_bus.md
 - 916 DONE [mapping+lighting] Pixel map: always on, cheap sampling, its own output to the lighting console → 916_WO_pixel_map_always_on_console_output.md
+- 917 DONE [mapping+lighting] Pixel map: an intensity override switch for playing with it in the previs → 917_WO_pixel_map_intensity_override.md
 
 ## lighting — DMX, Art-Net, sACN, fixtures, consoles (33)
 

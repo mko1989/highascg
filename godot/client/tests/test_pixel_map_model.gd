@@ -194,12 +194,15 @@ func test_window_has_smoothing_row() -> void:
 ## WO-916: the Console rows read the server's settings with its defaults (25 Hz, on, Art-Net, fixture universes).
 func test_console_settings_from() -> void:
 	var C := preload("res://features/previs/fixtures/pixel_map_console.gd")
-	t.eq(C.settings_from({}), {"rate_hz": 25, "console": {"enabled": true, "protocol": "artnet", "dest": "", "layout": "fixture", "universe": 1}})
+	t.eq(C.settings_from({}), {"intensity": {"override": false, "level": 100}, "rate_hz": 25, "console": {"enabled": true, "protocol": "artnet", "dest": "", "layout": "fixture", "universe": 1}})
 	t.eq(C.settings_from({"ok": true, "settings": {"rate_hz": 0.0, "console": {"enabled": false, "protocol": "sacn", "dest": "10.0.0.5",
-		"layout": "block", "universe": 40.0}}}), {"rate_hz": 0, "console": {"enabled": false, "protocol": "sacn", "dest": "10.0.0.5", "layout": "block", "universe": 40}})
+		"layout": "block", "universe": 40.0}}}), {"intensity": {"override": false, "level": 100}, "rate_hz": 0, "console": {"enabled": false, "protocol": "sacn", "dest": "10.0.0.5", "layout": "block", "universe": 40}})
 	t.eq(C.settings_from({"settings": {"rate_hz": 999, "console": {"protocol": "dmx", "layout": 3, "dest": 5}}}).console,
 		{"enabled": true, "protocol": "artnet", "dest": "", "layout": "fixture", "universe": 1}, "junk → defaults")
 	t.eq(C.settings_from({"settings": {"rate_hz": 999}}).rate_hz, 60)
+	# WO-917: the intensity override
+	t.eq(C.settings_from({"settings": {"intensity": {"override": true, "level": 40.0}}}).intensity, {"override": true, "level": 40})
+	t.eq(C.settings_from({"settings": {"intensity": {"override": "yes", "level": 400}}}).intensity, {"override": false, "level": 100}, "junk → off")
 
 
 ## WO-916: /live `console` → one status line: where it goes, or why nothing goes.
@@ -223,3 +226,17 @@ func test_window_has_console_rows() -> void:
 	var con := FileAccess.get_file_as_string("res://features/previs/fixtures/pixel_map_console.gd")
 	t.ok(con.contains("_dest.select_all_on_focus = true  # RULES.md 1"), "the address field selects on focus")
 	t.ok(con.contains("s.select_all_on_focus = true  # RULES.md 1; SpinBox evaluates"), "the spin boxes too")
+
+
+## WO-917: the Intensity row round-trips through show_settings → body(); the level follows the switch.
+func test_console_intensity_row() -> void:
+	var C := preload("res://features/previs/fixtures/pixel_map_console.gd")
+	var c: VBoxContainer = C.new()
+	c.show_settings({"settings": {"intensity": {"override": true, "level": 40}}})
+	t.eq(c.body().intensity, {"override": true, "level": 40})
+	t.eq(c.dirty, false)
+	c._override.button_pressed = false
+	t.eq(c.body().intensity, {"override": false, "level": 40})
+	t.eq(c.dirty, true, "flipping the switch makes Save *")
+	t.eq(c._level.editable, false, "the level is greyed out while not overriding")
+	c.free()
