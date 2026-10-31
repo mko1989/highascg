@@ -179,6 +179,8 @@ function scanDesktopApps(opts = {}) {
 				terminal,
 				icon: entry.Icon || '',
 				argv,
+				// WO-886: `Path=` is the working directory (MagicQ's runmagicq.sh exits unless started in /opt/magicq)
+				cwd: parse.workingDir(entry),
 				windowClasses: parse.deriveWindowClasses(entry, {
 					terminalBin,
 					terminalClass: terminalSupportsClass(terminalBin) ? terminalClassFor(id) : null,
@@ -221,7 +223,7 @@ function isAppAction(action) {
  * the resolved emulator — without that they would start with no controlling terminal and die
  * instantly, which on the operator GUI looks exactly like "the menu item does nothing".
  * @param {string} action
- * @returns {{ bin: string, args: string[], entry: object }|null}
+ * @returns {{ bin: string, args: string[], entry: object, cwd: string|null }|null}
  */
 function resolveAppLaunch(action) {
 	const entry = findAppEntry(action)
@@ -232,9 +234,9 @@ function resolveAppLaunch(action) {
 	if (entry.terminal) {
 		const term = resolveTerminalEmulator()
 		if (!term) return null
-		return { bin: term, args: terminalArgv(term, terminalClassFor(entry.id), entry.name, [bin, ...args]), entry }
+		return { bin: term, args: terminalArgv(term, terminalClassFor(entry.id), entry.name, [bin, ...args]), entry, cwd: entry.cwd }
 	}
-	return { bin, args, entry }
+	return { bin, args, entry, cwd: entry.cwd }
 }
 
 /**

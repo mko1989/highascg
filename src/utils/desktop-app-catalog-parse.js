@@ -222,6 +222,9 @@ function deriveWindowClasses(entry, opts = {}) {
 	push(entry.StartupWMClass)
 	const argv = splitExec(entry.Exec)
 	if (argv[0]) push(path.basename(argv[0]))
+	/* WO-886: a shell-script launcher (MagicQ's runmagicq.sh) never owns a window — the program it starts does, under its
+	 * own class (mqqt / "MagicQ", verified on this box). The entry's first Name word is that class for the ChamSys apps. */
+	if (/\.sh$/i.test(argv[0] || '')) push(String(entry.Name || '').trim().split(/\s+/)[0])
 	return out
 }
 
@@ -296,6 +299,18 @@ function pinnedActionFor(entry) {
 	return PINNED_BY_BINARY[path.basename(argv[0])] || null
 }
 
+/**
+ * PURE. WO-886 — the entry's `Path=` (the spec's working directory to run the program in), or null. Only an absolute path
+ * without `..` segments; the spawn fails loudly if it does not exist, like a stale Exec.
+ * @param {Record<string, string>} entry
+ * @returns {string|null}
+ */
+function workingDir(entry) {
+	const p = String(entry?.Path || '').trim()
+	if (!p || !path.isAbsolute(p) || p.split('/').includes('..')) return null
+	return p
+}
+
 module.exports = {
 	APP_DIRS,
 	TERMINAL_BINARIES,
@@ -308,4 +323,5 @@ module.exports = {
 	parseAppAction,
 	isMenuEntry,
 	pinnedActionFor,
+	workingDir,
 }

@@ -56,4 +56,5 @@ module.exports = [
 	'tools/smoke/smoke-wo580-shader-live-speed.test.js',
 	'tools/smoke/smoke-wo879-tap-tempo.test.js',
 	'tools/smoke/smoke-wo884-fft-follows-routed-slot.test.js',
+	'tools/smoke/smoke-wo886-dock-app-working-dir.test.js',
 ]

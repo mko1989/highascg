@@ -37,6 +37,8 @@ function spawnGuiDetached(action, opts = {}) {
 	let bin = null
 	/** @type {string[]} */
 	let args = []
+	/** @type {string|undefined} WO-886: an app entry's `Path=` */
+	let cwd
 	/* WO-387: an `app:<desktop-id>` action is any application installed on this box. The command
 	 * comes from the on-disk .desktop entry, never from the request — see
 	 * src/utils/desktop-app-catalog-parse.js for the security model. Console tools (Terminal=true)
@@ -48,6 +50,7 @@ function spawnGuiDetached(action, opts = {}) {
 		if (!launch) throw new Error(`Not an installed application: ${action}`)
 		bin = launch.bin
 		args = launch.args
+		cwd = launch.cwd || undefined
 	} else if (action === 'nvidia-settings') bin = resolveNvidiaSettings()
 	else if (action === 'desktopvideo_setup') bin = resolveDesktopvideoSetup()
 	else if (action === 'desktop_video_updater') bin = resolveBmdUpdater()
@@ -136,6 +139,7 @@ function spawnGuiDetached(action, opts = {}) {
 
 	const proc = spawn(bin, args, {
 		env,
+		cwd,
 		detached: true,
 		stdio: 'ignore',
 	})
