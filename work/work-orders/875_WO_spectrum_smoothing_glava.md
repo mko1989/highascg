@@ -1,7 +1,7 @@
 # WO-875 — Spectrum smoothing after GLava for every shader + a Spectrum scene in the Visuals
 
 **Area:** audio, engine, godot-client
-**Status: IN PROGRESS (31.10: smoothing in player.js + the Godot Visuals, Spectrum scene, offline-verified; on-box shots pending a server restart)**
+**Status: DONE (31.10.26 — offline suites; box: the live node sends `smooth` in every audio_fft frame, the Spectrum scene moves with the room audio in the owner GUI; the CEF player on air not observed)**
 
 Owner, 31.10: *"Check this project and see if anything from it would be beneficial https://github.com/jarcode-foss/glava"*,
 then, on the review: *"Yep, smoothing is something we need. Add this to the visuals engine and to any existing shader etc."*
@@ -79,3 +79,14 @@ then, on the review: *"Yep, smoothing is something we need. Add this to the visu
   200/s × 0.05 s = 10 bytes), Spectrum `level()` (silence, full scale, the bass bins, the tilt).
 - Pending: on-box screenshots with test music (the node service was stopped by the 00:33 eggs build and needs the owner's
   `sudo systemctl start highascg`), and a Caspar template replay to pick up player-smooth.js on air.
+
+## 4. On the box (31.10.26, node restarted 14:33)
+- Live WS `/api/ws`, one `audio_fft` frame: `smooth {"fall":200,"frames":3,"spread":0.02}`, freq 512 bytes — the server half
+  drives every renderer from the one setting.
+- Owner GUI, A/B PRV bank (the owner's bank A untouched on air, A/B off afterwards → project back to its two layers at 0 %):
+  Spectrum dropped from Sources ▸ Visuals ▸ Scenes; four frames 100 ms apart show the mirrored bar ring moving with the
+  room audio, bars falling between frames rather than cutting (seen at an angle: the bank's camera yaw/pitch, WO-896).
+- Caspar side: `template/` is Caspar's template path and `template/shaders/player-smooth.js` sits next to `player.js`, so a
+  shader template loaded from now on picks the companion up (its loading is pinned by `smoke-wo875-spectrum-smooth`).
+  Not observed inside CEF: no shader template is on air in the current project.
+

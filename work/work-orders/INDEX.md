@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-821 live WOs (31 open, 125 in progress, 665 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+821 live WOs (31 open, 124 in progress, 666 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -249,7 +249,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 862 DONE [audio+godot-client,web-client] audio mixer shows screen labels; a new live input starts unrouted → 862_WO_audio_mixer_screen_labels_new_input_unrouted.md
 - 866 DONE [audio+godot-client] Drum detection vs real music: measure against annotated drums, better detector,… → 866_WO_drum_detection_alignment.md
 - 872 DONE [audio] Beat tracking: compare with fosfora, adopt its grid/tempo/benchmark ideas → 872_WO_beat_tracking_fosfora_comparison.md
-- 875 IN PROGRESS [audio+engine,godot-client] Spectrum smoothing after GLava for every shader + a Spectrum scene in the Visua… → 875_WO_spectrum_smoothing_glava.md
+- 875 DONE [audio+engine,godot-client] Spectrum smoothing after GLava for every shader + a Spectrum scene in the Visua… → 875_WO_spectrum_smoothing_glava.md
 - 879 DONE [audio+godot-client] Tap tempo: the operator's beat when the tracker cannot lock (and when the feed… → 879_WO_tap_tempo_beat_override.md
 - 884 DONE [audio+engine] Live audio playing, audio-reactive visuals still: the FFT engine never followed… → 884_WO_fft_engine_missed_slot_routed_by_project_apply.md
 - 898 DONE [audio+devices-config] Audio-only channels: tiny custom video mode at the rate of the channel they feed → 898_WO_audio_only_channel_tiny_rate_matched_mode.md
