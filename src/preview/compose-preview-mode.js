@@ -85,7 +85,8 @@ function collectComposePreviewChannelsFromMap(map) {
 	for (const c of map?.decklinkInputChannels || []) push(c)
 	for (const c of map?.v4l2InputChannels || []) push(c)
 	for (const entry of map?.hostLiveChannels || []) push(entry?.channel)
-	for (const entry of map?.inputChannels || []) push(entry?.channel)
+	// WO-898: a live ALSA input channel has no picture (WO-887 no_picture) and a 64x36 raster — no JPEG consumer.
+	for (const entry of map?.inputChannels || []) if (entry?.kind !== 'live_audio') push(entry?.channel)
 	if (ch.size === 0) ch.add(1)
 	return [...ch].sort((a, b) => a - b)
 }

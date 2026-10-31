@@ -243,7 +243,7 @@ function getChannelMap(config, activeBuses = null) {
 
 	// WO-53: each live input gets its own Caspar channel so its audio meter is isolated (channel-level
 	// OSC meter == one input). DeckLink inputs get a full-quality channel (inputs_channel_mode); the
-	// DeckLink plays at layer = slot. Audio-only (ALSA) inputs get a cheap channel (lowest standard
+	// DeckLink plays at layer = slot. Audio-only (ALSA) inputs get a cheap channel (WO-898 tiny
 	// mode); ALSA plays at LIVE_AUDIO_INPUT_LAYER. Inputs are no longer bundled onto a shared host.
 	const _modes = require('./config-modes')
 	const decklinkInputModeRaw = String(readCasparSetting(config, 'inputs_channel_mode') ?? '1080p5000').trim()
@@ -252,7 +252,10 @@ function getChannelMap(config, activeBuses = null) {
 		readCasparSetting(config, 'v4l2_input_channel_mode') || readCasparSetting(config, 'inputs_channel_mode') || '1080p5000',
 	).trim()
 	const v4l2InputMode = _modes.STANDARD_VIDEO_MODES[v4l2InputModeRaw] ? v4l2InputModeRaw : decklinkInputMode
-	const liveAudioInputMode = _modes.resolveLiveAudioInputChannelMode(config)
+	// WO-898: an ALSA input channel only carries audio, routed to the PGM buses — tiny custom mode at the PGM rate
+	// (the generator registers it). The saved live_audio_inputs_channel_mode is a phantom '1080p5000' both clients
+	// round-trip with no picker, and any rate other than the PGM's chops the route:// audio — not consulted here.
+	const liveAudioInputMode = require('./audio-only-channel-mode').AUDIO_ONLY_MODE_ID
 	const LIVE_AUDIO_INPUT_LAYER = 10
 	const V4L2_HOST_LAYER = 1
 

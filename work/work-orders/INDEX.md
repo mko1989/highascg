@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-810 live WOs (30 open, 125 in progress, 655 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+811 live WOs (30 open, 125 in progress, 656 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -205,7 +205,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 881 OPEN [caspar-build+engine] Caspar came up without CEF after a supervisor tree-kill, and nothing said so → 881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md
 - 888 DONE [caspar-build+os-iso] PGM micro stutter on alt-tab: Caspar's window never takes focus; frame sync sti… → 888_WO_caspar_window_no_focus_sync_follows_pgm.md
 
-## audio — Audio routing, devices, meters (45)
+## audio — Audio routing, devices, meters (46)
 
 - 06 DONE [audio] Multi-Channel Audio Playout Architecture (CasparCG on Ubuntu) → 06_WO_AUDIO_PLAYOUT.md
 - 16 DONE [audio] Yamaha DM3 Audio Integration → 16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md
@@ -252,6 +252,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 875 IN PROGRESS [audio+engine,godot-client] Spectrum smoothing after GLava for every shader + a Spectrum scene in the Visua… → 875_WO_spectrum_smoothing_glava.md
 - 879 DONE [audio+godot-client] Tap tempo: the operator's beat when the tracker cannot lock (and when the feed… → 879_WO_tap_tempo_beat_override.md
 - 884 DONE [audio+engine] Live audio playing, audio-reactive visuals still: the FFT engine never followed… → 884_WO_fft_engine_missed_slot_routed_by_project_apply.md
+- 898 DONE [audio+devices-config] Audio-only channels: tiny custom video mode at the rate of the channel they feed → 898_WO_audio_only_channel_tiny_rate_matched_mode.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (29)
 

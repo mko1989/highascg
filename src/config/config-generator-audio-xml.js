@@ -1,7 +1,8 @@
 'use strict'
 
 const { channelXmlComment } = require('./config-generator-xml-comments')
-const { layoutChannelCount, getLowestStandardVideoModeIdForFps } = require('./config-modes')
+const { layoutChannelCount } = require('./config-modes')
+const { audioOnlyModeDimensions } = require('./audio-only-channel-mode')
 const { casparChannelLayoutId, DISCRETE_8CH_LAYOUT_ID } = require('./audio-channel-layouts')
 const { escapeXml, isCustomLiveProfile } = require('./config-generator-utils')
 const {
@@ -433,7 +434,9 @@ function buildMonitorChannelXml(config, casparChannelNum, sourceFps) {
 
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
 	const head = channelXmlComment(`Caspar channel ${ch}: Monitor / headphone mix (system-audio consumer)`)
-	const mode = getLowestStandardVideoModeIdForFps(sourceFps)
+	// WO-898: audio-only → the tiny custom mode (id only; the generator registers it at sourceFps). Was WO-237's
+	// getLowestStandardVideoModeIdForFps — rate-matched, but still a 720p raster read back every tick.
+	const mode = audioOnlyModeDimensions(sourceFps).modeId
 	return `${head}        <channel>
             <video-mode>${mode}</video-mode>
             <consumers>

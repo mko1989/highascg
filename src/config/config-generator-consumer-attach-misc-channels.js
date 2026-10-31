@@ -129,12 +129,15 @@ function buildPixelmapChannel(config, dest, dims, casparChannelNum) {
 /**
  * WO-53: one dedicated channel per live input. The producer (DeckLink/ALSA) is PLAYed here over AMCP,
  * so the channel-level OSC meter is isolated to that single input. DeckLink uses a full-quality mode
- * (`inputs_channel_mode`); audio-only ALSA uses the cheap lowest standard mode. No config consumers.
+ * (`inputs_channel_mode`); audio-only ALSA uses the WO-898 tiny custom mode. No config consumers.
  * @param {Record<string, unknown>} config
  * @param {{ kind: string, slot: number, channel: number, layer: number, mode: string, label: string }} entry
+ * @param {Set<string>} [registeredCustomModes] custom `<video-mode>` ids this config registers — a custom id is
+ *   only emitted when it is in here (Caspar refuses to start on an unknown video-mode id)
  */
-function buildInputChannel(config, entry) {
-	const modeId = entry && STANDARD_VIDEO_MODES[String(entry.mode)] ? String(entry.mode) : '1080p5000'
+function buildInputChannel(config, entry, registeredCustomModes) {
+	const wanted = String(entry?.mode ?? '')
+	const modeId = entry && (STANDARD_VIDEO_MODES[wanted] || registeredCustomModes?.has(wanted)) ? wanted : '1080p5000'
 	const ch = entry && Number.isFinite(Number(entry.channel)) ? Number(entry.channel) : '?'
 	const composeXml = Number.isFinite(Number(entry?.channel)) ? buildComposePreviewFfmpegConsumerXml(config, entry.channel) : ''
 	const role =

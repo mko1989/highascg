@@ -8,6 +8,9 @@
  * off.* were captured from the code BEFORE WO-868 existed: OFF must stay byte-identical to them.
  * on.*  are the reviewed ON outputs: channel 1 = operator GUI (shm opgui), 2-3 PGM1/PRV1, 4-5 PGM2/PRV2, host pins
  * (DeckLink 6, live audio 7) unchanged, monitor 8; operator monitor at x=0 and the LED wall (DP-0) at x=1920.
+ * Re-captured 31.10 for WO-898 (both states, diff reviewed): ONLY the live-audio channel 7 and monitor channel 8
+ * modes changed (1080p5000 / 720p5000 → 64x36), plus the 64x36@50 <video-modes> entry and the channel map's
+ * live-audio `mode` / `liveAudioInputMode`. Layouts untouched.
  */
 
 const { test } = require('node:test')

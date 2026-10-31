@@ -4,6 +4,7 @@ const { findStandardModeId, getModeDimensions, getExtraAudioModeDimensions, STAN
 const { screenModeString } = require('./config-generator-mode-helpers')
 const { multiviewModeDimensions } = require('./config-generator-multiview-mode')
 const { destinationsFromConfig } = require('./screen-destinations')
+const { AUDIO_ONLY_MODE_ID, audioOnlyModeDimensions } = require('./audio-only-channel-mode')
 
 /**
  * WO-243: dims for an `operator_gui` utility channel, sourced from the destination's own
@@ -58,11 +59,6 @@ function buildChannelPlan(config, routeMap) {
 		const pixelmap = pixelmapByMain.get(n - 1) || null
 		screens.push({ n, dims, pixelmap })
 	}
-	const extraAudio = []
-	for (let i = 1; i <= extraAudioCount; i++) {
-		const dims = getExtraAudioModeDimensions(config, i)
-		extraAudio.push({ i, dims })
-	}
 	const multiviewChannels = Array.isArray(routeMap.multiviewChannels) ? routeMap.multiviewChannels : (routeMap.multiviewCh != null ? [routeMap.multiviewCh] : [])
 	const multiviews = []
 	multiviewChannels.forEach((ch, idx) => {
@@ -90,6 +86,16 @@ function buildChannelPlan(config, routeMap) {
 	// WO-53: one Caspar channel per live input (DeckLink = full mode, ALSA = cheap mode).
 	const inputChannels = Array.isArray(routeMap.inputChannels) ? routeMap.inputChannels : []
 
+	// WO-898: ONE tiny audio-only mode per config, at the rate of the main channels its audio is routed to/from
+	// (same source as the monitor bus: first screen, else the operator-GUI channel). Live ALSA inputs, default
+	// extra-audio channels and the monitor bus all use it, so the shared `64x36` id is registered at one rate.
+	const audioOnlyDims = audioOnlyModeDimensions(screens[0]?.dims?.fps ?? operatorGuis[0]?.dims?.fps)
+	const extraAudio = []
+	for (let i = 1; i <= extraAudioCount; i++) {
+		const dims = getExtraAudioModeDimensions(config, i)
+		extraAudio.push({ i, dims: dims.modeId === AUDIO_ONLY_MODE_ID ? audioOnlyDims : dims })
+	}
+
 	return {
 		screens,
 		extraAudio,
@@ -98,6 +104,7 @@ function buildChannelPlan(config, routeMap) {
 		operatorGuiEnabled,
 		operatorGuis,
 		inputChannels,
+		audioOnlyDims,
 		decklinkCount,
 		liveAudioCount,
 		inputsHostChannelEnabled: routeMap.inputsHostChannelEnabled === true,

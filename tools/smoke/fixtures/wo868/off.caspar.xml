@@ -121,7 +121,7 @@
         </channel>
         <!-- HighAsCG: Caspar channel 7: Live audio input 1 (ALSA PLAY … alsa:// on layer 10; cheap channel, isolated VU) -->
         <channel>
-            <video-mode>1080p5000</video-mode>
+            <video-mode>64x36</video-mode>
             <channel-layout>stereo</channel-layout>
             <consumers>
             </consumers>
@@ -131,7 +131,7 @@
         </channel>
         <!-- HighAsCG: Caspar channel 8: Monitor / headphone mix (system-audio consumer) -->
         <channel>
-            <video-mode>720p5000</video-mode>
+            <video-mode>64x36</video-mode>
             <consumers>
                 <system-audio>
                     <device-name>sc60mon</device-name>
@@ -147,6 +147,14 @@
             <id>3840x1792</id>
             <width>3840</width>
             <height>1792</height>
+            <time-scale>50000</time-scale>
+            <duration>1000</duration>
+            <cadence>960</cadence>
+        </video-mode>
+        <video-mode>
+            <id>64x36</id>
+            <width>64</width>
+            <height>36</height>
             <time-scale>50000</time-scale>
             <duration>1000</duration>
             <cadence>960</cadence>

@@ -89,10 +89,15 @@ test('WO-406: generator derives flat keys and emits the monitor channel XML', ()
 	// Mode MUST match the screens' fps: route_producer's bounded queue drops every other
 	// frame's audio when the monitor channel runs at half the source rate — the owner heard
 	// this as "weird stuttery noise" on a 50 fps PRV routed into the old fixed 576p2500
-	// (25 fps) channel. Cheapest progressive mode AT the source rate, 576p2500 fallback.
-	assert.match(buildMonitorChannelXml(merged, 9, 50), /<video-mode>720p5000<\/video-mode>/)
-	assert.match(buildMonitorChannelXml(merged, 9, 25), /<video-mode>576p2500<\/video-mode>/)
-	assert.match(xml, /<video-mode>576p2500<\/video-mode>/) // no fps given → historical default
+	// (25 fps) channel. Repointed 31.10 (WO-898): the monitor is audio-only, so it uses the tiny
+	// `64x36` custom mode; the id carries no rate — the generator registers it AT the source rate
+	// (the full-XML rate checks live in smoke-wo237 + smoke-wo898).
+	const { audioOnlyModeDimensions } = require('../../src/config/audio-only-channel-mode')
+	assert.match(buildMonitorChannelXml(merged, 9, 50), /<video-mode>64x36<\/video-mode>/)
+	assert.match(buildMonitorChannelXml(merged, 9, 25), /<video-mode>64x36<\/video-mode>/)
+	assert.match(xml, /<video-mode>64x36<\/video-mode>/) // no fps given → same id (registered at 50)
+	assert.equal(audioOnlyModeDimensions(50).timeScale, 50000, 'registered at 50 fps for 50 fps sources')
+	assert.equal(audioOnlyModeDimensions(25).timeScale, 25000, 'registered at 25 fps for 25 fps sources')
 
 	// No monitor entry → nothing derived, nothing emitted.
 	const clean = { caspar_build_profile: 'custom_live', screen_count: 1 }

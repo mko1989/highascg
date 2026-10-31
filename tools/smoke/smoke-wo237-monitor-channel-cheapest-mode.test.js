@@ -3,6 +3,7 @@
 /**
  * WO-237 (updated for the WO-406 follow-up, 03.08.26): the monitor channel uses the
  * CHEAPEST PROGRESSIVE video mode AT THE SCREENS' FRAME RATE — not a fixed 576p2500.
+ * WO-898 (31.10.26): that mode is now the tiny 64x36 custom mode registered at that rate.
  * A rate-mismatched monitor channel makes route_producer's bounded queue drop every
  * other source frame (and its audio): the owner heard a 50 fps PRV routed into the old
  * 25 fps monitor channel as "weird stuttery noise". Consumer is system-audio (OpenAL),
@@ -53,15 +54,15 @@ describe('WO-237/406: monitor channel mode + consumer', () => {
 		assert.ok(monitorBlockMatch, 'should find monitor channel block')
 		const monitorBlock = monitorBlockMatch[0]
 
+		// Repointed 31.10 (WO-898): the cheapest mode is now the tiny `64x36` custom mode, registered in
+		// <video-modes> at the screens' rate — so the rate check reads the registration, not the id.
 		const fps = inferProjectFpsFromConfig(cfg)
-		const expectedMode = getLowestStandardVideoModeIdForFps(fps)
-		assert.match(
-			monitorBlock,
-			new RegExp(`<video-mode>${expectedMode}</video-mode>`),
-			`monitor channel should use ${expectedMode} for ${fps} fps screens`
-		)
-		const modeFps = STANDARD_VIDEO_MODES[expectedMode]?.fps
+		assert.match(monitorBlock, /<video-mode>64x36<\/video-mode>/, `monitor channel should use 64x36 for ${fps} fps screens`)
+		const reg = xml.match(/<video-mode>\s*<id>64x36<\/id>[\s\S]*?<time-scale>(\d+)<\/time-scale>\s*<duration>(\d+)<\/duration>/)
+		assert.ok(reg, '64x36 is registered in <video-modes>')
+		const modeFps = Number(reg[1]) / Number(reg[2])
 		assert.ok(Math.abs(modeFps - fps) < 0.06, 'monitor mode fps matches the screens fps')
+		assert.ok(STANDARD_VIDEO_MODES['720p5000'], 'standard table still loaded')
 
 		// system-audio consumer only — no portaudio, no video consumers.
 		assert.match(monitorBlock, /<system-audio>/, 'should have system-audio consumer')

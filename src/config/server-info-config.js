@@ -47,13 +47,42 @@ function parseChannelVideoModesFromInfoConfigXml(xmlStr) {
  */
 function buildChannelResolutionMap(xmlStr) {
 	const rows = parseChannelVideoModesFromInfoConfigXml(xmlStr)
+	const customFps = parseCustomVideoModeFpsFromInfoConfigXml(xmlStr)
 	/** @type {Record<number, { w: number, h: number, fps: number }>} */
 	const map = {}
 	for (const row of rows) {
 		if (!row.videoMode) continue
-		map[row.index] = resolutionFromVideoModeString(row.videoMode)
+		const res = resolutionFromVideoModeString(row.videoMode)
+		const fps = customFps[row.videoMode]
+		map[row.index] = fps > 0 ? { ...res, fps } : res
 	}
 	return map
+}
+
+/**
+ * WO-898: a `WxH` custom id says nothing about its rate (resolutionFromVideoModeString assumes 50) — read it from
+ * the config's own `<video-modes>` block (time-scale / duration), so a 25 fps `64x36` channel reports 25.
+ * @param {string} xmlStr
+ * @returns {Record<string, number>} custom mode id → fps
+ */
+function parseCustomVideoModeFpsFromInfoConfigXml(xmlStr) {
+	/** @type {Record<string, number>} */
+	const out = {}
+	const block = /<video-modes>([\s\S]*?)<\/video-modes>/i.exec(String(xmlStr || ''))
+	if (!block) return out
+	const re = /<video-mode>([\s\S]*?)<\/video-mode>/gi
+	let m
+	while ((m = re.exec(block[1])) !== null) {
+		const tag = (name) => {
+			const t = new RegExp(`<${name}>\\s*([^<]+?)\\s*</${name}>`, 'i').exec(m[1])
+			return t ? t[1] : ''
+		}
+		const id = tag('id')
+		const timeScale = parseInt(tag('time-scale') || '60000', 10)
+		const duration = parseInt(tag('duration') || '1000', 10)
+		if (id && timeScale > 0 && duration > 0) out[id] = Math.round((timeScale / duration) * 1000) / 1000
+	}
+	return out
 }
 
 module.exports = {

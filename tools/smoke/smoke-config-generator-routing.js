@@ -257,8 +257,9 @@ test('multiview off: per-DeckLink channels then streaming channel after screen p
 	assert.match(channelBlocks[4], /<video-mode>720p5000<\/video-mode>/, 'streaming channel is last with its mode')
 })
 
-test('WO-53: DeckLink inputs use full mode; ALSA inputs use the cheap lowest standard mode', () => {
-	const { getLowestStandardVideoModeId } = require('../../src/config/config-modes')
+test('WO-53: DeckLink inputs use full mode; ALSA inputs use the cheap audio-only mode', () => {
+	// Repointed 31.10 (WO-898): "cheap" = the tiny 64x36 custom mode at the PGM rate, not PAL.
+	const { AUDIO_ONLY_MODE_ID } = require('../../src/config/audio-only-channel-mode')
 	const app = clone(defaults)
 	addMockGraph(app)
 	app.screen_count = 1
@@ -279,7 +280,7 @@ test('WO-53: DeckLink inputs use full mode; ALSA inputs use the cheap lowest sta
 	app.rtmp = { ...app.rtmp, enabled: false }
 	const flat = buildCasparGeneratorFlatConfig(app)
 	const map = getChannelMap(flat)
-	const lowest = getLowestStandardVideoModeId()
+	const lowest = AUDIO_ONLY_MODE_ID
 	// One dedicated channel per input (2 decklink + 1 live audio).
 	assert.equal(map.inputChannels.length, 3, 'one dedicated channel per input slot')
 	assert.deepEqual(
@@ -287,18 +288,21 @@ test('WO-53: DeckLink inputs use full mode; ALSA inputs use the cheap lowest sta
 		['decklink', 'decklink', 'live_audio'],
 	)
 	assert.equal(map.inputChannels[0].mode, '1080p5000', 'DeckLink uses full inputs_channel_mode')
-	assert.equal(map.inputChannels[2].mode, lowest, 'ALSA uses the cheap lowest standard mode')
+	assert.equal(map.inputChannels[2].mode, lowest, 'ALSA uses the cheap audio-only mode')
 	assert.equal(map.inputChannels[0].route, `route://${map.decklinkInputChannels[0]}-1`)
 	assert.equal(map.inputChannels[2].route, `route://${map.liveAudioInputChannels[0]}`)
 	const xml = buildConfigXml(flat)
 	assert.match(xml, /DeckLink input 1/, 'DeckLink input channel comment present')
 	assert.match(xml, /Live audio input 1/, 'live audio input channel comment present')
-	assert.match(xml, new RegExp(`<video-mode>${lowest}</video-mode>`), 'cheap ALSA channel uses lowest standard mode')
-	// UI saves live_audio_inputs_channel_mode (with trailing "s"); routing must honour it.
+	assert.match(xml, new RegExp(`<video-mode>${lowest}</video-mode>`), 'cheap ALSA channel uses the audio-only mode')
+	assert.match(xml, new RegExp(`<id>${lowest}</id>`), 'the audio-only mode is registered in <video-modes>')
+	// WO-898 (contract change): both clients round-trip live_audio_inputs_channel_mode with a hardcoded
+	// '1080p5000' and no picker — it is never an operator choice, and any non-PGM rate chops route:// audio.
+	// It must NOT put the ALSA channel back on a full raster.
 	const hi = clone(app)
-	hi.casparServer = { ...hi.casparServer, live_audio_inputs_channel_mode: '1080p5000' }
+	hi.casparServer = { ...hi.casparServer, live_audio_inputs_channel_mode: '1080p5000', live_audio_input_channel_mode: '1080p5000' }
 	const mapHi = getChannelMap(buildCasparGeneratorFlatConfig(hi))
-	assert.equal(mapHi.inputChannels[2].mode, '1080p5000', 'live_audio_inputs_channel_mode overrides PAL default')
+	assert.equal(mapHi.inputChannels[2].mode, lowest, 'phantom 1080p5000 does not override the audio-only mode')
 	// No inputs configured → no input channels.
 	const off = clone(flat)
 	off.decklink_input_count = 0

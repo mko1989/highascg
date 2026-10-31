@@ -157,6 +157,10 @@ function buildChannelsSection(config, routeMap) {
 	for (const entry of plan.inputChannels) {
 		if (entry.kind === 'webpage_host' || entry.kind === 'ndi_host' || entry.kind === 'browser_display') {
 			setChannelXml(entry.channel, buildHostLiveChannel(config, entry))
+		} else if (entry.kind === 'live_audio') {
+			// WO-898: audio-only — the tiny custom mode at the PGM rate, registered in <video-modes>.
+			pushCustomMode(customVideoModes, customModeIds, plan.audioOnlyDims)
+			setChannelXml(entry.channel, buildInputChannel(config, { ...entry, mode: plan.audioOnlyDims.modeId }, customModeIds))
 		} else {
 			setChannelXml(entry.channel, buildInputChannel(config, entry))
 		}
@@ -185,9 +189,14 @@ function buildChannelsSection(config, routeMap) {
 	// The solo bus routes from whatever main channels exist — plain screens OR operator-GUI
 	// channels (an operator-gui-only box has plan.screens empty; falling back to 576p2500
 	// against a 50 fps GUI channel re-creates the WO-237 every-other-frame audio chop).
+	// WO-898: the solo bus is audio-only too — the tiny mode; plan.audioOnlyDims registers it at this same rate
+	// (config-generator-channel-plan.js derives it from the identical screens → operator-GUI expression).
 	const monitorSourceFps = plan.screens?.[0]?.dims?.fps ?? plan.operatorGuis?.[0]?.dims?.fps
 	const monitorXml = buildMonitorChannelXml(config, routeMap.monitorCh, monitorSourceFps)
-	if (monitorXml) setChannelXml(routeMap.monitorCh, monitorXml)
+	if (monitorXml) {
+		pushCustomMode(customVideoModes, customModeIds, plan.audioOnlyDims)
+		setChannelXml(routeMap.monitorCh, monitorXml)
+	}
 
 	const usedNums = [...channelXmlByNumber.keys()]
 	const maxChannel = usedNums.length ? Math.max(...usedNums) : 0

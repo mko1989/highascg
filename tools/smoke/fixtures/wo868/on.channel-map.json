@@ -71,7 +71,7 @@
    "slot": 1,
    "channel": 7,
    "layer": 10,
-   "mode": "1080p5000",
+   "mode": "64x36",
    "route": "route://7",
    "label": "Live audio 1"
   }
@@ -84,7 +84,7 @@
  ],
  "v4l2InputChannels": [],
  "decklinkInputMode": "1080p5000",
- "liveAudioInputMode": "1080p5000",
+ "liveAudioInputMode": "64x36",
  "v4l2InputMode": "1080p5000",
  "hostLiveChannels": [],
  "webpageHostChannels": [],

@@ -7,7 +7,7 @@
 const { parseString } = require('xml2js')
 const { getChannelMap } = require('./routing')
 const { getModeDimensions } = require('./config-generator')
-const { pixelSizeForVideoMode } = require('./config-modes')
+const { pixelSizeForVideoMode, getExtraAudioModeDimensions } = require('./config-modes')
 const { multiviewGeneratedConfigIncludesScreen } = require('./multiview-helpers')
 
 /**
@@ -115,9 +115,8 @@ function buildModuleChannelExpectation(config) {
 	const extraN = map.audioOnlyChannels?.length ?? 0
 	for (let i = 0; i < extraN; i++) {
 		const idx = i + 1
-		const vm = String(cfg[`extra_audio_${idx}_video_mode`] || 'match_screen1')
-		const modeKey = vm === 'match_screen1' ? String(cfg.screen_1_mode || '1080p5000') : vm
-		const dims = getModeDimensions(modeKey, cfg, 1)
+		// WO-898: same resolver as the generator (default = tiny audio-only mode, not screen 1's raster).
+		const dims = getExtraAudioModeDimensions(cfg, idx)
 		const chNum = map.audioOnlyChannels[i]
 		list.push({ index: chNum, role: `Extra audio ${idx}`, videoMode: dims.modeId, hasScreen: false })
 	}

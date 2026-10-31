@@ -4,6 +4,8 @@
  */
 'use strict'
 
+const { audioOnlyModeDimensions } = require('./audio-only-channel-mode')
+
 /** @type {Record<string, { width: number, height: number, fps: number }>} */
 const STANDARD_VIDEO_MODES = {
 	PAL: { width: 720, height: 576, fps: 25 },
@@ -237,7 +239,9 @@ function layoutChannelCount(layout) {
 }
 
 /**
- * Video mode for an extra audio-only channel (match screen 1 or a standard preset).
+ * Video mode for an extra audio-only channel. Default (`match_screen1`, also the unset value): WO-898 tiny
+ * audio-only mode at screen 1's rate — rate-matched for route://, without screen 1's full raster. An explicit
+ * mode id in `extra_audio_N_video_mode` is still honoured.
  * @param {Record<string, unknown>} config
  * @param {number} idx1 - 1-based extra audio index
  */
@@ -245,7 +249,7 @@ function getExtraAudioModeDimensions(config, idx1) {
 	const vm = String(config[`extra_audio_${idx1}_video_mode`] || 'match_screen1')
 	if (vm === 'match_screen1') {
 		const modeKey = String(config.screen_1_mode || '1080p5000')
-		return getModeDimensions(modeKey, config, 1)
+		return audioOnlyModeDimensions(getModeDimensions(modeKey, config, 1).fps)
 	}
 	return getModeDimensions(vm, config, 1)
 }
@@ -346,7 +350,6 @@ module.exports = {
 	layoutChannelCount,
 	getExtraAudioModeDimensions,
 	getStandardModeChoices,
-	getLowestStandardVideoModeId,
 	getLowestStandardVideoModeIdForFps,
 	resolveLiveAudioInputChannelMode,
 	// WO-242: pre-existing latent bug fix — project-fps.js requires this but it was never exported,
