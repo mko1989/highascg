@@ -27,6 +27,7 @@ var scene: Stage:  # the live deck's stage
 var flow: Flow
 var page: Page
 var publisher: Publisher
+var ring_name := M.RING  # dev: --visuals-ring=<name>, so a probe client never writes the operator's ring
 var sending := {}  # {channel, layer} while on air
 var _buses := {}
 var _audio_at := -AUDIO_STALE_MS
@@ -102,6 +103,10 @@ func _ready() -> void:
 		_resize()
 		_store())
 	page.send_toggled.connect(func(on: bool) -> void: send(on))
+	page.ring_toggled.connect(func(on: bool) -> void:
+		slice.output.ring = on
+		_store()
+		_sync_send_ui(_sync_ring()))
 	page.scenes_changed.connect(func(main: String, overlay: String) -> void:
 		slice.scene = main
 		slice.overlay = overlay if overlay != main else ""
@@ -132,6 +137,8 @@ func _ready() -> void:
 	page.sensitivity_changed.connect(_post_sensitivity)
 	publisher = Publisher.new()
 	add_child(publisher)
+	if _g("Config") and _g("Config").args.has("visuals-ring"):
+		ring_name = str(_g("Config").args["visuals-ring"])
 	if _g("Ws"):
 		_g("Ws").on("audio_fft", func(d: Variant) -> void:
 			_buses = M.buses_of(d)
@@ -159,6 +166,8 @@ func _ready() -> void:
 		(func() -> void: Probes.autopilot(self, float(_g("Config").args["probe-visuals-auto"]))).call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-shots"):  # dev: --probe-visuals-shots=<dir> (WO-873)
 		(func() -> void: Probes.shots(self, str(_g("Config").args["probe-visuals-shots"]))).call_deferred()
+	if _g("Config") and _g("Config").args.has("probe-visuals-ring"):  # dev: --probe-visuals-ring=<s>[:scene[:size[:shader]]] (WO-883)
+		(func() -> void: Probes.ring(self, str(_g("Config").args["probe-visuals-ring"]))).call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-shaders"):  # dev: --probe-visuals-shaders=<dir> (WO-874)
 		(func() -> void: Probes.shaders(self, str(_g("Config").args["probe-visuals-shaders"]))).call_deferred()
 
@@ -190,7 +199,7 @@ func _load() -> void:
 	_go(false)
 	page.set_state(slice, _cm())
 	_resize()
-	_sync_send_ui("")
+	_sync_send_ui(_sync_ring())
 
 
 ## WO-876: open (or close) the picked game's window on the screen this client is on.
@@ -328,11 +337,11 @@ func _orbit_input(e: InputEvent) -> void:
 		_orbit.z = clampf(_orbit.z * (0.9 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.1), 2.0, 80.0)
 
 
-## Shown or on air → render every frame; otherwise the canvas sleeps (the publisher keeps it on while sending).
+## Shown or publishing (on air or a Live source) → render every frame; otherwise the canvas sleeps.
 func _on_shown() -> void:
-	var shown := is_visible_in_tree()
-	mixer.set_running(shown or not sending.is_empty())
-	set_process(shown or not sending.is_empty())
+	var shown := is_visible_in_tree() or publisher.sink != null
+	mixer.set_running(shown)
+	set_process(shown)
 	if InspectorPanel.current == null:
 		return
 	if shown:
@@ -341,40 +350,64 @@ func _on_shown() -> void:
 		InspectorPanel.current.release(page)
 
 
-func can_send() -> String:
+## "" when this client can write the ring (on the box, with libhshm_sink), else why not.
+func can_publish() -> String:
 	if _g("DevicesTarget") == null or not _g("DevicesTarget").on_box():
 		return "Send works on the box itself (the ring is local shared memory)."
 	if not Publisher.available():
 		return "libhshm_sink is not loaded (godot/extensions/hshm/build.sh)."
-	if page.screen_channel() <= 0:
-		return "No screen destination."
 	return ""
+
+
+func can_send() -> String:
+	var why := can_publish()
+	if why == "" and page.screen_channel() <= 0:
+		return "No screen destination."
+	return why
+
+
+## The output screen's channel rate (programResolutions), the ring's fps.
+func _fps() -> int:
+	var cm: Variant = _cm()
+	var res: Array = cm.get("programResolutions", []) if cm is Dictionary and cm.get("programResolutions") is Array else []
+	var i := int(slice.output.screen)
+	return int(res[i].get("fps", 50)) if i < res.size() and res[i] is Dictionary else 50
+
+
+## WO-883: the ring runs while the canvas is a Live source (output.ring) or on air; returns "" or why it could not start.
+func _sync_ring() -> String:
+	var want: bool = slice.output.get("ring") == true or not sending.is_empty()
+	var why := ""
+	if want and publisher.sink == null:
+		why = can_publish()
+		if why == "":
+			why = publisher.start(out_vp, ring_name, _fps())
+	elif not want and publisher.sink != null:
+		publisher.stop()
+	_on_shown()
+	return why if slice.output.get("ring") == true else ""
 
 
 func send(on: bool) -> void:
 	if on and sending.is_empty():
 		var why := can_send()
-		if why == "":
-			var cm: Variant = _cm()
-			var res: Array = cm.get("programResolutions", []) if cm is Dictionary and cm.get("programResolutions") is Array else []
-			var i := int(slice.output.screen)
-			var fps := int(res[i].get("fps", 50)) if i < res.size() and res[i] is Dictionary else 50
-			why = publisher.start(out_vp, M.RING, fps)
+		if why == "" and publisher.sink == null:
+			why = publisher.start(out_vp, ring_name, _fps())
 		if why == "":
 			var ch := page.screen_channel()
-			var r: Dictionary = await _g("DevicesTarget").box_api.post_json("/api/play", M.play_body(ch, int(slice.output.layer)))
+			var r: Dictionary = await _g("DevicesTarget").box_api.post_json("/api/play", M.play_body(ch, int(slice.output.layer), ring_name))
 			if r.ok:
 				sending = {"channel": ch, "layer": int(slice.output.layer)}
 				_on_air_mark(sending)
 			else:
-				publisher.stop()
 				why = "PLAY failed: %s" % str(r.get("error", r.get("status", "")))
+		_sync_ring()  # a failed Send leaves the ring only when it is a Live source
 		_sync_send_ui(why)
 	elif not on and not sending.is_empty():
 		await _g("DevicesTarget").box_api.post_json("/api/stop", M.stop_body(sending.channel, sending.layer))
-		publisher.stop()
 		sending = {}
 		_on_air_mark({})
+		_sync_ring()
 		_sync_send_ui("")
 	_on_shown()
 
@@ -412,7 +445,9 @@ func _sync_send_ui(why: String) -> void:
 	var on := not sending.is_empty()
 	var note := why
 	if note == "" and on:
-		note = "On air: ring %s → ch %d layer %d at %dx%d." % [M.RING, sending.channel, sending.layer, out_vp.size.x, out_vp.size.y]
+		note = "On air: ring %s → ch %d layer %d at %dx%d." % [ring_name, sending.channel, sending.layer, out_vp.size.x, out_vp.size.y]
+	elif note == "" and publisher.sink != null:
+		note = "Live source shm://%s at %dx%d — drag it from Sources ▸ Live onto a look." % [ring_name, out_vp.size.x, out_vp.size.y]
 	elif note == "":
 		note = can_send()
-	page.set_sending(on, can_send() == "", note)
+	page.set_sending(on, can_send() == "", note, publisher.sink != null, can_publish() == "")

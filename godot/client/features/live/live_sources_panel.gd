@@ -59,7 +59,22 @@ func _ready() -> void:
 	visibility_changed.connect(func() -> void:
 		if is_visible_in_tree():
 			reload())
+	var shm_poll := Timer.new()  # WO-883: a ring started while this list is open (Visuals ▸ Live source) shows up by itself
+	shm_poll.wait_time = 3.0
+	shm_poll.timeout.connect(_poll_shm)
+	add_child(shm_poll)
+	shm_poll.start()
 	reload()
+
+
+## WO-883: only the shm rings, every 3 s while shown; _rebuild skips when nothing changed.
+func _poll_shm() -> void:
+	if not is_visible_in_tree():
+		return
+	var sh: Dictionary = await Api.get_json("/api/shm/sources")
+	if sh.ok:  # a missed poll keeps the rows
+		_shm = sh.data
+		_rebuild()
 
 
 ## Re-reads the connectors and the live-audio / USB configs (and refetches thumbnails).

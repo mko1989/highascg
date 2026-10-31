@@ -83,3 +83,10 @@ func test_timeline_rows() -> void:
 	t.eq(rows[1].tip, "t2 · 2:05 · 0 layers", "no layers array")
 	t.eq(M.timeline_rows(tls, "LEG").size(), 1, "filter on label")
 	t.eq(M.timeline_rows(null), [], "no timelines key")
+
+
+## WO-883 (owner 31.10): shaders only in Visuals — the Templates tab leaves them out, the + menu has no Shader FX…, the logo opens Visuals.
+func test_wo883_shaders_left_out_of_templates() -> void:
+	t.ok(FileAccess.get_file_as_string("res://features/live/media_panel.gd").contains('r.kind != "shader"'), "Templates filters shader rows")
+	t.ok(not FileAccess.get_file_as_string("res://features/live/media_add_menu.gd").contains('"Shader FX…"'), "no Shader FX… item")
+	t.ok(FileAccess.get_file_as_string("res://app/shell.gd").contains('tabs.get_node("Visuals")'), "logo → Visuals")

@@ -1,6 +1,6 @@
 extends MenuButton
 ## WO-603 slice 8 — the web Sources "+" dropup (sources-panel-shell.js ingest-dropup-menu): Select file(s)… ·
-## New folder… · Download from URL… · Import from USB… (WO-608) · Shader FX… (WO-606 editor). The menu only asks; the media panel ingests the chosen files (local-path
+## New folder… · Download from URL… · Import from USB… (WO-608). Shader FX… (WO-606) left with WO-883: shaders live in Visuals. The menu only asks; the media panel ingests the chosen files (local-path
 ## ingest on the box, HTTP upload off it) and the server downloads the URL (POST /api/ingest/download).
 
 signal files_chosen(paths: PackedStringArray)
@@ -9,8 +9,6 @@ signal url_chosen(url: String)
 signal usb_requested
 
 enum { FILES, FOLDER, URL, FX, USB }
-
-const ShaderFx := preload("res://features/live/shader_fx_dialog.gd")
 
 
 func _ready() -> void:
@@ -22,8 +20,6 @@ func _ready() -> void:
 	p.add_item("New folder…", FOLDER)
 	p.add_item("Download from URL…", URL)
 	p.add_item("Import from USB…", USB)
-	p.add_separator()
-	p.add_item("Shader FX…", FX)
 	p.id_pressed.connect(_on_item)
 	about_to_popup.connect(_count_usb)
 
@@ -44,8 +40,6 @@ func _on_item(id: int) -> void:
 			new_folder_requested.emit()
 		URL:
 			_ask_url()
-		FX:
-			ShaderFx.show_editor(self)
 		USB:
 			usb_requested.emit()
 

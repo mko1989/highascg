@@ -209,3 +209,31 @@ static func autopilot(tab: Node, secs: float) -> void:
 	c = await watch.call(2000.0, "pick")
 	print("[probe-auto] pick landed: %s" % (ctl.showing == picked))
 	tab.get_tree().quit()
+
+
+## dev probe (WO-883): the canvas as a Live source, `<seconds>[:<scene>[:<size>[:<shader>]]]` (default shader scene at the screen's
+## own size, sh-sa-ribbons) — the canvas size, the note, frame rate and skipped readbacks every 5 s, a canvas shot
+## user://probe-ring.png halfway; then the ring off, quit. Pair with --visuals-ring=<name>.
+static func ring(tab: Node, arg: String) -> void:
+	var a := arg.split(":")
+	await tab.get_tree().create_timer(3.0).timeout
+	tab.slice.output.size = int(a[2]) if a.size() > 2 else preload("res://features/visuals/visuals_model.gd").SIZE_SCREEN
+	tab.slice.output.ring = true
+	tab.slice.scene = a[1] if a.size() > 1 else "shader"
+	tab.slice.overlay = ""
+	tab.slice.shader = a[3] if a.size() > 3 else "sh-sa-ribbons"
+	await tab._go(true)
+	tab._resize()
+	tab._sync_send_ui(tab._sync_ring())
+	print("[probe-ring] %s · canvas %dx%d · %s" % [tab.ring_name, tab.out_vp.size.x, tab.out_vp.size.y, tab.page._note.text])
+	var n := int(float(a[0]) / 5.0)
+	for i in n:
+		var s0: int = tab.publisher.skipped
+		await tab.get_tree().create_timer(5.0).timeout
+		print("[probe-ring] fps %.1f · skipped %d in 5 s · master %.2f" % [Engine.get_frames_per_second(), tab.publisher.skipped - s0, tab.mixer.master])
+		if i == n / 2:
+			tab.out_vp.get_texture().get_image().save_png("user://probe-ring.png")
+	tab.slice.output.ring = false
+	tab._sync_ring()
+	print("[probe-ring] off: ", tab.publisher.sink == null)
+	tab.get_tree().quit()

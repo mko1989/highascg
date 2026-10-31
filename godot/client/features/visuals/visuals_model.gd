@@ -15,6 +15,7 @@ const BUSES := ["kick", "snare", "hats", "kick.level", "snare.level", "hats.leve
 const DROP_PULSE_MS := 1000.0
 const RING := "visuals"
 const RENDER_SIZES := [Vector2i(1280, 720), Vector2i(1920, 1080), Vector2i(960, 540)]
+const SIZE_SCREEN := 3  # WO-883: output.size past the presets = the screen destination's own resolution (1:1, no scaling)
 
 
 ## The WS `audio_fft` frame → {bus: 0..1}. Missing parts read 0 (no FFT source routed).
@@ -175,7 +176,8 @@ static func params_of(v: Variant) -> Dictionary:
 	return out
 
 
-## `project.visuals` → {graph, params, output: {screen, layer, size}, sync, scene, overlay} with every field present. `sync`
+## `project.visuals` → {graph, params, output: {screen, layer, size, ring}, sync, scene, overlay} with every field present
+## (`ring`, WO-883: the canvas is published as the Live source shm://visuals even when not sent to a screen). `sync`
 ## (WO-866): ms the drum pulses move against the room sound, −300..300 (visuals_sync.gd). `scene` / `overlay` (WO-873): the main
 ## scene and the second layer ("" = none, never the main scene twice). `shader` (WO-874): the library shader id the Shader scene
 ## runs ("" = none picked). `game` (WO-876): the ROM the Game scene's Play opens ("" = none). `fade` (WO-877): seconds a scene
@@ -189,7 +191,7 @@ static func slice_of(project: Variant) -> Dictionary:
 	var over := str(d.get("overlay", "")) if scene_ids().has(str(d.get("overlay", ""))) and str(d.get("overlay", "")) != main else ""
 	return {"graph": normalize_graph(d.get("graph")), "params": params_of(d.get("params")),
 		"output": {"screen": maxi(0, int(_num(o.get("screen")))), "layer": clampi(int(_num(o.get("layer", 1))), 1, 9999),
-			"size": clampi(int(_num(o.get("size"))), 0, RENDER_SIZES.size() - 1)},
+			"size": clampi(int(_num(o.get("size"))), 0, SIZE_SCREEN), "ring": o.get("ring") is bool and o.ring},
 		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0), "scene": main, "overlay": over,
 		"shader": str(d.get("shader", "")) if d.get("shader") is String else "",
 		"game": str(d.get("game", "")) if d.get("game") is String else "",
@@ -213,16 +215,20 @@ static func screens(cm: Variant) -> Array:
 	return out
 
 
-## The render size for a screen of `w`×`h`: the chosen preset's height at the screen's aspect (Caspar scales to the channel).
+## The render size for a screen of `w`×`h`: the chosen preset's height at the screen's aspect (Caspar scales to the channel);
+## SIZE_SCREEN (WO-883) is the screen itself, even-rounded and at most 8192 wide (1080 p until the screen is known).
 static func render_size(preset: int, w: float, h: float) -> Vector2i:
-	var p: Vector2i = RENDER_SIZES[clampi(preset, 0, RENDER_SIZES.size() - 1)]
+	if preset == SIZE_SCREEN and w > 0.0 and h > 0.0:
+		var k := minf(1.0, 8192.0 / w)
+		return Vector2i(maxi(16, roundi(w * k / 2.0) * 2), maxi(16, roundi(h * k / 2.0) * 2))
+	var p: Vector2i = RENDER_SIZES[clampi(preset, 0, RENDER_SIZES.size() - 1) if preset != SIZE_SCREEN else 1]
 	if w <= 0.0 or h <= 0.0:
 		return p
 	return Vector2i(maxi(16, roundi(p.y * w / h / 2.0) * 2), p.y)
 
 
-static func play_body(channel: int, layer: int) -> Dictionary:
-	return {"channel": channel, "layer": layer, "clip": "shm://" + RING, "loop": false}
+static func play_body(channel: int, layer: int, ring := RING) -> Dictionary:
+	return {"channel": channel, "layer": layer, "clip": "shm://" + ring, "loop": false}
 
 
 static func stop_body(channel: int, layer: int) -> Dictionary:

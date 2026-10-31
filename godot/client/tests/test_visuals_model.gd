@@ -69,7 +69,7 @@ func test_shape_envelope() -> void:
 func test_slice_screens_and_bodies() -> void:
 	var s := M.slice_of({"visuals": {"params": {"glow": 2}, "output": {"screen": 1, "layer": 0, "size": 9}}})
 	t.eq(s.params.glow, 1.0, "params clamped")
-	t.eq(s.output, {"screen": 1, "layer": 1, "size": M.RENDER_SIZES.size() - 1}, "output clamped")
+	t.eq(s.output, {"screen": 1, "layer": 1, "size": M.SIZE_SCREEN, "ring": false}, "output clamped")
 	t.eq(M.slice_of({}).graph, M.default_graph(), "a project without visuals gets the starter graph")
 	var sc := M.screens({"programChannels": [1, 3], "screenLabels": ["Dioda", ""]})
 	t.eq(sc, [{"label": "Dioda PGM (ch 1)", "channel": 1}, {"label": "Screen 2 PGM (ch 3)", "channel": 3}], "screens by label")
@@ -77,6 +77,14 @@ func test_slice_screens_and_bodies() -> void:
 	t.eq(M.render_size(1, 1920, 1080), Vector2i(1920, 1080), "1080 p at 16:9")
 	t.eq(M.render_size(0, 0, 0), M.RENDER_SIZES[0], "unknown screen → the preset")
 	t.eq(M.play_body(3, 1), {"channel": 3, "layer": 1, "clip": "shm://visuals", "loop": false}, "PLAY body → SHM NAME visuals")
+	# WO-883: the canvas at the screen destination's own size; the Live-source flag
+	t.eq(M.render_size(M.SIZE_SCREEN, 3840, 1792), Vector2i(3840, 1792), "Screen size = the Dioda wall, 1:1")
+	t.eq(M.render_size(M.SIZE_SCREEN, 1919, 1081), Vector2i(1920, 1082), "even-rounded")
+	t.eq(M.render_size(M.SIZE_SCREEN, 16384, 2048), Vector2i(8192, 1024), "at most 8192 wide, aspect kept")
+	t.eq(M.render_size(M.SIZE_SCREEN, 0, 0), M.RENDER_SIZES[1], "screen unknown → 1080 p")
+	t.eq(M.slice_of({"visuals": {"output": {"ring": true}}}).output.ring, true, "Live source kept")
+	t.eq(M.slice_of({"visuals": {"output": {"ring": "yes"}}}).output.ring, false, "only a real true")
+	t.eq(M.play_body(3, 1, "probe").clip, "shm://probe", "a dev ring name")
 	t.eq(M.stop_body(3, 1), {"channel": 3, "layer": 1}, "STOP body")
 	# WO-873: scene + second layer, the new parameters' defaults in an old project
 	t.eq([s.scene, s.overlay], ["rings", ""], "an old project: rings, no second layer")
@@ -103,4 +111,12 @@ func test_tab_builds_headless() -> void:
 	t.ok(tab.can_send() != "" or tab.page.screen_channel() > 0, "send refuses with a reason when it cannot")
 	tab._process(0.02)
 	t.ok(tab.scene.params.has("pulse"), "a frame evaluates the graph into the scene")
+	# WO-883: the page round-trips Screen size and the Live-source switch; off the box the ring refuses with a reason
+	var sl := M.slice_of({"visuals": {"output": {"size": M.SIZE_SCREEN, "ring": true}}})
+	tab.slice = sl
+	tab.page.set_state(sl, {})
+	t.eq(tab.page._size.get_selected_id(), M.SIZE_SCREEN, "Render shows Screen size")
+	t.ok(tab.page._ring.button_pressed, "Live source switch on")
+	t.ok(tab._sync_ring() != "", "no box → the ring says why")
+	t.ok(tab.publisher.sink == null, "nothing published")
 	tab.free()

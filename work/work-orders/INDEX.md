@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-793 live WOs (29 open, 123 in progress, 641 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+794 live WOs (29 open, 123 in progress, 642 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -359,7 +359,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (90)
+## godot-client — Godot client (91)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -451,6 +451,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 877 DONE [godot-client] Visuals show controls: looks (cues) with a crossfade, master fader + blackout,… → 877_WO_visuals_show_looks_crossfade_master.md
 - 878 DONE [godot-client+audio] Visuals autopilot: looks on the beat, the next look every N bars and on drops → 878_WO_visuals_autopilot_beat_quantised_looks.md
 - 880 DONE [godot-client] Show safety: a crashed operator client relaunches, and the Visuals go back on a… → 880_WO_client_crash_relaunch_visuals_resume.md
+- 883 DONE [godot-client+engine] Shaders only in Visuals; the Visuals canvas as a Live source; a "Screen size" c… → 883_WO_shaders_only_in_visuals_live_source_screen_size.md
 
 ## web-client — Web client (82)
 

@@ -181,14 +181,12 @@ func _build_header() -> Control:
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	logo.custom_minimum_size = Vector2(26, 32)
-	logo.tooltip_text = "Shader Live"
+	logo.tooltip_text = "Visuals"
 	logo.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	logo.gui_input.connect(func(e: InputEvent) -> void:  # WO-606: web mascot click → Shader Live
+	logo.gui_input.connect(func(e: InputEvent) -> void:  # WO-606 opened Shader Live; WO-883: shaders live in Visuals
 		var mb := e as InputEventMouseButton
 		if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-			var live: Node = tabs.get_node("Live")
-			tabs.current_tab = live.get_index()
-			live.toggle_shader_live())
+			tabs.current_tab = tabs.get_tab_idx_from_control(tabs.get_node("Visuals")))
 	row.add_child(logo)
 	var title := Label.new()
 	title.text = "HighAsCG"

@@ -9,6 +9,7 @@ const Show := preload("res://features/visuals/visuals_show.gd")
 signal params_changed(params: Dictionary)
 signal output_changed(output: Dictionary)
 signal send_toggled(on: bool)
+signal ring_toggled(on: bool)
 signal sensitivity_changed(map: Dictionary)
 signal sync_changed(ms: float)
 signal scenes_changed(main: String, overlay: String)
@@ -22,6 +23,7 @@ var _screen: OptionButton
 var _layer: SpinBox
 var _size: OptionButton
 var _send: CheckButton
+var _ring: CheckButton
 var _note: Label
 var _screens := []
 var _quiet := false
@@ -145,11 +147,19 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 	_layer.value_changed.connect(func(_v: float) -> void: _emit_output())
 	add_child(_row("Layer", _layer))
 	_size = OptionButton.new()
-	for s in M.RENDER_SIZES:
-		_size.add_item("%d p (screen aspect)" % s.y)
-	_size.tooltip_text = "Render height; the width follows the screen's aspect and Caspar scales to the channel"
+	_size.add_item("Screen size", M.SIZE_SCREEN)  # WO-883: the canvas = the screen destination, pixel for pixel
+	for i in M.RENDER_SIZES.size():
+		_size.add_item("%d p (screen aspect)" % M.RENDER_SIZES[i].y, i)
+	_size.tooltip_text = "Canvas size: the screen destination's own resolution, or a height at its aspect (Caspar scales to the channel)"
 	_size.item_selected.connect(func(_i: int) -> void: _emit_output())
 	add_child(_row("Render", _size))
+	_ring = CheckButton.new()
+	_ring.text = "Live source (shm://visuals)"
+	_ring.tooltip_text = "Publish the canvas as a source: Sources ▸ Live lists it, drag it onto a look layer"
+	_ring.toggled.connect(func(on: bool) -> void:
+		if not _quiet:
+			ring_toggled.emit(on))
+	add_child(_ring)
 	_send = CheckButton.new()
 	_send.text = "Send to screen"
 	_send.toggled.connect(func(on: bool) -> void:
@@ -186,7 +196,8 @@ func set_state(slice: Dictionary, cm: Variant) -> void:
 	if not _screens.is_empty():
 		_screen.select(clampi(int(slice.output.screen), 0, _screens.size() - 1))
 	_layer.set_value_no_signal(slice.output.layer)
-	_size.select(int(slice.output.size))
+	_size.select(_size.get_item_index(int(slice.output.size)))
+	_ring.set_pressed_no_signal(slice.output.get("ring") == true)
 	_sync.set_value_no_signal(float(slice.get("sync", 0.0)))
 	_sync_label.text = "%+d ms" % int(_sync.value)
 	_quiet = false
@@ -231,10 +242,13 @@ func set_shader_status(text: String) -> void:
 	_shader_note.text = text
 
 
-func set_sending(on: bool, can: bool, note: String) -> void:
+## `ring` / `can_ring` (WO-883): the Live source switch's state — off with a reason in `note` where it cannot publish.
+func set_sending(on: bool, can: bool, note: String, ring := false, can_ring := true) -> void:
 	_quiet = true
 	_send.button_pressed = on
 	_send.disabled = not can and not on
+	_ring.button_pressed = ring
+	_ring.disabled = not can_ring and not ring
 	_quiet = false
 	_note.text = note
 	_screen.disabled = on  # switching screens on air would orphan the layer: stop first
@@ -293,7 +307,8 @@ func _emit_sens() -> void:
 
 func _emit_output() -> void:
 	if not _quiet:
-		output_changed.emit({"screen": maxi(0, _screen.selected), "layer": int(_layer.value), "size": maxi(0, _size.selected)})
+		output_changed.emit({"screen": maxi(0, _screen.selected), "layer": int(_layer.value), "size": maxi(0, _size.get_selected_id()),
+			"ring": _ring.button_pressed})
 
 
 func _slider(lo: float, hi: float, step: float, tip: String) -> HSlider:

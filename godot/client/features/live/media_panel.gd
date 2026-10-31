@@ -9,7 +9,7 @@ extends VBoxContainer
 ## DeckLink / audio / USB inputs, saved live sources, all draggable onto the look editor). A DeckLink dropped on the
 ## Media tree switches to Live, which maps it and highlights the new source; the signals are Live's, re-emitted for
 ## the shell (Live workspace tab, Devices restart-dirty, device view re-read).
-## WO-623 C: the owner's four tabs — Media, Templates (Caspar TLS; shaders show their library name), Live, Timelines (this
+## WO-623 C: the owner's four tabs — Media, Templates (Caspar TLS without the shader templates: shaders live in Visuals, WO-883), Live, Timelines (this
 ## project's) — source_list_panel.gd rows drag the web payload ({type: "template" | "timeline", value, label}).
 ## WO-603 slice 1: files / folders dropped from the desktop onto this panel are copied by the server from their local
 ## paths into the folder under the cursor (media_ingest.gd; POST /api/media/ingest-local) with a progress line.
@@ -23,8 +23,6 @@ signal caspar_changed
 signal connector_dropped
 
 const UsbImport := preload("res://features/live/usb_import_dialog.gd")
-const ShaderFx := preload("res://features/live/shader_fx_dialog.gd")
-const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MediaInspector := preload("res://features/live/media_inspector.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
@@ -53,7 +51,6 @@ var live: LivePanel
 var templates: ListPanel
 var timelines: ListPanel
 var _tls: Array = []  # GET /api/templates
-var _shader_names := {}
 var _ingest_row: HBoxContainer
 var _ingest_label: Label
 var _bar: SelectionBar
@@ -86,13 +83,9 @@ func _ready() -> void:
 	templates = ListPanel.new()
 	templates.name = "Templates"
 	templates.empty_text = "No templates (↻ re-reads Caspar TLS)"
-	templates.provider = func(f: String) -> Array: return Lists.template_rows(_tls, _shader_names, f)
+	templates.provider = func(f: String) -> Array:  # WO-883 (owner 31.10): shaders only in Visuals, templates for the rest
+		return Lists.template_rows(_tls, {}, f).filter(func(r: Dictionary) -> bool: return r.kind != "shader")
 	templates.groups = Lists.GROUPS  # WO-661
-	templates.row_clicked.connect(func(p: Dictionary, kind: String) -> void:  # WO-606: audition while Shader Live is open
-		var shl: Node = ShaderLivePanel.current
-		if kind == "shader" and is_instance_valid(shl) and shl.is_visible_in_tree():
-			shl.audition(str(p.get("value", "")), str(p.get("label", p.get("value", "")))))
-	templates.row_context.connect(_template_menu)
 	_tabs.add_child(templates)
 	var ph := Placeholders.new()  # WO-603 row 26: offline / preshow only, like the web (dev: -- --placeholders)
 	ph.name = "Placeholders"
@@ -194,7 +187,7 @@ func _ready() -> void:
 			_on_selection.call_deferred())
 	if Config.args.has("sources-filter"):  # dev: preset the filter (tests)
 		_filter.text = str(Config.args["sources-filter"])
-	if Config.args.has("sources-tab"):  # dev: open on Media (0), Templates (1), Live (2) or Timelines (3)
+	if Config.args.has("sources-tab"):  # dev: open on Media (0), Templates (1), Live (3) or Timelines (4) — 2 is the hidden Placeholders
 		_tabs.current_tab = int(Config.args["sources-tab"])
 	load_media()
 
@@ -306,13 +299,10 @@ func _reload_current() -> void:
 		_: load_media()
 
 
-## Web fetchTemplates (Refresh): GET /api/templates (the server's TLS catalogue) + shader library names.
+## Web fetchTemplates (Refresh): GET /api/templates (the server's TLS catalogue).
 func load_templates() -> void:
 	var res: Dictionary = await Api.get_json("/api/templates")
 	_tls = res.data if res.ok and res.data is Array else []
-	var sh: Dictionary = await Api.get_json("/api/shaders")
-	_shader_names = Lists.shader_names(sh.data if sh.ok else null)
-	templates.group_warning = {"shaders": Lists.gpu_warning(sh.data if sh.ok else null)}
 	templates.rebuild()
 
 
@@ -481,18 +471,3 @@ func _show_ingest(st: Dictionary) -> void:
 func _exit_tree() -> void:
 	if inspector != null and not inspector.is_inside_tree():  # never selected → never adopted by the Inspector
 		inspector.free()
-
-
-## WO-606: right-click a shader template → open it in the Shader FX editor (the web row's edit button).
-func _template_menu(p: Dictionary, kind: String) -> void:
-	if kind != "shader":
-		return
-	var menu := PopupMenu.new()
-	menu.add_item("Edit shader…")
-	menu.id_pressed.connect(func(_i: int) -> void: ShaderFx.show_editor(self, str(p.get("value", "")).to_lower().replace("\\", "/").get_file()))  # TLS ids are upper-case
-	menu.popup_hide.connect(menu.queue_free, CONNECT_DEFERRED)
-	add_child(menu)
-	var at := Vector2i(get_viewport().get_mouse_position())
-	if not get_viewport().gui_embed_subwindows:
-		at += get_window().position
-	menu.popup(Rect2i(at, Vector2i.ZERO))
