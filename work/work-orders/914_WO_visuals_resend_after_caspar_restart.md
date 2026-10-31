@@ -1,7 +1,7 @@
 # WO-914 — Visuals: a Caspar restart leaves the Send output dark until Send is toggled
 
 **Area:** godot-client, engine
-**Status: IN PROGRESS (31.10.26 — fix + test in, suite 25539/0; live restart check pending)**
+**Status: DONE (31.10.26 — suite 25539/0; live: `casparcg-server` restart with the owner GUI sending to 2-1 → re-PLAYed by itself, shm 50/s)**
 
 ## Investigation
 
@@ -34,5 +34,7 @@ node replaying a shm PLAY it does not own would PLAY a dead ring after a client 
 
 - `tests/test_visuals_show.gd::test_caspar_reconnect_resends` — first connect / not sending / down→up / still up
   (one PLAY, exact body). Godot suite 25539 passed, 0 failed. `check-max-file-lines` 0.
-- Live: pending (restart `casparcg-server.service` with the owner GUI sending to 2-1 → ch2 shm back at 50/s
-  without touching Send).
+- Live (31.10.26): owner GUI relaunched on this code (boot resume: "on air before this client started — sending
+  again"), then `systemctl restart casparcg-server.service` at 17:03:23 → client log
+  `[visuals] Caspar reconnected: Send again to 2-1 — ok`; OSC at 17:04 `pres/s 50 shm/s 50 drop 2`, shm frames
+  1849 of 2016 presented since the restart (the ~3.4 s gap = Caspar start + `REPLAY_S`). Send never touched.

@@ -1,7 +1,7 @@
 # WO-881 — Caspar came up without CEF after a supervisor tree-kill, and nothing said so
 
 **Area:** caspar-build, engine
-**Status: IN PROGRESS** (31.10.26: the three to-dos built — supervisor smoke 5/5 against a stub Caspar, node smoke 2/2, Godot suite 25535/0; live box deploy below)
+**Status: DONE (31.10.26 — smokes 7/7, suite 25535/0; live: every Caspar restart since the deploy dropped the dead-pid CEF lock and came up with `Initialized html module.`; the eye goes red with the reason on a CEF failure)**
 
 Found while running the on-air checks for [WO-580](./580_WO_shader_live_seamless_speed_and_smooth_params.md) /
 [WO-877](./877_WO_visuals_show_looks_crossfade_master.md). A show-day failure mode: every HTML layer (shader looks,
@@ -68,3 +68,11 @@ lower thirds, the LED test card) is dead for hours while PLAY/AMCP look healthy.
 - `tools/smoke/smoke-wo881-cef-health-node.test.js` 2/2 — file → `cefFailed` broadcast once per change, removed →
   cleared, AMCP state kept; eye + LED back-off pinned. Supervisor smokes wo805 / wo400 green with it (19/19).
 - Godot suite 25535/0.
+- Live box (31.10.26), deployed 16:47: three `casparcg-server.service` restarts (16:47, 16:57, 17:03), each one the original
+  trigger (a tree kill leaving Chromium's `SingletonLock` → `<host>-<dead pid>`). `/tmp/caspar.log`:
+  `[supervisor] dropped a stale CEF profile lock (pid 3339102 gone)` (and pids 3604691, 3619070), then 3 s later in
+  `log/caspar_2026-10-31.log` `Initialized html module.` every time. The only `Failed to initialize CEF` of the day is the
+  00:37 incident itself (line 990). No health file left (`~/.highascg/run/caspar-cef-failed` absent).
+- Eye, live: node broadcasts `caspar.connection.cefFailed`; writing the health file by hand turned the owner GUI's eye red
+  with the reason in its tooltip, removing it turned it green again (screenshots compared, owner GUI relaunched for it).
+- Not forced live: a real double CEF failure (the fast relaunch and the warning) — covered by the stub-Caspar smoke.

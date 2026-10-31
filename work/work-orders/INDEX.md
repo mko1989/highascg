@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-825 live WOs (29 open, 125 in progress, 671 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+825 live WOs (29 open, 122 in progress, 674 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -128,7 +128,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 574 IN PROGRESS [engine+amcp] Multi-screen take (preset ▶ / global take) starts the screens at different times → 574_WO_MULTI_SCREEN_TAKE_SYNC_BARRIER.md
 - 576 DONE [engine+web-client] look clip start point two options → 576_WO_look_clip_start_point_two_options.md
 - 577 DONE [engine+web-client] shader live key controls → 577_WO_shader_live_key_controls.md
-- 580 IN PROGRESS [engine] Shader Live: speed changes without a phase jump + smooth (gliding) param changes → 580_WO_shader_live_seamless_speed_and_smooth_params.md
+- 580 DONE [engine] Shader Live: speed changes without a phase jump + smooth (gliding) param changes → 580_WO_shader_live_seamless_speed_and_smooth_params.md
 - 581 DONE [engine+amcp] Playlist look taken to PGM always starts on item 1, not the item set in preview → 581_WO_playlist_take_starts_on_set_item.md
 - 582 IN PROGRESS [engine+amcp] relative start moves loop point → 582_WO_relative_start_moves_loop_point.md
 - 583 DONE [engine+mapping] Edge strip: live param edits without restarting the animation + alternating str… → 583_WO_edge_strip_live_edits_and_alternating_colors.md
@@ -202,7 +202,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 742 DONE [caspar-build+engine] Caspar shm producer: play a shared-memory ring written by another process (WO-7… → 742_WO_caspar_shm_producer.md
 - 820 DONE [caspar-build+media] NotchLC: native GPU decode in Caspar (spike + build) → 820_WO_notchlc_native_gpu_decode.md
 - 847 DONE [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
-- 881 IN PROGRESS [caspar-build+engine] Caspar came up without CEF after a supervisor tree-kill, and nothing said so → 881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md
+- 881 DONE [caspar-build+engine] Caspar came up without CEF after a supervisor tree-kill, and nothing said so → 881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md
 - 888 DONE [caspar-build+os-iso] PGM micro stutter on alt-tab: Caspar's window never takes focus; frame sync sti… → 888_WO_caspar_window_no_focus_sync_follows_pgm.md
 
 ## audio — Audio routing, devices, meters (46)
@@ -479,7 +479,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 911 DONE [godot-client] Visuals: the work-area mode hint pinned the tab's width — Inspector pushed off-… → 911_WO_visuals_mode_hint_pinned_tab_width.md
 - 912 DONE [godot-client] Visuals MIDI: APC40 knobs are endless encoders — they never picked up; now rela… → 912_WO_visuals_apc_knobs_are_encoders.md
 - 913 DONE [godot-client] Visuals Controller: drop a visual on an APC40 pad → the pad loads it into PRV,… → 913_WO_visuals_apc_pads_load_visuals.md
-- 914 IN PROGRESS [godot-client+engine] Visuals: a Caspar restart leaves the Send output dark until Send is toggled → 914_WO_visuals_resend_after_caspar_restart.md
+- 914 DONE [godot-client+engine] Visuals: a Caspar restart leaves the Send output dark until Send is toggled → 914_WO_visuals_resend_after_caspar_restart.md
 
 ## web-client — Web client (82)
 

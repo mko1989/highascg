@@ -1,7 +1,7 @@
 # WO-875 — Spectrum smoothing after GLava for every shader + a Spectrum scene in the Visuals
 
 **Area:** audio, engine, godot-client
-**Status: DONE (31.10.26 — offline suites; box: the live node sends `smooth` in every audio_fft frame, the Spectrum scene moves with the room audio in the owner GUI; the CEF player on air not observed)**
+**Status: DONE (31.10.26 — offline suites; box: the live node sends `smooth` in every audio_fft frame, the Spectrum scene moves with the room audio in the owner GUI; 31.10 later: the CEF player on air — smoothed spectrum uploaded at 50/s, §4)**
 
 Owner, 31.10: *"Check this project and see if anything from it would be beneficial https://github.com/jarcode-foss/glava"*,
 then, on the review: *"Yep, smoothing is something we need. Add this to the visuals engine and to any existing shader etc."*
@@ -89,4 +89,9 @@ then, on the review: *"Yep, smoothing is something we need. Add this to the visu
 - Caspar side: `template/` is Caspar's template path and `template/shaders/player-smooth.js` sits next to `player.js`, so a
   shader template loaded from now on picks the companion up (its loading is pinned by `smoke-wo875-spectrum-smooth`).
   Not observed inside CEF: no shader template is on air in the current project.
+- In CEF on air (31.10, later): Caspar ch 6 layer 21, `sh-sa-audio-band-eq-demo`, a test beat injected into the FFT input
+  (ffmpeg → `udp://127.0.0.1:52221`), hooks installed before load via DevTools: the page's WS gets `audio_fft` at 28/s with
+  `smooth {fall:200, frames:3, spread:0.02}`, `player-smooth.js` and the live companion loaded, the audio texture's
+  spectrum row uploaded at 50/s. Frame-to-frame change of the low bins: raw 16.36 vs uploaded 5.43; 1 of 300 uploads
+  equals a raw frame (the rest are smoothed). Beat off → all bins fall to 0. Layer cleared afterwards.
 

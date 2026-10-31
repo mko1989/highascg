@@ -1,9 +1,7 @@
 # WO-580 — Shader Live: speed changes without a phase jump + smooth (gliding) param changes
 
 **Area:** engine
-**Status: IN PROGRESS** (2026-10-31: phase A — Speed × rides the player's eased clock rate — implemented and
-proven offline (§2.3, §3); phase B — literal-only edits glide through uniforms — implemented and proven in headless
-Chrome WebGL2 over the shader library (§2.4, §3); 31.10 phase A on air in Caspar's CEF (§3); phase B on air left.)
+**Status: DONE (31.10.26 — phase A + B offline (smokes, headless WebGL2, 184/184 library shaders) and on air in Caspar's CEF: literal glides with no recompile, Speed rides with no phase jump after minutes on air)**
 
 Source: owner, `work/archive/todos/todos25.09.26` (on show):
 > why does scroll value changes does not register to output in shaders editor. only update after
@@ -142,8 +140,7 @@ sets each glide array on each pass program (`uniform1fv`; locations cached per c
     `window.update`: up to 32 eligible literals per pass changed, then changed again: 184 / 184 with no compile error
     (7 failed before the macro use check; 3 needed a longer page load in the sweep, re-run clean).
   - Related smokes (wo266/268/333/344/376/606/662/811/875, alpha+audio binding) 122/122.
-- On air (Caspar's CEF): NOT yet — the service is down. To do: drag a Shader Live slider on a PGM shader and watch it
-  glide; wheel a value; Randomize; a structural edit in the web editor still recompiles as before.
+- On air (Caspar's CEF), 31.10: see the phase B on-air entry at the end of this section.
 - §2.3 (2026-10-31), offline: `tools/smoke/smoke-wo580-shader-live-speed.test.js` 3/3 — the clock eases (≈63 % after
   τ, snaps), 20 min on air then Speed 1 → 0.5 → 4 → 0.05: every frame's iTime step stays within dt × [0.05, 10] and
   equals the current rate's step (no jump); the `macro:speed` op sends exactly one `{"timeScale":0.5}` CG UPDATE and
@@ -157,3 +154,14 @@ sets each glide array on each pass program (`uniform1fv`; locations cached per c
   `<html><enable-gpu>true` — off on the factory config, so the XML was flipped for the test and restored after
   ([WO-881](./881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md) §1). Left: the jump check from the Godot Shader Live
   panel on a PGM shader with ≥ 2 time multipliers after minutes on air, and phase B's glide on air.
+- On air, 31.10 (later), Caspar ch 6 layer 20, `sh-bg-auroras`, CEF DevTools (:9222) hooks on the page's WebGL2 context
+  (`compileShader` counted, the default framebuffer read back after every draw), driven by `CG UPDATE` over AMCP:
+  - Phase B: a structural edit (auroras → flat `vec3(0.2)*0.5`) → 2 compiles (the hard path); the literal 0.2 → 0.8 →
+    R eases 25 → 61 → 85 → 98 → 102 over ~1 s with 2 compiles (the variant, once); the same literal → 0.4 eases back
+    with **0 compiles**; a second literal (0.5 → 1.0) → 2 compiles (one more slot); a comment edit → the hard path. 50 fps
+    throughout.
+  - Phase A after ~2.3 min on air: 48×48 centre patch in 8×8 block means, per-frame change while riding `timeScale`
+    1 → 0.3 → 3 → 0.05 → 1: median 0.08 / 0.05 / 0.19 / ~0.00 / back — follows the rate, max 0.38, no single-frame
+    spike (a phase jump would be one).
+  - The Godot panel → `{"timeScale"}` CG UPDATE op path is the offline smoke's; not driven live (it needs a look on
+    PGM/PRV). `<html><enable-gpu>` flipped for the test and restored (owner setting), Caspar restarted.
