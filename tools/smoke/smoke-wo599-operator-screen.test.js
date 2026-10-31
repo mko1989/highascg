@@ -115,6 +115,14 @@ describe('WO-599 T4 operator-screen picker routes', () => {
 		assert.equal(calls.length, 6)
 	})
 
+	it('WO-891: GET marks the outputs a Caspar screen consumer is planned on (the layout plan, by sysId)', () => {
+		const get = (config) => body(handleGet({ config }, { listOutputs, resolveFlagPort: () => 4, bootStatus: () => ({}) }))
+		const marked = (r) => r.outputs.filter((o) => o.caspar).map((o) => o.name)
+		assert.deepEqual(marked(get({ casparServer: { screen_count: 1 }, screen_1_system_id: 'DP-2' })), ['DP-2'])
+		assert.deepEqual(marked(get({})), [], 'no planned screen: nothing marked')
+		assert.equal(get({}).outputs[0].caspar, false, 'the field is always present')
+	})
+
 	it('is registered on the router for GET and POST without Caspar', () => {
 		const hits = routes.routes.filter((r) => r.path === '/api/system/operator-screen')
 		assert.deepEqual(hits.map((r) => r.method).sort(), ['GET', 'POST'])

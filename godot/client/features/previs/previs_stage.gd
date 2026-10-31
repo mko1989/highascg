@@ -7,6 +7,7 @@ extends Node3D
 signal model_loaded(meshes: Array)
 
 const FLOOR_LAYER := 1 << 19  # WO-616 T12: the camera overlay culls the floor plane (the real floor is in the picture)
+const Quality := preload("res://features/previs/previs_quality.gd")  # WO-892
 const PRESETS := {"Front": Vector3(0.0, 0.12, 12.0), "Top": Vector3(0.0, 1.45, 14.0), "ISO": Vector3(-0.75, 0.45, 13.0)}
 
 var live_texture: Texture2D
@@ -20,6 +21,8 @@ var _dist := 12.0
 var _target := Vector3(0, 2.2, 0)
 var _orbiting := false
 var _fly_tween: Tween
+var sun: DirectionalLight3D
+var floor_mat: StandardMaterial3D
 var walk: Node3D  # WO-741 (detachable): features/previs/xr/xr_walk.gd, only with the client flag -- --xr
 
 
@@ -36,7 +39,7 @@ func _ready() -> void:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
-	var sun := DirectionalLight3D.new()
+	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, -30, 0)
 	sun.light_energy = 0.6
 	sun.light_volumetric_fog_energy = 0.0  # WO-786: haze shows the heads' beams, not a lit room
@@ -48,6 +51,7 @@ func _ready() -> void:
 	var fm := StandardMaterial3D.new()
 	fm.albedo_color = Color(0.11, 0.11, 0.13)
 	floor_mi.material_override = fm
+	floor_mat = fm
 	floor_mi.layers = FLOOR_LAYER
 	add_child(floor_mi)
 	_cam = Camera3D.new()
@@ -55,8 +59,22 @@ func _ready() -> void:
 	add_child(_cam)
 	_cam.current = true
 	_update_camera()
+	Quality.shared().changed.connect(_on_quality)  # WO-892
+	_on_quality()
 	if Config.args.has("xr"):  # WO-741
 		walk = load("res://features/previs/xr/xr_walk.gd").attach(self)
+
+
+## WO-892: the render quality onto this view's environment, sun, floor and (a SubViewport only) its viewport.
+func _on_quality(_level := 0) -> void:
+	var p: Dictionary = Quality.shared().current()
+	Quality.apply_env(environment, p)
+	Quality.apply_sun(sun, p)
+	Quality.apply_floor(floor_mat, p)
+	var vp := get_viewport()
+	if vp is SubViewport:
+		Quality.apply_viewport(vp, p)
+		Quality.register_meter(vp)
 
 
 func load_glb_bytes(bytes: PackedByteArray) -> bool:

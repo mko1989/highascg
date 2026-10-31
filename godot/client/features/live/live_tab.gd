@@ -38,6 +38,7 @@ func _ready() -> void:
 	_video_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(_video_panel)
 	preview = LivePreview.new()
+	preview.home = _video_panel
 	preview.host(_video_panel)
 	visibility_changed.connect(func() -> void:  # WO-789: take the preview back from the Timeline tab
 		if is_visible_in_tree():

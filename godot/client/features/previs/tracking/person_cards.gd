@@ -253,6 +253,12 @@ func _clear() -> void:
 
 func _exit_tree() -> void:
 	VideoSurfaces.release_all(self)
+	_held.clear()  # WO-891: the Previs tab moves between windows — leased again when it re-enters
+
+
+func _enter_tree() -> void:
+	if is_node_ready():
+		_hold_roles()
 
 
 ## Dev probe: <dir>/frame.png + persons.json ({raster, mask_size, persons [{box, mask}], joints?}, from a real run) as

@@ -138,6 +138,8 @@ func _make_mirror() -> void:
 	vp.world_3d = get_viewport().find_world_3d()
 	vp.size = Walk.mirror_px(host.size)
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	var q := preload("res://features/previs/previs_quality.gd")  # WO-892
+	q.apply_viewport(vp, q.shared().current(), true)
 	add_child(vp)
 	_mirror = Camera3D.new()
 	_mirror.fov = Walk.MIRROR_FOV

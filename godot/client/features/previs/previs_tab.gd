@@ -370,8 +370,8 @@ func _apply_mode() -> void:
 			InspectorPanel.current.release(_side)
 
 
-func _exit_tree() -> void:
-	if track_page != null and not track_page.is_inside_tree():  # never adopted by the Inspector
+func _notification(what: int) -> void:  # WO-891: PREDELETE, not _exit_tree — moving the tab to the second window re-parents it
+	if what == NOTIFICATION_PREDELETE and is_instance_valid(track_page) and not track_page.is_inside_tree():  # never adopted by the Inspector
 		track_page.free()
 
 
@@ -397,8 +397,8 @@ func _build_toolbar() -> Control:
 	var fit := Button.new()
 	fit.text = "Fit"
 	fit.pressed.connect(func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))
-	for c in [fit, preload("res://features/previs/haze.gd").picker(), preload("res://features/previs/projector_beams.gd").checkbox(), preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button()]:
-		bar.add_child(c)  # WO-786 haze, projector beams, WO-770 VR
+	for c in [fit, preload("res://features/previs/haze.gd").picker(), preload("res://features/previs/previs_quality.gd").picker(), preload("res://features/previs/projector_beams.gd").checkbox(), preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button()]:
+		bar.add_child(c)  # WO-786 haze, WO-892 quality, projector beams, WO-770 VR
 	return bar
 
 

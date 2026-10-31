@@ -215,8 +215,8 @@ func _ready() -> void:
 	var on_prefs := func(keys: Array) -> void:  # WO-598 D: shared GPU rows / DeckLink order loaded or changed elsewhere
 		if is_visible_in_tree() and (keys.has("loaded") or keys.has("gpuLayout") or keys.has("decklinkRearOrder")):
 			refresh()
-	Model.GL.CP.listen(on_prefs)
-	tree_exiting.connect(func() -> void: Model.GL.CP.unlisten(on_prefs))  # WO-676: never left in the static array
+	Model.GL.CP.listen(on_prefs)  # WO-676: never left in the static array; WO-891: the tab re-enters from the second window
+	tree_exiting.connect(func() -> void: Model.GL.CP.unlisten(on_prefs)); tree_entered.connect(func() -> void: Model.GL.CP.listen(on_prefs))
 	if is_visible_in_tree():
 		refresh()
 

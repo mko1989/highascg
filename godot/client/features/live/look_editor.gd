@@ -357,8 +357,8 @@ func _release_page() -> void:
 		InspectorPanel.current.release(_page)
 
 
-func _exit_tree() -> void:
-	if _page != null and not _page.is_inside_tree():  # never adopted by the Inspector
+func _notification(what: int) -> void:  # WO-891: PREDELETE, not _exit_tree — moving the Live tab to the second window re-parents it
+	if what == NOTIFICATION_PREDELETE and is_instance_valid(_page) and not _page.is_inside_tree():  # never adopted by the Inspector
 		_page.free()
 
 

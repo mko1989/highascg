@@ -13,6 +13,7 @@ const AutoOverlay := preload("res://features/previs/tracking/auto_overlay.gd")
 const UI_CFG := "user://ui.cfg"
 
 static var current: Node  # the Live tab's instance — the Timeline tab reaches it through LivePreview.current
+var home: Control  # WO-891: the Live tab's slot (live_tab.gd)
 
 var _video: TextureRect
 var _no_signal: Label
@@ -73,6 +74,11 @@ func _ready() -> void:
 
 ## Move the preview into `slot` (a tab's black panel) — called by the tab that is being shown. Re-holds the surface
 ## and re-runs the 3D view's show / hide, which a reparent alone does not signal, and lets Auto fit the new panel.
+## WO-891: the Live tab is on screen. It keeps the preview then, even while a Timeline tab on the second monitor shows.
+func home_shown() -> bool:
+	return is_instance_valid(home) and home.is_visible_in_tree()
+
+
 func host(slot: Control) -> void:
 	if get_parent() == slot:
 		return

@@ -173,10 +173,11 @@ func _ready() -> void:
 		(func() -> void: Probes.shaders(self, str(_g("Config").args["probe-visuals-shaders"]))).call_deferred()
 
 
-func _exit_tree() -> void:
-	launcher.stop()
-	if page != null and not page.is_inside_tree():  # never adopted by the Inspector
-		page.free()
+func _notification(what: int) -> void:  # WO-891: PREDELETE, not _exit_tree — moving the tab to the second window re-parents it
+	if what == NOTIFICATION_PREDELETE:
+		launcher.stop()
+		if is_instance_valid(page) and not page.is_inside_tree():  # never adopted by the Inspector
+			page.free()
 
 
 ## Autoloads by name: the headless test runner has none (the tab still builds there).

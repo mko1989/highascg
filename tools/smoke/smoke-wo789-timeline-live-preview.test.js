@@ -22,7 +22,7 @@ test('one preview: only the Live tab makes it, the Timeline tab hosts LivePrevie
 	const tl = read('features/timeline/timeline_tab.gd')
 	assert.match(
 		tl,
-		/if is_visible_in_tree\(\) and is_instance_valid\(LivePreview\.current\):\n\t\tLivePreview\.current\.host\(preview_slot\)/
+		/if is_visible_in_tree\(\) and is_instance_valid\(LivePreview\.current\) and not LivePreview\.current\.home_shown\(\):\n\t\tLivePreview\.current\.host\(preview_slot\)/ // WO-891: Live tab shown on the other monitor keeps it
 	)
 	assert.match(tl, /visibility_changed\.connect\(_borrow_preview\)/)
 	assert.doesNotMatch(tl, /timeline_monitor/)

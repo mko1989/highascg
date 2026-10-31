@@ -88,6 +88,8 @@ func _ready() -> void:
 		if path == "*" or path == "channelMap":
 			_screen_names())
 	_borrow_preview.call_deferred()
+	if is_instance_valid(LivePreview.current):  # WO-891: the Live tab (other monitor) hid it — take it while shown here
+		LivePreview.current.visibility_changed.connect(func() -> void: _borrow_preview.call_deferred())
 	var split := TimelineLayout.stack(preview_slot, [transport, dest], view)  # WO-810: preview, controls row, timeline
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
@@ -115,9 +117,10 @@ func _ready() -> void:
 	refresh()
 
 
-## WO-789 — the Live tab's preview, moved here while this tab is shown (the Live tab takes it back when shown).
+## WO-789 — the Live tab's preview, moved here while this tab is shown (the Live tab takes it back when shown). WO-891:
+## with the two tabs on two monitors, both shown, the Live tab keeps it.
 func _borrow_preview() -> void:
-	if is_visible_in_tree() and is_instance_valid(LivePreview.current):
+	if is_visible_in_tree() and is_instance_valid(LivePreview.current) and not LivePreview.current.home_shown():
 		LivePreview.current.host(preview_slot)
 
 
@@ -144,9 +147,11 @@ func refresh() -> void:
 	transport.refresh()
 
 
-func _exit_tree() -> void:
+func _notification(what: int) -> void:  # WO-891: PREDELETE, not _exit_tree — moving the tab to the second window re-parents it
+	if what != NOTIFICATION_PREDELETE:
+		return
 	for p in [_page, _flag_page, _layer_page]:
-		if p != null and not p.is_inside_tree():  # never selected → never adopted by the Inspector
+		if is_instance_valid(p) and not p.is_inside_tree():  # never selected → never adopted by the Inspector
 			p.free()
 
 

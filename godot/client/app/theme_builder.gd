@@ -89,3 +89,16 @@ static func vline() -> ColorRect:
 	r.size_flags_vertical = Control.SIZE_FILL
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return r
+
+
+## WO-891: also the second operator window's header (app/second_window.gd).
+## The 72×96 bunny drawn at ~24×32 through a plain bilinear sample skipped pixels: its thin white outline broke into
+## dots. Resample once, Lanczos, to the exact pixels it covers (UI scale included); a resize does it again.
+static func sized_logo(img: Image, box: Vector2, win: Window) -> Texture2D:
+	if img.is_empty() or box.y < 1.0:
+		return null
+	var k := win.content_scale_factor if win else 1.0
+	var h := maxi(1, roundi(minf(box.y, box.x * img.get_height() / img.get_width()) * k))
+	var out := img.duplicate() as Image
+	out.resize(maxi(1, roundi(h * float(img.get_width()) / img.get_height())), h, Image.INTERPOLATE_LANCZOS)
+	return ImageTexture.create_from_image(out)

@@ -138,8 +138,8 @@ func _act(choice: String) -> void:
 			_keep()
 		"device_view", "load_snapshot":
 			_say({"text": M.KEEP_NOTICE, "tone": "warn", "sticky": true})
-			var devices: Node = shell.tabs.get_node("Devices")
-			shell.tabs.current_tab = devices.get_index()
+			var devices: Node = shell.tab_node("Devices")  # WO-891: it may live on the second monitor
+			shell.show_tab(devices)
 			if choice == "load_snapshot":
 				devices.snapshots.open_load()
 

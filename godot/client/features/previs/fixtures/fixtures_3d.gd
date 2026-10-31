@@ -13,22 +13,8 @@ const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 const Con := preload("res://features/previs/fixtures/console_selection.gd")  # WO-857: the console's own set (cyan marks)
 const Tint := preload("res://features/previs/model_tint.gd")
 const Haze := preload("res://features/previs/haze.gd")
-
-const CONE_SHADER := """
-shader_type spatial;
-render_mode blend_add, unshaded, cull_disabled, depth_draw_never, shadows_disabled;
-uniform vec4 tint : source_color;
-uniform float haze = 0.0;  // WO-786
-varying float along;
-void vertex() {
-	along = clamp(0.5 - VERTEX.y, 0.0, 1.0);  // 0 at the lens (top of the unit cone), 1 at its far end
-}
-void fragment() {
-	float edge = pow(abs(dot(normalize(NORMAL), normalize(VIEW))), 1.5);
-	ALBEDO = tint.rgb;
-	ALPHA = tint.a * pow(1.0 - along, 2.0 - 1.2 * haze) * edge * %s * (1.0 + 2.2 * haze);
-}
-""" % F.CONE_ALPHA
+const Quality := preload("res://features/previs/previs_quality.gd")  # WO-892
+const Cone := preload("res://features/previs/fixtures/beam_cone.gd")
 
 var _colors := {}  # WO-641: typeId → "#rrggbb" (project.previs.fixture_colors)
 var _layer_colors := {}  # WO-678: MVR layer → "#rrggbb"; a head patched from an MVR object takes its layer's colour
@@ -59,7 +45,6 @@ func _ready() -> void:
 	_watch.add_child(preload("res://features/previs/fixtures/console_selection_feed.gd").new())  # WO-857: under _watch, a rebuild frees every other child
 	Con.shared().changed.connect(_show_selection)
 	_shader = Shader.new()
-	_shader.code = CONE_SHADER
 	_cone = CylinderMesh.new()
 	_cone.top_radius = 0.004
 	_cone.bottom_radius = 1.0
@@ -72,6 +57,8 @@ func _ready() -> void:
 	Ws.message.connect(_on_ws)
 	sel.changed.connect(_show_selection)
 	Haze.shared().changed.connect(_set_haze)
+	Quality.shared().changed.connect(_quality)
+	_quality()
 	_set_haze.call_deferred(Haze.shared().level)  # in the tree by then: its world's Environment
 	_on_project(Store.project)
 	var res: Dictionary = await Api.get_json("/api/tracking/fixtures")
@@ -132,6 +119,7 @@ func _rebuild(list: Array) -> void:
 		if not rig.get("nodes") is Array:
 			continue
 		_build(f, rig)
+	_quality()
 	if not _last.is_empty():
 		apply(_last)
 	_show_selection()
@@ -396,6 +384,12 @@ func apply(data: Dictionary) -> void:
 			_light(parts.beams[id], beams.get(id, {}) if beams.get(id) is Dictionary else {})
 
 
+## WO-892: the render quality — cone shader / segments, spot shadows up to its budget (previs_quality.gd).
+func _quality(_level := 0) -> void:
+	var p: Dictionary = Quality.shared().current()
+	Cone.apply(_fx, _cone, _shader, Quality.spot_shadow_budget(p), p)
+
+
 func _set_haze(h: float) -> void:
 	haze = h
 	Haze.apply_env(get_world_3d().environment if is_inside_tree() else null, h)
@@ -474,7 +468,7 @@ func _assign(sl: SpotLight3D, key: String) -> void:
 	if tex != null and not was and gobo_lights >= F.MAX_GOBOS:
 		tex = null
 	sl.light_projector = tex
-	sl.shadow_enabled = tex != null  # Godot projects through the shadow map: no shadows → a black spot
+	sl.shadow_enabled = tex != null or bool(sl.get_meta("qshadow", false))  # Godot projects through the shadow map: no shadows → a black spot
 	gobo_lights += int(tex != null) - int(was)
 
 
@@ -492,7 +486,9 @@ func bounds() -> AABB:
 	return box
 
 
-func _exit_tree() -> void:
+func _notification(what: int) -> void:  # WO-891: PREDELETE, not _exit_tree — the Previs / Live tab moves between windows
+	if what != NOTIFICATION_PREDELETE:
+		return
 	for t in _meshes.values():
 		if t != null:
 			(t as Node).free()

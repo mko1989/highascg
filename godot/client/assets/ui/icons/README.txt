@@ -18,3 +18,6 @@ coloured on purpose (not white), so set it on Tree items, not on Buttons that ti
 bulb_on / bulb_off (WO-673 Live 3D light-beams toggle) are hand-drawn: a yellow bulb with rays (beams render) and the
 same bulb as a white outline (off). bulb_on is coloured on purpose; the toggle overrides the pressed icon tint to white.
 stop (WO-860 deck card: an on-air lower third's play-out) is the plain filled square the web transport uses.
+send_to_2 / send_to_1 (WO-891 tab button: move a workspace tab to the second operator window / back to the main one)
+are hand-drawn: an arrow pointing top-right out of a box holding a stroked "2" / "1". screen (WO-891 second window:
+which screen it opens on) is a plain monitor outline on a stand.

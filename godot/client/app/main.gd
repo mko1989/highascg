@@ -47,12 +47,12 @@ func _ready() -> void:
 		add_child(load("res://e2e/e2e_runner.gd").new())
 	if Config.args.has("probe-take"):  # dev: --probe-take=<sceneId>[:program]
 		var parts := str(Config.args["probe-take"]).split(":")
-		await shell.tabs.get_node("Live").deck.request_take(parts[0], 0, "program" if parts.size() > 1 else "preview")
+		await shell.tab_node("Live").deck.request_take(parts[0], 0, "program" if parts.size() > 1 else "preview")
 	if Config.args.has("probe-rename"):  # dev: --probe-rename=<sceneId>:<new name>
 		var kv := str(Config.args["probe-rename"]).split(":", true, 1)
 		if not Ws.is_open:
 			await Ws.connected
-		var lt2: Node = shell.tabs.get_node("Live")
+		var lt2: Node = shell.tab_node("Live")
 		print("[client] rename ", lt2.deck.rename_look(kv[0], kv[1]))
 		await ProjectSync.saved
 		print("[client] saved rev ", Store.project.get("rev"))
@@ -60,7 +60,7 @@ func _ready() -> void:
 		var tp := str(Config.args["probe-transition"]).split(":")
 		if not Ws.is_open:
 			await Ws.connected
-		var lt3: Node = shell.tabs.get_node("Live")
+		var lt3: Node = shell.tab_node("Live")
 		print("[client] transition ", lt3.deck.set_look_transition(tp[0], {"type": tp[1], "duration": int(tp[2])}))
 		await ProjectSync.saved
 		print("[client] saved rev ", Store.project.get("rev"))
@@ -76,14 +76,14 @@ func _ready() -> void:
 		dlg.popup_centered(Vector2i(700, 600))
 		sec.show_layer("probe", 0, {"layerNumber": 99, "source": {"type": "template", "value": "lower-thirds/lt-classic-box"}})
 	if Config.args.has("probe-snapshot-load"):  # dev: the Load device snapshot dialog (its entry is WO-608's)
-		shell.tabs.get_node("Devices").snapshots.open_load()
+		shell.tab_node("Devices").snapshots.open_load()
 	if Config.args.has("probe-edit"):  # dev: --probe-edit=<sceneId> opens the look editor (WO-600 F)
 		if not Ws.is_open:
 			await Ws.connected
-		shell.tabs.get_node("Live").editor.open(str(Config.args["probe-edit"]), 0)
+		shell.tab_node("Live").editor.open(str(Config.args["probe-edit"]), 0)
 		if Config.args.has("probe-inspect"):  # dev: --probe-inspect=<layer index> → fit canvas, mute, fader 50 % (WO-601)
 			await get_tree().create_timer(1.5).timeout
-			var ed2: Node = shell.tabs.get_node("Live").editor
+			var ed2: Node = shell.tab_node("Live").editor
 			ed2._select(int(Config.args["probe-inspect"]))
 			await get_tree().create_timer(0.8).timeout
 			var ins: Node = ed2._inspector
@@ -95,7 +95,7 @@ func _ready() -> void:
 			# seed (or keep) → +brightness, brightness 1.4, +levels, −brightness → restore the seed
 			await get_tree().create_timer(1.5).timeout
 			var pe := str(Config.args["probe-effect"]).split(":", true, 1)
-			var ed3: Node = shell.tabs.get_node("Live").editor
+			var ed3: Node = shell.tab_node("Live").editor
 			ed3._select(int(pe[0]))
 			var seed: Array = JSON.parse_string(pe[1]) if pe.size() > 1 else (ed3._layers()[ed3._sel].get("effects", []) as Array).duplicate(true)
 			ed3._apply_layer({"effects": seed.duplicate(true)})
@@ -120,7 +120,7 @@ func _ready() -> void:
 			print("[client] effects restored ", ed3._layers()[ed3._sel].get("effects"))
 		if Config.args.has("probe-pip"):  # dev: --probe-pip=<layer index> → +border, width 9, +shadow, shadow behind, −border, restore (WO-601)
 			await get_tree().create_timer(1.5).timeout
-			var ed4: Node = shell.tabs.get_node("Live").editor
+			var ed4: Node = shell.tab_node("Live").editor
 			ed4._select(int(Config.args["probe-pip"]))
 			var before: Variant = (ed4._layers()[ed4._sel] as Dictionary).get("pipOverlays", [])
 			await get_tree().create_timer(1.0).timeout
@@ -143,7 +143,7 @@ func _ready() -> void:
 			await step.call("restored")
 		if Config.args.has("probe-cg"):  # dev: --probe-cg → LT layer: title, Play, Play (out), Delete; timers layer: compact, Reload; both removed (WO-601)
 			await get_tree().create_timer(1.5).timeout
-			var ed5: Node = shell.tabs.get_node("Live").editor
+			var ed5: Node = shell.tab_node("Live").editor
 			var lts: Node = ed5._inspector._lt
 			var wait := func(s: float, label: String) -> void:
 				await get_tree().create_timer(s).timeout
@@ -178,7 +178,7 @@ func _ready() -> void:
 			print("[client] cg done, layers ", ed5._layers().map(func(l: Dictionary) -> int: return int(l.layerNumber)))
 		if Config.args.has("probe-countdown"):  # dev: --probe-countdown → add, 1 min, Start/Pause/Reset, re-take PRV, remove layer + timer (WO-601)
 			await get_tree().create_timer(1.5).timeout
-			var ed6: Node = shell.tabs.get_node("Live").editor
+			var ed6: Node = shell.tab_node("Live").editor
 			var cds: Node = ed6._inspector._cd
 			await ed6.add_layer_from_source({"type": "template", "value": "countdown/countdown", "label": "Countdown"})
 			await get_tree().create_timer(2.5).timeout
@@ -191,7 +191,7 @@ func _ready() -> void:
 				(cds.find_children("*", "Button", true, false).filter(func(x: Button) -> bool: return x.text == b)[0] as Button).pressed.emit()
 				await get_tree().create_timer(1.0).timeout
 				print("[client] cd ", b, " | ", cds._status.text)
-			await shell.tabs.get_node("Live").deck.request_take(ed6.scene_id, 0, "preview")
+			await shell.tab_node("Live").deck.request_take(ed6.scene_id, 0, "preview")
 			await get_tree().create_timer(2.0).timeout
 			var tid: String = cds._timer_id
 			ed6._remove_layer()
@@ -204,7 +204,7 @@ func _ready() -> void:
 			print("[client] cd done, layers ", ed6._layers().map(func(l: Dictionary) -> int: return int(l.layerNumber)), " timers ", tl.size())
 		if Config.args.has("probe-roster"):  # dev: --probe-roster=<sheet path> → LT layer, import, pick row 2, Play, Delete, remove (WO-601)
 			await get_tree().create_timer(1.5).timeout
-			var ed8: Node = shell.tabs.get_node("Live").editor
+			var ed8: Node = shell.tab_node("Live").editor
 			await ed8.add_layer_from_source({"type": "template", "value": "lower-thirds/lt-classic-box", "label": "Classic Box"})
 			await get_tree().create_timer(2.0).timeout
 			var lt8: Node = ed8._inspector._lt
@@ -225,7 +225,7 @@ func _ready() -> void:
 			print("[client] roster done, layers ", ed8._layers().map(func(l: Dictionary) -> int: return int(l.layerNumber)))
 		if Config.args.has("probe-style"):  # dev: --probe-style → layer 2 backup copy, preset from layer 1 → applied to 2, backup pasted, preset removed (WO-601)
 			await get_tree().create_timer(1.5).timeout
-			var ed9: Node = shell.tabs.get_node("Live").editor
+			var ed9: Node = shell.tab_node("Live").editor
 			var st: Node = ed9._inspector._style
 			ed9._select(1)
 			await get_tree().create_timer(0.6).timeout
@@ -253,11 +253,11 @@ func _ready() -> void:
 			print("[client] style after  ", NetUtil.to_json(ed9._layers()[1]))
 		if Config.args.has("probe-add-media"):  # dev: --probe-add-media=<media id> (drop equivalent)
 			await get_tree().create_timer(1.5).timeout
-			var ed: Node = shell.tabs.get_node("Live").editor
+			var ed: Node = shell.tab_node("Live").editor
 			print("[client] add layer ", await ed.add_layer_from_source({"type": "media", "value": str(Config.args["probe-add-media"])}))
 	if Config.args.has("probe-media"):  # dev: --probe-media=<local media id> → inspector sets in 1.5 s, out 0:40, mute (WO-601)
 		await get_tree().create_timer(2.5).timeout
-		var ins2: Node = shell.tabs.get_node("Live").find_children("*", "VBoxContainer", true, false).filter(func(n: Node) -> bool: return n.has_method("show_media"))[0]
+		var ins2: Node = shell.tab_node("Live").find_children("*", "VBoxContainer", true, false).filter(func(n: Node) -> bool: return n.has_method("show_media"))[0]
 		await ins2.show_media({"id": str(Config.args["probe-media"]), "type": "MOVIE", "fps": 50, "durationMs": 60000})
 		ins2._in.text = "1.5"
 		ins2._in.text_submitted.emit("1.5")
@@ -272,7 +272,7 @@ func _ready() -> void:
 		if not Ws.is_open:
 			await Ws.connected
 		await get_tree().create_timer(1.5).timeout
-		var lt7: Node = shell.tabs.get_node("Live")
+		var lt7: Node = shell.tab_node("Live")
 		lt7.deck.timers_requested.emit(int(Config.args["probe-timers"]), "Main")
 		await get_tree().create_timer(1.5).timeout
 		var tp: Node = lt7.timers
@@ -295,7 +295,7 @@ func _ready() -> void:
 	if Config.args.has("probe-versions"):  # dev: --probe-versions=<library path>|<new file> → upload, go back, purge (WO-601)
 		var pv := str(Config.args["probe-versions"]).split("|")
 		await get_tree().create_timer(2.5).timeout
-		var mi: Node = shell.tabs.get_node("Live").find_children("*", "VBoxContainer", true, false).filter(func(n: Node) -> bool: return n.has_method("show_media"))[0]
+		var mi: Node = shell.tab_node("Live").find_children("*", "VBoxContainer", true, false).filter(func(n: Node) -> bool: return n.has_method("show_media"))[0]
 		var entry := func() -> Dictionary:
 			var r: Dictionary = await Api.get_json("/api/media/library/entry?path=%s" % pv[0].uri_encode())
 			return r.data.entry if r.ok else {}
@@ -317,7 +317,7 @@ func _ready() -> void:
 		if not Ws.is_open:
 			await Ws.connected
 		await get_tree().create_timer(1.5).timeout
-		var lt9: Node = shell.tabs.get_node("Live")
+		var lt9: Node = shell.tab_node("Live")
 		lt9.deck.border_requested.emit(int(Config.args["probe-border"]), "Main")
 		await get_tree().create_timer(1.0).timeout
 		var bp: Node = lt9.border
@@ -341,7 +341,7 @@ func _ready() -> void:
 		if not Ws.is_open:
 			await Ws.connected
 		await get_tree().create_timer(1.0).timeout
-		var lt10: Node = shell.tabs.get_node("Live")
+		var lt10: Node = shell.tab_node("Live")
 		lt10.deck.border_requested.emit(int(Config.args["probe-border-artnet"]), "Main")
 		await get_tree().create_timer(0.8).timeout
 		var bpa: Node = lt10.border
@@ -364,7 +364,7 @@ func _ready() -> void:
 		await bpa.send({"clear": true}, true, true)
 		show.call("removed")
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
-		await shell.tabs.get_node("Live").deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))
+		await shell.tab_node("Live").deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))
 	var probes := {"probe-blank-clear": "deck_blank_probe", "probe-e2-presets": "preset_e2_probe", "probe-perf": "perf_probe", "probe-fixture": "fixture_shot_probe", "probe-docks": "docks_probe"}
 	for pf in probes:  # dev: self-driving GUI probes (WO-777 blank PRV clear =<main>, WO-781 E2 presets =<png prefix>, WO-617)
 		if Config.args.has(pf):
@@ -456,6 +456,7 @@ func _apply_window_args() -> void:
 	var override := float(Config.args.get("ui-scale", Placement.saved_scale()))
 	Placement.fit(w, Platform.is_local_origin(Config.origin), override)
 	Placement.apply_mode(w, Config.args, Platform.is_local_origin(Config.origin))  # WO-714: no title bar on the box
+	shell.undock.restore()  # WO-891: the tabs that were on the second monitor, once this window is on its own
 	_screen_question(fresh)
 
 

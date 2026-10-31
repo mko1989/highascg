@@ -2,8 +2,11 @@
 // UV (0,0) = top-left of the object's picture; uv_rect crops the source raster (x, y, w, h in 0..1).
 // LED look: dark seams between panels and an optional LED pixel grid, both anti-aliased with fwidth
 // so they fade out instead of shimmering when the camera is far away.
+// WO-892: LED_AA (previs_quality.gd strips this line on Low) averages four rotated-grid taps where the picture is
+// minified (more than one source pixel per screen pixel), so a distant wall does not shimmer or moire without mipmaps.
 shader_type spatial;
 render_mode cull_disabled;
+#define LED_AA
 
 uniform sampler2D video : source_color, filter_linear, repeat_disable;
 uniform bool has_video = false;
@@ -16,7 +19,21 @@ uniform float energy = 1.0;
 
 void fragment() {
 	vec2 st = UV;
-	vec3 c = has_video ? texture(video, uv_rect.xy + st * uv_rect.zw).rgb : vec3(0.05, 0.05, 0.07);
+	vec2 suv = uv_rect.xy + st * uv_rect.zw;
+	vec3 c = has_video ? texture(video, suv).rgb : vec3(0.05, 0.05, 0.07);
+#ifdef LED_AA
+	if (has_video) {
+		vec2 dx = dFdx(suv);
+		vec2 dy = dFdy(suv);
+		vec2 ts = vec2(textureSize(video, 0));
+		if (max(length(dx * ts), length(dy * ts)) > 1.0) {
+			c = 0.25 * (textureLod(video, suv + dx * -0.125 + dy * -0.375, 0.0).rgb
+					+ textureLod(video, suv + dx * 0.375 + dy * -0.125, 0.0).rgb
+					+ textureLod(video, suv + dx * 0.125 + dy * 0.375, 0.0).rgb
+					+ textureLod(video, suv + dx * -0.375 + dy * 0.125, 0.0).rgb);
+		}
+	}
+#endif
 	vec2 px = st * panels * panel_px;
 	vec2 fw = max(fwidth(px), vec2(1e-4));
 	if (seam_px > 0.0) {

@@ -8,7 +8,8 @@
  * the device graph — so the kiosk launcher, pointer confine, Godot window placement and the
  * Devices-tab cable all read one answer.
  *
- *   GET  /api/system/operator-screen            { outputs: [{ name, port, x, y, width, height, current }], port }
+ *   GET  /api/system/operator-screen            { outputs: [{ name, port, x, y, width, height, current, caspar }], port }
+ *                                               caspar (WO-891): a Caspar screen consumer is planned on that output
  *   POST /api/system/operator-screen { name }   { ok, name, port } | 400 no name | 404 unknown output | 422 unmapped
  *   POST /api/system/operator-screen { prompt } true: the prompt is up — let the pointer leave the operator monitor;
  *                                               false: it closed with no pick — confine again
@@ -56,6 +57,24 @@ function restoreConfine(ctx, deps) {
 	return true
 }
 
+/**
+ * WO-891: outputs the layout plan puts a Caspar screen consumer on (PGM / PRV / multiview / pixel-mapping head). The
+ * Godot client's second operator window never opens on one by default.
+ * @param {object} config
+ * @returns {Set<string>}
+ */
+function casparOutputNames(config) {
+	const names = new Set()
+	try {
+		const plan = require('../utils/os-layout-calculator').calculateLayoutPositions(config)
+		const rows = [plan?.screens, plan?.prv, plan?.multiview].flatMap((g) => Object.values(g || {}))
+		for (const r of rows.concat(plan?.mappingGpuOutputs || [])) if (r?.sysId) names.add(String(r.sysId))
+	} catch (_) {
+		/* no plan → nothing is marked; the client still never picks its own screen */
+	}
+	return names
+}
+
 function reply(status, body) {
 	return { status, headers: JSON_HEADERS, body: jsonBody(body) }
 }
@@ -75,8 +94,9 @@ function handleGet(ctx, deps = {}) {
 	} catch (e) {
 		boot = { pending: false, reason: `error: ${e?.message || e}` }
 	}
+	const caspar = (deps.casparOutputNames || casparOutputNames)(config)
 	return reply(200, {
-		outputs: outputs.map((o) => ({ ...o, current: port != null && o.port === port })),
+		outputs: outputs.map((o) => ({ ...o, current: port != null && o.port === port, caspar: caspar.has(o.name) })),
 		port: port ?? null,
 		boot,
 	})

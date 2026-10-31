@@ -89,4 +89,4 @@ func test_timeline_rows() -> void:
 func test_wo883_shaders_left_out_of_templates() -> void:
 	t.ok(FileAccess.get_file_as_string("res://features/live/media_panel.gd").contains('r.kind != "shader"'), "Templates filters shader rows")
 	t.ok(not FileAccess.get_file_as_string("res://features/live/media_add_menu.gd").contains('"Shader FX…"'), "no Shader FX… item")
-	t.ok(FileAccess.get_file_as_string("res://app/shell.gd").contains('tabs.get_node("Visuals")'), "logo → Visuals")
+	t.ok(FileAccess.get_file_as_string("res://app/shell.gd").contains('show_tab(tab_node("Visuals"))'), "logo → Visuals (WO-891: wherever the tab lives)")

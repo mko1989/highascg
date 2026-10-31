@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-806 live WOs (33 open, 123 in progress, 650 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+808 live WOs (33 open, 124 in progress, 651 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -363,7 +363,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (98)
+## godot-client — Godot client (100)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -460,6 +460,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 886 DONE [godot-client+os-iso] MagicQ does not open from the operator dock: the launch ignored the .desktop Pa… → 886_WO_dock_magicq_ignored_desktop_path.md
 - 889 DONE [godot-client] Device View GPU-port inspector: drop the "Confine" select → 889_WO_gpu_inspector_drop_confine_select.md
 - 890 DONE [godot-client] Visuals: dynamic layer stack with a per-layer opacity fader → 890_WO_visuals_dynamic_layers_opacity.md
+- 891 IN PROGRESS [godot-client+mapping] Second operator monitor: a second Godot window that workspace tabs move to → 891_WO_second_operator_monitor_window.md
+- 892 DONE [godot-client] Previs render quality setting (Low / Medium / High / Ultra) → 892_WO_previs_quality_setting.md
 - 894 OPEN [godot-client] Visuals ▸ Shader panel: the shader controls come back in the Visuals tab → 894_WO_visuals_shader_controls_panel.md
 - 895 OPEN [godot-client] Visuals playlists: an ordered list of looks and visuals that runs unattended → 895_WO_visuals_playlists.md
 - 896 OPEN [godot-client] Visuals 3D view drives the output: the orbit camera reaches the program → 896_WO_visuals_3d_view_drives_output.md

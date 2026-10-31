@@ -20,7 +20,7 @@ describe('WO-710 tracking overlay wiring', () => {
 			read('features/live/live_preview.gd'),
 			/preload\("res:\/\/features\/previs\/tracking\/auto_overlay\.gd"\)/
 		)
-		assert.match(read('features/live/live_tab.gd'), /preview = LivePreview\.new\(\)\n\tpreview\.host\(_video_panel\)/)
+		assert.match(read('features/live/live_tab.gd'), /preview = LivePreview\.new\(\)\n\tpreview\.home = _video_panel\n\tpreview\.host\(_video_panel\)/) // WO-891: home = the Live tab's own panel
 		assert.match(
 			read('features/previs/previs_tab.gd'),
 			/preload\("res:\/\/features\/previs\/tracking\/auto_overlay\.gd"\)\.new\(\)/

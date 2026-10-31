@@ -7,6 +7,7 @@ extends SubViewport
 ## Rendered only while active (tracking_view shows it in the Camera mode when the operator turns it on).
 
 const C := preload("res://features/previs/tracking/camera_model.gd")
+const Quality := preload("res://features/previs/previs_quality.gd")  # WO-892
 
 const MAX_W := 2048  # render width cap (the overlay is a ghost, not the programme picture)
 const MAX_OVERSCAN := 2.0
@@ -75,7 +76,17 @@ func attach(world: World3D, env: Environment, hide_layers: int) -> void:
 	e.background_mode = Environment.BG_CLEAR_COLOR
 	e.glow_enabled = false
 	cam.environment = e
+	if not Quality.shared().changed.is_connected(_on_quality):  # WO-892
+		Quality.shared().changed.connect(_on_quality)
+	_on_quality()
 	cam.cull_mask = 0xFFFFF & ~hide_layers
+
+
+## WO-892: the render quality — anti-aliasing and the Environment's effects (not glow, which would haze the picture).
+func _on_quality(_level := 0) -> void:
+	var p: Dictionary = Quality.shared().current()
+	Quality.apply_viewport(self, p, true)
+	Quality.apply_env(cam.environment as Environment, p, false)
 
 
 ## Pose / fov / lens from a tracking camera entry (tracking_model). → false when the camera is not usable.

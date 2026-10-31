@@ -31,6 +31,8 @@ const HeaderStatus := preload("res://app/header_status.gd")
 const OperatorDock := preload("res://app/operator_dock.gd")
 const DockModel := preload("res://app/operator_dock_model.gd")
 const NumericField := preload("res://core/numeric_field.gd")
+const TabUndock := preload("res://app/tab_undock.gd")
+const Platform := preload("res://core/platform.gd")
 
 var _eye: ConnectionEye
 var _logs: LogsDialog
@@ -38,7 +40,8 @@ var header_project: HeaderProject
 var header_tools: HeaderTools
 var header_status: HeaderStatus
 var _status := ""
-var tabs: TabContainer
+var tabs: TabContainer  # the main window's workspace tabs — a tab may live in the second window (WO-891): use tab_node()
+var undock: TabUndock
 var sources: MediaPanel
 var inspector: InspectorPanel
 var osc: OscMirror
@@ -99,27 +102,36 @@ func _ready() -> void:
 	sources.connector_dropped.connect(devices.refresh)
 	audio.caspar_changed.connect(devices.mark_restart_dirty)
 	audio.inspect_destination.connect(func(id: String) -> void:  # WO-604: a live-audio strip → its host-channel page
-		tabs.current_tab = devices.get_index()
+		show_tab(devices)
 		devices.inspect_destination(id))
 	var multiview := MultiviewTab.new()  # WO-600 M
 	multiview.name = "Multiview"
 	tabs.add_child(multiview)
 	_hide_multiview_until_created(multiview)
-	sources.tab_requested.connect(func(n: String) -> void: tabs.current_tab = tabs.get_tab_idx_from_control(tabs.get_node(n.capitalize())))
+	sources.tab_requested.connect(func(n: String) -> void: show_tab(tab_node(n.capitalize())))
 	var settings := SettingsTab.new()  # WO-608
 	settings.name = "Settings"
 	settings.logs_requested.connect(_open_logs)
 	tabs.add_child(settings)
+	undock = TabUndock.new()  # WO-891: workspace tabs on a second operator monitor (restored by main.gd once placed)
+	undock.on_box = Platform.is_local_origin(Config.origin)
+	undock.api = Api if undock.on_box else null
+	undock.forward_to = [_shortcut_input, ProjectUndo._unhandled_key_input]
+	add_child(undock)
+	undock.setup(tabs)
 	if Config.args.has("tab"):  # --tab=N (index) or --tab=Previs (name — survives a reorder)
 		var want := str(Config.args["tab"])
-		var named := tabs.get_node_or_null(NodePath(want.capitalize())) as Control
-		tabs.current_tab = tabs.get_tab_idx_from_control(named) if named else clampi(int(want), 0, tabs.get_tab_count() - 1)
+		var named := tab_node(want.capitalize())
+		if named:
+			show_tab(named)
+		else:
+			tabs.current_tab = clampi(int(want), 0, tabs.get_tab_count() - 1)
 	Ws.connected.connect(_refresh_eye)
 	Ws.disconnected.connect(_refresh_eye)
 	Store.changed.connect(func(_p: String, _v: Variant) -> void: _refresh_eye())
-	header_tools.settings_requested.connect(func() -> void: tabs.current_tab = tabs.get_tab_idx_from_control(settings))
+	header_tools.settings_requested.connect(func() -> void: show_tab(settings))
 	header_tools.notice.connect(header_project.say)
-	header_tools.badges.devices_requested.connect(func() -> void: tabs.current_tab = tabs.get_tab_idx_from_control(devices))
+	header_tools.badges.devices_requested.connect(func() -> void: show_tab(devices))
 	header_status.notice.connect(header_project.say)
 	header_status.setup(osc)
 	if Config.demo:  # WO-815: what the simulated server cannot do says so in the notice line
@@ -130,6 +142,17 @@ func _ready() -> void:
 	perf.toggled.connect(func(on: bool) -> void: _perf_btn.set_pressed_no_signal(on))
 	add_child(perf)
 	_add_dock()
+
+
+## WO-891: a workspace tab by name, in whichever window it lives (null: no such tab).
+func tab_node(n: String) -> Control:
+	return undock.page(n) if undock != null else tabs.get_node_or_null(NodePath(n)) as Control
+
+
+## WO-891: make a workspace tab current where it lives — on the second monitor it is selected there.
+func show_tab(page: Control) -> void:
+	if page != null:
+		undock.select(page)
 
 
 ## Owner 30.10 (WO-863): the Multiview tab shows only once a multiview exists (channelMap multiview channel, enabled).
@@ -175,7 +198,7 @@ func _build_header() -> Control:
 	var logo := TextureRect.new()
 	var logo_img := Image.new()
 	logo_img.load_png_from_buffer(FileAccess.get_file_as_bytes("res://assets/ui/logo.png"))
-	var fit_logo := func() -> void: logo.texture = sized_logo(logo_img, logo.size, logo.get_window())
+	var fit_logo := func() -> void: logo.texture = ThemeBuilder.sized_logo(logo_img, logo.size, logo.get_window())
 	logo.resized.connect(fit_logo)
 	logo.ready.connect(func() -> void: logo.get_window().size_changed.connect(fit_logo))  # UI scale is set after boot
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -186,7 +209,7 @@ func _build_header() -> Control:
 	logo.gui_input.connect(func(e: InputEvent) -> void:  # WO-606 opened Shader Live; WO-883: shaders live in Visuals
 		var mb := e as InputEventMouseButton
 		if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-			tabs.current_tab = tabs.get_tab_idx_from_control(tabs.get_node("Visuals")))
+			show_tab(tab_node("Visuals")))
 	row.add_child(logo)
 	var title := Label.new()
 	title.text = "HighAsCG"
@@ -232,7 +255,7 @@ func _open_logs() -> void:
 ## Connection eye: WS + Caspar link (state.caspar.connection, like client/components/connection-eye.js).
 ## WO-739: a server asking to link with this machine's server shows on the Devices tab, so it is seen from every tab.
 func _watch_invites(devices: Control) -> void:
-	var title := func(snap: Variant) -> void: tabs.set_tab_title(tabs.get_tab_idx_from_control(devices), ClusterModel.devices_title(snap))
+	var title := func(snap: Variant) -> void: undock.set_title(devices, ClusterModel.devices_title(snap))
 	Ws.on("cluster:peers", func(d: Variant) -> void: title.call(d))  # WO-802: the WS is always this machine's server
 	Ws.connected.connect(func() -> void:
 		var r: Dictionary = await DevicesTarget.box_api.get_json("/api/cluster")
@@ -253,15 +276,3 @@ func _refresh_eye() -> void:
 	_eye.set_state(Ws.is_open and caspar_ok, Settings.get_setting("offline_mode", false) == true,
 		"%s\n%s%s%s" % [state, Config.origin, ("\n" + _status) if _status != "" else "",
 			("\n" + Profiles.label(Config.profiles()) + " · right-click for A/B hosts") if Profiles.has_dual(Config.profiles()) else "\nRight-click: A/B hosts"])
-
-
-## The 72×96 bunny drawn at ~24×32 through a plain bilinear sample skipped pixels: its thin white outline broke into
-## dots. Resample once, Lanczos, to the exact pixels it covers (UI scale included); a resize does it again.
-static func sized_logo(img: Image, box: Vector2, win: Window) -> Texture2D:
-	if img.is_empty() or box.y < 1.0:
-		return null
-	var k := win.content_scale_factor if win else 1.0
-	var h := maxi(1, roundi(minf(box.y, box.x * img.get_height() / img.get_width()) * k))
-	var out := img.duplicate() as Image
-	out.resize(maxi(1, roundi(h * float(img.get_width()) / img.get_height())), h, Image.INTERPOLATE_LANCZOS)
-	return ImageTexture.create_from_image(out)
