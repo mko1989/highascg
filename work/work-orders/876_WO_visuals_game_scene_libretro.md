@@ -1,7 +1,7 @@
 # WO-876 — Visuals: a classic game as a scene / layer (libretro window → ring → effects)
 
 **Area:** godot-client, engine
-**Status: IN PROGRESS (31.10: Game scene + launcher + core installer, pipeline proven on Xvfb with the test core; waits for the owner to install cores and drop ROMs)**
+**Status: IN PROGRESS (31.10: Game scene + launcher + core installer; real Nestopia core proven on Xvfb with a test cart incl. input; waits for a real ROM, Play on the operator screen, a gamepad and Send on air)**
 
 Owner, 31.10: *"Also as part of the visuals I'd like to implement a classic games emulator, so I can run contra Mario or
 whatever use it as a layer in visuals with effects etc, but play normally on the operator monitor with keyboard/gamepad
@@ -57,5 +57,14 @@ input. Find open source projects that we can borrow from and start building it i
 - Xvfb end to end (scratchpad `w876/`): WO-745's window with the in-repo test core published `/dev/shm/highascg-visuals-game`
   (800×720); the Visuals probe showed it as the Game scene (tilted screen, scanlines, curvature, burst glitch rows), over the
   tunnel as keyed layer 2, and under the Spectrum layer; canvas GPU 0.13–0.15 ms.
-- Not yet: a real core and ROM (owner: `godot/retro/get-cores.sh`, ROMs in `~/.highascg/retro/games`), Play from the GUI
+- Real core (31.10, after the owner ran `get-cores.sh`: nestopia, bsnes-mercury balanced, mgba in `~/.highascg/retro/cores`).
+  No ROM on the box yet, so a hand-assembled NROM test cart (scratchpad `w876/mkrom.py`, my own 6502 code: 4-colour stripes
+  scrolling right every frame, A held scrolls down, Start resets) on Xvfb :377:
+  - `run-retro.sh --core …/nestopia_libretro.so --game stripes.nes --ring visuals-game`: window 960×720, ring
+    `/dev/shm/highascg-visuals-game` rewritten; the stripes move between shots 0.4 s apart.
+  - Input: X held (→ A) grew the empty band at the bottom 0 → 66 → 159 px; Return held 100 ms (→ Start) reset it to 0.
+    An `xdotool key` tap (down+up inside one frame) is missed — the core polls once per frame; a human press is longer.
+  - Visuals probe (second client on :377, scratch `XDG_DATA_HOME`, the live server): game, tunnel+game (keyed layer 2),
+    game+spectrum, and a crossfade out of game+spectrum all show the Nestopia picture; canvas GPU 0.11–0.12 ms.
+- Not yet: a real game ROM (owner: ROMs in `~/.highascg/retro/games`), Play from the GUI
   on the operator screen, a gamepad, the game on air through Send.
