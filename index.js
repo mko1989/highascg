@@ -346,6 +346,7 @@ function main() {
 		} catch (e) {
 			appCtx.log('warn', `[Pointer confine] Boot sync failed: ${e?.message || e}`)
 		}
+		if (!isHeadlessMode()) require('./src/system/caspar-window-sync').syncCasparWindowOnBoot(config, (level, msg) => appCtx.log(level, msg)) // WO-888
 		setTimeout(() => {
 			const { maybeAutoLoginOnBoot } = require('./src/network/tailscale-service')
 			void maybeAutoLoginOnBoot({ log: (level, msg) => appCtx.log(level, msg) }).catch((e) => {

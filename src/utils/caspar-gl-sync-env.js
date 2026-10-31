@@ -69,6 +69,8 @@ function resolveGlSyncDisplay(config) {
 	//    WO-439: the ticked PORT resolves to a name via the device graph's gpu_p{N-1} connector
 	//    when screen_N_system_id / layout-plan screens don't exist (mapping-node-only rig) —
 	//    the tick was being read and then silently dropped at exactly this lookup.
+	//    WO-888: a tick on the OPERATOR MONITOR is ignored (stale ticks pinned caspar to the GUI head's vblank, owner
+	//    31.10) — caspar's frame sync sticks to a real PGM screen; the owner may still tick any other screen.
 	try {
 		const { nvidiaSyncToDisplayPortIndex } = require('./x-display-session-layout-resolve')
 		const port = nvidiaSyncToDisplayPortIndex(config)
@@ -78,7 +80,7 @@ function resolveGlSyncDisplay(config) {
 				String(cs[`screen_${port}_system_id`] || '').trim() ||
 				planSysId(port) ||
 				resolveGpuPortIndexToXrandrOutput(config, port)
-			if (sid) return sid
+			if (sid && !isOperatorMonitorPort(config, port, sid, ensurePlan())) return sid
 		}
 	} catch {
 		/* resolver unavailable — fall through to auto */
@@ -91,6 +93,19 @@ function resolveGlSyncDisplay(config) {
 	if (sid) return sid
 	// 3. Mapping-only rig: the leftmost mapping-driven GPU head (WO-437).
 	return planMappingSysId() || null
+}
+
+/**
+ * WO-888: is GPU port `port` (connector `sid`) the operator monitor — its own tick, or an operator-GUI head of the
+ * layout plan? Never a frame-sync target for caspar.
+ * @param {Record<string, any>} config
+ * @param {number} port
+ * @param {string} sid
+ * @param {any} plan calculateLayoutPositions() result or null
+ */
+function isOperatorMonitorPort(config, port, sid, plan) {
+	if (require('./x-display-session-layout-resolve').operatorMonitorPortIndex(config) === port) return true
+	return Object.values(plan?.operatorGui || {}).some((g) => String(g?.sysId || '').trim() === sid)
 }
 
 /**

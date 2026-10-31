@@ -1,7 +1,7 @@
 # WO-887 — Live-source thumbnails months old: capture once per session on a non-black frame; no move cursor on Live rows
 
 **Area:** media, godot-client
-**Status: IN PROGRESS (31.10 — code + offline proof done: node 5030/5025/0/5 skip, new smoke 14/14, Godot 24141/0, --check OK; needs the node restart + box probes in §3)**
+**Status: DONE (31.10.26 — offline: node 5030/0, smoke 14/14, Godot 24141/0; box after node restart 12:08: ch2/3/4 session captures logged + `fresh`, ch5/6 black → `waiting` retry 10 s, ch7 `no_picture`)**
 **Source:** owner 31.10: *"in live tab of sources there are thumbanils for the live sources that are months old. need a good system that will recatch a thumbnail in an apropriete moment (non black frame, but i also dont want a checker running all the time to see if there is non black frame) and do it once, per sesion with only manual recatching available (which is not in the gui). when i hover over live sources i get a pointer change to an arrows cross, like for moving items."*
 **Related:** WO-392 (capture-once — superseded here by once-per-session), WO-331 (stable URLs), WO-110 (bus invalidation — removed here), WO-845 (atomic capture), WO-622 (Godot Live tab).
 
@@ -124,3 +124,15 @@ Not yet verified (needs the node restart — not done by this session):
   no PRINT; repeat GETs → no new `capturedAt`.
 - `curl -X POST /api/thumbnail/live/recapture -d '{"channel":4}'` on the box (router order proven offline only).
 - Hover cursor on a Live row in the running GUI (source check + test only; the GUI was not relaunched).
+
+### Box probe after the node restart (31.10.26 12:08)
+`GET /api/thumbnail/live/{2..7}` right after `kill -TERM` of the node:
+
+| ch | X-Live-Thumb-Session | on disk |
+|---|---|---|
+| 2, 3, 4 | `fresh` — journal `[live-thumb] chN: session thumbnail captured (attempt 1)` | ch-2/3/4.png re-written 31.10 12:08 |
+| 5 (PRV 2), 6 (DeckLink, no signal) | `waiting`, `X-Live-Thumb-Retry-Ms: 10000` (black frame refused) | old PNG kept (13.08 / 08:22) |
+| 7 (live audio) | `no_picture` — no PRINT | untouched |
+
+The Live-row cursor (no CURSOR_DRAG) is pinned by test_live_sources.gd; the owner's GUI was relaunched with it at 12:09.
+

@@ -58,4 +58,5 @@ module.exports = [
 	'tools/smoke/smoke-wo884-fft-follows-routed-slot.test.js',
 	'tools/smoke/smoke-wo886-dock-app-working-dir.test.js',
 	'tools/smoke/smoke-wo887-live-thumb-session.test.js',
+	'tools/smoke/smoke-wo888-caspar-sync-follows-pgm.test.js',
 ]

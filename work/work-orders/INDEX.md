@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-798 live WOs (29 open, 124 in progress, 645 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+804 live WOs (33 open, 123 in progress, 648 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -190,7 +190,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 845 DONE [amcp+lighting] Sweep: AMCP client, Art-Net/sACN, audio and media bugs → 845_WO_sweep_amcp_dmx_audio_media.md
 - 867 DONE [amcp+os-iso] Caspar build: CasparCG/server#1762 effects (BLUR / SHARPEN / GRAIN) brought up… → 867_WO_caspar_pr1762_effects_fixes.md
 
-## caspar-build — CasparCG server build and binaries (11)
+## caspar-build — CasparCG server build and binaries (12)
 
 - 233 DONE [caspar-build] Caspar rebuild research: CasparCG_Enhanced base + improved-artnet + live-events… → 233_WO_CASPAR_REBUILD_RESEARCH.md
 - 234 DONE [caspar-build] Assemble + build the final (for now) CasparCG for highascg → 234_WO_CASPAR_FINAL_BUILD.md
@@ -203,6 +203,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 820 DONE [caspar-build+media] NotchLC: native GPU decode in Caspar (spike + build) → 820_WO_notchlc_native_gpu_decode.md
 - 847 DONE [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
 - 881 OPEN [caspar-build+engine] Caspar came up without CEF after a supervisor tree-kill, and nothing said so → 881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md
+- 888 DONE [caspar-build+os-iso] PGM micro stutter on alt-tab: Caspar's window never takes focus; frame sync sti… → 888_WO_caspar_window_no_focus_sync_follows_pgm.md
 
 ## audio — Audio routing, devices, meters (45)
 
@@ -284,7 +285,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 521 OPEN [video-io+engine] Zoom meeting module: per-participant channels, strictly opt-in → 521_WO_ZOOM_MODULE_OPT_IN.md
 - 716 DONE [video-io+caspar-build] Screen consumers: vsync always off, gpu-texture on every channel → 716_WO_vsync_always_off_gpu_texture_every_screen.md
 
-## mapping — Pixel map, screens, multiview, destinations (37)
+## mapping — Pixel map, screens, multiview, destinations (38)
 
 - 18 IN PROGRESS [mapping] Pixel & Output Mapping — Unified Node-Based System → 18_WO_OUTPUT_SLICER.md
 - 40 IN PROGRESS [mapping+devices-config] Device View — GPU xrandr sync with screen destinations and override → 40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md
@@ -323,6 +324,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 634 DONE [mapping+godot-client] Make an LED screen from an MVR object (map a destination onto the MVR's wall) → 634_WO_mvr_object_to_led_screen.md
 - 769 IN PROGRESS [mapping+engine] Multiview PRV cells listed the PGM look's layers (no running times); playlist d… → 769_WO_mv_prv_cells_read_pgm_look_playlist_drop_hint.md
 - 807 DONE [mapping+lighting] Region-to-fixture-pixel mapping: average a screen area into one pixel of a ligh… → 807_WO_region_to_fixture_pixel_mapping.md
+- 897 OPEN [mapping] Pixel-map tick matches the channel rate: 50 fps frames are all sampled → 897_WO_pixel_map_tick_matches_channel_rate.md
 
 ## lighting — DMX, Art-Net, sACN, fixtures, consoles (33)
 
@@ -360,7 +362,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (93)
+## godot-client — Godot client (97)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -455,6 +457,10 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 883 DONE [godot-client+engine] Shaders only in Visuals; the Visuals canvas as a Live source; a "Screen size" c… → 883_WO_shaders_only_in_visuals_live_source_screen_size.md
 - 885 DONE [godot-client] Sources ▸ Visuals: every visual with a thumbnail, in folders, dragged onto the… → 885_WO_sources_visuals_tab_thumbnails_drag_to_canvas.md
 - 886 DONE [godot-client+os-iso] MagicQ does not open from the operator dock: the launch ignored the .desktop Pa… → 886_WO_dock_magicq_ignored_desktop_path.md
+- 889 DONE [godot-client] Device View GPU-port inspector: drop the "Confine" select → 889_WO_gpu_inspector_drop_confine_select.md
+- 894 OPEN [godot-client] Visuals ▸ Shader panel: the shader controls come back in the Visuals tab → 894_WO_visuals_shader_controls_panel.md
+- 895 OPEN [godot-client] Visuals playlists: an ordered list of looks and visuals that runs unattended → 895_WO_visuals_playlists.md
+- 896 OPEN [godot-client] Visuals 3D view drives the output: the orbit camera reaches the program → 896_WO_visuals_3d_view_drives_output.md
 
 ## web-client — Web client (82)
 
@@ -762,7 +768,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 759 DONE [media+godot-client] Media browser quick-look info: codec · resolution · fps · duration → 759_WO_media_browser_quick_look_column.md
 - 775 DONE [media] media versions: a new version may change the container (previz .mp4 → show .mov) → 775_WO_media_version_container_change.md
 - 818 DONE [media] ⚠ warning mark next to NotchLC files in the media lists (Godot + web) → 818_WO_notchlc_warning_mark.md
-- 887 IN PROGRESS [media+godot-client] Live-source thumbnails months old: capture once per session on a non-black fram… → 887_WO_live_thumbnails_once_per_session.md
+- 887 DONE [media+godot-client] Live-source thumbnails months old: capture once per session on a non-black fram… → 887_WO_live_thumbnails_once_per_session.md
 
 ## tracking-vr — Tracking, previs, VR (30)
 

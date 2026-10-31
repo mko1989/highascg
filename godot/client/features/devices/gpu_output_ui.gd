@@ -1,7 +1,7 @@
 extends RefCounted
 ## WO-605 slice 4 — the GPU-output page's live control values as one Dictionary, and what each edit does (the web
 ## page's change handlers): `initial` = what the controls start as, `apply` = one edit → the effects it fires,
-## in order — "caspar" (saveCasparSettings), "os" (the per-port OS save), "confine" (pointer confine), "preview"
+## in order — "caspar" (saveCasparSettings), "os" (the per-port OS save), "preview"
 ## (re-fetch the timing preview). The controller only mirrors widgets ↔ this dict and runs the effects; the replay
 ## against the web page lives in test_devices_gpu_output.gd.
 
@@ -22,7 +22,7 @@ const PREVIEW_FIELDS := ["mode", "custom_w", "custom_h", "custom_fps", "display"
 static func initial(cst: Dictionary, mst: Dictionary) -> Dictionary:
 	var ui := {"windowed": cst.windowed, "vsync": cst.vsync, "border": not cst.borderless, "edid": cst.edid_override,
 		"stretch": cst.stretch, "colour": cst.colour, "name": cst.name, "ar": cst.ar, "pos_x": cst.pos_x, "pos_y": cst.pos_y,
-		"confine": cst.confine, "mode": mst.mode, "prev_standard": mst.prev_standard,
+		"mode": mst.mode, "prev_standard": mst.prev_standard,
 		"custom_w": MI.fixed(mst.custom.w, 0), "custom_h": MI.fixed(mst.custom.h, 0), "custom_fps": MI.fixed(mst.custom.fps, 2),
 		"display": mst.display_sel, "os_w": MI.fixed(mst.os_custom.w, 0), "os_h": MI.fixed(mst.os_custom.h, 0),
 		"os_fps": MI.fixed(mst.os_custom.r, 2), "override": mst.override, "timing": mst.timing, "backend": mst.backend}
@@ -49,9 +49,6 @@ static func apply(ui: Dictionary, field: String, value: Variant) -> Array:
 			ui.mode = value
 			if value != "custom":
 				ui.prev_standard = value
-		"confine":
-			ui.confine = value
-			return ["confine"]
 		_:
 			ui[field] = value
 	var out := []

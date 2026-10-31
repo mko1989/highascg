@@ -1,8 +1,8 @@
 extends RefCounted
 ## WO-605 slice 4 — pure port of the GPU-output inspector's consumer side (web device-view-inspector-gpu.js +
 ## device-view-inspector-gpu-resolve.js + screen-consumer-defaults.js): the summary rows, the detected display behind a
-## rear jack, what every toggle / field starts as, and the POST /api/settings bodies the page sends (save, reset,
-## pointer confine). Video mode keys follow the Caspar screen the jack is bound to (`screen_n`); consumer / OS keys
+## rear jack, what every toggle / field starts as, and the POST /api/settings bodies the page sends (save, reset;
+## no pointer-confine select since WO-889 — confine follows the operator monitor automatically). Video mode keys follow the Caspar screen the jack is bound to (`screen_n`); consumer / OS keys
 ## follow the rear port (`port_n`). Golden-tested (test_devices_gpu_output.gd).
 
 const R := preload("res://features/devices/cable_rules.gd")
@@ -12,21 +12,19 @@ const GM := preload("res://features/devices/gpu_modeline_model.gd")
 const DM := preload("res://features/devices/destinations_model.gd")
 const STRETCH_OPTIONS := ["none", "fill", "uniform", "uniform_to_fill"]
 const COLOUR_OPTIONS := ["RGB", "datavideo-full", "datavideo-limited"]
-const CONFINE_OPTIONS := [["auto", "Confine: auto"], ["on", "Confine: on"], ["off", "Confine: off"]]
 ## [key, label, tooltip] in the web's toggle-row order (Fullscreen / Windowed / Border / V-sync are the base flags).
 const TOGGLES := [
 	["key_only", "Key only", "Output only key channel"],
 	["aot", "Always on top", "Keep window always on top"],
 	["operator_monitor", "Operator monitor", "Primary X11 output, confine cursor here, and enable interactive on this consumer"],
 	["interactive", "Interactive", "Caspar interactive mouse/keyboard on this screen consumer (confine also allows pointer here)"],
-	["nvidia_sync", "NVIDIA sync to display", "Sync to this display: NVIDIA OpenGL/XVideo target AND Caspar GL swap vblank (WO-407) — often PGM, not the operator monitor"],
+	["nvidia_sync", "NVIDIA sync to display", "Sync to this display: NVIDIA OpenGL/XVideo target AND Caspar GL swap vblank (WO-407). Unticked everywhere = automatic: the first PGM screen (WO-888). Ignored on the operator monitor"],
 	["sbs_key", "SBS Key", "Side-by-side key"],
 	["force_linear", "Force linear filter", "Force linear filtering"],
 	["mipmaps", "Enable mipmaps", "Enable mipmaps for scaling"],
 	["high_bitdepth", "High bitdepth", "Use high bitdepth"],
 ]
 const RESET_TIP := "Clears CasparCG mode, windowed/vsync toggles, and OS-level system ID / resolution for this screen index."
-const CONFINE_TIP := "auto (default): confine follows the operator monitor, same as before. off: this port still becomes the operator monitor for GUI placement, but the mouse is never caged to it. on: confine even without a resolved monitor."
 
 
 static func _flag(v: Variant) -> bool:
@@ -165,7 +163,7 @@ static func key(port_n: int, suffix: String, mv: bool) -> String:
 
 
 ## Everything renderGpuOutControls reads before building: indices, the seed write it fires, and each control's start.
-static func consumer_state(cs: Dictionary, settings: Variant, conn: Dictionary, payload: Dictionary) -> Dictionary:
+static func consumer_state(cs: Dictionary, _settings: Variant, conn: Dictionary, payload: Dictionary) -> Dictionary:
 	var st := {"screen_n": S.screen_number(conn, payload), "port_n": S.physical_screen_index(conn, payload),
 		"mv": is_multiview_bound(conn, payload)}
 	var n: int = st.port_n
@@ -204,8 +202,6 @@ static func consumer_state(cs: Dictionary, settings: Variant, conn: Dictionary, 
 	st.ar = _str_or(cs.get(k + "aspect_ratio"), "")
 	st.pos_x = GM.js_num_str(H.coalesce([cs.get(k + "x"), 0]))
 	st.pos_y = GM.js_num_str(H.coalesce([cs.get(k + "y"), 0]))
-	var confine := _str_or(R.d(R.d(settings).get("operatorTools")).get("pointerConfine"), "auto").to_lower()
-	st.confine = confine if confine in ["auto", "on", "off"] else "auto"
 	return st
 
 
@@ -268,9 +264,6 @@ static func reset_patch(st: Dictionary) -> Dictionary:
 		p[k + suffix] = null
 	return {"casparServer": p}
 
-
-static func confine_patch(value: String) -> Dictionary:
-	return {"operatorTools": {"pointerConfine": value}}
 
 
 ## The small "Physical: …" line under OS / X11 Settings.

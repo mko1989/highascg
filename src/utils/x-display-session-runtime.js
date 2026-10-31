@@ -3,7 +3,7 @@
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { calculateLayoutPositions } = require('./os-layout-calculator')
-const { resolveGpuPortIndexToXrandrOutput } = require('./xrandr-output-resolve')
+const { resolveGlSyncDisplay } = require('./caspar-gl-sync-env')
 const {
 	resolveNvidiaXApplyScript,
 	buildNvidiaDisplayPolicyShellLines,
@@ -12,8 +12,6 @@ const {
 const {
 	isOperatorPointerConfineDesired,
 	resolveOperatorMonitorRect,
-	nvidiaSyncToDisplayPortIndex,
-	readCasparSetting,
 } = require('./x-display-session-layout')
 const {
 	displaySessionEnv,
@@ -67,18 +65,14 @@ function buildConfineCursorShellLines(config, layout) {
 }
 
 /**
+ * The NVIDIA policy's sync head (XVideoSyncToDisplayID) — WO-888: the SAME display caspar's GL swaps gate on
+ * (caspar-gl-sync-env.js: the ticked port unless it is the operator monitor, else the first PGM screen), so both
+ * stick to PGM automatically; before, no tick meant no NVIDIA target at all.
  * @param {object} config
  * @returns {string|null}
  */
 function resolveNvidiaSyncToDisplayOutput(config) {
-	const port = nvidiaSyncToDisplayPortIndex(config)
-	if (!port) return null
-	// WO-439: screen_N_system_id only exists when screens are assigned; on a mapping-node-only
-	// rig the ticked port must resolve through the device graph's gpu_p{N-1} connector or the
-	// tick exports nothing and the NVIDIA policy script never learns the sync head.
-	const sysId =
-		String(readCasparSetting(config, `screen_${port}_system_id`) || '').trim() ||
-		resolveGpuPortIndexToXrandrOutput(config, port)
+	const sysId = String(resolveGlSyncDisplay(config) || '').trim()
 	if (!sysId || !/^[A-Za-z0-9._-]+$/.test(sysId)) return null
 	return sysId
 }

@@ -175,12 +175,12 @@ async function runDisplaySession(opts) {
 			{
 				isOperatorPointerConfineDesired: () => true,
 				resolveOperatorMonitorRect: () => ({ sysId: 'DP-2', kind: 'gpu', index: 2, x: 1000, y: 0, width: 1920, height: 1080 }),
-				nvidiaSyncToDisplayPortIndex: () => 3,
-				readCasparSetting: (_c, k) => (k === 'screen_3_system_id' ? 'DP-4' : ''),
 				resolveOperatorDisplayRect: () => null,
 				resolveHelperWindowRect: () => null,
 			},
 		],
+		// WO-888: the NVIDIA sync head is the same display caspar's GL swaps gate on (caspar-gl-sync-env.js).
+		['/caspar-gl-sync-env', { resolveGlSyncDisplay: () => 'DP-4' }],
 		[
 			'/x-display-session-runtime-env',
 			{

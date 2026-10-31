@@ -1,7 +1,7 @@
 extends "res://features/devices/host_controls_base.gd"
 ## WO-605 slice 4 — the GPU-output connector page the Devices tab hands to the shared Inspector column (web
 ## device-view-inspectors.js connector page → buildGpuInspectorSummaryRows + renderGpuOutControls +
-## populateGpuVideoModelineSection): title, summary table, the consumer toggle row with pointer confine, Video Mode
+## populateGpuVideoModelineSection): title, summary table, the consumer toggle row, Video Mode
 ## (+ custom W/H/FPS), the detected-modes / custom OS resolution block with Override, the CVT/GTF timing preview
 ## (server GET, debounced 280 ms), and the advanced block (OS backend, EDID override, stretch, colour, name, aspect,
 ## X/Y, Reset). Control values live in gpu_output_ui.gd's dict; every body comes from the golden-tested models.
@@ -166,12 +166,7 @@ func _toggles() -> Control:
 	for c in BASE_CHECKS:
 		add.call(c[0], c[1], c[2])
 	for t in GO.TOGGLES:
-		add.call(t[0], t[1], t[2])
-		if t[0] == "operator_monitor":  # web order: the confine select sits right after Operator monitor
-			var sel := _select(GO.CONFINE_OPTIONS, ui.confine, GO.CONFINE_TIP)
-			sel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-			sel.item_selected.connect(func(i: int) -> void: _edit("confine", str(sel.get_item_metadata(i))))
-			f.add_child(sel)
+		add.call(t[0], t[1], t[2])  # WO-889: no Confine select (owner 31.10: the automatic confine needs no setting)
 	return f
 
 
@@ -286,7 +281,7 @@ func _entry(field: String) -> LineEdit:
 func _edit(field: String, value: Variant) -> void:
 	for e in GU.apply(ui, field, value):
 		match e:
-			"caspar", "os", "confine":
+			"caspar", "os":
 				_save(e)
 			"preview":
 				_timer.start()
@@ -327,12 +322,9 @@ func _save(kind: String) -> void:
 	_inflight.erase(kind)
 	if not ok:
 		return
-	if kind == "confine":
-		status.emit("Pointer confine: " + str(ui.confine), true)
-	else:
-		if kind == "caspar":
-			status.emit(GO.save_status(ui, _env.cst), true)
-		dirty.emit()
+	if kind == "caspar":
+		status.emit(GO.save_status(ui, _env.cst), true)
+	dirty.emit()
 	await DevicesTarget.settings.load_from_server()
 
 
@@ -340,9 +332,7 @@ func _body(kind: String) -> Dictionary:
 	match kind:
 		"caspar":
 			return GO.caspar_patch(_env.cst, ui)
-		"os":
-			return GO.os_patch(_env.cst, _env.mst, ui)
-	return GO.confine_patch(str(ui.confine))
+	return GO.os_patch(_env.cst, _env.mst, ui)
 
 
 func _reset() -> void:

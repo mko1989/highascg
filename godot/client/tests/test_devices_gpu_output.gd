@@ -142,7 +142,6 @@ func test_initial_controls() -> void:
 		var env := _setup(c)
 		var g: Dictionary = c.init
 		_same_controls(env, g, c.name + " init")
-		t.eq(GO.CONFINE_OPTIONS, g.selects.confine.options, c.name + ": confine options")
 		t.eq(GO.mode_options(), g.selects.mode.options, c.name + ": mode options")
 		t.eq(GM.display_options(env.mst), g.selects.display.options, c.name + ": display options")
 		t.eq(GM.TIMING_OPTIONS, g.selects.timing.options, c.name + ": timing options")
@@ -199,7 +198,7 @@ func test_edits_replay() -> void:
 			for call in a.calls:
 				var kind: String = call[0]
 				if kind == "POST":
-					kind = "confine" if call[2].has("operatorTools") else ("caspar" if call[2].has("casparServer") else "os")
+					kind = "caspar" if call[2].has("casparServer") else "os"
 				if kind == "DIRTY":
 					continue
 				if want.has(kind):
@@ -215,9 +214,6 @@ func test_edits_replay() -> void:
 				status = GO.save_status(env.ui, env.cst)
 			if "os" in effects:
 				t.eq(_norm(GO.os_patch(env.cst, env.mst, env.ui)), _norm(want.os[2]), what + ": OS body")
-			if "confine" in effects:
-				t.eq(GO.confine_patch(env.ui.confine), want.confine[2], what + ": confine body")
-				status = "Pointer confine: " + env.ui.confine
 			if "preview" in effects:
 				t.eq(_preview(env).query, want.GET[1], what + ": preview GET")
 				_same_preview(env, a.preview, what)
