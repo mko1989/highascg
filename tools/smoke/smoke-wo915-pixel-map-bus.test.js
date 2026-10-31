@@ -4,7 +4,8 @@
  * WO-915 — pixel mappings bound to a bus (role pgmN / prvN) follow the bus when its Caspar channel changes (WO-868 moved
  * the Dioda PGM from ch1 to ch2 and the 896 edge mappings, stored as channelNo 1, sampled the operator GUI); a POST that
  * moves a mapping to another channel takes it off the bus; the edge proposal emits the wall's bus and counts a
- * renumbered bus as applied; the previs drawing the rig makes the sampler run with the DMX master off.
+ * renumbered bus as applied. (WO-915 also made the previs drawing the rig run the sampler with the DMX master off; WO-916
+ * made the sampler always on, so that gate is gone — the cases below now check it samples with nobody looking.)
  */
 
 const { describe, it, after } = require('node:test')
@@ -97,7 +98,7 @@ describe('WO-915 model: bus-bound mappings', () => {
 	})
 })
 
-describe('WO-915 service: the bus moves, the mapping follows; the previs watching samples with the master off', () => {
+describe('WO-915 service: the bus moves, the mapping follows; WO-916: sampled with the master off and nobody looking', () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wo915-'))
 	const segs = { pgm1: path.join(dir, 'highascg-pgm1'), ch1: path.join(dir, 'highascg-ch1') }
 	let t = 5_000_000
@@ -108,7 +109,7 @@ describe('WO-915 service: the bus moves, the mapping follows; the previs watchin
 	const pm = createPixelMapService({}, engine, { subscribe: false, now: () => t, surfacePath: (role) => segs[role] || path.join(dir, role),
 		lease: async (roles) => leases.push(roles), channelMap: () => map })
 	engine.pixelMap = pm
-	// DMX master OFF: nothing goes on the wire, so only a watcher makes the sampler run
+	// DMX master OFF: nothing goes on the wire (WO-916: the sampler runs anyway)
 	engine.configure({ dmx: { enabled: false, universes: [] }, patch: [
 		{ id: 'pl', name: 'Pixel Line IP 1042', typeId: TYPE, mode: 'Mode11 70DMX', universe: 18, address: 421, dest: '127.0.0.1:6455' }] })
 	const fx = () => engine.fixtures.find((f) => f.id === 'pl')
@@ -118,40 +119,26 @@ describe('WO-915 service: the bus moves, the mapping follows; the previs watchin
 	after(() => pm.stop())
 
 	it('channel 1 is PGM 1: the bus mapping samples pgm1 like a plain channel-1 mapping would', async () => {
-		pm.load({ pixelMappings: [{ id: 'bus', fixtureId: 'pl', pixel: 1, role: 'pgm1', channelNo: 1, rect: REGION }] })
+		// rate 0: every tick reads (each tick here is a new frame; the WO-916 rate has its own smokes)
+		pm.load({ pixelMappings: [{ id: 'bus', fixtureId: 'pl', pixel: 1, role: 'pgm1', channelNo: 1, rect: REGION }], pixelMapSettings: { rate_hz: 0 } })
 		await settle()
 		assert.deepEqual(pm.mappings().map((m) => [m.channelNo, m.role, m.problem]), [[1, 'pgm1', null]])
 		assert.deepEqual(leases.at(-1), ['pgm1'])
 	})
 
-	it('with the master off and nobody looking, the sampler idles (the head is not on the wire)', () => {
-		t += 23
-		engine.tick() // builds the head's universe (before that it counts as on the wire, WO-807)
-		writeSegment(segs.pgm1, 640, 360, REGION, [200, 40, 10], 1)
+	it('WO-916: with the master off and nobody looking, the next frame lands in the head\'s bytes (no idle)', () => {
 		t += 23
 		engine.tick()
-		assert.deepEqual(cell1(), [0, 0, 0], 'not sampled → the mapped cell is driven dark')
-		assert.ok(pm.live(t).stats.idle_ticks > 0)
-		t += 6000 // that /live read is not "looking" any more
-	})
-
-	it('the previs drawing the rig (watch) → the next frame lands in the head\'s bytes with the master off', () => {
-		pm.watch(t)
-		writeSegment(segs.pgm1, 640, 360, REGION, [200, 40, 10], 2)
+		writeSegment(segs.pgm1, 640, 360, REGION, [200, 40, 10], 1)
 		t += 23
 		engine.tick()
 		assert.deepEqual(cell1(), [200, 40, 10])
 		assert.equal(engine.isLive(fx()), false, 'still nothing on the wire')
-	})
-
-	it('only looked at (nothing on the wire) → at most one sample per 100 ms; the eye does not need 48/s', () => {
-		writeSegment(segs.pgm1, 640, 360, REGION, [7, 8, 9], 3)
+		assert.equal('idle_ticks' in pm.live(t).stats, false)
+		writeSegment(segs.pgm1, 640, 360, REGION, [7, 8, 9], 2)
 		t += 23
 		engine.tick()
-		assert.deepEqual(cell1(), [200, 40, 10], '23 ms after the last sample: not read yet')
-		t += 80
-		engine.tick()
-		assert.deepEqual(cell1(), [7, 8, 9], '103 ms: sampled')
+		assert.deepEqual(cell1(), [7, 8, 9], 'and the next one on the next tick')
 	})
 
 	it('WO-868 flips the channels: the bus mapping moves to ch2 (still pgm1), the plain ch1 mapping would sample the GUI', async () => {
@@ -159,12 +146,11 @@ describe('WO-915 service: the bus moves, the mapping follows; the previs watchin
 		pm.load({ pixelMappings: [
 			{ id: 'bus', fixtureId: 'pl', pixel: 1, role: 'pgm1', channelNo: 1, rect: REGION },
 			{ id: 'plain', fixtureId: 'pl', pixel: 2, channelNo: 1, rect: REGION },
-		] })
+		], pixelMapSettings: { rate_hz: 0 } })
 		await settle()
 		assert.deepEqual(pm.mappings().map((m) => [m.id, m.channelNo, m.role ?? null, m.problem]),
 			[['bus', 2, 'pgm1', null], ['plain', 1, null, null]])
 		assert.deepEqual(leases.at(-1), ['ch1', 'pgm1'], 'ch1 is no bus now → its own surface; the bus keeps pgm1')
-		pm.watch(t)
 		writeSegment(segs.pgm1, 640, 360, REGION, [0, 128, 255], 4)
 		writeSegment(segs.ch1, 320, 180, { x: 0, y: 0, w: 0, h: 0 }, [0, 0, 0], 1)
 		t += 100
@@ -173,9 +159,10 @@ describe('WO-915 service: the bus moves, the mapping follows; the previs watchin
 		assert.deepEqual([...engine.frameOf(fx()).subarray(427, 430)], [0, 0, 0], 'pixel 2 (absolute ch1) reads the GUI channel')
 	})
 
-	it('follow-service visual() marks the pixel map watched (pinned)', () => {
+	it('WO-916: nothing gates the sampler on someone looking any more (visual() / live() do not touch it)', () => {
 		const src = fs.readFileSync(path.join(ROOT, 'src/fixtures/follow-service.js'), 'utf8')
-		assert.match(src, /visual: \(\) => \{\n\t\t\tpixelMap\.watch\(\)/)
+		assert.doesNotMatch(src, /pixelMap\.watch\(/)
+		assert.doesNotMatch(fs.readFileSync(path.join(ROOT, 'src/fixtures/pixel-map-service.js'), 'utf8'), /function watch\(|WATCH_MS|idleTicks/)
 	})
 })
 

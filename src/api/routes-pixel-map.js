@@ -11,10 +11,14 @@
  *                                          mappings: [{ id, fixtureId, pixel, rgb [r, g, b] | null, age_ms, protocol,
  *                                          universe, slots [1-based DMX], order, dmx [{ slot, value }], on_wire, problem }] }
  *                                          WO-893: rgb = the smoothed colour as written (rounded), raw = the last frame's mean;
- *                                          `smooth` = the active settings
- *   GET  /api/fixtures/pixelmap/settings → { ok, settings: { smooth: { attack_ms 0–5000, release_ms 0–10000, snap 0–255 } } }
- *                                          (WO-893 smoothing after the region average; 0 / 0 = off, snap 0 = off)
- *   POST /api/fixtures/pixelmap/settings {smooth: {attack_ms?, release_ms?, snap?}}  → clamps, keeps omitted fields, saves it
+ *                                          `smooth` = the active settings. WO-916: + rate_hz, `console` (the console output's
+ *                                          settings + per universe dest / problem / packets), per mapping `console`
+ *                                          { universe, slots? } (block layout: its R G B slots), stats.skipped (by the rate)
+ *   GET  /api/fixtures/pixelmap/settings → { ok, settings: { smooth: { attack_ms 0–5000, release_ms 0–10000, snap 0–255 },
+ *                                          rate_hz 0–60, console: { enabled, protocol, dest, layout, universe } } }
+ *                                          (WO-893 smoothing after the region average; 0 / 0 = off, snap 0 = off; WO-916
+ *                                          rate_hz 0 = every frame, console: src/fixtures/pixel-map-console.js)
+ *   POST /api/fixtures/pixelmap/settings {smooth?, rate_hz?, console?}  → strict check, keeps omitted fields, saves it
  *                                          in project.pixelMapSettings (server-owned): 200 { ok, settings } | 400 { ok: false, error }
  *   GET  /api/fixtures/pixelmap/pixels  → { ok, fixtures: [{ id, name, protocol, universe, address, problem,
  *                                          pixels: [{ pixel, geometry, order, slots }] }] } — what can be mapped

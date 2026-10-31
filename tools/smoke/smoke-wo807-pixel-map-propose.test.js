@@ -344,7 +344,7 @@ describe('WO-807 edge proposal — pending, accept, the project key', () => {
 })
 
 describe('WO-807 sampling cost with many strips', () => {
-	it('sampling idles while no mapped head is on the wire and /live was not read for 5 s', () => {
+	it('WO-916: always on — sampled with the master off and nobody reading /live (no idle any more)', () => {
 		const { createPixelMapService } = require('../../src/fixtures/pixel-map-service')
 		const fixtures = patchOf([{ id: 'top', pose: ABOVE }])
 		let live = false
@@ -356,16 +356,14 @@ describe('WO-807 sampling cost with many strips', () => {
 			channelMap: () => ({ programChannels: [1], previewChannels: [], channelResolutionsByChannel: { 1: { w: 1024, h: 512 } } }), fsImpl })
 		svc.load({ pixelMappings: [{ id: 'a', fixtureId: 'top', pixel: 1, channelNo: 1, rect: { x: 0, y: 0, w: 10, h: 10 } }] })
 		svc.sample(t)
-		assert.equal(reads, 0, 'master off, nobody watching: no read')
-		assert.equal(svc.live(t).channels[0].state, 'idle')
-		svc.sample(t + 1000)
-		assert.equal(reads, 1, 'a /live reader keeps it sampling')
+		assert.equal(reads, 1, 'master off, nobody watching: still read')
+		assert.equal(svc.live(t).channels[0].state, 'missing')
 		t += 7000
 		svc.sample(t)
-		assert.equal(reads, 1, 'idle again 5 s after the last /live read')
+		assert.equal(reads, 2, 'and on every tick (no frame watcher here: a fake engine has no kick())')
 		live = true
 		svc.sample(t)
-		assert.equal(reads, 2, 'on the wire: sampled every tick')
+		assert.equal(reads, 3, 'on the wire: the same')
 		svc.stop()
 	})
 
@@ -373,6 +371,7 @@ describe('WO-807 sampling cost with many strips', () => {
 		const { buildPlan } = require('../../src/fixtures/pixel-map-frame')
 		const strips = [50, 934, 1074, 2726, 2866, 3750].map((x) => ({ x, y: 0, w: 40, h: 16, mode: 'average' }))
 		const plan = buildPlan(strips, 3840, 1792)
-		assert.deepEqual(plan.rows[0].spans, [[50, 1114], [2726, 3790]])
+		// WO-916: the point grid samples x0 + 5 … x0 + 35 of each 40-px strip
+		assert.deepEqual(plan.rows[0].spans, [[55, 1110], [2731, 3786]])
 	})
 })

@@ -189,3 +189,37 @@ func test_window_has_smoothing_row() -> void:
 	t.ok(src.contains("\"Attack ms\"") and src.contains("\"Release ms\"") and src.contains("\"Snap on cut\""), "labels like the Visuals Shape node")
 	t.ok(src.contains("s.select_all_on_focus = true  # RULES.md 1; SpinBox evaluates + - * / on commit (RULES.md 2)\n\t\ts.tooltip_text = str(sp[3])"), "the smoothing spin boxes select on focus")
 	t.ok(src.find("post_json(\"/api/fixtures/pixelmap/settings\"") > 0 and src.find("post_json(\"/api/fixtures/pixelmap/settings\"") < src.find("post_json(\"/api/fixtures/pixelmap\", {"), "settings are saved before the mappings")
+
+
+## WO-916: the Console rows read the server's settings with its defaults (25 Hz, on, Art-Net, fixture universes).
+func test_console_settings_from() -> void:
+	var C := preload("res://features/previs/fixtures/pixel_map_console.gd")
+	t.eq(C.settings_from({}), {"rate_hz": 25, "console": {"enabled": true, "protocol": "artnet", "dest": "", "layout": "fixture", "universe": 1}})
+	t.eq(C.settings_from({"ok": true, "settings": {"rate_hz": 0.0, "console": {"enabled": false, "protocol": "sacn", "dest": "10.0.0.5",
+		"layout": "block", "universe": 40.0}}}), {"rate_hz": 0, "console": {"enabled": false, "protocol": "sacn", "dest": "10.0.0.5", "layout": "block", "universe": 40}})
+	t.eq(C.settings_from({"settings": {"rate_hz": 999, "console": {"protocol": "dmx", "layout": 3, "dest": 5}}}).console,
+		{"enabled": true, "protocol": "artnet", "dest": "", "layout": "fixture", "universe": 1}, "junk → defaults")
+	t.eq(C.settings_from({"settings": {"rate_hz": 999}}).rate_hz, 60)
+
+
+## WO-916: /live `console` → one status line: where it goes, or why nothing goes.
+func test_console_status_line() -> void:
+	var C := preload("res://features/previs/fixtures/pixel_map_console.gd")
+	t.eq(C.status_line({}), "")
+	t.eq(C.status_line({"console": {"enabled": false}}), "not sending")
+	t.eq(C.status_line({"console": {"enabled": true, "universes": []}}), "nothing mapped to send")
+	t.eq(C.status_line({"console": {"enabled": true, "packets": 12, "universes": [{"universe": 13, "dest": null, "problem": "no console address"},
+		{"universe": 14, "dest": null, "problem": "no console address"}]}}), "not sending: no console address")
+	t.eq(C.status_line({"console": {"enabled": true, "packets": 12.0, "universes": [{"universe": 13, "dest": "10.0.0.5:6454", "problem": null},
+		{"universe": 14, "dest": "10.0.0.5:6454", "problem": null}]}}), "→ 10.0.0.5:6454 · 2 universe(s) · 12 packets")
+
+
+## WO-916: the window carries the Console rows, saves them with the smoothing (one settings POST) and feeds them /live.
+func test_window_has_console_rows() -> void:
+	var src := FileAccess.get_file_as_string("res://features/previs/fixtures/pixel_map_window.gd")
+	t.ok(src.contains("_console.body().merged({\"smooth\": body})"), "one POST carries smooth + rate + console")
+	t.ok(src.contains("if _smooth_dirty or _console.dirty:"), "a console edit alone saves")
+	t.ok(src.contains("_console.show_live(data)"), "status from /live")
+	var con := FileAccess.get_file_as_string("res://features/previs/fixtures/pixel_map_console.gd")
+	t.ok(con.contains("_dest.select_all_on_focus = true  # RULES.md 1"), "the address field selects on focus")
+	t.ok(con.contains("s.select_all_on_focus = true  # RULES.md 1; SpinBox evaluates"), "the spin boxes too")

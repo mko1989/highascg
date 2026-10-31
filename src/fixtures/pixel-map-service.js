@@ -13,28 +13,26 @@
  * lease lost) drives its mapped pixels black — the "extension of the screen" goes dark with the screen.
  * WO-893: the averaged colour of every mapping goes through an attack / release smoothing (pixel-map-smooth.js, project
  * key `pixelMapSettings`, 0 / 0 = off) after the averaging, once per tick; write() puts the smoothed value on the wire.
- * While no mapped head is on the wire and nobody read /live for WATCH_MS, ticks skip the sampling (state "idle"; the
- * lease stays, so the first frame after the DMX master opens is sampled on the next tick).
  * WO-897: a watcher reads only the surfaces' header seq every WATCH_POLL_MS and kicks the engine (engine.kick) when a
- * frame lands, so each frame is sampled once (the engine's own 23 ms clock skipped ~6.5 of 50 frames/s); `missed` counts
- * frames that still went by unsampled (seq gaps).
+ * frame lands, so each frame is sampled once (the engine's own 23 ms clock skipped ~6.5 of 50 frames/s).
+ * WO-916: always on while mappings exist (no idle when nobody looks / nothing is on the wire). The watcher marks a frame
+ * due only when the last due one is ≥ ¾ of 1 / rate_hz old (pixel-map-settings.js; 50 fps at 25 Hz = every 2nd frame);
+ * only due frames are read (a surface with none for HOLD_MS is read anyway, so missing / stalled still show). `skipped`
+ * counts frames the rate left out, `missed` frames that went by unsampled otherwise. After each sample the colours also
+ * go to the lighting console (pixel-map-console.js), independent of the DMX master.
  */
 
 const { onProjectChanged } = require('../engine/project-events')
 const { normalizeMappings, checkMapping, validateMappings, writePixel, slotsOf, bindRole } = require('./pixel-map-model')
 const { createRegionSampler, peekSeq } = require('./pixel-map-frame')
 const smoothing = require('./pixel-map-smooth')
+const pmSettings = require('./pixel-map-settings')
+const { createConsoleOutput, REFRESH_MS: CONSOLE_REFRESH_MS } = require('./pixel-map-console')
 
 const LEASE_ID = 'wo807-pixelmap'
 const LEASE_EVERY_MS = 5000
 const HOLD_MS = 1000
-// sampling idles while no mapped head is on the wire (DMX master off, universe not listed, visualiser) unless a /live
-// reader (the Godot editor's swatches, 2 Hz) or the previs drawing the rig (WO-915, visual()) asked within WATCH_MS —
-// 896 strips cost ~5 ms per frame on the box
-const WATCH_MS = 5000
 const WATCH_POLL_MS = 3
-// WO-915: looked at with nothing on the wire → this often is enough for the eye (896 strips at 48/s took ~33 % of a core)
-const WATCH_SAMPLE_MS = 100
 
 /** Default channel map (as video-surfaces.js resolves roles): program / preview lists + the channels Caspar runs. */
 function liveChannelMap(ctx) {
@@ -58,7 +56,8 @@ function roleFor(ch, map) {
  * @param {import('./follow-engine').FollowEngine} engine
  * @param {{ log?: Function, now?: () => number, channelMap?: () => object, lease?: (roles: string[]) => Promise<any>,
  *   surfacePath?: (role: string) => string, loadProject?: () => object | null, persist?: (mappings: object[]) => Promise<object>,
- *   fsImpl?: object, subscribe?: boolean }} [deps]
+ *   fsImpl?: object, subscribe?: boolean, send?: (to: object, packet: Buffer) => void,
+ *   isSelfLoop?: (to: object, universe: number, protocol: string) => boolean }} [deps]  send / isSelfLoop: the console output (WO-916)
  */
 function createPixelMapService(ctx, engine, deps = {}) {
 	const log = deps.log || (() => {})
@@ -74,19 +73,16 @@ function createPixelMapService(ctx, engine, deps = {}) {
 	let surfaces = new Map()
 	const colours = new Map() // mapping id → { rgb (rounded), means (unrounded), at }
 	const smoother = smoothing.createSmoother() // WO-893: mapping id → the float colour write() sends
-	let settings = smoothing.normalizeSettings(null) // project.pixelMapSettings
+	let settings = pmSettings.normalizeSettings(null) // project.pixelMapSettings
+	const consoleOut = createConsoleOutput({ send: deps.send || (() => {}), isSelfLoop: deps.isSelfLoop }) // WO-916
+	let consoleAt = 0
 	let stepAt = null // time of the last smoothing step (null: the next one starts fresh)
 	let leaseTimer = null
 	let pollTimer = null // WO-897: the frame watcher
 	let leasedRoles = ''
 	let lastWritten = new Map() // mapping id → [{ slot, value }]
-	const stats = { frames: 0, missed: 0, sampleMs: 0, lastSampleUs: 0, idleTicks: 0 }
-	let watchedAt = -Infinity
-	// a head whose universe the engine has not built yet (before its first tick) counts as on the wire
-	const onWire = (fx) => (typeof engine.frameOf === 'function' && !engine.frameOf(fx)) || engine.isLive(fx)
-	const onAir = () => typeof engine.isLive !== 'function' || [...resolved.byFixture.values()].some((list) => onWire(list[0].fx))
-	const wanted = (t) => t - watchedAt < WATCH_MS || onAir()
-	let sampledAt = -Infinity
+	const stats = { frames: 0, missed: 0, skipped: 0, sampleMs: 0, lastSampleUs: 0 }
+	const minGap = () => (settings.rate_hz > 0 ? 750 / settings.rate_hz : 0) // WO-916: ¾ period → steady every Nth frame
 
 	const resolutionIn = (map) => (ch) => {
 		const r = map?.channelResolutionsByChannel?.[String(ch)]
@@ -132,6 +128,7 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		for (const [ch, list] of byCh) {
 			const role = roleFor(ch, map)
 			next.set(ch, { role, file: surfacePath(role), ids: list.map((m) => m.id), since: 0, state: 'waiting', at: 0, width: 0, height: 0,
+				seen: 0, due: false, dueAt: -Infinity, tried: -Infinity, skippedSince: 0,
 				sampler: createRegionSampler(list.map((m) => ({ ...m.rect, mode: m.mode })), { fsImpl: deps.fsImpl }) })
 		}
 		surfaces = next
@@ -139,18 +136,26 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		watchFrames()
 	}
 
-	/** WO-897: poll the surfaces' seq; a new frame (not sampled yet, not kicked yet) kicks one engine tick. */
+	/** WO-897: poll the surfaces' seq; a new frame kicks one engine tick — WO-916: only a due one (rate_hz). */
 	function watchFrames() {
 		if (surfaces.size && !pollTimer && typeof engine.kick === 'function') {
 			pollTimer = setInterval(() => {
-				if (!wanted(now())) return
+				const t = now()
+				let kick = false
 				for (const s of surfaces.values()) {
 					const seq = peekSeq(s.file, { fsImpl: deps.fsImpl })
-					if (seq && seq !== s.since && seq !== s.kicked) {
-						s.kicked = seq
-						engine.kick()
+					if (!seq || seq === s.seen) continue
+					s.seen = seq
+					if (seq === s.since) continue
+					if (t - s.dueAt < minGap()) {
+						s.skippedSince++
+						continue
 					}
+					s.dueAt = t
+					s.due = true
+					kick = true
 				}
+				if (kick) engine.kick()
 			}, WATCH_POLL_MS)
 			if (typeof pollTimer.unref === 'function') pollTimer.unref()
 		} else if (!surfaces.size && pollTimer) {
@@ -178,7 +183,8 @@ function createPixelMapService(ctx, engine, deps = {}) {
 	}
 
 	function load(project) {
-		settings = smoothing.normalizeSettings(project?.pixelMapSettings)
+		settings = pmSettings.normalizeSettings(project?.pixelMapSettings)
+		consoleOut.configure(settings.console)
 		const next = normalizeMappings(project?.pixelMappings)
 		if (JSON.stringify(next) === JSON.stringify(mappings)) return
 		mappings = next
@@ -219,17 +225,17 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		if (!mappings.length) return
 		resolve()
 		if (!surfaces.size) return
-		if (!wanted(t)) {
-			stats.idleTicks++
-			for (const s of surfaces.values()) s.state = 'idle'
-			smoother.clear() // WO-893: the first sample after the idle starts at the raw colour, not at a stale smoothed one
-			stepAt = null
-			return
-		}
-		if (t - sampledAt < WATCH_SAMPLE_MS && !onAir()) return smoothStep(t) // WO-915: only looked at
-		sampledAt = t
 		const t0 = process.hrtime.bigint()
+		let sampled = false
 		for (const s of surfaces.values()) {
+			// WO-916: at a rate, with the watcher running, only its due frames are read (and a surface with none for HOLD_MS,
+			// for its state); rate 0 = every tick reads (a frame not new yet costs the header)
+			if (pollTimer && settings.rate_hz > 0 && !s.due && t - s.tried < HOLD_MS) {
+				if (s.at && t - s.at >= HOLD_MS) s.state = 'stalled'
+				continue
+			}
+			s.due = false
+			s.tried = t
 			let res
 			try {
 				res = s.sampler.read(s.file, { since: s.since })
@@ -237,7 +243,10 @@ function createPixelMapService(ctx, engine, deps = {}) {
 				res = { state: 'invalid', error: e?.message || String(e) }
 			}
 			if (res.state === 'frame') {
-				if (s.since && res.seq > s.since + 1) stats.missed += res.seq - s.since - 1 // WO-897: frames that went by
+				// WO-897: frames that went by; WO-916: those the rate left out are `skipped`, not missed
+				if (s.since && res.seq > s.since + 1) stats.missed += Math.max(0, res.seq - s.since - 1 - s.skippedSince)
+				stats.skipped += s.skippedSince
+				s.skippedSince = 0
 				s.since = res.seq
 				s.at = t
 				s.width = res.width
@@ -245,10 +254,16 @@ function createPixelMapService(ctx, engine, deps = {}) {
 				if (settings.smooth.snap > 0) snapChannel(s, res.means)
 				s.ids.forEach((id, i) => colours.set(id, { rgb: res.colours[i], means: res.means[i], at: t }))
 				stats.frames++
+				sampled = true
 			}
 			s.state = res.state === 'frame' || (res.state === 'none' && t - s.at < HOLD_MS) ? 'live' : res.state === 'none' ? 'stalled' : res.state
 		}
 		smoothStep(t)
+		// WO-916: the console gets every new sample (its own 1 s refresh while Caspar sends nothing)
+		if (sampled || t - consoleAt >= CONSOLE_REFRESH_MS) {
+			consoleAt = t
+			consoleOut.frame(resolved.list, (id) => smoother.get(id), t)
+		}
 		const us = Number(process.hrtime.bigint() - t0) / 1000
 		stats.lastSampleUs = Math.round(us)
 		stats.sampleMs += us / 1000
@@ -269,19 +284,15 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		return res.list.map((r) => ({ ...r.m, problem: r.problem }))
 	}
 
-	/** Someone looks at the mapped colours (the editor's /live, WO-915: the previs drawing the rig) → sample WATCH_MS more. */
-	function watch(t = now()) {
-		watchedAt = t
-	}
-
 	/** GET /api/fixtures/pixelmap/live */
 	function live(t = now()) {
-		watch(t)
 		const res = resolve()
 		return {
 			at: t,
 			smooth: settings.smooth,
-			stats: { frames: stats.frames, missed: stats.missed, sample_ms_total: Math.round(stats.sampleMs * 10) / 10, last_sample_us: stats.lastSampleUs, idle_ticks: stats.idleTicks },
+			rate_hz: settings.rate_hz,
+			console: consoleOut.status(t),
+			stats: { frames: stats.frames, missed: stats.missed, skipped: stats.skipped, sample_ms_total: Math.round(stats.sampleMs * 10) / 10, last_sample_us: stats.lastSampleUs },
 			channels: [...surfaces.entries()].map(([ch, s]) => ({ channelNo: ch, role: s.role, state: s.state, width: s.width, height: s.height,
 				age_ms: s.at ? t - s.at : null, mappings: s.ids.length })),
 			mappings: res.list.map((r) => {
@@ -291,7 +302,7 @@ function createPixelMapService(ctx, engine, deps = {}) {
 				// rgb = what is written (smoothed, rounded); raw = the region's mean of the last frame; a releasing stale one shows until black
 				const shown = st && (fresh || (!smoothing.isOff(settings.smooth) && Math.max(...st) >= 0.5)) ? st.map(Math.round) : null
 				return { id: r.m.id, fixtureId: r.m.fixtureId, pixel: r.m.pixel, enabled: r.m.enabled, problem: r.problem,
-					rgb: shown, raw: fresh ? c.rgb : null, age_ms: c ? t - c.at : null,
+					rgb: shown, raw: fresh ? c.rgb : null, age_ms: c ? t - c.at : null, console: consoleOut.placeOf(r.m.id),
 					...(r.fx && r.px ? { protocol: r.fx.protocol, universe: r.fx.universe, slots: slotsOf(r.fx, r.px), order: r.px.order,
 						dmx: lastWritten.get(r.m.id) || [], on_wire: typeof engine.isLive === 'function' ? engine.isLive(r.fx) : false } : {}) }
 			}),
@@ -317,11 +328,12 @@ function createPixelMapService(ctx, engine, deps = {}) {
 
 	/** POST /api/fixtures/pixelmap/settings: strict check (omitted fields keep their value), clamp, persist (the project change reloads us). */
 	async function setSettings(raw) {
-		const check = smoothing.validateSettings(raw, settings)
+		const check = pmSettings.validateSettings(raw, settings)
 		if (!check.ok) return check
 		const persist = deps.persistSettings || ((st) => persistSettingsToProject(ctx, st))
 		await persist(check.settings)
 		settings = check.settings
+		consoleOut.configure(settings.console)
 		return { ok: true, settings }
 	}
 
@@ -344,7 +356,6 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		settings: getSettings,
 		setSettings,
 		live,
-		watch,
 		mappings: view,
 		resolutionOf,
 		stop() {
@@ -380,7 +391,7 @@ async function persistSettingsToProject(ctx, settings) {
 	const { scheduleProjectSyncBroadcast } = require('../api/routes-data-project-sync')
 	const project = loadFullProject()
 	if (!project || typeof project !== 'object') throw new Error('no active project')
-	const result = await persistProject(ctx, { ...project, pixelMapSettings: smoothing.isDefault(settings) ? undefined : settings }, { writeAutosave: true })
+	const result = await persistProject(ctx, { ...project, pixelMapSettings: pmSettings.isDefault(settings) ? undefined : settings }, { writeAutosave: true })
 	if (result?.unchanged !== true) scheduleProjectSyncBroadcast(ctx, result.project)
 	return result
 }

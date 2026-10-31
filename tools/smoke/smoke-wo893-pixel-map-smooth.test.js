@@ -14,6 +14,7 @@ const os = require('os')
 const path = require('path')
 
 const sm = require('../../src/fixtures/pixel-map-smooth')
+const pmSettings = require('../../src/fixtures/pixel-map-settings')
 const model = require('../../src/fixtures/pixel-map-model')
 const { normalizePatch } = require('../../src/fixtures/follow-patch')
 const { createPixelMapService, HOLD_MS } = require('../../src/fixtures/pixel-map-service')
@@ -236,7 +237,7 @@ describe('WO-893 pixel-map-service smoothing', () => {
 		assert.equal(both.single, 100, 'a lower snap catches the 75 change too')
 	})
 
-	it('resets: a reload (changed mappings) and the resume from idle start at the raw colour', () => {
+	it('resets: a reload (changed mappings) starts at the raw colour (WO-916: no idle state any more)', () => {
 		const r = rig(S(1000, 1000))
 		r.frame([200, 200, 200], [0, 0, 0])
 		r.tick()
@@ -244,17 +245,6 @@ describe('WO-893 pixel-map-service smoothing', () => {
 		r.frame([20, 20, 20], [0, 0, 0])
 		r.tick()
 		assert.deepEqual(px(r.buf, 0), [20, 20, 20], 'after a reload: the new raw value, no ramp from the old colour')
-
-		const idle = rig(S(1000, 1000), { live: true })
-		idle.frame([200, 200, 200], [0, 0, 0])
-		idle.tick()
-		idle.state.live = false
-		idle.tick()
-		assert.equal(idle.svc.live(0).channels[0].state, 'idle')
-		idle.state.live = true
-		idle.frame([30, 30, 30], [0, 0, 0])
-		idle.tick()
-		assert.deepEqual(px(idle.buf, 0), [30, 30, 30], 'resume from idle: raw, not a slow release from 200')
 	})
 })
 
@@ -312,7 +302,8 @@ describe('WO-893 settings', () => {
 
 	it('the service loads the project key and the persisted write goes to it (source)', () => {
 		const svc = SRC('src/fixtures/pixel-map-service.js')
-		assert.match(svc, /settings = smoothing\.normalizeSettings\(project\?\.pixelMapSettings\)/)
+		assert.match(svc, /settings = pmSettings\.normalizeSettings\(project\?\.pixelMapSettings\)/)
+		assert.match(SRC('src/fixtures/pixel-map-settings.js'), /\.\.\.smoothing\.normalizeSettings\(raw\)/, 'WO-916: smooth stays WO-893\'s')
 		assert.match(svc, /\.\.\.project, pixelMapSettings:/)
 		assert.match(SRC('src/fixtures/pixel-map-frame.js'), /return \{ state: 'frame', seq, width, height, colours, means, reads \}/)
 	})
@@ -329,14 +320,16 @@ describe('WO-893 routes GET / POST /api/fixtures/pixelmap/settings', () => {
 	}
 
 	it('GET → the active settings; POST (raw JSON string body) clamps, keeps omitted fields, persists', async () => {
-		assert.deepEqual((await call('GET')).json, { ok: true, settings: S(0, 0, 0) })
+		// WO-916: the settings also carry rate_hz + console (their defaults here)
+		const full = (st) => pmSettings.normalizeSettings(st)
+		assert.deepEqual((await call('GET')).json, { ok: true, settings: full(S(0, 0, 0)) })
 		const post = await call('POST', JSON.stringify({ smooth: { attack_ms: 60, release_ms: 99999 } }))
 		assert.equal(post.status, 200)
-		assert.deepEqual(post.json.settings, S(60, 10000, 0))
-		assert.deepEqual(r.state.saved, [S(60, 10000, 0)])
-		assert.deepEqual((await call('GET')).json.settings, S(60, 10000, 0))
+		assert.deepEqual(post.json.settings, full(S(60, 10000, 0)))
+		assert.deepEqual(r.state.saved, [full(S(60, 10000, 0))])
+		assert.deepEqual((await call('GET')).json.settings, full(S(60, 10000, 0)))
 		const part = await call('POST', JSON.stringify({ smooth: { snap: 40 } }))
-		assert.deepEqual(part.json.settings, S(60, 10000, 40), 'omitted fields keep their value')
+		assert.deepEqual(part.json.settings, full(S(60, 10000, 40)), 'omitted fields keep their value')
 	})
 
 	it('POST: 400 on a non-object, a missing smooth, a non-numeric value, a malformed body; nothing persisted', async () => {

@@ -59,9 +59,12 @@ function segment(file) {
 	}
 }
 
-/** 50 fps for `frames` frames through a real engine + service; `kick` false = the engine's 23 ms clock only. */
-async function run({ frames = 50, kick = true } = {}) {
-	const file = path.join(dir, `pgm-${kick ? 'kick' : 'clock'}`)
+/**
+ * 50 fps for `frames` frames through a real engine + service; `kick` false = the engine's 23 ms clock only. rate_hz 0 =
+ * every frame (WO-897); WO-916 made 25 the default (every 2nd frame of 50).
+ */
+async function run({ frames = 50, kick = true, rate_hz = 0 } = {}) {
+	const file = path.join(dir, `pgm-${kick ? 'kick' : 'clock'}-${rate_hz}`)
 	const seg = segment(file)
 	const engine = new FollowEngine({ hub: { list: () => [], now: () => Date.now() }, send: () => {}, resolveMode })
 	engine.configure({ dmx: { enabled: false }, patch: PATCH }) // DMX master off: nothing goes on the wire
@@ -73,7 +76,7 @@ async function run({ frames = 50, kick = true } = {}) {
 	const svc = createPixelMapService({}, engine, { subscribe: false, surfacePath: () => file, lease: async () => {},
 		channelMap: () => ({ programChannels: [1], previewChannels: [], channelResolutionsByChannel: { 1: { w: W, h: H } } }) })
 	engine.pixelMap = svc
-	svc.load({ pixelMappings: [{ id: 'a', fixtureId: 'pl', pixel: 1, channelNo: 1, rect: { x: 0, y: 0, w: 8, h: 8 } }] })
+	svc.load({ pixelMappings: [{ id: 'a', fixtureId: 'pl', pixel: 1, channelNo: 1, rect: { x: 0, y: 0, w: 8, h: 8 } }], pixelMapSettings: { rate_hz } })
 	engine.start()
 	await new Promise((r) => setTimeout(r, 60))
 	const t0 = ticks
@@ -125,6 +128,14 @@ describe('WO-897 pixel-map frame tick', () => {
 		assert.equal(s.missed, 0, JSON.stringify(s))
 		assert.equal(s.frames, 50, JSON.stringify(s))
 		assert.ok(s.ticks >= 48 && s.ticks <= 56, `ticks ${s.ticks}`)
+	})
+
+	it('WO-916 25 Hz (the default): every 2nd frame, steady — 25 sampled, 25 skipped by the rate, none missed', async () => {
+		const s = await run({ rate_hz: 25 })
+		assert.equal(s.missed, 0, JSON.stringify(s))
+		assert.ok(s.frames >= 24 && s.frames <= 26, JSON.stringify(s))
+		assert.ok(s.frames + s.skipped >= 48 && s.frames + s.skipped <= 50, JSON.stringify(s))
+		assert.ok(Math.abs(s.skipped - s.frames) <= 1, 'one skipped per sampled: ' + JSON.stringify(s))
 	})
 
 	it('control: the 23 ms clock alone leaves frames unsampled (the 6.5 Hz judder)', async () => {

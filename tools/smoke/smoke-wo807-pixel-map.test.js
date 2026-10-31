@@ -146,7 +146,7 @@ describe('WO-807 region average from a HASCGSHM surface', () => {
 		assert.equal(r.seq, 4)
 		assert.deepEqual(r.colours[0], [100, 50, 20])
 		assert.deepEqual(r.colours[1], [200, 0, 40], 'point = the centre pixel: x (40 + 139) >> 1 = 89, inside the left half')
-		assert.equal(r.reads, 200, 'one read per sampled row (the two regions share their rows)')
+		assert.equal(r.reads, 17, 'WO-916: one read per sampled row — the 16 grid rows + the point\'s centre row')
 		assert.equal(s.read(file, { since: 4 }).state, 'none', 'the same frame is not averaged twice')
 	})
 
@@ -157,20 +157,22 @@ describe('WO-807 region average from a HASCGSHM surface', () => {
 		assert.equal(s.read(file).state, 'lapped')
 	})
 
-	it('exact for every pixel up to MAX_SAMPLES; a stride above it, still the true mean of a flat picture', () => {
+	it('WO-916: a point grid — one sample per ~10 × 10 px sub-cell (≤ 16 per axis); a flat picture reads its colour', () => {
 		const W = 1920
 		const H = 1080
-		const pic = picture(W, H, [{ x: 0, y: 0, w: W, h: H, rgb: [90, 30, 200] }, { x: 13, y: 0, w: 1, h: H, rgb: [255, 255, 255] }])
+		assert.deepEqual(frame.samplingOf({ x: 50, y: 100, w: 40, h: 16, mode: 'average' }, W, H), { xs: [55, 65, 75, 85], ys: [104, 112] },
+			'a PixelLine cell: 4 × 2 = 8 samples on 2 rows, each at its sub-cell centre')
+		assert.deepEqual(frame.samplingOf({ x: 0, y: 0, w: 3, h: 3, mode: 'average' }, W, H), { xs: [1], ys: [1] })
+		const pic = picture(W, H, [{ x: 0, y: 0, w: W, h: H, rgb: [90, 30, 200] }, { x: 200, y: 0, w: 800, h: H, rgb: [10, 250, 0] }])
 		writeSegment(file, pic, 9)
-		// 1-px white line every 13 px would alias the legacy 8 × 8 stride; here the region is exact (100 × 200 = 20 000 px)
 		const regions = [{ x: 0, y: 0, w: 100, h: 200, mode: 'average' }, { x: 200, y: 200, w: 1600, h: 800, mode: 'average' }]
-		const r = frame.createRegionSampler(regions).read(file)
-		const exact = (c, white) => Math.round((c * 99 + white) / 100)
-		assert.deepEqual(r.colours[0], [exact(90, 255), exact(30, 255), exact(200, 255)])
 		const big = frame.samplingOf(regions[1], W, H)
-		assert.ok(big.step > 1 && big.nx * big.ny >= frame.MAX_SAMPLES, `stride ${big.step}, ${big.nx * big.ny} samples`)
-		assert.deepEqual(r.colours[1], [90, 30, 200])
-		assert.deepEqual(r.colours[0], frame.averageBgra(pic.pixels, W * 4, frame.samplingOf(regions[0], W, H)))
+		assert.equal(big.xs.length, frame.GRID_MAX)
+		assert.equal(big.ys.length, frame.GRID_MAX)
+		const r = frame.createRegionSampler(regions).read(file)
+		assert.deepEqual(r.colours[0], [90, 30, 200], 'flat → exact')
+		assert.deepEqual(r.colours[1], [50, 140, 100], 'half / half (8 of 16 columns in each colour) → the mean')
+		assert.deepEqual(r.colours[1], frame.averageBgra(pic.pixels, W * 4, big))
 	})
 
 	it('regions are clipped to the surface; one fully outside gives no colour', () => {
@@ -238,7 +240,7 @@ describe('WO-807 project key and wiring', () => {
 		assert.match(eng, /this\.pixelMap\?\.sample\(now\)/)
 		assert.match(eng, /writeFixture\(u\.buf, fx, fx\.moving && aimed \? next : null, fx\.fixedList\)\n\t\t\t\}\n\t\t\tthis\.pixelMap\?\.write\(u\.buf, fx, now\)/)
 		const svc = SRC('src/fixtures/follow-service.js')
-		assert.match(svc, /const pixelMap = createPixelMapService\(ctx, engine, \{ log \}\)/)
+		assert.match(svc, /const pixelMap = createPixelMapService\(ctx, engine, \{ log, send, isSelfLoop \}\)/)
 		assert.match(svc, /engine\.pixelMap = pixelMap/)
 		assert.match(svc, /pixelMap\.stop\(\)/)
 	})

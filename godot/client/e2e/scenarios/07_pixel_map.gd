@@ -3,7 +3,8 @@ extends "res://e2e/e2e_scenario.gd"
 ## map…"; pick channel 1 (PGM) and see its picture; draw two regions on it (snapped, then typed exactly into x / y / w /
 ## h, one with maths); pick the PixelLine head; pixel 1 → region 1 (average, rgb), pixel 2 → region 2 (point, rgb);
 ## Save; the live swatches = GET /live = the DMX slots = the average re-computed from the channel frame = the ArtDMX
-## packet on the wire; unmap both, Save → the project has no pixelMappings key.
+## packet on the wire; WO-916: the Console rows → the console's own block (u300) on the wire; unmap both, Save → the
+## project has no pixelMappings key.
 ## Needs tools/e2e/pixel-map-fixture.js (run-gui-e2e.js starts it for this scenario): the loopback-only copy of the MHP
 ## patch (every dest 127.0.0.1:6455, DMX master on for artnet:18) and a known picture on the sandbox's pgm1 surface.
 ## The wire check binds 127.0.0.1:6455 — nothing is ever sent to a broadcast address or to :6454.
@@ -18,12 +19,13 @@ const R2 := Rect2i(1200, 500, 60, 40)
 ## R2's centre pixel ((1200+1260-1)>>1, (500+540-1)>>1) = (1229, 519) lies in the (255,255,0) marker.
 const R1_AVG := [128, 64, 100]
 const R2_POINT := [255, 255, 0]
+const CONSOLE_UNIVERSE := 300  # WO-916: the console block (R G B per mapping, pixel 1 then 2 of the same head)
 
 var win: AcceptDialog
 var view: Control
 var fx := {}  # GET /api/fixtures/pixelmap/pixels entry of HEAD
 var udp := PacketPeerUDP.new()
-var wire := {}  # last ArtDMX data of UNIVERSE (PackedByteArray) under "data"
+var wire := {}  # last ArtDMX data of UNIVERSE (PackedByteArray) under "data"; WO-916: CONSOLE_UNIVERSE's under "console"
 var live := {}  # last GET /live
 var frame_avg := []  # computed here from the shm file
 var frame_point := []
@@ -129,9 +131,13 @@ func _map_row(n: int, region: String, mode: String, order: String) -> String:
 func _drain() -> void:
 	while udp.get_available_packet_count() > 0:
 		var p := udp.get_packet()
-		if p.size() > 18 and p.slice(0, 8).get_string_from_ascii() == "Art-Net" and p.decode_u16(8) == 0x5000 and (p[14] | (p[15] << 8)) == UNIVERSE:
-			wire["data"] = p.slice(18, 18 + ((p[16] << 8) | p[17]))
-			wire["n"] = int(wire.get("n", 0)) + 1
+		if p.size() > 18 and p.slice(0, 8).get_string_from_ascii() == "Art-Net" and p.decode_u16(8) == 0x5000:
+			var u := p[14] | (p[15] << 8)
+			if u == UNIVERSE:
+				wire["data"] = p.slice(18, 18 + ((p[16] << 8) | p[17]))
+				wire["n"] = int(wire.get("n", 0)) + 1
+			elif u == CONSOLE_UNIVERSE:
+				wire["console"] = p.slice(18, 18 + ((p[16] << 8) | p[17]))
 
 
 ## Re-average R1 and read R2's centre from the pgm1 segment file the sandbox announces (HASCGSHM v1, BGRA).
@@ -363,6 +369,41 @@ func run() -> void:
 			p1[0], p1[2], Array(d.slice(p1[0] - 1, p1[0] + 2)), p2[0], p2[2], Array(d.slice(p2[0] - 1, p2[0] + 2)), by[1].rgb, by[2].rgb,
 			frame_avg, frame_point, _rgb(_row(1).swatch.color), _rgb(_row(2).swatch.color), int(wire.get("n", 0))])
 		return ""
+	)
+	await step("Console rows: address + own block from universe 300, Save → ArtDMX u300 = pixel 1 · pixel 2 colours", func() -> String:
+		var addr: LineEdit = await ui.await_control("LineEdit", "The console's IPv4 address", win, 5.0, false)
+		var layout: OptionButton = ui.find("OptionButton", "Fixture universes:", win, false)
+		var first: SpinBox = ui.find("SpinBox", "The block's first universe", win, false)
+		if addr == null or layout == null or first == null:
+			return "Console rows missing (address %s, layout %s, first universe %s)" % [addr, layout, first]
+		await ui.reveal(addr)
+		var why: String = await ui.type_into(addr, "127.0.0.1:6455")
+		if why == "":
+			why = await _pick(layout, "Own block")
+		if why == "":
+			why = await ui.type_into(first, "200+100")  # RULES.md 2
+		if why != "":
+			return why
+		why = await ui.click(ui.button("Save *", win))
+		if why != "":
+			return why
+		if await ui.await_control("Label", "Saved 2 mapping(s).", win, 8.0) == null:
+			return "no \"Saved 2 mapping(s).\" after saving the console"
+		why = await await_api("/api/fixtures/pixelmap/settings", func(d: Variant) -> bool:
+			var c: Variant = d.get("settings", {}).get("console") if d is Dictionary else null
+			return c is Dictionary and c.get("dest") == "127.0.0.1:6455" and c.get("layout") == "block" and int(c.get("universe", 0)) == CONSOLE_UNIVERSE \
+				and c.get("enabled") == true and c.get("protocol") == "artnet", "the stored console settings differ from the window")
+		if why != "":
+			return why
+		var got: Variant = await ui.wait_for(func() -> bool:
+			_drain()
+			var d: PackedByteArray = wire.get("console", PackedByteArray())
+			return d.size() >= 6 and Array(d.slice(0, 6)) == R1_AVG + R2_POINT, 4.0)
+		if not got:
+			return "console ArtDMX u%d on 127.0.0.1:6455: %s, want %s" % [CONSOLE_UNIVERSE, Array(wire.get("console", PackedByteArray()).slice(0, 6)), R1_AVG + R2_POINT]
+		var st: Variant = await ui.wait_for(func() -> Variant: return ui.find("Label", "→ 127.0.0.1:6455 · 1 universe(s)", win, false), 4.0)
+		print("[e2e] console u%d 1-6 = %s; status %s" % [CONSOLE_UNIVERSE, Array(wire.console.slice(0, 6)), (st as Label).text if st else "—"])
+		return expect(st != null, "the Console status line does not show where it sends")
 	)
 	await step("Unmap both, Save → no pixelMappings in the project", func() -> String:
 		for n in [1, 2]:

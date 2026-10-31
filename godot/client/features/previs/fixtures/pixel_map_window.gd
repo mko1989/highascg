@@ -5,13 +5,16 @@ extends AcceptDialog
 ## Right: the selected region's x / y / w / h, and the chosen fixture's pixels (pixel_map_rows.gd) with region, mode
 ## and colour order per pixel and the live colour the server samples (GET /api/fixtures/pixelmap/live, polled at 2 Hz
 ## only while this window is open). WO-893: a "Smoothing" row (attack / release in ms, snap on cut) sets how the server
-## smooths the colours it sends (GET / POST /api/fixtures/pixelmap/settings; 0 / 0 = off). Save POSTs the whole list to /api/fixtures/pixelmap (phase 1; the server checks
+## smooths the colours it sends (GET / POST /api/fixtures/pixelmap/settings; 0 / 0 = off). WO-916: the "Console" rows
+## (pixel_map_console.gd) set the server's own output of the colours to the lighting console and the sampling rate.
+## Save POSTs the whole list to /api/fixtures/pixelmap (phase 1; the server checks
 ## it and keeps it in the project); a 400's errors land on their rows. Never sends DMX itself.
 
 const P := preload("res://features/previs/fixtures/pixel_map_model.gd")
 const View := preload("res://features/previs/fixtures/pixel_map_view.gd")
 const Rows := preload("res://features/previs/fixtures/pixel_map_rows.gd")
 const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
+const Console := preload("res://features/previs/fixtures/pixel_map_console.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const POLL_S := 0.5
 
@@ -37,6 +40,7 @@ var _busy := false
 var _live_line := ""
 var _smooth_spins := {}  # "attack_ms" | "release_ms" | "snap" → SpinBox (WO-893)
 var _smooth_dirty := false
+var _console: Console  # WO-916
 
 
 func _init() -> void:
@@ -139,6 +143,9 @@ func _build_side() -> Control:
 	scroll.add_child(_rows)
 	side.add_child(scroll)
 	side.add_child(_build_smoothing())
+	_console = Console.new()
+	_console.edited.connect(func() -> void: _set_dirty(true))
+	side.add_child(_console)
 	var foot := HBoxContainer.new()
 	_save = Button.new()
 	_save.text = "Save"
@@ -208,6 +215,7 @@ func reload() -> void:
 	work = _clean(a.data.get("mappings", []))
 	var st: Dictionary = await Api.get_json("/api/fixtures/pixelmap/settings")
 	_show_smooth(P.smooth_from(st.data if st.ok else {}))
+	_console.show_settings(st.data if st.ok else {})
 	regions = P.regions_from(work)
 	fixtures = b.data.get("fixtures", []) if b.ok and b.data is Dictionary else []
 	_errors = {}
@@ -404,16 +412,17 @@ func _show_status() -> void:
 func _save_all() -> void:
 	var posted := work.duplicate(true)
 	_save.disabled = true
-	if _smooth_dirty:  # settings first, then the mappings
+	if _smooth_dirty or _console.dirty:  # settings first, then the mappings
 		var body := {}
 		for k in _smooth_spins:
 			body[k] = int((_smooth_spins[k] as SpinBox).value)
-		var sres: Dictionary = await Api.post_json("/api/fixtures/pixelmap/settings", {"smooth": body})
+		var sres: Dictionary = await Api.post_json("/api/fixtures/pixelmap/settings", _console.body().merged({"smooth": body}))
 		if not sres.ok:
 			_save.disabled = false
-			_set_note("Not saved: smoothing settings: %s" % sres.error, true)
+			_set_note("Not saved: settings: %s" % sres.error, true)
 			return
 		_show_smooth(P.smooth_from(sres.data))
+		_console.show_settings(sres.data)
 	var res: Dictionary = await Api.post_json("/api/fixtures/pixelmap", {"mappings": posted})
 	_save.disabled = false
 	var data: Dictionary = res.data if res.data is Dictionary else {}
@@ -458,6 +467,7 @@ func _tick() -> void:
 		if l != null and l.color is Color and rid != "" and not colours.has(rid):
 			colours[rid] = l.color
 	_view.colours = colours
+	_console.show_live(data)
 	_live_line = "live colours unavailable: %s" % res.error if not res.ok else "no saved mapping on channel %d" % _ch()
 	for c in data.get("channels", []):
 		if int(c.get("channelNo", 0)) == _ch():

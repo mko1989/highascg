@@ -113,17 +113,19 @@ function createFollowService(ctx, hub, deps = {}) {
 	const isLocalHost = (host) => host.startsWith('127.') || host.startsWith('0.') || targets.has(host)
 	const reachesSelf = (to) => to.port === ARTNET_PORT && isLocalHost(to.host)
 	const sacnReachesSelf = (to) => isMulticast(to.host) || (to.port === SACN_PORT && isLocalHost(to.host))
+	const send = (to, packet) => {
+		if (lightingOn()) return sender.send(to, packet)
+		blocked++
+	}
+	const isSelfLoop = (to, universe, protocol) =>
+		protocol === 'sacn'
+			? sacnReachesSelf(to) && inputUniverse(ctx) === universe
+			: reachesSelf(to) && inputPortAddress(ctx) === universe
 	const engine = new FollowEngine({
 		hub,
 		consoleFrames,
-		send: (to, packet) => {
-			if (lightingOn()) return sender.send(to, packet)
-			blocked++
-		},
-		isSelfLoop: (to, universe, protocol) =>
-			protocol === 'sacn'
-				? sacnReachesSelf(to) && inputUniverse(ctx) === universe
-				: reachesSelf(to) && inputPortAddress(ctx) === universe,
+		send,
+		isSelfLoop,
 		reachesSelf,
 		resolveMode: (typeId, mode) => {
 			try {
@@ -135,7 +137,9 @@ function createFollowService(ctx, hub, deps = {}) {
 			}
 		},
 	})
-	const pixelMap = createPixelMapService(ctx, engine, { log }) // WO-807: screen regions → fixture pixels (project.pixelMappings)
+	// WO-807: screen regions → fixture pixels (project.pixelMappings); WO-916: + its own output to the lighting console,
+	// through the same socket, lighting duty and self-loop guard
+	const pixelMap = createPixelMapService(ctx, engine, { log, send, isSelfLoop })
 	engine.pixelMap = pixelMap
 	let lastJson = ''
 	/**
@@ -257,7 +261,6 @@ function createFollowService(ctx, hub, deps = {}) {
 		 * ours, or in visualiser mode (T7) the console's (no fresh input = dark).
 		 */
 		visual: () => {
-			pixelMap.watch() // WO-915: the rig is being drawn → the mapped cells follow the picture with the DMX master off
 			const fixtures = []
 			const inputs = { artnet: consoleFrames, sacn: sacnIn }
 			for (const fx of engine.fixtures) {

@@ -119,7 +119,8 @@ describe('WO-807 loopback: screen region → Pixel Line pixel 1 → ArtDMX on 12
 
 	it('a known colour reaches DMX 425/426/427 of universe 18 on the first tick after the frame', async () => {
 		engine.configure(slice(true))
-		pm.load({ pixelMappings: [{ id: 'm1', fixtureId: 'pl1042', pixel: 1, channelNo: 1, rect: REGION }] })
+		// rate 0 = every frame (each tick here is a new frame); the WO-916 rate has its own smoke (wo916)
+		pm.load({ pixelMappings: [{ id: 'm1', fixtureId: 'pl1042', pixel: 1, channelNo: 1, rect: REGION }], pixelMapSettings: { rate_hz: 0 } })
 		assert.deepEqual(pm.mappings().map((m) => m.problem), [null])
 		await settle()
 		assert.deepEqual(leases[leases.length - 1], ['pgm1'], 'channel 1 is PGM 1 → the shared pgm1 surface')
@@ -149,7 +150,7 @@ describe('WO-807 loopback: screen region → Pixel Line pixel 1 → ArtDMX on 12
 	})
 
 	it('WO-893 smoothing on the wire: attack 0 / release 1000 ms → a cut to black falls over ~1 s, a rise goes in at once', async () => {
-		const smooth = (release_ms) => ({ pixelMappings: pm.mappings().map(({ problem: _p, ...m }) => m), pixelMapSettings: { smooth: { attack_ms: 0, release_ms, snap: 0 } } })
+		const smooth = (release_ms) => ({ pixelMappings: pm.mappings().map(({ problem: _p, ...m }) => m), pixelMapSettings: { rate_hz: 0, smooth: { attack_ms: 0, release_ms, snap: 0 } } })
 		pm.load(smooth(1000))
 		writeSegment(file, picture(640, 360, [{ ...REGION, rgb: [200, 100, 50] }]), 5)
 		assert.deepEqual([...(await tick()).data.subarray(424, 427)], [200, 100, 50], 'rising: at once')
