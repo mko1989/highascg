@@ -334,7 +334,7 @@ func _on_shown() -> void:
 	set_process(shown)
 	if InspectorPanel.current == null:
 		return
-	if shown:
+	if is_visible_in_tree():  # publishing keeps the canvas rendering, but the page belongs to this tab only
 		InspectorPanel.current.present(page)
 	else:
 		InspectorPanel.current.release(page)
