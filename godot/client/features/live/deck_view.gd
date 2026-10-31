@@ -17,6 +17,7 @@ const BlankClear := preload("res://features/live/deck_blank_clear.gd")
 const DeckHead := preload("res://features/live/deck_head.gd")
 const Destinations := preload("res://features/live/destinations.gd")
 const DeckOverlay := preload("res://features/live/deck_overlay.gd")
+const StickyHeads := preload("res://features/live/deck_sticky_heads.gd")
 const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
@@ -26,6 +27,7 @@ signal border_requested(main: int, label: String)  # WO-601: global border inspe
 signal look_deleted(scene_id: String)  # WO-623 B: the live tab closes the editor if it shows this look
 
 var _columns: HBoxContainer
+var _heads: StickyHeads  # the screens' header bars, kept visible while the deck scrolls
 var _dirty := true
 var _main_for_card := 0
 var _press_id := ""  # the card a left press landed on (WO-762: PRV on release, not on a drag)
@@ -42,7 +44,7 @@ func _ready() -> void:
 	_columns.add_theme_constant_override("separation", 12)
 	_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_columns.size_flags_vertical = Control.SIZE_EXPAND_FILL  # columns reach the bottom: all of it is drop space
-	add_child(_columns)
+	_heads = StickyHeads.mount(self, _columns)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _dirty = true)
 	Store.changed.connect(_on_store_changed)
 
@@ -56,11 +58,13 @@ func _process(_delta: float) -> void:
 	if _dirty:
 		_dirty = false
 		rebuild()
+	_heads.follow(scroll_vertical)
 
 
 func rebuild() -> void:
 	for c in _columns.get_children():
 		c.queue_free()
+	_heads.clear()
 	var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
 	var live: Dictionary = Store.get_value("scene.live", {}) if Store.get_value("scene.live") is Dictionary else {}
 	var ps: Dictionary = Store.project.get("scenes", {}) if Store.project.get("scenes") is Dictionary else {}
@@ -86,7 +90,7 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	col.mouse_filter = Control.MOUSE_FILTER_PASS
 	col.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))  # WO-623 B: blank deck space
 	var head_row := DeckHead.build(self, title, looks.size(), bus, main, cm)  # WO-781: title = destination toggle
-	col.add_child(head_row)
+	col.add_child(_heads.slot(head_row, col, _can_drop_new.bind(main), _drop_new.bind(main)))
 	var timer := TimerView.new()
 	timer.setup(osc_mirror, main)
 	col.add_child(timer)

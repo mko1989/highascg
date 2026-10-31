@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-815 live WOs (30 open, 126 in progress, 659 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+816 live WOs (30 open, 126 in progress, 660 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -364,7 +364,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (105)
+## godot-client — Godot client (106)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -471,6 +471,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 901 DONE [godot-client] Lockscreen: hidden mouse pointer + "Bounce" style (one bouncing character) → 901_WO_lockscreen_hidden_pointer_and_bounce_style.md
 - 902 DONE [godot-client+testing-ci] Live preview windows shrink on their own: run-client.sh --check re-tiled the sh… → 902_WO_live_compose_layout_no_foreign_retile.md
 - 904 DONE [godot-client] Changing any Visuals value froze the output: a whole-show undo snapshot on ever… → 904_WO_visuals_freeze_undo_snapshot_per_edit.md
+- 905 DONE [godot-client] Live deck: each screen's header bar stays visible while the deck scrolls → 905_WO_live_deck_sticky_screen_headers.md
 
 ## web-client — Web client (82)
 
