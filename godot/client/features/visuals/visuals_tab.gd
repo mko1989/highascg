@@ -162,7 +162,7 @@ func _ready() -> void:
 		(func() -> void: load("res://features/visuals/visuals_playlist_probe.gd").run(self, str(_g("Config").args["probe-visuals-playlist"]))).call_deferred()
 	if _g("Config") and _g("Config").args.has("probe-visuals-orbit"):  # dev: --probe-visuals-orbit=<dir> (WO-896)
 		(func() -> void: preload("res://features/visuals/visuals_probe_orbit.gd").run(self, str(_g("Config").args["probe-visuals-orbit"]))).call_deferred()
-	if _g("Config") and _g("Config").args.has("probe-midi"):  # dev: --probe-midi=<dir>[:real] (WO-900)
+	if _g("Config") and _g("Config").args.has("probe-midi") and str(_g("Config").args["probe-midi"]) != "off":  # dev: --probe-midi=<dir>[:real] (WO-900); =off: MIDI closed, no script
 		(func() -> void: load("res://features/visuals/visuals_midi_probe.gd").run(self, str(_g("Config").args["probe-midi"]))).call_deferred()
 
 

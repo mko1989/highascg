@@ -18,6 +18,7 @@ const M := preload("res://features/visuals/visuals_model.gd")
 const Auto := preload("res://features/visuals/visuals_autopilot.gd")
 const Looks := preload("res://features/visuals/visuals_looks.gd")
 const Apc := preload("res://features/visuals/visuals_midi_apc.gd")
+const Clips := preload("res://features/visuals/visuals_midi_clips.gd")
 const SECTION := "midi"
 
 var tab: Node
@@ -38,6 +39,7 @@ var _lit := {}  # the lights as last sent
 var _cc_last := {}  # source key → last CC value: a CC on a button target presses on its rising edge
 var _ghosts := {}  # target → its Ghost
 var _auto_back := 2  # Auto switched on from a button goes back to this item (8 bars)
+var clips: Clips  # WO-913: visual pads
 var apc_view: Apc  # WO-909: the Controller mode (the APC40 drawn) and the device-knob auto page
 var _hello_until := 0  # msec: until then CCs are the APC's position report (_hello)
 
@@ -51,6 +53,7 @@ func _init(t: Node, persist := false) -> void:
 	panel.learn_toggled.connect(func(on: bool) -> void: _set_mode("learn" if on else ""))
 	panel.unmap_toggled.connect(func(on: bool) -> void: _set_mode("unmap" if on else ""))
 	panel.menu_picked.connect(_menu)
+	clips = Clips.new(self)
 	apc_view = Apc.new(self)
 	add_child(apc_view)
 	if tab.work != null:
@@ -149,6 +152,8 @@ func _button(b: Dictionary, msg: Dictionary, c: Control) -> void:
 			_auto(c as OptionButton)
 		"select":
 			apc_view.select(b.target)
+		"clip":
+			clips.fire(int(b.target.get_slice(":", 1)))
 		_:
 			(c as BaseButton).pressed.emit()
 	_say("%s → %s" % [_name(msg), MidiMap.target_label(b.target)])
@@ -183,6 +188,8 @@ func control_of(target: String) -> Control:
 			return tab.dj.control(p[0])
 		"dev", "select":  # WO-909: the device knob page, the layer rows
 			return apc_view.control_of(target)
+		"clip":  # WO-913: a visual pad is there while it holds a visual
+			return apc_view.surface if clips.has(n + 1) else null
 	return tab.page.show_panel.control(target)
 
 
@@ -285,7 +292,7 @@ func tick() -> void:
 				Pickup.observe(pick[k], c.ratio)
 				_ghost(b.target, pick[k], c)
 	if out.port != "":  # the knob rings always (WO-912: the APC then turns on from the app's value); the pad lights when on
-		var f := Leds.frame(map, led_state)
+		var f := Leds.frame(map, led_state, clips.velocity)
 		if not leds:
 			f = Leds.rings(f)
 		out.send(Leds.diff(_lit, f))
@@ -315,6 +322,8 @@ func led_state(target: String) -> int:
 			return Leds.ALERT if tab.mixer.blackout else Leds.AVAIL
 		"select":
 			return Leds.OFF if c == null else (Leds.ON if int(target.get_slice(":", 1)) - 1 == tab.sel else Leds.AVAIL)
+		"clip":
+			return Leds.OFF if c == null else Leds.ON
 		"auto":
 			return Leds.ON if c != null and (c as OptionButton).selected > 0 else Leds.AVAIL
 		"audio":
@@ -402,6 +411,7 @@ func _load() -> void:
 	else:
 		map = MidiMap.normalize(c.get_value(SECTION, "map"))
 	leds = cfg_path != "" and c.get_value(SECTION, "leds", false) == true
+	clips.load_from(c)
 
 
 func _saved() -> void:

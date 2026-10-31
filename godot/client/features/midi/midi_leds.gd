@@ -26,14 +26,16 @@ static func ring(num: int) -> bool:
 
 ## The lights the map asks for: {"status:num": value}. `state.call(target)` = OFF..ALERT for a button target, 0..127 (its
 ## value) for a range one. Only notes light; a CC lights only when it is an APC knob (its ring).
-static func frame(map: Array, state: Callable) -> Dictionary:
+## `vel.call(target)` (optional, WO-913): an RGB pad's own palette colour, -1 = the state's.
+static func frame(map: Array, state: Callable, vel := Callable()) -> Dictionary:
 	var out := {}
 	for b in map:
 		var num := int(b.num)
 		if b.kind == "note":
 			var s := clampi(int(state.call(b.target)), OFF, ALERT)
 			var ch := 0 if rgb(num) else maxi(0, int(b.ch))
-			out["%d:%d" % [0x90 | ch, num]] = RGB_VEL[s] if rgb(num) else [0, 0, 1, 2 if num == 52 else 1][s]
+			var own := int(vel.call(b.target)) if rgb(num) and vel.is_valid() else -1
+			out["%d:%d" % [0x90 | ch, num]] = own if own >= 0 else (RGB_VEL[s] if rgb(num) else [0, 0, 1, 2 if num == 52 else 1][s])
 		elif b.kind == "cc" and ring(num):
 			out["%d:%d" % [0xB0, num]] = clampi(int(state.call(b.target)), 0, 127)
 	return out

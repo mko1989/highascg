@@ -5,7 +5,9 @@ extends Control
 ## flashes when it is touched, so moving anything on the unit shows where it is and what it drove. Hover = the full line;
 ## a click asks `picked` (the controller starts Learn for that control). Pure drawing: the host answers `info_cb`.
 ##   info_cb(control) → {label: String ("" = unmapped), value: float (0..1, -1 = none), lit: int (0..3), waiting: bool,
-##                       hw: float (the physical position while waiting, -1 = unknown), line: String (the tooltip)}
+##                       hw: float (the physical position while waiting, -1 = unknown), line: String (the tooltip),
+##                       color: Color or null (WO-913: a visual pad's own colour)}
+## WO-913: a drag over a control asks `can_drop_cb(control, data)`; a drop emits `dropped`.
 
 const L := preload("res://features/midi/apc40_layout.gd")
 const FLASH_MS := 300
@@ -15,8 +17,10 @@ const TEXT := Color(0.86, 0.88, 0.9)
 const DIM := Color(0.45, 0.47, 0.5)
 
 signal picked(control: Dictionary)
+signal dropped(control: Dictionary, data: Variant)
 
 var info_cb: Callable
+var can_drop_cb: Callable
 var controls := L.controls()
 var _touched := {}  # control key → msec
 var _scale := 1.0
@@ -50,6 +54,19 @@ func touch(msg: Dictionary) -> void:
 func _info(c: Dictionary) -> Dictionary:
 	var d: Variant = info_cb.call(c) if info_cb.is_valid() else null
 	return d if d is Dictionary else {"label": "", "value": -1.0, "lit": 0, "waiting": false, "hw": -1.0, "line": ""}
+
+
+func _can_drop_data(at: Vector2, data: Variant) -> bool:
+	var c := control_at(at)
+	return not c.is_empty() and can_drop_cb.is_valid() and bool(can_drop_cb.call(c, data))
+
+
+func _drop_data(at: Vector2, data: Variant) -> void:
+	var c := control_at(at)
+	if not c.is_empty():
+		dropped.emit(c, data)
+		_touched[L.key(c)] = Time.get_ticks_msec()
+		queue_redraw()
 
 
 func _box(r: Rect2) -> Rect2:
@@ -117,6 +134,9 @@ func _text(font: Font, at: Vector2, width: float, text: String, col: Color, fs: 
 func _button(font: Font, c: Dictionary, d: Dictionary, b: Rect2, flash: bool) -> void:
 	var mapped: bool = d.label != ""
 	var col: Color = LIT[clampi(int(d.lit), 0, 3)] if mapped else Color(0.13, 0.135, 0.145)
+	var own: Variant = d.get("color")
+	if own is Color:
+		col = own
 	if flash:
 		col = col.lightened(0.55)
 	draw_rect(b, col)
@@ -125,6 +145,8 @@ func _button(font: Font, c: Dictionary, d: Dictionary, b: Rect2, flash: bool) ->
 		return  # the four small per-track buttons: hover tells
 	var fs := _fs(0.22 if c.shape == "pad" else 0.2)
 	var txt := TEXT if mapped and int(d.lit) != 1 else (Color(0.08, 0.08, 0.09) if mapped else DIM)
+	if own is Color:
+		txt = Color(0.05, 0.05, 0.06) if col.get_luminance() > 0.5 else TEXT
 	_text(font, b.position + Vector2(2, b.size.y / 2.0 + fs * 0.35), b.size.x - 4.0, d.label if mapped else c.name, txt, fs)
 
 

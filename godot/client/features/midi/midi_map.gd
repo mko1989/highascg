@@ -8,7 +8,7 @@ extends RefCounted
 
 const ANY := -1
 const RANGES := ["layer", "master", "fade", "param", "xfade", "dev"]  # dev: WO-909 device knobs · continuous targets (a slider; picked up, midi_pickup.gd)
-const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select"]  # take / cut / xfade: WO-908 A/B
+const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select", "clip"]  # take / cut / xfade: WO-908 A/B · clip: WO-913 visual pads
 const PARAM_LABELS := {"cam_yaw": "Camera yaw", "cam_pitch": "Camera pitch", "cam_zoom": "Camera zoom"}
 
 
@@ -113,6 +113,8 @@ static func target_label(target: String) -> String:
 			return "A/B AUTO"
 		"cut":
 			return "A/B CUT"
+		"clip":
+			return "Visual pad (loads into PRV)"
 	return target.capitalize()
 
 

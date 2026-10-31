@@ -8,6 +8,7 @@ extends VBoxContainer
 const Catalog := preload("res://features/visuals/visuals_catalog.gd")
 const Layers := preload("res://features/visuals/visuals_layers.gd")
 const Thumbs := preload("res://features/visuals/visuals_thumbs.gd")
+const Palette := preload("res://features/midi/apc40_palette.gd")
 const Launcher := preload("res://features/visuals/game_launcher.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Icons := preload("res://app/ui_icons.gd")
@@ -223,4 +224,8 @@ func _drag(at: Vector2) -> Variant:
 	l.text = it.get_text(0)
 	h.add_child(l)
 	set_drag_preview(h)
-	return it.get_metadata(0).duplicate()
+	var p: Dictionary = it.get_metadata(0).duplicate()
+	var tex: Texture2D = thumbs.texture(str(it.get_meta("thumb", ""))) if str(it.get_meta("thumb", "")) != "" else null
+	if tex != null:  # WO-913: a visual pad lights in the visual's main colour
+		p.color = "#" + Palette.main_color(tex.get_image()).to_html(false)
+	return p

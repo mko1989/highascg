@@ -5,13 +5,15 @@ extends Node
 ## control starts Learn for it. The auto mapping: the 8 device knobs ("dev:N") follow the selected layer — a shader layer's
 ## key controls (the Shader mode's sliders, in its order and names), any other layer the camera and burst page — and the
 ## track select buttons ("select:N") pick that layer, so the knobs re-label themselves as the selection or the shader
-## changes. A knob that lands on a new parameter waits for pickup like any fader (midi_pickup.gd).
+## changes. A knob that lands on a new parameter waits for pickup like any fader (midi_pickup.gd). WO-913: a visual dropped on
+## a clip-grid pad makes it a visual pad (visuals_midi_clips.gd), drawn in the visual's colour.
 
 const MidiMap := preload("res://features/midi/midi_map.gd")
 const Pickup := preload("res://features/midi/midi_pickup.gd")
 const L := preload("res://features/midi/apc40_layout.gd")
 const Surface := preload("res://features/midi/apc40_surface.gd")
 const Layers := preload("res://features/visuals/visuals_layers.gd")
+const Catalog := preload("res://features/visuals/visuals_catalog.gd")
 const FALLBACK := ["param:cam_yaw", "param:cam_pitch", "param:cam_zoom", "param:burst"]
 const HINT := "Controller: what every APC40 control does now — move one to see it light up · click a control to Learn it · device knobs follow the selected layer"
 
@@ -26,6 +28,8 @@ func _init(m: Node) -> void:
 	surface = Surface.new()
 	surface.info_cb = info
 	surface.picked.connect(_learn)
+	surface.can_drop_cb = func(c: Dictionary, data: Variant) -> bool: return midi.clips.is_grid(int(c.num)) and c.shape == "pad" and Catalog.parse(data) != null
+	surface.dropped.connect(func(c: Dictionary, data: Variant) -> void: midi.clips.drop(int(c.num), data))
 
 
 ## The device knob page now: the selected shader layer's key sliders, else the camera / burst sliders.
@@ -100,6 +104,8 @@ func label(target: String) -> String:
 			return "A/B CUT"
 		"fade":
 			return "Fade time"
+		"clip":
+			return midi.clips.label(n + 1)
 	return MidiMap.target_label(target)
 
 
@@ -115,7 +121,9 @@ func info(c: Dictionary) -> Dictionary:
 	var st: Variant = midi.pick.get(MidiMap.key(b))
 	var waiting: bool = st is Dictionary and Pickup.waiting(st)
 	var line := "%s → %s" % [c.name, MidiMap.target_label(t) if t.begins_with("dev:") or t.begins_with("layer:") else label(t)]
-	if t.begins_with("dev:") or t.begins_with("layer:") or t.begins_with("look:"):
+	if t.begins_with("clip:"):
+		line = "%s → %s: press = into PRV, layer %d (drop another visual to replace it)" % [c.name, label(t), int(c.num) % 8 + 1]
+	elif t.begins_with("dev:") or t.begins_with("layer:") or t.begins_with("look:"):
 		line += ": " + label(t)
 	if ctl == null:
 		line += " (not there now)"
@@ -124,7 +132,8 @@ func info(c: Dictionary) -> Dictionary:
 	if waiting:
 		line += " · waiting: bring the control to the app value (amber tick = where it is)"
 	return {"label": label(t), "value": value, "lit": 0 if rng else (midi.led_state(t) if ctl != null else 0), "waiting": waiting,
-		"hw": float(st.hw) if st is Dictionary else -1.0, "line": line}
+		"hw": float(st.hw) if st is Dictionary else -1.0, "line": line,
+		"color": midi.clips.color(int(c.num)) if t.begins_with("clip:") and ctl != null else null}
 
 
 ## A click on a control: Learn for it — the next click in the Inspector picks what it drives.
