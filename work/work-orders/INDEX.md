@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-792 live WOs (29 open, 123 in progress, 640 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+793 live WOs (29 open, 123 in progress, 641 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (159)
+## engine — Looks, takes, timeline, playback (160)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -166,6 +166,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 858 DONE [engine+audio,godot-client] Godot as the live-visuals engine: audio analysis → visuals (FlowKit, audio part… → 858_WO_godot_audio_reactive_visuals_report.md
 - 860 DONE [engine+godot-client] Lower-third looks: overlay take over PGM, Scale % that works, the template visi… → 860_WO_lower_third_overlay_looks_scale_prv.md
 - 868 DONE [engine+os-iso] Operator GUI channel and monitor first everywhere (Caspar channel 1, leftmost X… → 868_WO_gui_channel_and_monitor_first.md
+- 882 DONE [engine+godot-client] A pre-eggs project loaded its looks but not its devices: an autosave had stampe… → 882_WO_autosave_clobbered_project_rig_after_factory_reset.md
 
 ## amcp — AMCP client and protocol (19)
 

@@ -102,6 +102,38 @@ test('autosave falls back to the STORED project when the payload carries no hard
 	}
 })
 
+/* WO-882: the REAL factory shape, not a hand-made empty one. The factory seeds the operator-GUI destination
+ * (WO-264) and New project may cable its monitor (WO-718); the predicate counted both, so on 30.10 21:32 a reset
+ * box looked rigged and an autosave stamped it over mhp_harder (3 destinations / 4 cables → 1 / 0). */
+function factoryLiveCtx(withGuiCable) {
+	const defaults = require('../../src/config/defaults')
+	const { buildFactoryModularConfig } = require('../../src/config/factory-starter')
+	const sd = require('../../src/config/screen-destinations')
+	const cfg = buildFactoryModularConfig(defaults, sd.finalizeScreenDestinationsConfig, sd.normalizeScreenDestinations)
+	cfg.deviceGraph.connectors = [{ id: 'gpu_p0', kind: 'gpu_out' }, { id: 'gpu_p2', kind: 'gpu_out' }]
+	if (withGuiCable) cfg.deviceGraph.edges = [{ id: 'e_gui', sourceId: 'dst_in_dst_operator_gui', sinkId: 'gpu_p2' }]
+	return { config: cfg, configManager: { get: () => cfg, save: () => {} }, persistence: { get: () => null, set: () => {} } }
+}
+
+test('WO-882: the factory config (operator GUI destination, with or without its cable) counts as empty', () => {
+	for (const cable of [false, true]) {
+		const probe = {}
+		injectHardwareConfigToProject(factoryLiveCtx(cable), probe)
+		assert.equal(probe.hardwareConfig.screenDestinations.destinations.length, 1, 'fixture: the factory GUI destination')
+		assert.equal(hardwareConfigHasOperatorIntent(probe.hardwareConfig), false, `factory, GUI cable ${cable}`)
+
+		const project = { name: 'mhp harder', hardwareConfig: RICH_HW }
+		injectHardwareConfigToProject(factoryLiveCtx(cable), project, { preserveWhenEmpty: true })
+		assert.equal(project.hardwareConfig, RICH_HW, 'the autosave keeps the project rig')
+	}
+	const gui = { id: 'dst_operator_gui', mode: 'operator_gui' }
+	const pgm = { id: 'a', mode: 'pgm_prv' }
+	const guiEdge = { sourceId: 'dst_in_dst_operator_gui', sinkId: 'gpu_p2' }
+	const hc = (dests, edges) => ({ screenDestinations: { destinations: dests }, deviceGraph: { edges } })
+	assert.equal(hardwareConfigHasOperatorIntent(hc([gui, pgm], [guiEdge])), true, 'a PGM destination is a rig')
+	assert.equal(hardwareConfigHasOperatorIntent(hc([gui], [guiEdge, { sourceId: 'dst_in_x', sinkId: 'dlsdi_4' }])), true, 'any other cable is a rig')
+})
+
 test('an EXPLICIT save may still record an empty rig', () => {
 	/* Deliberate asymmetry: "capture what is on screen now" must be able to record an empty rig,
 	 * otherwise clearing your Device View could never be saved. */

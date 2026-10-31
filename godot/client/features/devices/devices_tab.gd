@@ -211,6 +211,7 @@ func _ready() -> void:
 	visibility_changed.connect(func() -> void: if is_visible_in_tree(): refresh())
 	DevicesTarget.target_changed.connect(func() -> void: _gesture.forget(); refresh())  # WO-732 P3b: Edit / Back
 	Ws.on("gpu_topology_changed", func(_d: Variant) -> void: if is_visible_in_tree(): refresh())  # DRM hotplug
+	Ws.on("change", func(d: Variant) -> void: if is_visible_in_tree() and d is Dictionary and str(d.get("path")) in ["hardwareConfig", "project.activated"]: refresh())  # WO-882: load / apply-hardware
 	var on_prefs := func(keys: Array) -> void:  # WO-598 D: shared GPU rows / DeckLink order loaded or changed elsewhere
 		if is_visible_in_tree() and (keys.has("loaded") or keys.has("gpuLayout") or keys.has("decklinkRearOrder")):
 			refresh()

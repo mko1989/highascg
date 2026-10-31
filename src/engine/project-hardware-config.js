@@ -210,16 +210,20 @@ function applyHardwareConfigToCtx(ctx, hc) {
  * Connectors are enumerated GPU/DeckLink ports — a factory-reset box still reports 7 of them, so by
  * that measure a wiped config looks "non-empty" and would sail past this guard. Only cables (edges)
  * and screen destinations represent a decision worth protecting from a background write.
+ * WO-882: the operator-GUI destination and its monitor cable don't count — the factory config seeds them
+ * (factory-starter.js, WO-264/718), so with them counted a reset box looked rigged and an autosave
+ * stamped the bare rig over mhp_harder's 3 destinations / 4 cables (30.10 21:32).
  * @param {object} hc
  * @returns {boolean}
  */
 function hardwareConfigHasOperatorIntent(hc) {
 	if (!hc || typeof hc !== 'object') return false
-	const edges = Array.isArray(hc.deviceGraph?.edges) ? hc.deviceGraph.edges.length : 0
-	const dests = Array.isArray(hc.screenDestinations?.destinations)
-		? hc.screenDestinations.destinations.length
-		: 0
-	return edges > 0 || dests > 0
+	const all = Array.isArray(hc.screenDestinations?.destinations) ? hc.screenDestinations.destinations : []
+	const gui = new Set(all.filter((d) => d?.mode === 'operator_gui').map((d) => `dst_in_${d.id}`))
+	const edges = (Array.isArray(hc.deviceGraph?.edges) ? hc.deviceGraph.edges : []).filter(
+		(e) => !gui.has(e?.sourceId) && !gui.has(e?.sinkId),
+	).length
+	return edges > 0 || all.length > gui.size
 }
 
 /**
