@@ -200,6 +200,8 @@ func _build(o: Dictionary) -> void:
 			root.add_child(cab)
 		"projection":
 			mat.set_shader_parameter("energy", float(o.brightness))
+			mat.set_shader_parameter("roughness", 1.0)  # a projection screen is a matte surface: nothing to mirror
+			mat.set_shader_parameter("specular", 0.0)
 			root.add_child(_mesh(_quad(size, 0.0), mat))
 			var p := S.projector_offset(o)
 			var body := _box(Vector3(0.45, 0.18, 0.4))

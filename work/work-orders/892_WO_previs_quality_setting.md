@@ -151,3 +151,16 @@ Run the probe yourself:
 `setsid -f Xvfb :90 -screen 0 1920x1080x24 -nolisten tcp`, then
 `DISPLAY=:90 XDG_DATA_HOME=<private dir with a copy of app_userdata> godot --path godot/client res://app/previs_quality_probe.tscn -- --out=<dir> [--levels=0,1,2,3] [--real] [--haze=0.65] [--off=glow,sun,ssr,ssao,msaa,smaa,spots,deband,lens,cones,lights,plaincone,noglow]`
 (`--real` builds the live project's heads by GET only and lights every beam locally; nothing is sent to the server).
+
+## Follow-up 31.10.26 — projection screens reflected the room on Ultra
+
+Owner: "previs, the projectors final images are reflective in the ultra mode which doesnt make sense." The picture shader
+(`features/previs/led_screen.gdshader`) gave every surface `ROUGHNESS 0.35` (default specular): with SSR on (High) and
+Ultra's high SSR roughness quality the projection screens mirrored the beams and trusses. The shader now has
+`roughness` / `specular` uniforms (defaults 0.35 / 0.5, so LED walls and TVs look as before); `stage_builder.gd` sets a
+projection screen to 1.0 / 0.0 — matte, as a projection surface is. Verified: Godot suite 25535/0 with
+`test_stage_builder.gd` `test_projection_screen_is_matte`; an Xvfb client on the live project at Ultra, before vs after
+(the same frame, Projection 1 cropped): the reflected gradient across the screen is gone, the surface is flat.
+(`test_projector_beams_hide_in_place_…` now sets beams on first: it read this machine's ui.cfg, where the owner had just
+turned the beams off.)
+

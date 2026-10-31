@@ -16,6 +16,8 @@ uniform vec2 panel_px = vec2(192.0, 192.0);
 uniform float seam_px = 0.0;       // seam width in LED pixels (0 = none: TVs, projection)
 uniform float pixel_grid = 0.0;    // 0..1 strength of the dark gaps between LEDs
 uniform float energy = 1.0;
+uniform float roughness = 0.35;    // LED walls / TVs: a little gloss for the SSR floor-and-wall look (High / Ultra)
+uniform float specular = 0.5;      // owner 31.10: projection screens are matte — 1.0 / 0.0, else Ultra's SSR mirrors the room in them
 
 void fragment() {
 	vec2 st = UV;
@@ -52,5 +54,6 @@ void fragment() {
 	}
 	ALBEDO = vec3(0.0);
 	EMISSION = c * energy;
-	ROUGHNESS = 0.35;
+	ROUGHNESS = roughness;
+	SPECULAR = specular;
 }

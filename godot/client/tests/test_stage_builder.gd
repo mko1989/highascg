@@ -88,6 +88,7 @@ func _visible(n: Node) -> int:
 
 func test_projector_beams_hide_in_place_and_survive_a_rebuild() -> void:
 	var b := _builder()
+	b.set_beams(true)  # the builder starts from this machine's ui.cfg [previs] projector_beams — the owner may have it off
 	b.set_objects([S.new_object("projection")])
 	t.eq(_visible(b.node_for("projection_1")), 3, "beams on: screen + projector + frustum")
 	b.set_beams(false)
@@ -96,4 +97,15 @@ func test_projector_beams_hide_in_place_and_survive_a_rebuild() -> void:
 	t.eq(_visible(b.node_for("projection_1")), 2, "a rebuild keeps the beams off")
 	b.set_beams(true)
 	t.eq(_visible(b.node_for("projection_1")), 3, "beams back on")
+	b.free()
+
+
+## Owner 31.10: "the projectors final images are reflective in the ultra mode" — a projection screen is matte (SSR / the
+## Ultra roughness quality must find nothing to mirror); LED walls and TVs keep the shader's little gloss.
+func test_projection_screen_is_matte() -> void:
+	var b := _builder()
+	b.set_objects([S.new_object("led_wall"), S.new_object("projection")])
+	var proj: ShaderMaterial = b._mats["projection_1"]
+	t.eq([proj.get_shader_parameter("roughness"), proj.get_shader_parameter("specular")], [1.0, 0.0], "projection: matte")
+	t.eq(b._mats["led_wall_1"].get_shader_parameter("roughness"), null, "LED wall: the shader default (0.35)")
 	b.free()
