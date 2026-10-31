@@ -32,6 +32,7 @@ const dgram = require('dgram')
 const { pcmS16leToMonoFloats, analyserFreqBytes, waveformBytes, rmsOf } = require('./fft')
 const { createBeatDetector, bandsOf } = require('./beat-detect')
 const { createAudioParts } = require('./audio-parts')
+const { createTapTempo } = require('./beat-tap')
 
 const ARECORD_BINS = ['arecord', '/usr/bin/arecord']
 
@@ -192,6 +193,8 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 	/** WO-861: drum hits, band levels, tonal, mood and sections on the same samples. */
 	const parts = createAudioParts({ sampleRate: cfg.sampleRate })
 	parts.sensitivity(cfg.partsSensitivity)
+	/** WO-879: the operator's tapped beat replaces the detector's while tapping (and outlives a dead feed). */
+	const tapTempo = createTapTempo()
 
 	function resolveDevice() {
 		if (cfg.deviceMatch) {
@@ -236,17 +239,19 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 	function emitFrame() {
 		const fresh = Date.now() - lastPcmAt < cfg.staleMs
 		if (!fresh) {
-			if (staleFrameSent) return
+			if (staleFrameSent && !tapTempo.state().tap) return // WO-879: a tapped beat keeps going on silent frames
+			if (!staleFrameSent) {
+				beat.reset()
+				parts.reset()
+			}
 			staleFrameSent = true
 			smoothState.fill(0)
-			beat.reset()
-			parts.reset()
 			onFrame({
 				freq: new Uint8Array(cfg.fftSize >> 1),
 				wave: waveformBytes(new Float32Array(0), cfg.fftSize >> 1),
 				rms: 0,
 				device: test ? `file:${test.file.split('/').pop()}` : activeDevice,
-				beat: beat.snapshot(),
+				beat: tapTempo.merge(beat.snapshot(), Date.now()),
 				bands: [0, 0, 0],
 				parts: parts.snapshot(),
 			})
@@ -260,7 +265,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 			wave,
 			rms: rmsOf(ring),
 			device: test ? `file:${test.file.split('/').pop()}` : activeDevice,
-			beat: beat.snapshot(),
+			beat: tapTempo.merge(beat.snapshot(), Date.now()),
 			bands: bandsOf(freq, cfg.sampleRate),
 			parts: parts.snapshot(),
 		})
@@ -437,6 +442,12 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 			})
 			log('info', `[AudioFFT] test music: ${file} replaces the live input`)
 			return { file }
+		},
+		/** WO-879: `{}` = a tap now, `{ auto: true }` = the detector's beat again; @returns the tap state */
+		tap(b) {
+			if (b?.auto) tapTempo.auto()
+			else tapTempo.tap(Date.now())
+			return tapTempo.state()
 		},
 		/** WO-866: per-drum sensitivity, live */
 		sensitivity(map) {

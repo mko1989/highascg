@@ -118,4 +118,14 @@ function handleSensitivity(ctx, b) {
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, sensitivity: cur }) }
 }
 
-module.exports = { handlePartsCapture, handleTestMusic, handleSensitivity, replayHits, wavOf }
+/**
+ * WO-879 `POST /api/audio/tap` — `{}` taps the beat now (two or more set the tempo and take over the beat, one later
+ * re-phases it), `{ auto: true }` gives the beat back to the detector. Not stored.
+ */
+function handleTap(ctx, b) {
+	const st = typeof ctx?.audioTap === 'function' ? ctx.audioTap(b || {}) : null
+	if (!st) return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'no audio capture running' }) }
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, ...st }) }
+}
+
+module.exports = { handlePartsCapture, handleTestMusic, handleSensitivity, handleTap, replayHits, wavOf }

@@ -53,4 +53,6 @@ module.exports = [
 	'tools/smoke/smoke-wo828-d9-cut-timeline-hold.test.js',
 	'tools/smoke/smoke-wo829-timeline-wrap-and-reroute.test.js',
 	...require('./offline-test-files-3'), // WO-836: the uncurated-smoke sweep
+	'tools/smoke/smoke-wo580-shader-live-speed.test.js',
+	'tools/smoke/smoke-wo879-tap-tempo.test.js',
 ]

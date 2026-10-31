@@ -1,7 +1,8 @@
 extends VBoxContainer
 ## WO-877 — the Visuals page's Show block: the looks (click recalls with the fade; right-click saves the current picture over it,
 ## renames or deletes; keys 1–9), Save look, the fade time, the master fader and Blackout (B). WO-878: Auto — the next look
-## every N bars and/or on a drop — and "on the beat" (a picked look waits for the next beat).
+## every N bars and/or on a drop — and "on the beat" (a picked look waits for the next beat). WO-879: Tap (T) — the
+## operator's tempo when the music's beat cannot be locked — and Audio, the detector's beat again.
 
 const Auto := preload("res://features/visuals/visuals_autopilot.gd")
 
@@ -13,6 +14,7 @@ signal fade_changed(seconds: float)
 signal level_changed(v: float)
 signal blackout_toggled(on: bool)
 signal auto_changed(cfg: Dictionary)
+signal tapped(auto: bool)  # false = a tap, true = back to the music's beat
 
 var _grid: GridContainer
 var _fade: HSlider
@@ -27,6 +29,8 @@ var _auto: OptionButton
 var _drops: CheckBox
 var _quant: CheckBox
 var _auto_note: Label
+var _tap: Button
+var _audio: Button
 
 
 func _init() -> void:
@@ -98,10 +102,24 @@ func _init() -> void:
 	_quant.tooltip_text = "A look you pick waits for the next beat (at once while no tempo is locked)"
 	_quant.toggled.connect(func(_on: bool) -> void: _emit_auto())
 	add_child(_quant)
+	_tap = Button.new()
+	_tap.text = "Tap"
+	_tap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_tap.tooltip_text = "Tap the beat (key T): two or more taps set the tempo and take over the beat, one more re-phases it"
+	_tap.button_down.connect(func() -> void: tapped.emit(false))  # on the press, not the release: the beat is the press
+	_audio = Button.new()
+	_audio.text = "Audio"
+	_audio.toggle_mode = true
+	_audio.button_pressed = true
+	_audio.tooltip_text = "The beat follows the music (pressed) — click to leave the tapped tempo"
+	_audio.pressed.connect(func() -> void:
+		_audio.set_pressed_no_signal(true)
+		tapped.emit(true))
+	add_child(_row("Tempo", [_tap, _audio]))
 	_auto_note = Label.new()
 	_auto_note.modulate = Color(1, 1, 1, 0.6)
 	add_child(_auto_note)
-	for c in [save_b, _black, _drops, _quant]:  # clicked, they would keep the focus and take Space / B from the show keys
+	for c in [save_b, _black, _drops, _quant, _tap, _audio]:  # clicked, they would keep the focus and take Space / B from the show keys
 		c.focus_mode = Control.FOCUS_NONE
 
 
@@ -147,6 +165,11 @@ func set_state(fade: float, level: float, blackout: bool, auto := {}) -> void:
 ## The line under Auto: the tempo and what comes next.
 func set_auto_note(text: String) -> void:
 	_auto_note.text = text
+
+
+## WO-879: is the beat tapped (Audio released) or the music's?
+func set_tapped(on: bool) -> void:
+	_audio.set_pressed_no_signal(not on)
 
 
 func _emit_auto() -> void:

@@ -239,6 +239,7 @@ routes.post('/api/audio/monitor-source', ({ path, body, ctx }) => routesAudio.ha
 routes.post('/api/audio/solo', ({ path, body, ctx }) => routesAudio.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/audio/parts-capture', ({ body, ctx }) => routesAudioParts.handlePartsCapture(ctx, parseBody(body)), { requireCaspar: false })
 routes.post('/api/audio/test-music', ({ body, ctx }) => routesAudioParts.handleTestMusic(ctx, parseBody(body)), { requireCaspar: false })
+routes.post('/api/audio/tap', ({ body, ctx }) => routesAudioParts.handleTap(ctx, parseBody(body)), { requireCaspar: false })
 routes.get('/api/audio/parts-sensitivity', ({ ctx }) => routesAudioParts.handleSensitivity(ctx, null), { requireCaspar: false })
 routes.post('/api/audio/parts-sensitivity', ({ body, ctx }) => routesAudioParts.handleSensitivity(ctx, parseBody(body)), { requireCaspar: false })
 routes.get('/api/audio/mixer', () => routesAudioMixer.handleGet(), { requireCaspar: false })

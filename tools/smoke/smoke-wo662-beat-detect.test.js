@@ -140,7 +140,7 @@ describe('WO-662 (c): wiring', () => {
 		const eng = src('src/audio/audio-capture-fft.js')
 		assert.match(eng, /require\('\.\/beat-detect'\)/)
 		assert.match(eng, /function pushSamples\(f32\) \{\n\t\tbeat\.push\(f32\)/)
-		assert.match(eng, /beat: beat\.snapshot\(\),\s*bands: bandsOf\(freq, cfg\.sampleRate\)/)
+		assert.match(eng, /beat: tapTempo\.merge\(beat\.snapshot\(\), Date\.now\(\)\),\s*bands: bandsOf\(freq, cfg\.sampleRate\)/) // WO-879: through the tap merge
 		const life = src('src/bootstrap/audio-capture-lifecycle.js')
 		assert.match(life, /beat: frame\.beat,\n\t+bands: frame\.bands,/)
 	})

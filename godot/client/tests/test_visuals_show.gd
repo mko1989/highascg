@@ -172,3 +172,29 @@ func test_tab_autopilot_drives_the_mixer() -> void:
 	tab.show_ctl.status()
 	t.ok(tab.page.show_panel._auto_note.text.begins_with("Tempo 128 BPM"), "the page shows the tempo")
 	tab.free()
+
+
+# WO-879 tap tempo: the Tempo row's signals, Audio's state follows the frames' beat, the note says "Tapped".
+func test_tap_row() -> void:
+	var sp: VBoxContainer = preload("res://features/visuals/visuals_show.gd").new()
+	var got := []
+	sp.tapped.connect(func(auto: bool) -> void: got.append(auto))
+	sp._tap.button_down.emit()
+	sp._audio.pressed.emit()
+	t.eq(got, [false, true], "Tap = a tap, Audio = back to the music")
+	t.eq(sp._audio.button_pressed, true, "Audio stays pressed until a tap takes over")
+	sp.set_tapped(true)
+	t.eq(sp._audio.button_pressed, false, "tapped → Audio released")
+	sp.free()
+	var tab: Control = preload("res://features/visuals/visuals_tab.gd").new()
+	tab._ready()
+	tab.show_ctl._beat_at = Time.get_ticks_msec()
+	tab.show_ctl._beat = {"n": 3, "bpm": 124.0, "locked": true, "phase": 0.0, "tap": true}
+	tab.show_ctl.status()
+	t.ok(tab.page.show_panel._auto_note.text.begins_with("Tapped 124 BPM"), "the note: tapped")
+	t.eq(tab.page.show_panel._audio.button_pressed, false, "and Audio is released")
+	tab.show_ctl._beat = _b(4)
+	tab.show_ctl.status()
+	t.eq([tab.page.show_panel._audio.button_pressed, tab.page.show_panel._auto_note.text.begins_with("Tempo 128")], [true, true],
+		"the music's beat again")
+	tab.free()

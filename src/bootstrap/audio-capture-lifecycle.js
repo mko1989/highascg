@@ -93,6 +93,7 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 		appCtx.audioCaptureRate = cfg.sampleRate
 		appCtx.audioTestMusic = (file) => (engine ? engine.testMusic(file) : null) // WO-866
 		appCtx.audioPartsSensitivity = (map) => engine?.sensitivity(map)
+		appCtx.audioTap = (b) => (engine ? engine.tap(b) : null) // WO-879
 	}
 
 	function stopAudioCapture() {

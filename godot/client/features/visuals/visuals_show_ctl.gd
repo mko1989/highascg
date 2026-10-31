@@ -1,6 +1,7 @@
 extends Node
 ## WO-877 / WO-878 — the Visuals tab's show control: the looks (save, rename, delete, recall with the fade), the autopilot
-## (picked looks on the beat, the next look every N bars / on drops), master and blackout, and the show keys. Lives under the
+## (picked looks on the beat, the next look every N bars / on drops), master and blackout, tap tempo (WO-879) and the show
+## keys. Lives under the
 ## tab (visuals_tab.gd) and edits its slice; split out of it for the line limit.
 
 const Looks := preload("res://features/visuals/visuals_looks.gd")
@@ -71,6 +72,20 @@ func _wire(sp: Node) -> void:
 		tab._store())
 	sp.level_changed.connect(func(v: float) -> void: tab.mixer.level = v)
 	sp.blackout_toggled.connect(func(on: bool) -> void: tab.mixer.blackout = on)
+	sp.tapped.connect(tap)
+
+
+## WO-879: a tap (or `auto` = the music's beat again) to the node's beat clock — every consumer (these Visuals, the Caspar
+## shaders, the autopilot) gets the tapped beat through the audio frames.
+func tap(auto := false) -> void:
+	var api: Variant = get_node_or_null("/root/Api")  # an autoload, named at runtime: the test runner compiles this without it
+	if api == null:
+		return
+	var r: Dictionary = await api.post_json("/api/audio/tap", {"auto": true} if auto else {})
+	if r.get("ok", false):
+		tab.page.show_panel.set_tapped(bool(r.get("tap", false)))
+	elif auto:
+		tab.page.show_panel.set_tapped(false)
 
 
 ## WO-878: a look picked by hand (button, key): now, or on the next beat when "on the beat" is on and a tempo is locked.
@@ -91,7 +106,10 @@ func _live_beat() -> Variant:
 ## WO-878: the tempo, a look waiting for its beat, and the bars until the next timed change.
 func status() -> void:
 	var b: Variant = _live_beat()
-	var parts := ["Tempo %d BPM" % roundi(float(b.bpm)) if Auto.locked(b) else "No tempo locked (120 BPM clock)"]
+	var tapped: bool = b is Dictionary and b.get("tap", false)
+	tab.page.show_panel.set_tapped(tapped)
+	var parts := [("Tapped %d BPM" if tapped else "Tempo %d BPM") % roundi(float(b.bpm)) if Auto.locked(b)
+		else "No tempo locked (120 BPM clock) — T taps one"]
 	if _st.pending >= 0:
 		parts.append("look %d on the next beat" % (_st.pending + 1))
 	var left := Auto.bars_left(_st, tab.slice.auto)
@@ -119,7 +137,8 @@ func _looks_changed() -> void:
 	tab._store()
 
 
-## Show keys while the Visuals are shown (text fields take their own keys first): 1–9 recall a look, Space bursts, B blackout.
+## Show keys while the Visuals are shown (text fields take their own keys first): 1–9 recall a look, Space bursts, B blackout,
+## T taps the tempo.
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or k.echo or not tab.is_visible_in_tree() or k.is_command_or_control_pressed() or k.alt_pressed:
@@ -132,6 +151,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif k.keycode == KEY_B:
 		tab.mixer.blackout = not tab.mixer.blackout
 		tab.page.show_panel.set_state(tab.slice.fade, tab.mixer.level, tab.mixer.blackout, tab.slice.auto)
+	elif k.keycode == KEY_T:
+		tap()
 	else:
 		return
 	get_viewport().set_input_as_handled()
