@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-828 live WOs (29 open, 120 in progress, 679 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+828 live WOs (28 open, 121 in progress, 679 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -483,7 +483,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 912 DONE [godot-client] Visuals MIDI: APC40 knobs are endless encoders — they never picked up; now rela… → 912_WO_visuals_apc_knobs_are_encoders.md
 - 913 DONE [godot-client] Visuals Controller: drop a visual on an APC40 pad → the pad loads it into PRV,… → 913_WO_visuals_apc_pads_load_visuals.md
 - 914 DONE [godot-client+engine] Visuals: a Caspar restart leaves the Send output dark until Send is toggled → 914_WO_visuals_resend_after_caspar_restart.md
-- 918 OPEN [godot-client+engine,devices-config,mapping] GUI test sweep 01.11: new / load / rename / file projects and screen destinatio… → 918_WO_gui_project_and_destination_test_sweep.md
+- 918 IN PROGRESS [godot-client+engine,devices-config,mapping] GUI test sweep 01.11: new / load / rename / file projects and screen destinatio… → 918_WO_gui_project_and_destination_test_sweep.md
 
 ## web-client — Web client (82)
 

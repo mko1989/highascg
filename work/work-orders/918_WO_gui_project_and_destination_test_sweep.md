@@ -1,7 +1,7 @@
 # WO-918 — GUI test sweep 01.11: new / load / rename / file projects and screen destinations — 28 findings, 3 lose data
 
 **Area:** godot-client, engine, devices-config, mapping
-**Status: OPEN**
+**Status: IN PROGRESS (01.11.26: 21 of 28 fixed and re-tested live in the Godot GUI; F2 F4 F6 F11 F13 F20 F26 + N1–N5 open)**
 
 Owner, 01.11.26:
 > Run tests for new projects, loading projects, changing/ creating new screen destinations etc but from a point of view
@@ -140,7 +140,7 @@ those looks without a warning.
 
 Screenshots and the raw log are in the session scratchpad: `findings.md` and `live/shots/` (01–49).
 
-## Suggested fix order (not done)
+## Suggested fix order (items 1–4 done, 5 partly — see below)
 
 1. **F27 / F28.** Autosave must carry the slug the client is editing (`fromSlug`) and must never retire on a guess.
    A retire must also log. An empty payload must not count as a rename. A client whose slug ≠ the server's active
@@ -151,11 +151,93 @@ Screenshots and the raw log are in the session scratchpad: `findings.md` and `li
 4. **F22 / F25.** Fix the path resolution for root media and image producers.
 5. F1 / F3 / F4: make load and apply state honest. The rest is UI polish.
 
-## What was done
+## What was done (01.11.26)
 
-Nothing in code. This WO records the test sweep.
+Commits 77d509c9, 51b7cd25, 8b765c91, 67544d2b, f19c85b3 (not pushed).
 
-## What was verified
+**Project switch / rename (F27 F28 F10 F9 F23 F14 F15 F1 F8)** — `src/api/routes-data-project-slug.js`,
+`routes-data-project-handlers.js`, new `routes-data-project-new.js` (the /api/project/new block, 500-line limit),
+`src/engine/new-project.js`, `project-store.js`, `project-volume-sync.js`; Godot `core/project_sync.gd`,
+`project_sync_policy.gd`, `app/header_project.gd`, `header_model.gd`.
+- The Godot client sends `editingSlug` (the slug the server handed it) with every autosave/save. Server
+  `previousSlugKind`: editing the active slug under another name = `rename`; editing any other slug = `stale_client`
+  → 409 `not_active` (the client re-pulls `/api/project` and adopts it, notice "The server switched to …"). Chosen over
+  better heuristics because the client KNOWS which show it edits; guessing from looks is what trashed shows.
+  Without `editingSlug` (web client) a rename now needs positive evidence (shared looks) — an empty payload is never
+  a rename. Every rename logs `[project] renamed "a" → "b"`.
+- F10: a rename onto a stored show's name = 409 `name_taken`; the client restores the name. The header field follows a
+  project switch even while focused, and only commits after the operator typed.
+- Load / New / Load from file call `ProjectSync.settle()` first (pending autosave lands, timer stops).
+- Live sweep follow-up: every Load broadcasts `change project.activated`; other Godot clients now adopt the server's
+  show at once (their own switch opens a 30 s settle window so they do not adopt twice).
+- F9: New project takes the first free name (Untitled, Untitled 2, …; an autosave alone holds a name).
+- F23: Load from file refused with `stale_rev`/`stale_saved_at` asks Replace / Import as copy / Cancel. Replace
+  re-posts with `replaceExisting:true`: the stored file is COPIED to `_trash/<slug>-<ms>-replaced/` (the suffix keeps it
+  from reading as a retirement in `wasProjectSlugRetired`), the file wins with the stored rev.
+- F14/F15: retiring a slug also moves its bridge / stick copies into their `_trash` (the copy F15's sync revived).
+- F1: the restart-required load notice is sticky; a successful Apply (any client) broadcasts `change caspar.applied`
+  and replaces it with "CasparCG config applied". F8: New project wording says Operator GUI only.
 
-Every finding above was reproduced on the box on 01.11.26, with journal lines, API responses and screenshots as
-cited. F27 was also reproduced deterministically over the API.
+**Server (F25 F22 F3)** — agent, reviewed: `live-scene-reconcile.js` maps an image producer's
+`<file><path>media/x.png` to its clip id; `media-reference-rewrite.js` resolves a bare ref like playback (project copy
+if it exists, else media root); `full-config-apply.js` returns `layoutOk`/`layoutProblem` (applied AND verified) and
+stops claiming restarts that did not happen; `routes-caspar-config.js` puts both at the top of the Apply reply.
+
+**Devices (F16 F17 F18 F21 F19 F1 F5 F3)** — agent, reviewed: size 64..16384, fps 1..240, main index capped to the
+main-bus count (read-only with one screen), Operator GUI disabled in Add while one exists, Remove asks when looks sit
+on that main, drag-release on a valid connector completes the cable (`cable_drag_release.gd`), `devices_follow.gd`
+marks Apply dirty after a restart-required Load and shows an unverified layout in amber.
+
+**Live (F12 F24 F7)** — agent, reviewed: the look editor closes when its show / look / bus goes
+(`look_editor_stale.gd`) and cancels its pending preview push; the action line resets on a switch; the PGM outline
+uses the project's saved `liveSceneIdByMain` only when no PGM channel exists; missing-media labels stack and elide.
+
+Tests repointed (assertions kept, new form pinned): wo823 (import body built once), wo821 (rename sends
+`editingSlug` — its flat `scenes` fixture has no look ids), wo697 (6th gated `usbAutoSync`: retire). New:
+`smoke-wo918-project-switch` (8), `smoke-wo918-server-fixes` (19), Godot `test_devices_wo918`, `test_wo918_live_devices`,
+policy/header tests, e2e `17_wo918_drag_and_stale`.
+
+## What was VERIFIED (01.11.26)
+
+Offline: node suite 5158 pass / 0 fail / 5 skipped; Godot 25690 / 0; check-max-file-lines 0 over.
+
+Live, through the Godot GUI (test client on Xvfb :120 + the owner's :0 client relaunched on the new code), server
+restarted on the new code:
+- F9 New project → "Untitled 2" (untitled.json kept); :0 followed. F8 wording seen in the confirm dialog.
+- Rename "Untitled 2" → "WO918 Sweep A": journal `renamed "untitled_2" → "wo918_sweep_a"` + `retired untitled_2.json on
+  bridge` (F14).
+- F10 rename onto "mhp harder": `autosave refused (name_taken)`, field back to "WO918 Sweep A", mhp_harder rev 588
+  unchanged.
+- F18 "Operator GUI" disabled in Add; F16 99999 → 16384 and 1000 fps → 240 reached the device view; F17 one screen →
+  index read-only, two screens → typed 5 shows/stores 1; F21 confirm "1 look on this screen stays…"; F12 the open look
+  editor closed when its bus was removed.
+- F28: API load of mhp_harder under the clients, then an edit in the test client → `autosave refused (not_active)`,
+  the client adopted mhp_harder with the notice, mhp_harder rev 588, no fork. After the follow-up both clients
+  followed an API load immediately with no edit.
+- F1 GUI Load (with hardware) → sticky "Caspar channel layout changed…" still up after 14 s, Apply amber; Apply →
+  "Config written; layout applied; Caspar restarted." and the header notice became "CasparCG config applied".
+- F25 blackFHD.png taken to PGM ch 2 and ch 4, node restarted: `scene.live` kept both.
+- F22 against the real media tree: root `testowe/…/PK CLICK.wav` → used by look "Intro"; the project copy of
+  blackFHD.png wins over a root path.
+- F23 file saved at rev 5, show edited to rev 6, Load from file → dialog; Import as copy → `wo918_sweep_a_copy`
+  loaded, original rev 6 kept; Replace → rev 7 from the file, backup `_trash/wo918_sweep_a-…-replaced` (rev 6).
+- F19 press-drag-release from PGM/PRV 1's PGM dot onto DP 2/3 → edge `dst_in_dst_mvxpjc47_1 → gpu_p1`.
+- F7 Intro card shows two readable "No preview" labels.
+- Restored: mhp_harder active (rev 588), channels 1080p/3840x1792×2/1080p×3/64x36 aligned, DP-4 +0 / DP-6 +1920 /
+  DP-0 +3840, :0 client at 0,0; test projects moved to the session scratchpad.
+
+Not re-tested live: F15 on a stick (exFAT) — the bridge path only (untitled_2 did not come back after the rename);
+F27 legacy (web, no `editingSlug`) path — offline only (an API probe would have been adopted by
+both clients, the incident in memory); F3 failure wording (xrandr did not fail this time) — offline only; F24 outline.
+
+## Still open
+
+- F2 F4 F6 F11 F13 F20 F26 (unchanged).
+- N1 The header notice is clipped at 200 px: the restart / switch / name-taken texts need the tooltip to be read.
+- N2 A destination edit made just before another client switches shows is not stamped into the project: the autosave
+  that would carry it is (correctly) refused, so loading the show later brings back the removed destination.
+- N3 Live-thumb PRINT frames (`media/2026…T….png`) show in the Sources media list for the moment they exist.
+- N4 Bridge `_trash` syncs back into `projects/_trash` (a renamed slug left two `untitled_2-*` dirs) and `-replaced`
+  backups replicate to the bridge.
+- N5 A rename leaves the old, empty `media/projects/<old slug>/` folder.
+- The web client still uses the legacy path (no `editingSlug`, does not follow `project.activated`).
