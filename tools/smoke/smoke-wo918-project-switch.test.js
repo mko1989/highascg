@@ -129,6 +129,15 @@ test('F9: New project takes the first free Untitled name', () => {
 	assert.equal(freeUntitledName(), 'Untitled 3', 'an autosave alone holds the name too')
 })
 
+test('F28: Godot clients follow a Load made elsewhere (project.activated), not their own (settle window)', () => {
+	const src = fs.readFileSync(path.join(__dirname, '../../godot/client/core/project_sync.gd'), 'utf8')
+	assert.match(src, /Ws\.on\("change", _on_activated\)/)
+	assert.match(src, /"project\.activated"/)
+	assert.match(src, /func settle\(\) -> void:\n\t_own_switch_until = Time\.get_ticks_msec\(\) \+ OWN_SWITCH_MS/)
+	const hdr = fs.readFileSync(path.join(__dirname, '../../godot/client/app/header_project.gd'), 'utf8')
+	assert.equal(hdr.split('await ProjectSync.settle()').length - 1, 3, 'Load, New and Load from file settle first')
+})
+
 test('cleanup', () => {
 	persistence.flushSync()
 	fs.rmSync(TMP, { recursive: true, force: true })

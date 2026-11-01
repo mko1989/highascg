@@ -87,7 +87,7 @@ static func load_notice(data: Variant) -> Dictionary:
 	var act: Dictionary = d.get("_activation", {}) if d.get("_activation") is Dictionary else {}
 	if act.get("restartRequired") == true:
 		var why := str(act.get("restartReason", ""))
-		return {"text": why if why != "" else "This project changes the CasparCG channel layout — Apply Caspar config and restart CasparCG.", "tone": "error", "sticky": true}  # WO-918 F1: an action is owed — never fades
+		return {"text": why if why != "" else "This project changes the CasparCG channel layout — Apply Caspar config and restart CasparCG.", "tone": "error", "sticky": true, "restart": true}  # WO-918 F1: owed — never fades
 	if d.get("_recoveredFromAutosave") == true:
 		return {"text": "Project loaded — recovered newer autosaved work", "tone": "ok", "sticky": false}
 	return {"text": "Project loaded", "tone": "ok", "sticky": false}
@@ -108,6 +108,12 @@ static func parse_project_file(text: String) -> Dictionary:
 ## would apply the wrong rig. Only the import path sends it: a normal save must keep the hardware hold (WO-821).
 static func file_import_body(project: Dictionary) -> Dictionary:
 	return {"project": project, "allowReplace": true, "keepPayloadHardware": true}
+
+
+## WO-918 F1: a successful Apply (routes-caspar-config.js broadcasts change caspar.applied) clears the sticky
+## "Apply the CasparCG config" notice a restart-required load left up.
+static func answers_restart_notice(d: Variant) -> bool:
+	return d is Dictionary and str((d as Dictionary).get("path", "")) == "caspar.applied"
 
 
 ## WO-918 F23: the server refused the file because its stored show of that name has newer work.

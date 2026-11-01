@@ -25,6 +25,7 @@ var _new_confirm: ConfirmationDialog
 var _menu: PopupMenu
 var _fade: Timer
 var _sticky := false
+var _restart_up := false  # the sticky notice is the owed-restart one (an Apply answers it)
 var _replace: ConfirmationDialog  # WO-918 F23: Load from file of an older copy of a stored show
 var _pending_import: Dictionary = {}
 ## WO-918 F10: the slug whose name the field shows, and whether the operator typed since — a project switch while the
@@ -118,6 +119,9 @@ func _ready() -> void:
 	ProjectSync.name_refused.connect(func(message: String) -> void:
 		_show_name(Store.project, true)
 		say({"text": message + " — name not changed", "tone": "error", "sticky": false}))
+	Ws.on("change", func(d: Variant) -> void:  # WO-918 F1: an Apply answers the owed-restart load notice (any client's)
+		if _restart_up and HeaderModel.answers_restart_notice(d):
+			say({"text": "CasparCG config applied", "tone": "ok", "sticky": false}))
 	ProjectSync.switched.connect(func(project_name: String) -> void:
 		say({"text": "The server switched to \"%s\" — this client follows" % project_name, "tone": "warn", "sticky": false}))
 
@@ -138,6 +142,7 @@ func say(n: Dictionary) -> void:
 	var tones := {"error": ThemeBuilder.ERROR, "warn": ThemeBuilder.WARN, "muted": ThemeBuilder.TEXT_MUTED}
 	notice_label.add_theme_color_override("font_color", tones.get(tone, ThemeBuilder.SUCCESS))
 	_sticky = n.get("sticky") == true
+	_restart_up = n.get("restart") == true
 	if not _sticky:
 		_fade.start(NOTICE_S)
 

@@ -37,6 +37,9 @@ var _deck_pending := false
 var deck_emptied_by_delete := false
 ## WO-918 F10: the name before the header's last rename (restored when the server refuses the new one)
 var _name_before_edit := ""
+## WO-918 F28: until then a project.activated is this client's own Load / New / import (settle() opened the window)
+var _own_switch_until := 0
+const OWN_SWITCH_MS := 30000
 
 
 func _ready() -> void:
@@ -54,6 +57,20 @@ func _ready() -> void:
 	Ws.connected.connect(func() -> void:
 		if _deck_pending:
 			send_deck_sync(true))
+	Ws.on("change", _on_activated)
+
+
+## WO-918 F28: every Load broadcasts project.activated, but only the loading client adopted the show — the others kept
+## showing (and editing) the previous one until a save was refused. Follow another show at once.
+func _on_activated(d: Variant) -> void:
+	if not d is Dictionary or str(d.get("path", "")) != "project.activated" or not d.get("value") is Dictionary:
+		return
+	var slug := str((d["value"] as Dictionary).get("slug", ""))
+	if slug == "" or slug == str(Store.project.get("slug", "")) or Time.get_ticks_msec() < _own_switch_until:
+		return
+	while in_flight:
+		await get_tree().process_frame
+	await adopt_active()
 
 
 ## Call after editing looks / presets (then mark_dirty() for the rest of the project).
@@ -202,6 +219,7 @@ func rename(new_name: String) -> void:
 ## WO-918 F27: before a Load / New / import switches shows, land this show's pending edits and stop the timer, so no
 ## autosave of the old show can arrive after the server switched.
 func settle() -> void:
+	_own_switch_until = Time.get_ticks_msec() + OWN_SWITCH_MS
 	if not _timer.is_stopped() and not project_gone:
 		_timer.stop()
 		flush()
@@ -241,6 +259,7 @@ func save_now() -> Dictionary:
 
 ## A Load / New project replaced the show on the server (web resetServerProjectSync): forget the old project's state.
 func reset() -> void:
+	_own_switch_until = 0  # the switch landed (_adopt): a later activation is someone else's
 	_timer.stop()
 	pending = false
 	project_gone = false

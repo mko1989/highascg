@@ -44,7 +44,7 @@ func test_load_reply() -> void:
 	t.eq(H.loaded_project(reply), {"version": 3, "name": "npcc"}, "bookkeeping keys stripped")
 	t.eq(reply.has("_activation"), true, "reply untouched")
 	t.eq(H.load_notice(reply).text, "Project loaded — recovered newer autosaved work", "recovered")
-	t.eq(H.load_notice({"_activation": {"restartRequired": true, "restartReason": "Channel layout differs"}}), {"text": "Channel layout differs", "tone": "error", "sticky": true}, "restart needed wins — and stays up (WO-918 F1)")
+	t.eq(H.load_notice({"_activation": {"restartRequired": true, "restartReason": "Channel layout differs"}}), {"text": "Channel layout differs", "tone": "error", "sticky": true, "restart": true}, "restart needed wins — and stays up (WO-918 F1)")
 	t.eq(H.load_notice({}).text, "Project loaded", "plain")
 
 
@@ -78,3 +78,9 @@ func test_older_file_offers_replace_or_copy() -> void:  # WO-918 F23
 	t.eq(c.has("rev") or c.has("slug"), false, "a copy carries no stored rev / slug")
 	t.eq(src.name, "Show A", "the file's project is not mutated")
 	t.eq(H.older_file_text("Show A").contains("\"Show A\""), true)
+
+
+func test_apply_answers_restart_notice() -> void:  # WO-918 F1
+	t.eq(H.answers_restart_notice({"path": "caspar.applied", "value": {"layoutOk": true}}), true)
+	t.eq(H.answers_restart_notice({"path": "project.activated"}), false)
+	t.eq(H.answers_restart_notice(null), false)

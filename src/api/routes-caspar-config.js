@@ -232,6 +232,14 @@ async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 		}
 	}
 
+	if (fullApply.ok && typeof ctx._wsBroadcast === 'function') {
+		// WO-918: every client's "Apply the CasparCG config" load notice is answered — not only the applying client's
+		try {
+			ctx._wsBroadcast('change', { path: 'caspar.applied', value: { layoutOk: fullApply.layoutOk !== false, at: Date.now() } })
+		} catch {
+			/* optional */
+		}
+	}
 	return {
 		status: fullApply.ok ? 200 : 502,
 		headers: JSON_HEADERS,
