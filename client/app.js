@@ -17,6 +17,7 @@ import { initWorkspaceLayout } from './lib/workspace-layout.js'
 import { initHeaderBar } from './components/header-bar.js'
 import { normalizeProjectMediaRefs } from './lib/project-media-context.js'
 import { markLocalProjectSaved } from './lib/project-remote-sync.js'
+import { autosaveBody, followServerProject } from './lib/project-follow-server.js'
 import { initAudioMixerPanel } from './components/audio-mixer-panel.js'
 import { initTimerControlPanel, getScreenTimersSnapshot } from './components/timer-control-panel.js'
 import { initPlaylistControlPanel } from './components/playlist-control-panel.js'
@@ -167,7 +168,7 @@ async function init() {
 			try {
 				let project = projectState.exportProject(sceneState, timelineState, multiviewState, programOutputState)
 				project = normalizeProjectMediaRefs(project, settingsState.getSettings())
-				const res = await api.post('/api/project/autosave', { project })
+				const res = await api.post('/api/project/autosave', autosaveBody(project, projectState)) // WO-919: editingSlug
 				if (res?.slug && projectState.setProjectSlug) projectState.setProjectSlug(res.slug)
 				/* WO-329: adopt the server-issued rev — the next save must echo it or be seen as stale. */
 				if (res?.rev != null) projectState.setRev(res.rev)
@@ -193,6 +194,9 @@ async function init() {
 							detail: { reason: 'project_gone', message: e?.message || '' },
 						}),
 					)
+				} else if (e?.status === 409 && e?.reason === 'not_active') {
+					// WO-919: the server switched shows under this tab — the old show was NOT written; take the active one
+					void followServerProject({ projectState, sceneState, timelineState, multiviewState, programOutputState })
 				} else if (e?.status === 409 && e?.reason === 'stale_rev' && e?.storedRev != null && autosaveStaleRetries < 3) {
 					/* WO-329B (owner decision: last write wins): another client bumped the rev.
 					 * Adopting the server rev + re-pushing our CURRENT state once makes this client

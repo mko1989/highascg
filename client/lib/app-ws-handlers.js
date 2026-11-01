@@ -2,6 +2,7 @@
  * WebSocket event handlers for the main app.
  */
 import { consumeSkipRemoteProjectSync } from './project-remote-sync.js'
+import { activatedElsewhere, followServerProject } from './project-follow-server.js'
 import { resetSceneDeckSyncMemo } from './app-scene-deck.js'
 import { loadDeferredCatalogOverWs } from './deferred-catalog-ws.js'
 import { applyRemoteGlobalBordersArray } from './scene-state-global-border.js'
@@ -140,6 +141,10 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		if (!data || data.path == null) return
 		stateStore.applyChange(data.path, data.value)
 		ingestStreamingChannelChange(data.path, data.value)
+		// WO-919: another client / an API Load opened another show — this tab follows instead of editing the closed one
+		if (data.path === 'project.activated' && activatedElsewhere(data.value, projectState)) {
+			void followServerProject({ projectState, sceneState, timelineState, multiviewState, programOutputState })
+		}
 		if (data.path === 'scene.live' && data.value) {
 			if (Number.isFinite(data.seq)) {
 				if (_sceneLiveSeq != null && data.seq > _sceneLiveSeq + 1) {

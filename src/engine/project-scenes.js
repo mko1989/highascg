@@ -211,6 +211,14 @@ function applyStreamCredentialMigration(ctx, project) {
  * order is deterministic for identical content; any mismatch just means "changed" (safe fallback
  * to a normal persist).
  */
+/** JSON with object keys sorted (arrays keep their order): the web client exports keys in another order than the
+ * stored file, so a plain JSON.stringify called equal shows different (WO-919 F6: every web boot re-stamped savedAt). */
+function canonicalJson(v) {
+	return JSON.stringify(v, (_k, x) =>
+		x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x,
+	)
+}
+
 function projectContentEquals(a, b) {
 	if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false
 	const strip = (p) => {
@@ -220,7 +228,7 @@ function projectContentEquals(a, b) {
 		return rest
 	}
 	try {
-		return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
+		return canonicalJson(strip(a)) === canonicalJson(strip(b))
 	} catch (_) {
 		return false
 	}
@@ -242,7 +250,7 @@ function showContentEquals(a, b) {
 	}
 	if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false
 	try {
-		return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
+		return canonicalJson(strip(a)) === canonicalJson(strip(b))
 	} catch (_) {
 		return false
 	}

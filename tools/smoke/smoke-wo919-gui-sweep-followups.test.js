@@ -106,6 +106,10 @@ describe('WO-919 F6: only real edits and explicit saves move savedAt', () => {
 		assert.equal(S.showContentEquals(a, { ...a, hardwareConfig: { v: 2 }, channelScheme: 'legacy', rev: 9, savedAt: 'later' }), true)
 		assert.equal(S.showContentEquals(a, { ...a, name: 'Y' }), false)
 		assert.equal(S.showContentEquals(a, { ...a, scenes: { scenes: [look('a')] } }), false)
+		// the web client exports keys in another order than the stored file — not an edit (every web boot re-stamped)
+		const reordered = { scenes: { scenes: [{ layers: [], name: 'a', id: 'a' }, { layers: [], name: 'b', id: 'b' }] }, name: 'X', version: 2 }
+		assert.equal(S.showContentEquals(a, reordered), true)
+		assert.equal(S.showContentEquals(a, { ...reordered, scenes: { scenes: [look('b'), look('a')] } }), false, 'look order is content')
 	})
 
 	it('a hardwareConfig-only re-stamp (Apply / load) keeps the stored savedAt; a look edit moves it', () => {

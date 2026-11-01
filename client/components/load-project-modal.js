@@ -283,6 +283,7 @@ export function showLoadProjectModal(opts = {}) {
 		const recovered = project?._recoveredFromAutosave === true
 		if (recovered && project) delete project._recoveredFromAutosave
 		if (entry && !entry.legacy) {
+			projectState.setProjectSlug(entry.id) // WO-919: this tab's own Load is not "the server switched" (project.activated)
 			await api.post('/api/project/load', { slug: entry.id, applyHardware: false })
 		}
 		const result = await importProjectWithHardwareReconcile(project, importDeps(entry))

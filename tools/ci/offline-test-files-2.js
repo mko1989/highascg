@@ -76,4 +76,6 @@ module.exports = [
 	'tools/smoke/smoke-wo916-pixel-map-console.test.js',
 	'tools/smoke/smoke-wo917-pixel-map-intensity.test.js',
 	'tools/smoke/smoke-wo920-operator-gui-monitor-2.test.js',
+	'tools/smoke/smoke-wo919-xrandr-unplanned-heads.test.js',
+	'tools/smoke/smoke-wo919-web-follows-server-show.test.js',
 ]

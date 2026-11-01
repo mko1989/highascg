@@ -102,7 +102,8 @@ test('load without applyHardware holds the project; autosaves keep the stored ha
 	assert.equal(hold.isProjectHardwareHeld(SLUG), true)
 	assert.ok(ctx.logs.some((l) => l.includes('loaded without its hardware')))
 
-	const a = await post(ctx, '/api/project/autosave', { project: clientProject() })
+	// a real edit: an unchanged show is a no-op write since WO-919 F6 (no _autosave copy to check)
+	const a = await post(ctx, '/api/project/autosave', { project: clientProject(SLUG, { scenes: [{ ...LOOKS[0], name: 'Look 1 edited' }] }) })
 	assert.equal(a.status, 200, JSON.stringify(a.body))
 	assert.equal(storedDest(), 'show_dst', 'the box rig must not replace the show rig')
 	assert.equal(autosaveDest(), 'show_dst', '_autosave copy too')
