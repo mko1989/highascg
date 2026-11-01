@@ -5,6 +5,7 @@ const {
 	createDestinationWiringContext,
 } = require('../config/device-graph-destination-wiring')
 const {
+	OPERATOR_MONITOR_1,
 	resolvePhysicalPortIndexForDestination,
 } = require('../config/screen-consumer-port-resolve')
 const { resolveOperatorMonitorPort } = require('./operator-monitor-resolve')
@@ -175,9 +176,10 @@ function resolveLayoutRectForOperatorPort(config, layout, portN) {
 	const ctx = createDestinationWiringContext(config || {})
 	for (let destIndex = 0; destIndex < ctx.destinations.length; destIndex++) {
 		const dest = ctx.destinations[destIndex]
-		const portIdx = resolvePhysicalPortIndexForDestination(dest, destIndex, ctx)
-		if (portIdx !== portN) continue
 		const mode = String(dest?.mode || '').toLowerCase()
+		/* WO-920: an operator_gui destination owns this port through its dot-1 cable only (dot 2 = monitor 2) */
+		const portIdx = resolvePhysicalPortIndexForDestination(dest, destIndex, ctx, mode === 'operator_gui' ? OPERATOR_MONITOR_1 : {})
+		if (portIdx !== portN) continue
 		// operator_gui-bound jacks resolve to their OWN non-screen head, never to
 		// screen_<mainScreenIndex+1> (os-layout-calculator-assign.js) — WO-573 follow-up: this used
 		// to alias to the multiview rect, which broke the moment a real multiview destination was

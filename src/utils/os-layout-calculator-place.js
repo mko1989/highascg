@@ -15,6 +15,31 @@ const { resolveEffectiveOsModeSource } = require('./os-mode-source')
 const { isOperatorGuiFirst } = require('../config/operator-gui-first')
 
 /**
+ * WO-920: the operator heads keyed by the monitor their cable names (assign.js `n`: dot 1 → 1, dot 2 → 2), monitor 1
+ * first, so it keeps the left edge under "Operator GUI first" (WO-868) and monitor 2 sits right next to it. A second
+ * jack on the same dot (a fan-out cable) still lights, under the next number above 2, so `operatorGui[2]` always
+ * means the cable from dot 2.
+ * @param {object[]} [assignments]
+ * @returns {{ n: number, data: object }[]}
+ */
+function operatorGuiPlacementOrder(assignments) {
+	const used = new Set()
+	let spare = 2
+	const out = []
+	const sorted = [...(assignments || [])].sort((a, b) => (parseInt(a?.n, 10) || 1) - (parseInt(b?.n, 10) || 1))
+	for (const data of sorted) {
+		let n = Math.max(1, parseInt(data?.n, 10) || 1)
+		if (used.has(n)) {
+			while (used.has(++spare));
+			n = spare
+		}
+		used.add(n)
+		out.push({ n, data })
+	}
+	return out
+}
+
+/**
  * @param {object} config
  * @param {{
  *   allGpuAssignments: Map<number, object>,
@@ -28,10 +53,11 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 	/* WO-868: "Operator GUI first" — the operator monitor heads the canvas (x=0), the screens follow to its right.
 	 * Which jack is the operator stays the per-boot / cabled choice (WO-638, WO-412); only the order changes. */
 	const operatorFirst = isOperatorGuiFirst(config)
-	const pushOperatorGui = () =>
-		/* WO-573 follow-up: operator_gui is placed independently of a genuine multiview destination —
-		 * both can be live on separate physical outputs at once, so each gets its own results bucket. */
-		(operatorGuiAssignments || []).forEach((og, idx) => placements.push({ kind: 'operator_gui', n: idx + 1, data: og }))
+	/* WO-573 follow-up: operator_gui is placed independently of a genuine multiview destination —
+	 * both can be live on separate physical outputs at once, so each gets its own results bucket. */
+	const pushOperatorGui = () => {
+		for (const og of operatorGuiPlacementOrder(operatorGuiAssignments)) placements.push({ kind: 'operator_gui', ...og })
+	}
 	if (operatorFirst) pushOperatorGui()
 	const screens = getHorizontalLayoutOrder(effectiveScreenCount, swap)
 	for (const n of screens) placements.push({ kind: 'screen', n })
@@ -246,4 +272,4 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 	return results
 }
 
-module.exports = { computePlacedLayoutResults }
+module.exports = { computePlacedLayoutResults, operatorGuiPlacementOrder }

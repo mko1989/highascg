@@ -87,7 +87,8 @@ function applyMappingGpuPlacementOffsets(
 	for (const [key, info] of lead > 0 ? [] : operatorGui) {
 		const n = parseInt(key, 10)
 		if (!Number.isFinite(n) || n < 1 || !info) continue
-		if (manual(`operator_gui_${n}_os_${axis}`, `operator_gui_os_${axis}`) != null) continue
+		/* WO-920: the unnumbered key is monitor 1's (assign.js) — it never pins monitor 2 */
+		if (manual(`operator_gui_${n}_os_${axis}`, ...(n === 1 ? [`operator_gui_os_${axis}`] : [])) != null) continue
 		info[axis] = (Number(info[axis]) || 0) + off
 	}
 	for (const [key, info] of prv) {

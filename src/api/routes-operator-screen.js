@@ -8,8 +8,10 @@
  * the device graph — so the kiosk launcher, pointer confine, Godot window placement and the
  * Devices-tab cable all read one answer.
  *
- *   GET  /api/system/operator-screen            { outputs: [{ name, port, x, y, width, height, current, caspar }], port }
+ *   GET  /api/system/operator-screen            { outputs: [{ name, port, x, y, width, height, current, caspar, gui }], port }
  *                                               caspar (WO-891): a Caspar screen consumer is planned on that output
+ *                                               gui (WO-920): 1 / 2 = the layout plans that output as operator monitor 1 /
+ *                                               2 (the Operator GUI card's dot), absent otherwise
  *   POST /api/system/operator-screen { name }   { ok, name, port } | 400 no name | 404 unknown output | 422 unmapped
  *   POST /api/system/operator-screen { prompt } true: the prompt is up — let the pointer leave the operator monitor;
  *                                               false: it closed with no pick — confine again
@@ -64,15 +66,30 @@ function restoreConfine(ctx, deps) {
  * @returns {Set<string>}
  */
 function casparOutputNames(config) {
-	const names = new Set()
+	return planRoles(config).caspar
+}
+
+/**
+ * The layout plan's view of each output: `caspar` as above, `gui` name → operator monitor number (WO-920: the Godot
+ * second window opens on the output cabled from the Operator GUI card's dot 2).
+ * @param {object} config
+ * @returns {{ caspar: Set<string>, gui: Map<string, number> }}
+ */
+function planRoles(config) {
+	const caspar = new Set()
+	const gui = new Map()
 	try {
 		const plan = require('../utils/os-layout-calculator').calculateLayoutPositions(config)
 		const rows = [plan?.screens, plan?.prv, plan?.multiview].flatMap((g) => Object.values(g || {}))
-		for (const r of rows.concat(plan?.mappingGpuOutputs || [])) if (r?.sysId) names.add(String(r.sysId))
+		for (const r of rows.concat(plan?.mappingGpuOutputs || [])) if (r?.sysId) caspar.add(String(r.sysId))
+		for (const [n, r] of Object.entries(plan?.operatorGui || {})) {
+			const num = parseInt(n, 10)
+			if (r?.sysId && (num === 1 || num === 2)) gui.set(String(r.sysId), num)
+		}
 	} catch (_) {
 		/* no plan → nothing is marked; the client still never picks its own screen */
 	}
-	return names
+	return { caspar, gui }
 }
 
 function reply(status, body) {
@@ -94,9 +111,10 @@ function handleGet(ctx, deps = {}) {
 	} catch (e) {
 		boot = { pending: false, reason: `error: ${e?.message || e}` }
 	}
-	const caspar = (deps.casparOutputNames || casparOutputNames)(config)
+	const roles = (deps.planRoles || planRoles)(config)
+	const row = (o) => ({ ...o, current: port != null && o.port === port, caspar: roles.caspar.has(o.name) })
 	return reply(200, {
-		outputs: outputs.map((o) => ({ ...o, current: port != null && o.port === port, caspar: caspar.has(o.name) })),
+		outputs: outputs.map((o) => (roles.gui.has(o.name) ? { ...row(o), gui: roles.gui.get(o.name) } : row(o))),
 		port: port ?? null,
 		boot,
 	})
@@ -158,4 +176,4 @@ function register(routes) {
 	routes.post('/api/system/operator-screen', ({ body, ctx }) => handlePost(body, ctx), { requireCaspar: false })
 }
 
-module.exports = { register, handleGet, handlePost, handleBoot, PROMPT_MAX_MS }
+module.exports = { register, handleGet, handlePost, handleBoot, planRoles, PROMPT_MAX_MS }

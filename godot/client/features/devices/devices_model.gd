@@ -38,6 +38,8 @@ static func is_destination_connector(id: String) -> bool:
 
 
 ## Anchor identity: a pgm_prv destination is ONE connector with two halves, so its dots are `id#pgm` / `id#prv`.
+## WO-920: the Operator GUI's dots "1" / "2" are the same two halves — dot 2 = outputLayer 2 (the second operator
+## window's monitor, WO-891), so the cable gesture, drag-release and re-grab treat it exactly like a PRV half.
 static func anchor_key(id: String, half := "") -> String:
 	return "%s#%s" % [id, half] if half == "pgm" or half == "prv" else id
 
@@ -51,6 +53,25 @@ static func source_anchor(edge: Dictionary) -> String:
 
 
 ## "OPG · 1920x1080@50" / "NDI host · ch 4" (destinationRectLabel).
+## The card's dot rows for a destination mode: [half, tag] — PGM/PRV halves, the Operator GUI's monitors 1 / 2, else
+## none (one dot on the title row).
+static func half_rows(mode: String) -> Array:
+	match mode:
+		"pgm_prv":
+			return [["pgm", "PGM"], ["prv", "PRV"]]
+		"operator_gui":
+			return [["pgm", "1"], ["prv", "2"]]
+	return []
+
+
+## A destination cable's prefix in its card's link lines ("PGM: " / "2: "; "" for a one-dot card).
+static func link_prefix(mode: String, layer: int) -> String:
+	for r in half_rows(mode):
+		if (r[0] == "prv") == (layer >= 2):
+			return r[1] + ": "
+	return ""
+
+
 static func dest_sub(d: Dictionary) -> String:
 	var mode := str(d.get("mode", "pgm_prv"))
 	if mode == "host_channel":
@@ -134,6 +155,7 @@ static func build(payload: Dictionary, live_cm: Variant = null, cc: Variant = nu
 			intents[H.R.s(it.get("id"))] = it
 	var switcher_bus := H.R.s(H.R.d(caspar.get("channelMap")).get("transitionModel")) == "switcher_bus"
 	var dests := []
+	var gui_conns := {}
 	var counts := {"screen": 0, "host": 0}
 	for d in H.all_destinations(payload, live_cm):
 		var did := H.R.s(d.get("id")).strip_edges()
@@ -152,16 +174,22 @@ static func build(payload: Dictionary, live_cm: Variant = null, cc: Variant = nu
 			sub = "HOST · ch %s%s" % [H.R.s(ch) if ch != null else "?", " (planned)" if H.channel_planned(ch, cc) else ""]
 		var links := []
 		for e in edges.filter(func(x: Dictionary) -> bool: return str(x.sourceId) == conn):
-			var prefix := ("PGM: " if output_layer(e) == 1 else "PRV: ") if mode == "pgm_prv" else ""
-			links.append([output_layer(e), prefix + str(labels.get(str(e.sinkId), e.sinkId))])
+			links.append([output_layer(e), link_prefix(mode, output_layer(e)) + str(labels.get(str(e.sinkId), e.sinkId))])
 		links.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+		var rows := half_rows(mode)
+		if mode == "operator_gui":
+			gui_conns[conn] = true
 		dests.append({"id": did, "label": name, "sub": sub, "mode": mode, "host": host, "connector": conn,
-			"halves": ["pgm", "prv"] if mode == "pgm_prv" else [], "prv_dot": not switcher_bus, "dest": d,
-			"intent": intent, "links": links.map(func(l: Array) -> String: return l[1])})
+			"halves": rows.map(func(r: Array) -> String: return r[0]), "half_tags": rows.map(func(r: Array) -> String: return r[1]),
+			"prv_dot": not switcher_bus or mode == "operator_gui", "dest": d, "intent": intent,
+			"links": links.map(func(l: Array) -> String: return l[1])})
 	var cables := []
 	for e in edges:
+		var from := str(labels.get(str(e.sourceId), e.sourceId))
+		if gui_conns.has(str(e.sourceId)):  # WO-920: "Operator GUI 2 → DP-6"
+			from += " %d" % mini(output_layer(e), 2)
 		cables.append({"id": str(e.get("id", "")), "from": source_anchor(e), "to": str(e.sinkId),
-			"label": "%s → %s" % [labels.get(str(e.sourceId), e.sourceId), labels.get(str(e.sinkId), e.sinkId)]})
+			"label": "%s → %s" % [from, labels.get(str(e.sinkId), e.sinkId)]})
 	return {"destinations": dests, "slots": slots, "cables": cables, "screen_count": counts.screen,
 		"host_count": counts.host}
 

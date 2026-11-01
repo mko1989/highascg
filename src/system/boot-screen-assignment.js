@@ -138,6 +138,13 @@ function operatorSourceId(config) {
 	return op?.id ? `dst_in_${op.id}` : null
 }
 
+/** WO-920: jacks the operator's dot-2 cable (outputLayer 2, the second operator monitor) holds. */
+function monitor2Jacks(config, opSrc) {
+	const { readEdgeOutputLayer } = require('../config/device-graph-output-mapping')
+	const edges = config?.deviceGraph?.edges || []
+	return edges.filter((e) => opSrc && String(e?.sourceId || '') === opSrc && readEdgeOutputLayer(e) >= 2).map((e) => String(e.sinkId))
+}
+
 function gpuIds(config) {
 	return new Set(
 		(config?.deviceGraph?.connectors || [])
@@ -165,7 +172,7 @@ function planDestinationCables(config, lit, opId) {
 		if (!groups.has(sink)) groups.set(sink, [])
 		groups.get(sink).push(e)
 	}
-	const taken = new Set([opId])
+	const taken = new Set([opId, ...monitor2Jacks(config, opSrc)])  // no destination moves onto operator monitor 2
 	const keep = []
 	const move = []
 	for (const sink of groups.keys()) {
@@ -206,6 +213,7 @@ function defaultOperator(config, lit, flagPort) {
 		(config?.deviceGraph?.edges || [])
 			.filter((e) => String(e?.sourceId || '') !== opSrc)
 			.map((e) => String(e?.sinkId || ''))
+			.concat(monitor2Jacks(config, opSrc))
 	)
 	return lit.find((p) => !used.has(p.id)) || lit[0] || null
 }

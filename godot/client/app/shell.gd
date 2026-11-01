@@ -119,6 +119,7 @@ func _ready() -> void:
 	undock.forward_to = [_shortcut_input, ProjectUndo._unhandled_key_input]
 	add_child(undock)
 	undock.setup(tabs)
+	Ws.on("change", func(d: Variant) -> void: if d is Dictionary and str(d.get("path")) in ["caspar.applied", "hardwareConfig", "project.activated"]: undock.recheck())  # WO-920: dot 2 recabled
 	if Config.args.has("tab"):  # --tab=N (index) or --tab=Previs (name — survives a reorder)
 		var want := str(Config.args["tab"])
 		var named := tab_node(want.capitalize())

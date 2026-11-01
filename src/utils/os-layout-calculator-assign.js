@@ -143,7 +143,9 @@ function collectGpuLayoutAssignments(config) {
 			mainIndex = null
 			inferredFromEdge = true
 		} else if (edgeDerivedMode === 'operator_gui') {
-			binding = { type: 'operator_gui', index: 1 }
+			/* WO-920: the card's dot 2 (edge note outputLayer 2) is the second operator monitor (WO-891's window) —
+			 * operatorGui[2]; dot 1 / no note stays the main GUI monitor, operatorGui[1]. */
+			binding = { type: 'operator_gui', index: edgeOutputLayer >= 2 ? 2 : 1 }
 			mainIndex = null
 			inferredFromEdge = true
 		}
@@ -291,15 +293,18 @@ function collectGpuLayoutAssignments(config) {
 					boundDest && Number.isFinite(Number(boundDest.fps)) && Number(boundDest.fps) > 0
 						? Number(boundDest.fps)
 						: null
+				/* WO-920: the unnumbered `operator_gui_os_*` keys are monitor 1's — monitor 2 inheriting monitor 1's
+				 * manual x would stack both heads on the same pixels. */
+				const og = (k) => (n === 1 ? config[`operator_gui_${k}`] : undefined)
 				operatorGuiAssignments.push({
 					sysId,
 					n,
-					osMode: config[`operator_gui_${n}_os_mode`] || config.operator_gui_os_mode || ogVideoMode || c.caspar?.mode,
-					osBackend: String(config[`operator_gui_${n}_os_backend`] || config.operator_gui_os_backend || c.caspar?.osBackend || 'xrandr').trim().toLowerCase(),
-					osRate: ogFps ?? config[`operator_gui_${n}_os_rate`] ?? config.operator_gui_os_rate ?? c.caspar?.refreshHz,
+					osMode: config[`operator_gui_${n}_os_mode`] || og('os_mode') || ogVideoMode || c.caspar?.mode,
+					osBackend: String(config[`operator_gui_${n}_os_backend`] || og('os_backend') || c.caspar?.osBackend || 'xrandr').trim().toLowerCase(),
+					osRate: ogFps ?? config[`operator_gui_${n}_os_rate`] ?? og('os_rate') ?? c.caspar?.refreshHz,
 					casparMode: ogVideoMode || config[`operator_gui_${n}_mode`] || c.caspar?.mode,
-					manualX: Number.isFinite(config[`operator_gui_${n}_os_x`]) ? config[`operator_gui_${n}_os_x`] : (Number.isFinite(config.operator_gui_os_x) ? config.operator_gui_os_x : null),
-					manualY: Number.isFinite(config[`operator_gui_${n}_os_y`]) ? config[`operator_gui_${n}_os_y`] : (Number.isFinite(config.operator_gui_os_y) ? config.operator_gui_os_y : null),
+					manualX: Number.isFinite(config[`operator_gui_${n}_os_x`]) ? config[`operator_gui_${n}_os_x`] : (Number.isFinite(og('os_x')) ? og('os_x') : null),
+					manualY: Number.isFinite(config[`operator_gui_${n}_os_y`]) ? config[`operator_gui_${n}_os_y`] : (Number.isFinite(og('os_y')) ? og('os_y') : null),
 				})
 			}
 		}

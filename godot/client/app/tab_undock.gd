@@ -31,6 +31,7 @@ var api: Object = null  # Api autoload (GET /api/system/operator-screen); null o
 var forward_to: Array[Callable] = []  # main-window key handlers (F3, undo) that get the second window's spare keys
 var _outputs := []  # per screen, the server output at the last placement ({} unknown)
 var _screen := -1  # the operator's screen pick (ui.cfg), -1 automatic
+var _placed := -2  # the screen the last place() picked (WO-920 recheck)
 var _sig := ""
 var _save_t: Timer
 var _poll_t: Timer
@@ -206,6 +207,7 @@ func place() -> void:
 			_outputs = ScreenModel.match_outputs((r.data as Dictionary).get("outputs", []), screens)
 	var main := get_window().current_screen
 	var s := M.pick_screen(screens, _outputs, main, _screen)
+	_placed = s
 	var fill := M.fills_screen(s, main)
 	var main_rect := Rect2i(screens[main]) if main >= 0 and main < screens.size() else Rect2i(0, 0, 1920, 1080)
 	var rect := Rect2i(screens[s]) if fill else M.windowed_rect(main_rect, M.load_record(cfg_path).rect)
@@ -228,6 +230,20 @@ static func _screens() -> Array:
 	for i in DisplayServer.get_screen_count():
 		out.append(Rect2i(DisplayServer.screen_get_position(i), DisplayServer.screen_get_size(i)))
 	return out
+
+
+## WO-920: the cables may have changed (shell.gd: a Devices write, a project switch) — the X layout poll never sees a
+## cable, so ask the server again and move the window only when its pick did (dot 2 cabled to another monitor).
+func recheck() -> void:
+	if win == null or api == null:
+		return
+	var screens := _screens()
+	var r: Dictionary = await api.get_json("/api/system/operator-screen")
+	if win == null or not (r.ok and r.data is Dictionary):
+		return
+	var outs := ScreenModel.match_outputs((r.data as Dictionary).get("outputs", []), screens)
+	if M.pick_screen(screens, outs, get_window().current_screen, _screen) != _placed:
+		place()
 
 
 ## X layout changed (a monitor plugged, "Operator GUI first" moved them): place the window again.

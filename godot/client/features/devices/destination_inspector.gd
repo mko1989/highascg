@@ -95,7 +95,7 @@ func _screen_page(entry: Dictionary, payload: Dictionary, settings: Variant, edg
 	if edges.is_empty():
 		add_child(_muted("No mapped outputs yet."))
 	for e in edges:
-		add_child(_link(e, payload, true))
+		add_child(_link(e, payload, true, mode))
 	add_child(HSeparator.new())
 	var name_tip := "Name of this screen — shown in the looks selector, multiview, panels and Companion" \
 		if mode == "pgm_prv" or mode == "pgm_only" else "Name of this destination"
@@ -251,8 +251,9 @@ func _set_val(key: String, text: String) -> void:
 		_vals[key].text = text
 
 
-## A mapped output: its connector label (click focuses that connector), "(Layer N)" above 1 on screen pages.
-func _link(e: Dictionary, payload: Dictionary, layer: bool) -> Control:
+## A mapped output: its connector label (click focuses that connector), "(Layer N)" above 1 on screen pages — the
+## Operator GUI's "(monitor 2)" (WO-920).
+func _link(e: Dictionary, payload: Dictionary, layer: bool, mode := "") -> Control:
 	var h := HBoxContainer.new()
 	var sink := H.R.s(e.get("sinkId"))
 	var b := Button.new()
@@ -264,7 +265,7 @@ func _link(e: Dictionary, payload: Dictionary, layer: bool) -> Control:
 	h.add_child(b)
 	var n := Model.output_layer(e)
 	if layer and n > 1:
-		h.add_child(_muted(" (Layer %d)" % n))
+		h.add_child(_muted((" (monitor %d)" if mode == "operator_gui" else " (Layer %d)") % mini(n, 2 if mode == "operator_gui" else n)))
 	return h
 
 

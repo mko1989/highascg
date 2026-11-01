@@ -107,8 +107,8 @@ func test_build_destinations() -> void:
 	t.eq(op.id, "dst_op_1", "operator GUI first, in payload order")
 	t.eq(op.connector, "dst_in_dst_op_1", "connector is the dst_in_ id")
 	t.eq(op.sub, "OPG · 1920x1080@50", "operator GUI sub line")
-	t.eq(op.halves, [], "operator GUI has no PGM/PRV halves")
-	t.eq(op.links, ["DP 2/3 · DP-2"], "operator GUI link to its GPU socket, no prefix")
+	t.eq([op.halves, op.half_tags], [["pgm", "prv"], ["1", "2"]], "WO-920: operator GUI dots 1 / 2 (the pgm / prv anchors)")
+	t.eq(op.links, ["1: DP 2/3 · DP-2"], "operator GUI link names its dot (no note = monitor 1)")
 	var pv: Dictionary = built.destinations[1]
 	t.eq(pv.id, "dst_pv_1", "pgm_prv destination second")
 	t.eq(pv.connector, "dst_in_dst_pv_1", "pgm_prv connector")
@@ -144,7 +144,7 @@ func test_build_cables() -> void:
 	var op_cable: Dictionary = built.cables[0]
 	t.eq(op_cable.from, "dst_in_dst_op_1#pgm", "operator GUI cable leaves the PGM dot (no note)")
 	t.eq(op_cable.to, "gpu_p1", "operator GUI cable lands on gpu_p1")
-	t.eq(op_cable.label, "Operator GUI → DP 2/3 · DP-2", "operator GUI cable label")
+	t.eq(op_cable.label, "Operator GUI 1 → DP 2/3 · DP-2", "operator GUI cable label names dot 1")
 	var pv_cable: Dictionary = built.cables[1]
 	t.eq(pv_cable.from, "dst_in_dst_pv_1#prv", "PRV edge leaves the PRV dot")
 	t.eq(pv_cable.to, "gpu_p0", "PRV cable lands on gpu_p0")
@@ -171,3 +171,20 @@ func test_build_empty_payload() -> void:
 	t.eq(built.destinations, [], "empty payload → no destinations")
 	t.eq(built.cables, [], "empty payload → no cables")
 	t.eq(built.slots.size(), 6, "empty payload still draws the six rear-panel slots")
+
+
+## WO-920: the Operator GUI card's dot 2 — an edge from its #prv anchor (outputLayer 2) is the second operator monitor.
+func test_operator_gui_dot_2() -> void:
+	var fx := _fixture()
+	fx.graph.edges[0]["note"] = "{\"outputLayer\":2}"
+	var built := M.build(fx)
+	t.eq(built.destinations[0].links, ["2: DP 2/3 · DP-2"], "the link names dot 2")
+	t.eq([built.cables[0].from, built.cables[0].label], ["dst_in_dst_op_1#prv", "Operator GUI 2 → DP 2/3 · DP-2"],
+		"the cable leaves dot 2 (the #prv anchor) and says so")
+	fx.graph.edges[0]["note"] = "{\"outputLayer\":3}"
+	t.eq(M.build(fx).cables[0].label, "Operator GUI 2 → DP 2/3 · DP-2", "a higher layer still reads as dot 2")
+	t.eq(M.half_rows("operator_gui"), [["pgm", "1"], ["prv", "2"]])
+	t.eq(M.half_rows("pgm_prv"), [["pgm", "PGM"], ["prv", "PRV"]])
+	t.eq(M.half_rows("host_channel"), [])
+	t.eq([M.link_prefix("operator_gui", 1), M.link_prefix("operator_gui", 2), M.link_prefix("pgm_prv", 2),
+		M.link_prefix("pgm_prv", 1), M.link_prefix("multiview", 2)], ["1: ", "2: ", "PRV: ", "PGM: ", ""])

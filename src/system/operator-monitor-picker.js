@@ -313,8 +313,11 @@ function wireOperatorGuiGraphEdge(config, port) {
 		]
 	}
 	const edges = Array.isArray(graph.edges) ? graph.edges : []
+	/* WO-920: the cable from the card's dot 2 (outputLayer 2, the second operator monitor) stays unless it sits on the
+	 * picked jack — it is not the operator-monitor cable this choice replaces. */
+	const { readEdgeOutputLayer } = require('../config/device-graph-output-mapping')
 	const nextEdges = edges.filter(
-		(e) => String(e?.sourceId || '') !== srcId && String(e?.sinkId || '') !== gpuId,
+		(e) => (String(e?.sourceId || '') !== srcId || readEdgeOutputLayer(e) >= 2) && String(e?.sinkId || '') !== gpuId,
 	)
 	nextEdges.push({ id: `e_${srcId}_${gpuId}`, sourceId: srcId, sinkId: gpuId })
 	nextGraph.edges = nextEdges

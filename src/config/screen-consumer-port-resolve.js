@@ -47,6 +47,10 @@ const OPERATOR_GUI_PORT_FLAGS = {
 	operator_monitor: true,
 }
 
+/** WO-920: the operator monitor is the jack cabled from the card's dot 1; dot 2 (outputLayer 2) is the second
+ * operator window's monitor, never the operator_monitor port (it gets no Caspar consumer and no flags). */
+const OPERATOR_MONITOR_1 = { pgmOnly: true }
+
 /**
  * @param {object | null | undefined} connector
  * @returns {number | null} 1-based physical port index (gpu_p0 → 1)
@@ -64,16 +68,19 @@ function physicalPortIndexFromGpuConnector(connector) {
 /**
  * @param {string} sourceId
  * @param {ReturnType<typeof createDestinationWiringContext>} ctx
+ * @param {{ pgmOnly?: boolean }} [opts] pgmOnly: skip edges noted outputLayer >= 2 (a PRV half, the operator GUI's
+ *   monitor-2 dot — WO-920)
  * @returns {object | null}
  */
-function resolveGpuOutConnectorFromSource(sourceId, ctx) {
+function resolveGpuOutConnectorFromSource(sourceId, ctx, opts = {}) {
+	const edgeMap = opts.pgmOnly && ctx.outgoingPgm ? ctx.outgoingPgm : ctx.outgoing
 	const queue = [String(sourceId || '')]
 	const seen = new Set()
 	while (queue.length) {
 		const cur = queue.shift()
 		if (!cur || seen.has(cur)) continue
 		seen.add(cur)
-		for (const sinkId of ctx.outgoing.get(cur) || []) {
+		for (const sinkId of edgeMap.get(cur) || []) {
 			const sink = ctx.byId.get(String(sinkId || ''))
 			if (!sink) continue
 			if (sink.kind === 'gpu_out') return sink
@@ -94,11 +101,12 @@ function resolveGpuOutConnectorFromSource(sourceId, ctx) {
  * @param {object} dest
  * @param {number} destIndex
  * @param {ReturnType<typeof createDestinationWiringContext>} ctx
+ * @param {{ pgmOnly?: boolean }} [opts] see resolveGpuOutConnectorFromSource
  * @returns {number | null}
  */
-function resolvePhysicalPortIndexForDestination(dest, destIndex, ctx) {
+function resolvePhysicalPortIndexForDestination(dest, destIndex, ctx, opts = {}) {
 	for (const src of destinationSourceIds(dest, destIndex, ctx)) {
-		const gpu = resolveGpuOutConnectorFromSource(src, ctx)
+		const gpu = resolveGpuOutConnectorFromSource(src, ctx, opts)
 		const port = physicalPortIndexFromGpuConnector(gpu)
 		if (port) return port
 	}
@@ -143,7 +151,7 @@ function applyPhysicalPortConsumerFlagsToScreens(merged, appConfig) {
 		// stamp the operator-GUI flags on that port's own `screen_${portIdx}_*` keys, then stop —
 		// deliberately without falling through to the screen_${n} copy that WO-263 removed.
 		if (mode === 'operator_gui') {
-			const guiPort = resolvePhysicalPortIndexForDestination(dest, destIndex, ctx)
+			const guiPort = resolvePhysicalPortIndexForDestination(dest, destIndex, ctx, OPERATOR_MONITOR_1)
 			if (guiPort) {
 				for (const [field, value] of Object.entries(OPERATOR_GUI_PORT_FLAGS)) {
 					merged[`screen_${guiPort}_${field}`] = value
@@ -202,7 +210,7 @@ function deriveOperatorGuiAppConfigPortFlags(appConfig) {
 	for (let i = 0; i < ctx.destinations.length; i++) {
 		const dest = ctx.destinations[i]
 		if (String(dest?.mode || '').toLowerCase() !== 'operator_gui') continue
-		guiPort = resolvePhysicalPortIndexForDestination(dest, i, ctx)
+		guiPort = resolvePhysicalPortIndexForDestination(dest, i, ctx, OPERATOR_MONITOR_1)
 		if (guiPort) break
 	}
 	if (!guiPort) return { patch: {}, guiPort: null }
@@ -218,6 +226,7 @@ module.exports = {
 	WINDOW_CHROME_FIELDS,
 	PGM_DESTINATION_MODES,
 	OPERATOR_GUI_PORT_FLAGS,
+	OPERATOR_MONITOR_1,
 	physicalPortIndexFromGpuConnector,
 	resolveGpuOutConnectorFromSource,
 	resolvePhysicalPortIndexForDestination,

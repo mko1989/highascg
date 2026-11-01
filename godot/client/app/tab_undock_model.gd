@@ -49,10 +49,23 @@ static func busy(outputs: Array, i: int) -> bool:
 	return bool(o.get("caspar", false)) or bool(o.get("current", false))
 
 
-## The screen the second window opens on: the operator's pick (`saved`) while it exists and shows no Caspar output
-## — the main window's own screen too, as a plain window there — else the first other screen that is neither the
-## main window's nor busy; -1 when there is none (a plain window on the main screen: a one-monitor dev box).
+## WO-920: the screen whose output is cabled from the Operator GUI card's dot 2 (GET operator-screen `gui: 2`); -1 none.
+static func cabled_screen(outputs: Array) -> int:
+	for i in outputs.size():
+		var o: Variant = outputs[i]
+		if o is Dictionary and (o.get("gui") is int or o.get("gui") is float) and int(o.gui) == 2:
+			return i
+	return -1
+
+
+## The screen the second window opens on: the screen cabled as operator monitor 2 (WO-920) unless the main window is
+## on it; else the operator's pick (`saved`) while it exists and shows no Caspar output — the main window's own screen
+## too, as a plain window there — else the first other screen that is neither the main window's nor busy; -1 when
+## there is none (a plain window on the main screen: a one-monitor dev box).
 static func pick_screen(screens: Array, outputs: Array, main: int, saved: int) -> int:
+	var cabled := cabled_screen(outputs)
+	if cabled >= 0 and cabled < screens.size() and cabled != main:
+		return cabled
 	if saved >= 0 and saved < screens.size() and (saved == main or not busy(outputs, saved)):
 		return saved
 	for i in screens.size():
@@ -87,6 +100,8 @@ static func screen_label(i: int, o: Dictionary, main: int) -> String:
 		line += " (Caspar output)"
 	elif bool(o.get("current", false)):
 		line += " (operator monitor)"
+	elif cabled_screen([o]) == 0:
+		line += " (operator monitor 2 — cabled)"
 	return line
 
 

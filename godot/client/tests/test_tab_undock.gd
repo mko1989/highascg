@@ -46,6 +46,24 @@ func test_pick_screen_never_a_caspar_output() -> void:
 	t.ok(M.fills_screen(2, 0) and not M.fills_screen(0, 0) and not M.fills_screen(-1, 0))
 
 
+## WO-920: the output cabled from the Operator GUI card's dot 2 (operator-screen `gui: 2`) outranks the saved pick.
+func test_pick_screen_prefers_cabled_monitor_2() -> void:
+	var screens := [Rect2i(0, 0, 1920, 1080), Rect2i(1920, 0, 1920, 1080), Rect2i(3840, 0, 3840, 1792), Rect2i(7680, 0, 1920, 1080)]
+	var outs := [{"name": "DP-4", "current": true, "gui": 1}, {"name": "DP-6"}, {"name": "DP-0", "caspar": true}, {"name": "DP-2", "gui": 2}]
+	t.eq(M.cabled_screen(outs), 3)
+	t.eq(M.pick_screen(screens, outs, 0, 1), 3, "the dot-2 cable outranks the saved pick")
+	t.eq(M.pick_screen(screens, outs, 0, -1), 3, "and the automatic pick")
+	outs[3] = {"name": "DP-2", "gui": 2.0}
+	t.eq(M.pick_screen(screens, outs, 0, -1), 3, "a JSON float 2 counts")
+	t.eq(M.pick_screen(screens, outs, 3, 1), 1, "the main window on the cabled screen: the saved pick again")
+	t.eq(M.pick_screen(screens.slice(0, 3), outs, 0, 1), 1, "cabled output not among the screens: the saved pick")
+	var none := [{"name": "DP-4", "current": true, "gui": 1}, {"name": "DP-6"}, {"name": "DP-0", "caspar": true}, {"name": "DP-2"}]
+	t.eq(M.cabled_screen(none), -1)
+	t.eq(M.pick_screen(screens, none, 0, 1), 1, "no dot-2 cable: the saved pick stays")
+	t.eq(M.pick_screen(screens, none, 0, -1), 1, "no dot-2 cable: the first free screen")
+	t.eq(M.screen_label(3, outs[3], 0), "Screen 4 — DP-2 (operator monitor 2 — cabled)")
+
+
 func test_busy_and_labels() -> void:
 	var outs := [{"name": "DP-4", "current": true}, {"name": "DP-0", "caspar": true}, {}]
 	t.ok(M.busy(outs, 0) and M.busy(outs, 1) and not M.busy(outs, 2) and not M.busy(outs, 9))

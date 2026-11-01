@@ -46,7 +46,8 @@ describe('WO-243 follow-up: operator_gui never claims a program-screen layout sl
 			/dMode === 'multiview' \|\| dMode === 'operator_gui'/,
 			'WO-573: operator_gui must not be folded back into the multiview edge classification',
 		)
-		assert.match(src, /binding = \{ type: 'operator_gui', index: 1 \}/, 'operator_gui gets its own binding type')
+		/* WO-920: the index is the operator monitor the cable names (dot 2 = edge outputLayer 2), still its own type */
+		assert.match(src, /binding = \{ type: 'operator_gui', index: edgeOutputLayer >= 2 \? 2 : 1 \}/, 'operator_gui gets its own binding type')
 		assert.match(src, /dMode !== 'stream' && dMode !== 'multiview' && dMode !== 'operator_gui'/, 'legacy mainIndex fallback excludes operator_gui')
 	})
 	it('resolveLayoutRectForOperatorPort resolves operator_gui-bound ports to their OWN rect, not the multiview one', () => {

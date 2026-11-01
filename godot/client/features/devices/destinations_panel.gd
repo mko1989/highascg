@@ -270,7 +270,8 @@ func _show_band(payload: Dictionary) -> void:
 
 
 ## Title, "PGM/PRV · 1920x1080@50" (or "HOST · ch N"), then the output dot(s): one per half for a PGM/PRV pair
-## (`id#pgm`, `id#prv`; PRV without a dot on a switcher bus), else one on the title row. Under it: its cables.
+## (`id#pgm`, `id#prv`; PRV without a dot on a switcher bus) and for the Operator GUI's monitors "1" / "2" (WO-920:
+## the same two anchors), else one on the title row. Under it: its cables.
 func _card(d: Dictionary, anchors: Dictionary) -> Control:
 	var wrap := VBoxContainer.new()
 	wrap.set_meta("dest_id", d.id)
@@ -300,15 +301,21 @@ func _card(d: Dictionary, anchors: Dictionary) -> Control:
 	if d.halves.is_empty():
 		title.add_child(_dot(anchors, d.connector, "%s output" % d.label))
 	v.add_child(_label(str(d.sub), ThemeBuilder.TEXT_MUTED, 12))
-	for half in d.halves:
+	for i in d.halves.size():
+		var half: String = d.halves[i]
+		var tag_text: String = d.half_tags[i]
 		var row := HBoxContainer.new()
 		row.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.custom_minimum_size.y = 26
-		var tag := _label(str(half).to_upper(), PGM if half == "pgm" else PRV, 11)
+		var gui: bool = d.mode == "operator_gui"
+		var tag := _label(tag_text, ThemeBuilder.TEXT if gui else (PGM if half == "pgm" else PRV), 11)
 		tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(tag)
 		if half == "pgm" or d.get("prv_dot", true):
-			row.add_child(_dot(anchors, Model.anchor_key(d.connector, half), "%s %s output" % [d.label, str(half).to_upper()]))
+			var tip := "%s %s output" % [d.label, tag_text]
+			if gui:
+				tip = "%s — monitor %s (%s window)" % [d.label, tag_text, "second operator" if half == "prv" else "main"]
+			row.add_child(_dot(anchors, Model.anchor_key(d.connector, half), tip))
 		v.add_child(row)
 	for l in d.links:
 		wrap.add_child(_label("  • " + str(l), ThemeBuilder.TEXT_MUTED, 11))
