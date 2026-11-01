@@ -50,8 +50,17 @@ function pausedAt(ms) {
 	return { eng, tl }
 }
 
+/* WO-923: the engine only RESUMES when its cached transport frame is still the paused frame. Play and pause back to back
+ * normally share a frame, but on a loaded box (the curated suite) more than 40 ms (1 frame at 25 fps) passed between
+ * them: the pause landed on frame 301, the resume was declined and `fromMs` 0 won ("opts={} must not restart (50 vs
+ * 12044)"). The engine's only clock is Date.now, so the resume tests freeze it: play and pause are the same instant. */
+function freezeClock(t) {
+	t.mock.timers.enable({ apis: ['Date'], now: 1_000_000 })
+}
+
 describe('WO-537: play(fromMs) honours an explicit restart', () => {
-	it('the bug: a plain play() after a pause keeps the paused position', () => {
+	it('the bug: a plain play() after a pause keeps the paused position', (t) => {
+		freezeClock(t)
 		const { eng, tl } = pausedAt(12000)
 		const paused = eng.getPlayback().position
 		assert.ok(paused > 11000, 'sanity: really paused mid-timeline')
@@ -70,7 +79,8 @@ describe('WO-537: play(fromMs) honours an explicit restart', () => {
 		eng.stop(tl.id, { skipAmcp: true })
 	})
 
-	it('restart: true is opt-in — absent or false still resumes', () => {
+	it('restart: true is opt-in — absent or false still resumes', (t) => {
+		freezeClock(t)
 		for (const opts of [undefined, {}, { restart: false }, { takeFade: true }]) {
 			const { eng, tl } = pausedAt(12000)
 			const paused = eng.getPlayback().position

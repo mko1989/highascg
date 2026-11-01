@@ -198,3 +198,28 @@ The full set:
   (`compose-preview … stopped`) and was gone within 4 s.
 - `07_pixel_map` alone after the orphans were killed: 13 / 13 runs passed (runs 8–20; runs 9–20 with the
   preload). Before that: 3 failures in 7 runs. No sandbox server outlived its run (`ps` after the loop).
+
+## Round 4 (01.11.26): the WO-537 resume smoke flaked under load
+
+### Investigation
+
+- The final curated run had one failure: `smoke-wo537-look-timeline-starts-where-asked.test.js:73`,
+  "opts={} must not restart (50 vs 12044)". The file alone passed 10 / 10.
+- `play()` only RESUMES when `_canResumePlayback` finds the cached transport frame equal to the paused frame
+  (`src/engine/timeline-playback-amcp-send.js:30`, `prev.frame !== meta.frame`). Otherwise `fromMs` wins.
+- The test's `pausedAt(12000)` runs play and pause back to back. The engine's only clock is `Date.now`, and one
+  frame is 40 ms (TICK_MS). On the loaded box more than 40 ms passed between them, so the pause landed on frame 301
+  while the cache held frame 300. The resume was declined and `fromMs` 0 was honoured.
+
+### What was done
+
+- The two resume tests freeze `Date` (`t.mock.timers.enable({ apis: ['Date'] })`), so play, pause and the second
+  play see the same instant. Real timers keep running. The assertions are unchanged, and the engine is unchanged.
+- Open question, not verified: in production, `pause()` does not refresh the cached frame. If a pause lands a frame
+  after the last tick, the next plain `play()` could restart instead of resuming. Not seen on air. It needs a live
+  probe before it becomes a WO.
+
+### What was verified
+
+- The file: 3 / 3 runs, 9 / 9 tests. eslint is clean.
+- Curated suite, run alone: 5250 tests, 5245 pass, 0 fail, 5 skipped.
