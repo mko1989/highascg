@@ -91,4 +91,4 @@ function moveProjectMediaOnRename(ctx, prevSlug, slug, project) {
 	}
 }
 
-module.exports = { moveProjectMediaOnRename, countFiles }
+module.exports = { moveProjectMediaOnRename }

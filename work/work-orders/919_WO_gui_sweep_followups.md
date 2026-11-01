@@ -1,7 +1,7 @@
 # WO-919 — WO-918 follow-ups: the findings the 01.11 fix round left open
 
 **Area:** godot-client, engine, devices-config, mapping
-**Status: IN PROGRESS** (F2 F6 F11 F13 F26 N1 N3 N4 N5 done and verified; F4, F20, N2 and the web legacy autosave are open)
+**Status: IN PROGRESS** (everything but N2 done and verified live 01.11.26; N2 waits for an owner decision)
 
 Owner, 01.11.26 (after the WO-918 re-test): "Continue. Add work orders for this."
 
@@ -35,6 +35,49 @@ under the same number; it is not repeated here.
   `untitled_2-*` dirs in each), and the `-replaced` backups replicate to the bridge.
 - **N5** A rename leaves the old, empty `media/projects/<old slug>/` folder.
 - The web client still uses the legacy autosave path (no `editingSlug`) and does not follow `project.activated`.
+
+### Second round (01.11, F4 / F20 / web autosave)
+
+- **F4: one unplugged head failed the whole layout.**
+  - `applyX11Layout` (`src/utils/os-config-xrandr-apply.js`) sends every planned head in ONE `xrandr --output …`
+    command.
+  - With frontex loaded, `/api/system/xrandr-layout` planned DP-2 at +1920+0 as 5760x1728. xrandr reports DP-2
+    `disconnected`.
+  - `xrandr --output DP-2 --pos 1920x0 --mode 5760x1728 --rate 50` on its own gives `xrandr: cannot find mode
+    5760x1728` and exit 1, and nothing is applied. So none of the frontex heads moved.
+  - The same head also counted toward the planned canvas in `needsNodmRestartForLayout`, so it pushed the nodm
+    decision.
+  - The name resolver (`xrandr-output-resolve.js`) maps a stale pinned name onto a live sibling when it cannot place
+    it (WO-315). A pinned name the DRM inventory knows stays as it is, and that is the case on this box (DP-2).
+- **F4: the Caspar window over the GUI.**
+  - frontex stores its operator destination with `videoOutput: "screen"`, the kiosk-era output: a Caspar screen
+    window under the Firefox kiosk, which is gone since WO-646.
+  - A Load applied the show's `hardwareConfig` as-is (`project-hardware-config.js applyHardwareConfigFromProject`),
+    so the window came back over the Godot GUI.
+  - New project already treats this as the box's own setting (`new-project.js keepOperatorVideoOutput`, WO-684).
+    Load did not.
+  - My first pre-fix frontex Load in this round left `screen` in the live config. The rule below then kept it, so
+    the box was set back to shm in Devices (`updateDestination videoOutput:"shm"`).
+- **F4: no warning on Load.** The Load reply had no hardware facts. `hardware_reconcile.gd` runs only on
+  boot/reconnect.
+  - Also: the "Missing assets" notice that `check_assets()` raises after every Load REPLACED the Load notice. That
+    included the WO-918 F1 owed-restart notice, so it vanished within a second.
+- **Restart owed after a round trip.**
+  - `project-activate.js` compared the module config before and after the Load, never the running Caspar.
+  - Loading frontex, then mhp_harder with no Apply in between, said "restart CasparCG" although Caspar still ran
+    mhp_harder.
+- **F20.** An output that is lit but not in the plan is never part of the xrandr command, so it keeps its old
+  position. On 01.11 that was DP-6 at +1920+0, under the planned DP-0.
+- **Web legacy autosave.**
+  - The web client posted `{ project }` with no `editingSlug`.
+  - After another client or an API Load switched shows, the tab kept the old show. Its next autosave went through
+    `previousSlugKind`'s guess (`other_show`) into `persistProject`, which made the OLD show active again.
+  - Nothing in the web client reacted to `project.activated`.
+- **F6 hole, found while probing the web tab.**
+  - `showContentEquals` and `projectContentEquals` compared `JSON.stringify` output, which depends on key order.
+  - A web tab exports keys in another order than the stored file, so a fresh tab's first autosave of unchanged
+    mhp_harder bumped rev 592 → 593 and stamped savedAt `12:48:27.473Z`.
+  - The only real difference was `hardwareConfig.osDisplay.multiview_os_rate: ""`, a server-stamped slice.
 
 ## What was done
 
@@ -80,6 +123,59 @@ Commit 26e06ce9, unless noted.
   - `smoke-wo919-sweep-followups.test.js` (11) and `smoke-wo919-gui-sweep-followups.test.js` (13).
   - `test_wo919_followups.gd` and the N1 room cases in `test_header_model.gd`.
 
+### Second round (01.11)
+
+- **F4 / F20: new `src/utils/xrandr-unplanned-heads.js`.**
+  - `parseXrandrOutputStates` reads every output line: connected, lit geometry, current mode and rate.
+  - `reconcileHeadsWithOutputs` drops planned heads on `disconnected` outputs.
+  - It moves a lit unplanned output that overlaps the plan to the right of everything, keeping its current mode and
+    rate. One that overlaps nothing stays put, and off outputs are left alone.
+  - With no xrandr answer the plan passes unchanged.
+  - Why move rather than turn it off: an unplanned monitor is still somebody's screen. Moving it keeps it usable and
+    out of the playout canvas.
+- **Wiring.**
+  - `applyX11Layout` runs the reconcile before it builds the command and returns `disconnected` / `movedUnplanned`.
+  - `needsNodmRestartForLayout` sizes the canvas from the same reconcile, so the nodm decision matches what is
+    really placed.
+  - `GET /api/system/xrandr-layout` also returns that `canvas` check, which shows what an Apply would do without
+    running one.
+- **F4: Load names the unplugged outputs.**
+  - `routes-data-project-handlers.js` puts `_activation.unpluggedOutputs` in the Load reply when `applyHardware` is
+    set.
+  - `header_model.gd load_notice` appends "Not connected: DP-2 — Apply leaves it out." The notice is sticky, also
+    after the owed-restart text.
+- **F4: a second sticky notice joins instead of replacing.**
+  - New `header_model.gd joined_notice` and `header_project.gd say_also`. `hardware_reconcile.gd check_assets` uses
+    it.
+  - The worse tone and the owed restart (`restart`) are kept, and the tooltip carries both.
+- **F4: operator output.**
+  - `applyHardwareConfigFromProject` applies a copy of the show's `hardwareConfig` through `keepOperatorVideoOutput`
+    (now exported). The box's `videoOutput` and `shmName` win, and the stored show is not rewritten.
+- **Restart owed follows the running Caspar.**
+  - `project-activate.js` awaits `refreshConfigComparison`. When Caspar's INFO CONFIG is known, `restartRequired =
+    !aligned`.
+  - The module before/after signature is only the fallback.
+- **Web client: new `client/lib/project-follow-server.js`.**
+  - Autosaves carry `editingSlug` (`autosaveBody`).
+  - A 409 `not_active`, or a `project.activated` for another slug (`activatedElsewhere`), pulls the active show
+    silently (`followServerProject`) and toasts "The server switched to …".
+  - `load-project-modal.js` sets the tab's slug before its own Load, so its own broadcast is not taken for a switch.
+- **F6.** New `canonicalJson` in `project-scenes.js` (sorted object keys, arrays in order). Both equality checks use
+  it, so a reordered but equal show is a no-op write.
+- **Gates.**
+  - `tools/ci/offline-test-files.js` was at 502 lines, so the two new smokes are listed in
+    `offline-test-files-2.js`.
+  - The unused exports `clearPersistedAir` and `countFiles` from round one are no longer exported (WO-367 gate).
+  - The N1 source pin in `smoke-wo919-sweep-followups.test.js` now expects `notice_width(text_w, window_w, room)`.
+- **Tests:**
+  - New `smoke-wo919-xrandr-unplanned-heads.test.js` (6), including a test that a loaded show keeps the box's
+    operator output.
+  - New `smoke-wo919-web-follows-server-show.test.js` (3).
+  - A running-Caspar restart test in `smoke-project-load-activation.test.js`. It fails on the old before/after rule
+    (checked by forcing the fallback).
+  - Key-order cases in `smoke-wo919-gui-sweep-followups.test.js`.
+  - Godot: `test_header_model.gd` covers the unplugged load notice and `joined_notice`.
+
 ## What was verified
 
 - **Suites:** offline 5206/0 and Godot 25747/0. Line limit and eslint are clean.
@@ -107,9 +203,31 @@ Commit 26e06ce9, unless noted.
     - mhp_harder `savedAt` stayed `2026-11-01T10:45:16Z` across three Loads and a full Apply ("Config written; layout
       applied; Caspar restarted."); only `rev` moved, 589 → 590.
     - The Load dialog's Saved column showed 11:45 local throughout.
-- **Not verified live:** F26, which needs the F20 overlap reproduced.
-- **Still open:**
-  - **F4:** exclude disconnected outputs from the layout canvas and warn on Load.
-  - **F20:** a rule for any uncabled connected head.
-  - **N2:** needs an owner decision.
-  - The web client's legacy autosave path.
+- **Second round, live on the box (01.11):**
+  - **F4/F20, plan:** with frontex loaded (no Apply), `/api/system/xrandr-layout` reports
+    `canvas.disconnected: ["DP-2"]`, `movedUnplanned: ["DP-4"]` (DP-4 lit at 0,0 under frontex's DP-6) and `needed:
+    true`.
+    - The nodm restart is still owed for a real reason: frontex asks DP-0 for 1920x2304.
+    - mhp_harder: `canvas_fits`, nothing dropped or moved.
+  - **F4/F20, command:** a dry run of `applyX11Layout` (`live:false, persist:false`) against the loaded config builds
+    `xrandr --output DP-0 --pos 7680x0 --mode 1920x2304 --rate 50 --output DP-6 --pos 0x0 … --output DP-4 --pos
+    9600x0 --mode 1920x1080 --rate 50`. DP-2 is gone, so `cannot find mode` can no longer fail the command.
+  - **Not run:** a real frontex Apply. It would restart nodm, and it asks the NovaStar on DP-0 for a mode its EDID
+    does not drive.
+  - **F4, Load notice:** in the Godot GUI (test client on Xvfb :120), header Load frontex shows "Caspar channel layout
+    changed … Not connected: DP-2 — Apply leaves it out. · Missing assets — 7 media clips …". The tooltip lists the
+    clips.
+  - **F4, operator output:** with the box set to shm, `POST /api/project/load {frontex, applyHardware}` leaves
+    `config/screen_destinations.json` at `videoOutput: shm, shmName: opgui`. Before the fix it became `screen`.
+  - **Restart owed:** Load frontex gives `restartRequired: true, unpluggedOutputs: ["DP-2"]`. Load mhp_harder right
+    after, with Caspar still running mhp_harder, gives `restartRequired: false`.
+  - **Web client:** a headless Firefox (WebDriver BiDi, own profile, not on :0) opened the web UI on mhp_harder.
+    `POST /api/project/load frontex` turned the tab's project from "mhp harder" to "frontex" within 5 s.
+  - **F6:** with the fix, a fresh web tab on mhp_harder left `savedAt 2026-11-01T12:48:27.473Z` and rev 594
+    untouched. Before, the same boot stamped it and bumped the rev.
+  - mhp_harder was loaded back afterwards (`restartRequired: false`). The probe Firefox and the test client were
+    stopped.
+- **Not verified live:**
+  - F26, which needs the F20 overlap reproduced. F20 now prevents the overlap, so it can only be reproduced by hand.
+  - The web 409 `not_active` path (the offline smoke covers it).
+- **Still open:** N2 needs an owner decision.

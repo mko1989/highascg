@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 700,
+	"count": 698,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -240,7 +240,6 @@
 		"src/api/host-live-webpage.js: updateWebpageHostSource",
 		"src/api/host-operator-fullscreen.js: clearHostOperatorFullscreen",
 		"src/api/media-catalog.js: getWsCatalogChunkLimit",
-		"src/api/media-catalog.js: isHiddenThumbnailBucket",
 		"src/api/routes-about.js: CREDITS",
 		"src/api/routes-client-prefs.js: readPrefs",
 		"src/api/routes-fixture-dmx.js: handleAim",
@@ -691,7 +690,6 @@
 		"src/utils/xrandr-output-resolve.js: looksLikeDrmStylePortName",
 		"src/utils/xrandr-output-resolve.js: resolveLayoutHeadSysId",
 		"src/utils/xrandr-persist-script.js: assertSafeXrandrToken",
-		"src/utils/xrandr-safety.js: XRANDR_MODE_RE",
 		"src/virtual-output/v4l2-bridge-args.js: V4L2_BRIDGE_FPS_MAX",
 		"src/virtual-output/v4l2-bridge-args.js: V4L2_BRIDGE_STREAM_PORT_DEFAULT",
 		"src/virtual-output/v4l2-bridge-args.js: buildV4l2BridgeCasparFfmpegArgs",

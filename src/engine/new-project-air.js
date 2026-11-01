@@ -98,4 +98,4 @@ async function clearShowAir(ctx, channels) {
 	return { channels: channels || [], liveCleared }
 }
 
-module.exports = { showAirChannels, clearShowAir, clearPersistedAir }
+module.exports = { showAirChannels, clearShowAir }

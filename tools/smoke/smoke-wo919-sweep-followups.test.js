@@ -177,7 +177,7 @@ test('N1: the notice label grows (no fixed 200 px) and elides only out of room',
 	const hp = read('godot/client/app/header_project.gd')
 	assert.match(hp, /text_overrun_behavior = TextServer\.OVERRUN_TRIM_ELLIPSIS/)
 	assert.match(hp, /custom_minimum_size\.x = HeaderModel\.NOTICE_MIN_W/)
-	assert.match(hp, /HeaderModel\.notice_width\(text_w, window_w\)/)
+	assert.match(hp, /HeaderModel\.notice_width\(text_w, window_w, room\)/) // N1 follow-up: capped at the room the row leaves
 	assert.doesNotMatch(hp, /notice_label\.custom_minimum_size\.x = 200/)
 })
 
