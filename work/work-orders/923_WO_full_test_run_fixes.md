@@ -122,5 +122,37 @@ The full set:
   - The live batch tests send `PLAY 1-10 AMB` / `PLAY 1-11 AMB` to the REAL Caspar. On this box channel 1 is the
     operator GUI channel (operator-first). There is no AMB clip (404), so nothing plays, but it is a live command on
     the GUI channel.
-  - The server page still rebuilds fully whenever an item changes (the 3 s replication poll, the opening reads). A
-    click in the first second after opening the page can still land in such a rebuild.
+  - The server page still rebuilt fully whenever an item changed: fixed below, in "Round 2".
+
+## Round 2 (01.11.26, owner: "Fix 2")
+
+### Investigation
+
+- `server_controls.gd` `_render` freed and rebuilt EVERY node whenever any item differed.
+- With a paired backup, items change on nearly every 3 s poll:
+  - `replication_format.gd` `status_line` ("show synced %s" via `age_ms`);
+  - `peer_rows` ("Peer status · ping Ns ago", "Commands sent", "Queue depth", "Mirror seq", "Drift sampled");
+  - all of them are built with `now` (`server_page_model.gd` `connection_items`).
+- So the whole page would be rebuilt every 3 s, and a click whose press and release straddled a rebuild was lost, the
+  same failure as round 1. This comes from reading the code; the box has no paired backup to watch it happen.
+
+### What was done
+
+- New `godot/client/features/devices/page_item_reuse.gd`: `plan(old, new)` maps each new item to an equal old item
+  whose node is kept, or -1.
+  - The same index wins; otherwise the first unused equal item, so a line appearing above does not rebuild the rest.
+  - Each old node is used once.
+- `server_controls.gd` `_render`: keeps the nodes `plan` allows, builds only the changed items and reorders the
+  page.
+  - The radios share one `ButtonGroup` across renders.
+  - Focus restore applies only to rebuilt fields.
+  - `_shown = []` still forces a full rebuild: `show_server`, and the operator-first switch putting a refused change
+    back.
+
+### What was verified
+
+- Godot unit tests: `tests/test_page_item_reuse.gd` (8 asserts), whole suite 25760 / 0. `--check` boot OK.
+- e2e `15_wo868_operator_first`, new step "A status line changing keeps the other controls (WO-923)": it changes the
+  hot-backup line the poll writes, re-renders and requires the same check node.
+  - Alone: 12/12.
+  - With reuse disabled (`plan([], items)`) the step fails with "the check was rebuilt for a status line change".

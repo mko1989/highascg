@@ -136,6 +136,17 @@ func run() -> void:
 			if a != b:
 				return "the refresh rebuilt the server page; item %d was %s, now %s" % [i, JSON.stringify(a).left(200), JSON.stringify(b).left(200)]
 		return "the refresh rebuilt the server page with the same items")
+	await step("A status line changing keeps the other controls (WO-923)", func() -> String:
+		# A paired backup changes "Commands sent" / "synced 5s ago" on every 3 s poll; the sandbox has no peer, so the
+		# step changes the hot-backup line the poll writes and re-renders the way the poll does.
+		var srv: Node = _tab()._server
+		var cb: CheckBox = ui.find("CheckBox", OF.TEXT)
+		var text := "Role: standalone · e2e poll %d" % Time.get_ticks_msec()
+		srv.flow.s.rep_line = text
+		srv._render()
+		if ui.find("Label", text) == null:
+			return "the changed line is not on the page"
+		return expect(cb != null and ui.find("CheckBox", OF.TEXT) == cb, "the check was rebuilt for a status line change"))
 	await step("Turn it on (confirm lists the moves)", func() -> String:
 		var gui_before := 0
 		for r in _before:

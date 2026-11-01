@@ -4,7 +4,8 @@ extends "res://features/devices/host_controls_base.gd"
 ## device-view-inspector-caspar.js): server facts, project frame rate, CEF GPU, network, and the hot backup
 ## (replication) section. server_page_model.gd builds the item list from server_flow.gd's state; the flow runs the
 ## requests through `_Io` below (the Api autoload). While open, the replication status is re-read every 3 s like the
-## web's poll; the page is only rebuilt when its items changed, so an open select or a field being typed survives.
+## web's poll; only the items that changed get new nodes (WO-923), so an open select, a field being typed or a click on
+## an unchanged control survives.
 ## The web toasts; the Devices tab has one status line, so a toast shows there when the action set no status itself.
 
 signal dirty()
@@ -13,13 +14,16 @@ const M := preload("res://features/devices/server_page_model.gd")
 const Flow := preload("res://features/devices/server_flow.gd")
 const POLL_S := 3.0
 const NetworkPane := preload("res://features/settings/network_pane.gd")
+const Reuse := preload("res://features/devices/page_item_reuse.gd")
 
 var page := VBoxContainer.new()
 var is_open := false
 var flow: Flow
 var _io: _Io
 var _timer := Timer.new()
-var _shown: Array = []
+var _shown: Array = []  # the items on the page; [] forces every node to be rebuilt
+var _nodes: Array = []  # their nodes, same order
+var _group := ButtonGroup.new()  # the network radios (kept ones and new ones share it)
 var _status_set := false  # the running action set the status line (its toasts stay off it)
 var _net: Control  # WO-692: kept across re-renders (the 3 s poll must not wipe a field being typed)
 
@@ -115,21 +119,34 @@ func _render() -> void:
 	var items := M.items(flow.s, flow.clock.call(), true)
 	if items == _shown:
 		return
-	_shown = items
+	var keep := Reuse.plan(_shown, items)
 	var focus: Variant = get_viewport().gui_get_focus_owner() if is_inside_tree() else null
 	var refocus: Variant = focus.get_meta("key", null) if focus is LineEdit and page.is_ancestor_of(focus) else null
 	var caret: int = focus.caret_column if refocus != null else 0
+	var nodes := []
+	var built := {}
+	for j in items.size():
+		var k := keep[j]
+		if k >= 0 and is_instance_valid(_nodes[k]):
+			nodes.append(_nodes[k])
+		else:
+			nodes.append(_item(items[j], _group))
+			built[nodes[j]] = true
 	for ch in page.get_children():
-		page.remove_child(ch)
-		if ch != _net:
-			ch.queue_free()
-	var group := ButtonGroup.new()
-	for it in items:
-		var n := _item(it, group)
-		page.add_child(n)
-		if refocus != null and n is LineEdit and n.get_meta("key") == refocus:
+		if not nodes.has(ch):
+			page.remove_child(ch)
+			if ch != _net:
+				ch.queue_free()
+	for j in nodes.size():
+		var n: Control = nodes[j]
+		if n.get_parent() != page:
+			page.add_child(n)
+		page.move_child(n, j)
+		if built.has(n) and refocus != null and n is LineEdit and n.get_meta("key") == refocus:
 			n.grab_focus()
 			n.caret_column = caret
+	_shown = items
+	_nodes = nodes
 
 
 func _item(it: Dictionary, group: ButtonGroup) -> Control:
