@@ -4,7 +4,7 @@
  *   POST /api/media/version/upload?path=<media id>   multipart, ONE file → new current version
  *   POST /api/media/version/restore  { path, v }      go back to an old version (current becomes a version)
  *   POST /api/media/version/purge    { path, v }      delete one old version — final
- * A version may change the extension (previz .mp4 → show .mov): the path follows and every look,
+ * The new version takes its own file name (WO-921; and so a new extension, WO-775): the path follows and every look,
  * playlist and timeline is rewritten like a rename; the reply carries `renamed: { from, to }`.
  */
 'use strict'
@@ -43,6 +43,7 @@ function handleVersionUpload(req, ctx, query) {
 	if (!e) return Promise.resolve(reply(404, { error: 'not in media library' }))
 	return new Promise((resolve) => {
 		let staged = null
+		let name = ''
 		let error = null
 		let writing = null
 		const bb = busboy({ headers: req.headers, defParamCharset: 'utf8', limits: { files: 1 } })
@@ -53,6 +54,7 @@ function handleVersionUpload(req, ctx, query) {
 				file.resume()
 				return
 			}
+			name = versions.versionFileName(info.filename)
 			staged = versions.stagingPathFor(e.id, ext)
 			fs.mkdirSync(path.dirname(staged), { recursive: true })
 			const ws = fs.createWriteStream(staged)
@@ -77,12 +79,12 @@ function handleVersionUpload(req, ctx, query) {
 				if (staged) fs.rmSync(staged, { force: true })
 				return resolve(reply(400, { error }))
 			}
-			const r = versions.installNewVersion(ctx.config || {}, mediaPath, staged)
+			const r = versions.installNewVersion(ctx.config || {}, mediaPath, staged, { name })
 			if (!r.ok) {
 				fs.rmSync(staged, { force: true })
 				return resolve(reply(r.status, { error: r.error }))
 			}
-			ctx.log?.('info', `[media-versions] ${mediaPath}: new version v${r.entry.currentV}`)
+			ctx.log?.('info', `[media-versions] ${mediaPath}: new version v${r.entry.currentV}${r.renamed ? ` as ${r.renamed.to}` : ''}`)
 			await afterChange(ctx, r.renamed)
 			resolve(reply(200, { ok: true, entry: publicEntry(r.entry), renamed: r.renamed }))
 		})

@@ -36,7 +36,31 @@ Parents: [WO-592](./592_WO_media_library_links_versions_inspector.md) B (version
 
 ## What was done
 
-Nothing yet.
+- **`src/media/media-versions.js`**
+  - New `versionFileName(raw)`: one safe path segment. It normalises to NFC, keeps only the basename (also for `\`
+    paths), drops control characters, and refuses a name with no extension or a leading dot.
+  - `targetFor(config, e, file, name)`: with a name, the target is that name in the current file's folder. Without
+    one, the WO-775 rule applies (the extension follows).
+  - `targetClash` refuses a target that another file already holds (409, nothing moved). A case-only change of the
+    same file is not a clash.
+  - `stash()` records the replaced file's `name`. `restoreVersion` passes that name, so Go back brings the old name
+    back. Versions stashed before WO-921 have no name and keep the WO-775 behaviour.
+  - `installNewVersion(…, { name })`.
+- **`src/api/routes-media-versions.js`**: the multipart `info.filename` is cleaned with `versionFileName` and passed
+  through. The journal line names the new path.
+- **Godot `features/live/media_versions.gd`**:
+  - The confirm reads "The new version keeps its own name: the media list and every look will read "<new>"", or
+    "Every look plays it." when the name is the same.
+  - Old version rows show their name ("intro_v2.mov · replaced …"); a long name elides with a tooltip.
+  - The pure texts moved to the new `media_versions_model.gd`, so tests can load them, and the unused `ext_of` was
+    removed.
+- **Web `client/components/inspector-media-file-versions.js`**: the same confirm text and named rows.
+- **Why rename and not a badge.** The owner wants the name itself to prove which version plays. The rename machinery
+  (WO-592 A, `applyRenamesToProjects`) already rewrites every reference, including the server's live deck through
+  `persistProject`, so this changes only where the file lands. Keeping the old name plus a "v3" tag was rejected: the
+  look would still read the old file name.
+- **Not changed.** A clip that is on air keeps playing the old file, because Caspar holds the inode (WO-592). The next
+  take plays the new version under the new name.
 
 ## What was verified
 

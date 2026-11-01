@@ -291,6 +291,7 @@ module.exports = [
 	'tools/smoke/smoke-wo592-media-preview.test.js',
 	'tools/smoke/smoke-wo592-media-links.test.js',
 	'tools/smoke/smoke-wo592-media-versions.test.js',
+	'tools/smoke/smoke-wo921-media-version-name.test.js',
 	'tools/smoke/smoke-operator-gui-reconnect-reassert.test.js',
 	'tools/smoke/smoke-wo244-stream-secret-preserve.test.js',
 	'tools/smoke/smoke-wo249-audio-pair-select.test.js',

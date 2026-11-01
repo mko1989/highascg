@@ -1,7 +1,7 @@
 /**
- * WO-592 B — media-file inspector "Versions": upload a new version (same path → every look plays
- * it), list every old version, go back to a chosen one, purge one by hand (final). A version may be
- * another container (previz .mp4 → show .mov): the server renames the extension and looks follow.
+ * WO-592 B — media-file inspector "Versions": upload a new version, list every old version, go back to a chosen one,
+ * purge one by hand (final). WO-921: a new version takes its own file name (any container, WO-775) — the server renames
+ * the file and every look follows; Go back brings the old name back.
  */
 import { api, getApiBase } from '../lib/api-client.js'
 import { escapeHtml } from '../lib/dom-escape.js'
@@ -34,7 +34,7 @@ export function mountMediaFileVersions(host, { id, isCurrent }) {
 	host.innerHTML = `
 		<div class="media-insp__versions-head">
 			<span>Versions</span>
-			<label class="media-insp__btn media-insp__btn--sm media-insp__upload" title="Replace this file with a new version (any format, e.g. previz .mp4 → show .mov) — every look plays it">
+			<label class="media-insp__btn media-insp__btn--sm media-insp__upload" title="Replace this file with a new version (any format, e.g. previz .mp4 → show .mov) — it keeps its own name and every look follows">
 				New version…<input type="file" hidden />
 			</label>
 		</div>
@@ -50,7 +50,7 @@ export function mountMediaFileVersions(host, { id, isCurrent }) {
 		const old = [...(e.versions || [])]
 			.sort((a, b) => b.v - a.v)
 			.map(
-				(v) => `<div class="media-insp__ver"><b>v${v.v}</b><span>replaced ${escapeHtml(fmtDate(v.replacedAt))}</span><span>${fmtSize(v.size)}</span>
+				(v) => `<div class="media-insp__ver"><b>v${v.v}</b><span>${v.name ? `${escapeHtml(v.name)} · ` : ''}replaced ${escapeHtml(fmtDate(v.replacedAt))}</span><span>${fmtSize(v.size)}</span>
 					<button type="button" class="media-insp__btn media-insp__btn--sm" data-restore="${v.v}" title="Make v${v.v} current again (the current file is kept as a version)">Go back</button>
 					<button type="button" class="media-insp__btn media-insp__btn--sm media-insp__btn--danger" data-purge="${v.v}" title="Delete this old version permanently">✕</button></div>`,
 			)
@@ -66,10 +66,9 @@ export function mountMediaFileVersions(host, { id, isCurrent }) {
 
 	const upload = async (file) => {
 		if (!file) return
-		const ext = (s) => (s.match(/\.[^./]+$/) || [''])[0].toLowerCase()
 		const base = id.split('/').pop()
-		const becomes = ext(file.name) !== ext(base) ? `\nThe file becomes "${base.slice(0, base.length - ext(base).length)}${ext(file.name)}".` : ''
-		if (!confirm(`Replace "${base}" with "${file.name}"?\n\nEvery look plays the new version.${becomes} The current one is kept in the version list.`)) return
+		const tail = file.name === base ? 'Every look plays it.' : `The new version keeps its own name: the media list and every look will read "${file.name}".`
+		if (!confirm(`Replace "${base}" with "${file.name}"?\n\n${tail} The current one is kept in the version list.`)) return
 		msg.textContent = ''
 		bar.hidden = false
 		const fd = new FormData()

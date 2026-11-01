@@ -1,13 +1,14 @@
 extends VBoxContainer
-## WO-601 / WO-592 B — media-file "Versions" (web inspector-media-file-versions.js): upload a new version (same path
-## — every look plays it; another container, e.g. previz .mp4 → show .mov, renames the extension and looks follow),
-## list the old ones, Go back to one (the current file is kept as a version), purge one (final). The upload streams
-## the file (core/stream_upload.gd) — media files can be GBs.
+## WO-601 / WO-592 B — media-file "Versions" (web inspector-media-file-versions.js): upload a new version — it takes
+## its own file name in this file's folder (WO-921; any container, WO-775) and every look follows the rename — list
+## the old ones under their names, Go back to one (its name comes back; the current file is kept), purge one (final).
+## The upload streams the file (core/stream_upload.gd) — media files can be GBs.
 
 signal changed(new_id: String)  # a new current version → the inspector reloads facts / waveform (new_id: the path now)
 
 const Upload := preload("res://core/stream_upload.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const M := preload("res://features/live/media_versions_model.gd")
 
 var _id := ""
 var _list: VBoxContainer
@@ -24,7 +25,7 @@ func _ready() -> void:
 	head.add_child(l)
 	var up := Button.new()
 	up.text = "New version…"
-	up.tooltip_text = "Replace this file with a new version (any format, e.g. previz .mp4 → show .mov) — every look plays it"
+	up.tooltip_text = "Replace this file with a new version (any format, e.g. previz .mp4 → show .mov) — it keeps its own name and every look follows"
 	up.pressed.connect(_pick)
 	head.add_child(up)
 	add_child(head)
@@ -39,37 +40,16 @@ func _ready() -> void:
 	add_child(_msg)
 
 
-static func fmt_size(n: float) -> String:
-	if n >= 1e9:
-		return "%.1f GB" % (n / 1e9)
-	if n >= 1e6:
-		return "%d MB" % roundi(n / 1e6)
-	return "%d kB" % maxi(1, roundi(n / 1e3))
-
-
-## web fmtDate: DD.MM.YY HH:MM, local time
-static func fmt_date(ms: float) -> String:
-	if ms <= 0:
-		return ""
-	var d := Time.get_datetime_dict_from_unix_time(int(ms / 1000.0) + int(Time.get_time_zone_from_system().bias) * 60)
-	return "%02d.%02d.%02d %02d:%02d" % [d.day, d.month, d.year % 100, d.hour, d.minute]
-
-
-static func ext_of(file: String) -> String:
-	var base := file.get_file()
-	return base.substr(base.rfind(".")).to_lower() if base.rfind(".") > 0 else ""
-
-
 func show_entry(id: String, entry: Dictionary) -> void:
 	_id = id
 	_msg.text = ""
 	for c in _list.get_children():
 		c.queue_free()
-	_list.add_child(_row("v%d" % int(entry.get("currentV", 1)), "current", fmt_size(float(entry.get("size", 0))), -1))
+	_list.add_child(_row("v%d" % int(entry.get("currentV", 1)), "current", M.fmt_size(float(entry.get("size", 0))), -1))
 	var old: Array = (entry.get("versions", []) as Array).duplicate() if entry.get("versions") is Array else []
 	old.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.v) > int(b.v))
 	for v in old:
-		_list.add_child(_row("v%d" % int(v.v), "replaced %s" % fmt_date(float(v.get("replacedAt", 0))), fmt_size(float(v.get("size", 0))), int(v.v)))
+		_list.add_child(_row("v%d" % int(v.v), M.old_text(v), M.fmt_size(float(v.get("size", 0))), int(v.v)))
 	if old.is_empty():
 		var none := Label.new()
 		none.text = "No older versions"
@@ -82,6 +62,12 @@ func _row(v: String, what: String, size: String, ver: int) -> Control:
 	for t in [v, what, size]:
 		var l := Label.new()
 		l.text = t
+		if t == what:  # a long file name elides instead of widening the inspector
+			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			l.clip_text = true
+			l.tooltip_text = t
+			l.mouse_filter = Control.MOUSE_FILTER_PASS
 		r.add_child(l)
 	if ver > 0:
 		var back := Button.new()
@@ -108,15 +94,10 @@ func _pick() -> void:
 
 
 func _confirm_upload(file_path: String) -> void:
-	var base := _id.get_file()
-	var becomes := ""
-	if ext_of(file_path) != ext_of(base):
-		becomes = "\nThe file becomes \"%s%s\"." % [base.substr(0, base.length() - ext_of(base).length()), ext_of(file_path)]
-	_confirm("Replace \"%s\" with \"%s\"?\n\nEvery look plays the new version.%s The current one is kept in the version list." % [base, file_path.get_file(), becomes],
-		func() -> void: upload(file_path))
+	_confirm(M.upload_text(_id.get_file(), file_path.get_file()), func() -> void: upload(file_path))
 
 
-## The path after a version change: the reply's `renamed.to` when the extension changed.
+## The path after a version change: the reply's `renamed.to` when the name (or only the extension) changed.
 func _new_id(data: Variant) -> String:
 	if data is Dictionary and data.get("renamed") is Dictionary:
 		return str(data.renamed.get("to", _id))
