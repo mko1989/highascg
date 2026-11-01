@@ -33,7 +33,7 @@ const stripExt = (p) => (hasExt(p) ? p.slice(0, p.lastIndexOf('.')) : p)
 /**
  * Visit every media reference object in a project (mutable, in place).
  * @param {object} project
- * @param {(ref: object, where: { kind: 'look' | 'timeline', id: string, name: string }) => void} fn
+ * @param {(ref: object, where: { kind: 'look' | 'timeline', id: string, name: string }, owner: object) => void} fn
  */
 function forEachProjectMediaRef(project, fn) {
 	if (!project || typeof project !== 'object') return
@@ -42,15 +42,15 @@ function forEachProjectMediaRef(project, fn) {
 	for (const scene of scenes) {
 		const where = { kind: 'look', id: String(scene?.id || ''), name: String(scene?.name || scene?.id || '') }
 		for (const layer of scene?.layers || []) {
-			if (layer?.source) fn(layer.source, where)
-			for (const item of layer?.playlist || []) if (item) fn(item, where)
+			if (layer?.source) fn(layer.source, where, scene)
+			for (const item of layer?.playlist || []) if (item) fn(item, where, scene)
 		}
 	}
 	const tb = project.timelines
 	const timelines = Array.isArray(tb) ? tb : Array.isArray(tb?.timelines) ? tb.timelines : []
 	for (const tl of timelines) {
 		const where = { kind: 'timeline', id: String(tl?.id || ''), name: String(tl?.name || tl?.id || '') }
-		for (const layer of tl?.layers || []) for (const clip of layer?.clips || []) if (clip?.source) fn(clip.source, where)
+		for (const layer of tl?.layers || []) for (const clip of layer?.clips || []) if (clip?.source) fn(clip.source, where, tl)
 	}
 }
 
@@ -159,7 +159,7 @@ function rewriteProjectMediaRefs(project, slug, renames, config) {
 	const froms = new Set(list.map((r) => key(r.from)))
 	const tos = new Set(list.map((r) => key(r.to)))
 	const exists = (rel) => froms.has(key(rel)) || (!tos.has(key(rel)) && disk(rel))
-	forEachProjectMediaRef(next, (ref) => {
+	forEachProjectMediaRef(next, (ref, where, owner) => {
 		const resolved = resolveRefValue(ref, slug, config, exists)
 		if (!resolved) return
 		const hit = list.find((r) => refMatchesPath(resolved, r.from))
@@ -167,6 +167,8 @@ function rewriteProjectMediaRefs(project, slug, renames, config) {
 		const oldValue = ref.value
 		ref.value = rewriteValueShape(oldValue, resolved, hit.to, slug, config)
 		if (ref.label != null) ref.label = rewriteLabel(ref.label, oldValue, ref.value, hit.from, hit.to)
+		// WO-921: a look named after its clip (a drop on the deck names it by the stem) follows the file's new name
+		if (where.kind === 'look' && typeof owner?.name === 'string') owner.name = rewriteLabel(owner.name, oldValue, ref.value, hit.from, hit.to)
 		changed++
 	})
 	return { project: next, changed }

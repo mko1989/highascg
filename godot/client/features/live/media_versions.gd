@@ -49,7 +49,7 @@ func show_entry(id: String, entry: Dictionary) -> void:
 	var old: Array = (entry.get("versions", []) as Array).duplicate() if entry.get("versions") is Array else []
 	old.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.v) > int(b.v))
 	for v in old:
-		_list.add_child(_row("v%d" % int(v.v), M.old_text(v), M.fmt_size(float(v.get("size", 0))), int(v.v)))
+		_list.add_child(_row("v%d" % int(v.v), M.old_text(v), M.fmt_size(float(v.get("size", 0))), int(v.v), M.purge_text(v)))
 	if old.is_empty():
 		var none := Label.new()
 		none.text = "No older versions"
@@ -57,7 +57,7 @@ func show_entry(id: String, entry: Dictionary) -> void:
 		_list.add_child(none)
 
 
-func _row(v: String, what: String, size: String, ver: int) -> Control:
+func _row(v: String, what: String, size: String, ver: int, purge_ask := "") -> Control:
 	var r := HBoxContainer.new()
 	for t in [v, what, size]:
 		var l := Label.new()
@@ -78,7 +78,7 @@ func _row(v: String, what: String, size: String, ver: int) -> Control:
 		var purge := Button.new()
 		purge.text = "✕"
 		purge.tooltip_text = "Delete this old version permanently"
-		purge.pressed.connect(func() -> void: _confirm("Delete version %s permanently? This cannot be undone." % v, func() -> void: _purge(ver)))
+		purge.pressed.connect(func() -> void: _confirm(purge_ask, func() -> void: _purge(ver)))
 		r.add_child(purge)
 	return r
 

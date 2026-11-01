@@ -1,7 +1,7 @@
 # WO-921 — Media versions: the new version's file name replaces the old one in the media browser and in every look
 
 **Area:** media, godot-client
-**Status: OPEN**
+**Status: DONE (01.11.26 — offline 5205/0, Godot 25745/0, live Godot GUI: upload renames media list + looks, take plays the new file, Go back, purge)**
 
 Owner, 01.11.26:
 > Check the media file versioning workflow. I also need for it to change the file name in media browser and in looks to
@@ -62,6 +62,56 @@ Parents: [WO-592](./592_WO_media_library_links_versions_inspector.md) B (version
 - **Not changed.** A clip that is on air keeps playing the old file, because Caspar holds the inode (WO-592). The next
   take plays the new version under the new name.
 
+### Follow-ups found in the live GUI pass (01.11)
+
+- **A look named after its clip kept the old name.** A drop on the deck names the look by the clip's stem
+  ("intro_v2"). After the upload it played intro_v3 but its card still read "intro_v2". `media-reference-rewrite.js`
+  `forEachProjectMediaRef` now hands the owning look or timeline to the visitor. `rewriteProjectMediaRefs` puts the
+  look's `name` through `rewriteLabel`, so a name equal to the old path, basename or stem follows. A look the operator
+  named ("Opener") keeps its name. Plain renames (WO-592 A) get the same behaviour.
+- **The open look editor showed the old file.** With a PRV bus, the editor frame is Caspar's PRV channel. PRV is
+  restaged only by local edits, so after a server-side rewrite it kept playing the replaced file (red "VERSION 3"
+  under a layer labelled intro_v4.mp4). `look_editor_backdrop.gd` `open()` now records the look's media
+  (`sources_key`). `follow_media()`, run from the editor's `Store.project_changed`, schedules a PRV push when that
+  media changed (not on a move or resize). It lives in the backdrop file because `look_editor_stale.gd` references
+  the Store autoload, which the headless test runner can't compile, and `look_editor.gd` is at 500 lines.
+- **Media inspector, Godot:**
+  - "Used in" was fetched once, when the file was selected. Dropping the clip onto a new look left it reading "Not
+    used in any look or timeline". It now refetches 0.5 s after `Store.project_changed`, and only the label changes
+    (`_show_usage`), so a trim field being typed in keeps its text.
+  - The facts line said "0.0 MB" for a 23 kB file; under 1 MiB it now shows kB.
+- **Purge confirm** names the file: "Delete version v3 (intro_v4.mp4) permanently?". This is
+  `media_versions_model.gd purge_text` in Godot and the `data-name` attribute in the web client.
+
 ## What was verified
 
-Nothing yet.
+- **Offline suite:** `node tools/ci/run-offline-tests.js` passed 5205, failed 0.
+  - `smoke-wo921-media-version-name.test.js` has 8 tests, among them a real multipart POST through
+    `handleVersionUpload`, a 409 on a name clash, Go back to the old name, a pre-WO-921 version, and look-name follow.
+- **Godot suite:** 25745 passed, 0 failed. `test_media_versions_wo921.gd` covers the confirm text, the row names, the
+  purge text and the PRV restage on a media change only.
+- **Gates:** the 500-line check and eslint are clean. The one warning in `inspector-media-file-versions.js:34` was
+  already there. `npm run build:client` was run.
+- **Live, in the Godot GUI** (test client on Xvfb :120 against the box server; New project "Untitled 2"; clip
+  `media/_wo921/intro_v2.mov`, whose frames read "VERSION 2"):
+  1. I dropped the clip on a new look and picked New version… → `intro_v3.mov`. The confirm read "…the media list
+     and every look will read "intro_v3.mov"". The journal shows
+     `[media-versions] _wo921/intro_v2.mov: new version v2 as _wo921/intro_v3.mov` and
+     `… → _wo921/intro_v3.mov; 1 reference(s) in 1 project(s) follow`.
+     - On disk there is only `intro_v3.mov`.
+     - The media tree, the inspector title and the look's layer all read intro_v3.mov.
+     - The deck thumbnail turned red "VERSION 3", and the row reads "v1 intro_v2.mov · replaced …".
+     - TAKE: Caspar `INFO 2` shows `_WO921/INTRO_V3` playing.
+  2. A new version from `intro_v4.mp4` (container change) gave `new version v3 as _wo921/intro_v4.mp4`. The look was
+     rewritten and its thumbnail turned green "VERSION 4 MP4".
+  3. Go back v1 gave `restored v1` and `_wo921/intro_v4.mp4 → _wo921/intro_v2.mov`. The name came back everywhere
+     and the thumbnail is "VERSION 2".
+  4. Purge v3: the confirm appeared and `data/media-versions/<id>/v3.mp4` is gone. A re-take shows `INFO 2` =
+     `_WO921/INTRO_V2`.
+  5. After the follow-ups and a server restart, I re-ran the flow with the editor open on the look "intro_v2":
+     - New version intro_v4.mp4 renamed the look to "intro_v4".
+     - "Used in" showed both looks within a second of the drop.
+     - Go back v1 turned the look back into "intro_v2". The journal shows `[scene-take] preview-only path prv=3`
+       right after the restore, and the editor frame showed blue "VERSION 2" under "L10 intro_v2.mov".
+- **Not covered:** a clip on air during the upload keeps playing the old file until the next take (by design,
+  above). The header's on-air strip honestly names the file that is actually playing.

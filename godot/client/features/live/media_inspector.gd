@@ -22,6 +22,7 @@ var _peaks: Array = []
 var _defaults: Dictionary = {}
 var _usage: Array = []
 var _in_lib := false
+var _usage_timer: Timer
 var _facts: Label
 var _wave: Control
 var _lib: VBoxContainer
@@ -94,6 +95,12 @@ func _ready() -> void:
 		library_changed.emit()
 		show_media(_row))
 	_lib.add_child(_versions)
+	_usage_timer = Timer.new()  # "Used in" follows looks added or removed while this file is shown
+	_usage_timer.one_shot = true
+	_usage_timer.wait_time = 0.5
+	_usage_timer.timeout.connect(_refresh_usage)
+	add_child(_usage_timer)
+	Store.project_changed.connect(func(_p: Dictionary) -> void: if visible and _in_lib: _usage_timer.start())
 	_msg = Label.new()
 	_msg.add_theme_color_override("font_color", ThemeBuilder.ACCENT_RED)
 	add_child(_msg)
@@ -142,12 +149,21 @@ func show_media(row: Dictionary) -> void:
 	_wave.queue_redraw()
 
 
+func _refresh_usage() -> void:
+	var want := id
+	var er: Dictionary = await Api.get_json("/api/media/library/entry?path=%s" % id.uri_encode())
+	if want != id or not (er.ok and er.data is Dictionary):
+		return
+	_usage = er.data.get("usage", []) if er.data.get("usage") is Array else []
+	_show_usage()  # not _sync(): a trim field being typed in keeps its text
+
+
 func _show_facts(size: int) -> void:
 	var slash := id.rfind("/")
 	var t := "%s\n%s · %s · %s @ %s fps" % [id.substr(slash + 1), id.substr(0, maxi(0, slash)) if slash > 0 else "(root)",
 		str(_row.get("type", "?")), M.format_timecode(_dur, _fps), str(_row.get("fps", "?"))]
 	if size > 0:
-		t += " · %.1f MB" % (size / 1048576.0)
+		t += " · %.1f MB" % (size / 1048576.0) if size >= 1048576 else " · %d kB" % maxi(1, roundi(size / 1024.0))  # not "0.0 MB"
 	_facts.text = t
 
 
@@ -156,13 +172,15 @@ func _sync() -> void:
 	_set_time(_in, tc.call(_defaults.get("trimInMs")))
 	_set_time(_out, tc.call(_defaults.get("trimOutMs")))
 	_mute.set_pressed_no_signal(_defaults.get("muted", false) == true)
-	var n := 0
+	_show_usage()
+	_wave.queue_redraw()
+
+
+func _show_usage() -> void:
 	var names := PackedStringArray()
 	for u in _usage:
-		n += int(u.get("count", 0))
 		names.append("%s “%s”" % [u.get("kind", "?"), u.get("name", u.get("id", "?"))])
 	_used.text = ("Used in: " + ", ".join(names)) if not names.is_empty() else "Not used in any look or timeline."
-	_wave.queue_redraw()
 
 
 ## WO-843: remember the text a field was set to, so a blur or Enter without an edit saves nothing.

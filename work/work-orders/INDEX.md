@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-831 live WOs (31 open, 121 in progress, 679 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+831 live WOs (30 open, 121 in progress, 680 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -795,7 +795,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 775 DONE [media] media versions: a new version may change the container (previz .mp4 → show .mov) → 775_WO_media_version_container_change.md
 - 818 DONE [media] ⚠ warning mark next to NotchLC files in the media lists (Godot + web) → 818_WO_notchlc_warning_mark.md
 - 887 DONE [media+godot-client] Live-source thumbnails months old: capture once per session on a non-black fram… → 887_WO_live_thumbnails_once_per_session.md
-- 921 OPEN [media+godot-client] Media versions: the new version's file name replaces the old one in the media b… → 921_WO_media_version_takes_new_name.md
+- 921 DONE [media+godot-client] Media versions: the new version's file name replaces the old one in the media b… → 921_WO_media_version_takes_new_name.md
 
 ## tracking-vr — Tracking, previs, VR (30)
 

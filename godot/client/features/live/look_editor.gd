@@ -135,7 +135,7 @@ func _ready() -> void:
 	visibility_changed.connect(func() -> void: _hold(is_visible_in_tree()))
 	Store.project_changed.connect(func(_p: Dictionary) -> void:
 		if visible and not Stale.close_if_stale(self):
-			_refresh_list())
+			Backdrop.follow_media(self); _refresh_list())  # WO-921: media moved by the server restages PRV
 	Store.changed.connect(func(path: String, _v: Variant) -> void:  # a destination removed: its bus's editor goes with it
 		if visible and (path == "*" or path.begins_with("channelMap")): Stale.close_if_stale(self))
 

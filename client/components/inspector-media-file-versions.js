@@ -52,7 +52,7 @@ export function mountMediaFileVersions(host, { id, isCurrent }) {
 			.map(
 				(v) => `<div class="media-insp__ver"><b>v${v.v}</b><span>${v.name ? `${escapeHtml(v.name)} · ` : ''}replaced ${escapeHtml(fmtDate(v.replacedAt))}</span><span>${fmtSize(v.size)}</span>
 					<button type="button" class="media-insp__btn media-insp__btn--sm" data-restore="${v.v}" title="Make v${v.v} current again (the current file is kept as a version)">Go back</button>
-					<button type="button" class="media-insp__btn media-insp__btn--sm media-insp__btn--danger" data-purge="${v.v}" title="Delete this old version permanently">✕</button></div>`,
+					<button type="button" class="media-insp__btn media-insp__btn--sm media-insp__btn--danger" data-purge="${v.v}" data-name="${escapeHtml(v.name || '')}" title="Delete this old version permanently">✕</button></div>`,
 			)
 			.join('')
 		list.innerHTML = cur + (old || '<div class="media-insp__ver media-insp__ver--none">No older versions</div>')
@@ -98,12 +98,13 @@ export function mountMediaFileVersions(host, { id, isCurrent }) {
 	host.addEventListener('click', async (e) => {
 		const r = e.target.closest('[data-restore]')?.getAttribute('data-restore')
 		const p = e.target.closest('[data-purge]')?.getAttribute('data-purge')
+		const pn = e.target.closest('[data-purge]')?.getAttribute('data-name') // WO-921: the confirm names the file
 		if (!r && !p) return
 		msg.textContent = ''
 		try {
 			if (r) {
 				reselect(await api.post('/api/media/version/restore', { path: id, v: Number(r) }))
-			} else if (confirm(`Delete version v${p} permanently? This cannot be undone.`)) {
+			} else if (confirm(`Delete version v${p}${pn ? ` (${pn})` : ''} permanently? This cannot be undone.`)) {
 				await api.post('/api/media/version/purge', { path: id, v: Number(p) })
 				void load()
 			}

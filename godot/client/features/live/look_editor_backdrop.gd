@@ -20,6 +20,7 @@ static func _cm() -> Dictionary:
 
 ## Sets the editor up for its main; returns the video role to hold ("" = thumbnails, nothing to hold).
 static func open(ed: Control) -> String:
+	ed.set_meta("sources_key", sources_key(ed.scene_id, ed.look()))
 	return open_with(ed, _cm())
 
 
@@ -49,7 +50,26 @@ static func place(ed: Control, b: Rect2) -> void:
 		ed._thumb.size = b.size
 
 
-## The thumbnail backdrop follows the edits (the PRV surface follows by itself — the pushes restage PRV).
+## The thumbnail backdrop follows the edits (the PRV surface follows by itself — the pushes restage PRV; a server-side
+## media move does not push, see follow_media).
 static func refresh(ed: Control) -> void:
 	if ed._thumb != null:
 		ed._thumb.refresh(ed.look())
+
+
+## The open look's media, keyed with its id: a change of it (not of position or size) needs a fresh PRV stage.
+static func sources_key(scene_id: String, look: Dictionary) -> String:
+	var vals := PackedStringArray([scene_id])
+	for l in look.get("layers", []):
+		if l is Dictionary and (l as Dictionary).get("source") is Dictionary:
+			vals.append(str((l as Dictionary).source.get("value", "")))
+	return "|".join(vals)
+
+
+## WO-921: a project sync that moved the open look's media (a new version under its own name, a rename) restages PRV.
+## Local edits push by themselves; a server-side rewrite does not, and Caspar's PRV kept playing the old file.
+static func follow_media(ed: Control) -> void:
+	var key := sources_key(ed.scene_id, ed.look())
+	if str(ed.get_meta("sources_key", key)) != key:
+		ed.pusher.schedule(ed.scene_id, ed.main)
+	ed.set_meta("sources_key", key)

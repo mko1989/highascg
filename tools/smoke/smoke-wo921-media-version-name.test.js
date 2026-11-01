@@ -3,7 +3,7 @@
 /**
  * WO-921 — a new media version takes its own file name (owner 01.11: the media browser and every look must show the
  * latest version's name). The upload route carries the multipart file name through; Go back restores the old name;
- * references (path, CLS id, label) follow like a rename. Temp dirs only.
+ * references (path, CLS id, label, a look named after its clip) follow like a rename. Temp dirs only.
  */
 
 const { describe, it, before, after } = require('node:test')
@@ -127,5 +127,12 @@ describe('WO-921 a new version takes its own name', () => {
 		const [a, b] = p.scenes.scenes[0].layers.map((l) => l.source)
 		assert.deepEqual([a.value, a.label], [NEW, 'intro_v3.mov'])
 		assert.deepEqual([b.value, b.label], ['SHOW/INTRO_V3', 'intro_v3'])
+	})
+
+	it('a look named after its clip follows the new name; a look with its own name keeps it', () => {
+		const look = (id, name) => ({ id, name, layers: [{ source: { type: 'media', value: OLD } }] })
+		const proj = { scenes: { scenes: [look('a', 'intro_v2'), look('b', 'Opener'), look('c', 'intro_v2.mov')] } }
+		const { project: p } = rewriteProjectMediaRefs(proj, 'demo', [{ from: OLD, to: NEW }], {})
+		assert.deepEqual(p.scenes.scenes.map((s) => s.name), ['intro_v3', 'Opener', 'intro_v3.mov'])
 	})
 })
