@@ -418,6 +418,7 @@ module.exports = {
 	persistProject,
 	projectContentEquals,
 	showContentEquals,
+	canonicalJson,
 	mergeDeckSyncIntoProject,
 	applyLiveSceneDeckToCtx,
 	flushDeckSyncPersist,

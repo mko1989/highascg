@@ -140,6 +140,9 @@ function createNewProject(ctx) {
 	if (!ctx?.configManager) {
 		throw new Error('Server context missing configManager')
 	}
+	const name = freeUntitledName()
+	// WO-919 N2: the open show's final autosave of its rig — the starter hardware below replaces it
+	require('./project-switch-stamp').stampOutgoingShowRig(ctx, projectStore.projectSlugFromName(name))
 	/* WO-919 F11: the old show's PGM / PRV channels, from the config Caspar is RUNNING with — the starter config below
 	 * may number them differently, and Caspar keeps the old layout until it is applied and restarted. */
 	const airChannels = showAirChannels(ctx.config || ctx.configManager.get())
@@ -212,7 +215,7 @@ function createNewProject(ctx) {
 	}
 
 	const project = buildNewUntitledProject(hardwareConfig)
-	project.name = freeUntitledName()
+	project.name = name
 	const slug = projectStore.projectSlugFromName(project.name)
 
 	ctx.sceneDeck = {

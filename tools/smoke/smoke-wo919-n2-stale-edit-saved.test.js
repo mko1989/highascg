@@ -26,6 +26,7 @@ const persistence = require('../../src/utils/persistence')
 const projectStore = require('../../src/engine/project-store')
 const { handleProject } = require('../../src/api/routes-data-project-handlers')
 const hold = require('../../src/engine/project-hardware-hold')
+const { createNewProject } = require('../../src/engine/new-project')
 
 /** A rig told apart by its destination id (same shape as smoke-wo821-hardware-hold). */
 function rig(id) {
@@ -117,7 +118,7 @@ test('rig still X\'s (Y loaded without hardware): the stale edit lands in X with
 	assert.equal(stored('n2_x1').rev, rev + 1)
 })
 
-test("another rig live (Y loaded with its hardware): X's edit is saved, its stored hardwareConfig is kept", async () => {
+test("another rig live (Y loaded with its hardware): X's edit is saved over the rig the switch stamped, never Y's", async () => {
 	const c = boxCtx()
 	storeShow('n2_x2', ['x1'], 'n2_x2_stored', 2)
 	storeShow('n2_y2', ['y1'], 'n2_y2_rig', 5)
@@ -128,7 +129,7 @@ test("another rig live (Y loaded with its hardware): X's edit is saved, its stor
 	assert.equal(r.body.savedTo, 'n2_x2')
 	assert.equal(r.body.hardware, 'stored')
 	assert.deepEqual(lookIds(stored('n2_x2')), ['x1', 'added_by_a'])
-	assert.equal(dest(stored('n2_x2')), 'n2_x2_stored', "never Y's rig in X")
+	assert.equal(dest(stored('n2_x2')), 'n2_x2_edited', "X's own edited rig (the switch stamp), never Y's")
 	assertActiveUntouched(c, 'n2_y2', before)
 })
 
@@ -180,6 +181,79 @@ test('a stale RENAME stays refused and unsaved', async () => {
 	assert.deepEqual(stored('n2_x5'), x, 'X untouched')
 	assert.equal(projectStore.wasProjectSlugRetired('n2_x5'), false)
 	assertActiveUntouched(c, 'n2_y5', before)
+})
+
+/* ---- the switch stamp: a hardware-applying switch saves the outgoing show's live rig into it first ---- */
+
+test('Load Y with its hardware: X\'s edited destination is saved into X first; A\'s stale edit still lands over it', async () => {
+	const c = boxCtx()
+	storeShow('n2_x6', ['x1'], 'n2_x6_stored', 3)
+	storeShow('n2_y6', ['y1'], 'n2_y6_rig', 3)
+	assert.equal((await post(c, '/api/project/load', { slug: 'n2_x6', applyHardware: true })).status, 200)
+	const aRev = stored('n2_x6').rev // the rev client A holds
+	const aBody = staleBody('n2_x6')
+	editLiveRig(c, 'n2_x6_edited')
+	assert.equal((await post(c, '/api/project/load', { slug: 'n2_y6', applyHardware: true })).status, 200)
+	assert.equal(dest({ hardwareConfig: c.config }), 'n2_y6_rig', "Y's rig is live now")
+	assert.equal(dest(stored('n2_x6')), 'n2_x6_edited', 'the destination edit is in X')
+	assert.equal(stored('n2_x6').rev, aRev + 1)
+	assert.equal(dest(projectStore.readAutosaveFile('n2_x6')), 'n2_x6_edited', '_autosave copy too')
+	assert.deepEqual(lookIds(stored('n2_x6')), ['x1'], 'only the rig was stamped')
+	assert.ok(c.logs.some((l) => l.startsWith('info') && l.includes('"n2_x6": live rig saved into it before switching to "n2_y6"')), c.logs.join('\n'))
+	const before = { y: stored('n2_y6'), deck: JSON.stringify(c.sceneDeck || null), mirror: persistence.get('web_project')?.slug }
+	const r = await post(c, '/api/project/autosave', aBody) // A's last autosave, at the rev before the stamp
+	assert.equal(r.body.reason, 'not_active')
+	assert.equal(r.body.savedTo, 'n2_x6', 'the stamp is the only write since its rev: rebased, not stale_rev')
+	assert.equal(r.body.rev, aRev + 2)
+	assert.deepEqual(lookIds(stored('n2_x6')), ['x1', 'added_by_a'])
+	assert.equal(dest(stored('n2_x6')), 'n2_x6_edited', 'and the stamped rig stays')
+	assertActiveUntouched(c, 'n2_y6', before)
+	const older = await post(c, '/api/project/autosave', aBody)
+	assert.equal(older.body.notSaved, 'stale_rev', 'a second copy at that rev is stale now')
+})
+
+test('switch stamp guards: held X, an empty live rig and an unchanged rig write nothing', async () => {
+	const c = boxCtx()
+	storeShow('n2_x7', ['x1'], 'n2_x7_stored', 2)
+	storeShow('n2_y7', ['y1'], 'n2_y7_rig', 2)
+	await post(c, '/api/project/load', { slug: 'n2_x7' }) // held: the box rig is not X's
+	editLiveRig(c, 'n2_box_edit')
+	let x = stored('n2_x7')
+	await post(c, '/api/project/load', { slug: 'n2_y7', applyHardware: true })
+	assert.deepEqual(stored('n2_x7'), x, 'WO-821: a held show keeps its stored slice')
+
+	await post(c, '/api/project/load', { slug: 'n2_x7', applyHardware: true })
+	Object.assign(c.config, { screenDestinations: { version: 1, destinations: [], edidNotes: '' }, deviceGraph: { version: 1, devices: [], connectors: [], edges: [] } })
+	x = stored('n2_x7')
+	await post(c, '/api/project/load', { slug: 'n2_y7', applyHardware: true })
+	assert.deepEqual(stored('n2_x7'), x, 'WO-311: an empty live rig is never stamped')
+
+	await post(c, '/api/project/load', { slug: 'n2_x7', applyHardware: true })
+	await post(c, '/api/project/load', { slug: 'n2_y7', applyHardware: true }) // first stamp: the full live slice
+	await post(c, '/api/project/load', { slug: 'n2_x7', applyHardware: true })
+	x = stored('n2_x7')
+	const logs = c.logs.length
+	await post(c, '/api/project/load', { slug: 'n2_y7', applyHardware: true })
+	assert.deepEqual(stored('n2_x7'), x, 'an unchanged rig: no write, no rev bump')
+	assert.ok(!c.logs.slice(logs).some((l) => l.includes('live rig saved into it')))
+	const y = stored('n2_y7')
+	await post(c, '/api/project/load', { slug: 'n2_y7', applyHardware: true })
+	assert.deepEqual(stored('n2_y7'), y, 'reloading the open show stamps nothing')
+	assert.ok(!c.logs.slice(logs).some((l) => l.includes('live rig saved into it')))
+})
+
+test('New project: the open show keeps its edited destination', async () => {
+	const c = boxCtx()
+	storeShow('n2_x8', ['x1'], 'n2_x8_stored', 2)
+	await post(c, '/api/project/load', { slug: 'n2_x8', applyHardware: true })
+	editLiveRig(c, 'n2_x8_edited')
+	const rev = stored('n2_x8').rev
+	const { slug } = createNewProject(c)
+	assert.notEqual(active(), 'n2_x8')
+	assert.equal(active(), slug)
+	assert.equal(dest(stored('n2_x8')), 'n2_x8_edited')
+	assert.equal(stored('n2_x8').rev, rev + 1)
+	assert.ok(c.logs.some((l) => l.includes(`"n2_x8": live rig saved into it before switching to "${slug}"`)), c.logs.join('\n'))
 })
 
 test('cleanup', () => {

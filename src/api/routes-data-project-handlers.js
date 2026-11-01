@@ -31,6 +31,7 @@ const {
 } = require('./routes-data-project-slug')
 const { loadProjectMerged } = require('./routes-data-project-read')
 const { saveStaleClientEdit } = require('./routes-data-project-stale')
+const { stampOutgoingShowRig } = require('../engine/project-switch-stamp')
 
 // WO-919 F4: outputs the loaded show plans on that xrandr reports unplugged — Apply leaves them out; Load says so.
 function unpluggedOutputs(ctx) {
@@ -204,6 +205,7 @@ async function handleProject(path, body, ctx) {
 			reqSlug ||
 			(project.slug && String(project.slug).trim()) ||
 			projectStore.projectSlugFromName(project.name)
+		if (reqSlug && b.applyHardware === true) stampOutgoingShowRig(ctx, activeSlug) // WO-919 N2: its rig is about to go
 		const rigOf = liveRigOwnerAfter(projectStore.getActiveSlug(persistence)) // WO-919 N2: before the switch
 		projectStore.setActiveSlug(persistence, activeSlug)
 		ensureProjectMediaDir(ctx.config, activeSlug)

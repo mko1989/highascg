@@ -21,6 +21,8 @@ const channelModes = (xml) => [...String(xml || '').matchAll(/<video-mode>([^<]*
 function commitShow(ctx, project) {
 	const { persistProject } = require('../engine/project-scenes')
 	const { normalizeScreenDestinations } = require('../config/screen-destinations')
+	// WO-919 N2: taking ANOTHER show replaces the live destinations — the open show keeps its own first
+	require('../engine/project-switch-stamp').stampOutgoingShowRig(ctx, require('../engine/project-store').projectSlugFromName(project?.name))
 	const r = persistProject(ctx, project, { writeAutosave: true, pushVolumes: false })
 	const dst = project?.hardwareConfig?.screenDestinations
 	if (dst && stableJson(normalizeScreenDestinations(dst)) !== stableJson(normalizeScreenDestinations(ctx.config?.screenDestinations))) {
