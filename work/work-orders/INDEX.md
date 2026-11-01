@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-831 live WOs (30 open, 121 in progress, 680 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+831 live WOs (28 open, 122 in progress, 681 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -484,8 +484,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 913 DONE [godot-client] Visuals Controller: drop a visual on an APC40 pad → the pad loads it into PRV,… → 913_WO_visuals_apc_pads_load_visuals.md
 - 914 DONE [godot-client+engine] Visuals: a Caspar restart leaves the Send output dark until Send is toggled → 914_WO_visuals_resend_after_caspar_restart.md
 - 918 IN PROGRESS [godot-client+engine,devices-config,mapping] GUI test sweep 01.11: new / load / rename / file projects and screen destinatio… → 918_WO_gui_project_and_destination_test_sweep.md
-- 919 OPEN [godot-client+engine,devices-config,mapping] WO-918 follow-ups: the findings the 01.11 fix round left open → 919_WO_gui_sweep_followups.md
-- 920 OPEN [godot-client+devices-config,mapping] Operator GUI destination: a second output dot for the second operator monitor (… → 920_WO_operator_gui_second_monitor_dot.md
+- 919 IN PROGRESS [godot-client+engine,devices-config,mapping] WO-918 follow-ups: the findings the 01.11 fix round left open → 919_WO_gui_sweep_followups.md
+- 920 DONE [godot-client+devices-config,mapping] Operator GUI destination: a second output dot for the second operator monitor (… → 920_WO_operator_gui_second_monitor_dot.md
 
 ## web-client — Web client (82)
 

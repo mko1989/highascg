@@ -26,8 +26,10 @@ const NOTICE_MIN_W := 200.0
 const NOTICE_MAX_SHARE := 0.45
 
 
-static func notice_width(text_w: float, window_w: float) -> float:
-	return clampf(text_w + 6.0, NOTICE_MIN_W, maxf(NOTICE_MIN_W, window_w * NOTICE_MAX_SHARE))
+## `room`: what the header row leaves free — the notice must never push the row past the window (a show with timer
+## toggles and a clip on air left no 45% to take: the whole client spilled past the right edge).
+static func notice_width(text_w: float, window_w: float, room := INF) -> float:
+	return clampf(text_w + 6.0, NOTICE_MIN_W, maxf(NOTICE_MIN_W, minf(window_w * NOTICE_MAX_SHARE, room)))
 
 
 static func hhmm(t: Dictionary) -> String:

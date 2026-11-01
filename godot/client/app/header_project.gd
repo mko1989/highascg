@@ -79,6 +79,9 @@ func _ready() -> void:
 	notice_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS  # WO-919 N1: elide only when out of room
 	notice_label.custom_minimum_size.x = HeaderModel.NOTICE_MIN_W
 	add_child(notice_label)
+	tree_entered.connect(func() -> void:  # the row's other items and the window decide the notice's room
+		(get_parent() as Control).minimum_size_changed.connect(_fit_notice, CONNECT_DEFERRED)
+		get_viewport().size_changed.connect(_fit_notice), CONNECT_ONE_SHOT)
 	_fade = Timer.new()
 	_fade.one_shot = true
 	_fade.timeout.connect(func() -> void:
@@ -140,11 +143,21 @@ func _show_name(p: Dictionary, force := false) -> void:
 ## full text is always the tooltip. It was a fixed 200 px, so the restart / switched / name-taken texts were clipped.
 func _set_notice(text: String) -> void:
 	notice_label.text = text
+	_fit_notice()
+
+
+## WO-919 N1: the notice's width fits its text, up to what the header row leaves free. Re-run when the row's other
+## items grow (timer toggles, the on-air strip) or the window resizes; a settled width emits no further change.
+func _fit_notice() -> void:
 	var font := notice_label.get_theme_font("font")
 	var fsize := notice_label.get_theme_font_size("font_size")
-	var text_w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x if font != null else 0.0
+	var text_w := font.get_string_size(notice_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x if font != null else 0.0
 	var window_w := get_viewport_rect().size.x if is_inside_tree() else 1920.0
-	notice_label.custom_minimum_size.x = HeaderModel.notice_width(text_w, window_w)
+	var row := get_parent() as Control
+	var room := INF
+	if row != null:
+		room = window_w - (row.get_combined_minimum_size().x - notice_label.custom_minimum_size.x) - 8.0
+	notice_label.custom_minimum_size.x = HeaderModel.notice_width(text_w, window_w, room)
 
 
 func say(n: Dictionary) -> void:

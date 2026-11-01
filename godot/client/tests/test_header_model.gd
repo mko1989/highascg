@@ -21,6 +21,8 @@ func test_notice_width() -> void:  # WO-919 N1: it was a fixed 200 px and clippe
 	t.eq(H.notice_width(640.0, 1920.0), 646.0, "a long notice grows to its text")
 	t.eq(H.notice_width(2000.0, 1920.0), 864.0, "...but never past 45% of the window")
 	t.eq(H.notice_width(2000.0, 300.0), 200.0, "a tiny window still gets the minimum")
+	t.eq(H.notice_width(640.0, 1920.0, 400.0), 400.0, "a full header row: only the room it leaves")
+	t.eq(H.notice_width(640.0, 1920.0, 50.0), 200.0, "no room at all: the minimum (elided)")
 
 
 func test_project_rows() -> void:
