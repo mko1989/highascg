@@ -156,3 +156,45 @@ The full set:
   hot-backup line the poll writes, re-renders and requires the same check node.
   - Alone: 12/12.
   - With reuse disabled (`plan([], items)`) the step fails with "the check was rebuilt for a status line change".
+
+## Round 3 (01.11.26, owner: "Also fix 1"): the 07_pixel_map failures were stale sandbox servers
+
+### Investigation
+
+- The "Intensity: Override" step was given a diagnostic: on failure it reports the switch, the stored settings and
+  `/live`.
+- Running 07 alone 10× failed it in runs 3 and 4 with `switch true; stored intensity {"override":true}; live
+  intensity {"override":true}`. The server under test HAD the override; the u18 frames on 127.0.0.1:6455 did not.
+- Run 7 failed "Live: … ArtDMX u18 on 127.0.0.1:6455" with 255-filled slots: again frames no current server could
+  have sent.
+- Server-side theories were ruled out by reading the code:
+  - `persistProject` is synchronous from read to write, so an autosave cannot interleave a stale `pixelMapSettings`
+    into the settings Save;
+  - every `emitProjectChanged` caller passes a full persisted project.
+- `ps` showed three orphaned sandbox servers (PPID 1, `index.js --no-caspar --port …`):
+  - two from the GUI runs I killed at about 14:49 UTC (one killed 2 min in, when 07 configures its u18 fixture and
+    the console output to 127.0.0.1:6455);
+  - one 2 days old.
+- An orphan keeps its pixel-map engine and Art-Net output running, so it kept sending ITS u18 (override off: dimmer 0,
+  W 255) to the receiver of the next run, which read whichever packet came last.
+- Every 07 failure of the day came after those orphans appeared; the ~16 full runs before them passed.
+- Why they survive: `sandbox-server.js` spawns `index.js` as a plain child, and only `stop()` ends it. A runner that is
+  killed (TERM, KILL) or crashes never calls it, and Node does not take its children down with it.
+
+### What was done
+
+- New `tools/e2e/exit-with-parent.js`, preloaded into every sandbox server (`node --require`). Once a second it
+  checks `process.ppid`; when the parent is gone it sends itself SIGTERM, so the server's own shutdown runs.
+  - This covers TERM, KILL and crashes.
+  - It needs no production code.
+  - `tools/test-live/smoke-ws-restart-reconnect.test.js` also spawns `index.js`, but it is not part of the GUI suite
+    and is out of scope here.
+- `07_pixel_map.gd` keeps the diagnostic in its failure message.
+- The three orphans were killed (by PID).
+
+### What was verified
+
+- A throwaway parent started a sandbox and was SIGKILLed. The sandbox logged its normal shutdown
+  (`compose-preview … stopped`) and was gone within 4 s.
+- `07_pixel_map` alone after the orphans were killed: 13 / 13 runs passed (runs 8–20; runs 9–20 with the
+  preload). Before that: 3 failures in 7 runs. No sandbox server outlived its run (`ps` after the loop).

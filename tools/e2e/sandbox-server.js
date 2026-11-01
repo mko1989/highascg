@@ -133,7 +133,9 @@ async function startSandbox(opts) {
 		DISPLAY: '',
 	}
 	const out = fs.openSync(path.join(root, 'server.log'), 'a')
-	const child = spawn(process.execPath, [path.join(REPO_ROOT, 'index.js'), ...(opts.caspar ? [] : ['--no-caspar']), '--port', String(port), '--bind', '127.0.0.1'], {
+	// exit-with-parent: a killed runner must not leave its sandbox (and its Art-Net output) running (WO-923)
+	const child = spawn(process.execPath, ['--require', path.join(__dirname, 'exit-with-parent.js'), path.join(REPO_ROOT, 'index.js'),
+		...(opts.caspar ? [] : ['--no-caspar']), '--port', String(port), '--bind', '127.0.0.1'], {
 		cwd: root,
 		env,
 		stdio: ['ignore', out, out],

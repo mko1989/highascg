@@ -422,7 +422,12 @@ func run() -> void:
 			return d.size() > base + 67 and d[base] == 255 and d[base + 52] == 0 and d[base + 67] == 0, 4.0)
 		if not on:
 			var d: PackedByteArray = wire.get("data", PackedByteArray())
-			return "override on: u%d dimmer %s, W %s, want 255 / 0" % [UNIVERSE, d[base] if d.size() > base else "—", d[base + 52] if d.size() > base + 52 else "—"]
+			var stored: Variant = (await api("/api/fixtures/pixelmap/settings")).get("data", {})
+			var live: Variant = (await api("/api/fixtures/pixelmap/live")).get("data", {})
+			return "override on: u%d dimmer %s, W %s, want 255 / 0 (switch %s; stored intensity %s; live intensity %s)" % [UNIVERSE,
+				d[base] if d.size() > base else "—", d[base + 52] if d.size() > base + 52 else "—", sw.button_pressed,
+				JSON.stringify(stored.get("settings", {}).get("intensity") if stored is Dictionary else stored),
+				JSON.stringify(live.get("intensity") if live is Dictionary else live)]
 		why = await ui.click(sw)
 		if why == "":
 			why = await ui.click(ui.button("Save *", win))
