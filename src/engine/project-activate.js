@@ -202,12 +202,18 @@ async function activateLoadedProject(ctx, project, opts = {}) {
 	}
 	const afterSig = channelLayoutSignature(ctx.config)
 	// WO-919 F2: the Server ▾ compare's "Module expects" is derived from the project config — recompute it now.
+	let compared = null
 	try {
-		if (ctx.gatheredInfo?.infoConfig) require('../config/config-compare').refreshConfigComparison(ctx)
+		if (ctx.gatheredInfo?.infoConfig) {
+			await require('../config/config-compare').refreshConfigComparison(ctx)
+			compared = ctx._configComparison?.serverConfigDriven ? ctx._configComparison : null
+		}
 	} catch (e) {
 		if (typeof ctx.log === 'function') ctx.log('debug', `[project] configComparison refresh: ${e?.message || e}`)
 	}
-	const restartRequired = !!beforeSig && !!afterSig && beforeSig !== afterSig
+	// WO-919: the RUNNING Caspar decides when its config is known — Load frontex then mhp_harder (no Apply between) owed
+	// "restart CasparCG" although Caspar already ran mhp_harder. Before/after of the module config only without it.
+	const restartRequired = compared ? !compared.aligned : !!beforeSig && !!afterSig && beforeSig !== afterSig
 	const restartReason = restartRequired
 		? 'Caspar channel layout changed with this project — regenerate and Apply the CasparCG config, then restart CasparCG.'
 		: null

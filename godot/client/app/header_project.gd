@@ -26,6 +26,7 @@ var _menu: PopupMenu
 var _fade: Timer
 var _sticky := false
 var _restart_up := false  # the sticky notice is the owed-restart one (an Apply answers it)
+var _shown: Dictionary = {}  # the notice on the line now (say_also joins a sticky one)
 var _replace: ConfirmationDialog  # WO-918 F23: Load from file of an older copy of a stored show
 var _pending_import: Dictionary = {}
 ## WO-918 F10: the slug whose name the field shows, and whether the operator typed since — a project switch while the
@@ -161,6 +162,7 @@ func _fit_notice() -> void:
 
 
 func say(n: Dictionary) -> void:
+	_shown = n
 	_set_notice(str(n.text))
 	notice_label.tooltip_text = str(n.get("tip", n.text))
 	var tone := str(n.get("tone", "ok"))
@@ -170,6 +172,11 @@ func say(n: Dictionary) -> void:
 	_restart_up = n.get("restart") == true
 	if not _sticky:
 		_fade.start(NOTICE_S)
+
+
+## A notice that must not hide a sticky one already up (missing assets after a Load — WO-919 F4).
+func say_also(n: Dictionary) -> void:
+	say(HeaderModel.joined_notice(_shown if _sticky else {}, n))
 
 
 func _commit_name() -> void:

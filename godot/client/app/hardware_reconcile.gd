@@ -47,7 +47,7 @@ func check_assets() -> void:
 	var r: Dictionary = await Api.get_json("/api/project/missing-assets")
 	var n := M.missing_notice(r.data) if r.ok else {}
 	if not n.is_empty():
-		_say(n)
+		shell.header_project.say_also(n)  # never hides the Load's restart / unplugged notice (WO-919 F4)
 
 
 func check() -> void:

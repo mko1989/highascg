@@ -56,6 +56,13 @@ func test_load_reply() -> void:
 	t.eq(H.load_notice(reply).text, "Project loaded — recovered newer autosaved work", "recovered")
 	t.eq(H.load_notice({"_activation": {"restartRequired": true, "restartReason": "Channel layout differs"}}), {"text": "Channel layout differs", "tone": "error", "sticky": true, "restart": true}, "restart needed wins — and stays up (WO-918 F1)")
 	t.eq(H.load_notice({}).text, "Project loaded", "plain")
+	t.eq(H.load_notice({"_activation": {"unpluggedOutputs": ["DP-2"]}}), {"text": "Project loaded. Not connected: DP-2 — Apply leaves it out.", "tone": "warn", "sticky": true}, "an unplugged output is named (WO-919 F4)")
+	t.eq(H.load_notice({"_activation": {"restartRequired": true, "restartReason": "Layout differs.", "unpluggedOutputs": ["DP-2", "DP-3"]}}).text, "Layout differs. Not connected: DP-2, DP-3 — Apply leaves them out.", "restart notice carries it too")
+	var owed := {"text": "Apply Caspar.", "tone": "error", "sticky": true, "restart": true}
+	var miss := {"text": "Missing assets — 7 media clips", "tone": "warn", "sticky": true, "tip": "a.mov"}
+	t.eq(H.joined_notice(owed, miss), {"text": "Apply Caspar. · Missing assets — 7 media clips", "tone": "error", "sticky": true, "tip": "Apply Caspar.\na.mov", "restart": true}, "missing assets join the owed restart")
+	t.eq(H.joined_notice({"text": "Autosaved", "sticky": false}, miss), miss, "a passing notice is replaced")
+	t.eq(H.joined_notice({}, miss), miss, "nothing up")
 
 
 func test_project_file() -> void:

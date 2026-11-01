@@ -168,11 +168,15 @@ function needsNodmRestartForLayout(config, opts = {}) {
 	 * head that isn't physically present collapses into a live sibling (test red since e0e66cf;
 	 * production behavior unchanged: without opts.xrDetailed this stays undefined → live). */
 	const planned = plannedHeadsFromLayout(layout, { inventory, config, displays: opts.xrDetailed?.displays })
-	const plannedCanvas = boundingBoxFromHeads(planned)
+	const xr = opts.xrDetailed ?? getDisplaysXrandrDetailed()
+	/* WO-919 F4/F20: the canvas applyX11Layout will really ask for — no head on an unplugged output (that alone
+	 * restarted nodm for a monitor that is not there), plus any lit unplanned head it moves right of the plan. */
+	const { parseXrandrOutputStates, reconcileHeadsWithOutputs } = require('./xrandr-unplanned-heads')
+	const fit = reconcileHeadsWithOutputs(planned.map((h) => ({ ...h, output: h.sysId })), parseXrandrOutputStates(xr?.raw))
+	const plannedCanvas = boundingBoxFromHeads([...fit.heads, ...fit.moved])
 	if (plannedCanvas.width <= 0 || plannedCanvas.height <= 0) {
 		return { needed: false, plannedCanvas, currentCanvas: null, reason: 'no_planned_heads', warn: true }
 	}
-	const xr = opts.xrDetailed ?? getDisplaysXrandrDetailed()
 	const currentCanvas = currentXrandrCanvasSize(xr)
 	if (!currentCanvas) {
 		return { needed: false, plannedCanvas, currentCanvas: null, reason: 'no_live_canvas', warn: true }
@@ -184,6 +188,8 @@ function needsNodmRestartForLayout(config, opts = {}) {
 		plannedCanvas,
 		currentCanvas,
 		reason: needed ? 'canvas_expansion' : 'canvas_fits',
+		disconnected: fit.dropped,
+		movedUnplanned: fit.moved.map((m) => m.output),
 	}
 }
 

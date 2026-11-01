@@ -256,4 +256,5 @@ module.exports = {
 	buildStarterHardwareConfig,
 	createNewProject,
 	freeUntitledName,
+	keepOperatorVideoOutput,
 }

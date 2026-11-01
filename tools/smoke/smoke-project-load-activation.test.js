@@ -220,6 +220,32 @@ test('activateLoadedProject reports restartRequired when hardwareConfig moves th
 	assert.match(res.restartReason, /restart CasparCG/i)
 })
 
+test('WO-919: the running Caspar config decides — a Load back to the show Caspar already runs owes no restart', async () => {
+	const compare = require('../../src/config/config-compare')
+	const real = compare.refreshConfigComparison
+	const run = async (aligned) => {
+		compare.refreshConfigComparison = async (c) => {
+			c._configComparison = { serverConfigDriven: true, aligned }
+		}
+		const ctx = stubCtx({
+			configManager: { _cfg: { casparServer: { screen_count: 1 } }, get() { return this._cfg }, save(n) { this._cfg = n } },
+			gatheredInfo: { infoConfig: '<configuration/>' },
+			_liveSceneStateStub: null,
+		})
+		const project = {
+			...projectB(),
+			hardwareConfig: { version: 2, casparServer: { screen_count: 3 }, screenDestinations: { destinations: [{ id: 'd1', mainScreenIndex: 0 }, { id: 'd2', mainScreenIndex: 1 }] } },
+		}
+		return activateLoadedProject(ctx, project, { applyHardware: true, restage: false, _liveSceneState: stubLiveSceneState({}) })
+	}
+	try {
+		assert.equal((await run(true)).restartRequired, false, 'module layout moved, but Caspar already runs it')
+		assert.equal((await run(false)).restartRequired, true, 'Caspar runs something else')
+	} finally {
+		compare.refreshConfigComparison = real
+	}
+})
+
 test('activateLoadedProject reports no restart when only looks changed', async () => {
 	const ctx = stubCtx()
 	const res = await activateLoadedProject(ctx, projectB(), {

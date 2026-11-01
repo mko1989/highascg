@@ -307,7 +307,11 @@ function applyHardwareConfigFromProject(ctx, project) {
 		}
 		return
 	}
-	const ok = applyHardwareConfigToCtx(ctx, project.hardwareConfig)
+	/* WO-919 F4: how this box shows the operator GUI is the box's, not the show's (as on New project, WO-684) — an
+	 * old show's kiosk-era videoOutput:'screen' opened a Caspar window over the Godot GUI. */
+	const hc = JSON.parse(JSON.stringify(project.hardwareConfig))
+	require('./new-project').keepOperatorVideoOutput(hc, ctx.configManager?.get?.() || ctx.config)
+	const ok = applyHardwareConfigToCtx(ctx, hc)
 	if (ok && typeof ctx.log === 'function') {
 		const ver = project.hardwareConfig.version || 1
 		ctx.log(

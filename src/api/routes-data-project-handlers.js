@@ -31,6 +31,15 @@ const {
 } = require('./routes-data-project-slug')
 const { loadProjectMerged } = require('./routes-data-project-read')
 
+// WO-919 F4: outputs the loaded show plans on that xrandr reports unplugged — Apply leaves them out; Load says so.
+function unpluggedOutputs(ctx) {
+	try {
+		return require('../utils/xrandr-layout-verify').needsNodmRestartForLayout(ctx.config).disconnected || []
+	} catch {
+		return [] // no X (sandbox, headless) — nothing to warn about
+	}
+}
+
 async function handleProject(path, body, ctx) {
 	const b = parseBody(body)
 	if (path === '/api/project/save') {
@@ -208,6 +217,7 @@ async function handleProject(path, body, ctx) {
 			broadcastProject: b.broadcastProject === true,
 		})
 		if (b.applyHardware === true) releaseProjectHardware(activeSlug)
+		const unplugged = b.applyHardware === true ? unpluggedOutputs(ctx) : []
 
 		return {
 			status: 200,
@@ -221,6 +231,7 @@ async function handleProject(path, body, ctx) {
 					clearedLiveChannels: activation.clearedLiveChannels,
 					restartRequired: activation.restartRequired,
 					restartReason: activation.restartReason,
+					...(unplugged.length ? { unpluggedOutputs: unplugged } : {}),
 				},
 			}),
 		}

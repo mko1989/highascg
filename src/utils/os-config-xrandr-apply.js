@@ -19,6 +19,7 @@ const {
 	formatXrandrArgvForLog,
 } = require('./xrandr-safety')
 const { persistLayoutScript } = require('./os-config-persist')
+const { parseXrandrOutputStates, reconcileHeadsWithOutputs } = require('./xrandr-unplanned-heads')
 
 /** WO-337: async now — the sync sleep + sync xrandr execs froze the whole API/WS server. */
 function sleepMs(ms) {
@@ -262,6 +263,14 @@ async function applyX11Layout(config, opts = {}) {
 	Object.values(layout.prv || {}).forEach(processHeadDeduped) /* WO-364 PRV heads */
 	mapGpu.forEach(processHeadDeduped)
 
+	// WO-919 F4/F20: no head on an unplugged output (it failed the whole command); a lit unplanned head moves off the plan
+	const fit = reconcileHeadsWithOutputs(xrandrHeads, parseXrandrOutputStates(xrandrQueryOut))
+	for (const o of fit.dropped) logger.warn(`[OS-Config] ${o} is disconnected — left out of the xrandr layout`)
+	for (const m of fit.moved) {
+		logger.info(`[OS-Config] ${m.output} is not in the plan and overlaps it — moved +${m.from.x}+${m.from.y} → +${m.x}+${m.y} (mode ${m.mode})`)
+	}
+	xrandrHeads.splice(0, xrandrHeads.length, ...fit.heads, ...fit.moved.map(({ output, x, y, mode, rate }) => ({ output, x, y, mode, rate })))
+
 	const env = { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }
 	let applied = false
 	let persisted = false
@@ -379,6 +388,8 @@ async function applyX11Layout(config, opts = {}) {
 		verify,
 		customModes: customModeRegistry.toArray(),
 		modeCreation,
+		disconnected: fit.dropped,
+		movedUnplanned: fit.moved.map((m) => m.output),
 	}
 }
 

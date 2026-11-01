@@ -2,7 +2,7 @@
 
 const { JSON_HEADERS, jsonBody } = require('./response')
 const { checkXrandrLayout, applyX11Layout, calculateLayoutPositions } = require('../utils/os-config')
-const { plannedHeadsFromLayout } = require('../utils/xrandr-layout-verify')
+const { plannedHeadsFromLayout, needsNodmRestartForLayout } = require('../utils/xrandr-layout-verify')
 
 /**
  * @param {*} ctx
@@ -18,6 +18,7 @@ function handleXrandrLayoutGet(ctx) {
 			planned: plannedHeadsFromLayout(layout),
 			mismatches: check.mismatches,
 			actual: check.actual,
+			canvas: needsNodmRestartForLayout(ctx.config, { layout }), // WO-919: what an Apply would do (nodm? unplugged / moved heads)
 		}),
 	}
 }

@@ -97,12 +97,30 @@ static func loaded_project(data: Variant) -> Dictionary:
 static func load_notice(data: Variant) -> Dictionary:
 	var d: Dictionary = data if data is Dictionary else {}
 	var act: Dictionary = d.get("_activation", {}) if d.get("_activation") is Dictionary else {}
+	var gone: Array = act.get("unpluggedOutputs", []) if act.get("unpluggedOutputs") is Array else []
+	var unplugged := "" if gone.is_empty() else "Not connected: %s — Apply leaves %s out." % [", ".join(gone.map(func(o: Variant) -> String: return str(o))), "it" if gone.size() == 1 else "them"]  # WO-919 F4
 	if act.get("restartRequired") == true:
 		var why := str(act.get("restartReason", ""))
-		return {"text": why if why != "" else "This project changes the CasparCG channel layout — Apply Caspar config and restart CasparCG.", "tone": "error", "sticky": true, "restart": true}  # WO-918 F1: owed — never fades
+		why = why if why != "" else "This project changes the CasparCG channel layout — Apply Caspar config and restart CasparCG."
+		return {"text": why + ("" if unplugged == "" else " " + unplugged), "tone": "error", "sticky": true, "restart": true}  # WO-918 F1: owed — never fades
+	if unplugged != "":
+		return {"text": "Project loaded. " + unplugged, "tone": "warn", "sticky": true}
 	if d.get("_recoveredFromAutosave") == true:
 		return {"text": "Project loaded — recovered newer autosaved work", "tone": "ok", "sticky": false}
 	return {"text": "Project loaded", "tone": "ok", "sticky": false}
+
+
+## WO-919 F4: a second sticky notice (missing assets after a Load) joins the one that is up (restart owed, unplugged
+## output) instead of hiding it; the worse tone and the owed restart stay.
+static func joined_notice(cur: Dictionary, n: Dictionary) -> Dictionary:
+	if cur.get("sticky") != true or str(cur.get("text", "")) == "":
+		return n
+	var tone := "error" if "error" in [str(cur.get("tone")), str(n.get("tone"))] else str(n.get("tone", "warn"))
+	var out := {"text": "%s · %s" % [cur.text, n.text], "tone": tone, "sticky": true,
+		"tip": "%s\n%s" % [str(cur.get("tip", cur.text)), str(n.get("tip", n.text))]}
+	if cur.get("restart") == true:
+		out["restart"] = true
+	return out
 
 
 ## A picked .json file → the project document, or why not.
