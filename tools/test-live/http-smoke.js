@@ -101,16 +101,22 @@ async function main() {
 		fail(`GET /api/variables/batch parse error: ${e.message}`)
 	}
 
-	r = await httpGet(`${inst}/app.js`)
-	if (r.status !== 200) fail(`GET ${inst}/app.js expected 200, got ${r.status}`)
-	if (!String(r.body).includes('import ')) fail(`GET ${inst}/app.js expected ES module`)
+	// The web UI is a Vite build (dist-web): index.html names hashed ./assets/ bundles. Fetch the ones the instance
+	// shell names, under the prefix — an unmapped path falls back to the HTML shell, so require real JS / CSS.
+	r = await httpGet(`${inst}/`)
+	const shell = String(r.body)
+	const entry = shell.match(/<script type="module"[^>]*src="\.\/([^"]+\.js)"/)?.[1]
+	const css = shell.match(/<link rel="stylesheet"[^>]*href="\.\/([^"]+\.css)"/)?.[1]
+	if (!entry) fail(`GET ${inst}/ names no module entry script`)
+	r = await httpGet(`${inst}/${entry}`)
+	if (r.status !== 200) fail(`GET ${inst}/${entry} expected 200, got ${r.status}`)
+	if (/<!DOCTYPE/i.test(String(r.body)) || !/\bimport\b/.test(String(r.body))) fail(`GET ${inst}/${entry} expected an ES module`)
 
 	// WO-23 T23.5: main CSS bundle under Companion-style prefix (static map)
-	r = await httpGet(`${inst}/styles.css`)
-	if (r.status !== 200) fail(`GET ${inst}/styles.css expected 200, got ${r.status}`)
-	if (!String(r.body).includes('{') && !String(r.body).includes('@')) {
-		fail(`GET ${inst}/styles.css expected CSS content`)
-	}
+	if (!css) fail(`GET ${inst}/ names no stylesheet`)
+	r = await httpGet(`${inst}/${css}`)
+	if (r.status !== 200) fail(`GET ${inst}/${css} expected 200, got ${r.status}`)
+	if (/<!DOCTYPE/i.test(String(r.body)) || !String(r.body).includes('{')) fail(`GET ${inst}/${css} expected CSS content`)
 
 	r = await httpGet('/api/scene/live')
 	if (r.status !== 200) fail(`GET /api/scene/live expected 200, got ${r.status}`)
@@ -216,16 +222,19 @@ async function main() {
 				ws.close()
 				reject(new Error(`WebSocket timeout (${wsUrl})`))
 			}, 5000)
+			// The connect itself is logged and log lines are broadcast, so a `log_line` can precede the snapshot.
 			ws.on('message', (raw) => {
-				clearTimeout(t)
 				try {
 					const msg = JSON.parse(String(raw))
+					if (msg.type === 'log_line') return
+					clearTimeout(t)
 					if (msg.type !== 'state') {
 						ws.close()
-						reject(new Error(`expected first WS message type "state", got ${msg.type}`))
+						reject(new Error(`expected the WS snapshot (type "state") first, got ${msg.type}`))
 						return
 					}
 				} catch (e) {
+					clearTimeout(t)
 					ws.close()
 					reject(e)
 					return

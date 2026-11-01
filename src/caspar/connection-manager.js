@@ -69,6 +69,10 @@ class ConnectionManager extends EventEmitter {
 				port: this._port,
 				autoConnect: false,
 			})
+			// The library's request-timeout sweep is a ref'd setInterval that only destroy() clears: after stop() it
+			// alone kept a process alive (every tools/test-live AMCP file hung test:live forever). The server never
+			// relied on it to stay up.
+			this._ccg._timeoutTimer?.unref?.()
 			this._adapter = new AmcpConnectionAdapter(this._ccg, { log: this._log })
 			this._instrumentLibraryPlainAmcpSocket()
 		}

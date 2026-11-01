@@ -18,17 +18,22 @@ func run() -> void:
 	await step("A destination exists", func() -> String:
 		await ui.tab("Devices")
 		tab = ui.root.shell.tabs.get_node("Devices")
+		# the release suite runs every scenario on one sandbox: take the destination THIS step adds, not the first one
+		var had := {}
+		for x in (await api("/api/device-view")).get("data", {}).get("screenDestinations", {}).get("destinations", []):
+			had[str(x.id)] = true
 		var why: String = await ui.choose(ui.find("OptionButton", "Destination type to add"), "PGM only")
 		if why == "":
 			why = await ui.click(ui.button("Add destination"))
 		if why != "":
 			return why
 		return await await_api("/api/device-view", func(d: Variant) -> bool:
-			var ds: Array = d.get("screenDestinations", {}).get("destinations", [])
-			dest = str(ds[0].id) if not ds.is_empty() else ""
-			return dest != "", "no destination")
+			for x in d.get("screenDestinations", {}).get("destinations", []):
+				if not had.has(str(x.id)):
+					dest = str(x.id)
+			return dest != "", "no new destination")
 	)
-	await step("F19: dragging the output dot onto P1 cables it", func() -> String:
+	await step("F19: dragging the output dot onto a free GPU port cables it", func() -> String:
 		await tab.refresh()
 		await ui.sleep(1.0)  # the rear panel and the cards lay their dots out a frame or two after the reload
 		var anchors: Dictionary = tab.get("_anchors")
@@ -36,10 +41,19 @@ func run() -> void:
 		if not anchors.has(key):
 			key = "dst_in_" + dest
 
-		if not anchors.has(key) or not anchors.has("gpu_p1"):
-			return "no anchors %s / gpu_p1 (%s)" % [key, anchors.keys()]
+		# scenario 16 leaves P1 cabled (mapping node → Output 1): drop on a port nothing feeds yet
+		var busy := {}
+		for e in (await api("/api/device-view")).get("data", {}).get("graph", {}).get("edges", []):
+			busy[str(e.get("sinkId"))] = true
+		var port := ""
+		for p in ["gpu_p1", "gpu_p2", "gpu_p3", "gpu_p0"]:
+			if anchors.has(p) and not busy.has(p):
+				port = p
+				break
+		if not anchors.has(key) or port == "":
+			return "no anchors %s / a free gpu port (%s, busy %s)" % [key, anchors.keys(), busy.keys()]
 		var a: Vector2 = (anchors[key] as Control).get_global_rect().get_center()
-		var b: Vector2 = (anchors["gpu_p1"] as Control).get_global_rect().get_center()
+		var b: Vector2 = (anchors[port] as Control).get_global_rect().get_center()
 		ui._move(a, 0)
 		await ui.frames(1)
 		ui._button(a, MOUSE_BUTTON_LEFT, true, false)
@@ -49,7 +63,7 @@ func run() -> void:
 			await ui.frames(1)
 		ui._button(b, MOUSE_BUTTON_LEFT, false, false)
 		await ui.frames(3)
-		var why := await await_api("/api/device-view", func(d: Variant) -> bool: return _sink_of(d) == "gpu_p1", "the drag did not cable P1")
+		var why := await await_api("/api/device-view", func(d: Variant) -> bool: return _sink_of(d) == port, "the drag did not cable " + port)
 		if why != "":
 			return why
 		return expect(bool(await ui.wait_for(func() -> bool: return not tab.get("_gesture").armed() and not tab.get("_gesture").busy, 6.0)), "still armed after the drop")

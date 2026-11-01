@@ -28,6 +28,8 @@ const env = { ...process.env, HIGHASCG_LIVE_TESTS: '1' }
 const CASPAR_HOST = env.HIGHASCG_CASPAR_HOST || env.CASPAR_HOST || '127.0.0.1'
 const CASPAR_PORT = parseInt(env.HIGHASCG_CASPAR_PORT || env.CASPAR_PORT || '5250', 10)
 const API_PORT = parseInt(env.HIGHASCG_HTTP_PORT || env.HIGHASCG_SMOKE_PORT || '4200', 10)
+// the HTTP live test refuses to guess the port; the runner already knows it
+env.HIGHASCG_HTTP_PORT = String(API_PORT)
 
 /** Probes: exit code is the verdict. The take probe changes what is on air, so it is opt-in. */
 const PROBES = [

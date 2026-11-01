@@ -115,6 +115,27 @@ func run() -> void:
 		if cb == null:
 			return "the check never became enabled"
 		return expect(not cb.button_pressed and ui.find("Label", OF.HINT_OFF) != null, "check state / hint wrong"))
+	await step("A Devices refresh keeps the open page (WO-923)", func() -> String:
+		# The page's own opening reads end with /api/cluster (the auto-accept check enables); wait for that, then a
+		# refresh must not rebuild it. Re-opening on every refresh rebuilt it several times and lost clicks.
+		var settled: Variant = await ui.wait_for(func() -> Variant:
+			var c: CheckBox = ui.find("CheckBox", "Auto-accept master invites")
+			return c if c != null and not c.disabled else null, 15.0)
+		if settled == null:
+			return "the server page never finished loading"
+		var cb: CheckBox = ui.find("CheckBox", OF.TEXT)
+		var shown: Array = _tab()._server._shown
+		await _tab().refresh()
+		await ui.sleep(2.0)  # the old re-open re-read status, network and cluster, each one a full rebuild
+		if cb != null and ui.find("CheckBox", OF.TEXT) == cb:
+			return ""
+		var now: Array = _tab()._server._shown
+		for i in maxi(shown.size(), now.size()):
+			var a: Variant = shown[i] if i < shown.size() else null
+			var b: Variant = now[i] if i < now.size() else null
+			if a != b:
+				return "the refresh rebuilt the server page; item %d was %s, now %s" % [i, JSON.stringify(a).left(200), JSON.stringify(b).left(200)]
+		return "the refresh rebuilt the server page with the same items")
 	await step("Turn it on (confirm lists the moves)", func() -> String:
 		var gui_before := 0
 		for r in _before:

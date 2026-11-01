@@ -323,7 +323,7 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 			else:
 				page.show_connector(conn, payload, DevicesTarget.settings.settings)
 	if _server.is_open:
-		_server.show_server(payload, DevicesTarget.settings.settings)
+		_server.update_server(payload, DevicesTarget.settings.settings)  # WO-923: keep the open page, no re-read
 	if _mapc.node_id != "":
 		if _mapc.G.find_node(payload.get("graph"), _mapc.node_id).is_empty():
 			_close_port()

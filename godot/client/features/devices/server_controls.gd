@@ -91,6 +91,18 @@ func show_server(payload: Dictionary, settings: Variant) -> void:
 	flow.start()
 
 
+## WO-923: a Devices refresh while the page is open. The new device view + settings go into the SAME flow (the network,
+## replication and operator-first state it already read stays) and the page re-renders, which rebuilds only if its items
+## changed. Re-opening instead (show_server) put every section back to "Loading…" and re-read it all: several full
+## rebuilds per refresh, and a click that landed in one was lost (the check was freed between press and release).
+func update_server(payload: Dictionary, settings: Variant) -> void:
+	if not is_open:
+		return
+	flow.s.payload = payload
+	flow.s.settings = settings if settings is Dictionary else {}
+	_render()
+
+
 func close() -> void:
 	is_open = false
 	_io = null

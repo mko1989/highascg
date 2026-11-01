@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-832 live WOs (28 open, 122 in progress, 682 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+833 live WOs (28 open, 122 in progress, 683 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -859,7 +859,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 761 DONE [testing-ci] smoke-ws-restart-reconnect: a reconnect race failed it, and the failure hung te… → 761_WO_ws_reconnect_smoke_race_hung_test_ci_full.md
 - 836 DONE [testing-ci] Test categories: offline / live-box, and a GUI release suite with screenshot +… → 836_WO_test_categories_live_box_and_release_gui_suite.md
 
-## process — Docs, wiki, audits, work-order tooling (26)
+## process — Docs, wiki, audits, work-order tooling (27)
 
 - 33 DONE [process] (legacy filename) — use the index → 33_WO_DEVICE_VIEW_CASPAR_AND_PIXELHUE.md
 - 83 DONE [process+web-client] Interactive Project Architecture Map: index & dependency order → 83_WO_INTERACTIVE_PROJECT_MAP.md
@@ -887,6 +887,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 819 DONE [process] Verify, test and commit the open work of 29.10 (WO-806/807/812/813/814/816/817… → 819_WO_verify_and_commit_today.md
 - 831 DONE [process] Dead code removal (sweep §6) → 831_WO_dead_code_removal.md
 - 846 DONE [process] Work-order housekeeping: categorize, index, deprecate → 846_WO_work_order_housekeeping_index.md
+- 923 DONE [process+godot-client,amcp] Full test run 01.11: test:live hung forever, stale live probes, two GUI e2e fai… → 923_WO_full_test_run_fixes.md
 
 ## Deprecated (48)
 
