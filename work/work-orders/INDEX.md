@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-827 live WOs (28 open, 120 in progress, 679 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+828 live WOs (29 open, 120 in progress, 679 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -367,7 +367,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (114)
+## godot-client — Godot client (115)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -483,6 +483,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 912 DONE [godot-client] Visuals MIDI: APC40 knobs are endless encoders — they never picked up; now rela… → 912_WO_visuals_apc_knobs_are_encoders.md
 - 913 DONE [godot-client] Visuals Controller: drop a visual on an APC40 pad → the pad loads it into PRV,… → 913_WO_visuals_apc_pads_load_visuals.md
 - 914 DONE [godot-client+engine] Visuals: a Caspar restart leaves the Send output dark until Send is toggled → 914_WO_visuals_resend_after_caspar_restart.md
+- 918 OPEN [godot-client+engine,devices-config,mapping] GUI test sweep 01.11: new / load / rename / file projects and screen destinatio… → 918_WO_gui_project_and_destination_test_sweep.md
 
 ## web-client — Web client (82)
 
