@@ -36,6 +36,10 @@ var box_api: ApiScript:
 var settings: SettingsScript:
 	get:
 		return _peer_settings if editing != "" else Settings
+## This machine's Settings, whichever server is being edited (WO-919 F13: the header reloads it after a Load / New).
+var box_settings: SettingsScript:
+	get:
+		return Settings
 
 var _peer_api: ApiScript
 var _peer_settings: SettingsScript

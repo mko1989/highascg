@@ -152,17 +152,45 @@ function buildIssues(serverChannels, moduleChannels) {
 }
 
 /**
- * Expectations that mirror the running server — used so config comparison stays aligned (no false mismatches vs saved JSON).
- * @param {Array<{ index: number, videoMode: string, hasScreen: boolean }>} serverChannels
+ * WO-919 F2: what Apply WOULD write for the loaded project, as parsed channels. Uses the same effective XML as
+ * writeCasparConfig (routes-caspar-config.js:125 — manual override, else the generator over the project-derived
+ * `ctx.config`), so "Module expects" is the loaded project's layout, not a mirror of the running server.
+ * @param {Record<string, unknown>} config - `ctx.config`
+ * @returns {Promise<Array>}
  */
-function buildExpectationMatchingServer(serverChannels) {
-	return serverChannels.map((s) => ({
-		index: s.index,
-		videoMode: s.videoMode,
-		hasScreen: s.hasScreen,
-		role: `Channel ${s.index}`,
-		source: 'server',
-	}))
+function parseExpectedChannels(config) {
+	const override = String(config?.casparServer?.casparConfigOverride || '').trim()
+	const { buildConfigXml } = require('./config-generator')
+	const { buildCasparGeneratorFlatConfig } = require('./build-caspar-generator-config')
+	return parseServerChannels(override || buildConfigXml(buildCasparGeneratorFlatConfig(config || {})))
+}
+
+/**
+ * Pure: expected (project) channels vs running channels. Same-index pairs differ in mode, Caspar screen consumer or
+ * DeckLink output; a different channel count is reported once and the common prefix is still compared.
+ * @param {Array} serverChannels
+ * @param {Array} expected
+ */
+function compareExpectedToServer(serverChannels, expected) {
+	const issues = []
+	if (serverChannels.length !== expected.length) {
+		issues.push(`Channel count: server ${serverChannels.length} vs loaded project ${expected.length}.`)
+	}
+	const n = Math.min(serverChannels.length, expected.length)
+	for (let i = 0; i < n; i++) {
+		const s = serverChannels[i]
+		const m = expected[i]
+		const sv = (s.videoMode || '').trim()
+		const mv = (m.videoMode || '').trim()
+		if (sv && mv && sv !== mv) issues.push(`Ch ${s.index}: server "${sv}" ≠ project "${mv}"`)
+		if (s.hasScreen !== m.hasScreen) {
+			issues.push(`Ch ${s.index}: Caspar screen output is ${s.hasScreen ? 'on' : 'off'}, the project expects ${m.hasScreen ? 'on' : 'off'}`)
+		}
+		if (s.hasDecklinkOutput !== m.hasDecklinkOutput) {
+			issues.push(`Ch ${s.index}: DeckLink output is ${s.hasDecklinkOutput ? 'on' : 'off'}, the project expects ${m.hasDecklinkOutput ? 'on' : 'off'}`)
+		}
+	}
+	return issues
 }
 
 /**
@@ -173,7 +201,7 @@ function refreshConfigComparison(self) {
 	const xml = self.gatheredInfo?.infoConfig || ''
 	const settingsExpectation = buildModuleChannelExpectation(self.config || {})
 
-	const done = (serverChannels) => {
+	const done = (serverChannels, expected, expectError) => {
 		const serverPhysicalScreens = serverChannels
 			.filter((s) => s.hasScreen)
 			.map((s) => ({ index: s.index, videoMode: s.videoMode || '' }))
@@ -186,14 +214,24 @@ function refreshConfigComparison(self) {
 		let hint
 
 		if (serverChannels.length > 0) {
-			// Match expectations to the running server so we do not report bogus mode/screen-count mismatches.
-			moduleChannels = buildExpectationMatchingServer(serverChannels)
-			issues = []
-			aligned = true
-			screensCountMismatch = false
-			moduleScreenCount = serverPhysicalScreens.length || Math.max(1, Math.ceil(serverChannels.length / 2))
-			hint =
-				'HighAsCG is using the running Caspar server configuration from INFO CONFIG. Change routing or modes in Settings when you want a different layout; apply to Caspar separately.'
+			// WO-919 F2: expectation = the loaded project's layout (what Apply writes), compared with the running one.
+			moduleChannels = (expected || []).map((m) => ({
+				index: m.index,
+				videoMode: m.videoMode,
+				hasScreen: m.hasScreen,
+				hasDecklinkOutput: m.hasDecklinkOutput,
+				role: `Channel ${m.index}`,
+				source: 'project',
+			}))
+			issues = expectError
+				? [`Could not build the loaded project's Caspar config: ${expectError}`]
+				: compareExpectedToServer(serverChannels, moduleChannels)
+			moduleScreenCount = moduleChannels.filter((m) => m.hasScreen).length
+			screensCountMismatch = !expectError && serverPhysicalScreens.length !== moduleScreenCount
+			aligned = issues.length === 0
+			hint = aligned
+				? 'The running Caspar config matches what Apply would write for the loaded project.'
+				: 'The running CasparCG config differs from the loaded project. Apply (Devices) writes the project layout to Caspar and restarts it.'
 		} else {
 			moduleChannels = settingsExpectation
 			issues = buildIssues(serverChannels, moduleChannels)
@@ -209,10 +247,7 @@ function refreshConfigComparison(self) {
 					`Screen outputs: Caspar has ${serverPhysicalScreens.length} (ch ${idx}); app is set to ${moduleScreenCount} screen(s).`,
 				])
 			}
-			aligned =
-				serverChannels.length > 0 &&
-				serverChannels.length === moduleChannels.length &&
-				issues.length === 0
+			aligned = false
 			hint =
 				'To apply app screen settings to CasparCG, use config apply / restart when wired (**T10**), or edit caspar.config.xml on the server.'
 		}
@@ -240,14 +275,28 @@ function refreshConfigComparison(self) {
 
 	if (!xml.trim()) {
 		done([])
-		return
+		return Promise.resolve()
 	}
 
-	parseServerChannels(xml).then(done).catch(() => done([]))
+	return parseServerChannels(xml)
+		.then(async (serverChannels) => {
+			let expected = []
+			let expectError = ''
+			if (serverChannels.length > 0) {
+				try {
+					expected = await parseExpectedChannels(self.config)
+				} catch (e) {
+					expectError = e?.message || String(e)
+				}
+			}
+			done(serverChannels, expected, expectError)
+		})
+		.catch(() => done([]))
 }
 
 module.exports = {
 	parseServerChannels,
+	compareExpectedToServer,
 	buildModuleChannelExpectation,
 	refreshConfigComparison,
 }

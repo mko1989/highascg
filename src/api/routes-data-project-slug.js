@@ -90,9 +90,10 @@ function slugConflict(kind, prevSlug, slug, existing) {
  * @param {string | null} prevSlug
  * @param {string} slug
  * @param {null | 'rename' | 'imported' | 'other_show'} kind
+ * @param {object} [project] the renamed project: its media folder follows the rename (WO-919 N5)
  * @returns {boolean} true when prevSlug was retired
  */
-function retireRenamedSlug(ctx, prevSlug, slug, kind) {
+function retireRenamedSlug(ctx, prevSlug, slug, kind, project) {
 	if (!kind) return false
 	const log = (m) => typeof ctx?.log === 'function' && ctx.log('info', m)
 	if (kind === 'imported') {
@@ -107,6 +108,7 @@ function retireRenamedSlug(ctx, prevSlug, slug, kind) {
 	try {
 		const moved = retireSlugWithReplication(ctx, prevSlug, { reason: 'rename', replacementSlug: slug })
 		log(`[project] renamed "${prevSlug}" → "${slug}": "${prevSlug}" moved to projects/_trash`) // WO-918: never silent
+		require('../media/project-media-rename').moveProjectMediaOnRename(ctx, prevSlug, slug, project) // WO-919 N5: never throws
 		return moved
 	} catch (e) {
 		if (typeof ctx?.log === 'function') ctx.log('warn', `[project] retire previous slug ${prevSlug}: ${e?.message || e}`)

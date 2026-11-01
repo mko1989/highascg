@@ -226,6 +226,28 @@ function projectContentEquals(a, b) {
 	}
 }
 
+/**
+ * WO-919 F6: keys the SERVER stamps on a write (live hardware slice, channel scheme, rev/savedAt/slug) — a difference in
+ * only these is not a show edit. Applying a layout or loading a project changes the live rig, so the next background
+ * autosave re-stamps `hardwareConfig`; that must not turn the "Saved" column of the Load list into "last loaded".
+ */
+const SERVER_STAMPED_KEYS = ['rev', 'savedAt', 'slug', 'hardwareConfig', 'channelScheme']
+
+/** Show content equality ignoring {@link SERVER_STAMPED_KEYS}. */
+function showContentEquals(a, b) {
+	const strip = (p) => {
+		const rest = { ...p }
+		for (const k of SERVER_STAMPED_KEYS) delete rest[k]
+		return rest
+	}
+	if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false
+	try {
+		return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
+	} catch (_) {
+		return false
+	}
+}
+
 function persistProject(ctx, project, opts = {}) {
 	if (!ctx || !project || typeof project !== 'object') {
 		throw new Error('Invalid project persist payload')
@@ -254,6 +276,11 @@ function persistProject(ctx, project, opts = {}) {
 		projectContentEquals(stamped, storedProject)
 	) {
 		return { ok: true, slug, rev: projectRevOf(storedProject), project: storedProject, unchanged: true }
+	}
+	/* WO-919 F6: only a real edit or an explicit save (`opts.userSave`) moves savedAt. A write that changes nothing but
+	 * the server-stamped slices (Apply / load re-stamp hardwareConfig) keeps the stored stamp. */
+	if (opts.userSave !== true && storedProject?.savedAt && showContentEquals(stamped, storedProject)) {
+		stamped.savedAt = storedProject.savedAt
 	}
 	const storedRev = projectRevOf(storedProject) || 0
 	if (opts.bumpRev !== false) {
@@ -372,6 +399,7 @@ module.exports = {
 	sceneIdSet,
 	persistProject,
 	projectContentEquals,
+	showContentEquals,
 	mergeDeckSyncIntoProject,
 	applyLiveSceneDeckToCtx,
 	flushDeckSyncPersist,

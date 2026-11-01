@@ -15,6 +15,7 @@ const { ensureProjectMediaDir } = require('../media/project-media-root')
 const projectStore = require('./project-store')
 const { persistSceneDeckForCtx } = require('../state/live-deck-state')
 const { buildFactoryModularConfig } = require('../config/factory-starter')
+const { showAirChannels, clearShowAir } = require('./new-project-air')
 
 const EMPTY_PROJECT_TEMPLATE = require('../config/default-empty-project.json')
 
@@ -132,12 +133,16 @@ function freeUntitledName() {
 /**
  * Apply starter routing and persist empty Untitled project.
  * @param {object} ctx
- * @returns {{ project: object, slug: string }}
+ * @returns {{ project: object, slug: string, air: Promise<object> }} `air` settles when the old show is off PGM / PRV
+ *   (WO-919 F11, never rejects)
  */
 function createNewProject(ctx) {
 	if (!ctx?.configManager) {
 		throw new Error('Server context missing configManager')
 	}
+	/* WO-919 F11: the old show's PGM / PRV channels, from the config Caspar is RUNNING with — the starter config below
+	 * may number them differently, and Caspar keeps the old layout until it is applied and restarted. */
+	const airChannels = showAirChannels(ctx.config || ctx.configManager.get())
 	/* WO-569: stop the operator-GUI compose routes/shape holes on the CURRENT (about-to-be-stale)
 	 * channel before the destinations reset below can renumber which Caspar channel "operator_gui"
 	 * is (routing-map.js allocates it dynamically after programChannels/multiview — resetting to
@@ -238,7 +243,11 @@ function createNewProject(ctx) {
 		/* optional */
 	}
 
-	return { project, slug }
+	const air = clearShowAir(ctx, airChannels).catch((e) => {
+		if (typeof ctx.log === 'function') ctx.log('warn', `[project] new: clear old show: ${e?.message || e}`)
+		return { channels: airChannels, liveCleared: [] }
+	})
+	return { project, slug, air }
 }
 
 module.exports = {

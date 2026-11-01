@@ -313,7 +313,7 @@ function copyIfSrcNewer(src, dst) {
 const PUSH_LOG_COALESCE_MS = 5000
 const _pushLogMemo = new Map()
 function logPushCoalesced(log, slug, target, msg) {
-	const key = `${slug} ${target}`
+	const key = `${slug}\u0000${target}`
 	const now = Date.now()
 	const memo = _pushLogMemo.get(key)
 	if (memo && now - memo.at < PUSH_LOG_COALESCE_MS) {

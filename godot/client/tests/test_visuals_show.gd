@@ -244,3 +244,25 @@ func test_caspar_reconnect_resends() -> void:
 	await tab.caspar_link(true)
 	t.eq(api.posts.size(), 1, "still up: no repeat")
 	tab.free()
+
+
+# WO-919 F11: the server cleared the show (New project) -> Send is over: no replay when Caspar restarts, no resume marker.
+func test_show_cleared_ends_send() -> void:
+	var tab: Control = preload("res://features/visuals/visuals_tab.gd").new()
+	tab._ready()
+	tab.on_air_path = "user://test_wo919_on_air_%d.json" % Time.get_ticks_usec()
+	var api := _PlayApi.new()
+	tab.replay_api = api
+	tab.sending = {"channel": 2, "layer": 1}
+	tab._on_air_mark(tab.sending)
+	var Air := preload("res://features/visuals/visuals_air.gd")
+	t.eq(Air.show_cleared(tab, {"path": "hardwareConfig", "value": {}}), false, "another change: still sending")
+	t.eq(tab.sending, {"channel": 2, "layer": 1}, "...and the layer is kept")
+	t.eq(Air.show_cleared(tab, {"path": "show.cleared", "value": {"slug": "untitled_2", "channels": [2, 3]}}), true, "show.cleared ends it")
+	t.eq(tab.sending, {}, "not sending")
+	t.eq(FileAccess.file_exists(tab.on_air_path), false, "the on-air marker is gone: a restarted client does not resume")
+	tab.caspar_link(false)
+	await tab.caspar_link(true)
+	t.eq(api.posts.size(), 0, "Caspar restarting afterwards: no PLAY to 2-1")
+	t.eq(Air.show_cleared(tab, {"path": "show.cleared", "value": {}}), false, "nothing to end the second time")
+	tab.free()

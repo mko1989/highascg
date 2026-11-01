@@ -78,7 +78,7 @@ async function handleProject(path, body, ctx) {
 		}
 		let persisted
 		try {
-			persisted = await persistProject(ctx, project, { writeAutosave: true })
+			persisted = await persistProject(ctx, project, { writeAutosave: true, userSave: true }) // WO-919 F6: an explicit save stamps savedAt
 		} catch (e) {
 			if (typeof ctx.log === 'function') {
 				ctx.log('error', '[project] save persist failed: ' + (e?.message || e))
@@ -89,7 +89,7 @@ async function handleProject(path, body, ctx) {
 				body: jsonBody({ error: 'Project save failed', detail: e?.message || String(e) }),
 			}
 		}
-		retireRenamedSlug(ctx, prevSlug, slug, prevKind) // WO-824: an import / another show keeps the open show
+		retireRenamedSlug(ctx, prevSlug, slug, prevKind, project) // WO-824: an import / another show keeps the open show
 		ensureProjectMediaDir(ctx.config, slug)
 		if (ctx.artnetReceiver?.reconfigureFromProject) {
 			ctx.artnetReceiver.reconfigureFromProject(project)
@@ -418,7 +418,7 @@ async function handleProject(path, body, ctx) {
 		}
 		try {
 			const result = await persistProject(ctx, project, { writeAutosave: true })
-			retireRenamedSlug(ctx, prevSlug, slug, prevKind) // WO-824: only a rename retires the previous slug
+			retireRenamedSlug(ctx, prevSlug, slug, prevKind, project) // WO-824: only a rename retires the previous slug
 			if (ctx.artnetReceiver?.reconfigureFromProject) {
 				ctx.artnetReceiver.reconfigureFromProject(project)
 			} else if (ctx.artnetReceiver) {

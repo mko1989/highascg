@@ -135,6 +135,8 @@ function getState(ctx, opts = {}) {
 		composePreview: { blocklist: getComposeBlocklistStats() },
 		localMediaEnabled: !!(cfg.local_media_path || '').trim(),
 		configComparison: ctx._configComparison || null,
+		/* WO-919 F26: the OS layout watchdog's give-up (null = none) — bootstraps the Devices toolbar warning on connect. */
+		osLayout: ctx._osLayoutIssue || null,
 		ui: cfg.ui || {},
 		extraLiveSources: enrichExtraLiveSources(hostLiveMig.list, ctx),
 		/* WO-506: the raw override map, so the inspector can show which sources carry a custom name

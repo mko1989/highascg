@@ -14,6 +14,7 @@ const Launcher := preload("res://features/visuals/game_launcher.gd")
 const Catalog := preload("res://features/visuals/visuals_catalog.gd")
 const Mixer := preload("res://features/visuals/visuals_mixer.gd")
 const Probes := preload("res://features/visuals/visuals_probes.gd")
+const Air := preload("res://features/visuals/visuals_air.gd")
 const ShowCtl := preload("res://features/visuals/visuals_show_ctl.gd")
 const ShaderMode := preload("res://features/visuals/visuals_shader_mode.gd")
 const CamCtl := preload("res://features/visuals/visuals_camera_ctl.gd")
@@ -127,6 +128,7 @@ func _ready() -> void:
 	if _g("Config") and _g("Config").args.has("visuals-ring"):
 		ring_name = str(_g("Config").args["visuals-ring"])
 	if _g("Ws"):
+		_g("Ws").on("change", func(d: Variant) -> void: Air.show_cleared(self, d))  # WO-919 F11
 		_g("Ws").on("audio_fft", func(d: Variant) -> void:
 			_buses = M.buses_of(d)
 			mixer.audio_frame(d)
@@ -466,26 +468,13 @@ func _resume_send() -> void:
 		await get_tree().create_timer(2.0).timeout
 
 
-## WO-914: a Caspar restart (a crash, an Apply, the supervisor's CEF retry) drops the PLAY of the shm layer while this client
-## still sends, and nothing played it again: the output stayed dark until Send was toggled. When the AMCP link comes back,
-## PLAY it again after node's own restore of the looks (REPLAY_S) — the ring never stopped, Caspar takes it at once.
-const REPLAY_S := 3.0
+## WO-914: PLAY the shm layer again when Caspar's AMCP link comes back (visuals_air.gd); WO-919 F11: a cleared show ends Send.
 var _caspar_up := true
 var replay_api: Variant = null  # tests: stands in for DevicesTarget.box_api
 
 
 func caspar_link(up: bool) -> void:
-	var back := up and not _caspar_up
-	_caspar_up = up
-	if not back or sending.is_empty():
-		return
-	if is_inside_tree():
-		await get_tree().create_timer(REPLAY_S).timeout
-	if sending.is_empty() or not _caspar_up:
-		return
-	var api: Variant = replay_api if replay_api != null else _g("DevicesTarget").box_api
-	var r: Dictionary = await api.post_json("/api/play", M.play_body(int(sending.channel), int(sending.layer), ring_name))
-	print("[visuals] Caspar reconnected: Send again to %d-%d — %s" % [sending.channel, sending.layer, "ok" if r.ok else str(r)])
+	await Air.caspar_link(self, up)
 
 
 func _sync_send_ui(why: String) -> void:

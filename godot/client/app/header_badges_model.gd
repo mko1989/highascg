@@ -128,6 +128,10 @@ static func config_strip(c: Variant) -> Dictionary:
 		summary = "Server config matches module settings (%s channels).%s" % [_n(d.get("serverChannelCount")), phys_line]
 	elif not d.get("serverChannelCount"):
 		summary = "Connect to CasparCG or wait for INFO CONFIG to compare channel layout."
+	elif int(d.get("serverChannelCount", 0)) == int(d.get("moduleChannelCount", -1)):
+		# WO-919 F2: same channel count, but modes / screen outputs differ from the loaded project.
+		var n_diff: int = (d.get("issues", []) as Array).size() if d.get("issues") is Array else 0
+		summary = "Mismatch: the running server differs from the loaded project (%d difference%s).%s" % [n_diff, "" if n_diff == 1 else "s", phys_line]
 	else:
 		summary = "Mismatch: server has %s channel(s), module expects %s.%s%s" % [_n(d.get("serverChannelCount")), _n(d.get("moduleChannelCount")), phys_line,
 			" Screen count differs from app — check multiview or extra screen consumers." if d.get("screensCountMismatch") == true else ""]
@@ -138,7 +142,7 @@ static func config_strip(c: Variant) -> Dictionary:
 		var s: Dictionary = sv[i] if i < sv.size() and sv[i] is Dictionary else {}
 		var m: Dictionary = mv[i] if i < mv.size() and mv[i] is Dictionary else {}
 		var num: Variant = s.get("index", m.get("index", i + 1))
-		rows.append([str(int(num)), ("%s: %s" % [str(m.get("role", "")), str(m.get("videoMode", "—"))]) if not m.is_empty() else "—",
+		rows.append([str(int(num)), ("%s: %s%s" % [str(m.get("role", "")), str(m.get("videoMode", "—")), " (screen)" if m.get("hasScreen") == true else ""]) if not m.is_empty() else "—",
 			(str(s.get("videoMode", "—")) + (" (screen)" if s.get("hasScreen") == true else "")) if not s.is_empty() else "—"])
 	var issues: Array = (d.get("issues", []) as Array).map(func(x: Variant) -> String: return str(x)) if d.get("issues") is Array else []
 	return {"ok": ok, "summary": summary, "rows": rows, "issues": issues, "hint": str(d.get("hint", "")) if d.get("hint") != null else ""}

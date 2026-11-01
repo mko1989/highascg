@@ -15,6 +15,14 @@ func test_notices() -> void:
 	t.eq(H.clock_text({"hour": 20, "minute": 18, "second": 9}), "20:18:09", "wall clock")
 
 
+func test_notice_width() -> void:  # WO-919 N1: it was a fixed 200 px and clipped the restart / switched / name-taken texts
+	t.eq(H.notice_width(0.0, 1920.0), 200.0, "idle: the old width")
+	t.eq(H.notice_width(120.0, 1920.0), 200.0, "a short notice keeps the stable width")
+	t.eq(H.notice_width(640.0, 1920.0), 646.0, "a long notice grows to its text")
+	t.eq(H.notice_width(2000.0, 1920.0), 864.0, "...but never past 45% of the window")
+	t.eq(H.notice_width(2000.0, 300.0), 200.0, "a tiny window still gets the minimum")
+
+
 func test_project_rows() -> void:
 	var data := {"activeSlug": "untitled", "projects": [
 		{"slug": "untitled", "name": "Untitled", "savedAt": "2026-10-20T20:18:19.789Z", "active": true},

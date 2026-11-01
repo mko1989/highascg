@@ -201,6 +201,12 @@ async function activateLoadedProject(ctx, project, opts = {}) {
 		}
 	}
 	const afterSig = channelLayoutSignature(ctx.config)
+	// WO-919 F2: the Server ▾ compare's "Module expects" is derived from the project config — recompute it now.
+	try {
+		if (ctx.gatheredInfo?.infoConfig) require('../config/config-compare').refreshConfigComparison(ctx)
+	} catch (e) {
+		if (typeof ctx.log === 'function') ctx.log('debug', `[project] configComparison refresh: ${e?.message || e}`)
+	}
 	const restartRequired = !!beforeSig && !!afterSig && beforeSig !== afterSig
 	const restartReason = restartRequired
 		? 'Caspar channel layout changed with this project — regenerate and Apply the CasparCG config, then restart CasparCG.'

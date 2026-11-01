@@ -20,6 +20,16 @@ static func notice(kind: String, detail: String, hhmm: String) -> Dictionary:
 	return {"text": detail, "tone": "ok", "sticky": false}
 
 
+## WO-919 N1: the notice line is NOTICE_MIN_W wide when idle, grows to fit its text, and never takes more than
+## NOTICE_MAX_SHARE of the window (past that the text is elided; the tooltip has all of it).
+const NOTICE_MIN_W := 200.0
+const NOTICE_MAX_SHARE := 0.45
+
+
+static func notice_width(text_w: float, window_w: float) -> float:
+	return clampf(text_w + 6.0, NOTICE_MIN_W, maxf(NOTICE_MIN_W, window_w * NOTICE_MAX_SHARE))
+
+
 static func hhmm(t: Dictionary) -> String:
 	return "%02d:%02d" % [int(t.get("hour", 0)), int(t.get("minute", 0))]
 

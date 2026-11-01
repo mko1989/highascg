@@ -12,7 +12,17 @@ const { scheduleProjectSyncBroadcast } = require('./routes-data-project-sync')
 
 async function handleProjectNew(ctx) {
 	try {
-		const { project, slug } = await createNewProject(ctx)
+		const { project, slug, air } = await createNewProject(ctx)
+		/* WO-919 F11: answer once the old show is off PGM / PRV (a stuck AMCP link must not hold the reply) */
+		const cleared = await Promise.race([air, new Promise((r) => setTimeout(r, 4000).unref())])
+		if (typeof ctx._wsBroadcast === 'function') {
+			// clients that put something of the old show on PGM / PRV themselves (Godot Visuals ▸ Send) end it on this
+			try {
+				ctx._wsBroadcast('change', { path: 'show.cleared', value: { slug, channels: cleared?.channels || [] } })
+			} catch {
+				/* the reply below still carries the result */
+			}
+		}
 		releaseProjectHardware(slug) // WO-821: New applies its starter hardware
 		if (ctx.artnetReceiver?.reconfigureFromProject) {
 			ctx.artnetReceiver.reconfigureFromProject(project)

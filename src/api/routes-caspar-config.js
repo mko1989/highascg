@@ -236,6 +236,7 @@ async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 		// WO-918: every client's "Apply the CasparCG config" load notice is answered — not only the applying client's
 		try {
 			ctx._wsBroadcast('change', { path: 'caspar.applied', value: { layoutOk: fullApply.layoutOk !== false, at: Date.now() } })
+			if (fullApply.layoutOk !== false) require('../bootstrap/os-layout-issue').clearOsLayoutIssue(ctx) // WO-919 F26
 		} catch {
 			/* optional */
 		}

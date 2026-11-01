@@ -113,6 +113,11 @@ function validateMap(m) {
 				throw new Error(`exfat-sync map: pair ${id} bootPrefer must be exfat or project`)
 			}
 		}
+		const exclude = Array.isArray(p.exclude) ? p.exclude.map((x) => String(x)) : null
+		/* WO-919 N4: `_trash` is each place's own record of what it retired (projects/_trash locally, <volume>/projects/_trash
+		 * from retireProjectSlugOnVolumes) — syncing the projects tree copied every entry to the other side, so a rename
+		 * left two `<slug>-<ms>` dirs in each, and the `-replaced` backups replicated too. Never part of a projects pair. */
+		const withTrash = exfat === 'projects' && !(exclude || []).includes('_trash') ? [...(exclude || []), '_trash'] : exclude
 		normalized.push({
 			id,
 			volume,
@@ -120,7 +125,7 @@ function validateMap(m) {
 			project: proj,
 			direction: dir,
 			...(p.bootPrefer != null && String(p.bootPrefer).trim() ? { bootPrefer: String(p.bootPrefer).toLowerCase() } : {}),
-			...(Array.isArray(p.exclude) ? { exclude: p.exclude.map((x) => String(x)) } : {}),
+			...(withTrash ? { exclude: withTrash } : {}),
 			...(p.label != null ? { label: String(p.label) } : {}),
 			...(p.pushOnSave === true ? { pushOnSave: true } : {}),
 		})

@@ -128,3 +128,11 @@ func test_f3_layout_warning() -> void:
 	t.eq(Follow.status_color(false, false), Follow.ThemeBuilder.ERROR, "red")
 	var bar := FileAccess.get_file_as_string("res://features/devices/devices_toolbar.gd")
 	t.ok(bar.contains("func set_status(text: String, ok: bool, warn := false)") and bar.contains("Follow.status_color(ok, warn)"), "toolbar takes warn")
+
+
+## WO-919 F13: after a Load / New the header reloads Settings; the shown local Devices tab refreshes then (its first
+## refresh compared the old show's planned channelMap with the new live one and kept a stale host card).
+func test_f13_refresh_after_settings_loaded() -> void:
+	t.ok(Follow.refresh_on_settings_loaded("", true), "this machine, tab shown")
+	t.ok(not Follow.refresh_on_settings_loaded("", false), "tab hidden: its visibility refresh reads the fresh settings")
+	t.ok(not Follow.refresh_on_settings_loaded("peer-a", true), "an edited peer's planned map is not the local Settings")

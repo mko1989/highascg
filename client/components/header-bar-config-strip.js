@@ -35,6 +35,11 @@ export function initConfigStrip(headerEl, serverBtn) {
 		} else if (!c.serverChannelCount) {
 			sumEl.textContent = 'Connect to CasparCG or wait for INFO CONFIG to compare channel layout.'
 			sumEl.className = 'server-config-strip__summary server-config-strip__summary--warn'
+		} else if (c.serverChannelCount === c.moduleChannelCount) {
+			// WO-919 F2: same channel count, but modes / screen outputs differ from the loaded project.
+			const n = (c.issues || []).length
+			sumEl.textContent = `Mismatch: the running server differs from the loaded project (${n} difference${n === 1 ? '' : 's'}).${physLine}`
+			sumEl.className = 'server-config-strip__summary server-config-strip__summary--warn'
 		} else {
 			sumEl.textContent = `Mismatch: server has ${c.serverChannelCount} channel(s), module expects ${c.moduleChannelCount}.${physLine}${screenWarn}`
 			sumEl.className = 'server-config-strip__summary server-config-strip__summary--warn'
@@ -45,7 +50,7 @@ export function initConfigStrip(headerEl, serverBtn) {
 			const s = c.serverChannels?.[i]
 			const m = c.moduleChannels?.[i]
 			const tr = document.createElement('tr')
-			const modCell = m ? `${escapeHtml(m.role)}: ${escapeHtml(m.videoMode || '—')}` : '—'
+			const modCell = m ? `${escapeHtml(m.role)}: ${escapeHtml(m.videoMode || '—')}${m.hasScreen ? ' (screen)' : ''}` : '—'
 			const srvCell = s ? `${escapeHtml(s.videoMode || '—')}${s.hasScreen ? ' (screen)' : ''}` : '—'
 			tr.innerHTML = `<td>${s?.index ?? m?.index ?? i + 1}</td><td>${modCell}</td><td>${srvCell}</td>`
 			tbody.appendChild(tr)

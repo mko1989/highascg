@@ -76,13 +76,14 @@ func _ready() -> void:
 	notice_label = Label.new()
 	notice_label.add_theme_font_size_override("font_size", 12)
 	notice_label.clip_text = true
-	notice_label.custom_minimum_size.x = 200
+	notice_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS  # WO-919 N1: elide only when out of room
+	notice_label.custom_minimum_size.x = HeaderModel.NOTICE_MIN_W
 	add_child(notice_label)
 	_fade = Timer.new()
 	_fade.one_shot = true
 	_fade.timeout.connect(func() -> void:
 		if not _sticky:
-			notice_label.text = "")
+			_set_notice(""))
 	add_child(_fade)
 	_load = LoadDialog.new()
 	_load.chosen.connect(load_slug)
@@ -135,8 +136,19 @@ func _show_name(p: Dictionary, force := false) -> void:
 	_shown_slug = slug
 
 
+## WO-919 N1: the notice line grows to its text (the spacer after the tools gives way), up to a share of the window; the
+## full text is always the tooltip. It was a fixed 200 px, so the restart / switched / name-taken texts were clipped.
+func _set_notice(text: String) -> void:
+	notice_label.text = text
+	var font := notice_label.get_theme_font("font")
+	var fsize := notice_label.get_theme_font_size("font_size")
+	var text_w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x if font != null else 0.0
+	var window_w := get_viewport_rect().size.x if is_inside_tree() else 1920.0
+	notice_label.custom_minimum_size.x = HeaderModel.notice_width(text_w, window_w)
+
+
 func say(n: Dictionary) -> void:
-	notice_label.text = str(n.text)
+	_set_notice(str(n.text))
 	notice_label.tooltip_text = str(n.get("tip", n.text))
 	var tone := str(n.get("tone", "ok"))
 	var tones := {"error": ThemeBuilder.ERROR, "warn": ThemeBuilder.WARN, "muted": ThemeBuilder.TEXT_MUTED}

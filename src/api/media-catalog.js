@@ -24,6 +24,16 @@ function isHiddenThumbnailBucket(id) {
 }
 
 /**
+ * WO-919 N3: Caspar's PRINT consumer drops a timestamp-named still (`YYYYMMDDTHHMMSS.png`, CLS lists it without the
+ * extension) into the media ROOT and live-thumbnail-cache-capture.js deletes it after pickup. While it exists it is
+ * scratch, not an operator file. Precise on purpose: media root only, and the exact PRINT name (same shape as
+ * live-thumbnail-cache-capture.js isLikelyPrintScratchFile) — a file in a folder, or any other name, stays listed.
+ */
+function isPrintScratchStill(id) {
+	return /^\d{8}T\d{6}(\.png)?$/i.test(String(id || ''))
+}
+
+/**
  * CLS (+ optional disk scan) rows — no ffprobe batch, no CINF parse. Same ordering as `/api/media` pre-enrichment.
  * @param {object} ctx
  * @returns {object[]}
@@ -34,14 +44,14 @@ function getRawMediaCatalog(ctx) {
 		stateMedia.length > 0
 			? stateMedia
 			: (ctx.CHOICES_MEDIAFILES || []).map((c) => ({ id: c.id, label: c.label }))
-	media = media.filter((m) => !isHiddenThumbnailBucket(m?.id))
+	media = media.filter((m) => !isHiddenThumbnailBucket(m?.id) && !isPrintScratchStill(m?.id))
 	try {
 		const ingestBase = getMediaIngestBasePath(ctx.config)
 		const diskItems = scanMediaRecursiveForBrowser(ingestBase)
 		if (diskItems.length > 0) {
 			const seen = new Set(media.map((m) => normalizeMediaIdKey(m.id)))
 			for (const item of diskItems) {
-				if (isHiddenThumbnailBucket(item?.id)) continue
+				if (isHiddenThumbnailBucket(item?.id) || isPrintScratchStill(item?.id)) continue
 				const key = normalizeMediaIdKey(item.id)
 				if (!seen.has(key)) {
 					seen.add(key)
@@ -146,6 +156,7 @@ function normalizeChunkRange(offset, limit, totalCount) {
 
 module.exports = {
 	isHiddenThumbnailBucket,
+	isPrintScratchStill,
 	getRawMediaCatalog,
 	getTemplateCatalog,
 	enrichMediaListForHttp,

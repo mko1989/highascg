@@ -3,6 +3,7 @@
 const { applyX11Layout, checkXrandrLayout } = require('../utils/os-config')
 const { getDisplaysXrandrDetailed } = require('../utils/hardware-info')
 const { applyOperatorDisplaySession } = require('../utils/x-display-session')
+const { reportOsLayoutIssue } = require('./os-layout-issue')
 
 function envTruthy(name, defaultVal) {
 	const raw = process.env[name]
@@ -87,6 +88,8 @@ function startOsLayoutWatchdog(ctx) {
 			done = true
 			if (timer) clearInterval(timer)
 			log('warn', `[OS-Watchdog] Layout still wrong after ${maxAttempts} attempts — operator may need Apply OS`)
+			// WO-919 F26: the give-up reaches the GUI too (Devices toolbar), not only the journal.
+			reportOsLayoutIssue(ctx, res?.verify?.mismatches?.length ? res.verify : check, attempts)
 		}
 	}
 
