@@ -8,8 +8,10 @@ extends Node
 signal changed  # armed / selected / dirty / busy moved → the tab repaints tints, ghost, toolbar
 signal status(text: String, ok: bool)
 signal reload_requested
+signal applied(data: Dictionary)  # WO-918 F3: devices_follow.gd turns a layoutOk == false reply amber
 
 const R := preload("res://features/devices/cable_rules.gd")
+const DragRelease := preload("res://features/devices/cable_drag_release.gd")  # WO-918 F19
 const Seed := preload("res://features/devices/cable_seed.gd")
 const ApiScript := preload("res://core/api_timeouts.gd")  # WO-805: APPLY_TIMEOUT_S (no autoload deps)
 const PREWARM_S := 2.5  # under the server's 3 s xrandr cache TTL (web device-view-snapshot-prewarm.js)
@@ -26,6 +28,8 @@ var restart_dirty := false
 var busy := false
 var applying := false
 
+var anchor_at := Callable()  # global pos → anchor key; unset = the parent tab's cable layer (F19 drop target)
+var _drop := DragRelease.new()
 var _undo: Array = []
 var _prewarm: Timer
 
@@ -39,6 +43,25 @@ func _ready() -> void:
 
 func armed() -> bool:
 	return source_id != ""
+
+
+## WO-918 F19: a drag started on a dot and let go over a valid connector completes the cable.
+func _input(event: InputEvent) -> void:
+	var mb := event as InputEventMouseButton
+	if mb == null or mb.button_index != MOUSE_BUTTON_LEFT or busy:
+		return
+	if mb.pressed:
+		_drop.note_press(mb.global_position)
+		return
+	if not armed():
+		return
+	var layer: Variant = get_parent().get("_cables") if get_parent() != null else null
+	var key := str(anchor_at.call(mb.global_position)) if anchor_at.is_valid() else (str(layer.anchor_at(mb.global_position)) if layer != null else "")
+	var id := key.get_slice("#", 0)
+	var drop: bool = _drop.completes(true, regrab.is_empty(), mb.global_position, id, source_id, target_ok(id))
+	_drop.held = false  # only the arming press's own release can be a drop
+	if drop:
+		await click(key)
 
 
 ## The dot the ghost cable leaves: a re-grab hanging off a destination keeps its edge's half (web cableAnchorHalf).
@@ -92,6 +115,7 @@ func click(key: String) -> void:
 	selected_edge = ""
 	source_id = id
 	source_half = "prv" if half == "prv" else ""
+	_drop.arm(get_viewport().get_mouse_position(), Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 	_start_prewarm()
 	changed.emit()
 	status.emit("Cable armed: click another connector dot to connect", true)
@@ -402,6 +426,7 @@ func apply_caspar() -> void:
 	set_dirty(false)
 	var msg := R.s(R.d(r.data).get("message"))
 	status.emit(msg if msg != "" else "Caspar config applied", true)
+	applied.emit(R.d(r.data))
 
 
 ## WS log_line during an apply → "Applying: Step 2 …" (web applyCasparBtn progress).

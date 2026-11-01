@@ -18,6 +18,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const SnapshotDialogs := preload("res://features/devices/snapshot_dialogs.gd")
 const PREFS := "user://devices.cfg"
 const APPLY := "Apply Caspar config (restart)"
+const Follow := preload("res://features/devices/devices_follow_model.gd")
 const CableModel := preload("res://features/devices/cable_model.gd")
 const LOOP_STEPS := [0, 1, 2, 4, 8, 16, 32, CableModel.CHAOS]  # WO-674: the slider's stops; the last is "chaos"
 
@@ -116,10 +117,11 @@ func _pick(other: CheckBox, on: bool) -> void:
 	view_changed.emit(mode())
 
 
-func set_status(text: String, ok: bool) -> void:
+## `warn` (WO-918 F3): done, but not what was asked — amber, not green.
+func set_status(text: String, ok: bool, warn := false) -> void:
 	_status.text = text
 	_status.tooltip_text = text
-	_status.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR)
+	_status.add_theme_color_override("font_color", Follow.status_color(ok, warn))
 
 
 ## Gesture state → Cancel cable and the Apply button (busy / applying / restart-dirty).

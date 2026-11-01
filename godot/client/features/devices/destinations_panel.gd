@@ -15,6 +15,7 @@ signal changed  # a write landed → restart-dirty + reload
 signal refresh_requested  # a host-channel control applied something that needs no Caspar restart → reload only
 signal focus_connector(id: String)  # a mapped output clicked on the page (web: opens that connector's inspector)
 signal add_live_input  # the band's "+"
+signal _decided(ok: bool)  # the remove confirmation
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
@@ -115,10 +116,24 @@ func show_model(m: Dictionary, payload: Dictionary, anchors: Dictionary) -> void
 				ThemeBuilder.TEXT_MUTED, 13))
 		_cards.add_child(_card(d, anchors))
 	_show_band(payload)
+	_sync_type_options()
 	if selected_id != "" and not _entries.has(selected_id):
 		deselect()
 	elif selected_id != "":
 		_page.show_destination(_entries[selected_id], _payload, DevicesTarget.settings.settings)
+
+
+## WO-918 F18: only one Operator GUI destination is allowed (the server refuses the second) — the type list stops
+## offering it while one exists, instead of failing after the click.
+func _sync_type_options() -> void:
+	var dests: Array = DM.R.a(DM.R.d(_payload.get("screenDestinations")).get("destinations"))
+	var has_gui := DM.has_operator_gui(dests)
+	for i in _type.item_count:
+		if _type.get_item_metadata(i) == "operator_gui":
+			_type.set_item_disabled(i, has_gui)
+			_type.set_item_tooltip(i, "Only one Operator GUI destination is allowed." if has_gui else "")
+			if has_gui and _type.selected == i:
+				_type.select(0)
 
 
 func has(id: String) -> bool:
@@ -176,10 +191,36 @@ func _patch(id: String, body: Dictionary) -> void:
 
 
 func _remove(id: String) -> void:
+	var warn := _remove_warning(id)
+	if warn != "" and not await _ask(warn, "Remove"):
+		return
 	var r: Dictionary = await DevicesTarget.api.post_json("/api/device-view", {"removeDestination": {"id": id}})
 	if r.ok:
 		deselect()
 	_done(r, "Remove destination")
+
+
+## WO-918 F21: looks on the removed screen's bus stay in the project but nothing shows them — say so first.
+func _remove_warning(id: String) -> String:
+	var e: Dictionary = _entries.get(id, {})
+	if e.is_empty() or e.get("host") == true or not DM.is_main_bus(e.get("mode")):
+		return ""
+	var idx := maxi(0, str(DM.R.d(e.get("dest")).get("mainScreenIndex", 0)).to_int())
+	return DM.remove_confirm(str(e.get("label", id)), DM.looks_on_main(Store.project.get("scenes"), idx), idx)
+
+
+func _ask(text: String, ok_text: String) -> bool:
+	var dlg := ConfirmationDialog.new()
+	dlg.dialog_text = text
+	dlg.ok_button_text = ok_text
+	dlg.title = "Confirm"
+	add_child(dlg)
+	dlg.confirmed.connect(func() -> void: _decided.emit(true))
+	dlg.canceled.connect(func() -> void: _decided.emit(false))  # Cancel and the window close
+	dlg.popup_centered()
+	var ok: bool = await _decided
+	dlg.queue_free()
+	return ok
 
 
 func _done(r: Dictionary, what: String) -> void:

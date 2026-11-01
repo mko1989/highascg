@@ -100,8 +100,11 @@ func _screen_page(entry: Dictionary, payload: Dictionary, settings: Variant, edg
 	var name_tip := "Name of this screen — shown in the looks selector, multiview, panels and Companion" \
 		if mode == "pgm_prv" or mode == "pgm_only" else "Name of this destination"
 	_field("Name", _line(str(entry.label), "Name", name_tip, func(t: String) -> void: _send(DM.label_patch(t, _d))))
-	_field("Main index", _line(str(maxi(0, _int(_d.get("mainScreenIndex")))), "", "Main index (zero-based)",
-		func(t: String) -> void: _send(DM.main_index_patch(t)), [0, INF, 0]))
+	var mi_max := DM.main_index_max(_d, H.R.a(H.R.d(payload.get("screenDestinations")).get("destinations")))  # WO-918 F17
+	var mi := _line(str(maxi(0, _int(_d.get("mainScreenIndex")))), "", DM.main_index_tip(mi_max),
+		func(t: String) -> void: _send(DM.main_index_patch(t)), [0, mi_max, 0])
+	mi.editable = mi_max != 0.0  # one main-bus screen: its index can only be 0
+	_field("Main index", mi)
 	_field("Mode", _select(DM.MODE_OPTIONS, mode if mode in DM.MODE_OPTIONS.map(func(o: Array) -> String: return o[0]) else "pgm_prv",
 		"", func(v: String) -> void: _send({"mode": v})))
 	if DM.shows_audio(mode):
@@ -119,8 +122,9 @@ func _screen_page(entry: Dictionary, payload: Dictionary, settings: Variant, edg
 	_vm = _select(modes, choice, "", _on_video_mode)
 	_field("Video mode", _vm)
 	var custom := choice == "custom"
-	for spec in [["Width", str(DM.width(_d)), "width", [64, INF, 0]], ["Height", str(DM.height(_d)), "height", [64, INF, 0]],
-			["Frame rate", DM.num(DM.fps(_d)), "fps", [1, INF, 2]]]:
+	for spec in [["Width", str(DM.width(_d)), "width", [DM.MIN_SIZE, DM.MAX_SIZE, 0]],
+			["Height", str(DM.height(_d)), "height", [DM.MIN_SIZE, DM.MAX_SIZE, 0]],
+			["Frame rate", DM.num(DM.fps(_d)), "fps", [DM.MIN_FPS, DM.MAX_FPS, 2]]]:
 		var key: String = spec[2]
 		var le := _line(spec[1], spec[0], "", func(_t: String) -> void: _on_size(key), spec[3])
 		le.editable = custom
@@ -162,9 +166,9 @@ func _on_size(field: String) -> void:
 
 
 func _sync_video_summary(mode: String) -> void:
-	var w := DM._clamp_int(_size_fields[0].text if _size_fields[0].text != "" else null, 1920, 64)
-	var h := DM._clamp_int(_size_fields[1].text if _size_fields[1].text != "" else null, 1080, 64)
-	var f := DM._clamp_float(_size_fields[2].text if _size_fields[2].text != "" else null, 50.0, 1.0)
+	var w := DM._clamp_int(_size_fields[0].text if _size_fields[0].text != "" else null, 1920, DM.MIN_SIZE, DM.MAX_SIZE)
+	var h := DM._clamp_int(_size_fields[1].text if _size_fields[1].text != "" else null, 1080, DM.MIN_SIZE, DM.MAX_SIZE)
+	var f := DM._clamp_float(_size_fields[2].text if _size_fields[2].text != "" else null, 50.0, DM.MIN_FPS, DM.MAX_FPS)
 	_set_val("Video mode", mode)
 	_set_val("Resolution", "%dx%d" % [w, h])
 	_set_val("FPS", DM.num(f))

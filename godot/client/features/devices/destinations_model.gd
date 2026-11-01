@@ -59,29 +59,38 @@ static func seed_patch(screen: int, settings: Variant) -> Dictionary:
 	return S.screen_seed_patch(cs, screen, settings)
 
 
+## WO-918 F16: the server only floors these (screen-destinations.js: max(64, …), max(1, …)); a typed 99999 or 1000 fps
+## was stored and handed to Caspar as a channel mode. 16384 is the common GPU texture limit (the xrandr custom-mode
+## route stops at 8192, Caspar's own LED canvases are 5760-7680 wide); 240 is above every Caspar video mode (<= 60).
+const MIN_SIZE := 64
+const MAX_SIZE := 16384
+const MIN_FPS := 1.0
+const MAX_FPS := 240.0
+
+
 static func width(d: Dictionary) -> int:
-	return _clamp_int(d.get("width"), 1920, 64)
+	return _clamp_int(d.get("width"), 1920, MIN_SIZE, MAX_SIZE)
 
 
 static func height(d: Dictionary) -> int:
-	return _clamp_int(d.get("height"), 1080, 64)
+	return _clamp_int(d.get("height"), 1080, MIN_SIZE, MAX_SIZE)
 
 
 static func fps(d: Dictionary) -> float:
-	return _clamp_float(d.get("fps"), 50.0, 1.0)
+	return _clamp_float(d.get("fps"), 50.0, MIN_FPS, MAX_FPS)
 
 
-## Math.max(lo, parseInt(String(v ?? def), 10) || def)
-static func _clamp_int(v: Variant, def: int, lo: int) -> int:
+## Math.min(hi, Math.max(lo, parseInt(String(v ?? def), 10) || def))
+static func _clamp_int(v: Variant, def: int, lo: int, hi: int = MAX_SIZE) -> int:
 	var n: Variant = H.js_int(H.coalesce([v, def]))
-	return maxi(lo, n if n != null and n != 0 else def)
+	return mini(hi, maxi(lo, n if n != null and n != 0 else def))
 
 
-## Math.max(lo, parseFloat(String(v ?? def)) || def)
-static func _clamp_float(v: Variant, def: float, lo: float) -> float:
+## Math.min(hi, Math.max(lo, parseFloat(String(v ?? def)) || def))
+static func _clamp_float(v: Variant, def: float, lo: float, hi: float = MAX_FPS) -> float:
 	var x: Variant = H.coalesce([v, def])
 	var f: float = float(x) if x is int or x is float else js_float(R.s(x))
-	return maxf(lo, f if f != 0.0 else def)
+	return minf(hi, maxf(lo, f if f != 0.0 else def))
 
 
 ## JS parseFloat: the longest numeric prefix, 0 for NaN (every caller treats NaN like 0 via `|| def`).
@@ -159,9 +168,9 @@ static func video_mode_patch(choice: String, d: Dictionary) -> Dictionary:
 ## A typed width / height / fps → the patch (width + height together, fps alone — exactly what the web sends).
 static func size_patch(field: String, w_text: String, h_text: String, f_text: String, d: Dictionary) -> Dictionary:
 	if field == "fps":
-		return {"videoMode": "custom", "fps": _clamp_float(f_text if f_text != "" else 50, 50.0, 1.0)}
-	var w := _clamp_int(w_text if w_text != "" else (H.coalesce([d.get("width"), 1920]) if field == "height" else 1920), 1920, 64)
-	var h := _clamp_int(h_text if h_text != "" else (H.coalesce([d.get("height"), 1080]) if field == "width" else 1080), 1080, 64)
+		return {"videoMode": "custom", "fps": _clamp_float(f_text if f_text != "" else 50, 50.0, MIN_FPS, MAX_FPS)}
+	var w := _clamp_int(w_text if w_text != "" else (H.coalesce([d.get("width"), 1920]) if field == "height" else 1920), 1920, MIN_SIZE, MAX_SIZE)
+	var h := _clamp_int(h_text if h_text != "" else (H.coalesce([d.get("height"), 1080]) if field == "width" else 1080), 1080, MIN_SIZE, MAX_SIZE)
 	return {"videoMode": "custom", "width": w, "height": h}
 
 
@@ -171,6 +180,55 @@ static func label_patch(text: String, d: Dictionary) -> Dictionary:
 	if t == "":
 		t = R.s(d.label) if H.truthy(d.get("label")) else (R.s(d.id) if H.truthy(d.get("id")) else "Destination")
 	return {"label": t}
+
+
+## WO-918 F17: the server re-ranks main-bus destinations to a dense 0..n-1 (compactMainScreenIndices), so any index
+## above (main-bus destinations - 1) silently came back as a smaller one. The field stops at that number instead;
+## multiview / operator GUI / stream keep their index as a placement hint (no cap), and an unknown list = no cap.
+static func main_index_max(dest: Dictionary, destinations: Array) -> float:
+	if destinations.is_empty() or not is_main_bus(dest.get("mode")):
+		return INF
+	var n := 0
+	for d in destinations:
+		if d is Dictionary and is_main_bus(d.get("mode")):
+			n += 1
+	return float(maxi(0, n - 1))
+
+
+static func main_index_tip(max_index: float) -> String:
+	if max_index == 0.0:
+		return "Main index (zero-based). This is the only PGM/PRV screen, so the index is 0 — add another to use 1."
+	if max_index == INF:
+		return "Main index (zero-based)"
+	return "Main index (zero-based, 0-%d: screens are numbered without gaps)" % int(max_index)
+
+
+## WO-918 F18: the type list keeps offering Operator GUI although the server allows one ("At most one Operator GUI").
+static func has_operator_gui(destinations: Array) -> bool:
+	for d in destinations:
+		if d is Dictionary and d.get("mode") == "operator_gui":
+			return true
+	return false
+
+
+## WO-918 F21: looks (project.scenes.scenes) pinned to main `index` — mainScope is the index as a string ("all" is no
+## screen's). Only a main-bus destination owns a bus of looks.
+static func looks_on_main(scenes_root: Variant, index: int) -> int:
+	var list: Variant = scenes_root.get("scenes") if scenes_root is Dictionary else null
+	var n := 0
+	if list is Array:
+		for s in list:
+			if s is Dictionary and str(s.get("mainScope", "")).strip_edges() == str(index):
+				n += 1
+	return n
+
+
+## The question before removing a screen that has looks, "" when there is nothing to warn about.
+static func remove_confirm(label: String, count: int, index: int) -> String:
+	if count <= 0:
+		return ""
+	return "Remove \"%s\"?\n\n%d look%s on this screen stay%s in the project but %s hidden until a screen uses main index %d again." % [
+		label, count, "" if count == 1 else "s", "s" if count == 1 else "", "is" if count == 1 else "are", index]
 
 
 static func main_index_patch(text: String) -> Dictionary:

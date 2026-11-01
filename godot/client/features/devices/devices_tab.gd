@@ -8,10 +8,8 @@ extends MarginContainer
 ## ends lifts that end to move it; Esc / empty space cancels; Ctrl+Z undoes. cable_gesture.gd does the writes.
 ## Slice 3: the left column is destinations_panel.gd — add / edit / remove destinations through the Inspector, plus
 ## the input & host channel cards. A selected cable and a selected destination exclude each other.
-## Slice 4: a GPU port's row label (or a destination's mapped GPU output) opens gpu_output_controls.gd's page in the
-## Inspector; it and a destination page exclude each other.
-## Slice 5/6: DeckLink ports and the Stream / Record / Virtual cam / Audio outputs open their pages the same way;
-## the rear panel's "+" adds an output (output_port_controls.gd).
+## Slice 4-6: a GPU port (gpu_output_controls.gd), DeckLink port or Stream / Record / Virtual cam / Audio output opens
+## its page in the Inspector (a destination page excludes them); the rear panel's "+" adds an output (output_port_controls.gd).
 ## Slice 7: a click on the rear panel's background (not a port, cable or "+") opens the Caspar server page
 ## (server_controls.gd — frame rate, CEF, network, hot backup), like the web's casparBand → selectDevice(CASPAR_HOST).
 ## Slice 7c: the "Mapping nodes" column (mapping_panel.gd); a card or a mapping connector opens the node page
@@ -43,6 +41,7 @@ const NV := preload("res://features/devices/node_view_model.gd")
 const CablesList := preload("res://features/devices/cables_list.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const SliceEditor := preload("res://features/devices/slice_editor.gd")
+const Follow := preload("res://features/devices/devices_follow.gd")  # WO-918: project changes / apply layout warnings
 
 var _dests: DestinationsPanel
 var _rear: RearPanel
@@ -102,6 +101,7 @@ func _ready() -> void:
 	_bar.apply_pressed.connect(_gesture.apply_caspar)
 	_bar.save_pressed.connect(func() -> void: snapshots.open_save(_rear, _cables))
 	_bar.reload_pressed.connect(func() -> void: _sticky = false; refresh())
+	Follow.attach(self, _gesture, _bar, func(sticky: bool) -> void: _sticky = sticky)
 	var body := HBoxContainer.new()
 	body.add_theme_constant_override("separation", 40)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
