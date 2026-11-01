@@ -1,7 +1,7 @@
 # WO-919 — WO-918 follow-ups: the findings the 01.11 fix round left open
 
 **Area:** godot-client, engine, devices-config, mapping
-**Status: IN PROGRESS** (everything but N2 done and verified live 01.11.26; N2 waits for an owner decision)
+**Status: DONE** (01.11.26: F2–N5 verified live; N2 by the owner's decision "write it", verified offline — smoke-wo919-n2-stale-edit-saved 6/6 plus 23 related project smokes; not probed on the live server by request)
 
 Owner, 01.11.26 (after the WO-918 re-test): "Continue. Add work orders for this."
 
@@ -29,7 +29,8 @@ under the same number; it is not repeated here.
   tooltip.
 - **N2** A destination edit made just before another client switches shows is never stamped into the old show (its
   autosave is correctly refused as `not_active`), so loading that show later brings the removed destination back.
-  Decision needed: write a stale client's last edit into ITS show's file (rev-checked) instead of dropping it.
+  Owner decision 01.11.26: write a stale client's last edit into ITS show's file (rev-checked) instead of dropping
+  it. Investigation and fix under "N2" below.
 - **N3** Live-thumbnail PRINT frames (`media/2026…T….png`) appear in the Sources media list while they exist.
 - **N4** Trash entries duplicate between `~/bridge/projects/_trash` and `projects/_trash` (a rename left two
   `untitled_2-*` dirs in each), and the `-replaced` backups replicate to the bridge.
@@ -78,6 +79,29 @@ under the same number; it is not repeated here.
   - A web tab exports keys in another order than the stored file, so a fresh tab's first autosave of unchanged
     mhp_harder bumped rev 592 → 593 and stamped savedAt `12:48:27.473Z`.
   - The only real difference was `hardwareConfig.osDisplay.multiview_os_rate: ""`, a server-stamped slice.
+
+### N2 (after the owner's decision, 01.11)
+
+- **The refusal drops the payload.** `routes-data-project-handlers.js:369` (`slugConflict`) returns 409 `not_active`
+  for `stale_client` before anything is stamped or written. Client A's edit of show X never reaches X's file.
+- **Where a destination edit lives.** Godot Devices edits go to `POST /api/device-view` (`destinations_panel.gd:190`),
+  which changes the LIVE config only. `src/api/device-view-*.js` never writes a project. The edit reaches the show at
+  its next save/autosave: `stampProjectHardware` (handlers `:377`) stamps the live rig into `hardwareConfig`
+  (`injectHardwareConfigToProject`), or keeps the stored slice while the show is held (WO-821). The client's own
+  `hardwareConfig` is only the copy it loaded. No Godot code writes it (`rg hardwareConfig godot/client` outside the
+  file import), and a normal autosave never takes it.
+- **So the stale write cannot simply stamp the live rig.** After the switch the live rig is X's only if the load of Y
+  did not apply Y's hardware. Godot header Load always sends `applyHardware: true` (`header_project.gd:204`). A load
+  without hardware (web "Load without hardware", API loads like the WO-918 sweep's) leaves X's rig live and holds Y.
+  A chain X → Z (with hardware) → Y (without) holds Y while Z's rig is live, so "Y is held" alone is not proof.
+- **`persistProject` always activates.** `project-scenes.js:300-302` sets the active slug and the `web_project`
+  mirror. `:323-333` rewrite the live deck and notify the shared show (WO-746). `:271` migrates config stream
+  credentials into the written project. None of that may happen for a show that is not open.
+- **The autosave payload is enriched with the LIVE deck** (handlers `:361`), which is Y's after the switch. A stale
+  write must use the raw payload.
+- **Replication.** The autosave's `scheduleProjectPushToPeer` (handlers `:440`) sends `getActiveSlug()`
+  (`replicate-projects.js:82`), and the follower persists it as its live show (`:32`). Pushing X would switch the
+  follower to X under Y's slug. Volume push (`pushProjectSlugToVolumes`) is per slug and does not activate.
 
 ## What was done
 
@@ -176,6 +200,67 @@ Commit 26e06ce9, unless noted.
   - Key-order cases in `smoke-wo919-gui-sweep-followups.test.js`.
   - Godot: `test_header_model.gd` covers the unplugged load notice and `joined_notice`.
 
+### N2: a stale client's last edit is saved into its own show (01.11, owner decision)
+
+- **New `src/api/routes-data-project-stale.js` `saveStaleClientEdit`**, called from the autosave's `stale_client`
+  refusal. The answer stays 409 `not_active` (the client adopts the open show as before), plus either
+  `savedTo: "<slug>", rev, changed, hardware` (and an `error` text saying where the edit went) or
+  `savedTo: null, notSaved: "<why>"`. Each outcome logs one `info` line: `stale client's last edit of "x" saved
+  into its file (rev n, hardware live|stored)` or `… NOT saved (<why>)`.
+- **What is written, and when:**
+  - Only when the payload IS the show the client edits (payload slug == `editingSlug`). A stale rename stays refused
+    and unsaved (`notSaved: "rename"`): renaming a show nobody has open is not an edit.
+  - Only an existing show (`no_stored_show` otherwise). Like WO-311, a stale write never creates or resurrects a
+    file.
+  - **Rev rule:** the payload must carry a server-issued `rev` (`no_rev` otherwise), so it never wins on a client
+    clock. It then passes the normal autosave guard `validateIncomingProject`: a newer stored rev wins (`stale_rev`),
+    and there is no empty-over-looks and no unrelated look set. The write bumps the rev like any persist. An
+    unchanged echo writes nothing (`changed: false`).
+  - The client's RAW payload is written, not the live-deck-enriched copy. `preserveClientOwnedSlices` runs as on
+    every autosave.
+- **hardwareConfig: new `stampStaleShowHardware` in `project-hardware-hold.js`.**
+  - The client's `hardwareConfig` is never written: it is the load-time copy, and a normal autosave never takes it
+    either.
+  - The live rig is stamped (the normal autosave path, `stampProjectHardware` with `autosave`, so WO-311's
+    empty-rig guard applies) only when it provably still is X's: X is not held, and the open show Y was loaded
+    without its hardware while X's rig was live.
+  - Otherwise X keeps its stored slice (`hardware: "stored"`). Stamping would write another show's rig into X, which
+    is the WO-821 damage.
+  - To make "while X's rig was live" exact, a load without hardware now records `rigOf` in its WO-821 hold:
+    `liveRigOwnerAfter(prevSlug)` returns the previous show, or that show's own `rigOf` if it was held too. A
+    repeated load of a held slug refreshes it. The X → Z → Y chain therefore records Z, and X keeps its stored slice.
+- **`persistProject(..., { activate: false })` in `project-scenes.js`.**
+  - It writes the file, the `_autosave` copy and the bridge / stick copies, the same files a normal autosave
+    writes. The `_autosave` copy matters because a later Load merges it (`loadProjectForSlug mergeAutosave`), and a
+    stale copy left behind could out-date the file.
+  - It does not set the active slug, the `web_project` mirror, the deck or the shared-show hook, and it does not run
+    the config credential migration.
+  - An unchanged content is a no-op for an inactive write too.
+  - The early return carries `activated: false`, so the WO-746 pin on the activating return still holds.
+- **Not done on purpose:** no project_sync broadcast and no Art-Net reconfigure, because X is not the live project.
+  No replication peer push either: it sends the active slug and the follower adopts it as its live show.
+- **`routes-data-project-handlers.js`:** wires the above and computes `rigOf` before the Load's `setActiveSlug`. It
+  also drops an unused `slug` in the Load path (an eslint warning that was already there).
+- **Remaining gap, not part of N2 as decided:** when the switch APPLIES Y's hardware (every Godot header Load, New
+  project, `apply-hardware`), the live rig is replaced before A's autosave arrives. A's look/show edits are saved
+  into X, but a destination edit that only lived in the live rig is gone with it, and X keeps its stored
+  destinations.
+  - The same is true without any second client: a Devices edit reaches the show only at its next autosave, and a
+    Devices edit fires none.
+  - Fixing that means stamping the outgoing show's live rig at switch time, before the new rig is applied. That
+    touches every Load and needs an owner decision.
+- **Tests:**
+  - New `tools/smoke/smoke-wo919-n2-stale-edit-saved.test.js` (6, listed in `offline-test-files-2.js`). It covers:
+    - the rig still X's: X saved with a rev bump, the live destination edit and the `_autosave` copy;
+    - Y loaded with its hardware: X saved with its stored slice;
+    - the X → Z → Y chain: stored slice;
+    - an older rev and a missing rev: not written;
+    - a stale rename: not written, no fork, nothing retired;
+    - an unchanged echo: no write.
+  - Every case asserts that Y's file, the live deck, the `web_project` mirror and the active slug are untouched.
+  - `smoke-wo918-project-switch.test.js` F28 now also pins `notSaved: "no_rev"` for its rev-less payload. All its
+    old assertions are kept.
+
 ## What was verified
 
 - **Suites:** offline 5206/0 and Godot 25747/0. Line limit and eslint are clean.
@@ -230,4 +315,16 @@ Commit 26e06ce9, unless noted.
 - **Not verified live:**
   - F26, which needs the F20 overlap reproduced. F20 now prevents the overlap, so it can only be reproduced by hand.
   - The web 409 `not_active` path (the offline smoke covers it).
-- **Still open:** N2 needs an owner decision.
+- **N2 (offline only, 01.11):**
+  - `node --test tools/smoke/smoke-wo919-n2-stale-edit-saved.test.js`: 6/6.
+  - Mutation check: with `stampStaleShowHardware` forced to always stamp the live rig, the "Y loaded with its
+    hardware" and the X → Z → Y tests fail. So the tests catch the WO-821-class write.
+  - The 18 project smokes that grep or drive these paths (wo329, wo598, wo918-project-switch, pipeline-hardening,
+    wo919 ×3, wo824, wo311, wo746, wo842, wo617, wo614, wo823, wo261, wo821, wo585) plus the new one: 154/154.
+  - All 23 smokes that reference `project-scenes` / `project-hardware-hold` / the project handlers /
+    `project-media-root` / `projects-root`: 188 pass, 1 skipped, 0 fail.
+  - `check-max-file-lines` is at 0 over, `check-unwired-exports` has no new orphans, `format:check` is clean, and
+    eslint is clean on the changed files.
+  - Not probed on the live :4200 server: autosaves and loads there write the owner's shows.
+- **Still open:** the hardware-applying switch gap above (stamp the outgoing show's live rig at switch time) needs an
+  owner decision.

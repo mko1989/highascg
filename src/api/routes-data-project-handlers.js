@@ -17,7 +17,7 @@ const {
 	maskProjectStreamCredentials,
 } = require('../engine/project-stream-credentials')
 const { applyHardwareConfigToCtx, hardwareConfigHasOperatorData } = require('../engine/project-hardware-config')
-const { stampProjectHardware, holdProjectHardware, releaseProjectHardware } = require('../engine/project-hardware-hold')
+const { stampProjectHardware, holdProjectHardware, releaseProjectHardware, liveRigOwnerAfter } = require('../engine/project-hardware-hold')
 const { ensureProjectMediaDir } = require('../media/project-media-root')
 const { handleProjectNew } = require('./routes-data-project-new')
 const { scheduleProjectSyncBroadcast } = require('./routes-data-project-sync')
@@ -30,6 +30,7 @@ const {
 	replaceFromFile,
 } = require('./routes-data-project-slug')
 const { loadProjectMerged } = require('./routes-data-project-read')
+const { saveStaleClientEdit } = require('./routes-data-project-stale')
 
 // WO-919 F4: outputs the loaded show plans on that xrandr reports unplugged — Apply leaves them out; Load says so.
 function unpluggedOutputs(ctx) {
@@ -182,7 +183,6 @@ async function handleProject(path, body, ctx) {
 					? String(b.id).trim()
 					: ''
 		projectStore.migrateLegacySingleProject(persistence)
-		const slug = reqSlug || projectStore.getActiveSlug(persistence)
 		let project
 		let recoveredFromAutosave = false
 		if (reqSlug) {
@@ -204,13 +204,14 @@ async function handleProject(path, body, ctx) {
 			reqSlug ||
 			(project.slug && String(project.slug).trim()) ||
 			projectStore.projectSlugFromName(project.name)
+		const rigOf = liveRigOwnerAfter(projectStore.getActiveSlug(persistence)) // WO-919 N2: before the switch
 		projectStore.setActiveSlug(persistence, activeSlug)
 		ensureProjectMediaDir(ctx.config, activeSlug)
 		// WO-277: adopt the project into the RUNNING system (deck mirror, live-scene prune, artnet,
 		// broadcasts, PRV re-stage + thumb warm). Without this the load only moved the slug pointer
 		// and everything downstream kept serving the previous project until a service restart.
 		// WO-821: a slug load that skips the hardware holds the stored slice (persisted); a bootstrap load ({}) changes nothing
-		if (reqSlug && b.applyHardware !== true) holdProjectHardware(activeSlug, 'load', ctx)
+		if (reqSlug && b.applyHardware !== true) holdProjectHardware(activeSlug, 'load', ctx, { rigOf })
 		const { activateLoadedProject } = require('../engine/project-activate')
 		const activation = await activateLoadedProject(ctx, project, {
 			applyHardware: b.applyHardware === true,
@@ -369,7 +370,8 @@ async function handleProject(path, body, ctx) {
 		const conflict = slugConflict(prevKind, prevSlug, slug, existing) // WO-918 F27/F28/F10
 		if (conflict) {
 			ctx.log?.('warn', `[project] autosave refused (${conflict.reason}): "${slug}" from a client editing "${b.editingSlug}", active "${prevSlug}"`)
-			return { status: 409, headers: JSON_HEADERS, body: jsonBody(conflict) }
+			const stale = prevKind === 'stale_client' ? await saveStaleClientEdit(ctx, payload, { slug, editingSlug: editingSlugOf(b), activeSlug: prevSlug }) : null // WO-919 N2
+			return { status: 409, headers: JSON_HEADERS, body: jsonBody({ ...conflict, ...stale }) }
 		}
 		/* Autosave is a background write and must never destroy the stored hardware slice: not with an empty
 		 * (factory-reset) live config (WO-311 / 5d01bca), and not with this box's rig while the project was

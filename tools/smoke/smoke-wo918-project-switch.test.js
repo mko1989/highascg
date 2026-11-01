@@ -62,8 +62,10 @@ test('F28: a client still editing a show the server switched away from is refuse
 	const a = await openShow(c, 'wo918_show_a', ['x1', 'x2'])
 	const b = await openShow(c, 'wo918_show_b', ['y1', 'y2'])
 	const own = await post(c, '/api/project/autosave', { project: show('wo918_show_a', ['x1', 'x2', 'x3']), editingSlug: a })
-	assert.equal(own.status, 409, 'even under its own name: the stale copy would overwrite A and steal the active slug')
+	assert.equal(own.status, 409, 'even under its own name: the stale copy must not steal the active slug')
 	assert.equal(own.body.reason, 'not_active')
+	// WO-919 N2: a stale edit of its own show is written into that show only with a server-issued rev — this one has none
+	assert.equal(own.body.notSaved, 'no_rev')
 	assert.equal(projectStore.readProjectFile(a).scenes.scenes.length, 2, 'A untouched')
 	const stale = await post(c, '/api/project/autosave', { project: show('wo918_show_a_renamed', ['x1', 'x2']), editingSlug: a })
 	assert.equal(stale.status, 409)

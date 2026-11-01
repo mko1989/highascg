@@ -256,10 +256,17 @@ function showContentEquals(a, b) {
 	}
 }
 
+/**
+ * Write a project to its slug's file (rev bump, _autosave copy, volume push) and make it the open show.
+ * WO-919 N2: `opts.activate === false` writes a show that is NOT open (a stale client's last edit of the show the server
+ * switched away from): its file, _autosave copy and volume copies only — no active slug, no web_project mirror, no deck,
+ * no shared-show write, no config credential migration (those belong to the open show).
+ */
 function persistProject(ctx, project, opts = {}) {
 	if (!ctx || !project || typeof project !== 'object') {
 		throw new Error('Invalid project persist payload')
 	}
+	const inactive = opts.activate === false
 	const persistence = ctx.persistence || require('../utils/persistence')
 	const slug = projectStore.projectSlugFromName(project.name)
 	projectStore.migrateLegacySingleProject(persistence)
@@ -268,7 +275,7 @@ function persistProject(ctx, project, opts = {}) {
 	if (opts.authoritativeCredentials !== true) {
 		project = preserveProjectCredentials(project, projectStore.readProjectFile(slug))
 	}
-	applyStreamCredentialMigration(ctx, project)
+	if (!inactive) applyStreamCredentialMigration(ctx, project)
 	const normalized = normalizeProjectMediaRefs(project, ctx.config, persistence)
 	const stamped = projectStore.withProjectSlug(normalized, slug)
 	const storedProject = projectStore.readProjectFile(slug)
@@ -280,7 +287,7 @@ function persistProject(ctx, project, opts = {}) {
 	 * projects must still run the activeSlug/deck side effects below. */
 	if (
 		storedProject &&
-		projectStore.getActiveSlug(persistence) === slug &&
+		(inactive || projectStore.getActiveSlug(persistence) === slug) &&
 		projectContentEquals(stamped, storedProject)
 	) {
 		return { ok: true, slug, rev: projectRevOf(storedProject), project: storedProject, unchanged: true }
@@ -297,9 +304,11 @@ function persistProject(ctx, project, opts = {}) {
 		stamped.rev = storedRev
 	}
 	projectStore.writeProjectFile(slug, stamped)
-	projectStore.setActiveSlug(persistence, slug)
-	ensureProjectMediaDir(ctx.config, slug, persistence)
-	persistence.set('web_project', stamped)
+	if (!inactive) {
+		projectStore.setActiveSlug(persistence, slug)
+		ensureProjectMediaDir(ctx.config, slug, persistence)
+		persistence.set('web_project', stamped)
+	}
 	if (opts.writeAutosave !== false) {
 		try {
 			projectStore.writeAutosaveFile(slug, stamped)
@@ -320,6 +329,7 @@ function persistProject(ctx, project, opts = {}) {
 			}
 		}
 	}
+	if (inactive) return { ok: true, slug, rev: projectRevOf(stamped), project: stamped, activated: false } // no deck, no shared show
 	const deck = extractSceneDeckFromProjectScenes(project.scenes)
 	if (deck) {
 		const prevPreview = ctx.sceneDeck?.previewSceneId

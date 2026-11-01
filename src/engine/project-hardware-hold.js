@@ -30,9 +30,21 @@ function isProjectHardwareHeld(slug) {
 	return !!slug && Object.prototype.hasOwnProperty.call(holds(), slug)
 }
 
-function holdProjectHardware(slug, reason = 'load', ctx = null) {
-	if (!slug || isProjectHardwareHeld(slug)) return
-	persistence.set(HOLD_KEY, { ...holds(), [slug]: { since: new Date().toISOString(), reason } })
+/**
+ * @param {string} slug
+ * @param {string} [reason]
+ * @param {object|null} [ctx]
+ * @param {{ rigOf?: string|null }} [opts] WO-919 N2: the show whose applied hardware is still the live rig (see
+ *   {@link liveRigOwnerAfter}); a repeated load of a held slug only refreshes it.
+ */
+function holdProjectHardware(slug, reason = 'load', ctx = null, opts = {}) {
+	if (!slug) return
+	const rig = Object.prototype.hasOwnProperty.call(opts, 'rigOf') ? { rigOf: opts.rigOf || null } : {}
+	if (isProjectHardwareHeld(slug)) {
+		if ('rigOf' in rig && holds()[slug]?.rigOf !== rig.rigOf) persistence.set(HOLD_KEY, { ...holds(), [slug]: { ...holds()[slug], ...rig } })
+		return
+	}
+	persistence.set(HOLD_KEY, { ...holds(), [slug]: { since: new Date().toISOString(), reason, ...rig } })
 	if (typeof ctx?.log === 'function') {
 		ctx.log('info', `[project] "${slug}" loaded without its hardware: saves keep its stored hardwareConfig until the hardware is applied (WO-821)`)
 	}
@@ -44,6 +56,39 @@ function releaseProjectHardware(slug) {
 	delete next[slug]
 	persistence.set(HOLD_KEY, Object.keys(next).length ? next : null)
 	return true
+}
+
+/**
+ * WO-919 N2: whose applied hardware the live rig is once `prevSlug` (the show open until now) is left by a load WITHOUT
+ * hardware: `prevSlug`'s own when it was not held, else the owner its hold recorded, else unknown (null).
+ * @param {string|null} prevSlug
+ * @returns {string|null}
+ */
+function liveRigOwnerAfter(prevSlug) {
+	if (!prevSlug) return null
+	return isProjectHardwareHeld(prevSlug) ? holds()[prevSlug]?.rigOf || null : prevSlug
+}
+
+/**
+ * WO-919 N2: the hardwareConfig for a stale client's last edit of `slug`, written while `activeSlug` is open.
+ * Screen destinations / cables are edited in the LIVE config (/api/device-view), never in the client's project, so the
+ * client's own `hardwareConfig` is only the copy it loaded — never written (a normal autosave never takes it either).
+ * The live rig is stamped only when it provably still is `slug`'s: `slug` not held, and the open show was loaded
+ * without its hardware while `slug`'s rig was live (its hold's `rigOf`). Otherwise (a load / New / Apply put another
+ * show's rig live) stamping would write that rig into `slug` (the WO-821 damage): `slug` keeps its stored slice.
+ * @param {object} ctx
+ * @param {object} project the stale payload (mutated)
+ * @param {{ slug: string, activeSlug: string|null, existing: object }} o
+ * @returns {'live' | 'held' | 'stored'}
+ */
+function stampStaleShowHardware(ctx, project, o) {
+	const { slug, activeSlug, existing } = o
+	if (isProjectHardwareHeld(activeSlug) && holds()[activeSlug]?.rigOf === slug && !isProjectHardwareHeld(slug)) {
+		return stampProjectHardware(ctx, project, { slug, existing, autosave: true })
+	}
+	if (existing?.hardwareConfig !== undefined) project.hardwareConfig = existing.hardwareConfig
+	else delete project.hardwareConfig
+	return 'stored'
 }
 
 /**
@@ -92,4 +137,6 @@ module.exports = {
 	holdProjectHardware,
 	releaseProjectHardware,
 	stampProjectHardware,
+	liveRigOwnerAfter,
+	stampStaleShowHardware,
 }
