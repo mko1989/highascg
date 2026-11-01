@@ -40,8 +40,18 @@ The WO-919 sweep showed the frontex missing-asset notice listing `Spoty_Ptt_2026
   - URL name decoding: NFD → NFC, encoded slash, broken escape, empty path.
   - The busboy `utf8` pins.
   - Zip extraction with and without the UTF-8 flag, using hand-built zips.
-- **Not done:** repairing the garbled references in the shows listed above, because that rewrites stored shows. The
-  WO-592 repair (`latin1` → `utf8` decode of each name) applies directly if the owner wants it.
+- **Stored references repaired (owner, 01.11.26: "Push and repair").**
+  - A scan of every `projects/**/*.json` (not `_trash`) for a UTF-8 lead byte read as Latin-1 (`[Â-ô]` followed by
+    U+0080–U+00BF) found 20 files: the 9 + 2 shows above (project + `_autosave`). It also found one more:
+    `llkk` holds `01_Grzegorz ZÌ\x87ytka.mov`. That is a macOS NFD name (Z + U+0307) that went through the same bug.
+  - The repair edits the raw text, so the file formatting stays as the server wrote it. Each garbled run is decoded
+    `latin1` → `utf8` and composed with the letter before it (NFC), so `llkk` now reads `Żytka` (NFC, like uploads).
+  - Each file was checked before writing: it parses before and after, and only the repaired strings differ. The
+    rescan afterwards finds 0. The active show (`mhp_harder`) was not touched.
+  - `/api/project/list` lists all 14 repaired shows.
+  - The originals are backed up in the session scratchpad.
+  - None of these clips is on the box, so the shows still report them missing until the files are imported; they now
+    match by name when they are.
 
 ## What was verified
 
