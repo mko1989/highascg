@@ -17,6 +17,7 @@ const InspectorPanel := preload("res://app/inspector_panel.gd")
 const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
 const LivePreview := preload("res://features/live/live_preview.gd")
 const UI_CFG := "user://ui.cfg"
+const ACTION_HINT := "Click a look: stage on PRV · double-click: TAKE"
 
 var preview: LivePreview  # WO-789: the 2D / 3D preview, shared with the Timeline tab
 var _video_panel: PanelContainer
@@ -27,6 +28,7 @@ var border: GlobalBorderPanel
 var presets: LookPresetPage
 var _show_btns := {}  # WO-781: deck toolbar "Looks" toggle (WO-783: presets moved to the right column's tab)
 var _action: Label
+var _slug := ""  # WO-918 F24: the project the status line talks about
 var osc: Node  # the shell's OscMirror (set before _ready)
 var shader_live: ShaderLivePanel  # WO-606: replaces the deck while open (web shader-live-overlay)
 
@@ -47,9 +49,15 @@ func _ready() -> void:
 	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(bottom)
 	_action = Label.new()
-	_action.text = "Click a look: stage on PRV · double-click: TAKE"
+	_action.text = ACTION_HINT
 	_action.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	bottom.add_child(_action)
+	_slug = str(Store.project.get("slug", ""))
+	Store.project_changed.connect(func(p: Dictionary) -> void:  # "TAKE ok" / "Look deleted" belong to the project they were said in
+		if str(p.get("slug", "")) != _slug:
+			_slug = str(p.get("slug", ""))
+			_action.text = ACTION_HINT
+			_action.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED))
 	if osc == null:
 		osc = OscMirror.new()
 		add_child(osc)

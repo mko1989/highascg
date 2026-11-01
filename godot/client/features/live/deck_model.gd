@@ -37,10 +37,11 @@ static func resolve_bus_look_ids(main_idx: int, scene_live: Dictionary, channel_
 	var prv := ""
 	if has_separate_prv:
 		prv = _known(_live_scene_id(scene_live, prv_ch), known_ids)
-	if pgm == "":
+	# WO-918 F24: the project's saved liveSceneIdByMain / previewSceneIdByMain are a stale cache of an earlier session — a
+	# loaded project must not light the red PGM outline for a look the server is not playing. With a real PGM / PRV channel
+	# scene.live alone decides; the saved slots serve only a channelMap without one (the simulator).
+	if pgm == "" and pgm_ch <= 0:
 		pgm = _known(_by_main(project_scenes.get("liveSceneIdByMain", []), idx), known_ids)
-	if has_separate_prv and prv == "":
-		prv = _known(_by_main(project_scenes.get("previewSceneIdByMain", []), idx), known_ids)
 	# PGM-only mains (no PRV channel): the armed look lives in client state (B150.3).
 	if not has_separate_prv:
 		prv = _known(_by_main(project_scenes.get("previewSceneIdByMain", []), idx), known_ids)

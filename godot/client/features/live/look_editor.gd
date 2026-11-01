@@ -18,10 +18,12 @@ const Ops := preload("res://features/live/look_layer_ops.gd")  # WO-657: mirror 
 const Drop := preload("res://features/live/look_layer_drop.gd")  # WO-816: Sources drops (exchange on a layer / add)
 const Audio := preload("res://features/live/look_layer_audio.gd")  # WO-817: audio-only layers: not drawn / picked in the frame
 const Backdrop := preload("res://features/live/look_editor_backdrop.gd")  # WO-860: PRV, or HQ thumbnails without one
+const Stale := preload("res://features/live/look_editor_stale.gd")  # WO-918 F12: closes when the project / look / bus is gone
 const HANDLE := 8.0
 
 var scene_id := ""
 var main := 0
+var slug := ""  # the project the editor was opened on
 var pusher: Pusher
 var _title: Label
 var _frame: Control
@@ -132,13 +134,16 @@ func _ready() -> void:
 	add_child(_status)
 	visibility_changed.connect(func() -> void: _hold(is_visible_in_tree()))
 	Store.project_changed.connect(func(_p: Dictionary) -> void:
-		if visible:
+		if visible and not Stale.close_if_stale(self):
 			_refresh_list())
+	Store.changed.connect(func(path: String, _v: Variant) -> void:  # a destination removed: its bus's editor goes with it
+		if visible and (path == "*" or path.begins_with("channelMap")): Stale.close_if_stale(self))
 
 
 func open(look_id: String, main_idx: int) -> void:
 	scene_id = look_id
 	main = main_idx
+	slug = str(Store.project.get("slug", ""))
 	_view.reset()
 	_role = Backdrop.open(self)
 	visible = true
@@ -162,6 +167,7 @@ func show_status(text: String) -> void: _status.text = text
 
 
 func close_editor() -> void:
+	pusher.cancel()  # a push still inside its debounce must not re-take the closed look on the new project
 	_hold(false)
 	visible = false
 	_release_page()

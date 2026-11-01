@@ -68,6 +68,7 @@ func _draw() -> void:
 	if layers.is_empty():
 		draw_string(get_theme_default_font(), Vector2(8, size.y / 2.0 + 5), "Empty look", HORIZONTAL_ALIGNMENT_LEFT, size.x - 16, 12, ThemeBuilder.TEXT_MUTED)
 		return
+	var missing := []  # WO-918 F7: the placeholder labels are laid out together after the pictures (look_thumb_math.gd)
 	for l in layers:
 		var op := clampf(float(l.get("opacity", 1.0)) if l.get("opacity") != null else 1.0, 0.0, 1.0)
 		var box := TM.fill_rect(l, size)
@@ -86,5 +87,8 @@ func _draw() -> void:
 			var vis := TM.visible_rect(l, size).intersection(Rect2(Vector2.ZERO, size))
 			draw_rect(vis, Color(0.086, 0.106, 0.133, 0.45 * op))
 			var label := "Loading…" if p != "" and not _cache.has(p) else ("No preview" if p != "" else str(l.source.get("label", l.source.value)).get_file())
-			draw_string(get_theme_default_font(), vis.position + Vector2(6, minf(vis.size.y / 2.0 + 5, 18)), label, HORIZONTAL_ALIGNMENT_LEFT, maxf(vis.size.x - 12, 1), 11, ThemeBuilder.TEXT_MUTED)
+			missing.append({"vis": vis, "label": label})
 		draw_set_transform_matrix(Transform2D.IDENTITY)
+	var font := get_theme_default_font()
+	for slot in TM.label_slots(missing, func(s: String) -> float: return font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x):
+		draw_string(font, slot.pos, slot.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ThemeBuilder.TEXT_MUTED)

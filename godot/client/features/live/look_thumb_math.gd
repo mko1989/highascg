@@ -125,3 +125,44 @@ static func placement(layer: Dictionary, size: Vector2, img: Vector2) -> Diction
 		return {}
 	var k := src.size / dst.size
 	return {"dst": d, "src": Rect2(src.position + (d.position - dst.position) * k, d.size * k)}
+
+
+const LABEL_LINE := 14.0
+const LABEL_PAD := 6.0
+
+## WO-918 F7 — the text placeholders of the layers that have no picture (missing media, templates, buses…), laid out so
+## they never overdraw each other or get clipped to "No p": `items` = [{vis: Rect2, label: String}] bottom → top, `measure`
+## = text → pixel width. A label too wide for its box is elided with "…" (at least 4 characters stay), one that still
+## does not fit — or whose line would leave the box — is dropped; a label that would land on an earlier one moves down a
+## line. Returns [{pos: Vector2 (baseline start), text: String}].
+static func label_slots(items: Array, measure: Callable) -> Array:
+	var out := []
+	var used: Array[Rect2] = []
+	for it in items:
+		var vis: Rect2 = it.vis
+		var maxw := vis.size.x - 2.0 * LABEL_PAD
+		var text := _elide(str(it.label), maxw, measure)
+		if text == "":
+			continue
+		var x := vis.position.x + LABEL_PAD
+		var y := vis.position.y + minf(vis.size.y / 2.0 + 5.0, 18.0)
+		var w: float = measure.call(text)
+		var rect := Rect2(x, y - 11.0, w, LABEL_LINE)
+		while used.any(func(u: Rect2) -> bool: return u.intersects(rect)):
+			rect.position.y += LABEL_LINE
+		if rect.end.y > vis.end.y:
+			continue
+		used.append(rect)
+		out.append({"pos": Vector2(x, rect.position.y + 11.0), "text": text})
+	return out
+
+
+static func _elide(text: String, maxw: float, measure: Callable) -> String:
+	if text == "" or measure.call(text) <= maxw:
+		return text
+	var n := text.length() - 1
+	while n >= 4:
+		if measure.call(text.left(n) + "…") <= maxw:
+			return text.left(n) + "…"
+		n -= 1
+	return ""

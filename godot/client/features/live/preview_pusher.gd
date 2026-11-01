@@ -28,6 +28,11 @@ func schedule(scene_id: String, main: int) -> void:
 	_due_at = mini(now + DEBOUNCE_MS, _first_at + MAX_WAIT_MS)
 
 
+func cancel() -> void:  # WO-918 F12: the editor closed — drop a push that has not started
+	_due_at = 0
+	_again = false
+
+
 func _process(_d: float) -> void:
 	if _due_at == 0 or Time.get_ticks_msec() < _due_at:
 		return
