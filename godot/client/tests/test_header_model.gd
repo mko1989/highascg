@@ -44,7 +44,7 @@ func test_load_reply() -> void:
 	t.eq(H.loaded_project(reply), {"version": 3, "name": "npcc"}, "bookkeeping keys stripped")
 	t.eq(reply.has("_activation"), true, "reply untouched")
 	t.eq(H.load_notice(reply).text, "Project loaded — recovered newer autosaved work", "recovered")
-	t.eq(H.load_notice({"_activation": {"restartRequired": true, "restartReason": "Channel layout differs"}}), {"text": "Channel layout differs", "tone": "error", "sticky": false}, "restart needed wins")
+	t.eq(H.load_notice({"_activation": {"restartRequired": true, "restartReason": "Channel layout differs"}}), {"text": "Channel layout differs", "tone": "error", "sticky": true}, "restart needed wins — and stays up (WO-918 F1)")
 	t.eq(H.load_notice({}).text, "Project loaded", "plain")
 
 
@@ -66,3 +66,15 @@ func test_file_import_body() -> void:
 	t.eq((b.project as Dictionary).hardwareConfig, hw, "the file's rig travels untouched")
 	var parsed := H.parse_project_file(JSON.stringify(proj))
 	t.eq(H.file_import_body(parsed.project).project.hardwareConfig.screenDestinations.destinations[0].id, "show_dst", "survives the file parse")
+
+
+func test_older_file_offers_replace_or_copy() -> void:  # WO-918 F23
+	t.eq(H.is_older_file({"reason": "stale_rev"}), true)
+	t.eq(H.is_older_file({"reason": "stale_saved_at"}), true)
+	t.eq(H.is_older_file({"reason": "unrelated_scene_set"}), false)
+	var src := {"name": "Show A", "rev": 7, "slug": "show_a", "scenes": {"scenes": [{"id": "l1"}]}}
+	var c: Dictionary = H.copy_of(src)
+	t.eq(c.name, "Show A (copy)")
+	t.eq(c.has("rev") or c.has("slug"), false, "a copy carries no stored rev / slug")
+	t.eq(src.name, "Show A", "the file's project is not mutated")
+	t.eq(H.older_file_text("Show A").contains("\"Show A\""), true)

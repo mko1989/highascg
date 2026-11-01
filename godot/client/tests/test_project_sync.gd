@@ -31,3 +31,20 @@ func test_other_conflicts_fail_without_retry() -> void:
 	t.eq(v.action, "fail")
 	t.eq(v.reason, "empty_over_nonempty")
 	t.eq(PS.decide({"ok": false, "status": 0, "error": "transport error 4"}, 0).reason, "transport error 4")
+
+
+func test_server_switched_show_is_adopted_not_retried() -> void:  # WO-918 F28
+	var v: Dictionary = PS.decide({"ok": false, "status": 409, "data": {"reason": "not_active", "activeSlug": "show_b"}}, 0)
+	t.eq(v.action, "switched")
+	t.eq(v.active, "show_b")
+
+
+func test_rename_onto_taken_name_is_refused() -> void:  # WO-918 F10
+	var v: Dictionary = PS.decide({"ok": false, "status": 409, "data": {"reason": "name_taken", "error": "A project named \"A\" already exists"}}, 0)
+	t.eq(v.action, "name_taken")
+	t.eq(v.reason, "A project named \"A\" already exists")
+
+
+func test_writes_name_the_edited_slug() -> void:  # WO-918 F27
+	t.eq(PS.body_for({"name": "B", "slug": "a"}).get("editingSlug"), "a")
+	t.eq(PS.body_for({"name": "B"}).has("editingSlug"), false, "no slug yet → legacy server path")

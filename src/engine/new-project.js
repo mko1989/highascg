@@ -3,6 +3,7 @@
 /**
  * Atomic "new project" — empty Untitled show + eggs starter routing (1× PGM).
  */
+const fs = require('fs')
 const defaults = require('../config/defaults')
 const { finalizeScreenDestinationsConfig, normalizeScreenDestinations } = require('../config/screen-destinations')
 const {
@@ -114,6 +115,21 @@ function seedOperatorMonitorCable(hardwareConfig, cfg, persistence) {
 }
 
 /**
+ * WO-918 F9: a New project never overwrites a stored show. It always wrote slug `untitled`, so the second New project
+ * replaced the first one's file — looks and all, no trash copy, past the empty-over-nonempty guard (persistProject is
+ * called directly). Now: "Untitled", else "Untitled 2", "Untitled 3"… — the first name no stored show has.
+ * @returns {string}
+ */
+function freeUntitledName() {
+	for (let n = 1; n < 10000; n++) {
+		const name = n === 1 ? DEFAULT_PROJECT_NAME : `${DEFAULT_PROJECT_NAME} ${n}`
+		const slug = projectStore.projectSlugFromName(name)
+		if (!projectStore.readProjectFile(slug) && !fs.existsSync(projectStore.autosaveFilePath(slug))) return name
+	}
+	return `${DEFAULT_PROJECT_NAME} ${Date.now()}`
+}
+
+/**
  * Apply starter routing and persist empty Untitled project.
  * @param {object} ctx
  * @returns {{ project: object, slug: string }}
@@ -191,6 +207,7 @@ function createNewProject(ctx) {
 	}
 
 	const project = buildNewUntitledProject(hardwareConfig)
+	project.name = freeUntitledName()
 	const slug = projectStore.projectSlugFromName(project.name)
 
 	ctx.sceneDeck = {
@@ -229,4 +246,5 @@ module.exports = {
 	buildNewUntitledProject,
 	buildStarterHardwareConfig,
 	createNewProject,
+	freeUntitledName,
 }

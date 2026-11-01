@@ -168,6 +168,21 @@ function retireProjectSlug(slug) {
 }
 
 /**
+ * WO-918 F23: COPY (not move) the stored main file into `projects/_trash/<slug>-<ms>-replaced/` before it is replaced.
+ * @param {string} slug
+ * @returns {string | null} the trash directory name, null when there was nothing to keep
+ */
+function backupProjectToTrash(slug) {
+	const s = String(slug || '').trim()
+	if (!s || !isSafeProjectSlug(s) || !fs.existsSync(projectFilePath(s))) return null
+	const name = `${s}-${Date.now()}-replaced` // not `<slug>-<ms>`: that name is the retirement record (wasProjectSlugRetired)
+	const dir = path.join(PROJECTS_DIR, TRASH_SUBDIR, name)
+	fs.mkdirSync(dir, { recursive: true })
+	fs.copyFileSync(projectFilePath(s), path.join(dir, `${s}.json`))
+	return name
+}
+
+/**
  * Was this slug deliberately retired (deleted / factory reset) at some point?
  *
  * WO-311: `retireProjectSlug` moves the files to `projects/_trash/<slug>-<timestamp>/` rather
@@ -334,6 +349,7 @@ module.exports = {
 	parseProjectListFilename,
 	quarantineCorruptFile,
 	retireProjectSlug,
+	backupProjectToTrash,
 	projectsDir,
 	projectFilePath,
 	autosaveFilePath,

@@ -19,9 +19,16 @@ const {
 const { applyHardwareConfigToCtx, hardwareConfigHasOperatorData } = require('../engine/project-hardware-config')
 const { stampProjectHardware, holdProjectHardware, releaseProjectHardware } = require('../engine/project-hardware-hold')
 const { ensureProjectMediaDir } = require('../media/project-media-root')
-const { createNewProject } = require('../engine/new-project')
+const { handleProjectNew } = require('./routes-data-project-new')
 const { scheduleProjectSyncBroadcast } = require('./routes-data-project-sync')
-const { retireSlugWithReplication, previousSlugKind, retireRenamedSlug } = require('./routes-data-project-slug')
+const {
+	retireSlugWithReplication,
+	previousSlugKind,
+	retireRenamedSlug,
+	slugConflict,
+	editingSlugOf,
+	replaceFromFile,
+} = require('./routes-data-project-slug')
 const { loadProjectMerged } = require('./routes-data-project-read')
 
 async function handleProject(path, body, ctx) {
@@ -40,10 +47,13 @@ async function handleProject(path, body, ctx) {
 		const keepPayload = b.keepPayloadHardware === true
 		// WO-868: a file loaded from disk without a channel-scheme stamp predates "Operator GUI first" — legacy numbers
 		if (keepPayload && project.channelScheme == null) project.channelScheme = 'legacy'
-		const prevKind = previousSlugKind(prevSlug, slug, project, { imported: keepPayload }) // WO-824
+		const prevKind = previousSlugKind(prevSlug, slug, project, { imported: keepPayload, editingSlug: editingSlugOf(b) }) // WO-824
+		const conflict = slugConflict(prevKind, prevSlug, slug, existing) // WO-918
+		if (conflict) return { status: 409, headers: JSON_HEADERS, body: jsonBody(conflict) }
 		const renamedFrom = prevKind === 'rename' ? prevSlug : null // only a rename carries the previous slug's hold
 		stampProjectHardware(ctx, project, { slug, prevSlug: renamedFrom, existing, capture: b.captureHardware === true, keepPayload })
 		preserveClientOwnedSlices(project, existing) // WO-614: web saves never carry project.previs
+		const replacedBackup = keepPayload && b.replaceExisting === true ? replaceFromFile(ctx, project, existing, slug) : null // WO-918 F23
 		const allowReplace = b.force === true || b.allowReplace === true
 		const check = validateIncomingProject(project, existing, { allowReplace })
 		if (!check.ok) {
@@ -106,6 +116,7 @@ async function handleProject(path, body, ctx) {
 				activeSlug: slug,
 				created: !existing,
 				rev: persisted.rev,
+				...(replacedBackup ? { replacedBackup } : {}),
 			}),
 		}
 	}
@@ -214,61 +225,7 @@ async function handleProject(path, body, ctx) {
 			}),
 		}
 	}
-	if (path === '/api/project/new') {
-		try {
-			const { project, slug } = await createNewProject(ctx)
-			releaseProjectHardware(slug) // WO-821: New applies its starter hardware
-			if (ctx.artnetReceiver?.reconfigureFromProject) {
-				ctx.artnetReceiver.reconfigureFromProject(project)
-			} else if (ctx.artnetReceiver) {
-				ctx.artnetReceiver.reconfigure()
-			}
-			if (typeof ctx._wsBroadcast === 'function') {
-				try {
-					ctx._wsBroadcast('change', { path: 'hardwareConfig', value: { applied: true } })
-					scheduleProjectSyncBroadcast(ctx, project)
-					if (typeof ctx.getState === 'function') {
-						const st = ctx.getState()
-						if (st?.channelMap) {
-							ctx._wsBroadcast('change', { path: 'channelMap', value: st.channelMap })
-						}
-					}
-				} catch (e) {
-					if (typeof ctx.log === 'function') {
-						ctx.log('warn', '[project] WebSocket broadcast failed: ' + (e?.message || e))
-					}
-				}
-			}
-			if (typeof ctx.onProjectSavedForReplication === 'function') {
-				try {
-					ctx.onProjectSavedForReplication(project)
-				} catch (e) {
-					if (typeof ctx.log === 'function') ctx.log('warn', '[replication] project push: ' + (e?.message || e))
-				}
-			}
-			try {
-				const { refreshComposePreviewConsumers } = require('../preview/compose-preview-consumer')
-				void refreshComposePreviewConsumers(ctx).catch((e) => {
-					if (typeof ctx.log === 'function') {
-						ctx.log('warn', `[compose-preview] refresh after new project: ${e?.message || e}`)
-					}
-				})
-			} catch {
-				/* optional */
-			}
-			return {
-				status: 200,
-				headers: JSON_HEADERS,
-				body: jsonBody({ ok: true, slug, activeSlug: slug, project: maskProjectStreamCredentials(project) }),
-			}
-		} catch (e) {
-			return {
-				status: 500,
-				headers: JSON_HEADERS,
-				body: jsonBody({ ok: false, error: e?.message || 'New project failed' }),
-			}
-		}
-	}
+	if (path === '/api/project/new') return handleProjectNew(ctx) // routes-data-project-new.js
 	if (path === '/api/project/apply-hardware') {
 		const hc =
 			b.hardwareConfig && typeof b.hardwareConfig === 'object'
@@ -397,7 +354,12 @@ async function handleProject(path, body, ctx) {
 		const existing = projectStore.readProjectFile(slug)
 		/* WO-824: judge the client's payload — the enriched copy carries the live deck, which still holds the open
 		 * show until the importing client's deck sync lands. */
-		const prevKind = previousSlugKind(prevSlug, slug, payload)
+		const prevKind = previousSlugKind(prevSlug, slug, payload, { editingSlug: editingSlugOf(b) })
+		const conflict = slugConflict(prevKind, prevSlug, slug, existing) // WO-918 F27/F28/F10
+		if (conflict) {
+			ctx.log?.('warn', `[project] autosave refused (${conflict.reason}): "${slug}" from a client editing "${b.editingSlug}", active "${prevSlug}"`)
+			return { status: 409, headers: JSON_HEADERS, body: jsonBody(conflict) }
+		}
 		/* Autosave is a background write and must never destroy the stored hardware slice: not with an empty
 		 * (factory-reset) live config (WO-311 / 5d01bca), and not with this box's rig while the project was
 		 * loaded without its hardware (WO-821, project-hardware-hold.js). */

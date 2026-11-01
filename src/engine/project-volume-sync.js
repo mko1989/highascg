@@ -362,6 +362,46 @@ function pushProjectSlugToVolumes(slug, opts = {}) {
 }
 
 /**
+ * WO-918 F14/F15: a retired slug must leave the volumes too. The pushed copies stayed on the bridge (and the boot
+ * stick), so the Load list showed a ghost of the renamed show and the exFAT sync copied it back into projects/.
+ * Moves them into `<volume>/projects/_trash/<slug>-<ms>/` like projectStore.retireProjectSlug does locally.
+ * @param {string} slug
+ * @param {{ log?: (lvl: string, msg: string) => void }} [opts]
+ * @returns {{ usb: boolean, bridge: boolean }}
+ */
+function retireProjectSlugOnVolumes(slug, opts = {}) {
+	const log = opts.log || (() => {})
+	const s = String(slug || '').trim()
+	if (!s || s.includes('/') || s.includes('..')) return { usb: false, bridge: false }
+	const roots = getProjectRoots()
+	const retireIn = (dir) => {
+		const files = [
+			[path.join(dir, `${s}.json`), `${s}.json`],
+			[path.join(dir, AUTOSAVE_SUBDIR, `${s}.json`), `${s}.autosave.json`],
+		].filter(([src]) => fs.existsSync(src))
+		if (!files.length) return false
+		const trashDir = path.join(dir, '_trash', `${s}-${Date.now()}`)
+		fs.mkdirSync(trashDir, { recursive: true })
+		for (const [src, name] of files) fs.renameSync(src, path.join(trashDir, name))
+		return true
+	}
+	const out = { usb: false, bridge: false }
+	for (const [key, ok, root] of [
+		['usb', usbAutoSync(roots), roots.usb],
+		['bridge', !!(roots.bridge && isVolumeMountedSync(roots.bridge)), roots.bridge],
+	]) {
+		if (!ok || !root) continue
+		try {
+			out[key] = retireIn(volumeProjectsDir(root))
+			if (out[key]) log('info', `[project] retired ${s}.json on ${key} (${root}/projects/_trash/)`)
+		} catch (e) {
+			log('warn', `[project] retire ${s} on ${key}: ${e?.message || e}`)
+		}
+	}
+	return out
+}
+
+/**
  * After boot/volume sync, refresh working copy of one slug from USB if newer.
  * @param {string} slug
  */
@@ -423,6 +463,7 @@ module.exports = {
 	finalizeProjectCatalog,
 	listProjectsFromVolumes,
 	pushProjectSlugToVolumes,
+	retireProjectSlugOnVolumes,
 	pullProjectSlugFromUsbIfNewer,
 	pullAutosaveSlugFromVolumesIfNewer,
 	copyIfSrcNewer,

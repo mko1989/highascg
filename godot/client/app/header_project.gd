@@ -25,6 +25,12 @@ var _new_confirm: ConfirmationDialog
 var _menu: PopupMenu
 var _fade: Timer
 var _sticky := false
+var _replace: ConfirmationDialog  # WO-918 F23: Load from file of an older copy of a stored show
+var _pending_import: Dictionary = {}
+## WO-918 F10: the slug whose name the field shows, and whether the operator typed since — a project switch while the
+## field had focus left the OLD name in it and focus-out then renamed the NEW show onto it (and trashed it)
+var _shown_slug := ""
+var _typed := false
 
 
 func _ready() -> void:
@@ -35,6 +41,7 @@ func _ready() -> void:
 	name_edit.custom_minimum_size.x = 170
 	name_edit.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
 	name_edit.text_submitted.connect(func(_t: String) -> void: _commit_name())
+	name_edit.text_changed.connect(func(_t: String) -> void: _typed = true)
 	name_edit.focus_exited.connect(_commit_name)
 	add_child(name_edit)
 	# WO-751: the show belongs to the server this client is on. WO-802 (owner: "whatever server a client is connected to
@@ -62,7 +69,7 @@ func _ready() -> void:
 	new_btn = Button.new()
 	new_btn.text = "New project"
 	new_btn.focus_mode = Control.FOCUS_NONE
-	new_btn.tooltip_text = "Start a fresh project with empty looks and one PGM screen destination"
+	new_btn.tooltip_text = "Start a fresh project with empty looks and only the Operator GUI screen destination"
 	new_btn.pressed.connect(func() -> void: _new_confirm.popup_centered())
 	add_child(new_btn)
 	notice_label = Label.new()
@@ -87,20 +94,41 @@ func _ready() -> void:
 	add_child(stick)
 	_new_confirm = ConfirmationDialog.new()
 	_new_confirm.title = "New project"
-	_new_confirm.dialog_text = "Start a fresh project? Unsaved changes will be lost. Screen destinations reset to one PGM."
+	_new_confirm.dialog_text = "Start a fresh project? Unsaved changes will be lost. Screen destinations reset to the Operator GUI only — add PGM screens in Devices."
 	_new_confirm.ok_button_text = "Start fresh"
 	_new_confirm.confirmed.connect(new_project)
 	add_child(_new_confirm)
 	_menu = PopupMenu.new()
 	_menu.id_pressed.connect(func(id: int) -> void: _pick_file(id == 0))
 	add_child(_menu)
-	Store.project_changed.connect(func(p: Dictionary) -> void:
-		if not name_edit.has_focus():
-			name_edit.text = str(p.get("name", "")))
-	name_edit.text = str(Store.project.get("name", ""))
+	_replace = ConfirmationDialog.new()
+	_replace.title = "Load from file"
+	_replace.ok_button_text = "Replace"
+	_replace.add_button("Import as copy", true, "copy")
+	_replace.confirmed.connect(func() -> void: _import(_pending_import, true))
+	_replace.custom_action.connect(func(_a: StringName) -> void:
+		_replace.hide()
+		_import(HeaderModel.copy_of(_pending_import), false))
+	add_child(_replace)
+	Store.project_changed.connect(_show_name)
+	_show_name(Store.project)
 	ProjectSync.saved.connect(func(_rev: int) -> void: say(HeaderModel.notice("autosaved", "", HeaderModel.hhmm(Time.get_time_dict_from_system()))))
 	ProjectSync.save_failed.connect(func(reason: String) -> void:
 		say(HeaderModel.notice("gone" if reason == "project_gone" else "failed", reason, "")))
+	ProjectSync.name_refused.connect(func(message: String) -> void:
+		_show_name(Store.project, true)
+		say({"text": message + " — name not changed", "tone": "error", "sticky": false}))
+	ProjectSync.switched.connect(func(project_name: String) -> void:
+		say({"text": "The server switched to \"%s\" — this client follows" % project_name, "tone": "warn", "sticky": false}))
+
+
+## The field follows the store; another show (by slug) replaces the text even mid-edit (WO-918 F10).
+func _show_name(p: Dictionary, force := false) -> void:
+	var slug := str(p.get("slug", ""))
+	if force or slug != _shown_slug or not name_edit.has_focus():
+		name_edit.text = str(p.get("name", ""))
+		_typed = false
+	_shown_slug = slug
 
 
 func say(n: Dictionary) -> void:
@@ -116,13 +144,13 @@ func say(n: Dictionary) -> void:
 
 func _commit_name() -> void:
 	var n := HeaderModel.clean_name(name_edit.text)
-	if Store.project.is_empty() or n == str(Store.project.get("name", "")):
+	if Store.project.is_empty() or not _typed or n == str(Store.project.get("name", "")):
 		return
+	_typed = false
 	if n == "":
 		name_edit.text = str(Store.project.get("name", ""))
 		return
-	Store.project["name"] = n
-	ProjectSync.mark_dirty(true)  # the server autosave retires the old slug (routes-data-project-handlers.js)
+	ProjectSync.rename(n)  # the server autosave retires the old slug (routes-data-project-handlers.js)
 
 
 func save() -> void:
@@ -135,6 +163,7 @@ func save() -> void:
 
 func load_slug(slug: String) -> void:
 	say({"text": "Loading %s…" % slug, "tone": "muted"})
+	await ProjectSync.settle()  # WO-918 F27: no autosave of the old show may land after the switch
 	var res: Dictionary = await Api.post_json("/api/project/load", {"slug": slug, "applyHardware": true})
 	if not res.ok:
 		say(HeaderModel.notice("error", "Load failed: " + str(res.error), ""))
@@ -146,13 +175,16 @@ func load_slug(slug: String) -> void:
 
 func new_project() -> void:
 	new_btn.disabled = true
+	await ProjectSync.settle()
 	var res: Dictionary = await Api.post_json("/api/project/new", {})
 	new_btn.disabled = false
 	var d: Dictionary = res.data if res.data is Dictionary else {}
 	if not res.ok or not (d.get("project") is Dictionary):
 		say(HeaderModel.notice("error", "New project failed: " + str(d.get("error", res.error)), ""))
 		return
-	await _adopt(d["project"])
+	var project: Dictionary = d["project"]
+	project["slug"] = str(d.get("slug", ""))  # the New response carries the slug beside the project (WO-918 F27)
+	await _adopt(project)
 	say({"text": "New project started", "tone": "ok"})
 
 
@@ -224,8 +256,24 @@ func _load_file(path: String) -> void:
 	if parsed.has("error"):
 		say(HeaderModel.notice("error", str(parsed.error), ""))
 		return
-	var res: Dictionary = await Api.post_json("/api/project/save", HeaderModel.file_import_body(parsed.project))
-	if not res.ok:
-		say(HeaderModel.notice("error", "Load from file failed: " + str(res.error), ""))
+	await ProjectSync.settle()
+	await _import(parsed.project, false)
+
+
+## Store the file's show on the server, then load it. A stored show of the same name with newer work refuses the file
+## (stale_rev): ask — Replace (the stored version goes to projects/_trash) or Import as copy (WO-918 F23).
+func _import(project: Dictionary, replace: bool) -> void:
+	var body := HeaderModel.file_import_body(project)
+	if replace:
+		body["replaceExisting"] = true
+	var res: Dictionary = await Api.post_json("/api/project/save", body)
+	var d: Dictionary = res.data if res.data is Dictionary else {}
+	if not res.ok and HeaderModel.is_older_file(d):
+		_pending_import = project
+		_replace.dialog_text = HeaderModel.older_file_text(str(project.get("name", "")))
+		_replace.popup_centered()
 		return
-	await load_slug(str((res.data as Dictionary).get("slug", "")))
+	if not res.ok:
+		say(HeaderModel.notice("error", "Load from file failed: " + str(d.get("error", res.error)), ""))
+		return
+	await load_slug(str(d.get("slug", "")))

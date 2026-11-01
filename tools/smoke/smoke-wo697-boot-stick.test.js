@@ -85,7 +85,7 @@ describe('WO-697 boot stick detection', () => {
 		assert.match(sync, /if \(foreignStick\(p, exfatRoot\)\) \{\n\t\tlog\('info', `\[exfat-sync\] \$\{id\}: the stick/)
 		const pv = SRC('src/engine/project-volume-sync.js')
 		assert.match(pv, /return !!\(roots\.usb && isVolumeMountedSync\(roots\.usb\) && isBootStick\(roots\.usb\)\)/)
-		assert.equal(pv.match(/usbAutoSync\(roots\)/g).length, 5, 'definition + catalog, push, pull, autosave pull')
+		assert.equal(pv.match(/usbAutoSync\(roots\)/g).length, 6, 'definition + catalog, push, pull, autosave pull, retire (WO-918 F14)')
 		assert.doesNotMatch(pv, /roots\.usb && isVolumeMountedSync\(roots\.usb\)\)\s*\{/)
 		assert.match(SRC('src/system/private-volume-sync.js'), /if \(key === 'usb' && !isBootStick\(vol\.mount\)\)/)
 		for (const f of ['scripts/exfat/highascg-exfat-network-apply.sh', 'scripts/exfat/highascg-exfat-server-update.sh']) {

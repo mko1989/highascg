@@ -148,7 +148,9 @@ handleProject('/api/project/autosave', JSON.stringify({ project }), ctx).then((r
 })
 
 test('a rename moves the hold with the project', async () => {
-	const r = await post(ctx, '/api/project/autosave', { project: { ...clientProject(), name: `${SLUG}_v2` } })
+	// WO-918: a rename is "editing the active slug under a new name" — the client says which slug it edits (this
+	// fixture's flat `scenes` array carries no look ids, so the legacy shared-looks evidence cannot apply)
+	const r = await post(ctx, '/api/project/autosave', { project: { ...clientProject(), name: `${SLUG}_v2` }, editingSlug: SLUG })
 	assert.equal(r.status, 200, JSON.stringify(r.body))
 	assert.equal(storedDest(`${SLUG}_v2`), 'show_dst')
 	assert.equal(hold.isProjectHardwareHeld(`${SLUG}_v2`), true)

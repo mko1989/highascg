@@ -188,7 +188,11 @@ test('Godot sends the flag on Load from file only', () => {
 	const model = read('godot/client/app/header_model.gd')
 	assert.match(model, /"keepPayloadHardware": true/)
 	const proj = read('godot/client/app/header_project.gd')
-	assert.match(proj, /post_json\("\/api\/project\/save", HeaderModel\.file_import_body\(parsed\.project\)\)/)
+	// WO-918 F23: the import body is built once (it may gain replaceExisting) and is the one Load-from-file POST
+	assert.match(proj, /var body := HeaderModel\.file_import_body\(project\)/)
+	assert.match(proj, /post_json\("\/api\/project\/save", body\)/)
+	assert.match(proj, /await _import\(parsed\.project, false\)/)
+	assert.equal(proj.split('file_import_body(').length - 1, 1, 'one import call site')
 	assert.equal(proj.split('keepPayloadHardware').length - 1, 0, 'the flag lives in the model, not at call sites')
 	assert.doesNotMatch(read('godot/client/core/project_sync.gd'), /keepPayloadHardware/, 'normal saves never send it')
 })

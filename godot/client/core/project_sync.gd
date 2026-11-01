@@ -13,6 +13,8 @@ const NetUtil := preload("res://core/net_util.gd")
 
 signal saved(rev: int)
 signal save_failed(reason: String)
+signal switched(name: String)  # WO-918: the server had another show open — this client adopted it
+signal name_refused(message: String)  # WO-918 F10: the rename collided with a stored show; the old name is back
 signal edited  # WO-642: every local edit (mark_dirty / deck_changed) — ProjectUndo snapshots on it
 
 const DEBOUNCE_S := 3.0
@@ -33,6 +35,8 @@ var deck_syncs_sent := 0
 var _deck_pending := false
 ## WO-842 4h: set when the operator deleted the last look — only then may an empty deck replace the server's
 var deck_emptied_by_delete := false
+## WO-918 F10: the name before the header's last rename (restored when the server refuses the new one)
+var _name_before_edit := ""
 
 
 func _ready() -> void:
@@ -127,12 +131,13 @@ func flush() -> void:
 	var retries := 0
 	while true:
 		Store.project["savedAt"] = Time.get_datetime_string_from_system(true) + "Z"
-		var res: Dictionary = await Api.post_json("/api/project/autosave", {"project": Store.project})
+		var res: Dictionary = await Api.post_json("/api/project/autosave", Policy.body_for(Store.project))
 		var verdict: Dictionary = Policy.decide(res, retries)
 		match verdict.action:
 			"ok":
 				if verdict.rev > 0:
 					Store.project["rev"] = verdict.rev
+				adopt_slug(res)
 				if verdict.changed:
 					_skip_next_sync = true
 				saves_ok += 1
@@ -144,6 +149,12 @@ func flush() -> void:
 			"gone":
 				project_gone = true
 				save_failed.emit("project_gone")
+			"switched":
+				in_flight = false
+				await adopt_active()
+				return
+			"name_taken":
+				_refuse_name(str(verdict.reason))
 			_:
 				save_failed.emit(str(verdict.reason))
 		break
@@ -151,6 +162,53 @@ func flush() -> void:
 	if pending:
 		pending = false
 		flush()
+
+
+## After a save the server's slug is the one this client edits (a rename moved it).
+func adopt_slug(res: Dictionary) -> void:
+	var d: Variant = res.get("data")
+	if d is Dictionary and str((d as Dictionary).get("slug", "")) != "":
+		Store.project["slug"] = str(d["slug"])
+
+
+## The server has another show open (a Load on another client / the API) — take it, drop this client's stale copy.
+func adopt_active() -> void:
+	var pr: Dictionary = await Api.get_json("/api/project")
+	if not pr.ok or not (pr.data is Dictionary):
+		save_failed.emit("not_active")
+		return
+	reset()
+	Store.set_project(pr.data)
+	switched.emit(str((pr.data as Dictionary).get("name", "")))
+
+
+## A rename onto another stored show's name was refused: put the name the server still has back.
+func _refuse_name(message: String) -> void:
+	_timer.stop()
+	pending = false
+	if _name_before_edit != "":
+		Store.project["name"] = _name_before_edit
+		Store.project_changed.emit(Store.project)
+	name_refused.emit(message)
+
+
+## Header rename: remember the stored name so a refused rename can be undone, then save now.
+func rename(new_name: String) -> void:
+	_name_before_edit = str(Store.project.get("name", ""))
+	Store.project["name"] = new_name
+	mark_dirty(true)
+
+
+## WO-918 F27: before a Load / New / import switches shows, land this show's pending edits and stop the timer, so no
+## autosave of the old show can arrive after the server switched.
+func settle() -> void:
+	if not _timer.is_stopped() and not project_gone:
+		_timer.stop()
+		flush()
+	while in_flight:
+		await get_tree().process_frame
+	_timer.stop()
+	pending = false
 
 
 ## Header Save (web header-bar.js saveToServer): let a running autosave finish, then POST /api/project/save — the
@@ -164,13 +222,20 @@ func save_now() -> Dictionary:
 	if Store.project.is_empty():
 		return {"ok": false, "status": 0, "data": null, "error": "no project"}
 	Store.project["savedAt"] = Time.get_datetime_string_from_system(true) + "Z"
-	var res: Dictionary = await Api.post_json("/api/project/save", {"project": Store.project})
+	var res: Dictionary = await Api.post_json("/api/project/save", Policy.body_for(Store.project))
 	if res.ok:
 		var d: Dictionary = res.data if res.data is Dictionary else {}
 		if d.get("rev") != null:
 			Store.project["rev"] = int(d["rev"])
+		adopt_slug(res)
 		_skip_next_sync = true
 		project_gone = false  # an explicit save writes the file again (WO-311: clears the condition)
+	else:
+		match str(Policy.decide(res, Policy.MAX_STALE_RETRIES).action):
+			"switched":
+				await adopt_active()
+			"name_taken":
+				_refuse_name(str(Policy.decide(res, 0).reason))
 	return res
 
 

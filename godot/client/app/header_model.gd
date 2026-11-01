@@ -87,7 +87,7 @@ static func load_notice(data: Variant) -> Dictionary:
 	var act: Dictionary = d.get("_activation", {}) if d.get("_activation") is Dictionary else {}
 	if act.get("restartRequired") == true:
 		var why := str(act.get("restartReason", ""))
-		return {"text": why if why != "" else "This project changes the CasparCG channel layout — Apply Caspar config and restart CasparCG.", "tone": "error", "sticky": false}
+		return {"text": why if why != "" else "This project changes the CasparCG channel layout — Apply Caspar config and restart CasparCG.", "tone": "error", "sticky": true}  # WO-918 F1: an action is owed — never fades
 	if d.get("_recoveredFromAutosave") == true:
 		return {"text": "Project loaded — recovered newer autosaved work", "tone": "ok", "sticky": false}
 	return {"text": "Project loaded", "tone": "ok", "sticky": false}
@@ -108,6 +108,25 @@ static func parse_project_file(text: String) -> Dictionary:
 ## would apply the wrong rig. Only the import path sends it: a normal save must keep the hardware hold (WO-821).
 static func file_import_body(project: Dictionary) -> Dictionary:
 	return {"project": project, "allowReplace": true, "keepPayloadHardware": true}
+
+
+## WO-918 F23: the server refused the file because its stored show of that name has newer work.
+static func is_older_file(data: Dictionary) -> bool:
+	return str(data.get("reason", "")) in ["stale_rev", "stale_saved_at"]
+
+
+static func older_file_text(project_name: String) -> String:
+	return ("The server already has \"%s\" with newer work than this file.\n\nReplace it with the file (the server's " +
+		"version is kept in the project trash), or import the file as a separate copy?") % project_name
+
+
+## The file's show under a free-standing name: "<name> (copy)", without the stored show's rev / slug.
+static func copy_of(project: Dictionary) -> Dictionary:
+	var p := project.duplicate(true)
+	p["name"] = str(project.get("name", "Project")) + " (copy)"
+	p.erase("rev")
+	p.erase("slug")
+	return p
 
 
 ## Godot has no project-name slug rule of its own — the server's (project-store.js projectSlugFromName) decides;
