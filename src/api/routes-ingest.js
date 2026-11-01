@@ -134,6 +134,23 @@ function isWeTransferUrl(urlStr) {
 }
 
 /**
+ * The file name a URL download is saved under. The URL path is percent-encoded ("Micha%C5%82.mp4"): decode it, or the
+ * clip lands on disk under the escaped name (WO-922). NFC like the upload path; a bad escape keeps the raw segment.
+ * @param {string} url
+ * @returns {string}
+ */
+function urlFileName(url) {
+	const raw = path.posix.basename(new URL(url).pathname)
+	let name = raw
+	try {
+		name = path.posix.basename(decodeURIComponent(raw))
+	} catch {
+		/* malformed %-escape: keep the segment as sent */
+	}
+	return name.normalize('NFC') || 'downloaded_asset'
+}
+
+/**
  * POST /api/ingest/upload
  */
 async function handleUpload(req, res, ctx) {
@@ -337,7 +354,7 @@ async function handleDownload(body, ctx) {
 
 	let filename
 	try {
-		filename = path.basename(new URL(url).pathname) || 'downloaded_asset'
+		filename = urlFileName(url)
 	} catch {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid URL' }) }
 	}
@@ -464,4 +481,4 @@ async function handleIngestPreview(query, ctx) {
 	}
 }
 
-module.exports = { handleUpload, handleDownload, handleGetDownloadStatus, handleIngestPreview, writeBodyToFile }
+module.exports = { handleUpload, handleDownload, handleGetDownloadStatus, handleIngestPreview, writeBodyToFile, urlFileName }
