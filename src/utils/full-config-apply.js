@@ -13,6 +13,61 @@ const {
 } = require('./caspar-restart')
 const { needsNodmRestartForLayout, verifyXrandrMatchesLayout } = require('./xrandr-layout-verify')
 
+/** WO-918 F3: the layout outcome of a live applyX11Layout call, as stored on out.layout.verify. */
+function summarizeLayoutVerify(res) {
+	if (!res || !res.applied) return null
+	const v = res.verify
+	return {
+		ok: v?.ok === true,
+		mismatches: (Array.isArray(v?.mismatches) ? v.mismatches : []).map((m) => `${m.sysId} ${m.field}`),
+	}
+}
+
+/**
+ * WO-918 F3: was the display layout REALLY applied? `layoutOk` is true only when xrandr ran and the
+ * post-apply verify matched the plan — or when no layout step was needed (no GPU heads / no xrandr
+ * command). `clause` is the honest message fragment ('' when nothing to say).
+ * @returns {{ ok: boolean, clause: string, problem?: string }}
+ */
+function describeLayoutOutcome(out, layoutRes, canvasCheck) {
+	const required = canvasCheck.reason !== 'no_planned_heads' && !!layoutRes.xrandrCommand
+	if (!required) return { ok: true, clause: '' }
+	const saved = out.layout.persisted ? ' (apply-layout.sh saved)' : ''
+	if (!out.layout.postApplied) {
+		return {
+			ok: false,
+			clause: `layout NOT applied - xrandr failed${saved}`,
+			problem: 'Display layout was NOT applied: xrandr failed on every attempt (check the connected outputs and apply-layout.sh).',
+		}
+	}
+	const v = out.layout.verify
+	if (v && v.ok) return { ok: true, clause: 'layout applied' }
+	const list = v && v.mismatches.length ? v.mismatches.slice(0, 3).join(', ') : ''
+	return {
+		ok: false,
+		clause: `layout applied but NOT verified${list ? ` (${list})` : ''}`,
+		problem: list
+			? `Display layout applied but did not verify: ${list} - outputs may overlap or run at the wrong mode.`
+			: 'Display layout applied but could not be verified against the plan.',
+	}
+}
+
+function setLayoutOutcome(out, outcome) {
+	out.layoutOk = outcome.ok
+	if (outcome.ok) delete out.layoutProblem
+	else out.layoutProblem = outcome.problem
+}
+
+/** 'Config written; a; b.' - empty parts dropped. */
+function joinMessage(...parts) {
+	return ['Config written', ...parts.filter(Boolean)].join('; ') + '.'
+}
+
+/** Early exits where no layout was applied at all. */
+function layoutNotAttempted(out, step) {
+	return { ...out, layoutOk: false, layoutProblem: `Display layout was not applied: the Apply stopped at ${step}.` }
+}
+
 /**
  * Full server apply:
  *   1. Write casparcg.config
@@ -21,6 +76,9 @@ const { needsNodmRestartForLayout, verifyXrandrMatchesLayout } = require('./xran
  *   4. Brief AMCP RESTART, then fast-kill if still up — run.sh relaunches with new config
  *   5. NVIDIA Force Composition Pipeline on all outputs — ONCE, after the restart (WO-805: the blocking pre-restart
  *      run inside the operator display session is skipped here; xrandr in step 3 is what clears MetaMode)
+ *
+ * The result carries `layoutOk` (true only when the layout really applied and verified, or none was needed)
+ * and, when false, `layoutProblem` (WO-918 F3); `ok` keeps its meaning (config written + Caspar step did not throw).
  *
  * Canvas expansion path adds nodm restart, live xrandr after X settles,
  * then stop autostart Caspar (wrong layout window) before relaunch.
@@ -103,7 +161,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 	out.caspar = writeResult.ok ? { ok: true, path: writeResult.path } : writeResult
 	if (!writeResult.ok) {
 		return {
-			...out,
+			...layoutNotAttempted(out, 'the Caspar config write'),
 			ok: false,
 			step: 'caspar_write',
 			caspar: writeResult,
@@ -116,7 +174,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 	 * marker in /tmp, and the fast kill, whose `ss` sees the live Caspar on :5250). Write the config and stop. */
 	if (require('../bootstrap/sandbox').isSandbox()) {
 		log('info', '[Full apply] sandbox instance — config written; display, restart and NVIDIA steps skipped (WO-805)')
-		return { ...out, step: 'sandbox', message: 'Config written (sandbox: no display or Caspar restart).' }
+		return { ...out, layoutOk: true, step: 'sandbox', message: 'Config written (sandbox: no display or Caspar restart).' }
 	}
 
 	log('info', '[Full apply] Step 2 — persisting apply-layout.sh')
@@ -167,6 +225,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		})()
 		if (verify?.ok) {
 			out.step = 'no_changes'
+			out.layoutOk = true
 			out.message = 'No config changes — Caspar left running (config and display layout already match).'
 			log('info', '[Full apply] Config unchanged + layout verified — skipping Caspar restart (WO-337 gate)')
 			return out
@@ -183,7 +242,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 	if (layoutScriptRequired && !layoutRes.persisted) {
 		log('warn', '[Full apply] Planned GPU layout exists but apply-layout.sh was not persisted')
 		return {
-			...out,
+			...layoutNotAttempted(out, 'persisting apply-layout.sh'),
 			ok: false,
 			step: 'layout_persist',
 			message: 'Config written but apply-layout.sh was not persisted.',
@@ -214,6 +273,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		out.layout.postApplied = !!postLayout.applied
 		out.layout.postXrandrCommand = postLayout.xrandrCommand || null
 		out.displayRestart.postLayoutApplied = !!postLayout.applied
+		out.layout.verify = summarizeLayoutVerify(postLayout)
 
 		await applyOperatorDisplaySession(ctx.config, {
 			layout: calculateLayoutPositions(ctx.config),
@@ -230,12 +290,18 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		out.layout.preApplied = !!liveLayout.applied
 		out.layout.postApplied = !!liveLayout.applied
 		out.layout.postXrandrCommand = liveLayout.xrandrCommand || null
+		out.layout.verify = summarizeLayoutVerify(liveLayout)
 		await applyOperatorDisplaySession(ctx.config, {
 			layout: calculateLayoutPositions(ctx.config),
 			log,
 			skipNvidia: true, // WO-805: ~1.4 s per Apply; the deferred run below is the one that sticks
 		}).catch((e) => log('warn', `[Full apply] Operator display session: ${e?.message || e}`))
 	}
+
+	const layoutOutcome = describeLayoutOutcome(out, layoutRes, canvasCheck)
+	setLayoutOutcome(out, layoutOutcome)
+	if (!layoutOutcome.ok) log('warn', `[Full apply] ${layoutOutcome.problem}`)
+	const nodmClause = out.displayRestart.nodmRestarted ? 'nodm restarted' : 'nodm restart FAILED'
 
 	// WO-407: refresh the machine-owned caspar-env (GL swaps gate on the PGM display's
 	// vblank) so the value tracks layout changes — run.sh sources it at every launch.
@@ -248,15 +314,11 @@ async function applyFullServerConfig(ctx, opts = {}) {
 
 	if (opts.skipCasparRestart) {
 		log('info', '[Full apply] skipCasparRestart=true — config and layout script saved only')
-		out.message = needsNodm
-			? out.layout.postApplied
-				? 'Config written; nodm restarted; layout applied; Caspar restart skipped.'
-				: 'Config written; nodm restarted; Caspar restart skipped.'
-			: out.layout.postApplied
-				? 'Config written; layout applied; Caspar restart skipped.'
-				: layoutRes.persisted
-					? 'Config written; apply-layout.sh saved; Caspar restart skipped.'
-					: 'Config written; Caspar restart skipped.'
+		out.message = joinMessage(
+			needsNodm ? nodmClause : '',
+			layoutOutcome.clause || (layoutRes.persisted && !out.layout.postApplied ? 'apply-layout.sh saved' : ''),
+			'Caspar restart skipped',
+		)
 		return out
 	}
 
@@ -316,21 +378,11 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		})
 	}
 
-	if (needsNodm) {
-		out.message = out.casparRestart.reconnected
-			? 'Config written; nodm restarted; layout applied; Caspar restarted.'
-			: out.layout.postApplied
-				? 'Config written; nodm restarted; layout applied; Caspar restart pending.'
-				: 'Config written; nodm restarted; post-layout xrandr failed — check apply-layout.sh.'
-	} else {
-		out.message = out.casparRestart.reconnected
-			? 'Config written; layout applied; Caspar restarted.'
-			: out.layout.postApplied
-				? 'Config written; layout applied; Caspar restart pending.'
-				: layoutRes.persisted
-					? 'Config written; apply-layout.sh saved.'
-					: 'Config written.'
-	}
+	out.message = joinMessage(
+		needsNodm ? nodmClause : '',
+		layoutOutcome.clause || (layoutRes.persisted && !out.layout.postApplied ? 'apply-layout.sh saved' : ''),
+		out.casparRestart.reconnected ? 'Caspar restarted' : ctx.amcp ? 'Caspar restart pending' : '',
+	)
 	return out
 }
 

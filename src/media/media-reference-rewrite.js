@@ -12,13 +12,16 @@
  */
 'use strict'
 
+const fs = require('fs')
 const path = require('path')
 const { toCasparClsMediaId } = require('./caspar-cls-id')
 const {
 	isProjectScopedMediaEnabled,
 	expandMediaIdToMediaRoot,
 	projectMediaIdPrefixesForSlug,
+	getProjectMediaRelId,
 } = require('./project-media-root')
+const { getMediaIngestBasePath, resolveSafe } = require('./local-media-paths')
 
 const NON_MEDIA_TYPES = new Set(['template', 'html', 'timeline', 'effect', 'live'])
 const URL_LIKE = /^(https?|rtsp|rtmp|srt|udp|ndi|alsa|decklink|route):/i
@@ -52,15 +55,55 @@ function forEachProjectMediaRef(project, fn) {
 }
 
 /**
+ * Does a media-root-relative file (or, extension-less, any file with that stem) exist on disk?
+ * @returns {(rel: string) => boolean}
+ */
+function diskExistsFn(config) {
+	const base = getMediaIngestBasePath(config || {})
+	return (rel) => {
+		const abs = resolveSafe(base, rel)
+		if (!abs) return false
+		try {
+			if (fs.statSync(abs).isFile()) return true
+		} catch {
+			/* try stem resolution below */
+		}
+		if (hasExt(rel)) return false
+		try {
+			const leaf = path.basename(abs)
+			return fs.readdirSync(path.dirname(abs)).some((n) => path.parse(n).name === leaf)
+		} catch {
+			return false
+		}
+	}
+}
+
+const isProjectNamespaced = (v) => /^(projects|exfat\/projects|bridge\/projects)\//i.test(v)
+
+/**
  * Media-root-relative form of a stored value, or null for non-media refs.
+ *
+ * Under project-scoped media a stored id is project-relative first and falls back to the media
+ * root — the same order playback uses (caspar-cls-id.js resolveClipForAmcpLoad: the project folder
+ * when the file is on disk there, else the plain media-root lookup). So a bare `x.png` that only
+ * exists at the media root resolves to `x.png`, not `projects/<slug>/x.png` (WO-918 F22).
+ * Neither on disk → project-scoped for a bare id (legacy), the value as stored for a pathed one.
+ * @param {(rel: string) => boolean} [exists] - media-root-relative existence probe (default: disk)
  * @returns {string|null}
  */
-function resolveRefValue(ref, slug, config) {
+function resolveRefValue(ref, slug, config, exists) {
 	if (!ref || typeof ref !== 'object') return null
 	if (NON_MEDIA_TYPES.has(String(ref.type || 'media').toLowerCase())) return null
 	const value = nfc(ref.value)
 	if (!value || URL_LIKE.test(value)) return null
-	return slug && isProjectScopedMediaEnabled(config) ? nfc(expandMediaIdToMediaRoot(value, slug, config)) : value
+	if (!slug || !isProjectScopedMediaEnabled(config)) return value
+	const probe = exists || diskExistsFn(config)
+	const bare = !value.includes('/')
+	if (!bare && (isProjectNamespaced(value) || value.startsWith('../'))) return value
+	const scoped = bare ? nfc(expandMediaIdToMediaRoot(value, slug, config)) : nfc(`${getProjectMediaRelId(slug, config)}/${value}`)
+	if (probe(scoped)) return scoped
+	if (probe(value)) return value
+	return bare ? scoped : value
 }
 
 function refMatchesPath(resolved, filePath) {
@@ -109,8 +152,15 @@ function rewriteProjectMediaRefs(project, slug, renames, config) {
 	let changed = 0
 	const list = (renames || []).filter((r) => r && r.from && r.to && nfc(r.from) !== nfc(r.to))
 	if (!list.length) return { project: next, changed }
+	// The files have already moved on disk when this runs: judge each ref against the PRE-move
+	// layout (a source path still counts as existing, a destination as not yet there).
+	const disk = diskExistsFn(config)
+	const key = (p) => nfc(p).toLowerCase()
+	const froms = new Set(list.map((r) => key(r.from)))
+	const tos = new Set(list.map((r) => key(r.to)))
+	const exists = (rel) => froms.has(key(rel)) || (!tos.has(key(rel)) && disk(rel))
 	forEachProjectMediaRef(next, (ref) => {
-		const resolved = resolveRefValue(ref, slug, config)
+		const resolved = resolveRefValue(ref, slug, config, exists)
 		if (!resolved) return
 		const hit = list.find((r) => refMatchesPath(resolved, r.from))
 		if (!hit) return
@@ -146,9 +196,11 @@ function findProjectMediaUsage(project, slug, filePath, config) {
  */
 function projectReferencedFiles(project, slug, catalogIds, config) {
 	const files = (catalogIds || []).map(nfc).filter(Boolean)
+	const known = new Set(files.map((f) => f.toLowerCase()))
+	const exists = (rel) => known.has(rel.toLowerCase()) || (!hasExt(rel) && files.some((f) => toCasparClsMediaId(f) === toCasparClsMediaId(rel)))
 	const out = new Set()
 	forEachProjectMediaRef(project, (ref) => {
-		const resolved = resolveRefValue(ref, slug, config)
+		const resolved = resolveRefValue(ref, slug, config, exists)
 		if (!resolved) return
 		const hit = files.find((f) => refMatchesPath(resolved, f))
 		if (hit) out.add(hit)

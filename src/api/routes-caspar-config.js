@@ -243,6 +243,8 @@ async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 			disconnected: !!fullApply.casparRestart?.disconnected,
 			reconnected: !!fullApply.casparRestart?.reconnected,
 			layoutApplied: !!fullApply.layout?.postApplied,
+			layoutOk: fullApply.layoutOk, // WO-918 F3: applied AND verified — layoutApplied alone claimed unverified layouts
+			layoutProblem: fullApply.layoutProblem,
 			layoutPersisted: !!fullApply.layout?.persisted,
 			needsNodmRestart: !!fullApply.layout?.needsNodmRestart,
 			plannedCanvas: fullApply.layout?.plannedCanvas || null,

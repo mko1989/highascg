@@ -40,6 +40,20 @@ function pathsMatch(expected, actualFg) {
 }
 
 /**
+ * Caspar `<file><path>` -> media-root-relative clip id. Caspar prints the path relative to its
+ * working dir (`media/x.png`, its `<media-path>` is `media/`) and may print an absolute one.
+ * Drops everything up to and including the first `media/` segment.
+ * @param {string} p
+ * @returns {string}
+ */
+function mediaPathToClipId(p) {
+	const s = String(p || '').trim().replace(/\\/g, '/')
+	if (!s) return ''
+	const m = /(?:^|\/)media\/(.+)$/i.exec(s)
+	return m ? m[1] : s.replace(/^\/+/, '')
+}
+
+/**
  * @returns {Record<string, string>} layer index string -> foreground clip name
  */
 async function parseLayerFgClipsFromChannelXml(xmlStr) {
@@ -83,6 +97,10 @@ async function parseLayerFgClipsFromChannelXml(xmlStr) {
 					const looksLikeNumericPair = f.clip.length >= 2 && f.clip.every((v) => Number.isFinite(Number(v)))
 					if (!looksLikeNumericPair) fgClip = String(f.clip[0])
 				}
+				// WO-918 F25: the image producer (still PNG/JPG) reports only `<file><path>media/x.png</path>`
+				// — no `<name>`, no `<clip>` — so without this every still looked like an empty layer and
+				// reconcile cleared the persisted live look after each node restart.
+				if (!fgClip && Array.isArray(f.path) && f.path.length) fgClip = mediaPathToClipId(f.path[0])
 			}
 			out[layerIdx] = fgClip || ''
 		}
