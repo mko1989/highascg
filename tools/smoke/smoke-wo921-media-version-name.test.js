@@ -135,4 +135,17 @@ describe('WO-921 a new version takes its own name', () => {
 		const { project: p } = rewriteProjectMediaRefs(proj, 'demo', [{ from: OLD, to: NEW }], {})
 		assert.deepEqual(p.scenes.scenes.map((s) => s.name), ['intro_v3', 'Opener', 'intro_v3.mov'])
 	})
+
+	it('the on-air look snapshot follows, so the next take flips a playable look onto PRV', async () => {
+		const live = require('../../src/state/live-scene-state') // node:test → temp persistence file
+		const scene = { id: 's1', name: 'intro_v2', layers: [{ layer: 10, source: { type: 'media', value: OLD } }] }
+		await live.setChannel(2, { sceneId: 's1', scene, updatedAt: 123 })
+		const sent = []
+		const n = await links.applyRenamesToLiveLooks({ config: {}, _wsBroadcast: (t, d) => sent.push(d.path) }, null, [{ from: OLD, to: NEW }])
+		assert.equal(n, 1)
+		const e = live.getChannel(2)
+		assert.deepEqual([e.scene.layers[0].source.value, e.scene.name, e.updatedAt], [NEW, 'intro_v3', 123])
+		assert.ok(sent.includes('scene.live'), 'clients hear the new snapshot')
+		await live.clearChannel(2)
+	})
 })

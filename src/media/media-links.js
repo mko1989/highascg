@@ -6,6 +6,8 @@
  * - applyRenamesToProjects: rewrites references in EVERY project. The active one goes through
  *   persistProject + project_sync (clients import it); the rest are rewritten on disk
  *   (project file + its autosave).
+ *   The live PGM/PRV look snapshots (scene.live) follow too (WO-921): the next take flips the on-air
+ *   look back onto PRV FROM its snapshot, and a stale path there was a 404 LOADBG.
  * - scheduleMediaReconcile: after each media rescan, re-link files renamed outside the UI.
  */
 'use strict'
@@ -96,7 +98,23 @@ async function applyRenamesToProjects(ctx, renames) {
 		}
 		if (touched) projects++
 	}
+	await applyRenamesToLiveLooks(ctx, active, renames)
 	return { projects, refs }
+}
+
+/** WO-921: rewrite the looks in scene.live (what each PGM/PRV channel shows) — Caspar keeps playing the open file. */
+async function applyRenamesToLiveLooks(ctx, slug, renames) {
+	const live = require('../state/live-scene-state')
+	let n = 0
+	for (const [ch, e] of Object.entries(live.getAll())) {
+		if (!e?.scene || typeof e.scene !== 'object') continue
+		const r = rewriteProjectMediaRefs({ scenes: { scenes: [e.scene] } }, slug, renames, ctx.config)
+		if (!r.changed) continue
+		await live.setChannel(ch, { ...e, scene: r.project.scenes.scenes[0] })
+		n++
+	}
+	if (n) live.broadcastSceneLive(ctx)
+	return n
 }
 
 /**
@@ -199,6 +217,7 @@ function findMediaUsage(ctx, filePath) {
 module.exports = {
 	renameMediaFiles,
 	applyRenamesToProjects,
+	applyRenamesToLiveLooks,
 	followMediaMoves,
 	scheduleMediaReconcile,
 	findMediaUsage,

@@ -82,11 +82,17 @@ Parents: [WO-592](./592_WO_media_library_links_versions_inspector.md) B (version
   - The facts line said "0.0 MB" for a 23 kB file; under 1 MiB it now shows kB.
 - **Purge confirm** names the file: "Delete version v3 (intro_v4.mp4) permanently?". This is
   `media_versions_model.gd purge_text` in Godot and the `data-name` attribute in the web client.
+- **The next TAKE after a version failed its PGM→PRV exchange.** A take flips the look that was on air back onto PRV
+  from its `scene.live` snapshot (`routes-scene-take.js` `previousPgmScene`). The snapshot still held the old path,
+  so the journal showed `cmd="LOADBG 3-10 _WO921/INTRO_V2 …" reply="404 LOADBG FAILED"` and the GUI showed "TAKE ⚠ 1
+  command(s) failed". `media-links.js applyRenamesToProjects` now also runs `applyRenamesToLiveLooks`, which rewrites
+  every `scene.live` channel's look (path and look name, with `updatedAt` kept) and broadcasts `scene.live`. Caspar
+  keeps playing the open file, so only the snapshot changes. Renames get the same fix.
 
 ## What was verified
 
-- **Offline suite:** `node tools/ci/run-offline-tests.js` passed 5205, failed 0.
-  - `smoke-wo921-media-version-name.test.js` has 8 tests, among them a real multipart POST through
+- **Offline suite:** `node tools/ci/run-offline-tests.js` passed 5206, failed 0.
+  - `smoke-wo921-media-version-name.test.js` has 9 tests (the 9th: the on-air snapshot follows), among them a real multipart POST through
     `handleVersionUpload`, a 409 on a name clash, Go back to the old name, a pre-WO-921 version, and look-name follow.
 - **Godot suite:** 25745 passed, 0 failed. `test_media_versions_wo921.gd` covers the confirm text, the row names, the
   purge text and the PRV restage on a media change only.
@@ -113,5 +119,11 @@ Parents: [WO-592](./592_WO_media_library_links_versions_inspector.md) B (version
      - "Used in" showed both looks within a second of the drop.
      - Go back v1 turned the look back into "intro_v2". The journal shows `[scene-take] preview-only path prv=3`
        right after the restore, and the editor frame showed blue "VERSION 2" under "L10 intro_v2.mov".
+  6. The take exchange, after the scene.live fix and a server restart:
+     - I took Look 1 and uploaded intro_v3.mov (`new version v5 as _wo921/intro_v3.mov`).
+     - Taking look "intro_v3" gave `pgm->prv exchange done prvCh=3` with no failed command.
+     - Caspar `INFO 2-10` and `INFO 3-10` both show `_WO921/INTRO_V3`.
+     - The one 404 just before it, at 12:59:19 (`LOADBG 3-10 _WO921/INTRO_V4`), came from a snapshot written before
+       the fix.
 - **Not covered:** a clip on air during the upload keeps playing the old file until the next take (by design,
   above). The header's on-air strip honestly names the file that is actually playing.
