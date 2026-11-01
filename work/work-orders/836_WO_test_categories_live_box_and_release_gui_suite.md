@@ -86,7 +86,8 @@ The sweep's `smoke-private-volume-sync` finding on `getMachineId` was also real:
 - Full offline suite (`node tools/ci/run-offline-tests.js`, once): see the result block appended below.
 
 ### Broken uncurated smokes (reported, not added)
-`smoke-amcp-basic-plan-log.js` (casparcg-connection `_invokeTyped` drift), `smoke-amcp-command-plan.js` (tween case, plan diff), `smoke-caspar-cls-id.test.js` (7 cases need untracked `media/projects/tetst`), `smoke-decklink-output-resolve.js` (4 stale XML pins), `smoke-device-graph-output-mapping.js` (live-config fixtures), `smoke-live-thumbnail-api.js` (502 vs 400/503), `smoke-mapping-gpu-os-layout-2.js` (`<pixel-format>yuv`), `smoke-wo173-clip-start-batch.test.js` (TimelineEngine API drift), `smoke-wo47-manifest.mjs` (stale pin).
+**Fixed and curated 01.11.26:** `smoke-caspar-cls-id.test.js` (7 failing cases now build their `media/projects/<slug>/` tree in a temp `local_media_path`; 17/17 pass) and `smoke-wo173-clip-start-batch.test.js` (the PLAY pin now expects the CLS id `"TEST"`; 1/1 pass) are in `tools/ci/offline-test-files-3.js`. Still broken:
+`smoke-amcp-basic-plan-log.js` (casparcg-connection `_invokeTyped` drift), `smoke-amcp-command-plan.js` (tween case, plan diff), `smoke-decklink-output-resolve.js` (4 stale XML pins), `smoke-device-graph-output-mapping.js` (live-config fixtures), `smoke-live-thumbnail-api.js` (502 vs 400/503), `smoke-mapping-gpu-os-layout-2.js` (`<pixel-format>yuv`), `smoke-wo47-manifest.mjs` (stale pin).
 
 ### Full offline suite (run once, after all edits)
 `node tools/ci/run-offline-tests.js` -> 708 files, 4491 tests, 4485 pass, 1 fail, 5 skipped, 64 s. The one failure,

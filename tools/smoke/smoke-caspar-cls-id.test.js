@@ -2,12 +2,32 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
 const {
 	toCasparClsMediaId,
 	resolveCasparCinfMediaId,
 	resolveClipForAmcpLoad,
 	stripMediaFileExtension,
 } = require('../../src/media/caspar-cls-id')
+
+// Hermetic media tree (was an untracked media/projects/tetst on one machine): a temp local_media_path the tests
+// point config at. Files are empty — the resolver only stats them.
+const MEDIA_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'highascg-cls-id-'))
+for (const rel of [
+	'3825579625-preview.mp4',
+	'projects/untitled777/252166.mp4',
+	'projects/untitled888/MAIN SCREEN.png',
+	'projects/tetst/02_BUMPER.mp4',
+	'projects/tetst/Fidelity Brand Film - PL.mp4',
+	'projects/noc_foto/rynek/06_AGA_3.mov',
+]) {
+	const abs = path.join(MEDIA_ROOT, ...rel.split('/'))
+	fs.mkdirSync(path.dirname(abs), { recursive: true })
+	fs.writeFileSync(abs, '')
+}
+test.after(() => fs.rmSync(MEDIA_ROOT, { recursive: true, force: true }))
 
 test('toCasparClsMediaId: lowercase path + extension → uppercase CLS id', () => {
 	assert.equal(toCasparClsMediaId('bridge/exfat/MAIN SCREEN.png'), 'BRIDGE/EXFAT/MAIN SCREEN')
@@ -40,7 +60,7 @@ test('resolveCasparCinfMediaId: templates and routes pass through', () => {
 
 test('resolveClipForAmcpLoad: project basename expands to CLS id', () => {
 	const ctx = {
-		config: { projectScopedMedia: { enabled: true } },
+		config: { projectScopedMedia: { enabled: true }, local_media_path: MEDIA_ROOT },
 		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'untitled777' : null) },
 	}
 	assert.equal(resolveClipForAmcpLoad('252166.mp4', ctx), 'PROJECTS/UNTITLED777/252166')
@@ -50,7 +70,7 @@ test('resolveClipForAmcpLoad: basename at media root stays root CLS id when not 
 	const ctx = {
 		config: {
 			projectScopedMedia: { enabled: true },
-			local_media_path: require('path').join(__dirname, '../../media'),
+			local_media_path: MEDIA_ROOT,
 		},
 		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'no_such_project_folder' : null) },
 	}
@@ -60,7 +80,7 @@ test('resolveClipForAmcpLoad: basename at media root stays root CLS id when not 
 test('resolveClipForAmcpLoad: prefers CLS catalog row when clip is not in active project folder', () => {
 	const ctx = {
 		CHOICES_MEDIAFILES: [{ id: 'PROJECTS/EVENING/CLIP', label: 'PROJECTS/EVENING/CLIP' }],
-		config: { projectScopedMedia: { enabled: true } },
+		config: { projectScopedMedia: { enabled: true }, local_media_path: MEDIA_ROOT },
 		persistence: { get: () => 'untitled777' },
 	}
 	assert.equal(resolveClipForAmcpLoad('clip.mov', ctx), 'PROJECTS/EVENING/CLIP')
@@ -71,7 +91,7 @@ test('resolveClipForAmcpLoad: active project folder wins over CLS basename match
 		CHOICES_MEDIAFILES: [{ id: 'BRIDGE/FIDELITY BRAND FILM - PL', label: 'BRIDGE/FIDELITY BRAND FILM - PL' }],
 		config: {
 			projectScopedMedia: { enabled: true },
-			local_media_path: require('path').join(__dirname, '../../media'),
+			local_media_path: MEDIA_ROOT,
 		},
 		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'tetst' : null) },
 	}
@@ -85,7 +105,7 @@ test('resolveClipForAmcpLoad: project clip stored in a subfolder still gets the 
 	const ctx = {
 		config: {
 			projectScopedMedia: { enabled: true },
-			local_media_path: require('path').join(__dirname, '../../media'),
+			local_media_path: MEDIA_ROOT,
 		},
 		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'noc_foto' : null) },
 	}
@@ -96,7 +116,7 @@ test('resolveClipForAmcpLoad: a stored ref already in resolved CLS form (upperca
 	const ctx = {
 		config: {
 			projectScopedMedia: { enabled: true },
-			local_media_path: require('path').join(__dirname, '../../media'),
+			local_media_path: MEDIA_ROOT,
 		},
 		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'noc_foto' : null) },
 	}
@@ -110,7 +130,7 @@ test('resolveClipForAmcpLoad: project basename without extension expands to CLS 
 	const ctx = {
 		config: {
 			projectScopedMedia: { enabled: true },
-			local_media_path: require('path').join(__dirname, '../../media'),
+			local_media_path: MEDIA_ROOT,
 		},
 		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'tetst' : null) },
 	}
@@ -120,7 +140,7 @@ test('resolveClipForAmcpLoad: project basename without extension expands to CLS 
 	test('resolveClipForAmcpLoad: CLS catalog basename match returns uppercase CLS id', () => {
 		const ctx = {
 			CHOICES_MEDIAFILES: [{ id: 'projects/tetst/02_BUMPER.mp4', label: 'projects/tetst/02_BUMPER.mp4' }],
-			config: { projectScopedMedia: { enabled: true } },
+			config: { projectScopedMedia: { enabled: true }, local_media_path: MEDIA_ROOT },
 			persistence: { get: () => 'other_project' },
 		}
 		assert.equal(resolveClipForAmcpLoad('02_BUMPER', ctx), 'PROJECTS/TETST/02_BUMPER')
@@ -130,7 +150,7 @@ test('resolveClipForAmcpLoad: project basename without extension expands to CLS 
 		const ctx = {
 			config: {
 				projectScopedMedia: { enabled: true },
-				local_media_path: require('path').join(__dirname, '../../media'),
+				local_media_path: MEDIA_ROOT,
 			},
 			persistence: { get: (k) => (k === 'web_project_active_slug' ? 'untitled' : null) },
 			CHOICES_MEDIAFILES: [],
@@ -145,7 +165,7 @@ test('normalizeClipPlayAmcpLine: expands project basename in PLAY', () => {
 	const ctx = {
 		config: {
 			projectScopedMedia: { enabled: true },
-			local_media_path: require('path').join(__dirname, '../../media'),
+			local_media_path: MEDIA_ROOT,
 		},
 		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'tetst' : null) },
 	}
@@ -155,7 +175,7 @@ test('normalizeClipPlayAmcpLine: expands project basename in PLAY', () => {
 
 test('normalizeClipPlayAmcpLine: expands quoted basename with extension in PLAY', () => {
 	const ctx = {
-		config: { projectScopedMedia: { enabled: true } },
+		config: { projectScopedMedia: { enabled: true }, local_media_path: MEDIA_ROOT },
 		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'untitled888' : null) },
 	}
 	const line = normalizeClipPlayAmcpLine('PLAY 2-10 "MAIN SCREEN.png"', ctx)

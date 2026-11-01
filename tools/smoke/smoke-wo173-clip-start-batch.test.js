@@ -87,8 +87,9 @@ function makeEngine() {
 		assert.ok(/STOP \d+-\d+/.test(stopLine), `STOP format should be "STOP ch-layer"; got: ${stopLine}`)
 
 		// Check PLAY
-		const playLine = lines.find((l) => l.startsWith('PLAY') && l.includes('test.mov'))
-		assert.ok(playLine, 'batch should contain PLAY with source')
+		// The source goes through resolveClipForAmcpLoad: 'test.mov' is sent as its CLS id ("TEST", uppercase, no extension).
+		const playLine = lines.find((l) => /^PLAY \d+-\d+ "TEST"/.test(l))
+		assert.ok(playLine, `batch should contain PLAY with source (CLS id "TEST"); got ${JSON.stringify(lines)}`)
 
 		// Check opacity init (MIXER OPACITY 0 0)
 		const opacityInitLine = lines.find((l) => l.includes('OPACITY') && l.endsWith(' 0'))
