@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-828 live WOs (28 open, 121 in progress, 679 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+831 live WOs (31 open, 121 in progress, 679 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -367,7 +367,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (115)
+## godot-client — Godot client (117)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -484,6 +484,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 913 DONE [godot-client] Visuals Controller: drop a visual on an APC40 pad → the pad loads it into PRV,… → 913_WO_visuals_apc_pads_load_visuals.md
 - 914 DONE [godot-client+engine] Visuals: a Caspar restart leaves the Send output dark until Send is toggled → 914_WO_visuals_resend_after_caspar_restart.md
 - 918 IN PROGRESS [godot-client+engine,devices-config,mapping] GUI test sweep 01.11: new / load / rename / file projects and screen destinatio… → 918_WO_gui_project_and_destination_test_sweep.md
+- 919 OPEN [godot-client+engine,devices-config,mapping] WO-918 follow-ups: the findings the 01.11 fix round left open → 919_WO_gui_sweep_followups.md
+- 920 OPEN [godot-client+devices-config,mapping] Operator GUI destination: a second output dot for the second operator monitor (… → 920_WO_operator_gui_second_monitor_dot.md
 
 ## web-client — Web client (82)
 
@@ -769,7 +771,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 830 DONE [network] LAN hardening: remote crash, injection, secrets (sweep §2, without the auth swi… → 830_WO_lan_hardening_crash_and_injection.md
 - 842 DONE [network+devices-config] Sweep: data loss, replication boot and server-side ops bugs → 842_WO_sweep_data_loss_and_server_ops.md
 
-## media — Media library, thumbnails, ingest, transcode (22)
+## media — Media library, thumbnails, ingest, transcode (23)
 
 - 29 DONE [media] USB Drive Media Ingest → 29_WO_USB_MEDIA_INGEST.md
 - 42 OPEN [media+web-client] Sources browser — live thumbnails (channel/layer, wait-for-play) + thumbnail/PR… → 42_WO_SOURCES_LIVE_THUMBNAILS_AND_MEDIA_THUMB_FOLDER.md
@@ -793,6 +795,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 775 DONE [media] media versions: a new version may change the container (previz .mp4 → show .mov) → 775_WO_media_version_container_change.md
 - 818 DONE [media] ⚠ warning mark next to NotchLC files in the media lists (Godot + web) → 818_WO_notchlc_warning_mark.md
 - 887 DONE [media+godot-client] Live-source thumbnails months old: capture once per session on a non-black fram… → 887_WO_live_thumbnails_once_per_session.md
+- 921 OPEN [media+godot-client] Media versions: the new version's file name replaces the old one in the media b… → 921_WO_media_version_takes_new_name.md
 
 ## tracking-vr — Tracking, previs, VR (30)
 
