@@ -34,6 +34,37 @@ describe('project-volume-sync catalog merge', () => {
 		fs.rmSync(dir, { recursive: true, force: true })
 	})
 
+	// WO-930: on a stick-booted box the stick's 10-day-old, larger new_project_1.json overwrote the newer local save
+	it('copyIfSrcNewer never overwrites a newer local file with an older, larger one', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hacg-vol-'))
+		const src = path.join(dir, 'stick.json')
+		const dst = path.join(dir, 'local.json')
+		fs.writeFileSync(src, JSON.stringify({ rev: 25, pad: 'x'.repeat(2000) }), 'utf8')
+		const old = Date.now() - 10 * 86400_000
+		fs.utimesSync(src, old / 1000, old / 1000)
+		fs.writeFileSync(dst, '{"rev":600}', 'utf8')
+		assert.equal(copyIfSrcNewer(src, dst), false)
+		assert.equal(fs.readFileSync(dst, 'utf8'), '{"rev":600}')
+		fs.rmSync(dir, { recursive: true, force: true })
+	})
+
+	it('copyIfSrcNewer: within the 2 s FAT mtime tie only a larger source wins', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hacg-vol-'))
+		const src = path.join(dir, 'stick.json')
+		const dst = path.join(dir, 'local.json')
+		const t = Date.now() / 1000
+		fs.writeFileSync(dst, '{"v":1}', 'utf8')
+		fs.utimesSync(dst, t, t)
+		fs.writeFileSync(src, '{"v":2}', 'utf8')
+		fs.utimesSync(src, t - 1, t - 1)
+		assert.equal(copyIfSrcNewer(src, dst), false, 'same size, 1 s apart: the same save')
+		fs.writeFileSync(src, '{"v":22}', 'utf8')
+		fs.utimesSync(src, t - 1, t - 1)
+		assert.equal(copyIfSrcNewer(src, dst), true, 'larger within the tie')
+		assert.equal(fs.readFileSync(dst, 'utf8'), '{"v":22}')
+		fs.rmSync(dir, { recursive: true, force: true })
+	})
+
 	it('keeps newest savedAt across sources', () => {
 		const merged = mergeProjectCatalogs([
 			[{ slug: 'show_b', name: 'Older', savedAt: '2026-06-01T09:00:00.000Z', path: '/bridge/projects/show_b.json', source: 'bridge' }],

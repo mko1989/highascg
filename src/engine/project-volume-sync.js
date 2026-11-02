@@ -283,8 +283,12 @@ function copyIfExists(src, dst) {
 	return true
 }
 
+/** FAT-family volumes keep mtimes to 2 s: closer than this the two copies count as the same save. */
+const MTIME_TIE_MS = 2000
+
 /**
- * Copy `src` → `dst` when source is newer than destination (or dest missing).
+ * Copy `src` → `dst` when source is newer than destination (or dest missing). Size only breaks an mtime tie:
+ * WO-930 — "or larger" alone let a stick's older, bigger project overwrite a newer local save on every read.
  * @returns {boolean}
  */
 function copyIfSrcNewer(src, dst) {
@@ -301,7 +305,11 @@ function copyIfSrcNewer(src, dst) {
 	} catch {
 		stDst = null
 	}
-	if (stDst && stDst.mtimeMs >= stSrc.mtimeMs && stDst.size >= stSrc.size) return false
+	if (stDst) {
+		const ahead = stSrc.mtimeMs - stDst.mtimeMs
+		if (ahead < -MTIME_TIE_MS) return false
+		if (ahead <= MTIME_TIE_MS && stDst.size >= stSrc.size) return false
+	}
 	fs.mkdirSync(path.dirname(dst), { recursive: true })
 	copyFilePreserveTimes(src, dst)
 	return true
