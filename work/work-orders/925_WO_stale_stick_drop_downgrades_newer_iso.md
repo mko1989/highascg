@@ -40,8 +40,7 @@ there." / "the launcher … showed up 2min after the client already started."
   `ALLOW_DOWNGRADE` still installs, for a deliberate rollback. Non-date stamps (package.json semver) compare as before
   (equality only).
 - `tools/smoke/smoke-server-update-retain.test.js`: older drop not applied (installed stamp + files untouched); a newer drop
-  applies; `ALLOW_DOWNGRADE` rolls back. The file was not in the curated list, but it runs the same script as the curated
-  WO-737 smoke, so it is now curated too (`tools/ci/offline-test-files.js`).
+  applies; `ALLOW_DOWNGRADE` rolls back. The file is already in the curated CI list (`offline-test-files-3.js`).
 - .31: the owner emptied the stick's `drop-update/` by hand (07:44, Thunar). Nothing on .31 was changed from here.
 
 ## What was verified

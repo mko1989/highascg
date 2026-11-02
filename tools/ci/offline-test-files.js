@@ -408,7 +408,6 @@ module.exports = [
 	'tools/smoke/smoke-wo734-show-timers.test.js',
 	'tools/smoke/smoke-wo736-ci-release.test.js',
 	'tools/smoke/smoke-wo737-update-keeps-box-config.test.js',
-	'tools/smoke/smoke-server-update-retain.test.js',
 	'tools/smoke/smoke-wo739-link-invites.test.js',
 	'tools/smoke/smoke-wo744-shm-sources.test.js',
 	'tools/smoke/smoke-wo722-confine-resync.test.js',
