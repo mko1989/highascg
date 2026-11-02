@@ -1,7 +1,7 @@
 # WO-929 — Two-box cluster run with .31 (master / follower / failover on real servers); the sweep's media check failed since WO-830b
 
 **Area:** network, testing-ci
-**Status: DONE (02.11.26 — live e2e 9/0, hand run of the sandbox-only steps on both boxes all green, sweep cluster 3/3 after the check fix; boxes unlinked again). Forwarded playout on .31's real Caspar NOT run: it needs a destination cabled on .31 (owner decision, below)**
+**Status: DONE (02.11.26 — live e2e 9/0, real master restart / failover / hand back / follower restart green, sweep cluster 3/3; follow-up round the same day: fan-out playout on both real Caspars within one frame, failover with content on air, follower PGM skip — found WO-930..933; both boxes restored)**
 
 Owner, 02.11.26: "push then run connection tests between servers. master follower backup etc."
 
@@ -81,3 +81,62 @@ Owner, 02.11.26: "push then run connection tests between servers. master followe
   - a cable on .31, which regenerates .31's Caspar config.
   This round was proven on the same hardware as .4 in WO-772 (playheads within 0.04 s). Owner decision whether to run it
   again on .31.
+
+## Follow-up round, 02.11.26: playout through the fan-out on both real Caspars
+
+Owner: "You can do what's needed on both servers, they are in dev mode. I need you to run tests on both servers".
+
+Setup:
+- Linked at epoch 7 (this box master, auto failover), shared show on.
+- Destination "WO929 PGM" (pgm_prv, 1080p5000) added in the shared show. Channel map PGM 2 / PRV 3 on both boxes.
+- On .31 it is cabled to `gpu_p0`. DP-0 is unplugged, so the screen consumer sits at x=1920, off its single 1920-wide X
+  screen, and the operator GUI on HDMI-0 stays clear.
+- Caspar config applied on both: 3 channels at 1080p5000.
+- Send media: 2 paths. A look with `projects/airport/8. Tło Bankietowe - Wolniejszy Glow.mp4` on PGM.
+- Playheads read with simultaneous `INFO 2-110` on both Caspars (scratchpad `playheads.js`, Δ corrected for reply skew).
+
+| step | result |
+|---|---|
+| take on the master | fan-out 11 lines; same clip on ch2 of both; **Δ median 0.001 s, spread 0.021 s** (one frame) |
+| .31 Caspar `RESTART` | catch-up 8 lines within 1 s; clip back, but from frame 0 (Δ 35.6 s) — documented WO-670 limit |
+| failover with content on air (this box's node `SIGSTOP` 30 s) | .31 master at epoch 8 after 9.6 s; both Caspars PLAYING throughout; this box steps down in 0.2 s on `SIGCONT`; Δ 0.002 s after |
+| .31 as master | its fan-out reaches this box's Caspar; "no shared destination is cabled there" (correct: not cabled here) |
+| hand back | epoch 9 at once on both |
+| take sent to the follower (.31) | first failed `Cannot find module …/client/lib/…` → **WO-931**; after the fix `ok`, `skip local PGM AMCP ch=2 (leader fan-out drives air)`, .31's ch2 untouched (Δ 0.001 s) |
+| .31 node restart / hand back | the master replays its journal to .31's Caspar, which never stopped: clips jump to frame 0 → **WO-933** (OPEN) |
+| this box's node restart | journal empty after restart (0 lines replayed), .31 stays in sync |
+
+Found on the way:
+- **WO-930**: on stick-booted .31 the shared show's committed project (rev 600) was replaced within 0.1 s by the stick's
+  23.10 copy (rev 25). `copyIfSrcNewer`'s "or larger" clause caused it. Fixed, and the fix is copied onto .31.
+- **WO-931**: ISO installs had no `client/lib`. Every take through the API failed.
+- **WO-932**: sweeps on both boxes:
+  - this box: 26 pass / 3 warn / 1 fail;
+  - .31: 25 pass / 3 warn / 1 fail / 1 skip after the fix;
+  - fixed: 7 failed snap mount units on every clone, and the require check on ISO installs.
+  - The remaining fail on both boxes is the test project's stale DeckLink tiles plus the WO-869 probe's logged 403.
+- Spurious `diverged` backups on the follower: recorded in WO-930, not diagnosed.
+
+Restore (all verified afterwards):
+- shared show off, unlinked: 0 peers and epoch 0 on both;
+- this box: the 09:30 backup's `.highascg-state.json`, `device_graph.json`, `screen_destinations.json`, `casparcg.config`
+  and `new_project_1` restored. Caspar back on 720p5000 + screen (its pre-round state, including the pre-existing
+  mismatch with the project); X layout unchanged.
+- .31:
+  - my cleanup first loaded "mhp harder" **with** `applyHardware`. That replaced .31's live rig with the rig stored in the
+    show (3 destinations, cables to `dlsdi_4`, `gpu_p0/2/3`) and re-saved the show (rev 599, .31 fingerprint, a
+    180 KB pixel-mapping proposal).
+  - Undone:
+    - the six config slices written back from the pre-round API backup (`settings.json`: casparServer, audioRouting,
+      audioOutputs, screenDestinations, deviceGraph; `screen_count` / `screen_n_os_rate` in general.json);
+    - the show from `projects/_cluster/mhp_harder.before-share-20261102T085603.json` (rev 597, byte for byte);
+    - `casparcg.config` from the pre-round copy;
+    - a plain load to restore the WO-821 hold; node and Caspar restarted.
+  - Result: Operator GUI → `gpu_p1` only, 1 channel at 1080p5000, `aligned: true`, X on HDMI-0.
+  - The replaced files are kept in .31's `~/wo929-restore/undo/`.
+- Left on .31, which is a live ISO and loses everything below at its next boot except the stick:
+  - the WO-930 `project-volume-sync.js` and WO-931 `client/lib` + `client/package.json` + `client/fixtures`;
+  - `tools/sweep` and `replication-check.js` at HEAD.
+- **On .31's stick (persists):** `projects/new_project_1.json` + autosave now hold the test show. The stick's previous
+  copy (rev 25, a 23.10 snapshot of this box's "New project 1") is gone: the WO-930 bug replaced the local copy with it,
+  and the shared show then pushed over it. This box's own "New project 1" is unaffected (09:30 backup restored).
