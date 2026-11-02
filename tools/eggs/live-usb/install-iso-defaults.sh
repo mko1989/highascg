@@ -84,4 +84,11 @@ else
 	echo "==> HIGHASCG_ISO_BUILD_WEB=0 — no dist-web on squashfs (use drop-update/ on exFAT for UI)"
 fi
 
+# WO-926: the 01.11 ISO's server exited at boot (jszip came only via an optional dependency). Start the pruned tree.
+echo "==> Start the server on the production node_modules (hermetic sandbox)"
+run_as_caspar 'node tools/eggs/live-usb/verify-production-boot.js' || {
+	echo "ERROR: the server does not start on the ISO's node_modules — not building a dead ISO" >&2
+	exit 1
+}
+
 echo "==> ISO embed server ready under ${HIGHASCG_ROOT} (package.json + node_modules present)"

@@ -53,3 +53,13 @@ describe('WO-926 runtime dependencies', () => {
 		assert.ok(pkg.dependencies?.jszip, 'jszip must not ride on optional exceljs')
 	})
 })
+
+describe('WO-926 ISO build gate', () => {
+	it('install-iso-defaults.sh starts the pruned server before the ISO is produced', () => {
+		const sh = fs.readFileSync(path.join(REPO, 'tools/eggs/live-usb/install-iso-defaults.sh'), 'utf8')
+		const prune = sh.indexOf('npm prune --omit=dev --omit=optional')
+		const gate = sh.indexOf("run_as_caspar 'node tools/eggs/live-usb/verify-production-boot.js' || {")
+		assert.ok(prune > 0 && gate > prune, 'the boot check runs after the prune')
+		assert.match(fs.readFileSync(path.join(REPO, 'tools/eggs/live-usb/verify-production-boot.js'), 'utf8'), /startSandbox\(/)
+	})
+})
