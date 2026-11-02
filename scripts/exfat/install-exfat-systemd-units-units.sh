@@ -20,6 +20,16 @@ Options=defaults,uid=${UIDN},gid=${GIDN},umask=002,nofail,x-systemd.device-timeo
 WantedBy=multi-user.target
 BRIDGEEOF
 
+# WO-928: x-systemd.device-timeout above is ignored in a unit file (fstab only), so on a box without the bridge disk
+# the enabled mount waited systemd's default 90 s for HIGHASCGDAT — and decklink-install → exfat-sync → highascg are
+# After= it. This drop-in is what fstab-generator writes for that option; highascg-bridge-boot still mounts a late disk.
+bridge_dev_dropin='/etc/systemd/system/dev-disk-by\x2dlabel-HIGHASCGDAT.device.d'
+mkdir -p "$bridge_dev_dropin"
+cat > "${bridge_dev_dropin}/highascg-timeout.conf" <<'BRIDGEDEVEOF'
+[Unit]
+JobRunningTimeoutSec=5
+BRIDGEDEVEOF
+
 cat > "/etc/systemd/system/${bridge_prep_svc}" <<BRIDGEPREPEOF
 [Unit]
 Description=Ensure bridge volume exposes media/ (WO-52)

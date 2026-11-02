@@ -241,4 +241,5 @@ module.exports = [
 	'tools/smoke/smoke-wo881-cef-health-node.test.js',
 	'tools/smoke/smoke-wo919-gui-sweep-followups.test.js',
 	'tools/smoke/smoke-wo926-runtime-deps-declared.test.js',
+	'tools/smoke/smoke-wo928-bridge-device-timeout.test.js',
 ]

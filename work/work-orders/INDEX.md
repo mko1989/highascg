@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-837 live WOs (28 open, 121 in progress, 688 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+838 live WOs (28 open, 121 in progress, 689 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -654,7 +654,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (76)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (77)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -732,6 +732,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 925 DONE [os-iso] A stale drop-update/ on the stick downgraded the 01.11 ISO on every boot (no Ca… → 925_WO_stale_stick_drop_downgrades_newer_iso.md
 - 926 DONE [os-iso+process] The 01.11 ISO's server never started (jszip only via an optional dependency); I… → 926_WO_iso_node_dead_jszip_and_build_gate.md
 - 927 DONE [os-iso+tracking-vr] ISOs ship the server's previs module again (Godot Previs tab needs /api/previs/… → 927_WO_iso_ships_previs.md
+- 928 DONE [os-iso] Clone boots held node ~75 s waiting for a bridge disk (HIGHASCGDAT) the machine… → 928_WO_iso_boot_waits_90s_for_missing_bridge_disk.md
 
 ## network — Cluster, replication, Tailscale, auth (39)
 
