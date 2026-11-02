@@ -20,9 +20,28 @@ usr/src/blackmagic-*
 opt/nvidia-pool
 opt/nvidia-pool/*
 
-# Browser UI sources (Vite build inputs — not served on playout; dist-web/ is baked on ISO)
-home/casparcg/highascg/client
-home/casparcg/highascg/client/*
+# Browser UI sources (Vite build inputs — not served on playout; dist-web/ is baked on ISO).
+# WO-931: client/lib, client/package.json ("type": "module") and client/fixtures SHIP — the server imports them at
+# runtime (look takes, new layer, lower thirds…; releases carry them since WO-737). A blanket client/ exclude broke
+# every take on ISO installs. mksquashfs has no negation, so the rest is listed child by child.
+home/casparcg/highascg/client/README.md
+home/casparcg/highascg/client/app.js
+home/casparcg/highascg/client/*.html
+home/casparcg/highascg/client/*.css
+home/casparcg/highascg/client/assets
+home/casparcg/highascg/client/assets/*
+home/casparcg/highascg/client/assets-source
+home/casparcg/highascg/client/assets-source/*
+home/casparcg/highascg/client/components
+home/casparcg/highascg/client/components/*
+home/casparcg/highascg/client/fonts
+home/casparcg/highascg/client/fonts/*
+home/casparcg/highascg/client/node_modules
+home/casparcg/highascg/client/node_modules/*
+home/casparcg/highascg/client/styles
+home/casparcg/highascg/client/styles/*
+home/casparcg/highascg/client/tools
+home/casparcg/highascg/client/tools/*
 home/casparcg/highascg/deprecated
 home/casparcg/highascg/deprecated/*
 
@@ -222,6 +241,13 @@ snap/tailscale
 snap/tailscale/*
 root/snap/tailscale
 root/snap/tailscale/*
+# WO-932: eggs drops the snaps themselves (stock-custom list: var/lib/snapd/, snap/), not their systemd units, so every
+# clone booted with 7 failed snap-*.mount units ("special device …/core24_2124.snap does not exist") and a dead
+# snap tailscaled next to the deb one. The units go with the payload.
+etc/systemd/system/snap-*.mount
+etc/systemd/system/*.wants/snap-*.mount
+etc/systemd/system/snap.*.service
+etc/systemd/system/*.wants/snap.*.service
 
 # Remote-access / meeting / sync IDENTITY & LOGIN data — never ship (todos19.07.26).
 # NoMachine excluded FULLY (binaries + config + user state), same policy as Zoom (WO-142).

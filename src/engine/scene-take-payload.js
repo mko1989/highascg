@@ -28,7 +28,13 @@ function loadClientHelpers() {
 	if (!helpersPromise) {
 		helpersPromise = Promise.all(
 			CLIENT_LIB.map((n) => import(pathToFileURL(path.join(REPO_ROOT, 'client', 'lib', `${n}.js`)).href)),
-		).then(([lt, pip, vol, tr]) => ({ lt, pip, vol, tr }))
+		).then(
+			([lt, pip, vol, tr]) => ({ lt, pip, vol, tr }),
+			(e) => {
+				helpersPromise = null // WO-931: a failed import must not poison every later take until a restart
+				throw e
+			},
+		)
 	}
 	return helpersPromise
 }

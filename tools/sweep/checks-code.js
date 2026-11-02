@@ -92,6 +92,9 @@ module.exports = [
 		id: 'code.require-integrity',
 		name: 'every require() in the tree resolves',
 		async run() {
+			// ISO installs ship tools/sweep but not tools/ci (dev-only in the eggs embed list, WO-273); releases carry it
+			if (!fs.existsSync(path.join(REPO, 'tools/ci/check-require-integrity.js')))
+				return { status: 'skip', summary: 'tools/ci/check-require-integrity.js is not on this install (ISO)' }
 			const r = sh(process.execPath, ['tools/ci/check-require-integrity.js'], { timeoutMs: 120000 })
 			if (r.code === 0) return { status: 'pass', summary: 'all relative requires resolve' }
 			// the script also fails on conflict copies (their own check below) and stray .bak files

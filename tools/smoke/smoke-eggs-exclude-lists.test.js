@@ -296,6 +296,27 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 			])
 				assert.equal(excluded(pats, p), false, p)
 		})
+		it(`${name}: snap mount / service units stay off with the snaps eggs drops (WO-932: 7 failed units per clone)`, () => {
+			for (const p of [
+				'etc/systemd/system/snap-core24-2124.mount',
+				'etc/systemd/system/snapd.mounts.target.wants/snap-bare-5.mount',
+				'etc/systemd/system/multi-user.target.wants/snap-tailscale-169.mount',
+				'etc/systemd/system/snap.tailscale.tailscaled.service',
+				'etc/systemd/system/multi-user.target.wants/snap.tailscale.tailscaled.service',
+			])
+				assert.equal(excluded(pats, p), true, p)
+			for (const p of ['etc/systemd/system/highascg.service', 'etc/systemd/system/multi-user.target.wants/tailscaled.service'])
+				assert.equal(excluded(pats, p), false, p)
+		})
+		it(`${name}: the client/lib the server imports ships (WO-931); the rest of the browser sources do not`, () => {
+			if (name === 'fragment') return // that ISO takes its server, client/lib included, from the exFAT drop-update
+			// WO-931: the server imports client/lib at runtime; .31's 02.11 ISO had no client/ and every look take failed
+			const shipped = ['client/package.json', 'client/fixtures/global-border.txt']
+			for (const f of fs.readdirSync(path.join(REPO_ROOT, 'client/lib'))) shipped.push(`client/lib/${f}`)
+			for (const p of shipped) assert.equal(excluded(pats, `home/casparcg/highascg/${p}`), false, p)
+			for (const p of ['node_modules/x/index.js', 'assets/logo.png', 'components/scenes-shared.js', 'index.html', 'styles.css', 'app.js'])
+				assert.equal(excluded(pats, `home/casparcg/highascg/client/${p}`), true, p)
+		})
 		it(`${name}: WO-870 trim — MagicQ, other-OS Godot exports, build-only compilers and the kdump initrd go; the kernel's gcc stays`, () => {
 			for (const p of [
 				'opt/magicq/bin/mqqt',

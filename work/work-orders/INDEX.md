@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-840 live WOs (28 open, 121 in progress, 691 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+843 live WOs (29 open, 121 in progress, 693 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -655,7 +655,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (77)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (79)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -734,8 +734,10 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 926 DONE [os-iso+process] The 01.11 ISO's server never started (jszip only via an optional dependency); I… → 926_WO_iso_node_dead_jszip_and_build_gate.md
 - 927 DONE [os-iso+tracking-vr] ISOs ship the server's previs module again (Godot Previs tab needs /api/previs/… → 927_WO_iso_ships_previs.md
 - 928 DONE [os-iso] Clone boots held node ~75 s waiting for a bridge disk (HIGHASCGDAT) the machine… → 928_WO_iso_boot_waits_90s_for_missing_bridge_disk.md
+- 931 DONE [os-iso+engine] ISO installs have no client/lib: every look take through the API fails ("Cannot… → 931_WO_iso_drops_client_lib_takes_fail.md
+- 932 DONE [os-iso+testing-ci] Two-box sweep findings: every clone boots with 7 failed snap mount units; the s… → 932_WO_two_box_sweep_findings_iso_snap_units_require_check.md
 
-## network — Cluster, replication, Tailscale, auth (40)
+## network — Cluster, replication, Tailscale, auth (41)
 
 - 13 DONE [network+companion] Final Polish & Security Hardening → 13_WO_FINAL_POLISH_AND_HARDENING.md
 - 15 DONE [network+web-client] Client-Server Preshow Sync & Split Architecture → 15_WO_CLIENT_SERVER_SYNC.md
@@ -777,6 +779,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 830 DONE [network] LAN hardening: remote crash, injection, secrets (sweep §2, without the auth swi… → 830_WO_lan_hardening_crash_and_injection.md
 - 842 DONE [network+devices-config] Sweep: data loss, replication boot and server-side ops bugs → 842_WO_sweep_data_loss_and_server_ops.md
 - 929 DONE [network+testing-ci] Two-box cluster run with .31 (master / follower / failover on real servers); th… → 929_WO_two_box_cluster_run_dot31.md
+- 933 OPEN [network+engine] The cluster fan-out replays its air journal to a follower whose Caspar never st… → 933_WO_fanout_replays_to_follower_that_kept_playing.md
 
 ## media — Media library, thumbnails, ingest, transcode (24)
 

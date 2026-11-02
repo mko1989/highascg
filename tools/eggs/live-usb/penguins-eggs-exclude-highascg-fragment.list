@@ -242,6 +242,13 @@ snap/tailscale
 snap/tailscale/*
 root/snap/tailscale
 root/snap/tailscale/*
+# WO-932: eggs drops the snaps themselves (stock-custom list: var/lib/snapd/, snap/), not their systemd units, so every
+# clone booted with 7 failed snap-*.mount units ("special device …/core24_2124.snap does not exist") and a dead
+# snap tailscaled next to the deb one. The units go with the payload.
+etc/systemd/system/snap-*.mount
+etc/systemd/system/*.wants/snap-*.mount
+etc/systemd/system/snap.*.service
+etc/systemd/system/*.wants/snap.*.service
 
 # Zoom — dev/test tool on the build host only; MUST NOT ship on the ISO (WO-142 G1)
 opt/zoom
