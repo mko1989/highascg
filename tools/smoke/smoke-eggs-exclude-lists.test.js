@@ -308,6 +308,21 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 			for (const p of ['etc/systemd/system/highascg.service', 'etc/systemd/system/multi-user.target.wants/tailscaled.service'])
 				assert.equal(excluded(pats, p), false, p)
 		})
+		it(`${name}: the build host's NetworkManager profiles and screen layout stay off; the live netplan ships (WO-935)`, () => {
+			for (const p of [
+				'etc/netplan/90-NM-1f0c2a9e-7d3b-4c55-9a6e-2b8f1d4e6a10.yaml',
+				'etc/NetworkManager/system-connections/eno2.nmconnection',
+				'home/casparcg/.config/highascg/apply-layout.sh',
+				'home/casparcg/.config/highascg/caspar-env',
+			])
+				assert.equal(excluded(pats, p), true, p)
+			for (const p of [
+				'etc/netplan/01-live-networkd.yaml',
+				'etc/NetworkManager/NetworkManager.conf',
+				'home/casparcg/.config/highascg',
+			])
+				assert.equal(excluded(pats, p), false, p)
+		})
 		it(`${name}: the client/lib the server imports ships (WO-931); the rest of the browser sources do not`, () => {
 			if (name === 'fragment') return // that ISO takes its server, client/lib included, from the exFAT drop-update
 			// WO-931: the server imports client/lib at runtime; .31's 02.11 ISO had no client/ and every look take failed

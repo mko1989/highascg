@@ -180,6 +180,25 @@ else
 	ok "no home/casparcg/highascg/projects/${PROJECTS_TRASH_DIR} in squashfs"
 fi
 
+# WO-935 — the 02.11 ISO shipped the build host's shows (the reset ran while node + the bridge sync were live and they
+# were copied back) and its NetworkManager profiles (a static eno2, Wi-Fi PSKs) as /etc/netplan/90-NM-*.yaml.
+STARTER_SLUG="$(manifest_const STARTER_PROJECT_SLUG 'new_project_1')"
+set +o pipefail
+proj_leak="$("${UNSQ[@]}" -l "$SQ" home/casparcg/highascg/projects 2>/dev/null \
+	| grep -E '^squashfs-root/home/casparcg/highascg/projects/' \
+	| grep -vxE "squashfs-root/home/casparcg/highascg/projects/((_autosave/)?\\.gitkeep|_autosave(/${STARTER_SLUG}\\.json)?|${STARTER_SLUG}\\.json)" | head -3 | tr '\n' ' ')"
+set -o pipefail
+if [[ -n "$proj_leak" ]]; then
+	bad "build-host projects in squashfs: ${proj_leak//squashfs-root\//}— the ISO must ship only the starter ${STARTER_SLUG} (WO-935); the reset ran while node or the sync could write projects/ back"
+else
+	ok "projects/ holds only the starter ${STARTER_SLUG}"
+fi
+if squash_grep_list '^squashfs-root/etc/(netplan/90-NM-|NetworkManager/system-connections/.)' etc; then
+	bad "build-host network profiles in squashfs (etc/netplan/90-NM-* or NetworkManager/system-connections) — static IPs and Wi-Fi passwords leaked (WO-935); run install-eggs-config.sh --apply"
+else
+	ok "no build-host NetworkManager profiles in squashfs"
+fi
+
 # 22.10: a backup of the previous ISO in ~/iso-backup rode into the squashfs (+3.2 GB).
 # config/casparcg.config.iso is a Caspar config, not a disk image.
 set +o pipefail

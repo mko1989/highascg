@@ -119,8 +119,8 @@ ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf 2>/dev/null || tru
 echo "==> Hostname for ISO naming (${BASENAME})"
 hostnamectl set-hostname "${BASENAME}" 2>/dev/null || hostname "${BASENAME}"
 
-echo "==> Factory operator config (not eggs build-host JSON / .env)"
-bash "${HERE}/reset-iso-operator-config.sh"
+echo "==> Clear the build host's stick copy of its settings (while the stick is mounted)"
+HIGHASCG_RESET_PART=stick bash "${HERE}/reset-iso-operator-config.sh"
 
 echo "==> Clone host audit (swap, nvidia-pool, excludes, branding)"
 bash "${HERE}/audit-eggs-clone-host.sh"
@@ -134,6 +134,29 @@ else
 fi
 
 bash "${HERE}/pre-produce-preflight.sh"
+
+# WO-935: the factory reset of config/ + projects/ runs only now. Before the preflight, highascg and the bridge/USB
+# sync were live: the bridge pairs copied every build-host show back within 2 s of the reset (with their old mtimes)
+# and the 02.11 ISO shipped all 67. Syncthing pauses until the post-produce remount-sync has brought this host's own
+# data back, or it would send every reset file to the repo's peers.
+SYNCTHING_UNIT="syncthing@casparcg.service"
+SYNCTHING_PAUSED=0
+if systemctl is-active --quiet "$SYNCTHING_UNIT"; then
+	echo "==> Pause ${SYNCTHING_UNIT} for the produce"
+	systemctl stop "$SYNCTHING_UNIT"
+	SYNCTHING_PAUSED=1
+fi
+syncthing_left_paused() {
+	[[ "$SYNCTHING_PAUSED" == 1 ]] || return 0
+	echo "WARN: the build stopped before this host's config/ + projects/ came back from the bridge." >&2
+	echo "      They hold the factory reset now. Restore, then resume Syncthing (not before — peers would get the reset):" >&2
+	echo "        sudo bash ${REPO_ROOT}/tools/eggs/live-usb/unmask-exfat-systemd.sh" >&2
+	echo "        sudo bash ${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh casparcg" >&2
+	echo "        sudo systemctl start ${SYNCTHING_UNIT}" >&2
+}
+trap syncthing_left_paused EXIT
+echo "==> Factory operator config (not eggs build-host JSON / .env; highascg + volume sync stopped)"
+HIGHASCG_RESET_PART=tree bash "${HERE}/reset-iso-operator-config.sh"
 
 echo "==> Finalize GRUB splash + Plymouth initramfs (must run immediately before eggs produce)"
 bash "${HERE}/install-storage-drivers-for-iso.sh"
@@ -215,7 +238,9 @@ fi
 echo "==> Remount bridge/USB + config sync (eggs produce umounts volumes for squashfs)"
 bash "${HERE}/unmask-exfat-systemd.sh"
 systemctl reset-failed highascg-exfat-boot.service 2>/dev/null || true
+REMOUNT_SYNCED=1
 bash "${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" casparcg 2>/dev/null || {
+	REMOUNT_SYNCED=0
 	echo "WARN: remount/sync skipped — run: sudo bash ${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" >&2
 }
 
@@ -224,6 +249,12 @@ bash "${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" casparcg 2>/dev/null 
 # onto it (23.10: the build host ran the 1-channel factory config until the next Caspar restart).
 echo "==> Restart Caspar on the restored config"
 systemctl try-restart casparcg-server.service || echo "WARN: casparcg-server did not restart — sudo systemctl restart casparcg-server" >&2
+
+if [[ "$SYNCTHING_PAUSED" == 1 && "$REMOUNT_SYNCED" == 1 ]]; then
+	echo "==> Resume ${SYNCTHING_UNIT} (this host's own config/ + projects/ are back)"
+	systemctl start "$SYNCTHING_UNIT" || echo "WARN: ${SYNCTHING_UNIT} did not start — sudo systemctl start ${SYNCTHING_UNIT}" >&2
+	SYNCTHING_PAUSED=0
+fi
 
 # The squashfs step above stops companion.service; nothing started it again (22.10, Companion stayed down after a build).
 if systemctl is-enabled --quiet companion.service 2>/dev/null; then

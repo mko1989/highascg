@@ -248,6 +248,15 @@ etc/systemd/system/snap-*.mount
 etc/systemd/system/*.wants/snap-*.mount
 etc/systemd/system/snap.*.service
 etc/systemd/system/*.wants/snap.*.service
+# WO-935: the build host's NetworkManager profiles (HighAsCG network UI, `highascg-<iface>`) are netplan files: a static
+# eno2 2.0.0.13/8 and two Wi-Fi profiles with their passwords shipped in every ISO since 23.10. A clone starts on DHCP
+# (01-live-networkd.yaml, written by build-highascg-egg.sh, still ships).
+etc/netplan/90-NM-*
+etc/NetworkManager/system-connections/*
+# WO-935: the build host's screen layout (DP-0 mode/rate, written on Apply) and Caspar GL-sync env. A clone gets its
+# own on its first Apply; both are optional at session start (openbox autostart, run.sh).
+home/casparcg/.config/highascg/apply-layout.sh
+home/casparcg/.config/highascg/caspar-env
 
 # Remote-access / meeting / sync IDENTITY & LOGIN data — never ship (todos19.07.26).
 # NoMachine excluded FULLY (binaries + config + user state), same policy as Zoom (WO-142).
