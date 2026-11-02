@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-843 live WOs (28 open, 121 in progress, 694 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+844 live WOs (28 open, 121 in progress, 695 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -655,7 +655,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (79)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (80)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -736,6 +736,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 928 DONE [os-iso] Clone boots held node ~75 s waiting for a bridge disk (HIGHASCGDAT) the machine… → 928_WO_iso_boot_waits_90s_for_missing_bridge_disk.md
 - 931 DONE [os-iso+engine] ISO installs have no client/lib: every look take through the API fails ("Cannot… → 931_WO_iso_drops_client_lib_takes_fail.md
 - 932 DONE [os-iso+testing-ci] Two-box sweep findings: every clone boots with 7 failed snap mount units; the s… → 932_WO_two_box_sweep_findings_iso_snap_units_require_check.md
+- 934 DONE [os-iso+godot-client] The session autostart showed the operator GUI a minute before the start-up prom… → 934_WO_autostart_waits_for_node_and_start_up_answer.md
 
 ## network — Cluster, replication, Tailscale, auth (41)
 

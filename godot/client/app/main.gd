@@ -21,6 +21,9 @@ var boot_log := PackedStringArray()
 
 
 func _ready() -> void:
+	if Config.args.has("boot-launcher"):  # WO-934: the start-up prompts alone; run-client.sh starts the GUI after
+		add_child(preload("res://app/boot_launcher.gd").new())
+		return
 	theme = ThemeBuilder.build()
 	get_tree().root.theme = theme  # WO-608 R3: popups / tooltips / dialogs too — Rewir is the only font
 	if theme.default_font != null:
