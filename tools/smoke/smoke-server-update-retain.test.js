@@ -123,3 +123,34 @@ test('validation rejects drop missing dist-web', () => {
 		/validation failed|refusing/,
 	)
 })
+
+// WO-925: a Ventoy re-flash keeps the stick's exFAT — a 25.10 drop was merged over the 01.11 ISO on every boot.
+function applyOver(installedStamp, extra = () => {}) {
+	const root = fs.mkdtempSync(path.join(require('os').tmpdir(), 'ha-drop-'))
+	const drop = seedDrop(root)
+	extra(drop)
+	const dest = path.join(root, 'highascg')
+	fs.mkdirSync(dest, { recursive: true })
+	fs.writeFileSync(path.join(dest, 'BUILD_STAMP'), `${installedStamp}\n`)
+	fs.writeFileSync(path.join(dest, 'index.js'), '// installed\n')
+	const r = require('child_process').spawnSync(
+		APPLY,
+		['--source', drop, '--dest', dest, '--drop-update-root', drop, '--retain-drop', '--user', process.env.USER || 'nobody', '--excludes', EXCLUDES],
+		{ cwd: REPO, encoding: 'utf8', env: { ...process.env, HIGHASCG_SERVER_UPDATE_NPM_CI: '0', HIGHASCG_UPDATE_STAGING: path.join(root, '.staging') } },
+	)
+	assert.equal(r.status, 0, r.stderr)
+	const out = r.stdout + r.stderr
+	return { out, stamp: fs.readFileSync(path.join(dest, 'BUILD_STAMP'), 'utf8').trim(), index: fs.readFileSync(path.join(dest, 'index.js'), 'utf8') }
+}
+
+test('WO-925: a drop older than the installed code is not applied', () => {
+	const r = applyOver('2026-11-01_170159')
+	assert.match(r.out, /older than the installed 2026-11-01_170159 — not applied/)
+	assert.deepEqual([r.stamp, r.index], ['2026-11-01_170159', '// installed\n'])
+})
+
+test('WO-925: a newer drop still applies; ALLOW_DOWNGRADE rolls back on purpose', () => {
+	assert.equal(applyOver('2026-06-01_090000').stamp, '2026-06-28T120000Z')
+	const back = applyOver('2026-11-01_170159', (drop) => fs.writeFileSync(path.join(drop, 'ALLOW_DOWNGRADE'), ''))
+	assert.deepEqual([back.stamp, back.index], ['2026-06-28T120000Z', '// smoke\n'])
+})

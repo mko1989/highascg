@@ -153,6 +153,26 @@ stamp_unchanged_skip() {
 	[[ -n "$src_stamp" && -n "$dest_stamp" && "$src_stamp" == "$dest_stamp" && -f "${dest}/dist-web/index.html" && -x "${dest}/bin/casparcg" ]]
 }
 
+# WO-925: stamps are UTC date+time in two spellings (release 2026-10-25T080500Z, ISO 2026-11-01_170159);
+# their first 14 digits compare as numbers. Anything else (a package.json semver) prints nothing.
+stamp_digits() {
+	local d
+	d="$(printf '%s' "$1" | tr -cd '0-9')"
+	[[ ${#d} -ge 14 ]] && printf '%s' "${d:0:14}"
+}
+
+# WO-925: a drop OLDER than the installed code is not an update. A Ventoy re-flash keeps the stick's exFAT, so a
+# 25.10 drop was merged over a 01.11 ISO on every boot (half-old tree: run.sh called functions its old lib lacked,
+# Caspar never started). ALLOW_DOWNGRADE in the drop folder installs it anyway (a deliberate rollback).
+stamp_older_skip() {
+	local src="$1" dest="$2"
+	local s d
+	[[ -e "${src}/ALLOW_DOWNGRADE" ]] && return 1
+	s="$(stamp_digits "$(read_build_stamp "$src" 2>/dev/null || true)")"
+	d="$(stamp_digits "$(read_build_stamp "$dest" 2>/dev/null || true)")"
+	[[ -n "$s" && -n "$d" && "$s" < "$d" ]]
+}
+
 apply_server_drop() {
 	local src="$1" dest="$2" drop_root="$3" retain="$4" legacy="$5" user_name="$6" excludes="$7" dry_run="$8" archive_copy="$9"
 
@@ -179,6 +199,11 @@ apply_server_drop() {
 			date -u +%Y-%m-%dT%H:%M:%SZ >"${drop_root}/.applied-at" 2>/dev/null || true
 			chown "${user_name}:${grp}" "${drop_root}/.applied-stamp" "${drop_root}/.applied-at" 2>/dev/null || true
 		fi
+		return 0
+	fi
+
+	if stamp_older_skip "$src" "$dest"; then
+		log "drop ${src_stamp} is older than the installed $(read_build_stamp "$dest" 2>/dev/null) — not applied (touch ${src}/ALLOW_DOWNGRADE to roll back on purpose)"
 		return 0
 	fi
 
