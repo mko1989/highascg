@@ -19,10 +19,17 @@
  * P4b catch-up: everything this server sends is also kept in an air journal (cluster-air-journal.js). When a server's
  * Caspar connects (first time or again) or a destination gets newly cabled there, the journal of those channels is
  * replayed to it, translated, before any new line.
+ *
+ * WO-933: a replay restarts every clip from its first frame, and a fresh target is not proof of a lost Caspar (a
+ * follower node restart, a link flap or a hand back re-create it while that Caspar kept playing). So catch-up first
+ * asks that Caspar (`deps.queryInfo`, cluster-peer-info.js): a channel already showing the journal's clips is only
+ * given the journal's MIXER lines (idempotent) and is marked synced; the others are replayed. New lines for a channel
+ * being checked are held and sent after the decision (a replay already carries them, the journal has them).
  */
 
 const { shouldFanOutCommand, parseAmcpCommandChannel } = require('../replication/amcp-fanout')
 const { createAirJournal } = require('./cluster-air-journal')
+const { channelOnAir } = require('./cluster-peer-info')
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1'])
 
@@ -96,10 +103,13 @@ function payloadLines(payload) {
  * @param {{ isMaster: () => boolean, pairEnabled: () => boolean, members: () => Array<{ id, host, name }>,
  *   peerView: (id: string) => Promise<object|null>, ownView: () => Promise<object|null>,
  *   connect: (host: string, port: number, onConnected: Function) => object, journal?: object, log?: Function,
- *   onChange?: Function }} deps
+ *   onChange?: Function, queryInfo?: (host: string, port: number, channels: number[]) => Promise<Map|null> }} deps
  */
 function createClusterFanout(deps) {
-	/** id → { id, host, port, conn, plan, sent, error, synced: Set<master channel>, caught_up } */
+	/**
+	 * id → { id, host, port, conn, plan, sent, error, synced: Set<master channel>, caught_up,
+	 *   checking: Set<master channel>, held: Map<master channel, line[]>, gen }
+	 */
 	const targets = new Map()
 	const journal = deps.journal || createAirJournal()
 	let active = false
@@ -156,8 +166,12 @@ function createClusterFanout(deps) {
 			if (!t || t.host !== host || t.port !== port) {
 				drop(m.id)
 				const fresh = { id: m.id, host, port, sent: 0, error: '', synced: new Set(), caught_up: null }
+				Object.assign(fresh, { checking: new Set(), held: new Map(), gen: 0 })
 				fresh.conn = deps.connect(host, port, () => {
+					fresh.gen += 1 // a check still in flight answers for the old connection
 					fresh.synced.clear()
+					fresh.checking.clear()
+					fresh.held.clear()
 					catchUp(fresh)
 				})
 				t = fresh
@@ -180,17 +194,73 @@ function createClusterFanout(deps) {
 		deps.onChange?.()
 	}
 
-	/** Replays what is on air on the channels that server has not been given yet. */
+	const live = (t) => active && targets.get(t.id) === t && !!t.plan && !!t.conn?.isConnected
+
+	/** Brings the channels that server has not been given yet up to what is on air (WO-933: checked first). */
 	function catchUp(t) {
-		if (!active || targets.get(t.id) !== t || !t.plan || !t.conn?.isConnected) return
-		const todo = [...t.plan.map.keys()].filter((ch) => !t.synced.has(ch))
+		if (!live(t)) return
+		const todo = [...t.plan.map.keys()].filter((ch) => !t.synced.has(ch) && !t.checking.has(ch))
 		if (!todo.length) return
-		const out = journal.replay(new Set(todo)).map((l) => rewriteLine(l, t.plan.map)).filter(Boolean)
+		if (deps.queryInfo) check(t, todo)
+		else replayTo(t, todo, [])
+	}
+
+	function sendLines(t, out) {
 		for (let i = 0; i < out.length; i += 50) t.conn.enqueueBatchLines(out.slice(i, i + 50))
-		for (const ch of todo) t.synced.add(ch)
 		t.sent += out.length
-		t.caught_up = { at: Date.now(), lines: out.length }
-		log('info', `${t.id}: caught up on channels ${todo.join(', ')} (${out.length} lines)`)
+	}
+
+	function replayTo(t, todo, kept) {
+		if (!todo.length && !kept.length) return
+		const out = journal.replay(new Set(todo)).map((l) => rewriteLine(l, t.plan.map)).filter(Boolean)
+		sendLines(t, out)
+		for (const ch of todo) t.synced.add(ch)
+		t.caught_up = { at: Date.now(), lines: out.length, kept }
+		const keptMsg = kept.length ? `; channels ${kept.join(', ')} already on air there, kept` : ''
+		if (todo.length) log('info', `${t.id}: caught up on channels ${todo.join(', ')} (${out.length} lines)${keptMsg}`)
+		else log('info', `${t.id}: channels ${kept.join(', ')} already on air there, kept (no replay)`)
+	}
+
+	/** WO-933: asks that Caspar what it shows; replays only the channels that differ from the journal. */
+	async function check(t, todo) {
+		const gen = t.gen
+		for (const ch of todo) {
+			t.checking.add(ch)
+			t.held.set(ch, [])
+		}
+		const before = new Map(todo.map((ch) => [ch, journal.replay(new Set([ch]))]))
+		let infos
+		try {
+			infos = await deps.queryInfo(t.host, t.port, todo.map((ch) => t.plan.map.get(ch)))
+		} catch {
+			infos = null
+		}
+		const verdicts = new Map()
+		for (const ch of todo) {
+			const xml = infos?.get(t.plan?.map.get(ch))
+			verdicts.set(ch, infos ? await channelOnAir(before.get(ch), ch, xml) : false)
+		}
+		if (t.gen !== gen) return // reconnected meanwhile: that connection's catch-up decides
+		const held = new Map(todo.map((ch) => [ch, t.held.get(ch) || []]))
+		for (const ch of todo) {
+			t.checking.delete(ch)
+			t.held.delete(ch)
+		}
+		if (!live(t)) return
+		const kept = todo.filter((ch) => t.plan.map.has(ch) && verdicts.get(ch))
+		const replay = todo.filter((ch) => t.plan.map.has(ch) && !verdicts.get(ch))
+		const out = []
+		for (const ch of kept) {
+			// the mixer may have moved while that server was not forwarded to; re-setting a value is invisible
+			for (const l of [...before.get(ch).filter((l) => /^MIXER\s/i.test(l)), ...held.get(ch)]) {
+				const r = rewriteLine(l, t.plan.map)
+				if (r) out.push(r)
+			}
+			t.synced.add(ch)
+		}
+		sendLines(t, out)
+		replayTo(t, replay, kept)
+		changed()
 	}
 
 	/**
@@ -213,7 +283,14 @@ function createClusterFanout(deps) {
 		for (const t of active ? targets.values() : []) {
 			if (!t.plan?.map.size || !t.conn?.isConnected) continue
 			catchUp(t) // the journal without these lines, so they land on the rebuilt state
-			const out = lines.map((l) => rewriteLine(l, t.plan.map)).filter(Boolean)
+			const out = []
+			for (const l of lines) {
+				const r = rewriteLine(l, t.plan.map)
+				if (!r) continue
+				const ch = parseAmcpCommandChannel(l)
+				if (t.checking.has(ch)) t.held.get(ch)?.push(l)
+				else out.push(r)
+			}
 			if (!out.length) continue
 			if (out.length === 1) t.conn.enqueueSend(out[0])
 			else t.conn.enqueueBatchLines(out)

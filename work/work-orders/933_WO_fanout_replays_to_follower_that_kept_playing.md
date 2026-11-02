@@ -1,7 +1,7 @@
 # WO-933 — The cluster fan-out replays its air journal to a follower whose Caspar never stopped: its clips jump back to frame 0
 
 **Area:** network, engine
-**Status: OPEN (02.11.26 — reproduced three ways on .9 + .31; design choice for the owner below)**
+**Status: DONE (02.11.26 — option 1 per owner; smoke 7/7, offline suite 5268/0, on .31's real Caspar a fresh target kept the clip running 5.40 → 6.90 s where the old path reset it 7.90 → 1.38 s)**
 
 ## Investigation
 
@@ -45,6 +45,64 @@ both Caspars (`median Δ`, corrected for reply skew).
 
 Persisting the journal across a master restart (row 5) is independent and can come with any of them.
 
+Owner, 02.11.26: "Do the recommendation fix on wo 933 then commit and push all" → option 1.
+
 ## What was done
 
-Nothing in code yet. This WO records the measurements and the cause.
+- **`src/cluster/cluster-peer-info.js`** (new):
+  - `queryChannels(host, port, channels)`: `INFO <ch>` for each channel on one short-lived AMCP connection, 2 s
+    timeout. The fan-out's own `PeerCasparConnection` is send-only and drains replies, so it cannot ask.
+    - Returns `null` when that Caspar does not answer, and `''` for a channel it refuses.
+  - `expectedLayers(lines, ch)`: what the journal's lines leave in each layer's foreground. It follows the clip of
+    `PLAY`/`LOAD`, `LOADBG` + bare `PLAY`, `STOP`, and marks a layer that holds a CG template.
+  - `channelOnAir(lines, ch, xml)`: true when every such layer shows it there.
+    - A file clip must match by name. It reuses `live-scene-reconcile.js` (`parseLayerFgClipsFromChannelXml`,
+      `pathsMatch`), the parser the reconcile after connect already trusts on this build.
+    - Any other source (`route://`, DECKLINK, `[HTML]`, colours) and CG only need a producer that is not `empty`.
+    - Layers the journal does not cover are not compared. A replay would not clear them either.
+- **`src/cluster/cluster-fanout.js`** `catchUp`, used when a Caspar connects, a destination is newly cabled, or on
+  `resync`:
+  - With `deps.queryInfo` it now runs `check()` first:
+    - **already on air:** the channel gets only the journal's `MIXER` lines and is marked synced. Re-sending a value
+      is invisible, and it covers mixer moves made while that server was not forwarded to.
+    - **differs, or no answer:** the channel is replayed as before. That covers a Caspar restart (empty layers, row 1)
+      and a server that missed a take while its node was down.
+  - A `send()` for a channel under check is held. After the decision the held lines follow the mixer lines (kept);
+    a replay already carries them, because they are in the journal.
+  - A reconnect during a check bumps `gen`, and the stale answer sends nothing.
+  - `caught_up` gains `kept: [channels]`, and the log says `channels N already on air there, kept (no replay)`.
+- **`src/api/routes-cluster.js`**: wires `queryInfo` to `queryChannels`.
+- Not done: row 1 (SEEK to the master's playhead after a real Caspar restart, option 2) and keeping the journal across
+  a master restart. Both are separate follow-ups.
+
+## What was VERIFIED
+
+- `tools/smoke/smoke-wo933-fanout-checks-before-replay.test.js` **7/7** (in `offline-test-files-2.js`):
+  - journal → layers;
+  - on-air match and mismatch (other clip, empty layer, refused INFO);
+  - `queryChannels` against a fake AMCP server (split replies, a `401`, a dead port → `null`);
+  - catch-up keeps a matching channel and replays the other;
+  - an empty or silent Caspar is replayed as before;
+  - held lines arrive once;
+  - a reconnect during the check discards the stale answer.
+- Existing fan-out smokes (`wo670-cluster-catchup`, `wo670-cluster-fanout`, `wo772-media-sent-resync`): 15/15
+  unchanged. Offline suite **5272 tests, 5268 pass, 0 fail**. eslint and the 500-line check clean.
+- Real INFO from this box's Caspar (a clip at opacity 0 on 1-199, cleared afterwards):
+  - the same clip → on air;
+  - another clip or an empty layer → replay;
+  - `route://` → on air;
+  - a non-existent channel → `''`;
+  - a dead port → `null`.
+- **On .31's real Caspar** with the real `createClusterFanout` + `PeerCasparConnection` + `queryChannels` (scratchpad
+  `wo933-dot31.js`; master ch1 → .31 ch1 layer 199 at opacity 0, cleared afterwards):
+
+  | target | playhead before → after (1.5 s) | sent |
+  |---|---|---|
+  | first connect, layer empty | — → 1.40 s | replay, 2 lines |
+  | **fresh target, with the check** (as after a node restart) | **5.40 → 6.90 s** | 1 mixer line, `kept: [1]` |
+  | fresh target, old path (no `queryInfo`) | 7.90 → **1.38 s** | replay, 2 lines |
+
+- Deployed to both nodes and restarted, so the fix is live. Both came back unlinked (0 peers, epoch 0).
+  - On .31 the files are hand-copied (live ISO): gone at its next boot until the next ISO build.
+- A full re-run of the two-box round (link, shared show, cable, node restart) was not repeated. The .31 test above
+  drives the same code path, a fresh target against a Caspar that kept playing.

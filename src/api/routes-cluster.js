@@ -176,6 +176,8 @@ function fanoutOf(ctx) {
 			c.connect(host, port)
 			return c
 		},
+		// WO-933: what that Caspar already shows, so a server that kept playing is not cut back to frame 0
+		queryInfo: (host, port, channels) => require('../cluster/cluster-peer-info').queryChannels(host, port, channels),
 		journal: airJournalOf(ctx),
 		log: ctx.log,
 		onChange: () => broadcast(ctx),
