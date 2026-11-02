@@ -246,4 +246,4 @@ function buildWifiStatus(deps = {}) {
 	}
 }
 
-module.exports = { isWifiIface, listNetworkInterfaces, buildWifiStatus, parseNetworkdOperator }
+module.exports = { isWifiIface, listNetworkInterfaces, buildWifiStatus }
