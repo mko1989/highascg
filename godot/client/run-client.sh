@@ -71,7 +71,14 @@ process.stdin.on("data", (d) => (b += d)).on("end", () => {
 	done
 	echo "[run-client] $(stamp) start-up: ${state:-no answer from the node, starting the GUI anyway}"
 	if [[ "$state" == pending ]]; then
-		"$GODOT" --path "$HERE" --resolution 64x64 -- --boot-launcher || true
+		# WO-937: its main window starts iconic, never drawn. Only the launcher's own user:// holds the settings override
+		# (project.godot application/config/project_settings_override → display/window/size/mode=1, minimized); the GUI's
+		# user:// never has that file. HIGHASCG_SERVER keeps it on the node asked above (ui.cfg profiles are not there).
+		ud="$(mktemp -d "${TMPDIR:-/tmp}/highascg-launcher-XXXXXX")"
+		mkdir -p "$ud/godot/app_userdata/HighAsCG Operator"
+		printf '[display]\n\nwindow/size/mode=1\n' >"$ud/godot/app_userdata/HighAsCG Operator/launcher-override.cfg"
+		XDG_DATA_HOME="$ud" HIGHASCG_SERVER="$srv" "$GODOT" --path "$HERE" --resolution 64x64 -- --boot-launcher || true
+		rm -rf "$ud"
 		state="$(boot_state)"
 		echo "[run-client] $(stamp) start-up answered: ${state:-no answer from the node}"
 	fi

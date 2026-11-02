@@ -48,6 +48,20 @@ describe('WO-692 network interfaces', () => {
 		assert.equal(wl.mode, 'unknown')
 	})
 
+	it('WO-937: a port NetworkManager does not manage shows systemd-networkd’s mode (operator file = static, else DHCP)', () => {
+		const devs = 'enp5s0:ethernet:unmanaged:\neno2:ethernet:unmanaged:\n'
+		const files = { enp5s0: '[Match]\nName=enp5s0\n\n[Network]\nAddress=10.0.0.5/16\nGateway=10.0.0.1\nDNS=1.1.1.1\n' }
+		const [eno2, enp] = ni.listNetworkInterfaces({
+			...deps,
+			names: ['enp5s0', 'eno2'],
+			exec: (cmd, args) => (args.join(' ') === '-t -f DEVICE,TYPE,STATE,CONNECTION dev' ? devs : deps.exec(cmd, args)),
+			networkd: (name) => files[name] ?? null,
+		})
+		assert.equal(eno2.mode, 'dhcp')
+		assert.equal(enp.mode, 'static')
+		assert.deepEqual(enp.static, { address: '10.0.0.5', prefixLength: 16, gateway: '10.0.0.1', dns: ['1.1.1.1'] })
+	})
+
 	it('Wi-Fi: one row per SSID (strongest, the joined one first), escaped colons, hidden SSIDs dropped', () => {
 		const st = ni.buildWifiStatus(deps)
 		assert.equal(st.available, true)

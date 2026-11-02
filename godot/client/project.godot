@@ -6,6 +6,7 @@ config_version=5
 
 config/name="HighAsCG Operator"
 run/main_scene="res://app/main.tscn"
+config/project_settings_override="user://launcher-override.cfg"
 run/max_fps=100
 config/features=PackedStringArray("4.6", "Forward Plus")
 

@@ -22,7 +22,11 @@ function fake(name, body) {
 	fs.chmodSync(p, 0o755)
 }
 
-/** @param {{ profiles?: string, devices?: string, carrier?: string, upFails?: boolean }} st */
+/**
+ * state: nmcli GENERAL.STATE ("100 (connected)"); strict: `dev set managed yes` changes nothing (the live image's
+ * keyfile unmanaged-devices); networkd: systemd-networkd answers.
+ * @param {{ profiles?: string, state?: string, strict?: boolean, networkd?: boolean, carrier?: string, upFails?: boolean }} st
+ */
 function setup(st) {
 	root = fs.mkdtempSync(path.join(os.tmpdir(), 'wo692-'))
 	log = path.join(root, 'calls.log')
@@ -31,18 +35,19 @@ function setup(st) {
 	fs.mkdirSync(path.join(root, 'sys', 'enp3s0'), { recursive: true })
 	fs.writeFileSync(path.join(root, 'sys', 'enp3s0', 'carrier'), st.carrier ?? '1')
 	fs.writeFileSync(path.join(root, 'profiles'), st.profiles ?? '')
-	fs.writeFileSync(path.join(root, 'devices'), st.devices ?? 'enp3s0:connected')
+	fs.writeFileSync(path.join(root, 'state'), st.state ?? '100 (connected)')
 	fake(
 		'nmcli',
 		`case "$*" in
   "-t -f NAME,DEVICE con show") cat "${root}/profiles" ;;
   "-t -f NAME con show") cut -d: -f1 "${root}/profiles" ;;
-  "-t -f DEVICE,STATE device show"*) cat "${root}/devices" ;;
+  "-g GENERAL.STATE device show"*) cat "${root}/state" ;;
+  "dev set "*" managed yes") ${st.strict ? ':' : `echo '30 (disconnected)' >"${root}/state"`} ;;
   *"con up"*) ${st.upFails ? 'exit 4' : 'exit 0'} ;;
 esac`,
 	)
 	fake('ip')
-	fake('networkctl', 'exit 1')
+	fake('networkctl', st.networkd ? 'exit 0' : 'exit 1')
 	fake('sleep')
 }
 
@@ -67,7 +72,7 @@ describe('WO-692 network apply helper', () => {
 	})
 
 	it('a PCI-named port without a cable: profile saved with the static address, no activation', () => {
-		setup({ carrier: '0', devices: 'enp3s0:unavailable' })
+		setup({ carrier: '0', state: '20 (unavailable)' })
 		const r = run(['static', 'enp3s0', '10.0.0.5', '24', '', ''])
 		assert.equal(r.status, 0, r.stderr)
 		assert.match(r.stdout, /no link — saved/)
@@ -88,10 +93,38 @@ describe('WO-692 network apply helper', () => {
 	})
 
 	it('an unmanaged port is handed to NetworkManager', () => {
-		setup({ devices: 'enp3s0:unmanaged', profiles: 'highascg-enp3s0:enp3s0\n' })
+		setup({ state: '10 (unmanaged)', profiles: 'highascg-enp3s0:enp3s0\n', networkd: true })
 		const r = run(['dhcp', 'enp3s0'])
 		assert.equal(r.status, 0, r.stderr)
 		assert.ok(r.calls.includes('nmcli dev set enp3s0 managed yes'))
+		assert.ok(r.calls.includes('nmcli con up highascg-enp3s0 ifname enp3s0'), r.calls.join('\n'))
+	})
+
+	// WO-937: on the live image NetworkManager keeps off wired ports for good; .10 (02.11) ended with no address.
+	it('a strictly unmanaged port goes to systemd-networkd: static file sorts before 10-live-wired, no NM activation', () => {
+		setup({ state: '10 (unmanaged)', strict: true, networkd: true, profiles: 'highascg-enp3s0:\n' })
+		const handoff = path.join(root, 'networkd', '05-highascg-nm-enp3s0.network')
+		fs.writeFileSync(handoff, '[Match]\nName=enp3s0\n\n[Link]\nUnmanaged=yes\n')
+		const r = run(['static', 'enp3s0', '10.0.0.5', '16', '10.0.0.1', '1.1.1.1,8.8.8.8'])
+		assert.equal(r.status, 0, r.stderr)
+		assert.match(r.stdout, /systemd-networkd/)
+		const f = path.join(root, 'networkd', '05-highascg-operator-enp3s0.network')
+		assert.match(fs.readFileSync(f, 'utf8'), /Name=enp3s0[\s\S]*Address=10\.0\.0\.5\/16\nGateway=10\.0\.0\.1\nDNS=1\.1\.1\.1\nDNS=8\.8\.8\.8/)
+		assert.ok('05-highascg-operator-enp3s0.network' < '10-live-wired.network')
+		assert.equal(fs.existsSync(handoff), false, 'the NetworkManager hand-off left the port with no manager')
+		assert.ok(r.calls.includes('nmcli con delete highascg-enp3s0'))
+		assert.ok(r.calls.includes('networkctl reconfigure enp3s0'))
+		assert.ok(!r.calls.some((c) => c.includes('con up') || c.includes('con add')), r.calls.join('\n'))
+		const d = run(['dhcp', 'enp3s0'])
+		assert.equal(d.status, 0, d.stderr)
+		assert.equal(fs.existsSync(f), false, 'DHCP falls back to 10-live-wired.network')
+	})
+
+	it('a strictly unmanaged port without networkd still reports the NetworkManager failure', () => {
+		setup({ state: '10 (unmanaged)', strict: true, upFails: true })
+		const r = run(['dhcp', 'enp3s0'])
+		assert.notEqual(r.status, 0)
+		assert.equal(fs.existsSync(path.join(root, 'networkd', '05-highascg-operator-enp3s0.network')), false)
 	})
 
 	it('rejects names outside en*/eth* for wired and wl* for Wi-Fi', () => {

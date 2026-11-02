@@ -2,7 +2,8 @@ extends Node
 ## WO-934 — `--boot-launcher`: only the start-up prompts, no operator GUI. run-client.sh --autostart runs this once the
 ## node answers and a start-up question is pending, and starts the GUI only after it is answered (never when the
 ## answer is Run headless). The GUI used to come up first and sit there until the node asked, a minute on a stick boot.
-## The main window cannot be hidden in Godot: it starts small (run-client.sh --resolution) and is minimized at once.
+## The main window cannot be hidden in Godot. run-client.sh starts it iconic (a user:// settings override, WO-937), small,
+## and it is minimized here too in case it was started without that override.
 
 const ScreenPicker := preload("res://app/operator_screen_picker.gd")
 

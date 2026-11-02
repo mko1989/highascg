@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-846 live WOs (28 open, 121 in progress, 697 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+847 live WOs (28 open, 121 in progress, 698 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -655,7 +655,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (82)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (83)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -739,6 +739,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 934 DONE [os-iso+godot-client] The session autostart showed the operator GUI a minute before the start-up prom… → 934_WO_autostart_waits_for_node_and_start_up_answer.md
 - 935 DONE [os-iso] The ISO shipped the build host's network profiles and its shows instead of a cl… → 935_WO_iso_ships_build_host_network_profiles_and_shows.md
 - 936 DONE [os-iso] Every Calamares install from an ISO since 30.10 failed: the exclude list droppe… → 936_WO_calamares_install_fails_live_boot_payload_excluded.md
+- 937 DONE [os-iso+network,godot-client] Live ISO: the boot network apply left the wired port with no manager (no IP, ma… → 937_WO_live_wired_port_stranded_by_network_helper_and_launcher_window.md
 
 ## network — Cluster, replication, Tailscale, auth (41)
 

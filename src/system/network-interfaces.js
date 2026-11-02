@@ -15,6 +15,7 @@ const { execFileSync } = require('child_process')
 const { isAllowedEthernetIface } = require('../config/network-settings')
 
 const SYS_NET = '/sys/class/net'
+const NETWORKD_DIR = '/etc/systemd/network'
 const WIFI_RE = /^wl[a-z0-9]+$/i
 
 /** @param {string} name */
@@ -129,12 +130,41 @@ function parseProfileIpv4(text) {
 }
 
 /**
- * @param {{ names?: string[], exec?: (cmd: string, args: string[]) => string, sys?: (name: string, file: string) => string | null }} [deps]
+ * WO-937: a wired port NetworkManager does not manage (the live image) belongs to systemd-networkd. Its static values
+ * live in the helper's `05-highascg-operator-<iface>.network`; without that file it runs 10-live-wired.network (DHCP).
+ * @param {string | null} text
+ */
+function parseNetworkdOperator(text) {
+	if (text == null) return { mode: 'dhcp', static: { address: '', prefixLength: 24, gateway: '', dns: [] } }
+	const values = (key) => [...String(text).matchAll(new RegExp(`^\\s*${key}\\s*=\\s*(\\S+)`, 'gm'))].map((m) => m[1])
+	const [address, prefix] = String(values('Address')[0] || '').split('/')
+	return {
+		mode: 'static',
+		static: {
+			address: address || '',
+			prefixLength: Number(prefix) || 24,
+			gateway: values('Gateway')[0] || '',
+			dns: values('DNS'),
+		},
+	}
+}
+
+function readNetworkdOperator(name) {
+	try {
+		return fs.readFileSync(`${NETWORKD_DIR}/05-highascg-operator-${name}.network`, 'utf8')
+	} catch {
+		return null
+	}
+}
+
+/**
+ * @param {{ names?: string[], exec?: (cmd: string, args: string[]) => string, sys?: (name: string, file: string) => string | null, networkd?: (name: string) => string | null }} [deps]
  * @returns {Array<object>}
  */
 function listNetworkInterfaces(deps = {}) {
 	const exec = deps.exec || run
 	const sys = deps.sys || readSys
+	const networkd = deps.networkd || readNetworkdOperator
 	let names = deps.names
 	if (!names) {
 		try {
@@ -150,9 +180,12 @@ function listNetworkInterfaces(deps = {}) {
 	return names.map((name) => {
 		const dev = devs[name] || null
 		const connection = (dev && dev.connection) || (profiles[name] && profiles[name].name) || null
+		const byNetworkd = !connection && !isWifiIface(name) && dev && dev.state === 'unmanaged'
 		const ipv4 = connection
 			? parseProfileIpv4(exec('nmcli', ['-t', '-f', 'ipv4.method,ipv4.addresses,ipv4.gateway,ipv4.dns', 'con', 'show', connection]))
-			: { mode: 'unknown', static: { address: '', prefixLength: 24, gateway: '', dns: [] } }
+			: byNetworkd
+				? parseNetworkdOperator(networkd(name))
+				: { mode: 'unknown', static: { address: '', prefixLength: 24, gateway: '', dns: [] } }
 		const list = addrs[name] || []
 		return {
 			name,
@@ -213,4 +246,4 @@ function buildWifiStatus(deps = {}) {
 	}
 }
 
-module.exports = { isWifiIface, listNetworkInterfaces, buildWifiStatus }
+module.exports = { isWifiIface, listNetworkInterfaces, buildWifiStatus, parseNetworkdOperator }

@@ -16,7 +16,11 @@ MODE="${1:-}"
 IFACE="${2:-}"
 NETWORKD_DIR="${HIGHASCG_NETWORKD_DIR:-/etc/systemd/network}"
 SYS_NET="${HIGHASCG_SYS_NET:-/sys/class/net}"
-OPERATOR_NET="${NETWORKD_DIR}/80-highascg-operator.network"
+# WO-937: networkd takes the first matching file in name order, so an operator port's file must sort before the live
+# image's 10-live-wired.network (an 80-… file was never read). The old name is still removed.
+OPERATOR_NET="${NETWORKD_DIR}/05-highascg-operator-${IFACE}.network"
+OLD_OPERATOR_NET="${NETWORKD_DIR}/80-highascg-operator.network"
+NM_HANDOFF_NET="${NETWORKD_DIR}/05-highascg-nm-${IFACE}.network"
 
 case "$MODE" in
 dhcp | static | wifi-scan | wifi-connect | wifi-disconnect | wifi-radio) ;;
@@ -81,41 +85,53 @@ if [[ ! "$IFACE" =~ ^(eth[0-9]+|en[a-z0-9]+)$ ]]; then
 	exit 2
 fi
 
+# "100 (connected)", "10 (unmanaged)", … WO-937: this read `-t -f DEVICE,STATE device show`, which nmcli rejects
+# (invalid field), so the state was always empty and every port went down the NetworkManager path.
 iface_nm_state() {
-	nmcli -t -f DEVICE,STATE device show "$IFACE" 2>/dev/null | awk -F: '{print $2}' | head -1 || true
+	nmcli -g GENERAL.STATE device show "$IFACE" 2>/dev/null | head -1 || true
 }
 
-is_networkd_managed() {
-	command -v networkctl >/dev/null 2>&1 || return 1
-	local state
-	state="$(networkctl status "$IFACE" 2>/dev/null | awk '/State:/ {print $2; exit}')"
-	[[ -n "$state" && "$state" != "unmanaged" ]]
+nm_unmanaged() {
+	[[ "$(iface_nm_state)" == *"(unmanaged)"* ]]
 }
 
+networkd_running() {
+	command -v networkctl >/dev/null 2>&1 && networkctl list >/dev/null 2>&1
+}
+
+# WO-937: the live image keeps NetworkManager off wired ports (keyfile unmanaged-devices=*,except:type:wifi…, lifted
+# only while some netplan file uses the NetworkManager renderer: the build host's own profiles did that until WO-935).
+# Such a port is "strictly unmanaged": `nmcli dev set … managed yes` exits 0 and changes nothing, and `con up` fails.
+# It belongs to systemd-networkd (10-live-wired.network): a port NetworkManager still will not take goes there.
 should_use_networkd() {
-	local nm_state
-	nm_state="$(iface_nm_state)"
-	if [[ "$nm_state" == "unmanaged" ]] && is_networkd_managed; then
-		return 0
+	if ! command -v nmcli >/dev/null 2>&1; then
+		networkd_running
+		return
 	fi
-	if ! command -v nmcli >/dev/null 2>&1 && is_networkd_managed; then
-		return 0
-	fi
-	return 1
+	nm_unmanaged || return 1
+	nmcli dev set "$IFACE" managed yes >/dev/null 2>&1 || true
+	nm_unmanaged && networkd_running
+}
+
+# Undo what an earlier NetworkManager attempt left: the networkd hand-off file marks the port Unmanaged for networkd
+# too, so nothing configured it (.10, 02.11: no address at all), and the profile is what the Settings pane shows.
+networkd_take_back() {
+	rm -f "$NM_HANDOFF_NET" "$OLD_OPERATOR_NET"
+	nmcli con delete "highascg-${IFACE}" >/dev/null 2>&1 || true
 }
 
 apply_networkd_dhcp() {
+	networkd_take_back
 	rm -f "$OPERATOR_NET"
-	if command -v networkctl >/dev/null 2>&1; then
-		networkctl reload 2>/dev/null || systemctl reload systemd-networkd 2>/dev/null || true
-		networkctl reconfigure "$IFACE" 2>/dev/null || networkctl renew "$IFACE" 2>/dev/null || true
-	fi
+	networkctl reload 2>/dev/null || systemctl reload systemd-networkd 2>/dev/null || true
+	networkctl reconfigure "$IFACE" 2>/dev/null || networkctl renew "$IFACE" 2>/dev/null || true
 	echo "Applied DHCP on $IFACE (systemd-networkd; link-local via 10-live-wired.network)"
 }
 
 apply_networkd_static() {
 	local ip="$1" prefix="$2" gw="$3" dns_csv="$4"
-	local dns_line dns_part
+	local dns_part
+	networkd_take_back
 	{
 		echo '[Match]'
 		echo "Name=${IFACE}"
@@ -191,8 +207,9 @@ fi
 # here carried a second, DHCP address next to the one asked for. A port the operator sets is NetworkManager's alone:
 # an earlier-sorting networkd file marks it unmanaged (first match wins), and its old addresses go before NM's.
 hand_to_nm() {
-	local f="${NETWORKD_DIR}/05-highascg-nm-${IFACE}.network"
+	local f="$NM_HANDOFF_NET"
 	[[ -d "$NETWORKD_DIR" ]] || return 0
+	rm -f "$OPERATOR_NET"
 	if [[ ! -f "$f" ]]; then
 		printf '[Match]\nName=%s\n\n[Link]\nUnmanaged=yes\n' "$IFACE" >"$f"
 		chmod 644 "$f"

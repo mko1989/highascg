@@ -74,6 +74,10 @@ reset_via_nmcli() {
 
 reset_via_networkd() {
 	local dev="$1"
+	# WO-937: a NetworkManager hand-off file (highascg-network-apply.sh) on a port NetworkManager does not manage
+	# leaves it with no manager at all — give it back to networkd.
+	rm -f "${HIGHASCG_NETWORKD_DIR:-/etc/systemd/network}/05-highascg-nm-${dev}.network"
+	networkctl reload 2>/dev/null || true
 	echo "systemd-networkd: renew/reconfigure $dev"
 	if command -v networkctl >/dev/null 2>&1; then
 		networkctl renew "$dev" 2>/dev/null || true

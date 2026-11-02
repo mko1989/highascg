@@ -82,3 +82,5 @@ starter project carries no network or output settings of the build host.
 - **Not yet proven:** a produced ISO. The new eggs reads `custom.exclude.list`; the build regenerates it from the
   fragments before the produce (`eggs-run-lib.sh` → `install-eggs-config.sh --apply`), so no manual step is needed.
   The next build's verifier run is the proof.
+- **Regression, fixed in WO-937:** the build host's NM profiles had also let NetworkManager manage every wired port. Without them
+  the network helper stranded the port: no IP on .10's enp5s0, and setting a manual IP from the client failed.
