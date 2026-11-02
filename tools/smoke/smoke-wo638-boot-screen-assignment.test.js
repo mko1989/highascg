@@ -173,7 +173,7 @@ describe('WO-638 boot screen assignment', () => {
 		const { d, calls } = deps()
 		assert.equal((await B.prepare({ config: boxConfig() }, d)).spread, true)
 		assert.deepEqual(calls.xrandr[0].slice(0, 2), ['--output', 'DP-0'])
-		assert.equal(calls.invalidate, 1, 'the spread must reach the canvas check (stale cache → nodm restart, box 21.10)')
+		assert.equal(calls.invalidate, 2, 'the spread must reach the canvas check (stale cache → nodm restart, box 21.10)')
 		const apart = deps({
 			listOutputs: () => [
 				{ name: 'DP-0', x: 0, y: 0, width: 10, height: 10 },
@@ -182,6 +182,17 @@ describe('WO-638 boot screen assignment', () => {
 		})
 		assert.equal((await B.prepare({ config: boxConfig() }, apart.d)).spread, false)
 		assert.equal(apart.calls.xrandr.length, 0)
+	})
+
+	it('WO-924: prepare reads X live, not the cached boot snapshot', async () => {
+		const order = []
+		const { d } = deps({
+			invalidate: () => order.push('invalidate'),
+			listOutputs: () => (order.push('list'), []),
+		})
+		await B.prepare({ config: boxConfig() }, d)
+		// box 01.11: the cache held the 18:20:16 snapshot (DP-0 at +1920), X had DP-0 on DP-6 at 0,0 → no spread
+		assert.deepEqual(order, ['invalidate', 'list'])
 	})
 
 	it('a click while Caspar is held: flag + cables saved, config written before Caspar starts, gate opened', async () => {

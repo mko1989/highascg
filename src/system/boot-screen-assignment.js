@@ -332,6 +332,9 @@ function bootStatus(config, deps = {}) {
 async function prepare(ctx, deps = {}) {
 	const d = liveDeps(deps)
 	const config = ctx?.config || {}
+	// WO-924: read X as it is now. The cached read can be the boot snapshot taken before X placed every head
+	// (box 01.11: DP-0 not yet stacked on DP-6) — no overlap seen, no spread, both stacked prompts named DP-6.
+	d.invalidate()
 	const outputs = d.listOutputs(config) || []
 	if (!outputsOverlap(outputs)) return { ok: true, spread: false }
 	const names = [...outputs]
