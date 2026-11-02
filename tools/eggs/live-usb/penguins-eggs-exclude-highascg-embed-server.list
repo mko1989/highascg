@@ -253,13 +253,7 @@ home/casparcg/.claude.json
 home/casparcg/highascg/.operator-firefox-profile
 home/casparcg/highascg/.operator-firefox-profile/*
 
-# Previs — future module, deliberately NOT in this release (owner, todos19.07.26).
-# Source stays in git; it must not ship. Needs `three` (not installed) and is no longer
-# offered in the optional-module registry.
-home/casparcg/highascg/src/previs
-home/casparcg/highascg/src/previs/*
-home/casparcg/highascg/client/assets/modules/previs
-home/casparcg/highascg/client/assets/modules/previs/*
+# Previs ships again (owner 02.11.26, WO-927): the Godot Previs tab loads its models from /api/previs/models.
 
 # WO-429 (owner 04.08): credentials and user-supplied driver packages must never ship in an
 # ISO. The gh token below is what pushes this repo to GitHub — it was shipping until today.

@@ -33,7 +33,8 @@ come up at all now". Then: "dont focus on fixing the .31 but rather check whats 
     DeckLink at start).
   - **The server's `src/previs` is excluded from ISOs** (owner directive 19.07, `penguins-eggs-exclude-highascg-*.list`).
     The Godot Previs tab (WO-607) fetches `/api/previs/models`, so on an ISO its model list and loading fail
-    (`[modules] skipped "previs"`). This is an owner decision.
+    (`[modules] skipped "previs"`). This is an owner decision. The owner reversed it the same day: ISOs ship previs,
+    WO-927.
 
 ## What was done
 
