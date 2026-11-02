@@ -404,7 +404,10 @@ async function resolve(ctx, pick, deps = {}) {
 		`[Boot screens] operator = ${op.name} (port ${op.port}, ${how}); destination cables moved: ${moved}${plan.unplaced.length ? `; no free screen for ${plan.unplaced.join(', ')}` : ''}${changed ? ' — applying' : ' — nothing changed'}`
 	)
 	// Held = run.sh is still waiting: no gate for this boot AND no Caspar on AMCP (it may have started on its own backstop).
-	const held = !d.gateOpen(id) && ctx?._casparStatus?.connected !== true
+	const released = d.gateOpen(id)
+	const held = !released && ctx?._casparStatus?.connected !== true
+	// WO-926: up but never released this boot = run.sh's timeout started it on whatever config was on disk — apply.
+	const stale = !released && !held
 	const log = (level, msg) => ctx?.log?.(level, msg)
 	// X is laid out per the plan BEFORE the answer goes back (the client then moves onto the operator screen by name)
 	// and before Caspar is released — even when nothing moved, the spread in prepare() may not match the plan.
@@ -415,7 +418,7 @@ async function resolve(ctx, pick, deps = {}) {
 		log('warn', `[Boot screens] ${held ? 'pre-start write' : 'layout'} failed: ${e?.message || e}`)
 	}
 	d.openGate(id, log)
-	if (changed && !held) {
+	if ((changed || stale) && !held) {
 		// Caspar is already up with the old cables: the full apply moves its screen consumers (restart).
 		Promise.resolve()
 			.then(() => d.apply(ctx))

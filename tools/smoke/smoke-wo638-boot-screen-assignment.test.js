@@ -279,6 +279,15 @@ describe('WO-638 boot screen assignment', () => {
 		assert.deepEqual([r.casparHeld, calls.apply, calls.prestart, calls.gate], [false, 1, 0, 1])
 	})
 
+	it('WO-926: Caspar started by the run.sh timeout gets the full apply even when nothing moved', async () => {
+		const { d, calls } = deps({ gpuMap: () => MAP_SAME })
+		const { ctx } = makeCtx(boxConfig())
+		ctx._casparStatus = { connected: true }
+		await B.resolve(ctx, 'DP-2', d)
+		await tick()
+		assert.deepEqual([calls.relayout, calls.apply, calls.prestart], [1, 1, 0])
+	})
+
 	it('start-up: nothing to ask releases Caspar at once; a question holds it', () => {
 		const one = deps({ gpuMap: () => ({ ports: [port(0, 'DP-0')] }) })
 		assert.equal(B.startBootScreenGate({ config: boxConfig() }, one.d).pending, false)
