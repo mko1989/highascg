@@ -135,7 +135,8 @@ module.exports = [
 			if (cmp.aligned === false)
 				return {
 					status: 'warn',
-					summary: `${c.versionLine} · running ${cmp.serverChannelCount} channels, config says ${cmp.moduleChannelCount}: apply the Caspar config`,
+					// equal counts can still differ in mode or screen output: name the first difference
+					summary: `${c.versionLine} · ${cmp.issues?.[0] || `running ${cmp.serverChannelCount} channels, config says ${cmp.moduleChannelCount}`}: apply the Caspar config`,
 				}
 			return { status: 'pass', summary: `${c.versionLine} · ${cmp.serverChannelCount ?? '?'} channels aligned` }
 		},

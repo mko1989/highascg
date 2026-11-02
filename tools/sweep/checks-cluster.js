@@ -2,7 +2,7 @@
 
 /**
  * WO-730 — linked servers (WO-670): online, same build, clocks, the signed-call path. Read only, except the media
- * copy check (writes then empties media/.highascg-check/ on the peer), which runs only with --peers.
+ * copy check (writes three fixed files to media/.highascg-check/ on the peer; WO-830b: they stay), only with --peers.
  */
 
 const { get } = require('./sweep-util')

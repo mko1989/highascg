@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-838 live WOs (28 open, 121 in progress, 689 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+839 live WOs (28 open, 121 in progress, 690 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -734,7 +734,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 927 DONE [os-iso+tracking-vr] ISOs ship the server's previs module again (Godot Previs tab needs /api/previs/… → 927_WO_iso_ships_previs.md
 - 928 DONE [os-iso] Clone boots held node ~75 s waiting for a bridge disk (HIGHASCGDAT) the machine… → 928_WO_iso_boot_waits_90s_for_missing_bridge_disk.md
 
-## network — Cluster, replication, Tailscale, auth (39)
+## network — Cluster, replication, Tailscale, auth (40)
 
 - 13 DONE [network+companion] Final Polish & Security Hardening → 13_WO_FINAL_POLISH_AND_HARDENING.md
 - 15 DONE [network+web-client] Client-Server Preshow Sync & Split Architecture → 15_WO_CLIENT_SERVER_SYNC.md
@@ -775,6 +775,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 822 DONE [network] Remove the :4443 HTTPS proxy (highascg-https-proxy), the way nginx went in WO-4… → 822_WO_remove_https_proxy.md
 - 830 DONE [network] LAN hardening: remote crash, injection, secrets (sweep §2, without the auth swi… → 830_WO_lan_hardening_crash_and_injection.md
 - 842 DONE [network+devices-config] Sweep: data loss, replication boot and server-side ops bugs → 842_WO_sweep_data_loss_and_server_ops.md
+- 929 DONE [network+testing-ci] Two-box cluster run with .31 (master / follower / failover on real servers); th… → 929_WO_two_box_cluster_run_dot31.md
 
 ## media — Media library, thumbnails, ingest, transcode (24)
 

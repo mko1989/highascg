@@ -9,8 +9,9 @@
  *   node tools/e2e/replication-check.js --peer=192.168.0.4
  *   node tools/e2e/replication-check.js --peer=127.0.0.1      # this box's own sshd + wrapper (when it trusts its key)
  *
- * On the peer it writes only under media/.highascg-check/ and empties that folder again at the end (the empty
- * folder stays: removing it would need --delete on media/ itself). Exit code = failed steps.
+ * On the peer it writes only under media/.highascg-check/: three tiny files, the same names every run, hidden from
+ * Caspar's CLS and /api/media. They stay: the forced command refuses --delete (WO-830b), and the last step proves
+ * that. Exit code = failed steps.
  */
 
 const assert = require('node:assert/strict')
@@ -106,13 +107,20 @@ function steps({ host, user = 'casparcg', remoteRoot = path.resolve(__dirname, '
 			},
 		},
 		{
-			name: `clean up: ${DIR} emptied on the peer`,
-			always: true,
+			// WO-830b took --delete away from the key, so this step can no longer empty the folder (it failed every
+			// sweep since). It now proves the refusal; the check files stay, overwritten by the next run.
+			name: `--delete is refused (WO-830b); ${DIR} holds only the check's own files`,
 			run() {
 				fs.mkdirSync(path.join(dir('empty'), DIR), { recursive: true })
-				rsync(['--delete', ...rsyncArgs('push', DIR, o)], path.join(tmp, 'empty'))
+				let refused = ''
+				try {
+					rsync(['--delete', ...rsyncArgs('push', DIR, o)], path.join(tmp, 'empty'))
+				} catch (e) {
+					refused = e.message
+				}
+				assert.match(refused, /disallowed rsync option: --delete/, `--delete was not refused by the forced command: ${refused || 'it ran'}`)
 				const left = rsync(rsyncArgs('pull', DIR, o), dir('after'))
-				assert.deepEqual(readTree(path.join(tmp, 'after')), {}, 'files left on the peer')
+				assert.deepEqual(readTree(path.join(tmp, 'after')), FILES, 'the peer folder holds other files than the check wrote')
 				fs.rmSync(tmp, { recursive: true, force: true })
 				return { ms: left.ms }
 			},

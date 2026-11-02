@@ -587,3 +587,9 @@ any LAN host write into `media/`. So:
 
 - Investigation only. The file and line references above were read or grepped this session. `replication.json`
   (`enabled: false, autoPromote: false`) and the two-node device graph were checked on the box.
+
+## P5 — two real boxes (02.11.26)
+
+- [WO-929](./929_WO_two_box_cluster_run_dot31.md): this box + .31. Link, master, epoch fencing, signed calls, master
+  restart, failover by freezing the master (9.6 s), step-down, hand back and follower restart all passed on real servers.
+  Playout through the fan-out on a real second Caspar was not re-run there (WO-772 proved it on the same hardware).
