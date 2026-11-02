@@ -310,6 +310,7 @@ func _card(d: Dictionary, anchors: Dictionary) -> Control:
 		var gui: bool = d.mode == "operator_gui"
 		var tag := _label(tag_text, ThemeBuilder.TEXT if gui else (PGM if half == "pgm" else PRV), 11)
 		tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT  # next to its dot, not at the card's left edge
 		row.add_child(tag)
 		if half == "pgm" or d.get("prv_dot", true):
 			var tip := "%s %s output" % [d.label, tag_text]
