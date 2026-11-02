@@ -61,9 +61,16 @@ describe('WO-870 generate-eggs-config: custom.exclude.list', () => {
 
 	it('every lib/ lib64/ bin/ sbin/ line has its usr/ twin (merged-usr, WO-430)', () => {
 		const lib = pats.filter((l) => gen.MERGED_USR_RE.test(l))
-		assert.ok(lib.length >= 3, 'expected lib-ish lines (DeckLink udev rules / dkms modules / lib/live)')
+		assert.ok(lib.length >= 3, 'expected lib-ish lines (DeckLink udev rules / dkms modules)')
 		for (const l of lib) assert.ok(pats.includes(`usr/${l}`), `no usr/ twin for ${l}`)
 		assert.ok(pats.includes('usr/lib/modules/*/updates/dkms/blackmagic.ko*'))
+	})
+
+	it("ships live-boot's payload: the installed target's update-initramfs copies usr/lib/live/boot (WO-936)", () => {
+		for (const embedServer of [true, false]) {
+			const p = patterns(gen.buildExcludeList({ embedServer }))
+			assert.deepEqual(p.filter((l) => /^(usr\/)?lib\/live(\/|$)/.test(l)), [], `embed=${embedServer}`)
+		}
 	})
 
 	it('embed-server default keeps node_modules; --embed 0 (WO-47) excludes it, and both keep the media line', () => {

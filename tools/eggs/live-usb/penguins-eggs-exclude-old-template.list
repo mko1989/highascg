@@ -9,7 +9,9 @@
 *.cache
 
 # live-session leftovers
-lib/live/*
+# WO-936: no lib/live/* here. On merged-usr it matched nothing; its usr/ twin (WO-430) dropped live-boot's payload
+# usr/lib/live/boot, which dpkg still lists, and every Calamares install failed in the target's update-initramfs
+# (hooks/live: cp: cannot stat '/usr/lib/live/boot').
 var/lib/live/config/*
 persistence.conf
 

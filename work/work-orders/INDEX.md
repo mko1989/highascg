@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-845 live WOs (28 open, 121 in progress, 696 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+846 live WOs (28 open, 121 in progress, 697 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -655,7 +655,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (81)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (82)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -738,6 +738,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 932 DONE [os-iso+testing-ci] Two-box sweep findings: every clone boots with 7 failed snap mount units; the s… → 932_WO_two_box_sweep_findings_iso_snap_units_require_check.md
 - 934 DONE [os-iso+godot-client] The session autostart showed the operator GUI a minute before the start-up prom… → 934_WO_autostart_waits_for_node_and_start_up_answer.md
 - 935 DONE [os-iso] The ISO shipped the build host's network profiles and its shows instead of a cl… → 935_WO_iso_ships_build_host_network_profiles_and_shows.md
+- 936 DONE [os-iso] Every Calamares install from an ISO since 30.10 failed: the exclude list droppe… → 936_WO_calamares_install_fails_live_boot_payload_excluded.md
 
 ## network — Cluster, replication, Tailscale, auth (41)
 

@@ -199,6 +199,14 @@ else
 	ok "no build-host NetworkManager profiles in squashfs"
 fi
 
+# WO-936 — Calamares runs update-initramfs in the target; live-boot's hook copies usr/lib/live/boot and fails the
+# install when the squashfs lost it (the old template's lib/live/* + its usr/ twin, every ISO 30.10–02.11).
+if squash_has_path 'usr/share/initramfs-tools/hooks/live' && ! squash_has_tree 'usr/lib/live/boot'; then
+	bad "usr/lib/live/boot is missing but live-boot's initramfs hook ships — every Calamares install fails at update-initramfs (WO-936); check the exclude list for lib/live"
+else
+	ok "live-boot payload matches its initramfs hook (Calamares update-initramfs)"
+fi
+
 # 22.10: a backup of the previous ISO in ~/iso-backup rode into the squashfs (+3.2 GB).
 # config/casparcg.config.iso is a Caspar config, not a disk image.
 set +o pipefail
