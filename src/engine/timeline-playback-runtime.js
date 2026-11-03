@@ -188,6 +188,11 @@ module.exports = {
 			this._lastTickPositionMs = undefined
 			const now = cellNowMs(cell)
 			setCellPosition(cell, now)
+			/* WO-940: one last tick at the pause instant, while still playing. `_prevKey.frame` only advances on
+			 * the 40 ms tick, so a pause landing in a later frame than the last tick left it a frame behind the
+			 * paused position; `_canResumePlayback` then declined and the next Play restarted the producer
+			 * (STOP + PLAY SEEK = the black flash on spacebar resume) instead of sending RESUME. */
+			this._syncAmcpOnTimelineTick(id, now)
 			cell.playing = false
 			this._pauseAll()
 		} else {
