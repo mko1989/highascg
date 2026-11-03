@@ -19,6 +19,7 @@ const HOME_BEFORE = process.env.HOME
 process.env.HOME = path.join(TMP, 'home')
 
 const og = require('../../src/config/operator-gui-first')
+const { OPERATOR_CURSOR_GAP_PX: GAP } = require('../../src/utils/os-layout-calculator-place')
 const persistence = require('../../src/utils/persistence')
 const { planOperatorFirst } = require('../../src/system/operator-first-plan')
 const { runOperatorFirstSwitch } = require('../../src/system/operator-first-switch')
@@ -94,7 +95,7 @@ test('WO-868 POST dryRun (default) plans everything and writes nothing', async (
 	const gui = (rows) => rows.find((x) => x.kind === 'operator_gui')
 	const wall = (rows) => rows.find((x) => x.kind === 'screen' && x.n === 1)
 	assert.equal(gui(b.layout.after).x, 0)
-	assert.equal(wall(b.layout.after).x, gui(b.layout.after).width)
+	assert.equal(wall(b.layout.after).x, gui(b.layout.after).width + GAP) // WO-938 cursor gap
 	assert.equal(wall(b.layout.before).x, 0)
 	assert.ok(Array.isArray(b.external) && b.external.length > 0)
 	assert.equal('_remap' in b, false)

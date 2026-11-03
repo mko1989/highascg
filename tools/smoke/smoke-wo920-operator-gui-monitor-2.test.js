@@ -17,7 +17,7 @@ const hardwareInfo = require('../../src/utils/hardware-info')
 hardwareInfo.getDisplaysXrandrDetailed = () => ({ displays: ['DP-0', 'DP-4', 'DP-6'].map((name) => ({ name, connected: true })) })
 hardwareInfo.getGpuConnectorInventory = () => []
 const { calculateLayoutPositions } = require('../../src/utils/os-layout-calculator')
-const { operatorGuiPlacementOrder } = require('../../src/utils/os-layout-calculator-place')
+const { operatorGuiPlacementOrder, OPERATOR_CURSOR_GAP_PX: GAP } = require('../../src/utils/os-layout-calculator-place')
 const ports = require('../../src/config/screen-consumer-port-resolve')
 const { resolveLayoutRectForOperatorPort } = require('../../src/utils/x-display-session-layout-resolve')
 const picker = require('../../src/system/operator-monitor-picker')
@@ -107,7 +107,7 @@ describe('WO-920 layout plan: dot 2 is operatorGui[2]', () => {
 		const lay = calculateLayoutPositions(config(null, { casparServer: { operator_gui_first: true } }))
 		assert.deepEqual(rect(lay.operatorGui[1]), ['DP-4', 0, 0, 1920, 1080])
 		assert.deepEqual(rect(lay.operatorGui[2]), ['DP-6', 1920, 0, 1920, 1080])
-		assert.equal(lay.screens[1].x, 3840)
+		assert.equal(lay.screens[1].x, 3840 + GAP, 'WO-938: the screens start past the cursor gap')
 	})
 
 	it('a second jack on dot 1 (fan-out) still lights, but never as monitor 2', () => {

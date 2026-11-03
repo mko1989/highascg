@@ -1,6 +1,7 @@
 'use strict'
 
 const { resolvePixelMapFeedToProgramScreen } = require('../config/pixel-mapping-config')
+const { OPERATOR_CURSOR_GAP_PX } = require('./os-layout-calculator-place')
 
 /**
  * WO-40a: place destination-driven heads outside the mapping-fed bbox — to its right when the
@@ -84,12 +85,16 @@ function applyMappingGpuPlacementOffsets(
 		if (manual(`multiview_${n}_os_${axis}`, `multiview_os_${axis}`) != null) continue
 		info[axis] = (Number(info[axis]) || 0) + off
 	}
+	/* WO-938: operator heads that led the running x (nothing auto-placed before them) land flush on the canvas edge —
+	 * they need the cursor gap on top; ones that followed other heads already carry it in their x. */
+	const opXs = operatorGui.map(([, i]) => Number(i?.[axis])).filter(Number.isFinite)
+	const opOff = off + (opXs.length && Math.min(...opXs) === 0 ? OPERATOR_CURSOR_GAP_PX : 0)
 	for (const [key, info] of lead > 0 ? [] : operatorGui) {
 		const n = parseInt(key, 10)
 		if (!Number.isFinite(n) || n < 1 || !info) continue
 		/* WO-920: the unnumbered key is monitor 1's (assign.js) — it never pins monitor 2 */
 		if (manual(`operator_gui_${n}_os_${axis}`, ...(n === 1 ? [`operator_gui_os_${axis}`] : [])) != null) continue
-		info[axis] = (Number(info[axis]) || 0) + off
+		info[axis] = (Number(info[axis]) || 0) + opOff
 	}
 	for (const [key, info] of prv) {
 		const n = parseInt(key, 10)

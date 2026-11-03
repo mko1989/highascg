@@ -6,7 +6,7 @@ const { collectGpuLayoutAssignments } = require('./os-layout-calculator-assign')
 const { mergeMappingGpuOutputsWithScreens, recomputeMappingGpuBBox } = require('./os-layout-calculator-helpers')
 const { isOperatorGuiFirst } = require('../config/operator-gui-first')
 const { applyMappingGpuPlacementOffsets } = require('./os-layout-calculator-offset')
-const { computePlacedLayoutResults } = require('./os-layout-calculator-place')
+const { computePlacedLayoutResults, OPERATOR_CURSOR_GAP_PX } = require('./os-layout-calculator-place')
 
 function logLayoutPlan(results) {
 	try {
@@ -59,7 +59,8 @@ function operatorFirstLead(config, results) {
 	for (const info of Object.values(results.operatorGui || {})) {
 		if (info && Number.isFinite(info.x) && Number.isFinite(info.width)) lead = Math.max(lead, info.x + info.width)
 	}
-	return lead
+	/* WO-938: the canvas starts past the cursor gap, like the auto-placed heads do in computePlacedLayoutResults */
+	return lead > 0 ? lead + OPERATOR_CURSOR_GAP_PX : 0
 }
 
 function calculateLayoutPositions(config) {

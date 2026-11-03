@@ -59,7 +59,7 @@
                     <borderless>true</borderless>
                     <interactive>true</interactive>
                     <always-on-top>true</always-on-top>
-                    <x>1920</x><y>0</y>
+                    <x>2048</x><y>0</y>
                     <width>3840</width><height>1792</height>
                     <sbs-key>false</sbs-key>
                     <colour-space>RGB</colour-space>

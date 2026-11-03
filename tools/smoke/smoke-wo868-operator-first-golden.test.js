@@ -11,6 +11,8 @@
  * Re-captured 31.10 for WO-898 (both states, diff reviewed): ONLY the live-audio channel 7 and monitor channel 8
  * modes changed (1080p5000 / 720p5000 → 64x36), plus the 64x36@50 <video-modes> entry and the channel map's
  * live-audio `mode` / `liveAudioInputMode`. Layouts untouched.
+ * Re-captured 03.11 for WO-938 (diff reviewed): ONLY x moved by the 128 px operator cursor gap — off.layout operator
+ * GUI 3840→3968, on.layout + on.caspar.xml PGM1 1920→2048. off.caspar.xml and both channel maps unchanged.
  */
 
 const { test } = require('node:test')
@@ -24,6 +26,7 @@ const { buildCasparGeneratorFlatConfig } = require('../../src/config/build-caspa
 const { getChannelMap } = require('../../src/config/routing')
 const { calculateLayoutPositions } = require('../../src/utils/os-layout-calculator')
 const og = require('../../src/config/operator-gui-first')
+const { OPERATOR_CURSOR_GAP_PX: GAP } = require('../../src/utils/os-layout-calculator-place')
 
 const read = (n) => fs.readFileSync(path.join(FIX, n), 'utf8')
 const rig = () => JSON.parse(read('rig.config.json'))
@@ -79,13 +82,13 @@ test('WO-868 ON: channel 1 is the operator GUI, everything else moves up by one,
 	assert.match(xml, /Caspar channel 2: Screen 1 program output \(PGM\)/)
 })
 
-test('WO-868 ON: operator monitor at x=0, the wall moves right by the monitor width', () => {
+test('WO-868 ON: operator monitor at x=0, the wall moves right by the monitor width + the WO-938 cursor gap', () => {
 	const off = JSON.parse(read('off.layout.json'))
 	const on = JSON.parse(read('on.layout.json'))
 	assert.equal(off.screens['1'].x, 0)
-	assert.equal(off.operatorGui['1'].x, off.screens['1'].width)
+	assert.equal(off.operatorGui['1'].x, off.screens['1'].width + GAP)
 	assert.equal(on.operatorGui['1'].x, 0)
-	assert.equal(on.screens['1'].x, on.operatorGui['1'].width)
+	assert.equal(on.screens['1'].x, on.operatorGui['1'].width + GAP)
 	assert.equal(on.screens['1'].sysId, off.screens['1'].sysId, 'same jack, only X moves')
 	assert.equal(on.operatorGui['1'].sysId, off.operatorGui['1'].sysId)
 	// the PGM1 screen consumer follows the wall

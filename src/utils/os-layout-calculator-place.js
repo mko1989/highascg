@@ -15,6 +15,14 @@ const { resolveEffectiveOsModeSource } = require('./os-mode-source')
 const { isOperatorGuiFirst } = require('../config/operator-gui-first')
 
 /**
+ * WO-938: dead X-canvas pixels between the operator heads and every other head. Pointer barriers stop the cursor's
+ * HOTSPOT at the operator edge, but X draws the whole sprite (Adwaita 36x36, hotspot 4,1) from there — on 03.11 the
+ * arrow's tail showed on the LED wall (DP-0) right of DP-6. No CRTC scans this strip, so whatever of the sprite lands
+ * in it is invisible. 128 > the reach of any themed cursor up to size 96, either side of the hotspot.
+ */
+const OPERATOR_CURSOR_GAP_PX = 128
+
+/**
  * WO-920: the operator heads keyed by the monitor their cable names (assign.js `n`: dot 1 → 1, dot 2 → 2), monitor 1
  * first, so it keeps the left edge under "Operator GUI first" (WO-868) and monitor 2 sits right next to it. A second
  * jack on the same dot (a fan-out cable) still lights, under the next number above 2, so `operatorGui[2]` always
@@ -68,6 +76,8 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 
 	const results = { screens: {}, multiview: {}, operatorGui: {}, prv: {} }
 	let cumulativeX = 0
+	/** kind of the last auto-placed head — a step between operator and non-operator heads opens the WO-938 gap */
+	let lastAutoKind = null
 	for (const p of placements) {
 		let data
 		if (p.kind === 'screen') {
@@ -224,6 +234,9 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 				h = parseInt(resMatch[2], 10) || h
 			}
 		}
+		if (data.manualX === null && lastAutoKind !== null && (lastAutoKind === 'operator_gui') !== (p.kind === 'operator_gui')) {
+			cumulativeX += OPERATOR_CURSOR_GAP_PX
+		}
 		const posX = data.manualX !== null ? data.manualX : cumulativeX
 		const posY = data.manualY !== null ? data.manualY : 0
 
@@ -266,10 +279,13 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 		else if (p.kind === 'operator_gui') results.operatorGui[p.n] = info
 		else results.multiview[p.n] = info
 
-		if (data.manualX === null) cumulativeX += w
+		if (data.manualX === null) {
+			cumulativeX += w
+			lastAutoKind = p.kind
+		}
 	}
 
 	return results
 }
 
-module.exports = { computePlacedLayoutResults, operatorGuiPlacementOrder }
+module.exports = { computePlacedLayoutResults, operatorGuiPlacementOrder, OPERATOR_CURSOR_GAP_PX }
