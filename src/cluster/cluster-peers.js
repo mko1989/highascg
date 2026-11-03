@@ -39,6 +39,9 @@ const MAX_PEERS = 16
 const HEAL_MS = 60000
 const TOMBSTONE_MS = 30 * 24 * 3600 * 1000
 
+/** WO-958: the version a server shows = its build stamp; appVersion (package.json, frozen) only for older peers. */
+const versionOf = (ping) => String(ping?.buildStamp || ping?.appVersion || '')
+
 /** GET http://host:port/path → { ok, status, json } (never throws). WO-811: carries this node's shared password
  * (auth.outboundAuthHeaders, none today) — except `{ auth: false }`, the subnet scan, which must not hand it to every host. */
 function getJson(host, port, path, timeout = TIMEOUT_MS, { auth = true } = {}) {
@@ -180,7 +183,7 @@ function createCluster(opts) {
 			online: true,
 			last_seen: now(),
 			hostname: String(ping.hostname || ''),
-			version: String(ping.appVersion || ''),
+			version: versionOf(ping),
 			role: String(ping.role || 'standalone'),
 			epoch: Number(ping.leaderEpoch) || 0,
 			program_channels: Array.isArray(ping.channelMap?.programChannels) ? ping.channelMap.programChannels.length : null,
@@ -226,7 +229,7 @@ function createCluster(opts) {
 	function snapshot() {
 		const s = self || {}
 		return {
-			self: { id: s.selfId || '', hostname: s.hostname || '', version: s.appVersion || '', role: s.role || '', epoch: s.leaderEpoch ?? null,
+			self: { id: s.selfId || '', hostname: s.hostname || '', version: versionOf(s), role: s.role || '', epoch: s.leaderEpoch ?? null,
 				media: s.projectMedia ? { slug: s.projectMedia.slug, files: s.projectMedia.fileCount } : null, duties: s.duties ?? null,
 				auto_accept: invites ? invites.autoAccept() : true },
 			peers: [...peers.values()].map(view),
@@ -333,7 +336,7 @@ function createCluster(opts) {
 		const prev = peers.get(id)
 		if (fromServer && !prev && invites && !invites.autoAccept()) {
 			const name = String(r.json.hostname || id).slice(0, 64)
-			if (invites.record({ id, fp: deviceKey ? fingerprint(deviceKey) : '', host: addr.host, port: addr.port, name, version: String(r.json.appVersion || ''), device_key: deviceKey }))
+			if (invites.record({ id, fp: deviceKey ? fingerprint(deviceKey) : '', host: addr.host, port: addr.port, name, version: versionOf(r.json), device_key: deviceKey }))
 				log('info', `${name} asks to link with this server: waiting for the operator to accept`)
 			changed()
 			return { status: 202, body: { pending: true, error: `waiting for ${self?.hostname || 'that server'} to accept` } }
@@ -433,7 +436,7 @@ function createCluster(opts) {
 			if (linked.has(`${host}:4200`)) return null
 			const r = await fetchJson(host, 4200, '/api/replication/ping', SCAN_TIMEOUT_MS, { auth: false })
 			if (!r.ok || r.json?.appId !== 'highascg' || (self?.instanceId && r.json.instanceId === self.instanceId)) return null
-			return { host, port: 4200, hostname: String(r.json.hostname || host), version: String(r.json.appVersion || ''), role: String(r.json.role || '') }
+			return { host, port: 4200, hostname: String(r.json.hostname || host), version: versionOf(r.json), role: String(r.json.role || '') }
 		}))
 		return found.filter(Boolean)
 	}
@@ -453,5 +456,5 @@ function createCluster(opts) {
 		saved, list, byDeviceKey, mediaSend, setMediaSend, afterPoll: (fn) => pollHooks.push(fn) }
 }
 
-module.exports = { createCluster, parseAddress, mediaParity, subnetHosts, getJson, postJson, requestJson, localAddressTo, linkedFingerprints,
+module.exports = { createCluster, versionOf, parseAddress, mediaParity, subnetHosts, getJson, postJson, requestJson, localAddressTo, linkedFingerprints,
 	STORE_KEY, TOMBSTONE_KEY, POLL_MS, HEAL_MS }

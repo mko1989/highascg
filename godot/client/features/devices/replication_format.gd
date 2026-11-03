@@ -172,7 +172,7 @@ static func peer_rows(peer: Variant, st: Dictionary, role_label: String, now: fl
 		["Hardware ID", _or([p.get("hardwareId"), st.get("peerHardwareId")])],
 		["Address", "%s:%s" % [t(p.get("host")) if p.has("host") else "undefined", t(O.or_([p.get("port"), 4200]))]],
 		["Peer status", "online · ping %s" % age_ms(p.get("pingAgeMs")) if H.truthy(p.get("reachable")) else "offline"],
-		["Role", _or([p.get("role")])], ["App version", _or([p.get("appVersion")])]]
+		["Role", _or([p.get("role")])], ["App version", _or([p.get("buildStamp"), p.get("appVersion")])]]
 	var role := str(st.get("role"))
 	if role == "leader":
 		var fan_text := "inactive"

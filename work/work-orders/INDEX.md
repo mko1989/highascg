@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-867 live WOs (28 open, 121 in progress, 718 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+868 live WOs (28 open, 121 in progress, 719 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -614,7 +614,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 791 DONE [companion] Companion: recall look presets to PRV, to PGM, or to PGM with auto take → 791_WO_companion_look_preset_recall.md
 - 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
 
-## devices-config — Devices tab, settings, config generation (54)
+## devices-config — Devices tab, settings, config generation (55)
 
 - 33 IN PROGRESS [devices-config+web-client] Device view (program): index & dependency order → 33_WO_DEVICE_VIEW_INDEX.md
 - 33a OPEN [devices-config+web-client] Device view: data model, persistence, and HTTP API → 33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md
@@ -670,6 +670,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 869 DONE [devices-config+amcp,godot-client] Mapping node slices: cut a screen destination's output into slices and place th… → 869_WO_mapping_node_slices.md
 - 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
+- 958 DONE [devices-config+godot-client] Devices tab shows every server as "2026.05.20": the cluster read package.json's… → 958_WO_devices_tab_shows_frozen_package_version.md
 
 ## os-iso — ISO, sticks, kernel, NVIDIA, boot (85)
 

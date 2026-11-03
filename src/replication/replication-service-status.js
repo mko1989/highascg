@@ -18,6 +18,7 @@ function buildPeerBox(runtime, peerPing, repl) {
 		pingAgeMs: runtime?.lastPeerPingAt ? Date.now() - runtime.lastPeerPingAt : null,
 		role: ping.role || null,
 		appVersion: ping.appVersion || null,
+		buildStamp: ping.buildStamp || null, // WO-958
 		configHash: ping.configHash || null,
 		lastAppliedSeq: runtime?.peerLastAppliedSeq ?? ping.lastAppliedSeq ?? null,
 		liveStateSeq: ping.liveStateSeq ?? null,

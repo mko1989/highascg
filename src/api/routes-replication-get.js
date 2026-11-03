@@ -12,6 +12,8 @@ const { discoverAvailableLeaders } = require('../replication/discover-leaders')
 const { getReplicationMediaSyncStatus } = require('../replication/media-sync-status')
 const { getLocalSyncthingDeviceId } = require('../replication/syncthing-client')
 const pkg = require('../../package.json')
+const { readBuildStampFromDir } = require('../system/build-stamp')
+const REPO_ROOT = require('path').join(__dirname, '..', '..')
 const { getCasparEndpointForPeer } = require('../replication/caspar-endpoint')
 const { replicationTokenOk, rejectIfNotLeader, localPrimaryIp } = require('./routes-replication-shared')
 const { getLeaderActiveShowPingFields } = require('../replication/active-show-revision')
@@ -83,7 +85,8 @@ async function handleGet(path, ctx, req) {
 				appId: pingIdentity.appId,
 				role,
 				leaderAvailable: !!repl.leaderAvailable,
-				appVersion: pkg.version,
+				appVersion: pkg.version, // frozen package version: only the replication min-version gate reads it
+				buildStamp: readBuildStampFromDir(REPO_ROOT) || pkg.version, // WO-958: the version servers show (Devices tab)
 				configHash: hashConfig(ctx.config),
 				liveStateSeq: rt?.liveStateSeq ?? 0,
 				lastAppliedSeq: rt?.lastAppliedSeq ?? 0,

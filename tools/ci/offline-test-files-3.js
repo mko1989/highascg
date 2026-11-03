@@ -253,4 +253,5 @@ module.exports = [
 	'tools/smoke/smoke-wo951-gtzip-import.test.js',
 	'tools/smoke/smoke-wo955-trim-restages-prv.test.js',
 	'tools/smoke/smoke-wo956-relative-layer-keeps-playing.test.js',
+	'tools/smoke/smoke-wo958-build-stamp-version.test.js',
 ]

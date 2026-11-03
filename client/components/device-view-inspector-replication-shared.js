@@ -113,7 +113,7 @@ export function buildPeerRows(peer, st, roleLabel) {
 			value: peer.reachable ? `online · ping ${formatAgeMs(peer.pingAgeMs)}` : 'offline',
 		},
 		{ label: 'Role', value: peer.role || '—' },
-		{ label: 'App version', value: peer.appVersion || '—' },
+		{ label: 'App version', value: peer.buildStamp || peer.appVersion || '—' }, // WO-958: the build stamp
 	]
 	if (st.role === 'leader') {
 		rows.push({
