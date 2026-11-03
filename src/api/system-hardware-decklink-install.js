@@ -9,6 +9,39 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { checkNuclearPassword } = require('./routes-system-setup')
 
 const DECKLINK_INSTALL_SCRIPT = '/usr/local/lib/highascg/decklink-install-from-exfat.sh'
+/** dpkg + DKMS module build; the clients wait a little longer than this (api_timeouts.gd INSTALL_TIMEOUT_S). */
+const INSTALL_TIMEOUT_MS = 300000
+
+/**
+ * WO-941: the synchronous spawn's result shape ({ status, stdout, stderr, error }) without blocking the event loop.
+ * @returns {Promise<{ status: number|null, stdout: string, stderr: string, error?: Error }>}
+ */
+function runInstallScript(cmd, args, timeoutMs) {
+	const { spawn } = require('child_process')
+	return new Promise((resolve) => {
+		let stdout = ''
+		let stderr = ''
+		let error
+		let child
+		try {
+			child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+		} catch (e) {
+			resolve({ status: null, stdout, stderr, error: e })
+			return
+		}
+		const timer = setTimeout(() => {
+			error = new Error(`Install script timed out after ${Math.round(timeoutMs / 1000)} s`)
+			child.kill('SIGTERM')
+		}, timeoutMs)
+		child.stdout.setEncoding('utf8').on('data', (d) => (stdout += d))
+		child.stderr.setEncoding('utf8').on('data', (d) => (stderr += d))
+		child.on('error', (e) => (error = error || e))
+		child.on('close', (code) => {
+			clearTimeout(timer)
+			resolve({ status: code, stdout, stderr, error })
+		})
+	})
+}
 
 /**
  * POST /api/system/decklink/install — install or skip based on vendor availability.
@@ -32,11 +65,8 @@ async function handleDecklinkInstallPost(body, ctx) {
 	// WO-428 follow-up: the script LOGS TO STDERR — the old execFileSync read stdout only, so
 	// every result showed as "skipped: unknown". Read both streams and scan ALL lines for the
 	// last ok:/skip: marker instead of trusting a fixed line position.
-	const { spawnSync } = require('child_process')
-	const run = spawnSync('sudo', ['-n', DECKLINK_INSTALL_SCRIPT], {
-		encoding: 'utf8',
-		timeout: 300000, // 5 minutes
-	})
+	// WO-941: async — the synchronous spawn froze the whole server for the dpkg + DKMS build (every request, WS and tick).
+	const run = await runInstallScript('sudo', ['-n', DECKLINK_INSTALL_SCRIPT], INSTALL_TIMEOUT_MS)
 	const output = [run.stdout, run.stderr].filter(Boolean).join('\n').trim()
 
 	if (run.error || run.status !== 0) {
@@ -63,7 +93,7 @@ async function handleDecklinkInstallPost(body, ctx) {
 		const fs = require('fs')
 		const staged =
 			fs.existsSync(DECKLINK_LOCAL_VENDOR_DIR) && fs.readdirSync(DECKLINK_LOCAL_VENDOR_DIR).length > 0
-		if (action === 'skipped' && staged && !output.includes('vendor/decklink')) {
+		if (action === 'skipped' && staged && !output.includes('vendor/decklink') && !/already installed/.test(reason)) {
 			reason += ' — a driver package IS staged from the GUI upload, but the installed system scripts predate it. Run once: sudo bash scripts/exfat/install-exfat-systemd-units.sh — then retry Install.'
 		}
 	} catch {

@@ -4,6 +4,7 @@ extends VBoxContainer
 ## (confirm + nuclear gate). Upload only stages the package; installing is a separate, confirmed step.
 
 const NuclearGate := preload("res://app/nuclear_gate.gd")
+const Timeouts := preload("res://core/api_timeouts.gd")
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
 const K := preload("res://features/settings/pane_kit.gd")
@@ -81,8 +82,8 @@ func _on_upload() -> void:
 func _on_install() -> void:
 	K.confirm(self, "Install / update the DeckLink driver now? Capture may restart.", func() -> void:
 		_install.disabled = true
-		_result.text = "Installing…"
-		var res: Dictionary = await NuclearGate.post(self, "/api/system/decklink/install", {})
+		_result.text = "Installing… building the driver can take a few minutes."
+		var res: Dictionary = await NuclearGate.post(self, "/api/system/decklink/install", {}, null, Timeouts.INSTALL_TIMEOUT_S)
 		var d: Dictionary = res.data if res.data is Dictionary else {}
 		if res.ok and d.get("ok") == true:
 			_result.text = ("%s: %s" % [str(d.get("action", "")), str(d.reason)] if d.get("reason")

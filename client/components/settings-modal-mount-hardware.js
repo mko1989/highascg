@@ -157,7 +157,7 @@ export function wireDecklinkInstallListener(modal) {
 		}
 
 		installBtn.disabled = true
-		if (resultLine) resultLine.textContent = 'Installing…'
+		if (resultLine) resultLine.textContent = 'Installing… building the driver can take a few minutes.'
 
 		try {
 			const res = await api.post('/api/system/decklink/install', { password })

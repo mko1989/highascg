@@ -7,6 +7,9 @@ const TIMEOUT_S := 15.0
 ## out near ~100 s (RESTART, kill, 45 s AMCP wait, retry). 15 s turned a slow-but-fine Apply into "server did not answer
 ## in time" while the server finished it anyway. The cluster relay uses 110 s for these (cluster-relay.js).
 const APPLY_TIMEOUT_S := 120.0
+## WO-941: the DeckLink driver install answers when dpkg + the DKMS module build finish; the server caps the script at
+## 300 s (system-hardware-decklink-install.js INSTALL_TIMEOUT_MS). 15 s reported a successful install as an error.
+const INSTALL_TIMEOUT_S := 330.0
 
 
 ## The timeout one request runs with: `timeout_s` > 0 overrides the default.

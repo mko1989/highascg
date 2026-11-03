@@ -245,4 +245,5 @@ module.exports = [
 	'tools/smoke/smoke-wo938-operator-cursor-gap.test.js',
 	'tools/smoke/smoke-wo939-locale-guard.test.js',
 	'tools/smoke/smoke-wo940-pause-resume-no-restart.test.js',
+	'tools/smoke/smoke-wo941-decklink-install-async.test.js',
 ]

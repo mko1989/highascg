@@ -65,7 +65,10 @@ test('WO-428: tar.gz installer accepts the real nested Blackmagic archive layout
 
 test('WO-428 follow-up: Install reports the real reason and only prompts when the gate is on', () => {
 	const install = read('src/api/system-hardware-decklink-install.js')
-	assert.match(install, /spawnSync\('sudo'/, 'reads both streams (the script logs to STDERR — execFileSync saw nothing → "skipped: unknown")')
+	// WO-941: the synchronous spawn became the async runInstallScript — both pipes are still read
+	assert.match(install, /runInstallScript\('sudo'/, 'runs the script through the both-streams runner')
+	assert.match(install, /stdio: \['ignore', 'pipe', 'pipe'\]/, 'reads both streams (the script logs to STDERR — execFileSync saw nothing → "skipped: unknown")')
+	assert.match(install, /child\.stderr\.setEncoding\('utf8'\)\.on\('data'/, 'stderr is collected')
 	assert.match(install, /\[run\.stdout, run\.stderr\]/, 'stdout+stderr combined')
 	assert.ok(!install.includes('lines[lines.length - 2]'), 'no fixed-line-position parsing')
 	assert.match(install, /installed system scripts predate it/, 'stale-scripts hint when a package is staged but unseen')

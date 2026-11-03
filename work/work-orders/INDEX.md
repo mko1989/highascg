@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-850 live WOs (28 open, 121 in progress, 701 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+851 live WOs (28 open, 121 in progress, 702 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -256,7 +256,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 884 DONE [audio+engine] Live audio playing, audio-reactive visuals still: the FFT engine never followed… → 884_WO_fft_engine_missed_slot_routed_by_project_apply.md
 - 898 DONE [audio+devices-config] Audio-only channels: tiny custom video mode at the rate of the channel they feed → 898_WO_audio_only_channel_tiny_rate_matched_mode.md
 
-## video-io — DeckLink, NDI, v4l2, virtual camera, recording (29)
+## video-io — DeckLink, NDI, v4l2, virtual camera, recording (30)
 
 - 27 IN PROGRESS [video-io] Streaming Channel and UI Tab → 27_WO_STREAMING_CHANNEL.md
 - 28 DONE [video-io] DeckLink input / output routing → 28_WO_DECKLINK_INPUT_OUTPUT_ROUTING.md
@@ -287,6 +287,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 507 DONE [video-io+devices-config] An output consumer was emitted on a DeckLink bound as an INPUT → Caspar restart… → 507_WO_DECKLINK_OUTPUT_ON_AN_INPUT_CARD_RESTART_LOOP.md
 - 521 OPEN [video-io+engine] Zoom meeting module: per-participant channels, strictly opt-in → 521_WO_ZOOM_MODULE_OPT_IN.md
 - 716 DONE [video-io+caspar-build] Screen consumers: vsync always off, gpu-texture on every channel → 716_WO_vsync_always_off_gpu_texture_every_screen.md
+- 941 DONE [video-io+godot-client] DeckLink driver install reports "no response from the server" although the inst… → 941_WO_decklink_install_blocks_server_client_times_out.md
 
 ## mapping — Pixel map, screens, multiview, destinations (42)
 

@@ -15,18 +15,19 @@ class _Ask:
 
 
 ## `api`: the server to ask (WO-735: the box's own one for the dock and updates); default the connected server.
-static func post(host: Node, path: String, body: Dictionary, api: ApiScript = null) -> Dictionary:
+## `timeout_s` > 0: a long-running action (WO-941 DeckLink install) instead of the 15 s default.
+static func post(host: Node, path: String, body: Dictionary, api: ApiScript = null, timeout_s := 0.0) -> Dictionary:
 	var to: ApiScript = api if api else Api
 	var b := body.duplicate()
 	if _password != "":
 		b["password"] = _password
-	var res: Dictionary = await to.post_json(path, b)
+	var res: Dictionary = await to.post_json(path, b, timeout_s)
 	while N.needs_password(res):
 		var pw: String = await _ask(host, b.has("password"))
 		if pw == "":
 			return res
 		b["password"] = pw
-		res = await to.post_json(path, b)
+		res = await to.post_json(path, b, timeout_s)
 		if not N.needs_password(res):
 			_password = pw
 	return res
