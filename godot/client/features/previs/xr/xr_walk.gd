@@ -83,6 +83,10 @@ func _start_xr() -> bool:
 	if xi == null or not xi.is_initialized():  # initialised at startup only by --xr-mode on with a runtime present
 		return false
 	get_viewport().use_xr = true
+	# WO-957: the stage applied the render quality before use_xr was on (SMAA → black headset, Ultra's 1.5x) — again now
+	if get_viewport() is SubViewport:  # as previs_stage._on_quality: only the stage's own SubViewport takes it
+		var q := preload("res://features/previs/previs_quality.gd")
+		q.apply_viewport(get_viewport(), q.shared().current())
 	_origin = XROrigin3D.new()
 	add_child(_origin)
 	_cam = XRCamera3D.new()

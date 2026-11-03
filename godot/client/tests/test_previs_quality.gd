@@ -49,6 +49,23 @@ func test_viewport_settings() -> void:
 	sv.free()
 
 
+## WO-957: SMAA has no multiview path in Godot 4.7 — on the headset view it failed every frame and the eyes went black.
+func test_headset_view_never_gets_smaa_or_supersampling() -> void:
+	var sv := SubViewport.new()
+	sv.use_xr = true
+	for lv in [1, 2, 3]:
+		Quality.apply_viewport(sv, Quality.preset(lv))
+		t.eq(sv.screen_space_aa, Viewport.SCREEN_SPACE_AA_DISABLED, "%s: no SMAA in XR" % Quality.NAMES[lv])
+		t.ok(is_equal_approx(sv.scaling_3d_scale, 1.0), "%s: no supersampling in XR" % Quality.NAMES[lv])
+	t.eq(sv.msaa_3d, Viewport.MSAA_4X, "MSAA (multiview-safe) still follows the level")
+	sv.free()
+	# the stage applied the quality before use_xr was switched on — the walk re-applies it right after
+	var walk := FileAccess.get_file_as_string("res://features/previs/xr/xr_walk.gd")
+	var on := walk.find("get_viewport().use_xr = true")
+	var again := walk.find("q.apply_viewport(get_viewport(), q.shared().current())")
+	t.ok(on >= 0 and again > on, "xr_walk re-applies the quality after turning use_xr on")
+
+
 func test_environment_sun_floor() -> void:
 	var env := Environment.new()
 	Quality.apply_env(env, Quality.preset(3))

@@ -97,7 +97,8 @@ static func apply_viewport(vp: Viewport, p: Dictionary, compact := false) -> voi
 	if vp == null:
 		return
 	vp.msaa_3d = {0: Viewport.MSAA_DISABLED, 2: Viewport.MSAA_2X, 4: Viewport.MSAA_4X}.get(int(p.msaa), Viewport.MSAA_DISABLED)
-	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_SMAA if p.smaa else Viewport.SCREEN_SPACE_AA_DISABLED
+	# WO-957: never SMAA on the headset view — Godot 4.7's SMAA has no multiview path (framebuffer errors, black eyes)
+	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_SMAA if p.smaa and not vp.use_xr else Viewport.SCREEN_SPACE_AA_DISABLED
 	vp.use_debanding = p.deband
 	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 	vp.scaling_3d_scale = 1.0 if compact or vp.use_xr else float(p.scale)
