@@ -8,6 +8,8 @@ const IGNORES = [
 	// Runtime-generated Firefox kiosk profile (prefs.js/user.js are not our code)
 	'.operator-firefox-profile/**',
 	'dist-web/**',
+	// Godot export output (gitignored, like .gitignore's godot/**/export/): engine-generated web worklets, not our code
+	'godot/**/export/**',
 	'dist/**',
 	'dist-map/**',
 	'cef-cache/**',
