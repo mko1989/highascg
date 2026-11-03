@@ -206,6 +206,13 @@ if squash_has_path 'usr/share/initramfs-tools/hooks/live' && ! squash_has_tree '
 else
 	ok "live-boot payload matches its initramfs hook (Calamares update-initramfs)"
 fi
+# WO-939 — no `locales` package: a Calamares install keeps en_US.UTF-8 in /etc/locale.conf and Caspar cannot start
+G939=etc/systemd/system/sysinit.target.wants/highascg-locale-guard.service
+if squash_has_path usr/lib/locale/locale-archive || { squash_has_path "$G939" && squash_has_path usr/local/lib/highascg/highascg-locale-guard.sh; }; then
+	ok "installs fall back to C.UTF-8 when the chosen locale is not in the image (WO-939)"
+else
+	bad "no locale-archive and no enabled highascg-locale-guard in squashfs — installs keep a locale Caspar cannot load (WO-939)"
+fi
 
 # 22.10: a backup of the previous ISO in ~/iso-backup rode into the squashfs (+3.2 GB).
 # config/casparcg.config.iso is a Caspar config, not a disk image.

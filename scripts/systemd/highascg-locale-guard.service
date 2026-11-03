@@ -1,0 +1,15 @@
+[Unit]
+Description=HighAsCG locale guard (C.UTF-8 when /etc/locale.conf names a locale that is not installed, WO-939)
+DefaultDependencies=no
+After=local-fs.target
+Before=sysinit.target casparcg-server.service highascg.service nodm.service
+ConditionPathExists=/etc/locale.conf
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=15
+ExecStart=/usr/local/lib/highascg/highascg-locale-guard.sh
+
+[Install]
+WantedBy=sysinit.target

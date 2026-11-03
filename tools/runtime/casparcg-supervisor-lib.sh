@@ -398,3 +398,27 @@ caspar_wait_amcp_port_free() {
 	# per relaunch, with the WO-337 one-shot skip flag coordinated across both files). run.sh
 	# owns the grace now — this helper only guarantees the port is free.
 }
+
+# WO-939: is locale NAME loadable by libc? `locale` prints "Cannot set …" on stderr for one that is not installed
+# (exit 0 either way). C / POSIX / C.UTF-8 are built into glibc and always load.
+caspar_locale_available() {
+	case "$1" in C | POSIX | C.UTF-8 | C.utf8) return 0 ;; esac
+	[ -z "$(LC_ALL="$1" locale 2>&1 >/dev/null)" ]
+}
+
+# WO-939: casparcg calls std::locale("") at startup, which THROWS ("locale::facet::_S_create_c_locale name not valid")
+# when LANG / LC_* names a locale that is not installed, so it dies before AMCP and run.sh crash-loops it. Calamares
+# writes the operator's pick (default en_US.UTF-8) to /etc/locale.conf, but the image carries no `locales` package —
+# only C / C.UTF-8 / POSIX exist (192.168.0.35, 03.11.26). Caspar needs no user locale: fall back to C.UTF-8 then.
+caspar_sanitize_locale() {
+	_bad=""
+	for _v in LC_ALL LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES LC_PAPER LC_NAME \
+		LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT LC_IDENTIFICATION; do
+		eval "_val=\${$_v:-}"
+		[ -n "$_val" ] || continue
+		caspar_locale_available "$_val" || _bad="$_bad $_v=$_val"
+	done
+	[ -n "$_bad" ] || return 0
+	caspar_supervisor_log "[run.sh] locale not installed:${_bad} — starting Caspar with C.UTF-8 (WO-939)"
+	export LANG=C.UTF-8 LC_ALL=C.UTF-8
+}

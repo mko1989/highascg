@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-848 live WOs (28 open, 121 in progress, 699 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+849 live WOs (28 open, 121 in progress, 700 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -655,7 +655,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (84)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (85)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -741,6 +741,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 936 DONE [os-iso] Every Calamares install from an ISO since 30.10 failed: the exclude list droppe… → 936_WO_calamares_install_fails_live_boot_payload_excluded.md
 - 937 DONE [os-iso+network,godot-client] Live ISO: the boot network apply left the wired port with no manager (no IP, ma… → 937_WO_live_wired_port_stranded_by_network_helper_and_launcher_window.md
 - 938 DONE [os-iso+devices-config] The mouse arrow's tail showed on the Dioda wall when parked at the operator mon… → 938_WO_pointer_sprite_shows_on_program_output_past_barrier.md
+- 939 DONE [os-iso+caspar-build] Calamares installs keep a locale the image does not carry (en_US.UTF-8) and Cas… → 939_WO_calamares_install_locale_not_installed_caspar_cannot_start.md
 
 ## network — Cluster, replication, Tailscale, auth (41)
 

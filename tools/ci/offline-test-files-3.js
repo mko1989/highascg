@@ -243,4 +243,5 @@ module.exports = [
 	'tools/smoke/smoke-wo926-runtime-deps-declared.test.js',
 	'tools/smoke/smoke-wo928-bridge-device-timeout.test.js',
 	'tools/smoke/smoke-wo938-operator-cursor-gap.test.js',
+	'tools/smoke/smoke-wo939-locale-guard.test.js',
 ]

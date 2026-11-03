@@ -57,6 +57,28 @@ else
 	echo "WARN: ${REPO_LAUNCHER} missing — cannot refresh the installed launcher" >&2
 fi
 
+# WO-939: an install whose /etc/locale.conf names a locale the image does not carry (Calamares default en_US.UTF-8,
+# no `locales` package) left Caspar unable to start. The guard unit must be on THIS host to ship in the clone.
+REPO_ROOT_PF="$(cd "${HERE}/../../.." && pwd)"
+LOCALE_GUARD_SRC="${REPO_ROOT_PF}/tools/runtime/highascg-locale-guard.sh"
+LOCALE_GUARD_UNIT="${REPO_ROOT_PF}/scripts/systemd/highascg-locale-guard.service"
+if [[ -f "$LOCALE_GUARD_SRC" && -f "$LOCALE_GUARD_UNIT" ]]; then
+	install -d -m 0755 /usr/local/lib/highascg
+	install -m 0755 "$LOCALE_GUARD_SRC" /usr/local/lib/highascg/highascg-locale-guard.sh
+	install -m 0644 "$LOCALE_GUARD_UNIT" /etc/systemd/system/highascg-locale-guard.service
+	systemctl daemon-reload
+	systemctl enable highascg-locale-guard.service >/dev/null 2>&1
+	if systemctl is-enabled --quiet highascg-locale-guard.service; then
+		echo "==> highascg-locale-guard.service installed + enabled (WO-939)"
+	else
+		echo "ERROR: highascg-locale-guard.service did not enable — the ISO would ship without it" >&2
+		exit 1
+	fi
+else
+	echo "ERROR: WO-939 locale guard sources missing (${LOCALE_GUARD_SRC}, ${LOCALE_GUARD_UNIT})" >&2
+	exit 1
+fi
+
 # shellcheck source=eggs-cli-lib.sh
 source "${HERE}/eggs-cli-lib.sh"
 if [[ "$(highascg_eggs_flavor)" == "new" ]]; then

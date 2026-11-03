@@ -49,6 +49,7 @@ flock -n 9 || exit 0
 
 # shellcheck source=casparcg-supervisor-lib.sh
 . "${CASPAR_ROOT}/tools/runtime/casparcg-supervisor-lib.sh"
+caspar_sanitize_locale
 
 _inhibit="${CASPAR_INHIBIT_FILE:-}"
 if [ -z "$_inhibit" ]; then
