@@ -164,8 +164,9 @@ func set_running(on: bool) -> void:
 	_update()
 
 
-## One frame: the fade-in / fade-out weights move; a layer that has faded out is freed.
+## One frame: the fade-in / fade-out weights move; a layer that has faded out is freed; the backdrop follows the base's tint.
 func step(delta: float) -> void:
+	_backdrop()
 	var moved := false
 	for s in slots + leaving:
 		if s.w != s.to:
@@ -216,8 +217,10 @@ func _slot(l: Dictionary, cfgs: Dictionary) -> Dictionary:
 	return {"vp": vp, "stage": st, "rect": rect, "mat": mat, "key": L.key(l), "layer": l, "w": 1.0, "to": 1.0, "at": 0}
 
 
-## Drawing order: the stack, each fading-out layer back at its old place; the bottom layer is the base (opaque, the tinted
-## background), every other one renders on a transparent black world.
+## Drawing order: the stack, each fading-out layer back at its old place. Every layer renders on a transparent world; the
+## bottom one is the base, whose tinted background the deck paints behind the stack (_backdrop). WO-945: the base used to
+## switch its viewport to an opaque background, and a SubViewport whose transparent_bg flips draws nothing for that frame —
+## removing (or moving) the bottom layer flashed the layer that was leaving under it.
 func _order() -> void:
 	var order := slots.duplicate()
 	var gone := leaving.duplicate()
@@ -227,8 +230,7 @@ func _order() -> void:
 	for i in order.size():
 		out.move_child(order[i].rect, i + 1)  # 0 is the black backdrop
 	for i in slots.size():
-		slots[i].stage.set_base(i == 0)
-		slots[i].vp.transparent_bg = i != 0
+		slots[i].stage.set_base(i == 0)  # WO-945: the tint and a game's overlay mode only — the viewport stays transparent
 
 
 func _reap() -> void:
@@ -246,10 +248,21 @@ func _free(s: Dictionary) -> void:
 		s.vp.get_parent().remove_child(s.vp)
 
 
+## The base layer's background (its hue + audio flash, visuals_stage.gd bg_tint) behind the stack, at the base's opacity:
+## what its opaque world used to give, the fader dimming it to black as before.
+func _backdrop() -> void:
+	var c := Color.BLACK
+	if not slots.is_empty():
+		var b: Dictionary = slots[0]
+		c = (b.stage.bg_tint as Color) * float(b.get("a", 0.0))
+	_back.color = Color(c.r, c.g, c.b, 1.0)
+
+
 func _update() -> void:
 	for s in slots + leaving:
 		var l: Dictionary = s.layer
 		var a := float(l.get("opacity", 1.0)) * (1.0 if l.get("visible", true) else 0.0) * float(s.w)
+		s.a = a
 		var sh := _shader(str(l.get("blend", "normal")))
 		if s.mat.shader != sh:
 			s.mat.shader = sh

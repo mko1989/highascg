@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-854 live WOs (28 open, 121 in progress, 705 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+855 live WOs (28 open, 121 in progress, 706 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -372,7 +372,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (118)
+## godot-client — Godot client (119)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -492,6 +492,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 919 DONE [godot-client+engine,devices-config,mapping] WO-918 follow-ups: the findings the 01.11 fix round left open → 919_WO_gui_sweep_followups.md
 - 920 DONE [godot-client+devices-config,mapping] Operator GUI destination: a second output dot for the second operator monitor (… → 920_WO_operator_gui_second_monitor_dot.md
 - 944 DONE [godot-client+mapping] Mapping node: "Place outputs" — drag each output, at its own resolution, onto t… → 944_WO_mapping_place_outputs_on_the_canvas.md
+- 945 DONE [godot-client] Visuals: removing the bottom layer flashed it for a frame → 945_WO_visuals_bottom_layer_removal_flash.md
 
 ## web-client — Web client (82)
 

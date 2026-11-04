@@ -38,6 +38,7 @@ var start_scene := "rings"  # WO-877: "" for the mixer's idle deck
 ## WO-890: false = an upper layer of a deck (visuals_deck.gd): its world renders over the layers below, so the background is
 ## black (no tint, no flash — the bottom layer has them) and a game keys its black out like the old layer 2.
 var base := true
+var bg_tint := Color.BLACK  # WO-945: the base layer's background (hue + flash) — the deck paints it behind the stack
 ## WO-896: the orbit pose (yaw, pitch, dist; visuals_camera.gd) of this stage's camera — the deck sets it on every layer, so a stack
 ## stays aligned; Flow's cam_* params offset it each frame. HOME = the old fixed camera at (0, 0, 14).
 var pose := Cam.HOME:
@@ -56,6 +57,7 @@ func _ready() -> void:
 	var we := WorldEnvironment.new()
 	_env = Environment.new()
 	_env.background_mode = Environment.BG_COLOR
+	_env.background_color = Color.BLACK  # WO-945: never tinted here — the deck paints the base tint (bg_tint)
 	_env.glow_enabled = true
 	_env.glow_hdr_threshold = 0.9  # only the content blooms, never the background
 	_env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
@@ -201,4 +203,6 @@ func _process(delta: float) -> void:
 	var glow := float(p.get("glow", 0.3))
 	var flash := maxf(float(p.get("flash", 0.0)), _flash * 0.4)
 	_env.glow_intensity = 0.4 + glow * 1.6
-	_env.background_color = Color.from_hsv(fposmod(hue + 0.5, 1.0), 0.6, 0.02 + flash * 0.25) if base else Color.BLACK
+	# WO-945: every layer renders on a transparent world (flipping a live viewport's transparent_bg blanks it for a frame);
+	# the base's tint (hue + flash) is drawn by the deck behind the stack instead (visuals_deck.gd _backdrop).
+	bg_tint = Color.from_hsv(fposmod(hue + 0.5, 1.0), 0.6, 0.02 + flash * 0.25) if base else Color.BLACK

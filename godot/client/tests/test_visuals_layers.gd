@@ -91,13 +91,34 @@ func test_runs_highlight() -> void:
 	p.free()
 
 
+## WO-945 (owner 04.11: "removing the bottom layer gives the glitch, not the top one"): a SubViewport whose transparent_bg
+## flips draws nothing for that frame (probed on the box: the texture's centre went red → black → red), and the base used to
+## flip to opaque — removing the bottom layer flashed the leaving one through the new base. No viewport flips any more; the
+## base's tint is painted behind the stack by the deck.
+func test_removing_the_bottom_layer_flips_no_viewport() -> void:
+	var d: Node = Deck.new()
+	d.apply(L.normalize([{"scene": "tunnel"}, {"scene": "particles", "opacity": 0.5}]), {}, 0.0)
+	var top: Dictionary = d.slots[1]
+	top.stage.base = false
+	d.apply(L.normalize([{"scene": "particles", "opacity": 0.5}]), {}, 1.0)
+	t.ok(d.slots[0] == top, "the top layer keeps running and becomes the base")
+	t.eq([top.stage.base, top.vp.transparent_bg], [true, true], "base now, its viewport untouched (still transparent)")
+	t.eq([d.leaving.size(), d.leaving[0].at, d.leaving[0].vp.transparent_bg], [1, 0, true],
+		"the removed bottom fades out under it, on a transparent world too")
+	t.ok(d.leaving[0].rect.get_index() < top.rect.get_index(), "drawn below the new base, not over it")
+	top.stage.bg_tint = Color(0.2, 0.4, 0.6)
+	d.step(0.0)
+	t.eq(d.get("_back").color, Color(0.1, 0.2, 0.3, 1.0), "the backdrop = the new base's tint at its opacity (50 %)")
+	d.free()
+
+
 func test_deck_edits_in_place() -> void:
 	var d: Node = Deck.new()
 	d.apply(L.normalize([{"scene": "tunnel"}, {"scene": "particles"}]), {}, 0.0)
 	var tunnel: Node3D = d.stage_at(0)
 	t.eq([d.ids(), d.slots[0].w, d.slots[1].w], [["tunnel", "particles"], 1.0, 1.0], "a cut: both at full weight")
 	t.eq([d.slots[0].stage.base, d.slots[1].stage.base, d.slots[0].vp.transparent_bg, d.slots[1].vp.transparent_bg],
-		[true, false, false, true], "the bottom layer is the base (opaque, tinted); the one above is transparent")
+		[true, false, true, true], "the bottom layer is the base (tinted by the deck, WO-945); every layer world is transparent")
 	t.eq(d.slots[1].stage.layers[0].name, "particles", "one scene per layer world")
 	d.apply(L.normalize([{"scene": "tunnel", "opacity": 0.5}, {"scene": "particles"}, {"scene": "rings"}]), {}, 1.0)
 	t.ok(d.stage_at(0) == tunnel, "an unchanged layer keeps running (same stage)")
