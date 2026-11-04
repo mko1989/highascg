@@ -25,7 +25,9 @@ const {
 	readDecklinkConsumerSettings,
 	resolveDecklinkConsumerKeyer,
 	decklinkPixelFormatXml,
+	normalizeDecklinkPixelFormat,
 } = require('./decklink-key-fill')
+const { decklinkSubregionXml } = require('./decklink-v210-subregion')
 const {
 	resolveDecklinkVideoModeForTarget,
 	channelVideoModeForDecklinkConsumer,
@@ -51,8 +53,9 @@ function buildDecklinkTiledConsumersXml(tiles, opts = {}) {
 			keyer: opts.keyer,
 		}),
 	)}</keyer>`
-	const subBlock = (t, indent) =>
-		`${indent}<subregion>\n${indent}    <src-x>${t.srcX}</src-x>\n${indent}    <src-y>${t.srcY}</src-y>\n${indent}    <dest-x>${t.destX}</dest-x>\n${indent}    <dest-y>${t.destY}</dest-y>\n${indent}    <width>${t.width}</width>\n${indent}    <height>${t.height}</height>\n${indent}</subregion>`
+	/* WO-942: on the 2.5.1 binary a yuv (v210) port with width/height/dest-x outputs solid green — those are dropped. */
+	const pixelFormat = normalizeDecklinkPixelFormat(opts.consumerSettings?.pixelFormat)
+	const subBlock = (t, indent) => decklinkSubregionXml(t, pixelFormat, indent)
 	const portBody = (t, indent) =>
 		`\n${indent}<device>${t.device}</device>\n${indent}    <key-only>false</key-only>\n${indent}     <buffer-depth>3</buffer-depth>\n${indent}     <video-mode>${escapeXml(t.videoMode)}</video-mode>\n${subBlock(t, indent)}`
 	const primary = tiles[0]

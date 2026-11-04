@@ -246,4 +246,5 @@ module.exports = [
 	'tools/smoke/smoke-wo939-locale-guard.test.js',
 	'tools/smoke/smoke-wo940-pause-resume-no-restart.test.js',
 	'tools/smoke/smoke-wo941-decklink-install-async.test.js',
+	'tools/smoke/smoke-wo942-v210-subregion.test.js',
 ]
