@@ -1,6 +1,6 @@
 extends "res://features/devices/host_controls_base.gd"
 ## WO-869 — the slice section of the mapping node's Inspector page (owner Q1: the Inspector holds the slice list and
-## the numeric fields; "Edit slices" opens the two canvases in the Devices tab centre). Built from
+## the numeric fields; "Edit mapping" opens the editor in the Devices tab centre). Built from
 ## slice_page_model.gd items into `box`, which mapping_controls.gd mounts on its page. Edits go through the shared
 ## slice_flow.gd; a canvas drag updates the numbers here in place (a focused field is left alone).
 ## Number fields are RULES.md math fields (NumericField.math_line: focus selects, + - * / evaluate, garbage reverts).

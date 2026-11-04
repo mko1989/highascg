@@ -13,7 +13,7 @@ extends MarginContainer
 ## Slice 7: a click on the rear panel's background (not a port, cable or "+") opens the Caspar server page
 ## (server_controls.gd — frame rate, CEF, network, hot backup), like the web's casparBand → selectDevice(CASPAR_HOST).
 ## Slice 7c: the "Mapping nodes" column (mapping_panel.gd); a card or a mapping connector opens the node page
-## (mapping_controls.gd), whose "Edit slices" (WO-869) shows slice_editor.gd in place of the body.
+## (mapping_controls.gd), whose "Edit mapping" (WO-869 / WO-944) shows slice_editor.gd in place of the body.
 ## Slice 8: the header's download arrow saves a device snapshot (snapshot_dialogs.gd). Slice 10: the toolbar toggles
 ## the Matrix view (matrix_view.gd) and the Node view (node_panel.gd, Bézier cables). Cables list: cables_list.gd.
 
@@ -143,7 +143,7 @@ func _ready() -> void:
 		page.status.connect(_set_status)
 		page.dirty.connect(func() -> void: _gesture.set_dirty(true))
 		page.reload.connect(func(_dirty: bool) -> void: refresh())
-	_slices = SliceEditor.new()  # WO-869: "Edit slices" — the node's canvases in place of the body
+	_slices = SliceEditor.new()  # WO-869 / WO-944: "Edit mapping" — the node's canvases in place of the body
 	_slices.visible = false
 	v.add_child(_slices)
 	_slices.closed.connect(_close_slices)

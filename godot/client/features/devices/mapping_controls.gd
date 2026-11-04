@@ -7,7 +7,7 @@ extends "res://features/devices/host_controls_base.gd"
 ## are math inputs that evaluate and clamp first (the web commits math after `change` — WO-605 slice 7c notes).
 ## Not ported: "Show Mapping Preview" (the pixel-map editor is outside WO-605).
 ## WO-869: the per-output Src fields gave way to the slice section (slice_inspector.gd over slice_flow.gd, mounted
-## before "Actions"); its "Edit slices" asks the Devices tab for the centre canvases (`edit_slices`).
+## before "Actions"); its "Edit mapping" asks the Devices tab for the centre canvases (`edit_slices`).
 
 signal dirty()
 signal edit_slices()

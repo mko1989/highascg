@@ -22,6 +22,7 @@ var slices: Array = []
 var outputs: Array = []  # [{id, label, w, h}]
 var plans: Array = []  # the node's mappingSlicePlans entry, as a one-element list (SP.plan_row reads lists)
 var input := Vector2(1920, 1080)  # the feed raster the src rects live in
+var input_label := ""  # WO-944: the screen destination cabled into the node ("" = not cabled)
 var channel := 0  # PGM channel feeding the node (0 = not cabled / unknown)
 var screen := 0  # program screen feeding the node (1-based; 0 = not cabled): the canvases show surface "pgm<screen>"
 var sel := -1
@@ -49,6 +50,7 @@ func load_payload(payload: Dictionary, id: String, channel_map: Variant = null) 
 	var res_in := M.input_resolution(payload, id)
 	if not res_in.is_empty():
 		input = Vector2(maxf(1.0, float(res_in.width)), maxf(1.0, float(res_in.height)))
+	input_label = R.s(res_in.get("label"))
 	var feed := SP.feed_screen(payload, id, channel_map)
 	screen = int(feed.get("screen", 0))
 	channel = int(feed.get("channel", 0))

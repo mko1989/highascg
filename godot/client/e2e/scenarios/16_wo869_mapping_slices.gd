@@ -1,6 +1,6 @@
 extends "res://e2e/e2e_scenario.gd"
 ## WO-869 — mapping-node slices, walked as the operator does it: a PGM destination cabled into a mapping node whose
-## Output 1 goes to a GPU head; the node page's slice section (no per-output Src fields any more); "Edit slices" puts
+## Output 1 goes to a GPU head; the node page's slice section (no per-output Src fields any more); "Edit mapping" → "Free slices" puts
 ## the input and output canvases in the Devices tab centre; two slices drawn on the input picture with real drags;
 ## on the output: move one, rotate it with the knob, keystone a corner in Warp mode, flip it; numbers typed in the
 ## Inspector (maths, gibberish reverts — RULES.md); Done brings the panels back. After every gesture the server's
@@ -93,18 +93,23 @@ func run() -> void:
 		var why: String = await ui.click(card)
 		if why != "":
 			return why
-		var edit: BaseButton = await ui.wait_for(func() -> Variant: return ui.button("Edit slices"), 8.0)
+		var edit: BaseButton = await ui.wait_for(func() -> Variant: return ui.button("Edit mapping"), 8.0)
 		if edit == null:
-			return "no Edit slices button on the node page"
+			return "no Edit mapping button on the node page"
 		if ui.find("Label", "Src X") != null:
 			return "the per-output Src X field is still on the page"
 		return expect(ui.find("Label", "Output 1: Not cabled", null, false) == null, "Output 1 is cabled to a GPU head but reads Not cabled")
 	)
-	await step("Edit slices → the two canvases take the centre", func() -> String:
-		var why: String = await ui.click(ui.button("Edit slices"))
+	await step("Edit mapping → Free slices → the two canvases take the centre", func() -> String:
+		var why: String = await ui.click(ui.button("Edit mapping"))
 		if why != "":
 			return why
 		ed = tab.get("_slices")
+		if str(ed.get("view")) != "place":
+			return "a node without slices should open in Place outputs (WO-944), got %s" % ed.get("view")
+		why = await ui.click(ui.button("Free slices"))  # WO-944: drawing slices is the Free slices view
+		if why != "":
+			return why
 		src_cv = ed.get("src")
 		dst_cv = ed.get("dst")
 		await ui.frames(4)

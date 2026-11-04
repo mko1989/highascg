@@ -74,9 +74,9 @@ static func items(slices: Array, outputs: Array, sel: int, drawn := []) -> Array
 	var out := [{"t": "heading", "text": "Slices"}]
 	for d in drawn:
 		out.append({"t": "readout", "text": "%s: %s" % [d[0], d[1]]})
-	out.append({"t": "button", "text": "Edit slices", "key": "slices.edit"})
+	out.append({"t": "button", "text": "Edit mapping", "key": "slices.edit"})
 	if slices.is_empty():
-		out.append({"t": "note", "text": "No slices: nothing is drawn on the outputs. Add one, or draw it on the input picture in Edit slices."})
+		out.append({"t": "note", "text": "No slices: nothing is drawn on the outputs. Add one, or place the outputs in Edit mapping."})
 	for i in slices.size():
 		var s: Dictionary = slices[i]
 		out.append({"t": "slice_row", "i": i, "selected": i == sel, "enabled": SM.not_false(s.get("enabled")),
