@@ -6,7 +6,8 @@
  *
  * 1. `INFO <ch>` for each channel until one carries a screen consumer: the fork reports `<slices>n</slices>` in every
  *    screen consumer's state, stock 2.5.1 does not (config/caspar-caps.js `screenSlicesFromInfoXml`). Read-only.
- * 2. No screen consumer anywhere (all heads on DeckLink, or nothing configured yet): `APPLY <ch>-65535 SLICES CLEAR`.
+ * 2. No screen consumer anywhere, and a mapping output IS cabled to a GPU head (WO-943 — otherwise the answer changes
+ *    nothing and the probe is skipped, `source: not-needed`): `APPLY <ch>-65535 SLICES CLEAR`.
  *    No consumer has index 65535, so nothing changes; a binary without the APPLY command answers 400 (no slices for
  *    certain), one with it answers 403 "no consumer" (APPLY exists, slices still unknown → left null).
  *
@@ -22,6 +23,20 @@ const NO_CONSUMER_INDEX = 65535
 function isUnknownCommandError(e) {
 	const msg = String(e?.message || e || '')
 	return /^400\b|COMMAND_UNKNOWN|Command not understood/i.test(msg)
+}
+
+/**
+ * WO-943: the caps only change what a mapping output cabled to a GPU head gets (a slice window or the legacy head
+ * layout); DeckLink outputs are planned the same either way. Without such a cable the APPLY probe cannot change any
+ * decision — and on the fork it always answers 403 ("unknown"), logged as an error twice per reconnect.
+ * @param {{ devices?: any[], connectors?: any[], edges?: any[] }|null|undefined} dg
+ */
+function mappingFeedsGpuHead(dg) {
+	const connectors = Array.isArray(dg?.connectors) ? dg.connectors : []
+	const byId = new Map(connectors.map((c) => [String(c?.id || ''), c]))
+	return (Array.isArray(dg?.edges) ? dg.edges : []).some(
+		(e) => byId.get(String(e?.sourceId || ''))?.kind === 'pixel_map_out' && byId.get(String(e?.sinkId || ''))?.kind === 'gpu_out',
+	)
 }
 
 /** Channel numbers from a bare `INFO` reply ("1 1080p5000 PLAYING" per line). */
@@ -63,6 +78,9 @@ async function probeCasparCaps(ctx) {
 		return caps
 	}
 	if (!channels.length) return null
+	if (!mappingFeedsGpuHead(ctx?.config?.deviceGraph)) {
+		return setCasparCaps({ screenSlices: null, source: 'not-needed' })
+	}
 	try {
 		await amcp.raw(`APPLY ${channels[0]}-${NO_CONSUMER_INDEX} SLICES CLEAR`)
 	} catch (e) {
@@ -74,4 +92,4 @@ async function probeCasparCaps(ctx) {
 	return setCasparCaps({ screenSlices: null, source: 'no-screen-consumer' })
 }
 
-module.exports = { probeCasparCaps, isUnknownCommandError }
+module.exports = { probeCasparCaps, isUnknownCommandError, mappingFeedsGpuHead }

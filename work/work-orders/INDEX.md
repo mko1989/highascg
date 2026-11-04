@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-852 live WOs (28 open, 121 in progress, 703 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+853 live WOs (28 open, 121 in progress, 704 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -170,7 +170,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 930 DONE [engine+os-iso] A stick-booted box overwrites a newer local project with the stick's older, lar… → 930_WO_stick_copy_overwrites_newer_local_project.md
 - 940 DONE [engine+amcp] Spacebar pause → play sometimes flashes black: resume restarted the producer in… → 940_WO_timeline_pause_resume_black_flash.md
 
-## amcp — AMCP client and protocol (19)
+## amcp — AMCP client and protocol (20)
 
 - 07 DONE [amcp] Complete AMCP Protocol API Implementation → 07_WO_AMCP_PROTOCOL_API.md
 - 08 DONE [amcp+audio] CasparCG Client Features — OSC status, VU meters, layer/channel status → 08_WO_CASPARCG_CLIENT_FEATURES.md
@@ -191,6 +191,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 754 DONE [amcp+os-iso] The AMCP watchdog kills the Caspar the start-up launcher just released → 754_WO_amcp_watchdog_kills_caspar_released_by_boot_launcher.md
 - 845 DONE [amcp+lighting] Sweep: AMCP client, Art-Net/sACN, audio and media bugs → 845_WO_sweep_amcp_dmx_audio_media.md
 - 867 DONE [amcp+os-iso] Caspar build: CasparCG/server#1762 effects (BLUR / SHARPEN / GRAIN) brought up… → 867_WO_caspar_pr1762_effects_fixes.md
+- 943 DONE [amcp+mapping] "APPLY 1-65535 SLICES CLEAR … 403 APPLY FAILED" logged as an error on every Cas… → 943_WO_caps_probe_apply_noise_without_gpu_mapping.md
 
 ## caspar-build — CasparCG server build and binaries (12)
 

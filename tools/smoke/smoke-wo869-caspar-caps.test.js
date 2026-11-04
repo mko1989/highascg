@@ -15,7 +15,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const defaults = require('../../src/config/defaults')
 const Caps = require('../../src/config/caspar-caps')
-const { probeCasparCaps, isUnknownCommandError } = require('../../src/engine/caspar-caps-probe')
+const { probeCasparCaps, isUnknownCommandError, mappingFeedsGpuHead } = require('../../src/engine/caspar-caps-probe')
 const Plan = require('../../src/config/mapping-slices-plan')
 const { buildCasparGeneratorFlatConfig } = require('../../src/config/build-caspar-generator-config')
 const { reapplyAllMappingSlices } = require('../../src/engine/mapping-slices-apply')
@@ -86,13 +86,28 @@ describe('WO-869 caps: the connect probe', () => {
 	})
 
 	it('no screen consumer: APPLY to index 65535 (cannot exist) — 400 = no slices, 403 = still unknown', async () => {
+		/* WO-943: only asked when a mapping output is cabled to a GPU head (the fixture below has two). */
 		const stock = fakeAmcp({ 1: '', 2: '' }, { apply: 'COMMAND_UNKNOWN_DATA: APPLY 1-65535 SLICES CLEAR' })
-		assert.equal((await probeCasparCaps({ amcp: stock })).screenSlices, false)
+		assert.equal((await probeCasparCaps({ amcp: stock, config: appConfig() })).screenSlices, false)
 		assert.deepEqual(stock.sent.slice(-1), ['APPLY 1-65535 SLICES CLEAR'])
 		const fork = fakeAmcp({ 1: '' }, { apply: '403 APPLY FAILED' })
-		const caps = await probeCasparCaps({ amcp: fork })
+		const caps = await probeCasparCaps({ amcp: fork, config: appConfig() })
 		assert.equal(caps.screenSlices, null)
 		assert.equal(caps.source, 'no-screen-consumer')
+	})
+
+	it('WO-943: no mapping output on a GPU head (all-DeckLink rig) → no APPLY at all, caps stay unknown', async () => {
+		const config = appConfig()
+		const dg = config.deviceGraph
+		for (const c of dg.connectors) if (c.kind === 'gpu_out') Object.assign(c, { kind: 'decklink_io', externalRef: '3' })
+		assert.equal(mappingFeedsGpuHead(dg), false)
+		assert.equal(mappingFeedsGpuHead(appConfig().deviceGraph), true)
+		const fork = fakeAmcp({ 1: '', 2: '' }, { apply: '403 APPLY FAILED' })
+		const caps = await probeCasparCaps({ amcp: fork, config })
+		assert.equal(caps.screenSlices, null)
+		assert.equal(caps.source, 'not-needed')
+		assert.ok(!fork.sent.some((l) => l.startsWith('APPLY')), fork.sent.join(' | '))
+		assert.equal((await probeCasparCaps({ amcp: fakeAmcp({ 1: '' }, {}) })).source, 'not-needed', 'no graph at all')
 	})
 
 	it('never sends SLICES SET (the WO-proposed `SLICES SET 0` would clear a live slice window)', () => {
