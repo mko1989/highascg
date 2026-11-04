@@ -116,6 +116,13 @@ func handle_msg(msg: Dictionary) -> void:
 func _move(b: Dictionary, msg: Dictionary, c: Range, hello := false) -> void:
 	if msg.kind != "cc" or c == null or not c.editable:
 		return
+	if msg.get("virtual", false):  # WO-946: the drawn unit, moved with the mouse — set as is, no pickup (visuals_midi_apc.gd turn)
+		var was := c.value
+		c.ratio = float(msg.ratio)
+		if not c.is_inside_tree() and c.value != was:
+			c.value_changed.emit(c.value)
+		_say("%s (virtual) → %s %s" % [_name(msg), MidiMap.target_label(b.target), _value_text(b.target, c)])
+		return
 	var k := MidiMap.key(b)
 	if not pick.has(k):
 		pick[k] = Pickup.new_state()

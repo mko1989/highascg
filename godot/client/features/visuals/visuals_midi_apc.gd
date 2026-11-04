@@ -15,7 +15,7 @@ const Surface := preload("res://features/midi/apc40_surface.gd")
 const Layers := preload("res://features/visuals/visuals_layers.gd")
 const Catalog := preload("res://features/visuals/visuals_catalog.gd")
 const FALLBACK := ["param:cam_yaw", "param:cam_pitch", "param:cam_zoom", "param:burst"]
-const HINT := "Controller: what every APC40 control does now — move one to see it light up · click a button or pad to press it, a knob / fader (or right-click anything) to Learn it · drop a visual on a pad · ◀ ▶ = edit bank A / B"
+const HINT := "Controller: what every APC40 control does now, and a virtual one — drag a fader, drag a knob up / down (or the wheel), click a button or pad to press it · right-click anything to Learn it · drop a visual on a pad · ◀ ▶ = edit bank A / B"
 
 var midi: Node
 var surface: Surface
@@ -29,6 +29,7 @@ func _init(m: Node) -> void:
 	surface.info_cb = info
 	surface.picked.connect(_learn)
 	surface.clicked.connect(_click)
+	surface.turned.connect(turn)
 	surface.can_drop_cb = func(c: Dictionary, data: Variant) -> bool: return midi.clips.is_grid(int(c.num)) and c.shape == "pad" and Catalog.parse(data) != null
 	surface.dropped.connect(func(c: Dictionary, data: Variant) -> void: midi.clips.drop(int(c.num), data))
 
@@ -141,7 +142,8 @@ func info(c: Dictionary) -> Dictionary:
 		"color": midi.clips.color(int(c.num)) if t.begins_with("clip:") and ctl != null else null}
 
 
-## WO-913: a click on a mapped button or pad presses it (as the hardware would); on a knob, fader or unmapped control it Learns.
+## WO-913: a click on a mapped button or pad presses it (as the hardware would); on an unmapped control (or a knob / fader whose
+## target is not there now — a mapped one is dragged instead, WO-946) it Learns.
 func _click(c: Dictionary) -> void:
 	var b := MidiMap.find(midi.map, L.msg_of(c))
 	if b.is_empty() or MidiMap.is_range(b.target) or c.kind != "note":
@@ -150,7 +152,15 @@ func _click(c: Dictionary) -> void:
 	midi.handle_msg({"kind": "note", "ch": maxi(0, int(c.ch)), "num": int(c.num), "val": 127})
 
 
-## A right-click (or a click on a knob / fader / unmapped control): Learn for it — the next click in the Inspector picks what it drives.
+## WO-946: a fader / knob moved with the mouse — the message the unit would send, marked virtual: it drives the same target
+## (and Learns in Learn mode), but sets the value as it is (no pickup — the drawing already sits at the app value) and leaves
+## the hardware's pickup state alone, so the real fader waits for the new value like after any other edit.
+func turn(c: Dictionary, ratio: float) -> void:
+	var v := clampf(ratio, 0.0, 1.0)
+	midi.handle_msg({"kind": "cc", "ch": maxi(0, int(c.ch)), "num": int(c.num), "val": roundi(v * 127.0), "ratio": v, "virtual": true})
+
+
+## A right-click (or a click on an unmapped control, or one whose target is not there now): Learn for it — the next click in the Inspector picks what it drives.
 func _learn(c: Dictionary) -> void:
 	midi._set_mode("learn")
 	midi._captured(L.msg_of(c))

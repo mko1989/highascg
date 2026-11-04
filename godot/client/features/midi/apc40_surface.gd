@@ -4,6 +4,8 @@ extends Control
 ## buttons lit like their target (the midi_leds.gd states: there / showing / alert), unmapped controls dim. A control
 ## flashes when it is touched, so moving anything on the unit shows where it is and what it drove. Hover = the full line;
 ## a click asks `clicked` (WO-913: the host presses a mapped button / pad, else Learns it), a right-click `picked` (Learn).
+## WO-946: played with the mouse like the unit — a mapped fader / crossfader is grabbed and dragged (from where its cap is,
+## never a jump), a knob or encoder is turned by dragging up / down or with the wheel: `turned(control, ratio 0..1)`.
 ## Pure drawing: the host answers `info_cb`.
 ##   info_cb(control) → {label: String ("" = unmapped), value: float (0..1, -1 = none), lit: int (0..3), waiting: bool,
 ##                       hw: float (the physical position while waiting, -1 = unknown), line: String (the tooltip),
@@ -16,10 +18,14 @@ const LIT := [Color(0.2, 0.21, 0.23), Color(0.42, 0.44, 0.47), Color(0.25, 0.75,
 const AMBER := Color(1.0, 0.72, 0.2)
 const TEXT := Color(0.86, 0.88, 0.9)
 const DIM := Color(0.45, 0.47, 0.5)
+const KNOB_PX := 160.0  # WO-946: a knob's full turn = this many screen px of vertical drag
+const WHEEL := 2.0 / 127.0  # one wheel notch = two 7-bit steps
+const RANGES := ["fader", "xfader", "knob", "encoder"]
 
 signal picked(control: Dictionary)
 signal clicked(control: Dictionary)
 signal dropped(control: Dictionary, data: Variant)
+signal turned(control: Dictionary, ratio: float)  # WO-946: a mouse drag / wheel on a mapped fader, knob or encoder
 
 var info_cb: Callable
 var can_drop_cb: Callable
@@ -28,6 +34,7 @@ var _touched := {}  # control key → msec
 var _scale := 1.0
 var _origin := Vector2.ZERO
 var _tick: Timer
+var _drag := {}  # WO-946: {c, v0 (the value it was grabbed at), at (mouse px), v (last sent)}
 
 
 func _init() -> void:
@@ -87,16 +94,78 @@ func _get_tooltip(at: Vector2) -> String:
 	if c.is_empty():
 		return ""
 	var line := str(_info(c).get("line", ""))
-	return line if line != "" else "%s — not mapped (click to Learn it)" % c.name
+	if line == "":
+		return "%s — not mapped (click to Learn it)" % c.name
+	return line + ("\nDrag it (or the wheel) · right-click to Learn" if playable(c) >= 0.0 else "")
 
 
 func _gui_input(e: InputEvent) -> void:
-	var mb := e as InputEventMouseButton
-	if mb and mb.pressed and mb.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
-		var c := control_at(mb.position)
-		if not c.is_empty():
-			(clicked if mb.button_index == MOUSE_BUTTON_LEFT else picked).emit(c)
+	var mm := e as InputEventMouseMotion
+	if mm:
+		if not _drag.is_empty():
+			_drag_to(mm.position)
 			accept_event()
+		else:
+			mouse_default_cursor_shape = _cursor(control_at(mm.position))
+		return
+	var mb := e as InputEventMouseButton
+	if mb == null:
+		return
+	if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed and not _drag.is_empty():
+		_drag = {}
+		accept_event()
+		return
+	if mb.pressed and mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		var w := control_at(mb.position)
+		var v := playable(w)
+		if v >= 0.0:
+			turned.emit(w, clampf(v + (WHEEL if mb.button_index == MOUSE_BUTTON_WHEEL_UP else -WHEEL), 0.0, 1.0))
+			accept_event()
+		return
+	if mb.pressed and mb.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+		var c := control_at(mb.position)
+		if c.is_empty():
+			return
+		accept_event()
+		if mb.button_index == MOUSE_BUTTON_LEFT and playable(c) >= 0.0:
+			_drag = {"c": c, "v0": playable(c), "at": mb.position, "v": playable(c)}  # grabbed where it is: nothing sent yet
+			return
+		(clicked if mb.button_index == MOUSE_BUTTON_LEFT else picked).emit(c)
+
+
+## WO-946: the value a mouse can move this control from (0..1), or -1 (a button, unmapped, or its target is not there now).
+func playable(c: Dictionary) -> float:
+	if c.is_empty() or not c.shape in RANGES:
+		return -1.0
+	var d := _info(c)
+	return float(d.value) if d.label != "" and float(d.value) >= 0.0 else -1.0
+
+
+## The grabbed control's value for the mouse at `at`: a fader follows the mouse along its slot, a knob 0→1 over KNOB_PX up.
+func drag_value(c: Dictionary, v0: float, from: Vector2, at: Vector2) -> float:
+	var b := _box(c.rect)
+	var d := at - from
+	match c.shape:
+		"fader":
+			return clampf(v0 - d.y / maxf(b.size.y, 1.0), 0.0, 1.0)
+		"xfader":
+			return clampf(v0 + d.x / maxf(b.size.x, 1.0), 0.0, 1.0)
+	return clampf(v0 - d.y / KNOB_PX, 0.0, 1.0)
+
+
+func _drag_to(at: Vector2) -> void:
+	var v := drag_value(_drag.c, float(_drag.v0), _drag.at, at)
+	if absf(v - float(_drag.v)) > 0.0001:
+		_drag.v = v
+		turned.emit(_drag.c, v)
+
+
+func _cursor(c: Dictionary) -> CursorShape:
+	if c.is_empty():
+		return Control.CURSOR_ARROW
+	if playable(c) >= 0.0:
+		return Control.CURSOR_HSIZE if c.shape == "xfader" else Control.CURSOR_VSIZE
+	return Control.CURSOR_POINTING_HAND
 
 
 func _draw() -> void:
