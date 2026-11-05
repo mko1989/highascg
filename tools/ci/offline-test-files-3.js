@@ -251,4 +251,5 @@ module.exports = [
 	'tools/smoke/smoke-wo949-take-auto-transition.test.js',
 	'tools/smoke/smoke-wo949-timeline-hydrate.test.js',
 	'tools/smoke/smoke-wo951-gtzip-import.test.js',
+	'tools/smoke/smoke-wo955-trim-restages-prv.test.js',
 ]

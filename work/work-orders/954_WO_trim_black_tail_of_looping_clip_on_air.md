@@ -60,8 +60,8 @@ Cleanup:
 - the probes were removed;
 - `CLEAR 2-10`, `2-110` and `3-10` were sent; PGM layer 1 (there before the test) was untouched.
 
-## Follow-ups (not done — owner's call)
+## Follow-ups (owner 05.11)
 
-1. A layer trim edit should restage PRV with the new LENGTH, so PRV shows the trimmed clip without a card click.
-2. Optional: "apply trim live to PGM" for a looping layer (Caspar `CALL <ch-layer> LENGTH …`), which would avoid the take.
-   This is untested on this Caspar fork.
+1. A layer trim edit restages PRV with the new LENGTH: **done in [WO-955](./955_WO_trim_edit_restages_prv.md)**. Step 3
+   (the card click) is no longer needed.
+2. "Apply trim live to PGM": **declined by the owner**. The fix on air stays layer trim, then TAKE.

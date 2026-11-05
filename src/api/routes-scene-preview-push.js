@@ -9,6 +9,8 @@
  *     (client/lib/scenes-preview-snapshot.js isGeometryOnlyPreview — the web's own rule, imported) →
  *     MIXER-only via the existing /api/preview/mixer-nudge handler (same fill math as the take pipeline,
  *     staleness-guarded, queued on the per-channel take chain); the staged payload is then refreshed;
+ *   - WO-955: a changed trim in / out is never geometry-only — only a reload (LOADBG … SEEK / LENGTH) shows it, so the
+ *     operator sees the trimmed clip on PRV without staging the look again;
  *   - anything else (clip, loop, audio, PIP, layers added/removed, another look staged) → the existing
  *     take-look path, target preview + forceCut (what the web uses for deck recall).
  *   - no sourced layer left (the editor removed the last one) → clear PRV (/api/scene/live/preview/clear). A take
@@ -38,11 +40,20 @@ async function decidePreviewPush(staged, scene, sceneId) {
 	if (!staged || String(staged.sceneId || '') !== String(sceneId) || !staged.scene) return 'take'
 	const sourced = (scene.layers || []).filter((l) => l?.source?.value)
 	if (sourced.length === 0 || sourced.length > NUDGE_MAX_LAYERS) return 'take'
+	if (trimKey(staged.scene) !== trimKey(scene)) return 'take' // WO-955
 	const { buildPreviewContentSnapshot, isGeometryOnlyPreview } = await snapshotLib()
 	const prev = buildPreviewContentSnapshot(String(sceneId), staged.scene)
 	if (isGeometryOnlyPreview(prev, scene)) return 'nudge'
 	const { isOverlayOnlyChange } = require('./routes-scene-preview-pip')
 	return isOverlayOnlyChange(isGeometryOnlyPreview, buildPreviewContentSnapshot, sceneId, staged.scene, scene) ? 'overlay' : 'take'
+}
+
+/** WO-955: each sourced layer's trim in / out (null = the clip's own start / end), in layer order. */
+function trimKey(scene) {
+	const rows = (scene?.layers || [])
+		.filter((l) => l?.source?.value)
+		.map((l) => [Number(l.layerNumber), l.trimInMs ?? null, l.trimOutMs ?? null])
+	return JSON.stringify(rows.sort((a, b) => a[0] - b[0]))
 }
 
 function parseRes(res) {
