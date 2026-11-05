@@ -9,6 +9,9 @@
  *     (client/lib/scenes-preview-snapshot.js isGeometryOnlyPreview — the web's own rule, imported) →
  *     MIXER-only via the existing /api/preview/mixer-nudge handler (same fill math as the take pipeline,
  *     staleness-guarded, queued on the per-channel take chain); the staged payload is then refreshed;
+ *   - WO-961: content sizing (contentFit) counts as geometry, not content — the nudge resolves the fill with the layer's
+ *     contentFit exactly like a take (scene-native-fill.js getResolvedFillForSceneLayer → mapContentFitToStretch), so a
+ *     reload would only restart the clip;
  *   - WO-955: a changed trim in / out is never geometry-only — only a reload (LOADBG … SEEK / LENGTH) shows it, so the
  *     operator sees the trimmed clip on PRV without staging the look again;
  *   - anything else (clip, loop, audio, PIP, layers added/removed, another look staged) → the existing
@@ -42,10 +45,26 @@ async function decidePreviewPush(staged, scene, sceneId) {
 	if (sourced.length === 0 || sourced.length > NUDGE_MAX_LAYERS) return 'take'
 	if (trimKey(staged.scene) !== trimKey(scene)) return 'take' // WO-955
 	const { buildPreviewContentSnapshot, isGeometryOnlyPreview } = await snapshotLib()
-	const prev = buildPreviewContentSnapshot(String(sceneId), staged.scene)
-	if (isGeometryOnlyPreview(prev, scene)) return 'nudge'
+	const [was, now] = [withoutContentFit(staged.scene), withoutContentFit(scene)] // WO-961
+	const prev = buildPreviewContentSnapshot(String(sceneId), was)
+	if (isGeometryOnlyPreview(prev, now)) return 'nudge'
 	const { isOverlayOnlyChange } = require('./routes-scene-preview-pip')
-	return isOverlayOnlyChange(isGeometryOnlyPreview, buildPreviewContentSnapshot, sceneId, staged.scene, scene) ? 'overlay' : 'take'
+	return isOverlayOnlyChange(isGeometryOnlyPreview, buildPreviewContentSnapshot, sceneId, was, now) ? 'overlay' : 'take'
+}
+
+/**
+ * WO-961: the scene as the content compare sees it — every layer's contentFit dropped. The web's shared rule
+ * (previewContentCompareKey) keeps contentFit as content for the web's own in-browser push; on the server's path a
+ * content sizing change is a MIXER FILL like any resize: the nudge gets the real layers and resolves their fill with
+ * the new contentFit (getResolvedFillForSceneLayer), the same numbers a take would send — without restarting the clip.
+ */
+function withoutContentFit(scene) {
+	const layers = (scene?.layers || []).map((l) => {
+		if (!l || typeof l !== 'object' || !('contentFit' in l)) return l
+		const { contentFit: _fit, ...rest } = l
+		return rest
+	})
+	return { ...scene, layers }
 }
 
 /** WO-955: each sourced layer's trim in / out (null = the clip's own start / end), in layer order. */
