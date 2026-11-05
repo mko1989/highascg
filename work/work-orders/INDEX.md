@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-876 live WOs (28 open, 121 in progress, 727 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+877 live WOs (28 open, 121 in progress, 728 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -378,7 +378,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (131)
+## godot-client — Godot client (132)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -511,6 +511,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 964 DONE [godot-client+video-io] A header record / stream badge opens its own Inspector page instead of switchin… → 964_WO_header_badge_opens_its_inspector.md
 - 965 DONE [godot-client] A media file dropped into the look editor brings the new layer's Inspector page… → 965_WO_media_drop_opens_layer_inspector.md
 - 966 DONE [godot-client] The media file Inspector gets "Set in" / "Set out" buttons at the preview posit… → 966_WO_media_inspector_set_in_out_buttons.md
+- 967 DONE [godot-client] Dragging a media file into a layer's playlist: the file's Inspector page no lon… → 967_WO_media_drag_to_playlist_not_covered_by_inspector.md
 
 ## web-client — Web client (82)
 
