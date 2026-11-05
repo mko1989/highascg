@@ -7,8 +7,8 @@
  *
  * Playlist layers keep their authored source.value across hops, so a running playlist on a program
  * channel resolves to the item actually on air (ctx.playlistActiveIndices, the same index
- * GET /api/playlist/state reports). Looks recalled on preview do not run playlists (WO-581) — they
- * keep the authored value, like the web.
+ * GET /api/playlist/state reports). WO-968: a look recalled on preview runs its playlist too (its own
+ * channel-scoped index), so a PRV instance resolves the same way; no runtime index → the start item.
  */
 
 const liveSceneState = require('../state/live-scene-state')
@@ -27,7 +27,7 @@ function isPreview(ctx, ch) {
 /** @param {object} ctx @param {number} ch @param {object} scene @param {object} layer @returns {string|null} */
 function playlistNowValue(ctx, ch, scene, layer) {
 	const list = layer?.sourceMode === 'list' && Array.isArray(layer?.playlist) ? layer.playlist : null
-	if (!list || !list.length || isPreview(ctx, ch)) return null
+	if (!list || !list.length) return null
 	const { playlistRuntimeKey } = require('../engine/scene-take-lbg-playlist')
 	const rt = (ctx.playlistActiveIndices || {})[playlistRuntimeKey(ch, scene.id, layer.layerNumber)]
 	const idx = rt ?? (ctx.playlistStartIndices || {})[`${scene.id}-${layer.layerNumber}`] ?? 0

@@ -125,10 +125,16 @@ function programFps(ctx, sceneId) {
 	return resolveChannelFramerateForMixerTween(ctx, ch)
 }
 
-/** The item the inspector marks: playing on program, else the start item (what PRV shows and a take starts on). */
+/** The item the inspector marks: playing on program, else (WO-968) playing on PRV, else the start item (a take starts on it). */
 function currentIndex(ctx, sceneId, layerNumber) {
+	const { playlistRuntimeKey } = require('../engine/scene-take-lbg-playlist')
+	const active = ctx.playlistActiveIndices || {}
 	const ch = liveProgramChannel(ctx, sceneId)
-	if (ch != null) return (ctx.playlistActiveIndices || {})[require('../engine/scene-take-lbg-playlist').playlistRuntimeKey(ch, sceneId, layerNumber)] ?? 0
+	if (ch != null) return active[playlistRuntimeKey(ch, sceneId, layerNumber)] ?? 0
+	for (const [chKey, entry] of Object.entries(liveSceneState.getAll() || {})) {
+		const idx = entry?.scene && String(entry.scene.id) === sceneId ? active[playlistRuntimeKey(parseInt(chKey, 10), sceneId, layerNumber)] : undefined
+		if (Number.isInteger(idx)) return idx // only PRV channels are left here: liveProgramChannel found no program one
+	}
 	return (ctx.playlistStartIndices || {})[`${sceneId}-${layerNumber}`] ?? 0
 }
 

@@ -255,4 +255,5 @@ module.exports = [
 	'tools/smoke/smoke-wo961-content-fit-nudges-prv.test.js',
 	'tools/smoke/smoke-wo956-relative-layer-keeps-playing.test.js',
 	'tools/smoke/smoke-wo958-build-stamp-version.test.js',
+	'tools/smoke/smoke-wo968-prv-playlist-runs.test.js',
 ]

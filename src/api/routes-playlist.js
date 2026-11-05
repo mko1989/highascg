@@ -10,7 +10,7 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
 const { physicalProgramLayer } = require('../engine/scene-transition')
-const { triggerPlaylistAdvance, playlistRuntimeKey, stagePlaylistItem } = require('../engine/scene-take-lbg-playlist')
+const { triggerPlaylistAdvance, playlistRuntimeKey } = require('../engine/scene-take-lbg-playlist')
 const panel = require('./routes-playlist-panel')
 
 /**
@@ -40,13 +40,15 @@ function handleStateGet(ctx) {
 			loop: layer.playlistLoop !== false,
 			activeIndex: (rtKey != null ? (ctx.playlistActiveIndices || {})[rtKey] : undefined) ?? (ctx.playlistStartIndices || {})[pKey] ?? 0,
 			startIndex: (ctx.playlistStartIndices || {})[pKey] ?? 0,
+			/* WO-968: the item a PRV-only recall is playing (PRV runs its own chain); null when not on PRV */
+			previewActiveIndex: previewChannel != null ? ((ctx.playlistActiveIndices || {})[playlistRuntimeKey(previewChannel, scene.id, layer.layerNumber)] ?? null) : null,
 			/* WO-603: timeless / missing / timelessSecs are decided here, not in each client. */
 			timelessSecs: panel.timelessSecsOf(layer.playlist),
 			items: panel.panelItems(layer.playlist, mediaIndex),
 		})
 	}
-	/* WO-581: a look recalled on PREVIEW is not live — playlists run on program only (WO-355).
-	 * Listing it live:true with the PRV channel sent the panel's item pick as a `goto` onto the
+	/* WO-581: a look recalled on PREVIEW lists as not live (+ previewChannel) even though it plays there since
+	 * WO-968: listing it live:true with the PRV channel sent the panel's item pick as a `goto` onto the
 	 * PRV bus, so the start item was never recorded and the take to PGM began at item 0.
 	 * Program channels list first (live wins); PRV recalls list as not-live + previewChannel. */
 	const isPrv = (ch) => {
@@ -82,8 +84,9 @@ function handleStateGet(ctx) {
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, playlists }) }
 }
 
-/* WO-371 option C / WO-581: re-stage item `idx` on every PREVIEW channel where the look is
- * recalled, via the schedule-free stagePlaylistItem — no timers, never a program channel. */
+/* WO-581 / WO-968: re-stage item `idx` on every PREVIEW channel where the look is recalled and run the PRV
+ * playlist on from there (WO-371 option B — the owner's 05.11 reversal of option C). Never a program channel:
+ * only channels isPreviewCasparChannel names are touched, and the chain stays on the channel it was armed on. */
 async function restagePreviewChannels(ctx, sceneId, layerNumber, idx) {
 	const previewChannels = []
 	try {
@@ -97,7 +100,7 @@ async function restagePreviewChannels(ctx, sceneId, layerNumber, idx) {
 			if (!liveLayer || liveLayer.sourceMode !== 'list' || !Array.isArray(liveLayer.playlist) || idx >= liveLayer.playlist.length) continue
 			const bank = (ctx?.programLayerBankByChannel && ctx.programLayerBankByChannel[String(ch)]) || 'a'
 			const pLayer = physicalProgramLayer(layerNumber, bank === 'b' ? 'b' : 'a')
-			await stagePlaylistItem(ctx, ch, pLayer, scene, liveLayer, idx)
+			await triggerPlaylistAdvance(ctx, ch, pLayer, scene, liveLayer, idx)
 			previewChannels.push(ch)
 		}
 	} catch { /* preview restage is advisory; the start index moved regardless */ }
@@ -149,11 +152,9 @@ async function handleControlPost(body, ctx) {
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, sceneId, layerNumber, startIndex: idx, previewChannels }) }
 	}
 
-	/* WO-371 option C (owner 29.07: "actually it makes sense that it pauses"): ⏮/⏭ for a
-	 * NOT-live playlist. Moves the sticky start index (the same key set_start writes) and, when
-	 * the look is currently recalled on a PREVIEW channel, re-stages that item there via the
-	 * schedule-free stagePlaylistItem — no timers arm, so WO-355 item 27 ("sits still") stays
-	 * true, and nothing is ever emitted to a program channel. */
+	/* WO-371 ⏮/⏭ for a NOT-live playlist. Moves the sticky start index (the same key set_start writes) and, when
+	 * the look is currently recalled on a PREVIEW channel, re-stages that item there; WO-968 (owner 05.11, option
+	 * B): the PRV playlist then runs on from it. Nothing is ever emitted to a program channel. */
 	if (action === 'step_preview') {
 		const sceneId = String(b.sceneId || '').trim()
 		const dir = String(b.direction || 'next') === 'prev' ? -1 : 1

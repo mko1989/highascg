@@ -113,6 +113,8 @@ async function handlePreviewLiveClear(body, ctx) {
 		}
 	}
 
+	/* WO-968: PRV runs playlists now — a cleared PRV must not keep a timer / fade-end hop armed for the look it held */
+	require('../engine/scene-take-lbg-playlist').clearChannelPlaylistState(ctx, previewCh)
 	const hadEntry = !!liveSceneState.getChannel(previewCh)
 	if (hadEntry) {
 		await liveSceneState.clearChannel(previewCh)

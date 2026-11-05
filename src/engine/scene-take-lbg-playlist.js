@@ -4,7 +4,7 @@
 
 'use strict'
 
-const { resolvePlaylistPlayingIndex } = require('./playlist-path-match')
+const { resolvePlaylistPlayingIndex, scorePlaylistPathMatch } = require('./playlist-path-match')
 const { normalizeProgramLayerBank, physicalProgramLayer } = require('./scene-transition')
 const { resolveSceneClipForAmcp } = require('./scene-take-lbg-helpers')
 const { resolvePlaylistStartIndex } = require('./scene-take-playlist-start')
@@ -42,14 +42,31 @@ function playlistRuntimeKey(channel, sceneId, layerNumber) {
 	return `${channel}:${sceneId}-${layerNumber}`
 }
 
-/* todos27.07.26 (owner): playlists RUN on program only. A preview recall shows the staged item
- * statically — no timers, no OSC-driven hops, no preloads on a PRV bus. */
-function isPlaylistChannelEligible(self, channel) {
+/* WO-968 (owner 05.11: "when playlist is being edited on prv it should play the playlist items, not just the
+ * first"): WO-371 option B — a playlist runs on EVERY channel its look is on, PRV included. The WO-355 PRV gate
+ * (isPlaylistChannelEligible) is gone; PGM and PRV get independent chains through the channel-scoped runtime
+ * keys above, and every PRV AMCP line goes to the PRV channel the chain was armed on. The sticky start item
+ * (playlistStartIndices) is never written here, so PRV's own advance cannot move where a PGM take starts. */
+/* WO-968: PRV is bank-less, so a recall / pick / step re-stages the SAME physical layer — for a few frames OSC
+ * still names the clip that was there, which read as an "advance" back to it and preloaded the wrong next item
+ * (box 05.11: three LOADBG AUTO in 150 ms after a PRV recall, corrected one frame later). A mismatch with the
+ * item just staged is ignored for STALE_OSC_MS (a PGM goto reuses its layer too). */
+const STALE_OSC_MS = 400
+function markStaged(self, pKey, idx) {
+	self.playlistStagedAt = self.playlistStagedAt || {}
+	self.playlistStagedAt[pKey] = { idx, at: Date.now() }
+}
+const isStaleOsc = (self, pKey, itemIdx) => {
+	const st = self.playlistStagedAt?.[pKey]
+	return !!st && itemIdx !== st.idx && Date.now() - st.at < STALE_OSC_MS
+}
+
+function isSceneStillLive(channel, sceneId) {
 	try {
-		const { isPreviewCasparChannel } = require('./caspar-channel-clear')
-		return !isPreviewCasparChannel(self.config, channel)
+		const liveNow = require('../state/live-scene-state').getChannel(channel)
+		return { live: !!liveNow?.scene && String(liveNow.scene.id) === String(sceneId), scene: liveNow?.scene || null }
 	} catch {
-		return true
+		return { live: true, scene: null } // state unavailable — fire as before
 	}
 }
 
@@ -61,7 +78,7 @@ function clearChannelPlaylistState(self, channel) {
 	for (const key of Object.keys(self.playlistImageTimers || {})) {
 		if (key.startsWith(prefix)) clearPlaylistImageTimer(self, key)
 	}
-	for (const bag of [self.playlistActiveIndices, self.playlistOscPrevPlayingPath, self.playlistFadeEndArmed]) {
+	for (const bag of [self.playlistActiveIndices, self.playlistOscPrevPlayingPath, self.playlistFadeEndArmed, self.playlistStagedAt]) {
 		if (!bag) continue
 		for (const key of Object.keys(bag)) {
 			if (key.startsWith(prefix)) delete bag[key]
@@ -71,9 +88,8 @@ function clearChannelPlaylistState(self, channel) {
 
 function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 	clearChannelPlaylistState(self, channel)
-	const runs = isPlaylistChannelEligible(self, channel)
 	// Register the global OSC playlist handler on self.oscState exactly once!
-	if (runs && self.oscState && !self._playlistOscBound) {
+	if (self.oscState && !self._playlistOscBound) {
 		self._playlistOscBound = true
 		self.oscState.on('change', (snapshot) => {
 			handlePlaylistOscUpdate(self, snapshot)
@@ -90,10 +106,10 @@ function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 			 * WO-371 PRV step) — arm the chain from THAT item. Replaces the old 400 ms post-take
 			 * hop, which put item 0 on air first with item 0's timer/preload already armed. */
 			const startIdx = resolvePlaylistStartIndex(self, incoming.id, layer)
-			/* WO-766: a ↘ start item fades at its end on PRV too — a fade is not an advance (WO-371 C). */
+			/* WO-766: a ↘ start item fades at its end (PGM and, WO-968, a PRV recall alike). */
 			if (fadesOut(layer.playlist[startIdx])) void queuePlaylistFadeOut(self, channel, job.pLayer, layer)
-			if (!runs) continue
 			self.playlistActiveIndices[pKey] = startIdx
+			markStaged(self, pKey, startIdx)
 			if (layer.playlistAdvance === 'auto') {
 				self.playlistOscPrevPlayingPath = self.playlistOscPrevPlayingPath || {}
 				delete self.playlistOscPrevPlayingPath[pKey]
@@ -121,6 +137,15 @@ function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 	}
 }
 
+/* WO-968 (box 05.11, PRV clip → still): Caspar's image producer sends only file/path, so the clip's file/name
+ * stayed in the OSC state and the still read as the clip — no advance, no duration timer, the list sat on the
+ * still forever (PGM too). A path that names a different file than the name is the fresher of the two. */
+function oscForegroundFile(f) {
+	if (!f || (!f.name && !f.path)) return null
+	if (f.name && f.path && scorePlaylistPathMatch(f.name, f.path) < 0) return f.path
+	return f.name || f.path
+}
+
 function handlePlaylistOscUpdate(self, snapshot) {
 	try {
 		const liveSceneState = require('../state/live-scene-state')
@@ -130,7 +155,6 @@ function handlePlaylistOscUpdate(self, snapshot) {
 			const channel = parseInt(chKey, 10)
 			const liveEntry = activeScenes[chKey]
 			if (!liveEntry || !liveEntry.scene) continue
-			if (!isPlaylistChannelEligible(self, channel)) continue
 			const scene = liveEntry.scene
 			const activeBank = normalizeProgramLayerBank(self.programLayerBankByChannel?.[chKey])
 
@@ -143,7 +167,7 @@ function handlePlaylistOscUpdate(self, snapshot) {
 						const chOsc = snapshot.channels && snapshot.channels[chKey]
 						const layerOsc = chOsc && chOsc.layers && chOsc.layers[pLayer]
 						const playingFile =
-							(layerOsc && layerOsc.file && (layerOsc.file.name || layerOsc.file.path)) ||
+							oscForegroundFile(layerOsc?.file) ||
 							/* CG/shader producers report template.path, never file.* */
 							(layerOsc && layerOsc.template && String(layerOsc.template.path || '').replace(/\.html?$/i, '')) ||
 							null
@@ -160,6 +184,7 @@ function handlePlaylistOscUpdate(self, snapshot) {
 							/* WO-768: an empty item is on air — Caspar keeps the last clip's file fields, which would match back to it */
 							if (isEmptyPlaylistItem(layer.playlist[lastIdx])) continue
 							const itemIdx = resolvePlaylistPlayingIndex(layer.playlist, playingFile, lastIdx, prevPlaying)
+							if (isStaleOsc(self, pKey, itemIdx)) continue
 							self.playlistOscPrevPlayingPath[pKey] = playingFile
 
 							if (itemIdx >= 0) {
@@ -213,7 +238,8 @@ function handlePlaylistOscUpdate(self, snapshot) {
 							const afterIdx = itemIdx + 1 < layer.playlist.length ? itemIdx + 1 : layer.playlistLoop !== false ? 0 : -1
 							if (itemIdx >= 0 && layer.playlist.length > 1 && (fadesOut(layer.playlist[itemIdx]) || isEmptyPlaylistItem(layer.playlist[afterIdx]))) {
 								scheduleFadeEndAdvance(self, pKey, itemIdx, elapsed, duration, () => {
-									if (afterIdx >= 0) triggerPlaylistAdvance(self, channel, pLayer, scene, layer, afterIdx)
+									/* WO-968: the look may have left this channel (a PRV clear) while the fade ran */
+									if (afterIdx >= 0 && isSceneStillLive(channel, scene.id).live) triggerPlaylistAdvance(self, channel, pLayer, scene, layer, afterIdx)
 								})
 							}
 							// T211.5: Stall watchdog for imperfect media (video stream ends before container duration).
@@ -326,22 +352,22 @@ function schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, itemIdx
 
 		/* Defensive: the look may have left this channel between arm and fire — never hop a
 		 * playlist whose scene is no longer live here (todos27 "playlist continues after take"). */
-		try {
-			const liveNow = require('../state/live-scene-state').getChannel(channel)
-			if (!liveNow?.scene || String(liveNow.scene.id) !== String(scene.id)) return
-		} catch {
-			/* state unavailable — fire as before */
-		}
+		const now = isSceneStillLive(channel, scene.id)
+		if (!now.live) return
+		/* WO-968: hop through the list as it is NOW — an edit patched into the live scene since this timer armed
+		 * (patchLivePlaylist) is what plays next, not the list captured at arm time. */
+		const liveLayer = (now.scene?.layers || []).find((l) => Number(l?.layerNumber) === Number(layer.layerNumber))
+		const L = liveLayer?.sourceMode === 'list' && Array.isArray(liveLayer.playlist) && liveLayer.playlist.length > 0 ? liveLayer : layer
 
 		// Advance to next
 		let nextIdx = itemIdx + 1
-		if (layer.playlistLoop !== false) {
-			nextIdx = nextIdx % layer.playlist.length
-		} else if (nextIdx >= layer.playlist.length) {
+		if (L.playlistLoop !== false) {
+			nextIdx = nextIdx % L.playlist.length
+		} else if (nextIdx >= L.playlist.length) {
 			return // Done playing once
 		}
 
-		triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx)
+		triggerPlaylistAdvance(self, channel, pLayer, L === layer ? scene : now.scene, L, nextIdx)
 	}, durationMs)
 }
 
@@ -399,6 +425,7 @@ function stagePlaylistItem(self, channel, pLayer, scene, layer, nextIdx) {
 			const pKey = playlistRuntimeKey(channel, scene.id, layer.layerNumber)
 			self.playlistActiveIndices = self.playlistActiveIndices || {}
 			self.playlistActiveIndices[pKey] = nextIdx
+			markStaged(self, pKey, nextIdx)
 			if (self.playlistFadeEndArmed) delete self.playlistFadeEndArmed[pKey]
 			return true
 		} catch (err) {
@@ -410,13 +437,17 @@ function stagePlaylistItem(self, channel, pLayer, scene, layer, nextIdx) {
 	})()
 }
 
+/* Stage item `nextIdx` and arm the chain onward from it — the PGM hop / goto and (WO-968) a PRV pick or step.
+ * Resolves true once staged and armed, false when the stage failed. */
 function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
-	void stagePlaylistItem(self, channel, pLayer, scene, layer, nextIdx).then((staged) => {
-		if (!staged) return
+	return stagePlaylistItem(self, channel, pLayer, scene, layer, nextIdx).then((staged) => {
+		if (!staged) return false
+		/* WO-968: a jump off a still left the still's timer armed, which then hopped the list a second time */
+		clearPlaylistImageTimer(self, playlistRuntimeKey(channel, scene.id, layer.layerNumber))
 		// Setup next advancement
 		const nextItem = layer.playlist[nextIdx]
 		/* manual: the operator advances; a ↘ item's fade is already queued by stagePlaylistItem */
-		if (isLoopedPlaylistItem(nextItem) || layer.playlistAdvance === 'manual' || fadesOut(nextItem)) return
+		if (isLoopedPlaylistItem(nextItem) || layer.playlistAdvance === 'manual' || fadesOut(nextItem)) return true
 		if (isTimelessPlaylistItem(nextItem)) {
 			schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, nextIdx)
 		} else {
@@ -430,6 +461,7 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 				queueNextPlaylistItem(self, channel, pLayer, layer, nextNextIdx)
 			}
 		}
+		return true
 	})
 }
 

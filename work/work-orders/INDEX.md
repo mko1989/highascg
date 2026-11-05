@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-877 live WOs (28 open, 121 in progress, 728 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+878 live WOs (28 open, 121 in progress, 729 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (167)
+## engine — Looks, takes, timeline, playback (168)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -174,6 +174,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 955 DONE [engine] A look layer's trim edit reloads PRV straight away → 955_WO_trim_edit_restages_prv.md
 - 956 DONE [engine] The same loop on the same layer in two looks is reloaded on every take (relativ… → 956_WO_shared_loop_across_looks_reloads_every_take.md
 - 961 DONE [engine+godot-client] Changing a look layer's content sizing restarts its clip on PRV → 961_WO_content_sizing_change_restarts_prv_clip.md
+- 968 DONE [engine+godot-client] A playlist look on PRV plays its items (option B), not just the first → 968_WO_prv_playlist_plays_all_items.md
 
 ## amcp — AMCP client and protocol (20)
 

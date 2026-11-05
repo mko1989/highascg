@@ -3,6 +3,11 @@
 **Area:** engine, web-client
 **Status: DONE (2026-08-04 — option C implemented, §6–7: ⏮/⏭ step the PRV render via a schedule-free stage path; smoke 3/3, suite 1818/0/2, deployed both halves. Owner QA: step a playlist look recalled to PRV)**
 
+> **05.11.26 — superseded in part by [WO-968](968_WO_prv_playlist_plays_all_items.md):** the owner reversed
+> option C ("when playlist is being edited on prv it should play the playlist items, not just the first") —
+> PRV now runs its own channel-scoped chain (option B). The ⏮/⏭ step / pick of §6 stay and the PRV list runs
+> on from the stepped item; the "sits still" contract below and checklist27.07 item 27's first half no longer hold.
+
 > Owner, 29.07, on re-reading the options: *"actually it makes sense that it pauses."* — asked which
 > of A/C that meant, they chose **C**: preview stays frozen (WO-355 item 27 stays true), and the
 > Playlists panel's existing ⏮/⏭ step the PRV render through the list so an edited playlist can be

@@ -5,7 +5,7 @@
  * the Playlists panel), never item 0:
  *  - /api/playlist/state lists a PRV-only recall as NOT live (+ previewChannel), so the panel's
  *    item pick is a set_start, not a `goto` onto the PRV bus; a PGM recall still wins as live
- *  - set_start restages the pick on PRV (schedule-free, program untouched)
+ *  - set_start restages the pick on PRV (program untouched); WO-968: the PRV list runs on from it
  *  - buildTakeJobs loads the start item itself (auto + manual)
  *  - setupLayerPlaylists arms the chain from the start item — no delayed hop from item 0
  */
@@ -71,7 +71,7 @@ test('WO-581: a PRV-only recall lists as not live; set_start restages PRV only',
 
 	let list = JSON.parse(handleStateGet(ctx).body).playlists
 	assert.equal(list.length, 1)
-	assert.equal(list[0].live, false, 'a preview recall is not live (playlists run on PGM only)')
+	assert.equal(list[0].live, false, 'a preview recall lists not live, so a panel pick is a set_start (it still plays there, WO-968)')
 	assert.equal(list[0].channel, null)
 	assert.equal(list[0].previewChannel, 2)
 
@@ -83,10 +83,15 @@ test('WO-581: a PRV-only recall lists as not live; set_start restages PRV only',
 	assert.equal(ctx.playlistStartIndices[`${SCENE.id}-10`], 1)
 	assert.ok(calls.length > 0 && calls.every((c) => c.ch === 2), 'restaged on PRV ch2 only')
 	assert.match(calls.find((c) => c.cmd === 'LOADBG').clip, /b/i)
-	assert.equal(Object.keys(ctx.playlistImageTimers).length, 0, 'no timers on PRV')
+	/* WO-968 (owner 05.11, option B): was "no timers on PRV" — the PRV chain now runs on from the pick: item 1 is a
+	 * clip, so the next item is preloaded AUTO on the PRV channel, and PRV's own index sits on the pick. */
+	assert.ok(calls.some((c) => c.cmd === 'LOADBG' && c.ch === 2 && c.opts?.auto === true && /c/i.test(c.clip)), 'item 2 preloaded AUTO on PRV ch2')
+	assert.equal(ctx.playlistActiveIndices[`2:${SCENE.id}-10`], 1, 'PRV runtime index on the pick')
+	assert.equal(Object.keys(ctx.playlistImageTimers).length, 0, 'a clip arms no timer')
 
 	list = JSON.parse(handleStateGet(ctx).body).playlists
 	assert.equal(list[0].activeIndex, 1, 'panel shows the set item')
+	assert.equal(list[0].previewActiveIndex, 1, 'WO-968: the item PRV plays is listed too')
 })
 
 test('WO-581: the same look on PGM and PRV lists live on the PGM channel', () => {
