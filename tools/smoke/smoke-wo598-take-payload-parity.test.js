@@ -26,6 +26,7 @@ const RES = [
 
 /** The web builder runs in Node with minimal browser stubs (it only touches sceneState). */
 async function loadWebBuilder() {
+	TD = await import(pathToFileURL(path.join(REPO, 'client/lib/transition-duration.js')).href)
 	globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
 	globalThis.window = globalThis
 	globalThis.document = globalThis.document || { addEventListener() {}, removeEventListener() {}, dispatchEvent() {}, querySelector: () => null, querySelectorAll: () => [] }
@@ -44,6 +45,24 @@ function projectFiles() {
 		for (const f of fs.readdirSync(d)) if (f.endsWith('.json')) out.push(path.join(d, f))
 	}
 	return out
+}
+
+/**
+ * WO-949: the server resolves a stored "auto" duration (12 = half the screen's fps, client/lib/transition-duration.js)
+ * at take time â€” the Godot card shows "MIX auto 25 fr", the raw 12 mixed over 12 frames. The web builder sent 12
+ * as is; resolving it on the web side here is the only intended difference, so the comparison stays strict.
+ */
+let TD = null
+function wo949Auto(payload, fps) {
+	const r = (t) =>
+		t && typeof t === 'object' && String(t.type || '').toUpperCase().trim() !== 'CUT'
+			? { ...t, duration: TD.resolveTransitionDuration(t.duration, fps) }
+			: t
+	return {
+		...payload,
+		defaultTransition: r(payload.defaultTransition),
+		layers: (payload.layers || []).map((l) => ({ ...l, transition: r(l.transition), playlistTransition: r(l.playlistTransition) })),
+	}
 }
 
 function normalize(payload) {
@@ -71,7 +90,7 @@ test('WO-598 C1: server take payload == web builder payload (all fixture looks Ã
 			const mains = scope === 'all' ? [0, 1, 2] : [Math.min(2, Math.max(0, parseInt(scope, 10) || 0))]
 			for (const mainIdx of mains) {
 				for (const pgmOnly of [false, true]) {
-					const web = normalize(webBuild(scene, { timeline: null, positionMs: 0, mainIdx, pgmOnly }))
+					const web = normalize(wo949Auto(webBuild(scene, { timeline: null, positionMs: 0, mainIdx, pgmOnly }), RES[mainIdx]?.fps ?? 50))
 					const srv = normalize(await buildServerIncomingScene(scene, { mainIdx, channelMap, pgmOnly }))
 					compared++
 					try {
@@ -123,7 +142,7 @@ test('WO-598 C1: /api/scene/take-look builds the same take body the web client s
 	assert.equal(sent[1].channel, 3)
 	assert.equal(sent[1].target, 'preview')
 	assert.equal(sent[2].forceCut, true)
-	const web = normalize((await loadWebBuilder())(byId['cov-cg'], { mainIdx: 1, pgmOnly: true }))
+	const web = normalize(wo949Auto((await loadWebBuilder())(byId['cov-cg'], { mainIdx: 1, pgmOnly: true }), RES[1]?.fps ?? 50))
 	assert.deepStrictEqual(normalize(sent[2].incomingScene), web, 'PGM-only main gets the PGM-only payload')
 	assert.equal((await handleTakeLook({}, {}, deps)).status, 400)
 	assert.equal((await handleTakeLook({ sceneId: 'nope' }, {}, deps)).status, 404)

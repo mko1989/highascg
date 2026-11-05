@@ -19,7 +19,7 @@ const { pathToFileURL } = require('url')
 const { REPO_ROOT } = require('../repo-paths')
 
 const FALLBACK_CANVAS = { w: 1920, h: 1080 } // client/lib/scene-state-persistence-logic.js:12
-const CLIENT_LIB = ['lower-third-cg-data', 'pip-overlay-registry', 'audio-volume-scale', 'transition-presets']
+const CLIENT_LIB = ['lower-third-cg-data', 'pip-overlay-registry', 'audio-volume-scale', 'transition-presets', 'transition-duration']
 
 let helpersPromise = null
 
@@ -29,7 +29,7 @@ function loadClientHelpers() {
 		helpersPromise = Promise.all(
 			CLIENT_LIB.map((n) => import(pathToFileURL(path.join(REPO_ROOT, 'client', 'lib', `${n}.js`)).href)),
 		).then(
-			([lt, pip, vol, tr]) => ({ lt, pip, vol, tr }),
+			([lt, pip, vol, tr, td]) => ({ lt, pip, vol, tr, td }),
 			(e) => {
 				helpersPromise = null // WO-931: a failed import must not poison every later take until a restart
 				throw e
@@ -44,6 +44,16 @@ const clone = (v) => JSON.parse(JSON.stringify(v))
 function canvasForMain(channelMap, mainIdx) {
 	const r = channelMap?.programResolutions?.[mainIdx]
 	return r?.w > 0 && r?.h > 0 ? { w: r.w, h: r.h } : { ...FALLBACK_CANVAS }
+}
+
+/**
+ * WO-949: a stored duration of 12 means "auto: half the project fps" (client/lib/transition-duration.js). The web client
+ * resolved it before sending a take; the server-built take (POST /api/scene/take-look, the Godot client's path) sent the
+ * raw 12 — every "MIX auto 25 fr" look mixed over 12 frames on a 50 fps screen. A CUT keeps its 0.
+ */
+function resolveAutoDuration(t, h, fps) {
+	if (!t || typeof t !== 'object' || String(t.type || '').toUpperCase().trim() === 'CUT') return t
+	return { ...t, duration: h.td.resolveTransitionDuration(t.duration, fps) }
 }
 
 function buildLayerRow(l, h) {
@@ -125,6 +135,16 @@ async function buildServerIncomingScene(scene, opts) {
 		globalBorder: scene.globalBorder ? clone(scene.globalBorder) : undefined,
 		layers: (scene.layers || []).map((l) => buildLayerRow(l, h)),
 		...(scene.audioOnlyLook ? { audioOnlyLook: true } : {}),
+	}
+	const fps = Number(opts?.channelMap?.programResolutions?.[mainIdx]?.fps) || 50
+	payload = {
+		...payload,
+		defaultTransition: resolveAutoDuration(payload.defaultTransition, h, fps),
+		layers: payload.layers.map((l) => ({
+			...l,
+			transition: resolveAutoDuration(l.transition, h, fps),
+			playlistTransition: resolveAutoDuration(l.playlistTransition, h, fps),
+		})),
 	}
 	if (opts?.pgmOnly === true) {
 		const n = h.tr.normalizeTransitionForPgmOnly
