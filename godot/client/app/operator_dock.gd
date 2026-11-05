@@ -13,6 +13,8 @@ const ConnectionEye := preload("res://app/connection_eye.gd")
 const D := preload("res://app/operator_dock_model.gd")
 const DockMenu := preload("res://app/operator_dock_menu.gd")
 const NuclearGate := preload("res://app/nuclear_gate.gd")
+const ColourPicker := preload("res://app/colour_picker.gd")  # WO-950
+const Icons := preload("res://app/ui_icons.gd")
 
 signal notice(n: Dictionary)
 
@@ -30,6 +32,7 @@ var _bubble_label: Label
 var _dots := {}  # action → the running dot under its button
 var _loaded := false  # WO-705: the app list is in the dock (once)
 var _loading := false
+var picker: Node  # WO-950: the colour picker, made on first use (a child of the root, not of this dock window)
 
 
 func _init() -> void:
@@ -85,6 +88,7 @@ func _ready() -> void:
 			_release())
 	_build_bubble()
 	_add_self_button()
+	_add_picker_button()
 	set_expanded(false)
 	show()
 	_load()
@@ -142,6 +146,20 @@ func _add_self_button() -> void:
 		launch("highascg", b))  # the server activates it — Openbox refuses a window raising itself
 	row.add_child(b)
 	_add_dot(b, "highascg")
+
+
+## WO-950: a built-in tool, not an installed app — the colour picker runs in this client (no server launch, no gate).
+func _add_picker_button() -> void:
+	var b := _button("Colour picker")
+	b.icon = Icons.texture("eyedropper", D.ICON)
+	b.pressed.connect(func() -> void:
+		set_expanded(false)  # out of the frozen picture
+		if picker == null:
+			picker = ColourPicker.new()
+			picker.name = "ColourPicker"
+			get_tree().root.add_child(picker)
+		picker.pick())
+	row.add_child(b)
 
 
 ## WO-628 running dots: a small dot under each app with an open window (GET /api/system/dock `running`).
