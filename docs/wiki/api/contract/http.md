@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-546 routes.
+547 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -196,6 +196,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/lower-thirds/clear` | handler | `src/api/routes-lower-thirds.js` |
 | GET | `/api/lower-thirds/fonts` | handler | `src/api/routes-lower-thirds.js` |
 | POST | `/api/lower-thirds/fonts` | handler | `src/api/routes-lower-thirds.js` |
+| POST | `/api/lower-thirds/import-gtzip` | handler | `src/api/routes-lower-thirds.js` |
 | POST | `/api/lower-thirds/load` | handler | `src/api/routes-lower-thirds.js` |
 | POST | `/api/lower-thirds/next` | handler | `src/api/routes-lower-thirds.js` |
 | POST | `/api/lower-thirds/play` | handler | `src/api/routes-lower-thirds.js` |
