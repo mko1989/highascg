@@ -10,7 +10,30 @@ extends RefCounted
 ##   api = Api (tests: a fake) — post_json(path, body) → {ok, data, error}
 
 const Ops := preload("res://features/live/look_layer_ops.gd")
+const LP := preload("res://features/live/layer_preset_model.gd")
+const S := preload("res://features/live/layer_style_model.gd")
 const IMAGE := "(?i)\\.(jpe?g|png|gif|bmp|webp|tiff?)$"  # web setLayerSource: a still never loops
+
+
+## WO-952: the look editor's frame and list take media sources and Layer presets tab cards.
+static func can_take(data: Variant) -> bool:
+	return LP.is_drag(data) or not Ops.drop_sources(data).is_empty()
+
+
+## A drop of either kind. A preset card applies its style (everything but the source) to the layer under the pointer —
+## or, off every layer, to the selected one — without taking the right column away from the Layer presets tab.
+static func drop_data(ed: Variant, api: Variant, target: int, data: Variant) -> void:
+	if not LP.is_drag(data):
+		await drop(ed, api, target, Ops.drop_sources(data))
+		return
+	var layers: Array = ed._layers()
+	var i: int = target if target >= 0 else int(ed._sel)
+	if i < 0 or i >= layers.size() or not (layers[i] is Dictionary):
+		ed.show_status("Drop the preset on a layer (its box or its row)")
+		return
+	ed._select(i, false)
+	ed._apply_layer(S.style_patch(data.data))
+	ed.show_status("Preset “%s” applied to L%d" % [str(data.get("name", "")), int((layers[i] as Dictionary).get("layerNumber", 0))])
 
 
 ## `target` = the layer index the pointer is on (-1 = none): its media is exchanged with the first source.

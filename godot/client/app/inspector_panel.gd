@@ -5,7 +5,8 @@ extends PanelContainer
 ## One page shows at a time; with none, "Select an item" (web empty state). Pages stay owned by their feature (the
 ## panel only re-parents them), so a page keeps its state while another is shown.
 ## WO-783: the column has tabs — "Inspector" (the selection pages) plus panes features add with `add_tab()` (Look
-## presets), which stay at hand whatever is selected. A new selection (`present()`) brings the Inspector tab back.
+## presets), which stay at hand whatever is selected. A new selection (`present()`) brings the Inspector tab back —
+## WO-952: except over a tab added with `keep_on_select` (Layer presets: click a layer, Apply, click the next one).
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
@@ -20,6 +21,7 @@ var _tabs: Array[Button] = []
 var _panes: Array[Control] = []
 var _covered: Control = null  # the page the last present() hid — shown again when that page is released
 var _released := {}  # pages their owner released (never brought back by a release of another page)
+var _keep := {}  # WO-952: tab index → a selection swaps the Inspector page underneath but does not switch to it
 
 
 func _init() -> void:
@@ -46,12 +48,14 @@ func _ready() -> void:
 
 
 ## WO-783: a tab of the right-hand column (scrolled). Its pane stays owned by the feature, like a page.
-func add_tab(title: String, pane: Control) -> void:
+func add_tab(title: String, pane: Control, keep_on_select := false) -> void:
 	var b := Button.new()
 	b.text = title
 	b.flat = true
 	b.focus_mode = Control.FOCUS_NONE
 	var i := _tabs.size()
+	if keep_on_select:
+		_keep[i] = true
 	b.pressed.connect(func() -> void: show_tab(i))
 	_tab_row.add_child(b)
 	_tabs.append(b)
@@ -110,7 +114,8 @@ func present(page: Control) -> void:
 				_covered = c
 			(c as Control).visible = false
 	page.visible = true
-	show_tab(0)
+	if not _keep.has(tab_shown()):
+		show_tab(0)
 	_sync_empty()
 
 

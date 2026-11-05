@@ -32,11 +32,16 @@ func _ready() -> void:
 	_presets = OptionButton.new()
 	_presets.item_selected.connect(_apply_preset)
 	add_child(_presets)
+	Store.project_changed.connect(_on_project_changed)  # WO-952: the Layer presets tab edits the list too
 
 
 func show_layer(layer: Dictionary) -> void:
 	_layer = layer
 	_paste.disabled = _clipboard.is_empty()
+	_fill_presets()
+
+
+func _on_project_changed(_p: Dictionary) -> void:
 	_fill_presets()
 
 
@@ -90,6 +95,7 @@ func save_preset(name: String) -> String:
 	var list: Array = _root().layerPresets
 	var id := _uuid()
 	list.append({"id": id, "name": S.unique_name(list, name), "data": S.style_data(_layer)})
+	Store.project_changed.emit(Store.project)  # WO-952: the Layer presets tab lists it
 	ProjectSync.deck_changed()
 	ProjectSync.mark_dirty()
 	_fill_presets()

@@ -404,11 +404,11 @@ func _hold(on: bool) -> void:
 
 ## --- WO-600 K / WO-816: media from the Sources panel (look_layer_drop.gd). On a layer (its frame box, its list row) the
 ## first source exchanges that layer's media; the rest (or a drop on blank frame / below the rows) add layers.
-func _can_drop(_at: Vector2, data: Variant) -> bool: return scene_id != "" and not Ops.drop_sources(data).is_empty()
+func _can_drop(_at: Vector2, data: Variant) -> bool: return scene_id != "" and Drop.can_take(data)  # media, or a layer preset (WO-952)
 
 
 func _drop(at: Vector2, data: Variant, on_list := false) -> void:
-	await Drop.drop(self, Api, _list.get_item_at_position(at, true) if on_list else _layer_at(at), Ops.drop_sources(data))
+	await Drop.drop_data(self, Api, _list.get_item_at_position(at, true) if on_list else _layer_at(at), data)
 
 
 func add_layer_from_source(src: Dictionary) -> bool: return await Drop.add(self, Api, src)

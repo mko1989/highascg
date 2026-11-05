@@ -13,6 +13,7 @@ const LookEditor := preload("res://features/live/look_editor.gd")
 const ScreenTimerPanel := preload("res://features/live/screen_timer_panel.gd")
 const GlobalBorderPanel := preload("res://features/live/global_border_panel.gd")
 const LookPresetPage := preload("res://features/live/look_preset_page.gd")
+const LayerPresetPage := preload("res://features/live/layer_preset_page.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
 const LivePreview := preload("res://features/live/live_preview.gd")
@@ -26,6 +27,7 @@ var editor: LookEditor
 var timers: ScreenTimerPanel
 var border: GlobalBorderPanel
 var presets: LookPresetPage
+var layer_presets: LayerPresetPage  # WO-952: the right column's "Layer presets" tab
 var _show_btns := {}  # WO-781: deck toolbar "Looks" toggle (WO-783: presets moved to the right column's tab)
 var _action: Label
 var _slug := ""  # WO-918 F24: the project the status line talks about
@@ -109,6 +111,13 @@ func _ready() -> void:
 	else:
 		add_child(presets)
 	presets.said.connect(func(text: String, ok: bool) -> void: deck.action_result.emit(text, ok))
+	layer_presets = LayerPresetPage.new()  # WO-952: applies to the look editor's selected layer
+	layer_presets.editor = editor
+	if is_instance_valid(InspectorPanel.current):
+		InspectorPanel.current.add_tab("Layer presets", layer_presets, true)  # stays while layers are clicked
+	else:
+		add_child(layer_presets)
+	layer_presets.said.connect(func(text: String, ok: bool) -> void: deck.action_result.emit(text, ok))
 	deck.edit_requested.connect(func(id: String, m: int) -> void: editor.open(id, m))
 	editor.take_requested.connect(func(id: String, m: int) -> void: deck.request_take(id, m, "program"))
 	deck.look_deleted.connect(func(id: String) -> void:

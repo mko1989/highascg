@@ -70,6 +70,23 @@ func test_tabs_and_selection() -> void:
 	p.free()
 
 
+func test_keep_on_select_tab() -> void:
+	# WO-952: the Layer presets tab stays while layers are clicked (select, Apply, select the next, Apply)
+	var a := _panel()
+	var p: Control = a[0]
+	var layers := VBoxContainer.new()
+	p.add_tab("Layer presets", layers, true)
+	p.show_tab(1)
+	p.present(a[1])
+	t.eq(p.tab_shown(), 1, "a selection does not take the column from Layer presets")
+	t.ok(p.showing(a[1]), "the page is swapped underneath")
+	p.show_tab(0)
+	t.ok(p._panes[0].visible and p.showing(a[1]), "Inspector shows the selected page")
+	p.present(a[1])
+	t.eq(p.tab_shown(), 0, "from the Inspector tab, unchanged")
+	p.free()
+
+
 func test_panes_reserve_the_scrollbar_width() -> void:
 	# WO-813 follow-up: content growing taller (Trim opening) showed the scrollbar and widened the column by its width
 	var p: Control = InspectorPanel.new()
