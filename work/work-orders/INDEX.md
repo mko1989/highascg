@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-865 live WOs (28 open, 121 in progress, 716 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+866 live WOs (29 open, 121 in progress, 716 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (165)
+## engine — Looks, takes, timeline, playback (166)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -172,6 +172,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 949 DONE [engine] Timeline / look transition tests (frame-accurate on PGM): "auto" mixes ran 12 f… → 949_WO_timeline_look_transition_tests.md
 - 954 DONE [engine+media,godot-client] A looping clip with black frames at its end, on air: what a media-browser trim… → 954_WO_trim_black_tail_of_looping_clip_on_air.md
 - 955 DONE [engine] A look layer's trim edit reloads PRV straight away → 955_WO_trim_edit_restages_prv.md
+- 956 OPEN [engine] The same loop on the same layer in two looks is reloaded on every take (relativ… → 956_WO_shared_loop_across_looks_reloads_every_take.md
 
 ## amcp — AMCP client and protocol (20)
 
