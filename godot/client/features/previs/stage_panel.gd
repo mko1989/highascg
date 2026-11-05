@@ -60,7 +60,7 @@ func _ready() -> void:
 		row.add_child(b)
 	add_child(row)
 	_list = ItemList.new()
-	_list.custom_minimum_size.y = 110
+	preload("res://features/previs/previs_ui.gd").fit_list(_list, 8)  # WO-948: as tall as its rows
 	_list.item_selected.connect(func(i: int) -> void: _select(str(builder.objects[i].id)))
 	add_child(_list)
 	_info = Label.new()

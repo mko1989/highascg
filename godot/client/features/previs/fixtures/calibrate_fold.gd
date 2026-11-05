@@ -43,7 +43,7 @@ func _ready() -> void:
 	_muted("Stage marks — real spots on the floor (tape, grid corners). Place one by clicking the floor in the 3D " +
 		"view, then type its measured position (metres from the stage origin: X stage left, Y upstage).")
 	_list = ItemList.new()
-	_list.custom_minimum_size.y = 96
+	preload("res://features/previs/previs_ui.gd").fit_list(_list, 5)  # WO-948: as tall as its rows
 	_list.item_selected.connect(func(i: int) -> void:
 		_picked = int(_list.get_item_metadata(i))
 		_fill_edit())

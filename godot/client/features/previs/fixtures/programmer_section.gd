@@ -42,7 +42,7 @@ func _ready() -> void:
 	add_child(_view_switch())
 	_list = ItemList.new()
 	_list.select_mode = ItemList.SELECT_MULTI
-	_list.custom_minimum_size.y = 110
+	preload("res://features/previs/previs_ui.gd").fit_list(_list, 8)  # WO-948: as tall as its rows
 	_list.auto_height = false
 	_list.multi_selected.connect(func(_i: int, _on: bool) -> void:
 		sel.set_ids(Array(_list.get_selected_items()).map(func(i: int) -> String: return str(_list.get_item_metadata(i)))))

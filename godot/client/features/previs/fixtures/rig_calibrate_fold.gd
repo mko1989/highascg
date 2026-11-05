@@ -47,7 +47,7 @@ func _ready() -> void:
 	_box.add_child(row)
 	_summary = _muted(_box)
 	_list = ItemList.new()
-	_list.custom_minimum_size.y = 140
+	preload("res://features/previs/previs_ui.gd").fit_list(_list, 6)  # WO-948: as tall as its rows
 	_list.item_selected.connect(func(i: int) -> void: sel.set_ids([str(_list.get_item_metadata(i))]))
 	_box.add_child(_list)
 	row = HBoxContainer.new()

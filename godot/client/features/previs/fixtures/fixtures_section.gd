@@ -60,6 +60,7 @@ func _ready() -> void:
 	_type.fit_to_longest_item = false
 	_type.tooltip_text = "Fixture type (GDTF) — the one Add places, Body colour tints and Remove / Replace act on"
 	_type.item_selected.connect(func(_i: int) -> void: _fill_modes())
+	kit.add_child(preload("res://features/previs/previs_ui.gd").caption("Fixture type"))  # WO-948
 	kit.add_child(_type)
 	var row := HBoxContainer.new()
 	for spec in [["Import GDTF…", _import], ["Remove", _ask_remove]]:
@@ -80,6 +81,7 @@ func _ready() -> void:
 	_mode.fit_to_longest_item = false
 	_mode.tooltip_text = "DMX mode (channel layout) of the heads Add places"
 	_mode.item_selected.connect(_on_mode)
+	kit.add_child(preload("res://features/previs/previs_ui.gd").caption("DMX mode · then protocol, universe and how many to add"))
 	kit.add_child(_mode)
 	var add := HBoxContainer.new()
 	_proto = OptionButton.new()

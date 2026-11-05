@@ -42,6 +42,7 @@ var _unpatch_confirm: ConfirmationDialog
 var _place := {}  # "x" / "y" / "z" / "yaw" → SpinBox
 var _fit_on_load := false
 var _screens: MvrScreens
+var _scene_rows := []  # WO-948: the rows that only mean something with a scene (position, map hint, patch, Layers)
 var _colors := ColorRows.new()  # WO-641: a colour per layer
 var _screen_uuids: Array = []  # WO-647: what the screens tool has selected
 var _walls_for := ""  # WO-706: the scene new to this project — its wall layers start hidden once it has loaded
@@ -81,7 +82,6 @@ func _ready() -> void:
 		scene.set_layer_colors(Tint.with_color(Tint.colors(_cfg(), "layer_colors"), l, c)))
 	_colors.changed.connect(_set_layer_color)
 	_colors.visibility_toggled.connect(_set_layer_shown)
-	add_child(Fold.new("Layers", [_colors]))
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -112,6 +112,7 @@ func _ready() -> void:
 	fit.tooltip_text = "Centre the visible scene on the stage and stand it on the floor"
 	fit.pressed.connect(func() -> void: _set_place(M.fit_place(scene.bounds(true), float(_place.yaw.value))))
 	place.add_child(fit)
+	add_child(preload("res://features/previs/previs_ui.gd").caption("Scene position — stage left · upstage · up (m), turn (°)"))
 	add_child(place)
 	_screens = MvrScreens.new()
 	_screens.selection_changed.connect(func(uuids: Array) -> void:
@@ -138,6 +139,9 @@ func _ready() -> void:
 		_unpatch_confirm.popup_centered())
 	prow.add_child(_unpatch_btn)
 	add_child(prow)
+	add_child(Fold.new("Layers", [_colors]))  # WO-948: below the scene's rows, not over them
+	_scene_rows = [place, get_child(place.get_index() - 1), prow, _screens, get_child(get_child_count() - 1)]
+	for n in _scene_rows: n.visible = false  # until a scene is shown (_on_loaded)
 	_patch_status = Label.new()
 	_patch_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_patch_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -326,6 +330,7 @@ func _on_loaded(info: Dictionary) -> void:
 			_set_hidden_layers(walls)
 	_fill_layers()
 	_remove_btn.disabled = info.is_empty()  # {} = no scene picked
+	for n in _scene_rows: n.visible = info.has("name")  # WO-948
 	_info = info
 	_status.text = M.summary(info)
 	if _fit_on_load and info.has("parts"):
@@ -338,10 +343,9 @@ func _on_loaded(info: Dictionary) -> void:
 	_load_types()
 
 
-## WO-636: a shown scene's GDTFs go into the box's type store (POST …/types; content-addressed, a known type is not
-## re-read) and its fixtures carry over — none patched yet and no Unpatch (mvr.unpatched) → the file's own patch.
-## WO-637: placeholders among them are first swapped for the real files from GDTF Share (when an account is set), so
-## the patch lands on the real types; fixtures patched before move over (RM.repoint).
+## WO-636: a shown scene's GDTFs go into the box's type store (POST …/types, content-addressed) and its fixtures carry
+## over — none patched yet and no Unpatch (mvr.unpatched) → the file's own patch. WO-637: placeholders are first swapped
+## for the real GDTF Share files (account set), so the patch lands on real types; earlier patches move (RM.repoint).
 func _load_types() -> void:
 	var c := _cfg()
 	var id := str(c.get("id", ""))
@@ -363,8 +367,7 @@ func _load_types() -> void:
 		types_changed.emit()
 
 
-## WO-637: POST /api/fixtures/share/resolve for the placeholders in `types` → the ones replaced ({id, to, modes}).
-## The outcome goes under the scene summary; no account / nothing to do → silent.
+## WO-637: POST /api/fixtures/share/resolve for the placeholders in `types` → the replaced ({id, to, modes}); outcome under the summary.
 func _from_share(types: Array) -> Array:
 	var ids := types.filter(func(t: Dictionary) -> bool: return t.get("placeholder", false) and not t.has("replacedBy")).map(
 		func(t: Dictionary) -> String: return str(t.id))
@@ -448,8 +451,7 @@ func _unpatch() -> void:
 	_patch_status.text = "Unpatched %d fixture(s)." % (before - s.patch.size())
 
 
-## Unpatch is remembered (project.previs.mvr.unpatched) so showing the scene again does not re-patch it. _last follows
-## the write: the scene is not reloaded for it.
+## Unpatch is remembered (project.previs.mvr.unpatched): showing the scene again does not re-patch it; no reload.
 func _mark_unpatched(on: bool) -> void:
 	var c := _cfg()
 	if c.is_empty() or bool(c.get("unpatched", false)) == on:

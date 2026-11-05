@@ -28,6 +28,7 @@ const TrackingModel := preload("res://features/previs/tracking/tracking_model.gd
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const GlbScreens := preload("res://features/previs/glb_screens_model.gd")
 const Fold := preload("res://features/previs/fold_section.gd")
+const UI := preload("res://features/previs/previs_ui.gd")
 const UI_CFG := "user://ui.cfg"
 const MODES := ["3d", "camera"]
 
@@ -462,8 +463,32 @@ func _build_panel() -> Control:
 	v.add_theme_constant_override("separation", 8)
 	_position.fold = Fold.new("Position", [_position])
 	v.add_child(_position.fold)
+	_source = OptionButton.new()  # WO-948: by job — what you look at, what is on stage, the rig; empty lists collapse
+	for role in ["opgui", "pgm1", "prv1", "pgm2", "prv2"]:
+		_source.add_item(role)
+	_source.item_selected.connect(func(i: int) -> void: _set_source(_source.get_item_text(i)))
+	var cams := HBoxContainer.new()
+	for p in ["Front", "Top", "ISO"]:
+		var b := Button.new()
+		b.text = p
+		b.pressed.connect(func() -> void: stage.fly_to_preset(p))
+		cams.add_child(b)
+	v.add_child(Fold.new("View", [UI.caption("Camera"), cams, UI.caption("Live picture on the screens"), _source]))
 	stage_panel = StagePanel.new()
 	v.add_child(Fold.new("Stage", [stage_panel]))
+	_models = ItemList.new()
+	UI.fit_list(_models, 6)
+	_models.item_activated.connect(load_model)
+	_models.item_selected.connect(load_model)
+	v.add_child(Fold.new("Models", [_models]))
+	var scroll := ScrollContainer.new()
+	_meshes = VBoxContainer.new()
+	scroll.add_child(_meshes)
+	UI.fit_scroll(scroll, _meshes, 160.0)
+	_status = Label.new()
+	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
+	v.add_child(Fold.new("Screens (live texture)", [scroll, _status]))
 	mvr_section = MvrSection.new()
 	v.add_child(Fold.new("MVR scene", [mvr_section]))
 	var fixtures_section := FixturesSection.new()
@@ -472,29 +497,4 @@ func _build_panel() -> Control:
 	inset.add_child(fixtures_section)
 	v.add_child(Fold.new("Lighting", [inset]))
 	mvr_section.types_changed.connect(fixtures_section.refresh_types)  # WO-615 T10: a patch imports GDTF types
-	_models = ItemList.new()
-	_models.custom_minimum_size.y = 120
-	_models.item_activated.connect(load_model)
-	_models.item_selected.connect(load_model)
-	v.add_child(Fold.new("Models", [_models]))
-	_source = OptionButton.new()
-	for role in ["opgui", "pgm1", "prv1", "pgm2", "prv2"]:
-		_source.add_item(role)
-	_source.item_selected.connect(func(i: int) -> void: _set_source(_source.get_item_text(i)))
-	v.add_child(Fold.new("Live source", [_source]))
-	var cams := HBoxContainer.new()
-	for p in ["Front", "Top", "ISO"]:
-		var b := Button.new()
-		b.text = p
-		b.pressed.connect(func() -> void: stage.fly_to_preset(p))
-		cams.add_child(b)
-	v.add_child(Fold.new("Camera", [cams]))
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size.y = 120
-	_meshes = VBoxContainer.new()
-	scroll.add_child(_meshes)
-	_status = Label.new()
-	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
-	v.add_child(Fold.new("Screens (live texture)", [scroll, _status]))
 	return v
