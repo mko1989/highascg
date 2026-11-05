@@ -55,9 +55,16 @@ test('relative take keeps a trim-in as the loop point; LENGTH is measured from I
 	assert.equal(job.loadOpts.length, 450, 'out 500 = in 50 + LENGTH 450, independent of the seek frame')
 })
 
-test('trim-out before a relative start point sends no LENGTH', async () => {
+/* WO-956 (owner 05.11): a relative seek past the trim-out used to drop LENGTH, so the clip played its untrimmed tail
+ * (a looping bg's black frames). The seek is now placed inside the trimmed span, and the LENGTH is kept. */
+test('a relative start past the trim-out wraps inside the trimmed loop and keeps its LENGTH', async () => {
 	const job = await take({ startBehaviour: 'relativeToPrevious', playSeekFrames: 264, trimOutMs: 4000 })
-	assert.equal(job.loadOpts.length, undefined)
+	assert.deepEqual([job.loadOpts.in, job.loadOpts.seek, job.loadOpts.length], [0, 64, 200], '264 in a 200-frame loop = 64')
+})
+
+test('a one-shot shorter than the relative position starts at its in point, trimmed', async () => {
+	const job = await take({ startBehaviour: 'relativeToPrevious', playSeekFrames: 264, trimOutMs: 4000, loop: false })
+	assert.deepEqual([job.loadOpts.in, job.loadOpts.seek, job.loadOpts.length], [0, 0, 200])
 })
 
 /* ── WO-582 part 2: one-way failure + visible lag ─────────────────────────────────────────── */

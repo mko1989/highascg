@@ -398,6 +398,7 @@ async function handleSceneTakeInner(body, ctx, sync) {
 				forceCut: !!b.forceCut,
 				self: ctx,
 				skipLayerVisualEquality: true,
+				keepRelativeLayers: true, // WO-956: an unchanged "relative" layer keeps playing
 				playSync: sync,
 				...programTimers,
 				/* WO-814: flip-flop the preview once the PGM PLAY batch is committed and acked — never
@@ -428,7 +429,7 @@ async function handleSceneTakeInner(body, ctx, sync) {
 		const takeUpdatedAt = programTakeStarted(ctx, {
 			mainIdx, inc, forceCut: !!b.forceCut, channel, previousId: currentScene?.id, framerate: b.framerate,
 		})
-		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly, playSync: sync, ...programTimers })
+		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, keepRelativeLayers: true, pgmOnly, playSync: sync, ...programTimers })
 		if (inc && typeof inc === 'object' && inc.id) {
 			await liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
 		}

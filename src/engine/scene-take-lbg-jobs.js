@@ -42,6 +42,7 @@ async function buildTakeJobs(opts) {
 		globalT,
 		framerate,
 		skipLayerVisualEquality = false,
+		keepRelativeLayers = false, // WO-956: PGM takes leave an unchanged "relative" layer playing
 		outgoingTopIsTimeline = false,
 		restrictTimelineToPreview = false,
 		deferTimelinePlay = false,
@@ -151,9 +152,10 @@ async function buildTakeJobs(opts) {
 
 		const cur = currentMap.get(layer.layerNumber)
 		const hasOutgoingOnAir = layerHasContent(cur)
-		const diffs = skipLayerVisualEquality
-			? { _: 'skipLayerVisualEquality' }
-			: require('./scene-transition').layerVisuallyEqual(cur, layer, true)
+		const st = require('./scene-transition')
+		const keep = keepRelativeLayers && st.relativeLayerKeepsPlaying(cur, layer)
+		if (keep && typeof self.log === 'function') self.log('info', `[buildTakeJobs] layer ${layer.layerNumber} keeps playing (relative start, unchanged)`)
+		const diffs = skipLayerVisualEquality && !keep ? { _: 'skipLayerVisualEquality' } : st.layerVisuallyEqual(cur, layer, true)
 		if (Object.keys(diffs).length === 0) {
 			// WO-218: Track visually-equal layers that are being skipped
 			// They may need SWAP/re-stage if the bank flips during this take

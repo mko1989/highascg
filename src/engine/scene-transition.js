@@ -121,6 +121,22 @@ function layerVisuallyEqual(cur, incoming, returnDiff = false) {
 	return Object.keys(diffs).length === 0
 }
 
+/**
+ * WO-956 — a PGM take leaves this layer playing untouched (no LOADBG / PLAY; the WO-218 SWAP carries it over a bank
+ * flip): the incoming layer starts "relative to the clip playing on this layer", the on-air layer shows the same
+ * thing (layerVisuallyEqual) and loads it the same way (trim in / out). Owner 05.11: "changing between looks
+ * shouldnt restart the loop" — a reload re-seeked it, 0 / +1 frame off normally and 13 frames once. Playlists and
+ * timelines always take.
+ */
+function relativeLayerKeepsPlaying(cur, incoming) {
+	if (!cur || !incoming || incoming.startBehaviour !== 'relativeToPrevious') return false
+	if (incoming.sourceMode === 'list' || cur.sourceMode === 'list') return false
+	if (String(incoming.source?.type || '') === 'timeline' || !layerHasContent(cur)) return false
+	if ((cur.trimInMs ?? null) !== (incoming.trimInMs ?? null)) return false
+	if ((cur.trimOutMs ?? null) !== (incoming.trimOutMs ?? null)) return false
+	return layerVisuallyEqual(cur, incoming)
+}
+
 function layerHasContent(l) {
 	return !!(l && l.source && l.source.value)
 }
@@ -292,6 +308,7 @@ module.exports = {
 	programChannelToScreenIdx,
 	sourceEqual,
 	layerVisuallyEqual,
+	relativeLayerKeepsPlaying,
 	layerHasContent,
 	normalizeTransition,
 	isLayerAnimateTakeTransition,

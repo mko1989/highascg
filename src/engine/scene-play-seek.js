@@ -246,19 +246,26 @@ function resolvePlaySeekFramesForSceneLayer(layer, ctx, opts) {
 		return trimInFrames
 	}
 
+	/* WO-956: the playhead read below belongs to the clip ON AIR on this layer, which may be another clip than the
+	 * incoming one ("different clips can also start relative to the clip playing on that layer"). Every result is
+	 * placed inside the INCOMING clip's own in / out (looped, or from its start when a one-shot is shorter). */
+	const fit = (f) => fitRelativeSeekToIncomingClip(f, ctx, layer, fps)
+
 	/* WO-582: the server's own OSC read wins over the client's `playSeekFrames` — the client reads
 	 * logical layer N regardless of bank, so leaving a bank-B look it read the empty bank-A layer
 	 * and sent 0 ("works only one way"). It is also projected to when the PLAY will land. */
 	if (!forceCut && isOscPlaybackActive(ctx)) {
 		const projected = projectRelativeSeekFrames(ctx, channel, onAirPhys, fps)
 		if (projected != null) {
-			rememberLastPlayFrame(ctx, channel, layerNumber, projected)
-			return projected
+			const f = fit(projected)
+			ctx.log?.('info', `[relative-seek] ${channel}-${onAirPhys} → L${layerNumber} ${layer?.source?.value}: playhead ${projected} → SEEK ${f}`)
+			rememberLastPlayFrame(ctx, channel, layerNumber, f)
+			return f
 		}
 	}
 
 	if (layer.playSeekFrames != null && Number.isFinite(Number(layer.playSeekFrames))) {
-		const f = Math.max(0, Math.floor(Number(layer.playSeekFrames)))
+		const f = fit(Math.max(0, Math.floor(Number(layer.playSeekFrames))))
 		rememberLastPlayFrame(ctx, channel, layerNumber, f)
 		return f
 	}
@@ -266,20 +273,46 @@ function resolvePlaySeekFramesForSceneLayer(layer, ctx, opts) {
 	if (!forceCut) {
 		const live = getLivePlayheadFrames(ctx, channel, onAirPhys, fps)
 		if (live != null) {
-			rememberLastPlayFrame(ctx, channel, layerNumber, live)
-			return live
+			const f = fit(live)
+			rememberLastPlayFrame(ctx, channel, layerNumber, f)
+			return f
 		}
 	}
 
 	const last = getLastPlayFrame(ctx, channel, layerNumber)
-	if (last != null) return last
+	if (last != null) return fit(last)
 
 	if (!forceCut && sb === 'relativeToPrevious') {
 		const matrixFallback = getLivePlayheadFrames(ctx, channel, onAirPhys, fps)
-		if (matrixFallback != null && matrixFallback > 0) return matrixFallback
+		if (matrixFallback != null && matrixFallback > 0) return fit(matrixFallback)
 	}
 
 	return null
+}
+
+/**
+ * WO-956 — a relative seek (the on-air clip's playhead) placed inside the incoming clip: its trim-in … trim-out (else
+ * 0 … its length). Past the end, a looping clip wraps (position modulo its span) and a one-shot starts at its in point;
+ * a seek inside the span, or an incoming clip of unknown length, is returned unchanged.
+ * @param {number} frames
+ * @param {object} ctx
+ * @param {object} layer incoming scene layer
+ * @param {number} fps
+ * @param {(ctx: object, clip: string) => number|null} [durationMs] tests: the clip length lookup
+ * @returns {number}
+ */
+function fitRelativeSeekToIncomingClip(frames, ctx, layer, fps, durationMs = resolveClipDurationMs) {
+	const rate = Math.max(1, fps || 25)
+	const src = String(layer?.source?.value || '')
+	const ms = src && !src.startsWith('route://') ? durationMs(ctx, src) : null
+	const total = Number.isFinite(ms) && ms > 0 ? Math.floor((ms * rate) / 1000) : 0
+	const outMs = Number(layer?.trimOutMs)
+	const trimOut = layer?.trimOutMs != null && Number.isFinite(outMs) ? Math.round((outMs * rate) / 1000) : 0
+	const end = trimOut > 0 && (total === 0 || trimOut < total) ? trimOut : total
+	if (!(end > 0) || frames < end) return frames
+	const start = resolvePlayInFramesForSceneLayer(layer, rate)
+	if (end <= start) return frames
+	return layer?.loop ? start + ((frames - start) % (end - start)) : start
 }
 
 /**
@@ -361,6 +394,7 @@ module.exports = {
 	elapsedFramesFromPlayback,
 	resolvePlaySeekFramesForSceneLayer,
 	resolvePlayInFramesForSceneLayer,
+	fitRelativeSeekToIncomingClip,
 	resolveTimelineClipFrame,
 	seekFramesFromTimelineClip,
 }

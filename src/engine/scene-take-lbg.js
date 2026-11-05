@@ -41,7 +41,7 @@ const {
 
 /**
  * @param {object} amcp
- * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean, onProgramTransitionStarted?: Function, onProgramPlayCommitted?: Function, skipLayerVisualEquality?: boolean, banklessTake?: boolean }} opts
+ * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean, onProgramTransitionStarted?: Function, onProgramPlayCommitted?: Function, skipLayerVisualEquality?: boolean, keepRelativeLayers?: boolean, banklessTake?: boolean }} opts
  */
 async function runSceneTakeLbg(amcp, opts) {
 	// WO-156: every take path (API take, preview stage, sync-push, replication) funnels through
@@ -197,6 +197,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		globalT,
 		framerate,
 		skipLayerVisualEquality: !!opts.skipLayerVisualEquality,
+		keepRelativeLayers: !!opts.keepRelativeLayers, // WO-956
 		restrictTimelineToPreview: !!opts.restrictTimelineToPreview,
 		deferTimelinePlay: !!opts.deferTimelinePlay,
 		holdTemplates: banklessTake, // WO-860: PRV staging (every preview take is bankless)
