@@ -180,3 +180,22 @@ static func scrub_note(data: Dictionary) -> String:
 			return "PRV holds another clip on this layer — the slider only picks the points for the next take"
 		_:
 			return "Look not on PRV — the slider only picks the points for the next take"
+
+
+## WO-962 — the clip transport row under the slider. Every move is a scrub position (ms in the clip), snapped to a frame.
+## "in" = the stored in point (or the clip's start), "out" = the last frame before the out point (or the clip's end).
+const JUMP_IN := "in"
+const JUMP_OUT := "out"
+
+
+static func jump_ms(layer: Dictionary, dur_ms: float, which: String, fps: float) -> float:
+	if which == JUMP_IN:
+		return snap_ms(in_ms(layer), dur_ms, fps)
+	var last := maxf(in_ms(layer), out_ms(layer, dur_ms) - frame_to_ms(1, fps))
+	return snap_ms(last, dur_ms, fps)
+
+
+## One frame back (-1) / forward (+1) from `cur_ms`, kept inside the clip.
+static func step_ms(cur_ms: float, dir: int, dur_ms: float, fps: float) -> float:
+	var f := ms_to_frame(snap_ms(cur_ms, dur_ms, fps), fps) + (1 if dir > 0 else -1)
+	return snap_ms(frame_to_ms(maxi(0, f), fps), dur_ms, fps)

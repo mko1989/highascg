@@ -19,6 +19,7 @@ const M := preload("res://features/live/media_math.gd")
 const X := preload("res://features/live/mixer_math.gd")
 const TimelineMedia := preload("res://features/timeline/timeline_media.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const Icons := preload("res://app/ui_icons.gd")
 const RESET_TIP_IN := "Ctrl+click or ↺ to reset to the clip's start"
 const RESET_TIP_OUT := "Ctrl+click or ↺ to reset to the clip's end"
 const FIELD_SAMPLE := "00:00.00"  # the widest point text a field shows (m:ss.ff up to 99 min)
@@ -46,6 +47,9 @@ var _in_btn: Button
 var _out_btn: Button
 var _in_edit: LineEdit
 var _out_edit: LineEdit
+var _play_btn: Button
+var _tport: Array = []  # WO-962: the transport buttons (disabled while the length is unknown)
+var _paused := false  # the PRV copy's state as this section last set it (a fresh stage plays)
 
 
 func _init() -> void:
@@ -90,6 +94,7 @@ func _ready() -> void:
 	_pos.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	srow.add_child(_pos)
 	_body.add_child(srow)
+	_body.add_child(_transport_row())
 	set_open(false)
 
 
@@ -131,6 +136,8 @@ func show_layer(scene_id: String, main_idx: int, layer: Dictionary) -> void:
 		_key = key
 		_dur_ms = 0.0
 		_note = ""
+		_paused = false
+		_set_play_icon()
 		var value := str(src.get("value", ""))
 		var clip := str(src.get("type", "media")) in ["media", "file", ""] and X.supports_loop(value, str(src.get("type", "media")))
 		_set_row_visible(clip)  # templates, routes, stills: nothing to trim
@@ -174,6 +181,8 @@ func _refresh() -> void:
 	_in_edit.editable = known
 	_out_edit.editable = known
 	_in_btn.disabled = not known
+	for b in _tport:
+		(b as Button).disabled = not known
 	_out_btn.disabled = not known
 	if not known:
 		_pos.text = "--:--.--"
@@ -308,3 +317,52 @@ func _field(parent: Control, is_in: bool) -> LineEdit:
 	e.text_submitted.connect(func(_t: String) -> void: _commit(is_in))
 	e.focus_exited.connect(func() -> void: _commit(is_in))
 	return e
+
+
+## WO-962 (owner 5.11: "trim inside layer inspector is missing clips transport buttons"): jump to in, frame back,
+## play / pause, frame forward, jump to out — the web's transport (WO-570 inspector-media-transport.js) under the slider.
+## Moves go through the slider, so they scrub the look's PRV copy exactly like a drag (layer-scrub); play / pause is the
+## same route with `transport`. PGM is never touched. "Set in / out from here" is the Trim in / Trim out buttons above.
+func _transport_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 2)
+	_tport.append(_tbtn(row, "prev", "Jump to the in point", func() -> void: _goto(T.jump_ms(_layer, _dur_ms, T.JUMP_IN, _fps))))
+	_tport.append(_tbtn(row, "step_back", "Back one frame", func() -> void: _goto(T.step_ms(_slider.value, -1, _dur_ms, _fps))))
+	_play_btn = _tbtn(row, "pause", "", func() -> void: _toggle_play())
+	_tport.append(_play_btn)
+	_tport.append(_tbtn(row, "step_fwd", "Forward one frame", func() -> void: _goto(T.step_ms(_slider.value, 1, _dur_ms, _fps))))
+	_tport.append(_tbtn(row, "next", "Jump to the out point", func() -> void: _goto(T.jump_ms(_layer, _dur_ms, T.JUMP_OUT, _fps))))
+	_set_play_icon()
+	return row
+
+
+func _tbtn(parent: Control, icon: String, tip: String, fn: Callable) -> Button:
+	var b := Icons.button(icon, tip, 14)
+	b.pressed.connect(fn)
+	parent.add_child(b)
+	return b
+
+
+func _goto(ms: float) -> void:
+	if _dur_ms > 0.0:
+		_slider.value = ms  # value_changed → the paced scrub (a no-op when the slider is already there)
+
+
+func _set_play_icon() -> void:
+	if _play_btn == null:
+		return
+	_play_btn.icon = Icons.texture("play" if _paused else "pause", 14)
+	_play_btn.tooltip_text = "Play the clip on PRV" if _paused else "Pause the clip on PRV"
+
+
+func _toggle_play() -> void:
+	var kind := "resume" if _paused else "pause"
+	var res: Dictionary = await Api.post_json("/api/scene/layer-scrub", {"sceneId": _scene_id, "mainIdx": _main, "layerNumber": int(_layer.get("layerNumber", 0)), "transport": kind})
+	var data: Variant = res.data if res.ok else null
+	if data is Dictionary and data.get("onPrv", false) == true and data.get("ok", true) != false:
+		_paused = not _paused
+		_set_play_icon()
+		status.emit("PRV clip %s" % ("paused" if _paused else "playing"))
+	else:
+		status.emit(T.scrub_note(data) if data is Dictionary and data.get("ok", true) != false else "Play / pause failed: %s" % (res.error if not res.ok else str((data as Dictionary).get("error", "") if data is Dictionary else "")))

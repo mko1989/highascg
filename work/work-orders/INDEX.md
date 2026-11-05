@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-869 live WOs (28 open, 121 in progress, 720 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+873 live WOs (28 open, 121 in progress, 724 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -377,7 +377,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (125)
+## godot-client — Godot client (129)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -504,6 +504,10 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 952 DONE [godot-client] Layer presets: a tab of the right column, like Look presets → 952_WO_layer_presets_tab.md
 - 953 DONE [godot-client] Live tab: hide a screen's deck column (its destination header and all its look… → 953_WO_hide_screen_columns_live_deck.md
 - 959 DONE [godot-client+mapping] Test card / Border as one tick button; "Screens" lists every screen with its ey… → 959_WO_tick_buttons_and_screens_menu_destinations.md
+- 962 DONE [godot-client] Trim section: clip transport buttons → 962_WO_trim_section_clip_transport.md
+- 964 DONE [godot-client+video-io] A header record / stream badge opens its own Inspector page instead of switchin… → 964_WO_header_badge_opens_its_inspector.md
+- 965 DONE [godot-client] A media file dropped into the look editor brings the new layer's Inspector page… → 965_WO_media_drop_opens_layer_inspector.md
+- 966 DONE [godot-client] The media file Inspector gets "Set in" / "Set out" buttons at the preview posit… → 966_WO_media_inspector_set_in_out_buttons.md
 
 ## web-client — Web client (82)
 

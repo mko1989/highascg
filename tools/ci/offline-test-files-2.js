@@ -81,4 +81,5 @@ module.exports = [
 	'tools/smoke/smoke-wo919-n2-stale-edit-saved.test.js',
 	'tools/smoke/smoke-wo922-ingest-utf8-names.test.js',
 	'tools/smoke/smoke-wo933-fanout-checks-before-replay.test.js',
+	'tools/smoke/smoke-wo962-layer-transport.test.js',
 ]

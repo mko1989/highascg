@@ -47,7 +47,8 @@ async function handleLayerScrub(body, ctx, deps = {}) {
 	const b = parseBody(body)
 	const sceneId = String(b.sceneId || '').trim()
 	const ln = Number(b.layerNumber)
-	const ms = Number(b.ms)
+	const transport = b.transport === 'pause' || b.transport === 'resume' ? b.transport : '' // WO-962: no ms needed
+	const ms = transport ? 0 : Number(b.ms)
 	if (!sceneId || !Number.isFinite(ln) || !Number.isFinite(ms) || ms < 0) {
 		return out(400, { ok: false, error: 'sceneId, layerNumber and ms (≥ 0) required' })
 	}
@@ -84,6 +85,25 @@ async function handleLayerScrub(body, ctx, deps = {}) {
 	if (String(stagedLayer?.source?.value || '') !== src)
 		return out(200, { ok: true, onPrv: false, reason: 'clip_not_staged' })
 
+	if (transport) {
+		// WO-962: the Trim section's play / pause — PAUSE / RESUME on the look's PRV copy only, tracker kept in step.
+		const act = deps.transportAct || (async (ch, l, kind) => {
+			const tracker = require('../state/playback-tracker')
+			if (kind === 'pause') {
+				await ctx.amcp.pause(ch, l)
+				tracker.recordPause(ctx, ch, l)
+			} else {
+				await ctx.amcp.resume(ch, l)
+				tracker.recordResume(ctx, ch, l)
+			}
+		})
+		try {
+			await act(prvCh, ln, transport)
+		} catch (err) {
+			return out(200, { ok: false, error: String(err?.message || err) })
+		}
+		return out(200, { ok: true, onPrv: true, channel: prvCh, layer: ln, transport })
+	}
 	const { resolveChannelFramerateForMixerTween } = require('../engine/scene-transition')
 	const chFps = Math.max(1, resolveChannelFramerateForMixerTween(ctx, prvCh, 25))
 	const frame = seekFrameForMs(ms, chFps)
