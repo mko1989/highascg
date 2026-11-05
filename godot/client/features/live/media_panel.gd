@@ -164,6 +164,11 @@ func _ready() -> void:
 	_bar.add_menu.files_chosen.connect(func(paths: PackedStringArray) -> void: _ingest(paths, _bar.folder))
 	_bar.add_menu.url_chosen.connect(_download)
 	_bar.add_menu.usb_requested.connect(func() -> void: UsbImport.show_import(self, load_media))
+	_bar.add_menu.gtzip_imported.connect(func(res: Dictionary) -> void:  # WO-951: show it in CGs
+		_line(_bar.add_menu.gtzip_line(res))
+		if res.get("ok") == true:
+			_tabs.current_tab = templates.get_index()
+			load_templates())
 	_ingest_row = HBoxContainer.new()
 	_ingest_row.visible = false
 	_ingest_label = Label.new()

@@ -201,6 +201,7 @@ function handleGet(p, ctx, query = {}) {
 
 async function handlePost(p, body, ctx, req) {
 	if (p === '/api/lower-thirds/roster/import') return require('./routes-lower-third-roster').handleRosterImport(body) // WO-601
+	if (p === '/api/lower-thirds/import-gtzip') return require('./routes-lower-third-gtzip').handleImport(body, ctx) // WO-951
 	// Special case for multipart file upload which shouldn't parse the JSON body
 	if (p === '/api/lower-thirds/fonts' && req) {
 		return new Promise((resolve) => {

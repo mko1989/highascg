@@ -7,19 +7,21 @@ signal files_chosen(paths: PackedStringArray)
 signal new_folder_requested
 signal url_chosen(url: String)
 signal usb_requested
+signal gtzip_imported(result: Dictionary)  # WO-951: {ok, id, casparPath, fields, warnings} or {ok: false, error}
 
-enum { FILES, FOLDER, URL, FX, USB }
+enum { FILES, FOLDER, URL, FX, USB, GTZIP }
 
 
 func _ready() -> void:
 	text = "+"
-	tooltip_text = "Add media: files from this computer, a new folder, or a download from a URL"
+	tooltip_text = "Add media: files from this computer, a new folder, a download from a URL, or a lower third template (.gtzip)"
 	flat = false
 	var p := get_popup()
 	p.add_item("Select file(s)…", FILES)
 	p.add_item("New folder…", FOLDER)
 	p.add_item("Download from URL…", URL)
 	p.add_item("Import from USB…", USB)
+	p.add_item("Lower third template (.gtzip)…", GTZIP)  # WO-951
 	p.id_pressed.connect(_on_item)
 	about_to_popup.connect(_count_usb)
 
@@ -42,6 +44,8 @@ func _on_item(id: int) -> void:
 			_ask_url()
 		USB:
 			usb_requested.emit()
+		GTZIP:
+			_pick_gtzip()
 
 
 func _pick_files() -> void:
@@ -56,6 +60,43 @@ func _pick_files() -> void:
 	dlg.canceled.connect(dlg.queue_free)
 	add_child(dlg)
 	dlg.popup_centered_ratio(0.6)
+
+
+## WO-951: a NewTek LiveGraphics-style .gtzip → a CG Studio lower third on the server (POST /api/lower-thirds/import-gtzip;
+## the file is read here, so a client on another machine imports its own files too).
+func _pick_gtzip() -> void:
+	var dlg := FileDialog.new()
+	dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	dlg.access = FileDialog.ACCESS_FILESYSTEM
+	dlg.title = "Import a lower third template (.gtzip)"
+	dlg.filters = PackedStringArray(["*.gtzip ; Lower third templates (NewTek LiveGraphics)"])
+	dlg.current_dir = preload("res://core/platform.gd").start_dir()
+	dlg.file_selected.connect(func(path: String) -> void:
+		dlg.queue_free()
+		import_gtzip(path))
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered_ratio(0.6)
+
+
+func import_gtzip(path: String) -> void:
+	var bytes := FileAccess.get_file_as_bytes(path)
+	if bytes.is_empty():
+		gtzip_imported.emit({"ok": false, "error": "could not read %s" % path.get_file()})
+		return
+	var r: Dictionary = await Api.post_json("/api/lower-thirds/import-gtzip", {"name": path.get_file(), "data": Marshalls.raw_to_base64(bytes)})
+	var d: Dictionary = r.data if r.data is Dictionary else {}
+	gtzip_imported.emit(d if r.ok and d.get("ok") == true else {"ok": false, "error": str(d.get("error", r.error))})
+
+
+## The line the Sources panel shows after an import.
+static func gtzip_line(res: Dictionary) -> String:
+	if res.get("ok") != true:
+		return "Import failed: %s" % str(res.get("error", "?"))
+	var f: Dictionary = res.get("fields", {}) if res.get("fields") is Dictionary else {}
+	var w: Array = res.get("warnings", []) if res.get("warnings") is Array else []
+	return "Imported %s — title: %s, subtitle: %s%s" % [str(res.get("casparPath", "")), str(f.get("title", "—")),
+		str(f.get("subtitle", "—")), (" · not imported: " + "; ".join(w)) if not w.is_empty() else ""]
 
 
 func _ask_url() -> void:
