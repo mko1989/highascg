@@ -12,7 +12,8 @@ static func label_for(s: Dictionary, px_dim := 0) -> String:
 	return str(s.get("label", s.get("key", ""))) + (" (px)" if px_dim > 0 else "")
 
 
-static func control(s: Dictionary, v: Variant, on_change: Callable, px_dim := 0) -> Control:
+## `on_drag(held: bool)` (optional, WO-963) is called when a slider is grabbed / released.
+static func control(s: Dictionary, v: Variant, on_change: Callable, px_dim := 0, on_drag := Callable()) -> Control:
 	match str(s.get("type", "float")):
 		"select":
 			var o := OptionButton.new()
@@ -34,10 +35,10 @@ static func control(s: Dictionary, v: Variant, on_change: Callable, px_dim := 0)
 			cp.color_changed.connect(func(c: Color) -> void: on_change.call(P.to_css(c)))
 			return cp
 		_:
-			return _number(s, float(v if v != null else 0.0), on_change, px_dim)
+			return _number(s, float(v if v != null else 0.0), on_change, px_dim, on_drag)
 
 
-static func _number(s: Dictionary, v: float, on_change: Callable, dim: int) -> Control:
+static func _number(s: Dictionary, v: float, on_change: Callable, dim: int, on_drag := Callable()) -> Control:
 	var is_int := str(s.get("type", "")) == "int"
 	var row := HBoxContainer.new()
 	var sp := SpinBox.new()
@@ -66,6 +67,9 @@ static func _number(s: Dictionary, v: float, on_change: Callable, dim: int) -> C
 		sl.value_changed.connect(func(x: float) -> void:
 			if not is_equal_approx(sp.value, x):
 				sp.value = x)
+		if on_drag.is_valid():
+			sl.drag_started.connect(func() -> void: on_drag.call(true))
+			sl.drag_ended.connect(func(_changed: bool) -> void: on_drag.call(false))
 		row.add_child(sl)
 	sp.value_changed.connect(func(x: float) -> void:
 		if sl != null and not is_equal_approx(sl.value, x):

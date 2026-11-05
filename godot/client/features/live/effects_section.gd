@@ -17,6 +17,10 @@ var _content := Vector2i.ZERO
 var _add: OptionButton
 var _list: VBoxContainer
 var _open_adv := {}  # type → advanced section expanded
+var _key := ""  # which layer the section shows (show_effects `key`)
+var _dragging := 0  # sliders currently held (WO-963)
+var _hold_until := 0  # ticks_msec: our own recent edit is newer than anything the show document echoes back
+const HOLD_MS := 600
 
 
 func _ready() -> void:
@@ -50,13 +54,35 @@ func _fill_add_menu() -> void:
 
 ## content = layer content resolution (crop px editing); ZERO → fractions.
 ## An echo of our own edit (same array) does not rebuild — the dragged slider stays alive.
-func show_effects(effects: Array, content: Vector2i) -> void:
+## WO-963: neither does a STALE echo of the same layer (`key` unchanged or empty): the server's deck-scene broadcast lands
+## mid-drag with an older value, and rebuilding from it destroyed the slider being held and jumped it back.
+## While a slider is held, and for HOLD_MS after our last edit, the section's own state is the newest; a different
+## `key` (another layer / look) always shows.
+func show_effects(effects: Array, content: Vector2i, key := "") -> void:
+	if (key == "" or key == _key) and is_holding():
+		return
+	if key != "":  # "" = the same layer again (a content-resolution refresh)
+		_key = key
+		_hold_until = 0
 	if effects == _effects and content == _content and _list != null and _list.get_child_count() > 0:
 		return
 	_effects = effects.duplicate(true)
 	_content = content
 	if is_node_ready():
 		_rebuild()
+
+
+func is_holding() -> bool:
+	return _dragging > 0 or Time.get_ticks_msec() < _hold_until
+
+
+func _hold() -> void:
+	_hold_until = Time.get_ticks_msec() + HOLD_MS
+
+
+func _on_drag(on: bool) -> void:
+	_dragging = maxi(0, _dragging + (1 if on else -1))
+	_hold()
 
 
 func _on_add(i: int) -> void:
@@ -70,11 +96,13 @@ func _on_add(i: int) -> void:
 
 func _commit(next: Array) -> void:
 	_effects = next
+	_hold()
 	changed.emit(next.duplicate(true))
 	_rebuild()
 
 
 func _rebuild() -> void:
+	_dragging = 0  # a held slider dies with its card
 	for c in _list.get_children():
 		c.queue_free()
 	for i in _effects.size():
@@ -143,10 +171,11 @@ func _param(g: GridContainer, i: int, fx: Dictionary, s: Dictionary) -> void:
 	l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	g.add_child(l)
 	var key := str(s.key)
-	g.add_child(F.control(s, E.value_of(fx, s), func(v: Variant) -> void: _set_param(i, key, v), dim))
+	g.add_child(F.control(s, E.value_of(fx, s), func(v: Variant) -> void: _set_param(i, key, v), dim, _on_drag))
 
 
 ## A param edit emits without rebuilding the cards (keeps the slider being dragged alive).
 func _set_param(i: int, key: String, v: Variant) -> void:
 	_effects = E.set_param(_effects, i, key, v)
+	_hold()
 	changed.emit(_effects.duplicate(true))

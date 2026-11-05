@@ -122,7 +122,7 @@ func show_layer(look_id: String, main_idx: int, layer: Dictionary, index := -1) 
 		await _load_options()
 	_sync()
 	if not layer.is_empty():
-		_fx.show_effects(layer.get("effects", []) if layer.get("effects") is Array else [], _content)
+		_fx.show_effects(layer.get("effects", []) if layer.get("effects") is Array else [], _content, "%s/%d/%s" % [look_id, main_idx, layer.get("layerNumber", index)])
 		_pip.show_overlays(PipModel.from_layer(layer))
 		_style.show_layer(layer)
 		_pl.show_layer(look_id, layer)
