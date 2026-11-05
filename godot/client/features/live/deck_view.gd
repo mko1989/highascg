@@ -1,7 +1,6 @@
 extends ScrollContainer
-## WO-600 step 1 — looks deck, read-only: one column per main (client/components/scene-list.js),
-## cards highlighted red = on PGM, green = on PRV, dashed accent = global look ('all').
-## Rebuilds on project / scene / channelMap changes (coalesced to one rebuild per frame).
+## WO-600 step 1 — looks deck: one column per main (client/components/scene-list.js), cards red = on PGM, green = on
+## PRV, dashed accent = global look ('all'). Rebuilds on project / scene / channelMap changes (one per frame).
 
 const DeckModel := preload("res://features/live/deck_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -17,6 +16,7 @@ const BlankClear := preload("res://features/live/deck_blank_clear.gd")
 const DeckHead := preload("res://features/live/deck_head.gd")
 const Destinations := preload("res://features/live/destinations.gd")
 const DeckOverlay := preload("res://features/live/deck_overlay.gd")
+const DeckHidden := preload("res://features/live/deck_hidden.gd")
 const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
@@ -49,7 +49,7 @@ func _ready() -> void:
 
 
 func _on_store_changed(path: String, _v: Variant) -> void:
-	if path == "*" or path.begins_with("scene") or path == "channelMap" or path == Destinations.PATH:
+	if path == "*" or path.begins_with("scene") or path == "channelMap" or path == Destinations.PATH or path == DeckHidden.PATH:
 		_dirty = true
 
 
@@ -71,12 +71,14 @@ func rebuild() -> void:
 		if s is Dictionary:
 			known[str((s as Dictionary).get("id", ""))] = true
 	Destinations.prune(DeckModel.screen_count(cm))
-	for main in DeckModel.screen_count(cm):
+	var mains := DeckHidden.visible_mains(DeckModel.screen_count(cm))  # WO-953: this client's hidden screens drop out
+	for main in mains:
 		_main_for_card = main
 		var bus := DeckModel.resolve_bus_look_ids(main, live, cm, known, ps)
-		if main > 0:  # a line between screens: their cards would otherwise run together
+		if main != mains[0]:  # a line between screens: their cards would otherwise run together
 			_columns.add_child(ThemeBuilder.vline())
 		_columns.add_child(_column(DeckModel.screen_label(cm, main), DeckModel.scenes_for_main(scenes, main), bus, main, cm))
+	if mains.is_empty() and DeckModel.screen_count(cm) > 0: _columns.add_child(DeckHidden.note(DeckModel.screen_count(cm)))
 
 
 func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictionary) -> Control:
@@ -250,8 +252,7 @@ func take_main(main := 0) -> Dictionary:
 	return await request_take(str(bus.prv), main, "program")
 
 
-## WO-598 C1: click = stage on PRV, double-click = take to PGM — server builds the payload
-## (POST /api/scene/take-look); the deck re-highlights from the scene.live broadcast that follows.
+## WO-598 C1: click = PRV, double-click = TAKE (POST /api/scene/take-look); re-highlighted by the scene.live broadcast.
 func _on_card_input(event: InputEvent, scene_id: String, main: int) -> void:
 	var mb := event as InputEventMouseButton
 	if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
@@ -306,8 +307,7 @@ func request_ftb(main: int, cm: Dictionary) -> Dictionary:
 	return res
 
 
-## First editing path (WO-598/599): rename a look in the show document, saved through ProjectSync
-## (autosave/rev protocol shared with the web client). Returns false when the look is unknown.
+## WO-598/599: rename a look in the show document, saved through ProjectSync (false = unknown look).
 func rename_look(scene_id: String, new_name: String) -> bool:
 	var root: Variant = Store.project.get("scenes")
 	if not (root is Dictionary) or new_name.strip_edges() == "":

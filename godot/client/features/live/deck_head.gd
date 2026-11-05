@@ -5,6 +5,7 @@ extends RefCounted
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Icons := preload("res://app/ui_icons.gd")
 const Destinations := preload("res://features/live/destinations.gd")
+const DeckHidden := preload("res://features/live/deck_hidden.gd")
 
 
 ## `deck` = deck_view.gd (its request_take / request_ftb and Inspector signals).
@@ -50,4 +51,7 @@ static func build(deck: Node, title: String, n_looks: int, bus: Dictionary, main
 	brd.tooltip_text = "Global border for this screen"
 	brd.pressed.connect(func() -> void: deck.border_requested.emit(main, title))
 	head_row.add_child(brd)
+	var hid := Icons.button("eye_off", "Hide this screen's column — its looks stay on the show (“Screens” in the toolbar shows it again)")
+	hid.pressed.connect(func() -> void: DeckHidden.set_hidden(main, true))  # WO-953
+	head_row.add_child(hid)
 	return head_row

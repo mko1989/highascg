@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-861 live WOs (28 open, 121 in progress, 712 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+863 live WOs (28 open, 121 in progress, 714 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -374,7 +374,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (122)
+## godot-client — Godot client (124)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -498,6 +498,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 946 DONE [godot-client] Visuals Controller: play the drawn APC40 with the mouse like the real unit → 946_WO_visuals_apc40_virtual_controller.md
 - 948 DONE [godot-client] Previs Inspector: ordered by job, empty lists collapse, MVR rows only with a sc… → 948_WO_previs_inspector_cleanup.md
 - 950 DONE [godot-client] Operator dock: a colour picker (click any colour on screen, copy it as HEX / Ca… → 950_WO_dock_colour_picker.md
+- 952 DONE [godot-client] Layer presets: a tab of the right column, like Look presets → 952_WO_layer_presets_tab.md
+- 953 DONE [godot-client] Live tab: hide a screen's deck column (its destination header and all its look… → 953_WO_hide_screen_columns_live_deck.md
 
 ## web-client — Web client (82)
 

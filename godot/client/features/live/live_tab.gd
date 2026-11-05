@@ -14,6 +14,7 @@ const ScreenTimerPanel := preload("res://features/live/screen_timer_panel.gd")
 const GlobalBorderPanel := preload("res://features/live/global_border_panel.gd")
 const LookPresetPage := preload("res://features/live/look_preset_page.gd")
 const LayerPresetPage := preload("res://features/live/layer_preset_page.gd")
+const DeckHidden := preload("res://features/live/deck_hidden.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
 const LivePreview := preload("res://features/live/live_preview.gd")
@@ -175,12 +176,45 @@ func _transition_toolbar() -> Control:
 		b.toggled.connect(func(on: bool) -> void: _set_shown(k, on, true))
 		bar.add_child(b)
 		_show_btns[k] = b
+	bar.add_child(_screens_menu())
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _sync_default_row())
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
 		if path == "*" or path == "channelMap":
 			_sync_default_row())
 	_sync_default_row.call_deferred()
 	return bar
+
+
+## WO-953 — "Screens": which screens' columns this client's deck shows (a column header's eye hides one too).
+func _screens_menu() -> MenuButton:
+	var mb := MenuButton.new()
+	mb.tooltip_text = "Show or hide a screen's column (its title, its looks) in this deck — the preview above is unchanged"
+	var pm := mb.get_popup()
+	pm.hide_on_checkable_item_selection = false
+	var label := func() -> void:
+		var n := DeckModel.screen_count(Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {})
+		var hidden := n - DeckHidden.visible_mains(n).size()
+		mb.text = "Screens" if hidden == 0 else "Screens · %d hidden" % hidden
+		mb.add_theme_color_override("font_color", ThemeBuilder.WARN if hidden > 0 else ThemeBuilder.TEXT)
+	pm.about_to_popup.connect(func() -> void:
+		pm.clear()
+		var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
+		for m in DeckModel.screen_count(cm):
+			pm.add_check_item(DeckModel.screen_label(cm, m), m)
+			pm.set_item_checked(pm.get_item_index(m), not DeckHidden.is_hidden(m))
+		pm.add_separator()
+		pm.add_item("Show all", 1000))
+	pm.id_pressed.connect(func(id: int) -> void:
+		if id == 1000:
+			DeckHidden.show_all()
+			return
+		DeckHidden.set_hidden(id, not DeckHidden.is_hidden(id))
+		pm.set_item_checked(pm.get_item_index(id), not DeckHidden.is_hidden(id)))
+	Store.changed.connect(func(path: String, _v: Variant) -> void:
+		if path == "*" or path == "channelMap" or path == DeckHidden.PATH:
+			label.call())
+	label.call()
+	return mb
 
 
 func _set_shown(kind: String, on: bool, persist: bool) -> void:
