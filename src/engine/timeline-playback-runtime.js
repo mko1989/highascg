@@ -14,6 +14,27 @@ function setCellPosition(cell, pos) {
 	cell._t0 = Date.now()
 }
 
+/**
+ * WO-949: a timeline the engine does not hold is loaded from the stored project before it gives up. Clients push a
+ * timeline only when it is edited or shown in their Timeline tab, so after a server restart a look containing a
+ * timeline took to BLACK ("timeline not on server") until someone opened that timeline (box 05.11).
+ * @param {object} eng the timeline engine
+ * @param {string} id
+ * @returns {object | null} the timeline now in the engine, or null when the project has none with that id
+ */
+function hydrateFromProject(eng, id) {
+	try {
+		const list = require('./project-scenes-load').loadFullProject()?.timelines?.timelines
+		const stored = Array.isArray(list) ? list.find((t) => t && String(t.id) === String(id)) : null
+		if (!stored) return null
+		eng.create(JSON.parse(JSON.stringify(stored)))
+		if (typeof eng.self?.log === 'function') eng.self.log('info', `[Timeline] ${id} loaded from the stored project`)
+		return eng.timelines.get(id) || null
+	} catch {
+		return null
+	}
+}
+
 module.exports = {
 	/**
 	 * @param {string} id
@@ -31,7 +52,7 @@ module.exports = {
 	 *   receive the DEFER lead tweens `take: true` would produce (the WO-519 fail-dark class).
 	 */
 	play(id, fromMs, opts) {
-		const tl = this.timelines.get(id) || this._hydrate(id)
+		const tl = this.timelines.get(id) || hydrateFromProject(this, id)
 		if (!tl) {
 			const msg = `[Timeline] play(${id}): timeline not on server`
 			if (typeof this.self?.log === 'function') this.self.log('warn', msg)
@@ -71,11 +92,7 @@ module.exports = {
 			this._lastKfSegment.clear()
 		}
 
-		const pos = wasPausedResume
-			? (cell.position ?? 0)
-			: fromMs != null
-				? fromMs
-				: cell.position ?? 0
+		const pos = wasPausedResume ? (cell.position ?? 0) : fromMs != null ? fromMs : (cell.position ?? 0)
 
 		this._airTimelineId = id
 		setCellPosition(cell, pos)
@@ -123,7 +140,7 @@ module.exports = {
 	 *   in itself (MIX), so the per-clip instant OPACITY must be suppressed — see WO-528.
 	 */
 	async playForTake(id, fromMs, opts) {
-		const tl = this.timelines.get(id) || this._hydrate(id)
+		const tl = this.timelines.get(id) || hydrateFromProject(this, id)
 		if (!tl) {
 			const msg = `[Timeline] playForTake(${id}): timeline not on server`
 			if (typeof this.self?.log === 'function') this.self.log('warn', msg)
@@ -162,26 +179,6 @@ module.exports = {
 		this._lastTickPositionMs = undefined
 		this._ticker = setInterval(() => this._tick(), TICK_MS)
 		this._emitPb(id)
-	},
-
-	/**
-	 * WO-949: a timeline the engine does not hold is loaded from the stored project before it gives up. Clients push a
-	 * timeline only when it is edited or shown in their Timeline tab, so after a server restart a look containing a
-	 * timeline took to BLACK ("timeline not on server") until someone opened that timeline (box 05.11).
-	 * @param {string} id
-	 * @returns {object | null} the timeline now in the engine, or null when the project has none with that id
-	 */
-	_hydrate(id) {
-		try {
-			const list = require('./project-scenes-load').loadFullProject()?.timelines?.timelines
-			const stored = Array.isArray(list) ? list.find((t) => t && String(t.id) === String(id)) : null
-			if (!stored) return null
-			this.create(JSON.parse(JSON.stringify(stored)))
-			if (typeof this.self?.log === 'function') this.self.log('info', `[Timeline] ${id} loaded from the stored project`)
-			return this.timelines.get(id) || null
-		} catch {
-			return null
-		}
 	},
 
 	/**
