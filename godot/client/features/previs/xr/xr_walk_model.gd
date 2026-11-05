@@ -16,6 +16,20 @@ static func start_pose(target: Vector3, back := 8.0) -> Dictionary:
 	return {"pos": Vector3(target.x, EYE, target.z + back), "yaw": 0.0, "pitch": 0.0}
 
 
+## WO-969: where the walk starts in a loaded MVR room — its middle at eye height, facing `focus` (the rig's centre, i.e.
+## the stage) when it is off to one side. An MVR's audience sits on either side of its origin, so start_pose (8 m +Z of
+## 0,0,0) put the owner backstage, outside the venue, behind the LED walls (05.11: "doesnt show most of the scene").
+static func room_pose(box: AABB, focus: Variant) -> Dictionary:
+	var c := box.get_center()
+	var pos := Vector3(c.x, EYE, c.z)
+	var yaw := 0.0
+	if focus is Vector3:
+		var d: Vector3 = (focus as Vector3) - pos
+		if Vector2(d.x, d.z).length() > 0.5:
+			yaw = atan2(-d.x, -d.z)  # forward at yaw = (-sin, 0, -cos) — as step()
+	return {"pos": pos, "yaw": yaw, "pitch": 0.0}
+
+
 ## One frame of walking: `move` x = strafe right, y = forward (each -1..1), along the floor whatever the pitch.
 static func step(pos: Vector3, yaw: float, move: Vector2, dt: float, speed := SPEED) -> Vector3:
 	if move.length() > 1.0:

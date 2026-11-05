@@ -161,3 +161,14 @@ func test_pointer_smoothing() -> void:
 		p = Walk.euro(sweep, Vector2(i * 600.0 / 72.0, 0), 1.0 / 72.0)
 	t.ok(absf(p.x - 300.0) < 40.0, "a 600 px/s sweep lags under 40 px (%.1f behind)" % (300.0 - p.x))
 	t.ok(Walk.PRESS_SLOP_PX > 4.0 and Walk.PRESS_SLOP_PX < 20.0, "the press slop is a small move, not a drag")
+
+
+## WO-969: an MVR room starts the walk in its middle, facing its rig — not 8 m +Z of the origin (backstage in a venue
+## whose audience sits at -Z, owner 05.11 "the vr session doesnt show most of the scene").
+func test_room_pose_faces_the_rig() -> void:
+	var box := AABB(Vector3(-33, 0, -24), Vector3(62, 6, 27))  # the Narvill venue: tables at -Z, LED walls at z -1.5
+	var p := Walk.room_pose(box, Vector3(0, 4, -4))
+	t.ok(_near(p.pos, Vector3(-2, Walk.EYE, -10.5)), "starts in the middle of the room at eye height")
+	t.ok(_near(Walk.step(p.pos, p.yaw, Vector2(0, 1), 1.0, 1.0) - p.pos, Vector3(2, 0, 6.5).normalized()), "forward points at the rig")
+	t.eq(Walk.room_pose(box, null).yaw, 0.0, "no rig → looks -Z as before")
+	t.eq(Walk.room_pose(box, Vector3(-2, 5, -10.5)).yaw, 0.0, "a rig right overhead → no turn")

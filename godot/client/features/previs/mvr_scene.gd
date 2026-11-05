@@ -183,6 +183,37 @@ func set_hidden_layers(names: Array) -> void:
 func hidden_layers() -> Dictionary: return _hidden
 
 
+## WO-969: the loaded scene in world space — {box: every object's meshes (shown or not), rig: the MVR fixtures' centre
+## or null}; {} when nothing is loaded. The walk starts in the box's middle facing the rig.
+func room() -> Dictionary:
+	var box := AABB()
+	var has := false
+	var rig := Vector3.ZERO
+	var heads := 0
+	var fx := {}
+	for u in fixture_uuids:
+		fx[u] = true
+	for n in get_children():
+		if not (n is Node3D) or not n.has_meta("uuid"):
+			continue  # the selection marks
+		var own := AABB()
+		var any := false
+		for mi in n.find_children("*", "MeshInstance3D", true, false):
+			var b: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
+			own = own.merge(b) if any else b
+			any = true
+		if not any:
+			continue
+		box = box.merge(own) if has else own
+		has = true
+		if fx.has(str(n.get_meta("uuid"))):
+			rig += own.get_center()
+			heads += 1
+	if not has:
+		return {}
+	return {"box": box, "rig": rig / heads if heads > 0 else null}
+
+
 ## WO-615 T10 — fixtures patched from this scene are drawn by the live rig (fixtures_3d.gd): hide their static model.
 func set_patched(uuids: Dictionary) -> void:
 	_patched = uuids

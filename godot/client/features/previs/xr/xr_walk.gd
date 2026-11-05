@@ -69,12 +69,36 @@ func _ready() -> void:
 	xr = _start_xr()
 	if xr:
 		_origin.position = Vector3(start.pos.x, 0.0, start.pos.z)
+	else:
+		_cam = Camera3D.new()
+		_cam.fov = 70
+		_cam.position = start.pos
+		add_child(_cam)
+		_cam.current = true
+		_apply()
+	var mvr: Variant = tab.get("mvr") if tab != null else null  # WO-969: an MVR room → start inside it, facing its rig
+	if mvr is Node:
+		(mvr as Node).connect("loaded", func(info: Dictionary) -> void:
+			if not info.is_empty() and not info.has("error"):  # a cleared scene still holds its freed nodes this frame
+				_to_room(mvr))
+		_to_room(mvr)
+
+
+## WO-969: stand in the middle of the loaded MVR room, facing its rig (now, and whenever another scene loads).
+func _to_room(mvr: Node) -> void:
+	var r: Dictionary = mvr.call("room")
+	if r.is_empty():
 		return
-	_cam = Camera3D.new()
-	_cam.fov = 70
-	_cam.position = start.pos
-	add_child(_cam)
-	_cam.current = true
+	var p := Walk.room_pose(r.box, r.rig)
+	var at := to_local(p.pos)
+	print("[xr] room start ", at, " yaw ", snappedf(rad_to_deg(p.yaw), 0.1))
+	if xr:
+		_origin.position = Vector3(at.x, 0.0, at.z)
+		_origin.rotation.y = p.yaw
+		return
+	_cam.position = at
+	_yaw = p.yaw
+	_pitch = 0.0
 	_apply()
 
 
