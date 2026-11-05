@@ -28,6 +28,7 @@ var _wave: Control
 var _lib: VBoxContainer
 var _in: LineEdit
 var _out: LineEdit
+var _marks: Array[Button] = []  # WO-966: Set in / Set out at the preview position
 var _mute: CheckBox
 var _used: Label
 var _msg: Label
@@ -43,7 +44,9 @@ func _ready() -> void:
 	add_child(_facts)
 	preview = Preview.new()
 	preview.osc_mirror = osc_mirror
-	preview.position_changed.connect(func() -> void: _wave.queue_redraw())
+	preview.position_changed.connect(func() -> void:
+		_wave.queue_redraw()
+		_sync_marks())
 	add_child(preview)
 	_wave = Control.new()
 	_wave.custom_minimum_size.y = 48
@@ -56,7 +59,9 @@ func _ready() -> void:
 	add_child(_lib)
 	var trim := HBoxContainer.new()
 	_in = _time_field(trim, "In", "start", "trimInMs")
+	_mark_button(trim, "trimInMs")
 	_out = _time_field(trim, "Out", "end", "trimOutMs")
+	_mark_button(trim, "trimOutMs")
 	var clr := Button.new()
 	clr.text = "✕"
 	clr.tooltip_text = "Clear trim"
@@ -172,6 +177,7 @@ func _sync() -> void:
 	_set_time(_in, tc.call(_defaults.get("trimInMs")))
 	_set_time(_out, tc.call(_defaults.get("trimOutMs")))
 	_mute.set_pressed_no_signal(_defaults.get("muted", false) == true)
+	_sync_marks()
 	_show_usage()
 	_wave.queue_redraw()
 
@@ -210,6 +216,41 @@ func _time_field(row: HBoxContainer, label: String, ph: String, key: String) -> 
 	e.focus_exited.connect(commit)
 	row.add_child(e)
 	return e
+
+
+## WO-966 (owner 05.11: "in the media clip's inspector there is no buttons to set in/out points, only input boxs"):
+## a button after each box sets that point to where the preview is (playing or paused, a waveform click seeks).
+func _mark_button(row: HBoxContainer, key: String) -> void:
+	var b := Button.new()
+	b.text = "Set in" if key == "trimInMs" else "Set out"
+	b.focus_mode = Control.FOCUS_NONE
+	b.tooltip_text = "Set the %s point to the preview position" % ("in" if key == "trimInMs" else "out")
+	b.pressed.connect(func() -> void:
+		var patch := mark_patch(key, preview.pos, _defaults)
+		if patch.has("error"):
+			_msg.text = str(patch.error)
+			return
+		_save(patch))
+	row.add_child(b)
+	_marks.append(b)
+
+
+func _sync_marks() -> void:
+	var on := _in_lib and preview != null and preview.active()
+	for b in _marks:
+		b.disabled = not on
+		b.tooltip_text = b.tooltip_text.get_slice("\n", 0) + ("" if on else "\n(start the preview first)")
+
+
+## The defaults patch for "Set in / Set out" at `pos_s` seconds; {error} when it would cross the other point.
+static func mark_patch(key: String, pos_s: float, defaults: Dictionary) -> Dictionary:
+	var ms := roundi(maxf(0.0, pos_s) * 1000.0)
+	var other: Variant = defaults.get("trimOutMs" if key == "trimInMs" else "trimInMs")
+	if other != null and key == "trimInMs" and ms >= int(other):
+		return {"error": "In must be before Out — move the preview before the out point"}
+	if other != null and key == "trimOutMs" and ms <= int(other):
+		return {"error": "Out must be after In — move the preview past the in point"}
+	return {key: ms}
 
 
 func _save(patch: Dictionary) -> void:
