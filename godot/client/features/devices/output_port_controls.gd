@@ -73,7 +73,10 @@ func _rebuild() -> void:
 	for c in page.get_children():
 		page.remove_child(c)
 		c.queue_free()
+	var labels: Dictionary = SR.FIELD_LABELS.get(kind, {})  # WO-947: a caption above every stream / record field
 	for it in _items():
+		if it.t in ["input", "select"] and labels.has(str(it.get("key", ""))):
+			page.add_child(_caption(labels[it.key]))
 		page.add_child(_item(it))
 
 

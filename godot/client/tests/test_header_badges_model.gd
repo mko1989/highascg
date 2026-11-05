@@ -23,6 +23,14 @@ func test_stream_badges() -> void:
 	var on := M.stream_badges([], rec, {"record": {"active": true, "activeOutputs": ["rec_1"], "path": "/media/rec/a.mp4"}})
 	t.eq([on[0].tone, on[0].tip], ["live", "Rec1 is recording (/media/rec/a.mp4)"], "recording")
 	t.eq(M.stream_badges(null, null, null), [], "nothing configured")
+	# WO-947: a stream Caspar cannot get through is amber, the reason in the tip
+	var st := [{"id": "str_1", "name": "Str1"}]
+	var down := M.stream_badges(st, [], {"rtmp": {"active": true, "outputId": "str_1", "link": "reconnecting",
+		"lastError": "Receiver not reachable — Caspar keeps retrying since 08:56:53 (2 attempts)"}})
+	t.eq([down[0].tone, down[0].tip], ["pending", "Str1: Receiver not reachable — Caspar keeps retrying since 08:56:53 (2 attempts)"],
+		"reconnecting stream → amber with the reason")
+	var up := M.stream_badges(st, [], {"rtmp": {"active": true, "outputId": "str_1", "link": "connected"}})
+	t.eq([up[0].tone, up[0].tip], ["live", "Str1 is streaming"], "through → live")
 
 
 func test_replication_badge() -> void:

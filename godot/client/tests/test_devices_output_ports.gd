@@ -231,3 +231,25 @@ func test_single_portaudio() -> void:
 	t.eq(own.filter(func(i: Dictionary) -> bool: return i.get("key") == "type")[0].options.size(), 2, "the PortAudio output keeps both types")
 	var host: Dictionary = own.filter(func(i: Dictionary) -> bool: return i.get("key") == "host_api")[0]
 	t.eq(host.options.map(func(o: Array) -> String: return o[0]), ["auto", "ALSA", "JACK"], "Linux host APIs")
+
+
+## WO-947: every stream / record field the page shows has a caption above it (output_port_controls.gd renders
+## SR.FIELD_LABELS) — for every protocol, so a field added later cannot come back as a bare number.
+func test_every_stream_record_field_is_labelled() -> void:
+	for c in _golden().cases:
+		var e := _env(c.ops)
+		var conn: Dictionary = O.R.connector_by_id(e.p, c.connId)
+		if not conn.kind in ["stream_out", "record_out"]:
+			continue
+		var types: Array = ["rtmp", "srt", "udp"] if conn.kind == "stream_out" else [""]
+		for ty in types:
+			var ui := _state(conn.kind, conn, e)
+			if ty != "":
+				ui.type = ty
+			var keys := []
+			for it in _items(conn.kind, conn, e, ui, null):
+				if it.t in ["input", "select"]:
+					keys.append(str(it.key))
+			var missing := keys.filter(func(k: String) -> bool: return not SR.FIELD_LABELS[conn.kind].has(k))
+			t.eq(missing, [], "%s %s: every field captioned" % [conn.kind, ty])
+	t.ok(str(SR.FIELD_LABELS.record_out.vbitrate).contains("0 = use the CRF"), "record: the bitrate / CRF rule is on the page")

@@ -12,6 +12,7 @@ const {
 } = require('./routes-streaming-channel-shared')
 const { pushRtmpLog } = require('./routes-streaming-channel-log')
 const { redactStreamUrl } = require('../streaming/streaming-channel-status')
+const { watchStreamLink, unwatchStreamLink, linkErrorText } = require('../streaming/stream-link-health')
 const projectStore = require('../engine/project-store')
 const { resolveStreamCredential } = require('../engine/project-stream-credentials')
 
@@ -21,6 +22,7 @@ function parseStreamStatusPollMs() {
 }
 
 function stopStreamingStatusPoll(ctx) {
+	unwatchStreamLink(ctx) // WO-947
 	if (ctx._streamingChannelRtmpPollTimer) {
 		clearInterval(ctx._streamingChannelRtmpPollTimer)
 		ctx._streamingChannelRtmpPollTimer = null
@@ -46,6 +48,12 @@ async function pollRtmpHealth(ctx) {
 
 function startStreamingStatusPoll(ctx) {
 	stopStreamingStatusPoll(ctx)
+	// WO-947: tell the operator when Caspar cannot reach the receiver (and when it gets through again) — always on.
+	watchStreamLink(ctx, (link) =>
+		link.state === 'reconnecting'
+			? pushRtmpLog(ctx, 'warn', linkErrorText(link))
+			: pushRtmpLog(ctx, 'info', 'Receiver reached again — streaming'),
+	)
 	const ms = parseStreamStatusPollMs()
 	if (!ms || !ctx.streamingChannelRtmp?.active) return
 	ctx._streamingChannelRtmpPollTimer = setInterval(() => {

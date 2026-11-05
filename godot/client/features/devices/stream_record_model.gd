@@ -24,6 +24,22 @@ const PAIR := [["all", "audio pair: all"], ["1+2", "audio pair: 1+2"], ["3+4", "
 	["7+8", "audio pair: 7+8"]]
 
 
+## WO-947: every stream / record field gets a caption above it (they only had placeholders, which vanish once a value is
+## there — and new outputs arrive filled, so the page was a column of bare numbers). output_port_controls.gd renders them; they
+## are not items, because the item lists are golden-replayed against the web inspector. The texts state the encoder rules as they are:
+## record — video bitrate ≥ 200 kbps wins, 0 / blank = CRF (routes-streaming-channel-shared.js recordFfmpegArgs);
+## stream — the quality preset only fills defaults, the bitrate and speed below are always sent and win.
+const FIELD_LABELS := {
+	"stream_out": {"type": "Protocol", "name": "Name", "url": "Server URL", "key": "Stream key",
+		"srt_latency": "SRT latency (ms)", "srt_stream_id": "SRT stream ID", "srt_mode": "SRT mode", "srt_pass": "SRT passphrase",
+		"quality": "Quality preset (defaults only — the bitrate and speed below win)", "vcodec": "Video codec",
+		"vbitrate": "Video bitrate (kbps)", "preset": "Encoder speed", "acodec": "Audio codec", "abitrate": "Audio bitrate (kbps)",
+		"pair": "Audio channels"},
+	"record_out": {"name": "File name", "crf": "Quality — CRF 18–51 (used only when the video bitrate is 0)",
+		"vcodec": "Video codec", "vbitrate": "Video bitrate (kbps) — 0 = use the CRF above", "preset": "Encoder speed",
+		"acodec": "Audio codec", "abitrate": "Audio bitrate (kbps)"},
+}
+
 static func _sel(key: String, options: Array, value: String) -> Dictionary:
 	return {"t": "select", "key": key, "value": value, "options": options, "disabled": false}
 

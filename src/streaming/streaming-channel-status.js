@@ -4,6 +4,8 @@ const { getChannelMap, resolveStreamingChannelRoute, resolveStreamingChannelRout
 // WO-307: redaction logic lives in a zero-dependency leaf module so the AMCP transport layer
 // (amcp-client-transport.js) can require it directly without pulling in ../config/routing.
 const { redactStreamUrl, redactAmcpStreamCommand } = require('./stream-secret-redact')
+// WO-947: whether the running stream reaches its receiver (Caspar's reconnect lines), not just "ADD was accepted".
+const { runningStreamLink, linkErrorText } = require('./stream-link-health')
 
 /**
  * @param {unknown} extra
@@ -16,9 +18,19 @@ function sanitizeLogExtra(extra) {
 	return out
 }
 
+/** WO-947: the running stream's link state; a log read that fails never breaks the status. */
+function safeLink(rtmp) {
+	try {
+		return runningStreamLink(rtmp)
+	} catch {
+		return null
+	}
+}
+
 /**
  * @param {object} ctx
- * @param {{ rtmpConsumerIndex?: number, recordConsumerIndex?: number }} [opts]
+ * @param {{ rtmpConsumerIndex?: number, recordConsumerIndex?: number, link?: object | null }} [opts] `link` (tests): the
+ *   link state to report instead of reading the Caspar log
  */
 function buildStreamingChannelStatusPayload(ctx, opts = {}) {
 	const rtmpIdx = opts.rtmpConsumerIndex ?? 97
@@ -41,6 +53,7 @@ function buildStreamingChannelStatusPayload(ctx, opts = {}) {
 		ctx._streamingChannelLogs && typeof ctx._streamingChannelLogs === 'object'
 			? ctx._streamingChannelLogs
 			: { rtmp: [], record: [] }
+	const link = opts.link !== undefined ? opts.link : safeLink(rtmp)
 	const vRoute = resolveStreamingChannelRoute(ctx.config || {})
 	const aRoute = resolveStreamingChannelRouteForRole(ctx.config || {}, 'audio')
 	const sc =
@@ -77,7 +90,8 @@ function buildStreamingChannelStatusPayload(ctx, opts = {}) {
 			url: rtmp.url ? redactStreamUrl(rtmp.url) : null,
 			outputId: rtmp.outputId || null,
 			consumerIndex: rtmp.consumerIndex ?? rtmpIdx,
-			lastError: rtmp.lastError || null,
+			link: link ? link.state : null,
+			lastError: rtmp.lastError || linkErrorText(link) || null,
 			logs: Array.isArray(logs.rtmp) ? logs.rtmp : [],
 		},
 		record: {

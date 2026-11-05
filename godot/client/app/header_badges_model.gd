@@ -57,7 +57,12 @@ static func stream_badges(stream_outputs: Variant, record_outputs: Variant, stat
 			var tip := ("%s is %s" % [name, pair[5]]) if on else ("%s (idle)" % name)
 			if on and pair[1] == "record" and st.get("record") is Dictionary and str(st.record.get("path", "")) not in ["", "<null>"]:
 				tip += " (%s)" % str(st.record.path)
-			out.append({"id": id, "label": label, "tone": "live" if on else "idle", "tip": tip})
+			var tone := "live" if on else "idle"
+			# WO-947: a stream Caspar cannot get through (receiver gone, retrying) is amber, its reason in the tip
+			if on and pair[1] == "rtmp" and st.get("rtmp") is Dictionary and str(st.rtmp.get("link", "")) == "reconnecting":
+				tone = "pending"
+				tip = "%s: %s" % [name, str(st.rtmp.get("lastError", "reconnecting"))]
+			out.append({"id": id, "label": label, "tone": tone, "tip": tip})
 	return out
 
 
