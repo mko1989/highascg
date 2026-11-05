@@ -12,6 +12,7 @@ extends RefCounted
 const Ops := preload("res://features/live/look_layer_ops.gd")
 const LP := preload("res://features/live/layer_preset_model.gd")
 const S := preload("res://features/live/layer_style_model.gd")
+const InspectorPanel := preload("res://app/inspector_panel.gd")
 const IMAGE := "(?i)\\.(jpe?g|png|gif|bmp|webp|tiff?)$"  # web setLayerSource: a still never loops
 
 
@@ -85,6 +86,7 @@ static func exchange(ed: Variant, api: Variant, i: int, src: Dictionary) -> bool
 		return false
 	var was := Ops.layer_name(layer.source) if has_media(layer) else ""
 	ed._select(i)
+	reveal(ed)
 	ed._apply_layer(exchange_patch(layer, res.data.layer, res.data.get("contentResolution") is Dictionary))
 	ed._refresh_list()
 	var now := Ops.layer_name(res.data.layer.source)
@@ -104,5 +106,15 @@ static func add(ed: Variant, api: Variant, src: Dictionary) -> bool:
 	(lk.layers as Array).append(res.data.layer)
 	ed._refresh_list()
 	ed._select((lk.layers as Array).size() - 1)
+	reveal(ed)
 	ed.pusher.schedule(ed.scene_id, ed.main)
 	return true
+
+
+## WO-965 (owner 05.11: "droping a media into looks editor should auto open the layers inspector"): `_select` presents
+## the layer page, but over a `keep_on_select` tab (Layer presets, WO-952 — kept for layer clicks) the column stayed
+## there and the page loaded unseen. A media drop is a new layer, not a click: bring the Inspector tab forward.
+static func reveal(ed: Variant) -> void:
+	var ip: Node = InspectorPanel.current
+	if ed is Node and ip != null and is_instance_valid(ip) and ip.showing(ed.get("_page")):
+		ip.show_tab(0)
