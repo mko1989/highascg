@@ -19,6 +19,7 @@ const Drop := preload("res://features/live/look_layer_drop.gd")  # WO-816: Sourc
 const Audio := preload("res://features/live/look_layer_audio.gd")  # WO-817: audio-only layers: not drawn / picked in the frame
 const Backdrop := preload("res://features/live/look_editor_backdrop.gd")  # WO-860: PRV, or HQ thumbnails without one
 const Stale := preload("res://features/live/look_editor_stale.gd")  # WO-918 F12: closes when the project / look / bus is gone
+const Drag := preload("res://features/live/look_editor_drag.gd")  # WO-960: move / resize / crop drags, snapping + guides
 const HANDLE := 8.0
 
 var scene_id := ""
@@ -43,6 +44,7 @@ var _crop_mode := false
 var _crop_btn: Button
 var _fit := Fit.new()
 var _view := View.new()
+var _snap := Drag.new()
 const CROP_COLOR := Color("#e3b341")
 
 
@@ -239,6 +241,7 @@ func _draw_frame() -> void:
 			for p in _handles(hr).values():
 				_overlay.draw_rect(Rect2(p - Vector2(HANDLE, HANDLE) / 2.0, Vector2(HANDLE, HANDLE)), hc)
 		_overlay.draw_set_transform_matrix(Transform2D.IDENTITY)
+	_snap.draw(self, _overlay)
 
 
 func _handles(r: Rect2) -> Dictionary:
@@ -256,31 +259,10 @@ func _frame_input(event: InputEvent) -> void:
 			_begin_drag(mb.position)
 		else:
 			_drag = {}
+			_snap.clear()
 	var mm := event as InputEventMouseMotion
 	if mm != null and not _drag.is_empty():
-		var b := _box()
-		var from: Vector2 = _drag.start
-		var d: Vector2 = (mm.position - from) / b.size
-		var local: Vector2 = (mm.position - from).rotated(-deg_to_rad(float(_drag.get("deg", 0.0))))  # a turned layer's own axes
-		if _drag.get("is_crop", false):
-			var lp: Vector2 = _drag.layer_px
-			var cd: Vector2 = local / Vector2(maxf(1.0, lp.x), maxf(1.0, lp.y))
-			_set_crop(C.crop_delta(_drag.edge, _drag.crop, cd.x, cd.y))
-			return
-		var start: Dictionary = _drag.fill
-		var f: Dictionary
-		if _drag.edge == "":
-			f = C.move_fill(start, d.x, d.y, _others_fills(_sel), 10.0 / b.size.x, 10.0 / b.size.y)
-		else:
-			d = local / b.size
-			var xs := _snap_candidates(true)
-			var ys := _snap_candidates(false)
-			var tx := 10.0 / b.size.x
-			var ty := 10.0 / b.size.y
-			var locked: bool = _layers()[_sel].get("aspectLocked") != false and not mm.shift_pressed  # web: layer lock && !Shift
-			f = C.edge_resize(_drag.edge, start, d.x, d.y, locked, 0.02,
-				func(v: float) -> float: return C.snap_value(v, xs, tx), func(v: float) -> float: return C.snap_value(v, ys, ty))
-		_apply_layer({"fill": f})
+		_snap.motion(self, mm)
 
 
 func _begin_drag(at: Vector2) -> void:
@@ -310,23 +292,6 @@ func _begin_drag(at: Vector2) -> void:
 
 
 func _layer_at(at: Vector2) -> int: return Audio.pick(_layers(), look(), func(l: Dictionary) -> Rect2: return _fill_rect(_shown(l)), at)  # WO-817: a viewer drop never targets an audio-only layer
-
-
-func _others_fills(skip: int) -> Array:
-	var out := []
-	var layers := _layers()
-	for i in layers.size():
-		if i != skip and layers[i].get("fill") is Dictionary and not Audio.is_audio_only(layers[i], look()):  # no snap to unseen boxes
-			out.append(_shown(layers[i]))
-	return out
-
-
-func _snap_candidates(x_axis: bool) -> Array:
-	var out: Array = [0.0, 1.0]
-	for f in _others_fills(_sel):
-		var a := float(f.get("x" if x_axis else "y", 0))
-		out.append_array([a, a + float(f.get("scaleX" if x_axis else "scaleY", 0))])
-	return out
 
 
 func _set_field(key: String, v: float) -> void:

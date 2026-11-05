@@ -20,10 +20,19 @@ static func stale(opened_slug: String, project: Dictionary, scene_id: String, ma
 	return true
 
 
+## WO-960: the slug the editor compares against. Opened while the client did not know the show's slug (a project
+## re-pull — e.g. after a screen add — drops it until the next save answers, project_sync.adopt_slug), the first slug
+## learned is the same show, not another one; a real switch still closes it (its looks are gone).
+static func opened_slug(opened: String, now: String) -> String:
+	return opened if opened != "" else now
+
+
 ## Closes the look editor `ed` when it went stale; true when it did.
 static func close_if_stale(ed: Node) -> bool:
 	var cm: Variant = Store.get_value("channelMap", {})
-	if not stale(ed.slug, Store.project, ed.scene_id, ed.main, DeckModel.screen_count(cm if cm is Dictionary else {})):
+	var slug := opened_slug(str(ed.slug), str(Store.project.get("slug", "")))
+	if not stale(slug, Store.project, ed.scene_id, ed.main, DeckModel.screen_count(cm if cm is Dictionary else {})):
+		ed.slug = slug
 		return false
 	ed.close_editor()
 	return true
