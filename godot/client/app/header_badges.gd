@@ -1,7 +1,8 @@
 extends HBoxContainer
 ## WO-608 header slice 2 — round status badges right of FTB: one per configured stream / record output (grey idle,
-## red on air — web header-bar-streaming.js) and the hot-backup L / F letter (header-bar-replication.js). A click opens
-## the Devices tab, where those outputs and the server's replication live.
+## red on air — web header-bar-streaming.js) and the hot-backup L / F letter (header-bar-replication.js). WO-964: a
+## click opens that output's page (or the Caspar server page for the L / F letter) in the Inspector column, on
+## whatever tab is showing — owner 05.11: "should bring up its inspector, not move to devices tab".
 ## Sources: settings streamOutputs / recordOutputs; GET /api/streaming-channel + WS `streaming_channel`;
 ## GET /api/replication/status every 2.5 s (web POLL_MS) + WS `replication_status`.
 
@@ -9,7 +10,8 @@ const M := preload("res://app/header_badges_model.gd")
 
 const REPL_POLL_S := 2.5
 
-signal devices_requested
+signal output_requested(id: String)  # a stream / record output's connector id (= its settings row id)
+signal server_requested  # the replication letter
 
 var _stream_status: Variant = null
 var _repl: Dictionary = {}
@@ -58,13 +60,14 @@ func render() -> void:
 		if c is Button:
 			c.queue_free()
 	for b in M.stream_badges(Settings.get_setting("streamOutputs"), Settings.get_setting("recordOutputs"), _stream_status):
-		_add(badge(b))
+		var id := str(b.id)
+		_add(badge(b), func() -> void: output_requested.emit(id))
 	if not _repl.is_empty():
-		_add(badge(_repl))
+		_add(badge(_repl), func() -> void: server_requested.emit())
 
 
-func _add(btn: Button) -> void:
-	btn.pressed.connect(func() -> void: devices_requested.emit())
+func _add(btn: Button, on_click: Callable) -> void:
+	btn.pressed.connect(on_click)
 	add_child(btn)
 
 

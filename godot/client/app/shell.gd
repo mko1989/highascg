@@ -132,7 +132,8 @@ func _ready() -> void:
 	Store.changed.connect(func(_p: String, _v: Variant) -> void: _refresh_eye())
 	header_tools.settings_requested.connect(func() -> void: show_tab(settings))
 	header_tools.notice.connect(header_project.say)
-	header_tools.badges.devices_requested.connect(func() -> void: show_tab(devices))
+	header_tools.badges.output_requested.connect(_open_output)  # WO-964: its Inspector page, not the Devices tab
+	header_tools.badges.server_requested.connect(func() -> void: devices._open_server())
 	header_status.notice.connect(header_project.say)
 	header_status.setup(osc)
 	if Config.demo:  # WO-815: what the simulated server cannot do says so in the notice line
@@ -282,3 +283,17 @@ func _refresh_eye() -> void:
 	_eye.set_state(Ws.is_open and caspar_ok, Settings.get_setting("offline_mode", false) == true,
 		"%s\n%s%s%s" % [state, Config.origin, ("\n" + _status) if _status != "" else "",
 			("\n" + Profiles.label(Config.profiles()) + " · right-click for A/B hosts") if Profiles.has_dual(Config.profiles()) else "\nRight-click: A/B hosts"])
+
+
+## WO-964 — a header stream / record badge: that output's page in the Inspector column, on the tab that is showing.
+## The Devices tab builds the page (devices_tab.gd is at the 500-line cap, hence its own `_open_port`); before the
+## tab has loaded the device view once, load it first. Only an output the device view does not know opens the tab.
+func _open_output(id: String) -> void:
+	var devices: Node = tab_node("Devices")
+	if devices == null:
+		return
+	if devices._open_port(id):
+		return
+	await devices.refresh()
+	if not devices._open_port(id):
+		show_tab(devices)
