@@ -9,9 +9,8 @@ extends VBoxContainer
 ## DeckLink / audio / USB inputs, saved live sources, all draggable onto the look editor). A DeckLink dropped on the
 ## Media tree switches to Live, which maps it and highlights the new source; the signals are Live's, re-emitted for
 ## the shell (Live workspace tab, Devices restart-dirty, device view re-read).
-## WO-623 C: the owner's tabs — Media, Templates (Caspar TLS without the shader templates: shaders live in Visuals, WO-883), Live, Visuals
-## (WO-885: what the Visuals canvas runs, visuals_sources_panel.gd), Timelines (this
-## project's) — source_list_panel.gd rows drag the web payload ({type: "template" | "timeline", value, label}).
+## WO-623 C: the owner's tabs — Media, Templates (Caspar TLS without the shader templates: shaders live in Visuals, WO-883), Live,
+## Visuals (WO-885, visuals_sources_panel.gd), Timelines (this project's; source_list_panel.gd rows drag {type, value, label}).
 ## WO-603 slice 1: files / folders dropped from the desktop onto this panel are copied by the server from their local
 ## paths into the folder under the cursor (media_ingest.gd; POST /api/media/ingest-local) with a progress line.
 ## WO-603 slice 2: multi-select + the web selection bar (media_selection_bar.gd: Copy to… / Move to… / Delete / New
@@ -49,6 +48,7 @@ var _rows: Array = []
 var _info_w := 0.0  # WO-759: widest quick-look text
 var _fx: Dictionary = {}  # GET /api/scene/effect-registry {effects, categories}
 var inspector: MediaInspector
+var _press_row: Variant = null  # WO-967: a pressed file's page waits for the release — a drag (to a playlist) never covers its target
 var _tabs: TabContainer
 var live: LivePanel
 var visuals: VisualsPanel
@@ -210,7 +210,7 @@ func _ready() -> void:
 
 
 ## The bar gets every selected file; the focused row picks the folder (New folder…, picker start) and — when it is
-## the only file — the Inspector (web: a single selection announces the file).
+## the only file — the Inspector (web: a single selection announces the file); after a press, on its release (WO-967).
 func _on_selection() -> void:
 	_select_queued = false
 	var sel: Array = []
@@ -223,12 +223,18 @@ func _on_selection() -> void:
 	var focus := _tree.get_selected()
 	var meta: Variant = focus.get_metadata(0) if focus != null else null
 	_bar.set_selection(sel, Ingest.folder_for(meta))
+	_press_row = null
 	if sel.size() == 1 and meta is Dictionary and (meta as Dictionary).get("row") is Dictionary:
-		InspectorPanel.current.present(inspector)
-		inspector.show_media(meta.row)
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT): _press_row = meta.row
+		else: show_file(meta.row)
 	elif sel.size() > 1 and InspectorPanel.current.showing(inspector):
 		InspectorPanel.current.release(inspector)  # several files have no one inspector; the covered page returns
 
+
+func show_file(row: Dictionary) -> void:
+	_press_row = null
+	InspectorPanel.current.present(inspector)
+	inspector.show_media(row)
 
 ## WO-603 slice 9: Delete / Backspace deletes the selected files (web sources-panel.js:336, same confirm); a
 ## right-click on a folder offers "Delete folder…" (the web ✕ on the folder row).
@@ -241,6 +247,8 @@ func _tree_input(event: InputEvent) -> void:
 		_bar.confirm_delete()
 		return
 	var mb := event as InputEventMouseButton
+	if mb != null and not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _press_row != null:
+		show_file(_press_row)  # WO-967: a click, not a drag (a drag clears it in _drag_data)
 	if mb == null or not mb.pressed:
 		return
 	if mb.button_index != MOUSE_BUTTON_RIGHT:
@@ -398,6 +406,7 @@ func _build_effects(root: TreeItem, f: String) -> void:
 			it.set_metadata(0, {"type": "effect", "value": str(e.type), "label": label})
 
 func _drag_data(at: Vector2) -> Variant:
+	_press_row = null  # WO-967: the drop target (layer page, playlist) stays in the Inspector
 	var it := _tree.get_item_at_position(at)
 	if it == null or not (it.get_metadata(0) is Dictionary) or not (it.get_metadata(0) as Dictionary).has("value"):
 		return null
