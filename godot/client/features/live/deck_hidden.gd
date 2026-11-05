@@ -2,10 +2,10 @@ extends RefCounted
 ## WO-953 — screens whose deck column this client hides (owner 05.11: "an option to hide a screen destination with all
 ## its looks in the live tab … the bottom looks cards not the preview"). A view setting of this client, like the
 ## toolbar's "Looks" toggle: `user://ui.cfg [live] hidden_screens`. Hiding never changes the show — the screen keeps its
-## looks, its PGM / PRV and Companion — but it drops out of the highlighted look-preset destinations, so a preset saved
-## afterwards never silently covers a screen nobody can see. Changes are announced as Store.changed("ui.deck_hidden").
+## looks, its PGM / PRV, Companion and its look-preset destination highlight — WO-959: the toolbar's "Screens" lists
+## every screen with its eye, so a hidden one can still be (un)highlighted and saved with a preset; its caption counts
+## hidden screens that are highlighted. Changes are announced as Store.changed("ui.deck_hidden").
 
-const Destinations := preload("res://features/live/destinations.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const PATH := "ui.deck_hidden"
 
@@ -69,8 +69,6 @@ static func set_hidden(main: int, on: bool) -> void:
 		return
 	if on:
 		_hidden[main] = true
-		if Destinations.is_on(main):
-			Destinations.toggle(main)
 	else:
 		_hidden.erase(main)
 	var cfg := ConfigFile.new()

@@ -1,6 +1,6 @@
 extends RefCounted
-## WO-953 — screens hidden from this client's deck: persisted in the ui config, dropped from the look-preset
-## destinations when hidden, "Show all" brings every column back.
+## WO-953 — screens hidden from this client's deck: persisted in the ui config, "Show all" brings every column back.
+## WO-959: a hidden screen keeps its look-preset destination highlight (the toolbar's "Screens" still selects it).
 
 const H := preload("res://features/live/deck_hidden.gd")
 const Destinations := preload("res://features/live/destinations.gd")
@@ -17,7 +17,7 @@ func test_hide_show_persist() -> void:
 	Destinations.set_only([1, 2])
 	H.set_hidden(1, true)
 	t.eq(H.visible_mains(3), [0, 2], "screen 2's column hidden")
-	t.eq(Destinations.selected(), [2], "a hidden screen leaves the highlighted destinations")
+	t.eq(Destinations.selected(), [1, 2], "WO-959: a hidden screen stays a highlighted destination")
 	H.reset()
 	t.eq(H.hidden(), [1], "read back from the config")
 	H.set_hidden(0, true)

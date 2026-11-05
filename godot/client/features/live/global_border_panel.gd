@@ -13,6 +13,7 @@ const P := preload("res://features/live/pip_model.gd")
 const F := preload("res://features/live/param_field.gd")
 const A := preload("res://features/live/border_artnet_model.gd")
 const ArtnetSection := preload("res://features/live/border_artnet_section.gd")
+const BorderSwitch := preload("res://features/live/border_switch.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const TYPES := ["border", "shadow", "edge_strip", "glow"]
 const DEBOUNCE_S := 0.11
@@ -28,6 +29,7 @@ var _pending: Dictionary = {}
 var _busy := false
 var _timer: Timer
 var _sync_timer: Timer
+var _announcing := false
 var _last_sync := {}  # screen → last desk runtime (the server's reply carries the stored UI values, not the desk's)
 
 
@@ -65,6 +67,10 @@ func _ready() -> void:
 	Ws.on("global_border_sync", _on_sync)
 	# a project_sync replaces the slots with the stored (UI) values — put the desk's live runtime back on top
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _reapply_syncs())
+	# WO-959: the deck header's Border tick switched this screen — show the new state
+	Store.changed.connect(func(path: String, v: Variant) -> void:
+		if path == BorderSwitch.PATH and not _announcing and visible and int(v) == screen_idx:
+			_render())
 
 
 func _reapply_syncs() -> void:
@@ -119,13 +125,7 @@ func slot() -> Variant:
 
 
 func _adopt(border: Variant) -> void:
-	if not (Store.project.get("scenes") is Dictionary):
-		Store.project["scenes"] = {}
-	var arr: Array = Store.project.scenes.get("globalBorders", []) if Store.project.scenes.get("globalBorders") is Array else []
-	while arr.size() < 4:
-		arr.append(null)
-	arr[screen_idx] = border
-	Store.project.scenes["globalBorders"] = arr
+	BorderSwitch.adopt(Store.project, screen_idx, border)
 
 
 ## Queue a partial edit; `now` skips the debounce (structural edits), `rebuild` re-renders after the reply.
@@ -159,8 +159,13 @@ func _flush() -> void:
 	_busy = false
 	if res.ok and res.data is Dictionary:
 		var b: Variant = res.data.get("border")
+		var was_on := BorderSwitch.enabled_in(Store.project, screen_idx)
 		_adopt(A.apply_sync(b, _last_sync[screen_idx]) if _last_sync.has(screen_idx) and b is Dictionary else b)
 		_status.text = "%d AMCP line%s" % [(res.data.get("lines", []) as Array).size(), "" if (res.data.get("lines", []) as Array).size() == 1 else "s"]
+		if was_on != BorderSwitch.enabled_in(Store.project, screen_idx):  # WO-959: the deck header's tick follows
+			_announcing = true
+			BorderSwitch.announce(screen_idx)
+			_announcing = false
 		if rebuild:
 			_render()
 	else:

@@ -1,11 +1,14 @@
 extends RefCounted
 ## A deck column's header (web scene-list-column.js head): the screen's title — WO-781: a click highlights the screen as
-## a look-preset destination (E2 style, destinations.gd) — then TAKE, FTB, screen timers and global border.
+## a look-preset destination (E2 style, destinations.gd) — then TAKE, FTB, screen timers and global border
+## (WO-959: one tick button — tick = on / off, label = its Inspector page).
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Icons := preload("res://app/ui_icons.gd")
 const Destinations := preload("res://features/live/destinations.gd")
 const DeckHidden := preload("res://features/live/deck_hidden.gd")
+const TickButton := preload("res://app/tick_button.gd")
+const BorderSwitch := preload("res://features/live/border_switch.gd")
 
 
 ## `deck` = deck_view.gd (its request_take / request_ftb and Inspector signals).
@@ -46,10 +49,17 @@ static func build(deck: Node, title: String, n_looks: int, bus: Dictionary, main
 	var tmr := Icons.button("timer", "Screen timers")
 	tmr.pressed.connect(func() -> void: deck.timers_requested.emit(main, title))
 	head_row.add_child(tmr)
-	var brd := Button.new()
-	brd.text = "Border"
-	brd.tooltip_text = "Global border for this screen"
-	brd.pressed.connect(func() -> void: deck.border_requested.emit(main, title))
+	var brd := TickButton.new("Border", "Global border on / off for this screen", "Global border options for this screen")
+	brd.set_on(BorderSwitch.is_on(main))  # WO-959: tick = on / off, label = the Inspector page
+	brd.toggled.connect(func(on: bool) -> void:
+		brd.set_busy(true)
+		var res: Dictionary = await BorderSwitch.set_on(main, on)  # announces → the deck rebuilds this header
+		if not res.ok:
+			deck.action_result.emit("Border %s failed: %s" % ["on" if on else "off", res.error], false)
+		if is_instance_valid(brd):
+			brd.set_busy(false)
+			brd.set_on(BorderSwitch.is_on(main)))
+	brd.opened.connect(func() -> void: deck.border_requested.emit(main, title))
 	head_row.add_child(brd)
 	var hid := Icons.button("eye_off", "Hide this screen's column — its looks stay on the show (“Screens” in the toolbar shows it again)")
 	hid.pressed.connect(func() -> void: DeckHidden.set_hidden(main, true))  # WO-953
