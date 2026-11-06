@@ -37,8 +37,10 @@ func _live_audio(slot: int, ch: Variant, layer: Variant) -> Control:
 	var sel := _select([[cur.device, cur.device if cur.device != "" else "— loading —"]], cur.device, "ALSA capture device for this slot")
 	box.add_child(_field("Capture device", sel))
 	var fft := _check("Feed audio-reactive shaders" + (" (now: slot %d)" % fft_slot if fft_slot > 0 and fft_slot != slot else ""),
-		fft_slot == slot, "Route this slot's capture to the shader FFT tee (one slot at a time)")
+		fft_slot == slot and str(cs.get("audio_fft_source_kind", "")) != "channel", "Route this slot's capture to the shader FFT tee (one slot at a time)")
 	box.add_child(_field("Shader FFT source", fft))
+	var src_sel := _select([["none", "— loading —"]], "none", "What drives audio-reactive visuals: an input slot, or a screen's program/preview mix")
+	box.add_child(_field("Audio-reactive source", src_sel))
 	var row := _row()
 	var refresh := _button("Refresh devices", func() -> void: pass)
 	var start := _button("Start", func() -> void: pass, "Restart this input's capture on its dedicated channel")
@@ -95,6 +97,16 @@ func _live_audio(slot: int, ch: Variant, layer: Variant) -> Control:
 			for k in sel.item_count:
 				if str(sel.get_item_metadata(k)) == cur.device:
 					sel.select(k)))
+	src_sel.item_selected.connect(func(i: int) -> void:
+		if _busy:
+			return
+		var id := str(src_sel.get_item_metadata(i))
+		_busy = true
+		src_sel.disabled = true
+		var r: Dictionary = await _run(IS.fft_source_requests(id))
+		src_sel.disabled = false
+		_busy = false
+		settle.call(r.ok, "Audio-reactive source: %s." % src_sel.get_item_text(i) if r.ok else r.error, func() -> void: pass))
 	refresh.pressed.connect(func() -> void:
 		refresh.disabled = true
 		var r: Dictionary = await DevicesTarget.api.get_json("/api/audio/devices?refresh=1")
@@ -120,7 +132,15 @@ func _live_audio(slot: int, ch: Variant, layer: Variant) -> Control:
 		stop.disabled = false)
 
 	_boot.call_deferred(show_status, fill)
+	_boot_fft_source.call_deferred(src_sel)
 	return box
+
+
+## WO-976: the picker's options + current choice from GET /api/audio/fft-source.
+func _boot_fft_source(sel: OptionButton) -> void:
+	var r: Dictionary = await DevicesTarget.api.get_json("/api/audio/fft-source")
+	if r.ok and is_instance_valid(sel):
+		_fill(sel, IS.fft_source_options(r.data), str(H.R.d(r.data).get("source", "none")))
 
 
 ## The two initial GETs (status, devices) once the block is in the tree.

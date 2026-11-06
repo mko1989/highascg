@@ -138,6 +138,20 @@ static func fft_requests(slot: int, on: bool) -> Array:
 		["POST", "/api/audio/live-inputs/apply", {}]]
 
 
+## WO-976: the "Audio-reactive source" picker (`none` | `slot:N` | `channel:D:pgm|prv`): config + apply.
+static func fft_source_requests(id: String) -> Array:
+	return [["POST", "/api/audio/live-inputs/config", {"audio_fft_source": id}],
+		["POST", "/api/audio/live-inputs/apply", {}]]
+
+
+## GET /api/audio/fft-source → [[id, label], ...] for the picker's options.
+static func fft_source_options(data: Variant) -> Array:
+	var out: Array = []
+	for o in R.a(R.d(data).get("options")):
+		out.append([R.s(R.d(o).get("id")), R.s(R.d(o).get("label"))])
+	return out
+
+
 static func fft_message(slot: int, on: bool) -> String:
 	return "Shaders now react to slot %d audio." % slot if on else "Shader FFT source cleared."
 

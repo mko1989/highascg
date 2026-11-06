@@ -13,6 +13,7 @@ async function setupLiveAudioInputs(self) {
 	} catch (e) {
 		self.log?.('warn', `[AudioFFT] sync before live-audio setup: ${e?.message || e}`)
 	}
+	await require('../audio/fft-channel-source').syncFftChannelConsumer(self).catch(() => {}) // WO-976: channel-as-FFT-source STREAM consumer (runtime, re-added here)
 	const { count, slots } = listConfiguredLiveAudioSlots(self.config)
 	const playable = slots.filter((s) => Number.isFinite(Number(s.channel)))
 	if (!self.amcp || count <= 0 || playable.length === 0) {

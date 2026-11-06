@@ -112,6 +112,9 @@ function handleGet(path, query, ctx) {
 		const data = listAudioDevices({ refresh })
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(data) }
 	}
+	if (path === '/api/audio/fft-source') {
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(require('../audio/fft-channel-source').describeFftSource(ctx?.config || {})) } // WO-976
+	}
 	if (path === '/api/audio/live-inputs') {
 		const cfg = ctx?.config || {}
 		const map = getChannelMap(cfg)
@@ -469,10 +472,7 @@ async function handlePost(path, body, ctx) {
 		}
 		if (b.live_audio_pgm_always_on != null) cs.live_audio_pgm_always_on = b.live_audio_pgm_always_on
 		// WO-333b: which slot feeds the shader-FFT tee (0/'' = none). Single-select by design.
-		if (b.audio_fft_source_slot != null) {
-			const n = parseInt(String(b.audio_fft_source_slot), 10)
-			cs.audio_fft_source_slot = Number.isFinite(n) && n >= 1 && n <= 8 ? n : 0
-		}
+		require('../audio/fft-channel-source').applyFftSourceBody(cs, b) // WO-976: slot tick or picker id (channel:D:pgm)
 		// WO-845 removed slots keep no PGM selection; WO-862 a newly added slot starts with none — see the module.
 		const pruned = require('../audio/live-audio-slot-prune').pruneSlotPgmRoutes(prevCfg.casparServer, cs, b)
 		for (const line of pruned) apiLog(ctx, 'info', `[Audio] live-inputs/config: ${line}`)

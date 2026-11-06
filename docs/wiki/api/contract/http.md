@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-549 routes.
+550 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -22,6 +22,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/audio/cross-screen/plan` | registry | `src/api/routes-audio-cross-screen.js` |
 | POST | `/api/audio/default-device` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
 | GET | `/api/audio/devices` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
+| GET | `/api/audio/fft-source` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
 | POST | `/api/audio/inputs/route` | registry | `src/api/router.js` |
 | GET | `/api/audio/inputs/routing` | registry | `src/api/router.js` |
 | POST | `/api/audio/inputs/send` | registry | `src/api/router.js` |

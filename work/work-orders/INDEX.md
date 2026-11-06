@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-888 live WOs (29 open, 123 in progress, 736 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+888 live WOs (28 open, 124 in progress, 736 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -265,7 +265,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 884 DONE [audio+engine] Live audio playing, audio-reactive visuals still: the FFT engine never followed… → 884_WO_fft_engine_missed_slot_routed_by_project_apply.md
 - 898 DONE [audio+devices-config] Audio-only channels: tiny custom video mode at the rate of the channel they feed → 898_WO_audio_only_channel_tiny_rate_matched_mode.md
 - 974 IN PROGRESS [audio+engine,godot-client] LTC timecode in (reader + timeline chase) and out (generator) → 974_WO_ltc_timecode_in_out.md
-- 976 OPEN [audio+engine,godot-client] A Caspar channel / screen destination (e.g. Dioda PGM) as the audio-reactive FF… → 976_WO_caspar_channel_as_fft_source.md
+- 976 IN PROGRESS [audio+engine,godot-client] A Caspar channel / screen destination (e.g. Dioda PGM) as the audio-reactive FF… → 976_WO_caspar_channel_as_fft_source.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (32)
 

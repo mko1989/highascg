@@ -46,9 +46,21 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 		// the slot's bridge ffmpeg tees raw PCM to us, so the capture host stays the
 		// device's only opener. The tee output format is pinned s16le/48k/stereo.
 		let fftSlot = 0
+		let fftChannel = null
 		try {
-			const { resolveAudioFftSourceSlot } = require('../config/live-audio-input')
-			fftSlot = resolveAudioFftSourceSlot(config)
+			const { resolveAudioFftSource, resolveFftSourceChannel, FFT_CHANNEL_UDP_PORT } = require('../audio/fft-channel-source')
+			const src = resolveAudioFftSource(config)
+			if (src.kind === 'slot') fftSlot = src.slot
+			// WO-976: a Caspar channel (screen destination PGM/PRV) — its STREAM consumer tees stereo PCM to one fixed port.
+			if (src.kind === 'channel') fftChannel = resolveFftSourceChannel(config, src)
+			if (fftChannel != null) {
+				cfg.enabled = true
+				cfg.source = 'slot'
+				cfg.fftChannel = fftChannel
+				cfg.udpPort = FFT_CHANNEL_UDP_PORT
+				cfg.sampleRate = 48000
+				cfg.channels = 2
+			}
 		} catch {
 			/* live-audio config unavailable — device mode only */
 		}
@@ -67,7 +79,8 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 	function startAudioCapture() {
 		const cfg = resolveCaptureConfig()
 		boundKey = JSON.stringify(cfg)
-		if (cfg.source === 'slot') logger.info(`[AudioFFT] source: live-audio slot ${cfg.fftSlot} bridge tee`)
+		if (cfg.fftChannel) logger.info(`[AudioFFT] source: Caspar channel ${cfg.fftChannel} STREAM consumer tee`)
+		else if (cfg.source === 'slot') logger.info(`[AudioFFT] source: live-audio slot ${cfg.fftSlot} bridge tee`)
 		if (!cfg.enabled) {
 			logger.info(
 				'[AudioFFT] no source routed (live-audio inspector) and config.audioCapture disabled — shaders fall back to OSC-level reactivity'

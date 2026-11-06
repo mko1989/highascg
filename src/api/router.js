@@ -229,6 +229,7 @@ routes.get('/api/osc', ({ path, ctx }) => routesOsc.handleGet(path, ctx), { requ
 routes.get('/api/audio/devices', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false })
 routes.get('/api/audio/portaudio-devices', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false })
 routes.get('/api/audio/live-inputs', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false })
+routes.get('/api/audio/fft-source', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false }) // WO-976
 routes.get('/api/audio/alsa-mixer', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false })
 routes.post('/api/audio/default-device', ({ path, body, ctx }) => routesAudio.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/audio/alsa-mixer', ({ path, body, ctx }) => routesAudio.handlePost(path, body, ctx), { requireCaspar: false })

@@ -246,10 +246,12 @@ describe('WO-333b: live-audio slot routed as the FFT source (bridge PCM tee)', (
 
 	it('API + lifecycle + inspector wiring', () => {
 		const routes = src('src/api/routes-audio.js')
-		assert.match(routes, /audio_fft_source_slot != null/)
+		assert.match(routes, /applyFftSourceBody\(cs, b\)/) // WO-976: the slot body parsing moved to fft-channel-source.js
+		assert.match(src('src/audio/fft-channel-source.js'), /b\.audio_fft_source_slot == null/)
 		assert.match(routes, /_audioCaptureLifecycle\?\.restartAudioCapture\?\.\(\)/)
 		const lc = src('src/bootstrap/audio-capture-lifecycle.js')
-		assert.match(lc, /resolveAudioFftSourceSlot\(config\)/)
+		assert.match(lc, /resolveAudioFftSource\(config\)/) // WO-976: slot or channel; the slot legacy read lives in fft-channel-source.js
+		assert.match(src('src/audio/fft-channel-source.js'), /resolveAudioFftSourceSlot\(cfg\)/)
 		assert.match(lc, /cfg\.source = 'slot'/)
 		assert.match(lc, /restartAudioCapture/)
 		const insp = src('client/components/inspector-live-audio-input.js')
