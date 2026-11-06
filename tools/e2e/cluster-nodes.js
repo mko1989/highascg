@@ -66,9 +66,16 @@ async function clusterView(node, timeoutMs = 3000) {
 	return r.status === 200 ? r.data : null
 }
 
+/**
+ * @param {{ log?: Function, extra?: (id: string, root: string) => { config?: object, env?: object, tracking?: boolean } }} [opts]
+ *   extra: per-server startSandbox options (WO-979: a media and a tracking role), asked again on every restart
+ */
 async function startSandboxNodes(root, ids, opts = {}) {
-	const start = (id, port) =>
-		startSandbox({ root: path.join(root, id), port, media: false, config: { replication: { enabled: false, selfId: id } }, log: opts.log })
+	const start = (id, port) => {
+		const r = path.join(root, id)
+		const x = opts.extra ? opts.extra(id, r) || {} : {}
+		return startSandbox({ ...x, root: r, port, media: false, config: { ...x.config, replication: { enabled: false, selfId: id } }, log: opts.log })
+	}
 	// WO-752: one sandbox failing must not leak the others — their processes kept the test process (and test:ci)
 	// alive for hours; the caller never got `nodes` to stop.
 	const settled = await Promise.allSettled(

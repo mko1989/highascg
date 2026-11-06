@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-888 live WOs (28 open, 122 in progress, 738 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+889 live WOs (28 open, 123 in progress, 738 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -886,7 +886,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 969 IN PROGRESS [tracking-vr+godot-client] VR starts inside the loaded MVR room, facing its rig, not 8 m +Z of the origin… → 969_WO_vr_starts_inside_the_mvr_room.md
 - 978 DONE [tracking-vr+lighting,godot-client] Tracking → lighting desk test environment: puppet marker, PSN to ChamSys MagicQ → 978_WO_tracking_desk_test_env_puppet_psn_magicq.md
 
-## testing-ci — Tests and CI (25)
+## testing-ci — Tests and CI (26)
 
 - 77 IN PROGRESS [testing-ci+os-iso] Operator USB stick — post-boot QA test suite (read-only) → 77_WO_STICK_BOOT_QA_TEST_SUITE.md
 - 99 DONE [testing-ci] CI, lint, and format pipeline → 99_WO_CI_LINT_FORMAT_PIPELINE.md
@@ -913,6 +913,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 756 DONE [testing-ci+os-iso] The rest of the 2026-08-03 tools review: the clock-setting test, the eggs clean… → 756_WO_review_tools_findings_6_to_10.md
 - 761 DONE [testing-ci] smoke-ws-restart-reconnect: a reconnect race failed it, and the failure hung te… → 761_WO_ws_reconnect_smoke_race_hung_test_ci_full.md
 - 836 DONE [testing-ci] Test categories: offline / live-box, and a GUI release suite with screenshot +… → 836_WO_test_categories_live_box_and_release_gui_suite.md
+- 979 IN PROGRESS [testing-ci+network,tracking-vr] Linked-servers role-split test environment: media playout ↔ camera tracking / p… → 979_WO_linked_roles_test_env.md
 
 ## process — Docs, wiki, audits, work-order tooling (27)
 

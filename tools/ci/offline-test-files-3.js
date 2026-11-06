@@ -259,4 +259,5 @@ module.exports = [
 	'tools/smoke/smoke-wo970-exit-only-take-fades.test.js',
 	'tools/smoke/smoke-wo976-fft-channel-source.test.js',
 	'tools/smoke/smoke-wo978-puppet-psn.test.js',
+	'tools/smoke/smoke-wo979-linked-roles.test.js',
 ]

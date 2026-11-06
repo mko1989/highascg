@@ -18,7 +18,7 @@
  * data waits. A peer that refuses is logged once (and once more when it takes calls again).
  * Receiver: `receive(topic, data, peer)` keeps the newest per source and re-broadcasts it when it changed. A source
  * not heard from for EXPIRE_MS is dropped, re-broadcast empty once (`gone: true`), so the overlay hides; `onData`
- * hears every new data and that empty one.
+ * hears every new data and that empty one. `drop(peerId)` does the same at once when that server is unlinked (WO-979).
  */
 
 const HEARTBEAT_MS = 5000
@@ -124,6 +124,25 @@ function createExchange(deps) {
 		}
 	}
 
+	/**
+	 * WO-979: a linked server left (unlinked here or there, RULES "Linked servers" 4): its data goes now, the same way
+	 * as an expiry (one `gone` broadcast per topic, `onData` empty), not 15 s later; nothing more is sent to it.
+	 * → how many topics it had here.
+	 */
+	function drop(peerId) {
+		let n = 0
+		for (const [k, m] of inbox) {
+			if (m.source.id !== peerId) continue
+			inbox.delete(k)
+			n++
+			const t = TOPICS[m.topic]
+			deps.broadcast(t.ws, { ...t.empty, source: m.source, gone: true })
+			deps.onData?.(m.topic, { ...t.empty }, m.source)
+		}
+		for (const k of [...out.keys()]) if (k.endsWith(`|${peerId}`)) out.delete(k)
+		return n
+	}
+
 	/** The newest data a linked server sent on `topic`, tagged with its source (null when none is current). */
 	function latest(topic) {
 		expire()
@@ -145,7 +164,7 @@ function createExchange(deps) {
 		Object.entries(TOPICS).map(([topic, t]) => [t.action, async (args, peer) => receive(topic, args.data, peer)])
 	)
 
-	return { offer, receive, expire, latest, view, info }
+	return { offer, receive, expire, drop, latest, view, info }
 }
 
 module.exports = { createExchange, TOPICS, HEARTBEAT_MS, EXPIRE_MS }

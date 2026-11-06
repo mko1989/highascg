@@ -130,14 +130,11 @@ async function syncFftChannelConsumer(ctx) {
 }
 
 module.exports = {
-	FFT_CHANNEL_CONSUMER_INDEX,
 	FFT_CHANNEL_UDP_PORT,
-	FFT_CHANNEL_FORMAT_ARGS,
 	resolveAudioFftSource,
 	resolveFftSourceChannel,
 	fftChannelAddCommand,
 	fftChannelRemoveCommand,
-	fftSourceKeysFromId,
 	applyFftSourceBody,
 	describeFftSource,
 	syncFftChannelConsumer,

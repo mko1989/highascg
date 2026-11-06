@@ -9,6 +9,11 @@
  *   node tools/e2e/run-cluster-e2e.js --servers=2
  *   node tools/e2e/run-cluster-e2e.js --live=192.168.0.23:4200,192.168.0.4:4200 --yes
  *   node tools/e2e/run-cluster-e2e.js --scenario=show     # WO-746 shared show, several operators (sandbox only)
+ *   node tools/e2e/run-cluster-e2e.js --scenario=duties   # WO-979 role split: a media server + a tracking server
+ *   node tools/e2e/run-cluster-e2e.js --scenario=duties --live --peer=192.168.0.31 --yes [--self=media|tracking] [--look=<id>]
+ *       this box (its LAN address next to the peer's) + the peer; --self = this box's role (default media); the
+ *       tracking one must have detection on + a camera in its project. --look: a look id on the media server that the
+ *       air / impose steps take to its program (without it they skip). `--live=<media>,<tracking>` works too.
  *
  * --live drives REAL servers: they must not be linked to anything yet. While it runs they link, every one is master
  * in turn (a follower skips its local PGM takes, kiosks follow the master), and at the end they are unlinked and
@@ -24,6 +29,8 @@ const path = require('path')
 const { startSandboxNodes, liveNodes } = require('./cluster-nodes')
 const { runScenario } = require('./cluster-scenario')
 const { runShowScenario } = require('./shared-show-scenario')
+const { runDutiesScenario } = require('./duties-scenario')
+const dutiesFixture = require('./duties-fixture')
 
 const arg = (k, d) => {
 	const hit = process.argv.find((a) => a === `--${k}` || a.startsWith(`--${k}=`))
@@ -62,12 +69,25 @@ async function liveRestore(nodes, senders) {
 		}
 }
 
+/** --peer: this box's address on the peer's network (the same /24, else the first LAN IPv4) + the peer, by role. */
+function peerPair(peer, self) {
+	const host = peer.split(':')[0]
+	const mine = Object.values(os.networkInterfaces()).flat().filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => i.address)
+	const same = mine.find((a) => a.split('.').slice(0, 3).join('.') === host.split('.').slice(0, 3).join('.')) || mine[0]
+	if (!same) throw new Error('--peer: this box has no LAN IPv4 address')
+	const here = `${same}:${Number(arg('port', '4200')) || 4200}`
+	return self === 'tracking' ? [peer, here] : [here, peer]
+}
+
 async function main() {
 	const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
 	const out = path.resolve(arg('out', path.join(os.tmpdir(), 'highascg-cluster-e2e', stamp)))
 	fs.mkdirSync(out, { recursive: true })
-	const live = arg('live', '')
 	const scenario = arg('scenario', 'cluster')
+	const peer = arg('peer', '')
+	let live = arg('live', '')
+	if (peer) live = peerPair(peer, arg('self', 'media')).join(',')
+	if (live === '1') throw new Error('--live needs addresses (--live=<media>,<tracking>) or --peer=host[:port]')
 	if (live && scenario === 'show') throw new Error('--scenario=show replaces every server\'s show: sandbox servers only')
 	let nodes
 	let senders = null
@@ -82,16 +102,21 @@ async function main() {
 		senders = await liveGuard(nodes)
 	} else {
 		const count = Math.max(2, Number(arg('servers', '3')) || 3)
-		const ids = Array.from({ length: count }, (_, i) => `sb-${String.fromCharCode(97 + i)}`)
-		nodes = await startSandboxNodes(path.join(out, 'sandboxes'), ids, { log: (s) => console.log(`[cluster-e2e] ${s}`) })
+		const ids = scenario === 'duties' ? ['sb-media', 'sb-tracking'] : Array.from({ length: count }, (_, i) => `sb-${String.fromCharCode(97 + i)}`)
+		// WO-979: per role — the media one owns a screen, the tracking one a (fake) camera
+		const extra = scenario === 'duties' ? (id, root) => dutiesFixture.sandboxOptions(id === 'sb-media' ? 'media' : 'tracking', root) : undefined
+		nodes = await startSandboxNodes(path.join(out, 'sandboxes'), ids, { log: (s) => console.log(`[cluster-e2e] ${s}`), extra })
 	}
 	let results
+	let fixture = null
 	try {
-		results = await (scenario === 'show' ? runShowScenario : runScenario)(nodes, {
-			benchN: Number(arg('bench', '100')) || 100,
-			onStep: (r) => console.log(`[cluster-e2e] ${r.status.toUpperCase().padEnd(4)} ${r.step}${r.ms !== undefined ? ` (${r.ms} ms)` : ''}${r.error ? ` — ${r.error}` : ''}`),
-		})
+		const onStep = (r) => console.log(`[cluster-e2e] ${r.status.toUpperCase().padEnd(4)} ${r.step}${r.ms !== undefined ? ` (${r.ms} ms)` : ''}${r.error ? ` — ${r.error}` : ''}`)
+		if (scenario === 'duties') {
+			if (!live) fixture = await dutiesFixture.prepare(nodes, (s) => console.log(`[cluster-e2e] ${s}`))
+			results = await runDutiesScenario(nodes, { ears: fixture?.ears, look: arg('look', ''), onStep })
+		} else results = await (scenario === 'show' ? runShowScenario : runScenario)(nodes, { benchN: Number(arg('bench', '100')) || 100, onStep })
 	} finally {
+		if (fixture) await fixture.stop()
 		if (senders) await liveRestore(nodes, senders)
 		await Promise.all(nodes.map((n) => n.stop()))
 		if (!live && arg('keep', '') !== '1') fs.rmSync(path.join(out, 'sandboxes'), { recursive: true, force: true })

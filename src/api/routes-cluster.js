@@ -89,9 +89,11 @@ function clusterOf(ctx) {
  * WO-802: a linked server left (unlinked here or there, or dropped by the repair). The master claim that named it goes
  * (cluster-master.js `dropped`), and the fan-out drops its Caspar now: the poll that would refresh it stops when the
  * list is empty, so a master kept forwarding takes to an unlinked server's Caspar. Shared-show state prunes itself.
+ * WO-979: the exchange drops what that server sent (its people on the overlay, its air for the on-air rules) at once.
  */
 function removed(ctx, saved) {
 	ctx._clusterMaster?.dropped(saved)
+	if (saved?.id) ctx._clusterExchange?.drop(saved.id) // WO-979: its people / air go now, not after the 15 s expiry
 	ctx._clusterFanout?.refresh().catch(() => {})
 	broadcast(ctx)
 }
