@@ -4,7 +4,7 @@ extends RefCounted
 const MD := preload("res://app/markdown_bbcode.gd")
 const HelpDialog := preload("res://app/help_dialog.gd")
 const Fold := preload("res://features/previs/fold_section.gd")
-const TOPICS := ["psn-output", "calibrate-heads", "calibrate-cameras", "calibrate-ptz", "vr-walk"]
+const TOPICS := ["psn-output", "calibrate-heads", "calibrate-cameras", "calibrate-ptz", "vr-walk", "tracking-desk-test"]
 var t
 
 

@@ -4,9 +4,9 @@
  * Loaded by `src/module-registry.tryLoad('tracking')` when the Tracking plugin is enabled. Owns the marker hub
  * (`marker-hub.js`): sources write markers over WS (`tracking:marker`, the Godot camera view's driver) or HTTP;
  * every client gets `tracking:markers` (≤ 30 Hz while anything moves, a 1 Hz heartbeat, and at once when a marker
- * goes stale). `ctx.trackingHub` is the hub for server consumers. No PSN / OSC output: dropped by the owner
- * 2026-10-19 (WO-616 T6) — markers leave the box as Art-Net through the follow engine (T11,
- * src/fixtures/follow-service.js: hub → pan / tilt → ArtDmx, patch in `project.fixtures`).
+ * goes stale). `ctx.trackingHub` is the hub for server consumers; markers leave the box through the follow service
+ * (src/fixtures/follow-service.js: PSN trackers, WO-631, or this box's own pan / tilt over Art-Net, WO-616 T11).
+ * WO-978 test puppet (puppet.js): GET / POST /api/tracking/puppet — a simulated person writing marker 1 (source puppet).
  *
  * HTTP: GET /api/tracking/markers · POST /api/tracking/markers {id,x,y,z,name?} or {markers:[…]} ·
  *       DELETE /api/tracking/markers/<id> · GET /api/tracking/stats · GET /api/tracking/follow (engine status) · GET /api/tracking/fixtures (WO-615 T5 GDTF axes / beams)
@@ -78,14 +78,13 @@ const PRESENTERS_EVENT = 'tracking:presenters'
 const PRESENTERS_MS = 500
 
 const hub = new MarkerHub()
+const puppet = require('./puppet').createPuppet({ hub, log: (lvl, msg) => _ctx?.log?.(lvl, msg), onWrite: () => _writes++ }) // WO-978, off at boot
 let _timer = null
 let _ctx = null
 let _sent = { rev: -1, stale: '', at: 0 }
 let _writes = 0
 let _follow = null
-let _calib = null
-let _spot = null
-let _rig = null
+let _calib = null, _spot = null, _rig = null
 let _followSent = { json: '', at: 0 }
 const fixturesWatch = createFixturesWatch() // WO-797: tracking:fixtures only while a client looks
 let _zones = null
@@ -330,7 +329,7 @@ async function handleApi({ method, path, body, req }) {
 	const audio = await handleAudioDesk(_desk, _presenters, { method, path, body }) // WO-731, before the presenter routes
 	if (audio) return audio
 	const pr =
-		(await handlePresenters(_presenters, { method, path, body, req })) || handleAuto(auto, { method, path, body })
+		(await handlePresenters(_presenters, { method, path, body, req })) || handleAuto(auto, { method, path, body }) || puppet.handle(method, path, body)
 	if (pr) return pr
 	if (method === 'GET' && path === '/api/tracking/stats') {
 		return reply(200, {
@@ -482,8 +481,8 @@ module.exports = {
 		_follow = null
 		followProject(auto, null)
 		autoPtz.stop()
-		_calib = _rig = null
-		_spot = null
+		_calib = _rig = _spot = null
+		puppet.stop('shutdown')
 		if (_zones) _zones.stop()
 		_zones = null
 		if (_detect) _detect.stop()

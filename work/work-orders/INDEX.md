@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-887 live WOs (29 open, 123 in progress, 735 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+888 live WOs (29 open, 123 in progress, 736 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -850,7 +850,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 922 DONE [media] Media import keeps Polish file names on every path (URL downloads saved the %-e… → 922_WO_media_import_utf8_names.md
 - 951 DONE [media+godot-client] Import a .gtzip lower third (NewTek LiveGraphics-style) as a CG Studio template → 951_WO_gtzip_lower_third_import.md
 
-## tracking-vr — Tracking, previs, VR (32)
+## tracking-vr — Tracking, previs, VR (33)
 
 - 17 DONE [tracking-vr+web-client] 3D Previs — Live Video on Imported 3D Stage Models → 17_WO_3D_PREVIS.md
 - 30 IN PROGRESS [tracking-vr+process] Previs & Tracking Module — Packaging and Integration → 30_WO_PREVIS_TRACKING_MODULE.md
@@ -884,6 +884,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 859 IN PROGRESS [tracking-vr+godot-client] VR: the left trigger held adds to the selection, the right stick flies → 859_WO_vr_left_trigger_add_right_stick_fly.md
 - 957 DONE [tracking-vr+godot-client] VR headset black while the GUI mirror shows the scene: WO-892's SMAA on the mul… → 957_WO_vr_headset_black_smaa_multiview.md
 - 969 IN PROGRESS [tracking-vr+godot-client] VR starts inside the loaded MVR room, facing its rig, not 8 m +Z of the origin… → 969_WO_vr_starts_inside_the_mvr_room.md
+- 978 DONE [tracking-vr+lighting,godot-client] Tracking → lighting desk test environment: puppet marker, PSN to ChamSys MagicQ → 978_WO_tracking_desk_test_env_puppet_psn_magicq.md
 
 ## testing-ci — Tests and CI (25)
 

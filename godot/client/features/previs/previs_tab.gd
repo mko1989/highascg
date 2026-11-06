@@ -85,10 +85,9 @@ func _ready() -> void:
 	builder.live = false
 	stage.add_child(builder)
 	mvr = MvrScene.new()
-	stage.add_child(mvr)
 	coverage = Coverage3D.new()
-	stage.add_child(coverage)
-	stage.add_child(fixtures3d)
+	for n: Node in [mvr, coverage, fixtures3d, preload("res://features/previs/tracking/marker_pins_3d.gd").new()]:  # WO-978 hub markers
+		stage.add_child(n)
 	stage.add_child(preload("res://features/previs/fixtures/calib_marks_3d.gd").new())  # WO-700 stage marks
 	fixtures3d.follow(mvr)  # WO-678: heads take their MVR layer's colour
 	aim_drag.post = func(b: Dictionary) -> Dictionary: return await Api.post_json("/api/fixtures/program/aim", b)

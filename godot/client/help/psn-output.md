@@ -77,7 +77,13 @@ The fixtures need their real Pos X / Y / Z in the patch.
 ## ChamSys MagicQ
 
 On consoles it works as is. **On PC or Mac it only works when unlocked with a MagicQ or GeNetix interface.** The
-tracker simulator works without one.
+tracker simulator works without one. Without an interface, Tracker Rx and PSN Function show **[Locked]**.
+
+A GeNetix node on the network unlocks it (checked with a GN10 on MagicQ PC 1.9.8.3):
+- MagicQ's own IP address (Network tab) must be on the network port the node is on;
+- **Net Manager** then lists the node, and the title bar says MagicQ PC instead of demo.
+
+A GN2 or GN4 unlocks only the basic level, which has no PSN.
 
 1. **Setup → View Settings → Network**: set **Tracker Rx** to **PSN/SpotMe**.
 2. Same tab: set **PSN Function** to **Normal PSN 1**, so HighAsCG marker 1 = MagicQ tracker 1. The default,
@@ -94,10 +100,14 @@ Active trackers show as a green cross in MagicVis. The cross turns red, then dis
 **Axes.**
 - MagicQ uses Y as height. It also says *"PSN has Z positive towards the back of the stage"*. HighAsCG's **Y up**
   sends height as Y, but its depth is positive **toward the audience**, so depth arrives mirrored.
-- Fix that in MagicQ: **Macro window → View Autom → View Trackers**, set a **negative Z scale** for each tracker
-  (−256 = ×−1).
+- Fix that in MagicQ: **Macro window → View Autom → View Trackers**, set **Z scale −1** for each tracker. The
+  scale is a plain multiplier (checked on 1.9.8.3: −256 gave Z = −256 × depth).
 - Then walk a marker upstage and check the cross goes upstage. If left and right are swapped, a negative X scale
   fixes that the same way.
+
+**MagicQ on this same computer.** MagicQ listens for PSN only on the port its IP address is on. Set this page's
+**Interface** to that port too: this box's own multicast reaches a local program only through the port it is sent
+out of. To try it without anyone on stage, see [Test tracking with the lighting desk](tracking-desk-test.md).
 
 > MagicQ manages IGMP itself: its querier defaults to "Normal (Detect others)". If PSN never arrives, see Network
 > below.

@@ -257,4 +257,5 @@ module.exports = [
 	'tools/smoke/smoke-wo958-build-stamp-version.test.js',
 	'tools/smoke/smoke-wo968-prv-playlist-runs.test.js',
 	'tools/smoke/smoke-wo970-exit-only-take-fades.test.js',
+	'tools/smoke/smoke-wo978-puppet-psn.test.js',
 ]

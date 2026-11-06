@@ -67,6 +67,7 @@ func _ready() -> void:
 	_state.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_state.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	add_child(_state)
+	add_child(preload("res://features/previs/tracking/puppet_row.gd").new())  # WO-978 the test puppet (desk tests)
 
 
 func set_defs(markers: Array) -> void:
