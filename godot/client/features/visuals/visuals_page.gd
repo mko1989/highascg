@@ -6,6 +6,7 @@ extends VBoxContainer
 const M := preload("res://features/visuals/visuals_model.gd")
 const Show := preload("res://features/visuals/visuals_show.gd")
 const LayerList := preload("res://features/visuals/visuals_layer_list.gd")
+const FftSource := preload("res://features/visuals/visuals_fft_source.gd")
 const MidiPanel := preload("res://features/midi/midi_panel.gd")
 
 signal params_changed(params: Dictionary)
@@ -101,6 +102,7 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 		_sliders[p] = s
 		add_child(row)
 	add_child(_heading("Audio"))
+	add_child(FftSource.new())  # WO-976: which input / screen's mix drives the visuals
 	for d in ["kick", "snare", "hats"]:
 		var s := _slider(0.0, 1.0, 0.05, "How easily a %s counts as a hit — left: only clear hits, right: ghost notes too" % d)
 		s.value = 0.5

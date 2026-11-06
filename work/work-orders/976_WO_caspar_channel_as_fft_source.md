@@ -1,7 +1,7 @@
 # WO-976 — A Caspar channel / screen destination (e.g. Dioda PGM) as the audio-reactive FFT source
 
 **Area:** audio, engine, godot-client
-**Status: IN PROGRESS (06.11.26: server + API + engine proven on the box; Godot picker built and headless-tested, but it lives in the live-audio slot inspector, so it is unreachable on a box with no input slot. Open: a slot-independent place for the picker)**
+**Status: DONE (07.11.26: server + API + engine proven on the box 06.11; Godot picker proven on the glass 07.11)**
 
 Owner 06.11 (after the show): *"can caspar channels like dioda pgm 1 can be an audio source for audio reactive visuals?"*
 → *"add a work order for the caspar channel/screen destination as an fft source"*.
@@ -86,8 +86,7 @@ consumer downmixes at the source and the engine needs no N-channel mode (design 
   `GET /api/audio/fft-source` -> `{source, channel, options:[{id,label}]}`; `POST /api/audio/live-inputs/config` takes
   `{audio_fft_source: 'none'|'slot:N'|'channel:D:pgm|prv'}` (or the legacy slot field). **Shared file touched:** `src/api/router.js`, +1 route line.
   settings-post.js / defaults-core.js not touched (the keys ride casparServer through live-inputs/config, which saves it itself).
-- Godot: `input_slots_model.gd` (`fft_source_requests`, `fft_source_options`), `host_input_controls.gd` (an "Audio-reactive
-  source" select under the existing "Shader FFT source" tick; options from the new GET; pick = config + apply; the tick shows off while a channel is the source).
+- Godot (07.11, moved): the picker lives on the **Visuals tab Inspector page, Audio section, "Source"** (new `features/visuals/visuals_fft_source.gd`, one line in `visuals_page.gd`), so it works with 0 live-audio slots. Options come from GET /api/audio/fft-source (none, each input slot, each screen's PGM/PRV); a pick posts live-inputs/config `{audio_fft_source}` + apply and reloads. `input_slots_model.gd` holds `fft_source_requests`/`fft_source_options`. The duplicate select in the slot inspector (`host_input_controls.gd`) was dropped as redundant: it showed the same list in a place that only exists with a slot. The slot's "Feed audio-reactive shaders" tick stays (same server key, picks kind slot), now shows off while a channel is the source, and its tooltip points at the Visuals picker.
 - `docs/wiki/api/contract/http.md` regenerated (550 routes; it also carries other agents' routes if they landed).
 - Tests: `tools/smoke/smoke-wo976-fft-channel-source.test.js` (added to offline-test-files-3.js); `smoke-wo333` repointed
   (slot parsing and the resolver now live in fft-channel-source.js; assertions kept, not weakened).
@@ -105,7 +104,6 @@ consumer downmixes at the source and the engine needs no N-channel mode (design 
   (kind key now stored as `slot`, `audio_fft_source_slot` 1 unchanged).
 - Cost (OSC :6250, ch2 screen consumer, 8 s windows): no consumer 50.00 presented/s, 0 dropped; consumer on 50.00/s, 0 dropped; consumer off 50.00/s, 0 dropped.
   Note that :6250 sends `presented_frames` as int64 (`h`) inside `#bundle`s.
-- NOT proven: latency vs. the audio; Godot picker on the glass (no live-audio slot on this box -> the inspector block never renders, so it is
-  untested beyond the headless tests); a Caspar restart / project load on the box (the re-add path is smoke-tested with a fake AMCP,
+- Glass (07.11, GUI relaunched under box2.lock, :0 screenshots p976_visuals2/open/picked/none.png in the scratchpad): the Visuals Inspector shows Audio > Source with None / Screen 1 program (ch 2) / Screen 1 preview (ch 3). Clicking Screen 1 program: `GET fft-source` -> `channel:1:pgm`, ch 2, `INFO 2` has `port_9276` (count 1), field shows "Screen 1 program (ch 2)". Clicking None: source `none`, `INFO 2` count 0. Restored `audio_fft_source_slot` 1 + apply (as found); GUI relaunched on the Live tab. Godot headless 26079/0 after the move, max-lines 0.
+- NOT proven: latency vs. the audio; a Caspar restart / project load on the box (the re-add path is smoke-tested with a fake AMCP,
   not exercised live); the DM3 feed returning after the switch back (no slot is configured on this box, `liveAudioCount` 0).
-- Follow-up: move or duplicate the picker somewhere slot-independent (Visuals tab or the screen destination inspector).
