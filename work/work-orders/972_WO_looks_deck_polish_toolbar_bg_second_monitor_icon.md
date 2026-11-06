@@ -64,4 +64,4 @@ Files changed: `godot/client/features/live/live_tab.gd`, `godot/client/features/
 `godot/client/app/tab_undock.gd`, `godot/client/tests/test_tab_undock.gd`,
 `tools/smoke/smoke-wo781-look-preset-destinations.test.js`, new `work/work-orders/972_WO_looks_deck_polish_toolbar_bg_second_monitor_icon.md`.
 
-OPEN_ISSUES one-liner: `| WO-972 | Looks deck polish: remove toolbar Looks toggle, lighter deck bg, send-to-2 icon only with a second operator monitor | [972](work-orders/972_WO_looks_deck_polish_toolbar_bg_second_monitor_icon.md) | IN PROGRESS — code+suite done, glass pending (box lock) |`
+OPEN_ISSUES one-liner: `| WO-972 | Looks deck polish: remove toolbar Looks toggle, lighter deck bg, send-to-2 icon only with a second operator monitor | WO-972 | IN PROGRESS — code+suite done, glass pending (box lock) |`
