@@ -13,6 +13,11 @@ const view = fs.readFileSync(
 	'utf8'
 )
 const column = view.slice(view.indexOf('func _column('), view.indexOf('\nfunc ', view.indexOf('func _column(') + 1))
+// WO-971: the column's scroller setup (no sideways scroll + the kept offset) lives in deck_scroll.gd
+const deckScroll = fs.readFileSync(
+	path.join(__dirname, '..', '..', 'godot', 'client', 'features', 'live', 'deck_scroll.gd'),
+	'utf8'
+)
 
 describe('WO-905 Live deck per-screen scrolling', () => {
 	it('the deck itself never scrolls vertically', () => {
@@ -20,7 +25,8 @@ describe('WO-905 Live deck per-screen scrolling', () => {
 	})
 	it('each column scrolls its grid, header and timer stay above it', () => {
 		assert.match(column, /var scroll := ScrollContainer\.new\(\)/)
-		assert.match(column, /scroll\.horizontal_scroll_mode = ScrollContainer\.SCROLL_MODE_DISABLED/)
+		assert.match(column, /DeckScroll\.setup\(scroll, main\)/)
+		assert.match(deckScroll, /\tscroll\.horizontal_scroll_mode = ScrollContainer\.SCROLL_MODE_DISABLED/)
 		assert.match(column, /scroll\.size_flags_vertical = Control\.SIZE_EXPAND_FILL/)
 		assert.match(column, /scroll\.add_child\(grid\)\n\tcol\.add_child\(scroll\)/)
 		assert.ok(column.indexOf('col.add_child(head_row)') < column.indexOf('col.add_child(timer)'))
