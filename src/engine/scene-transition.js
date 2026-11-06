@@ -219,9 +219,9 @@ function baseTypeStripAnimateSuffix(typeStr) {
 function resolveChannelFramerateForMixerTween(self, channel, clientHint) {
 	const ch = parseInt(channel, 10)
 	const k = `channel_${ch}_framerate`
-	const fromVar = parseInt(String(self?.variables?.[k] ?? ''), 10)
+	const fromVar = parseFloat(String(self?.variables?.[k] ?? ''))
 	if (Number.isFinite(fromVar) && fromVar > 0) return fromVar
-	const n = parseInt(String(clientHint ?? ''), 10)
+	const n = parseFloat(String(clientHint ?? ''))
 	if (Number.isFinite(n) && n > 0) return n
 	return 50
 }

@@ -5,7 +5,7 @@ const { toCasparTween } = require('./caspar-tween')
 
 function msToFrames(durationMs, fps) {
 	const rate = Number(fps) > 0 ? Number(fps) : 25
-	return Math.max(0, Math.floor(Number(durationMs || 0) / (1000 / rate)))
+	return Math.max(0, Math.floor((Number(durationMs || 0) * rate) / 1000 + 1e-6)) // WO-983: +1e-6 frame (as timecode-math) so an exact boundary (5*1000/30 ms at 30) is 5, not 4
 }
 
 function normalizeTransitionForAmcp(transition, fps) {

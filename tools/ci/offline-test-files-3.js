@@ -262,5 +262,8 @@ module.exports = [
 	'tools/smoke/smoke-wo979-linked-roles.test.js',
 	'tools/smoke/smoke-wo981-canonical-json.test.js',
 	'tools/smoke/smoke-wo980-node-hot-paths.test.js',
+	'tools/smoke/smoke-983-amcp-edges.test.js',
+	'tools/smoke/smoke-983-timecode-scene-math.test.js',
+	'tools/smoke/smoke-983-timeline-schedule.test.js',
 	'tools/smoke/smoke-984-multiview-deadline.test.js',
 ]

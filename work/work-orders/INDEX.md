@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-892 live WOs (28 open, 123 in progress, 741 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+894 live WOs (28 open, 123 in progress, 743 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -179,6 +179,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 973 DONE [engine+amcp,godot-client] Per-layer clip playback speed → 973_WO_clip_playback_speed_per_layer.md
 - 980 DONE [engine+process,media] Optimization sweep: node server hot paths (polled project reads, findmnt spawns… → 980_WO_node_hot_paths_sweep.md
 - 981 DONE [engine] take / project / autosave path latency and cost (optimization sweep 07.11) → 981_WO_take-project-autosave-path-cost.md
+- 983 DONE [engine+amcp,testing-ci] Test-coverage + correctness sweep of AMCP planning and timecode/scene math → 983_WO_amcp_timecode_scene_math_sweep.md
+- 984 DONE [engine+testing-ci,network,process] Code-health sweep of src/ and tools/ → 984_WO_src_tools_code_health_sweep.md
 
 ## amcp — AMCP client and protocol (20)
 

@@ -45,7 +45,7 @@ test('msToFrames converts transition ms using fps', () => {
 test('normalizeTransitionForAmcp maps ms + easing to clip opts', () => {
 	assert.deepEqual(
 		normalizeTransitionForAmcp({ type: 'mix', durationMs: 500, easing: 'LINEAR', direction: 'RIGHT' }, 50),
-		{ transition: 'MIX', duration: 25, tween: 'LINEAR', direction: 'RIGHT' }
+		{ transition: 'MIX', duration: 25, tween: 'linear', direction: 'RIGHT' }
 	)
 })
 
@@ -61,6 +61,6 @@ test('diffCasparLayerPlan emits LOADBG then PLAY swap', () => {
 		{ fps: 50 }
 	)
 	assert.equal(plan.length, 2)
-	assert.equal(serializeClipCommandPlan(plan[0]), 'LOADBG 1-10 AMB/new.mp4 LOOP MIX 25 LINEAR RIGHT')
+	assert.equal(serializeClipCommandPlan(plan[0]), 'LOADBG 1-10 AMB/new.mp4 LOOP MIX 25 linear RIGHT')
 	assert.equal(serializeClipCommandPlan(plan[1]), 'PLAY 1-10')
 })
