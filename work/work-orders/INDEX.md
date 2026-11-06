@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-894 live WOs (28 open, 123 in progress, 743 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+895 live WOs (28 open, 123 in progress, 744 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -388,7 +388,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (135)
+## godot-client — Godot client (136)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -525,6 +525,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 971 DONE [godot-client] Looks deck: scroll position kept across every deck action → 971_WO_deck_scroll_kept_across_rebuild.md
 - 972 DONE [godot-client] looks deck polish: no "Looks" toolbar toggle, lighter deck background, send-to-… → 972_WO_looks_deck_polish_toolbar_bg_second_monitor_icon.md
 - 977 DONE [godot-client] Devices tab wider than the window: Inspector pushed off the right edge → 977_WO_devices_tab_wider_than_window.md
+- 985 DONE [godot-client+web-client,mapping] OSC WS delta: a delta channel REPLACES the client copy, then delta mode ON → 985_WO_osc_ws_delta_replace_and_enable.md
 
 ## web-client — Web client (82)
 

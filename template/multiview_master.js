@@ -15,24 +15,6 @@
 		let timerScale = 1; // WO-203: timerScale/100 from CG payload
 		let highlightTopTimer = true; // WO-203 §5
 
-		function mergeChannel(a, b) {
-			if (!b) return a;
-			if (!a) return b;
-			const o = { ...a, ...b };
-			if (b.layers || a.layers) {
-				o.layers = { ...(a.layers || {}) };
-				for (const k of Object.keys(b.layers || {})) {
-					const aL = a.layers && a.layers[k] ? a.layers[k] : {};
-					const bL = b.layers[k];
-					const merged = { ...aL, ...bL };
-					if (aL.file && bL.file && typeof aL.file === 'object' && typeof bL.file === 'object') {
-						merged.file = { ...aL.file, ...bL.file };
-					}
-					o.layers[k] = merged;
-				}
-			}
-			return o;
-		}
 
 		function wsAuthQuery() {
 			/* WO-811: CEF WebSockets cannot send headers. The node hands this template its own short-lived TEMPLATE KEY
@@ -68,9 +50,8 @@
 					} else if (msg.type === 'osc') {
 						if (msg.data?.channels) {
 							if (msg.data.delta) {
-								for (const k of Object.keys(msg.data.channels)) {
-									oscState.channels[k] = mergeChannel(oscState.channels[k], msg.data.channels[k]);
-								}
+								/* WO-985: a delta carries each dirty channel COMPLETE — it replaces, a merge kept pruned layers. */
+								Object.assign(oscState.channels, msg.data.channels);
 							} else {
 								oscState.channels = msg.data.channels;
 							}

@@ -61,9 +61,8 @@ function connect() {
 			} else if (msg.type === 'osc') {
 				if (msg.data?.channels) {
 					if (msg.data.delta) {
-						for (const k of Object.keys(msg.data.channels)) {
-							oscState.channels[k] = mergeChannel(oscState.channels[k], msg.data.channels[k]);
-						}
+						/* WO-985: a delta carries each dirty channel COMPLETE — it replaces, a merge kept pruned layers. */
+						Object.assign(oscState.channels, msg.data.channels);
 					} else {
 						oscState.channels = msg.data.channels;
 					}

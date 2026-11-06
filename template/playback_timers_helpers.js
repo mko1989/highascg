@@ -14,25 +14,6 @@ function getActiveScenes(channelMap, sceneLive) {
 	return list;
 }
 
-function mergeChannel(a, b) {
-	if (!b) return a;
-	if (!a) return b;
-	const o = { ...a, ...b };
-	if (b.layers || a.layers) {
-		o.layers = { ...(a.layers || {}) };
-		for (const k of Object.keys(b.layers || {})) {
-			const aL = a.layers && a.layers[k] ? a.layers[k] : {};
-			const bL = b.layers[k];
-			const merged = { ...aL, ...bL };
-			if (aL.file && bL.file && typeof aL.file === 'object' && typeof bL.file === 'object') {
-				merged.file = { ...aL.file, ...bL.file };
-			}
-			o.layers[k] = merged;
-		}
-	}
-	return o;
-}
-
 function formatMmSs(sec) {
 	if (!Number.isFinite(sec) || sec < 0) return '0:00';
 	const m = Math.floor(sec / 60);

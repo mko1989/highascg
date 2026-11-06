@@ -67,24 +67,26 @@ func test_idle_labels_like_wo297() -> void:
 	t.eq(P.tier(null), "muted", "no remaining")
 
 
-func test_merge_channel_keeps_file_fields() -> void:
-	var a := {"layers": {"10": {"file": {"duration": 60.0, "elapsed": 1.0}, "type": "ffmpeg"}}}
-	var b := {"layers": {"10": {"file": {"elapsed": 2.0}}}}
-	var m := P.merge_channel(a, b)
-	t.eq(m.layers["10"].file.duration, 60.0, "delta keeps duration")
-	t.eq(m.layers["10"].file.elapsed, 2.0, "delta updates elapsed")
-	t.eq(m.layers["10"].type, "ffmpeg", "other layer fields kept")
+## WO-985: a delta carries the channel COMPLETE — it replaces the mirror's copy, so a pruned layer / audio slot is gone.
+func test_apply_osc_delta_replaces_channel() -> void:
+	var cur := {"1": {"layers": {"10": {"file": {"elapsed": 1.0}}, "20": {"file": {"elapsed": 5.0}}}}, "2": {"layers": {"10": {}}}}
+	var d := {"delta": true, "channels": {"1": {"layers": {"10": {"file": {"elapsed": 2.0}}}}}}
+	var m := P.apply_osc(cur, d)
+	t.ok(not m["1"].layers.has("20"), "layer the server pruned is gone")
+	t.eq(m["1"].layers["10"].file.elapsed, 2.0, "layer 10 updated")
+	t.ok(m.has("2"), "channels absent from the delta are kept")
+	t.ok(cur["1"].layers.has("20"), "input not mutated")
 
 
+func test_apply_osc_delta_audio_slots_follow_server() -> void:
+	var cur := {"1": {"audio": {"nbChannels": 2, "levels": [{"dBFS": -10.0, "peak": -3.0}, {"dBFS": -12.0, "peak": -4.0}]}}}
+	var m := P.apply_osc(cur, {"delta": true, "channels": {"1": {"audio": {"nbChannels": 2, "levels": [{"dBFS": -120.0}]}}}})
+	t.eq(m["1"].audio.levels.size(), 1, "the delta's slot list wins")
+	t.eq(m["1"].audio.levels[0].dBFS, -120.0, "fresh dBFS replaces the stale one")
+	t.ok(not m["1"].audio.levels[0].has("peak"), "no stale peak survives")
 
-## WO-604 — web mergeChannel: meter slots merge slot-wise; the delta's slot count wins.
-func test_merge_channel_audio_levels_slotwise() -> void:
-	var a := {"audio": {"nbChannels": 2, "levels": [{"dBFS": -10.0, "peak": -3.0}, {"dBFS": -12.0, "peak": -4.0}]}}
-	var b := {"audio": {"levels": [{"dBFS": -120.0}]}}
-	var m := P.merge_channel(a, b)
-	t.eq(m.audio.nbChannels, 2, "other audio fields kept")
-	t.eq(m.audio.levels.size(), 1, "the delta's slot list wins")
-	t.eq(m.audio.levels[0].dBFS, -120.0, "fresh dBFS replaces the stale one")
-	t.eq(m.audio.levels[0].peak, -3.0, "fields the delta omits are kept")
-	t.eq(a.audio.levels[0].dBFS, -10.0, "the old snapshot is not mutated")
-	t.eq(P.merge_channel({}, {"audio": {"levels": [{"dBFS": -5.0}]}}).audio.levels[0].dBFS, -5.0, "no previous audio")
+
+func test_apply_osc_snapshot_replaces_all() -> void:
+	var m := P.apply_osc({"1": {}, "2": {}}, {"channels": {"3": {"layers": {}}}})
+	t.eq(m.keys(), ["3"], "full snapshot replaces the mirror")
+	t.eq(P.apply_osc({"1": {}}, {"delta": true}).keys(), ["1"], "payload without channels is ignored")

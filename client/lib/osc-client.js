@@ -1,33 +1,14 @@
 /** OSC from WS `{ type: 'osc', data }`. Pass `{ wsClient }` to share {@link WsClient}. */
 import { getWsUrl } from './ws-client.js'
-function mergeChannel(a, b) {
-	if (!b) return a
-	if (!a) return b
-	const o = { ...a, ...b }
-	if (b.layers || a.layers) {
-		o.layers = { ...(a.layers || {}) }
-		for (const k of Object.keys(b.layers || {})) {
-			const aL = a.layers && a.layers[k] ? a.layers[k] : {}
-			const bL = b.layers[k]
-			const merged = { ...aL, ...bL }
-			// Shallow layer merge overwrites nested `file` entirely; preserve fields (e.g. duration) across delta ticks.
-			if (aL.file && bL.file && typeof aL.file === 'object' && typeof bL.file === 'object') {
-				merged.file = { ...aL.file, ...bL.file }
-			}
-			o.layers[k] = merged
-		}
-	}
-	// Merge mixer meter slots so a delta with fresh dBFS (-120) updates instead of keeping stale peaks from `a`.
-	if (b.audio && typeof b.audio === 'object' && Array.isArray(b.audio.levels)) {
-		const al = a.audio?.levels
-		const bl = b.audio.levels
-		o.audio = {
-			...(a.audio || {}),
-			...b.audio,
-			levels: bl.map((slot, i) => ({ ...(Array.isArray(al) && al[i] ? al[i] : {}), ...(slot || {}) })),
-		}
-	}
-	return o
+/**
+ * WO-985: a delta carries each DIRTY channel COMPLETE (osc-state `_buildChangePayload`), so it REPLACES the mirror's copy.
+ * The former layer-level merge kept layers / audio slots the server had pruned (CLEAR, look change, stale prune) until a
+ * reconnect. Replacement also gives WO-604's goal (a fresh dBFS beats a stale peak). Channels absent from a delta stay.
+ * @returns {Record<string, any>} the new mirror (the input is not mutated)
+ */
+export function applyOscPayload(ch, d) {
+	if (!d || typeof d !== 'object' || !d.channels) return ch
+	return d.delta ? { ...ch, ...d.channels } : { ...d.channels }
 }
 function safe(f) {
 	try {
@@ -70,9 +51,7 @@ export class OscClient {
 
 	_ingest(d) {
 		if (!d || typeof d !== 'object') return
-		if (d.delta && d.channels) {
-			for (const k of Object.keys(d.channels)) this._ch[k] = mergeChannel(this._ch[k], d.channels[k])
-		} else if (d.channels) this._ch = { ...d.channels }
+		this._ch = applyOscPayload(this._ch, d)
 		this._run()
 	}
 

@@ -132,43 +132,19 @@ static func pick_top_layer(channel: Variant, bank: Variant, now_ms: float, want_
 	return {"layer": best, "state": best_state} if best >= 0 else none
 
 
-## web osc-client mergeChannel: layer-level shallow merge, nested `file` merged too.
-static func merge_channel(a: Variant, b: Variant) -> Dictionary:
-	if not (b is Dictionary):
-		return a if a is Dictionary else {}
-	if not (a is Dictionary):
-		return (b as Dictionary).duplicate(true)
-	var o := (a as Dictionary).duplicate()
-	o.merge(b as Dictionary, true)
-	if (a as Dictionary).has("layers") or (b as Dictionary).has("layers"):
-		var layers: Dictionary = (a.get("layers", {}) as Dictionary).duplicate()
-		for k in (b.get("layers", {}) as Dictionary):
-			var al: Dictionary = layers.get(k, {}) if layers.get(k) is Dictionary else {}
-			var bl: Dictionary = b.layers[k]
-			var merged := al.duplicate()
-			merged.merge(bl, true)
-			if al.get("file") is Dictionary and bl.get("file") is Dictionary:
-				var f: Dictionary = (al.file as Dictionary).duplicate()
-				f.merge(bl.file, true)
-				merged["file"] = f
-			layers[k] = merged
-		o["layers"] = layers
-	# WO-604: meter slots merge slot-wise (web osc-client mergeChannel), so a delta's fresh dBFS replaces a stale peak.
-	var ba: Variant = (b as Dictionary).get("audio")
-	if ba is Dictionary and ba.get("levels") is Array:
-		var aa: Dictionary = a.get("audio") if a.get("audio") is Dictionary else {}
-		var al: Variant = aa.get("levels")
-		var audio := aa.duplicate()
-		audio.merge(ba, true)
-		var levels := []
-		for i in (ba.levels as Array).size():
-			var slot: Dictionary = (al[i] as Dictionary).duplicate() if al is Array and i < al.size() and al[i] is Dictionary else {}
-			if ba.levels[i] is Dictionary:
-				slot.merge(ba.levels[i], true)
-			levels.append(slot)
-		audio["levels"] = levels
-		o["audio"] = audio
-	return o
+## WO-985: apply one `osc` WS payload to the client mirror. A full snapshot replaces everything; a delta carries each
+## DIRTY channel COMPLETE (server osc-state `_buildChangePayload`), so the channel REPLACES the mirror's copy. The former
+## layer-level merge kept layers/audio slots the server had pruned (CLEAR, look change, stale prune) until a reconnect.
+## Replacement also gives WO-604's goal (a fresh dBFS beats a stale peak) with no slot-wise merge. Channels absent from
+## a delta are untouched. Returns the new mirror (the input is not mutated).
+static func apply_osc(channels: Dictionary, d: Variant) -> Dictionary:
+	if not (d is Dictionary) or not ((d as Dictionary).get("channels") is Dictionary):
+		return channels
+	var chs: Dictionary = d.channels
+	var out: Dictionary = channels.duplicate() if d.get("delta", false) else {}
+	for k in chs:
+		out[str(k)] = chs[k]
+	return out
 
 
 ## PGM channel actually playing for main `i` (web refresh(): switcher_bus remap) + its layer bank.

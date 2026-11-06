@@ -10,6 +10,7 @@ module.exports = [
 	'test/client/thumbnail-error-handler.test.js',
 	'test/multiview-aspect-ratio.test.js',
 	'test/multiview-playback-osc.test.js',
+	'test/osc-delta-replace.test.js',
 	'test/project-media-parity.test.js',
 	'test/replication-caspar-parity.test.js',
 	'test/replication-channel-parity.test.js',

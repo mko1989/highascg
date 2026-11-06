@@ -1,6 +1,6 @@
 extends Node
-## WO-600 O — client copy of the server's OSC channel state (`osc` WS snapshots ~25 Hz + deltas, merged
-## like client/lib/osc-client.js). Timers read `channels[str(ch)]`.
+## WO-600 O — client copy of the server's OSC channel state (`osc` WS snapshots ~25 Hz + deltas; a delta channel
+## REPLACES the copy, WO-985). Timers read `channels[str(ch)]`.
 
 signal updated
 
@@ -19,12 +19,5 @@ func _ready() -> void:
 func _ingest(d: Variant) -> void:
 	if not (d is Dictionary) or not ((d as Dictionary).get("channels") is Dictionary):
 		return
-	var chs: Dictionary = d.channels
-	if d.get("delta", false):
-		for k in chs:
-			channels[str(k)] = P.merge_channel(channels.get(str(k)), chs[k])
-	else:
-		channels = {}
-		for k in chs:
-			channels[str(k)] = chs[k]
+	channels = P.apply_osc(channels, d)
 	updated.emit()
