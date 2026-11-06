@@ -325,6 +325,7 @@ export function buildIncomingScenePayload(scene, seekOpts) {
 				: {}),
 			...(l.trimInMs != null ? { trimInMs: l.trimInMs } : {}),
 			...(l.trimOutMs != null ? { trimOutMs: l.trimOutMs } : {}),
+			...(Number(l.speed) > 0 && Number(l.speed) !== 1 ? { speed: Number(l.speed) } : {}), // WO-973
 		}
 		if (Array.isArray(l.effects) && l.effects.length > 0) {
 			row.effects = JSON.parse(JSON.stringify(l.effects))

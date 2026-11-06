@@ -199,3 +199,28 @@ static func jump_ms(layer: Dictionary, dur_ms: float, which: String, fps: float)
 static func step_ms(cur_ms: float, dir: int, dur_ms: float, fps: float) -> float:
 	var f := ms_to_frame(snap_ms(cur_ms, dur_ms, fps), fps) + (1 if dir > 0 else -1)
 	return snap_ms(frame_to_ms(maxi(0, f), fps), dur_ms, fps)
+
+
+## WO-973 — per-layer playback speed of a video clip (`speed` on the look layer, 1 = normal and stored as absent).
+## The server turns it into VF setpts=PTS/x + AF atempo=x on LOADBG; trim / seek points stay in the clip's own time.
+const SPEED_MIN := 0.25
+const SPEED_MAX := 4.0
+const MX := preload("res://features/live/mixer_math.gd")
+
+
+static func speed_of(layer: Dictionary) -> float:
+	var v: Variant = layer.get("speed")
+	if v == null or not (v is float or v is int) or float(v) <= 0.0:
+		return 1.0
+	return clampf(float(v), SPEED_MIN, SPEED_MAX)
+
+
+## A typed / spun speed → the patch to store (1 clears the key: null).
+static func speed_patch(v: float) -> Dictionary:
+	var c := clampf(snappedf(v, 0.01), SPEED_MIN, SPEED_MAX)
+	return {"speed": null if absf(c - 1.0) < 0.0005 else c}
+
+
+## Video files only: not stills, templates, routes, timelines (they have no clip to retime).
+static func supports_speed(value: String, source_type: String) -> bool:
+	return source_type.to_lower() != "timeline" and MX.supports_loop(value, source_type)

@@ -18,6 +18,7 @@ const PlaylistSection := preload("res://features/live/playlist_section.gd")
 const ClipTrimSection := preload("res://features/live/clip_trim_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"], ["vertical", "Fill height"], ["stretch", "Stretch"]]
+const T := preload("res://features/live/clip_trim_model.gd")
 const STARTS: Array = preload("res://features/live/clip_trim_model.gd").STARTS  # WO-813: no Custom — trim works under both
 
 var scene_id := ""
@@ -58,6 +59,7 @@ func _ready() -> void:
 	_trim.status.connect(func(t: String) -> void: status.emit(t))
 	g.add_child(_trim.header)  # "▸ Trim" in the label column, the folded summary / compact editor beside it
 	g.add_child(_trim)
+	_row(g, "Speed ×", _spin("speed", T.SPEED_MIN, T.SPEED_MAX, 0.05, func(v: float) -> void: _emit(T.speed_patch(v))))  # WO-973
 	_row(g, "Loop", _check("loop", func(on: bool) -> void: _emit({"loop": on})))
 	_row(g, "Straight alpha", _check("alpha", func(on: bool) -> void: _emit({"straightAlpha": on})))
 	_row(g, "Rotation °", _spin("rot", -180, 180, 0.5, func(v: float) -> void: _emit({"rotation": v})))
@@ -189,6 +191,8 @@ func _sync() -> void:
 	_trim.show_layer(scene_id, main, _layer)
 	var src: Dictionary = _layer.get("source", {}) if _layer.get("source") is Dictionary else {}
 	var can_loop := X.supports_loop(str(src.get("value", "")), str(src.get("type", "media")))
+	(_w.speed as SpinBox).editable = T.supports_speed(str(src.get("value", "")), str(src.get("type", "media")))  # WO-973: video clips only (same set as Loop: no stills / templates / routes)
+	(_w.speed as SpinBox).value = T.speed_of(_layer)
 	(_w.loop as CheckBox).disabled = not can_loop
 	(_w.loop as CheckBox).button_pressed = can_loop and _layer.get("loop", false) == true
 	(_w.alpha as CheckBox).button_pressed = _layer.get("straightAlpha", false) == true

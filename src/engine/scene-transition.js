@@ -5,6 +5,7 @@
 
 const { getChannelMap } = require('../config/routing')
 const { toCasparTween } = require('../caspar/caspar-tween')
+const { normalizeSpeed } = require('../caspar/clip-speed') // WO-973
 const { normalizeProgramLayerBank } = require('./program-layer-bank')
 const sceneExitLayers = require('./scene-exit-layers')
 const { runExitLayers } = sceneExitLayers
@@ -101,6 +102,7 @@ function layerVisuallyEqual(cur, incoming, returnDiff = false) {
 	if (!numClose(cur.opacity ?? 1, incoming.opacity ?? 1)) diffs.opacity = { cur: cur.opacity, inc: incoming.opacity }
 	if (!!cur.straightAlpha !== !!incoming.straightAlpha) diffs.straightAlpha = { cur: cur.straightAlpha, inc: incoming.straightAlpha }
 	if ((cur.audioRoute || '1+2') !== (incoming.audioRoute || '1+2')) diffs.audioRoute = { cur: cur.audioRoute, inc: incoming.audioRoute }
+	if ((normalizeSpeed(cur.speed) ?? 1) !== (normalizeSpeed(incoming.speed) ?? 1)) diffs.speed = { cur: cur.speed, inc: incoming.speed } // WO-973
 	if (!!cur.loop !== !!incoming.loop) diffs.loop = { cur: cur.loop, inc: incoming.loop }
 	if ((cur.contentFit || 'native') !== (incoming.contentFit || 'native')) diffs.contentFit = { cur: cur.contentFit, inc: incoming.contentFit }
 	if (!numClose(cur.volume ?? 1, incoming.volume ?? 1)) diffs.volume = { cur: cur.volume, inc: incoming.volume }

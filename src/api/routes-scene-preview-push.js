@@ -23,6 +23,7 @@
 
 const path = require('path')
 const { pathToFileURL } = require('url')
+const { normalizeSpeed } = require('../caspar/clip-speed') // WO-973
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { REPO_ROOT } = require('../repo-paths')
 
@@ -71,7 +72,7 @@ function withoutContentFit(scene) {
 function trimKey(scene) {
 	const rows = (scene?.layers || [])
 		.filter((l) => l?.source?.value)
-		.map((l) => [Number(l.layerNumber), l.trimInMs ?? null, l.trimOutMs ?? null])
+		.map((l) => [Number(l.layerNumber), l.trimInMs ?? null, l.trimOutMs ?? null, normalizeSpeed(l.speed)]) // WO-973: speed is part of the clip load
 	return JSON.stringify(rows.sort((a, b) => a[0] - b[0]))
 }
 

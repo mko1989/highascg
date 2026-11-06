@@ -2,6 +2,7 @@
 
 const { chLayer, param, audioFilterParam } = require('./amcp-utils')
 const { toCasparTween } = require('./caspar-tween')
+const { speedFilters, scaleLength } = require('./clip-speed')
 
 function shouldAppendClipVerbFields(commandName, clip) {
 	return commandName !== 'PLAY' || (clip != null && String(clip).trim() !== '')
@@ -58,9 +59,13 @@ function serializeClipCommandPlan(plan) {
 	 * `get_param(L"IN", params, seek)`), so a bare `LOOP SEEK n` also moves the loop point to n. */
 	if (withClipFields && opts.in != null) cmd += ` IN ${opts.in}`
 	if (withClipFields && opts.seek != null) cmd += ` SEEK ${opts.seek}`
-	if (withClipFields && opts.length != null) cmd += ` LENGTH ${opts.length}`
+	if (withClipFields && opts.length != null) cmd += ` LENGTH ${clip ? scaleLength(opts.length, opts.speed) : opts.length}` // WO-973: output-time LENGTH
+	/* WO-973: speed rides VF + AF (VF/AF override FILTER's both-streams default); only on a command that carries a clip */
+	const sp = withClipFields && clip ? speedFilters(opts.speed, opts.filter, opts.audioFilter) : {}
 	if (opts.filter) cmd += ` FILTER ${param(opts.filter)}`
-	if (opts.audioFilter) cmd += ` AF ${audioFilterParam(opts.audioFilter)}`
+	if (sp.videoFilter) cmd += ` VF ${param(sp.videoFilter)}`
+	if (sp.audioFilter) cmd += ` AF ${audioFilterParam(sp.audioFilter)}`
+	else if (opts.audioFilter) cmd += ` AF ${audioFilterParam(opts.audioFilter)}`
 	if (opts.auto) cmd += ' AUTO'
 	if ((opts.transition !== 'STING' || !withClipFields) && opts.parameters) cmd += ' ' + opts.parameters
 

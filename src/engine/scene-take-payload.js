@@ -17,6 +17,7 @@
 const path = require('path')
 const { pathToFileURL } = require('url')
 const { REPO_ROOT } = require('../repo-paths')
+const { normalizeSpeed } = require('../caspar/clip-speed') // WO-973
 
 const FALLBACK_CANVAS = { w: 1920, h: 1080 } // client/lib/scene-state-persistence-logic.js:12
 const CLIENT_LIB = ['lower-third-cg-data', 'pip-overlay-registry', 'audio-volume-scale', 'transition-presets', 'transition-duration']
@@ -97,6 +98,7 @@ function buildLayerRow(l, h) {
 		...(l.startBehaviour === 'beginning' || l.startBehaviour === 'relativeToPrevious' ? { startBehaviour: l.startBehaviour } : l.startBehaviour === 'custom' ? { startBehaviour: 'beginning' } : {}), // WO-813: a legacy custom takes as beginning (trim kept)
 		...(l.trimInMs != null ? { trimInMs: l.trimInMs } : {}),
 		...(l.trimOutMs != null ? { trimOutMs: l.trimOutMs } : {}),
+		...(normalizeSpeed(l.speed) != null ? { speed: normalizeSpeed(l.speed) } : {}), // WO-973
 	}
 	if (Array.isArray(l.effects) && l.effects.length > 0) row.effects = clone(l.effects)
 	const pipOverlays = h.pip.getPipOverlaysFromLayer(l)

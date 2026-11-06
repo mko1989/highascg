@@ -30,7 +30,7 @@ function sameClip(a, b) {
  * Snapshot shape (minimal):
  * {
  *   channel, layer,
- *   nextUp: { clip, loop?, in?, seek?, length?, filter?, audioFilter?, transition? },
+ *   nextUp: { clip, loop?, in?, seek?, length?, filter?, audioFilter?, speed?, transition? },
  *   playing: boolean
  * }
  */
@@ -53,6 +53,7 @@ function diffCasparLayerPlan(prev, next, opts = {}) {
 				length: nextNext.length,
 				filter: nextNext.filter,
 				audioFilter: nextNext.audioFilter,
+				speed: nextNext.speed,
 				auto: !!nextNext.auto,
 				...(t || {}),
 			})

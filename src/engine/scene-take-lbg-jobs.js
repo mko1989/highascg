@@ -4,6 +4,7 @@ const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel, routeSourceChannelsToAudioFilter } = require('./audio-route')
 const { deferMixerAmcpLine, param } = require('../caspar/amcp-utils')
 const { diffCasparLayerPlan } = require('../caspar/amcp-layer-diff-plan')
+const { normalizeSpeed, clipSupportsSpeed } = require('../caspar/clip-speed') // WO-973
 const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 const { pipOverlaysFromLayer } = require('./pip-overlay')
 const { buildSceneTemplateCgSpec } = require('./scene-template-cg')
@@ -260,7 +261,10 @@ async function buildTakeJobs(opts) {
 			const lengthFrames = outFrames - (seekFrames != null ? inFrames : 0)
 			if (outFrames > startFrames && lengthFrames > 0) loadOpts.length = lengthFrames
 		}
-		if (startsEmpty) for (const k of ['audioFilter', 'seek', 'in', 'length']) delete loadOpts[k]
+		/* WO-973: per-layer clip speed (VF setpts + AF atempo on the LOADBG; trim / seek stay in clip time) */
+		const layerSpeed = normalizeSpeed(layer.speed)
+		if (layerSpeed != null && layer.sourceMode !== 'list' && clipSupportsSpeed(clip)) loadOpts.speed = layerSpeed
+		if (startsEmpty) for (const k of ['audioFilter', 'seek', 'in', 'length', 'speed']) delete loadOpts[k]
 		const baseType = isMerge ? baseTypeStripAnimateSuffix(globalT.type) : globalT.type
 
 		// Bank A/B crossfade uses paired MIXER OPACITY — not LOADBG MIX. Everything else (plain MIX/WIPE
@@ -380,6 +384,7 @@ async function buildTakeJobs(opts) {
 					length: loadOpts.length,
 					filter: loadOpts.filter,
 					audioFilter: loadOpts.audioFilter,
+					speed: loadOpts.speed,
 					auto: !!loadOpts.auto,
 					transition: loadOpts.transition
 						? {

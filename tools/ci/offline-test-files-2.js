@@ -82,5 +82,6 @@ module.exports = [
 	'tools/smoke/smoke-wo922-ingest-utf8-names.test.js',
 	'tools/smoke/smoke-wo933-fanout-checks-before-replay.test.js',
 	'tools/smoke/smoke-wo962-layer-transport.test.js',
+	'tools/smoke/smoke-wo973-clip-speed.test.js',
 	'tools/smoke/smoke-wo975-nvidia-sync-auto.test.js',
 ]
