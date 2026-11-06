@@ -54,4 +54,4 @@ function scaleLength(length, speed) {
 	return Math.max(1, Math.round(Number(length) / s))
 }
 
-module.exports = { scaleLength, SPEED_MIN, SPEED_MAX, normalizeSpeed, atempoChain, speedFilters, clipSupportsSpeed }
+module.exports = { scaleLength, normalizeSpeed, atempoChain, speedFilters, clipSupportsSpeed }
