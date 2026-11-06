@@ -19,9 +19,10 @@ const assert = require('node:assert/strict')
 test('recordPause freezes elapsed time; recordResume rebases startedAt to resume exactly there', () => {
 	const playbackTracker = require('../../src/state/playback-tracker')
 	const ctx = { _playbackMatrix: {} }
-	const before = Date.now()
 	playbackTracker.recordPlay(ctx, 2, 10, 'clip.mov', { silent: true })
-	ctx._playbackMatrix['2-10'].startedAt = before - 5000 // pretend 5s have already elapsed
+	// pretend 5s have already elapsed — stamped AFTER recordPlay: its first call can take >50 ms on a loaded CI runner
+	// (07.11 run 42313163390: 5054), which counted as elapsed time when `before` was taken ahead of it
+	ctx._playbackMatrix['2-10'].startedAt = Date.now() - 5000
 	ctx._playbackMatrix['2-10'].durationMs = 60000
 
 	playbackTracker.recordPause(ctx, 2, 10)
