@@ -213,10 +213,48 @@ function applyStreamCredentialMigration(ctx, project) {
  */
 /** JSON with object keys sorted (arrays keep their order): the web client exports keys in another order than the
  * stored file, so a plain JSON.stringify called equal shows different (WO-919 F6: every web boot re-stamped savedAt). */
+const SAFE_KEY = /^[A-Za-z0-9_ .:/-]*$/ // nothing JSON.stringify would escape
+const ARRAY_INDEX_KEY = /^(?:0|[1-9]\d*)$/
+
+/** Keys in the order `Object.fromEntries(Object.keys(o).sort())` enumerates them: array-index keys ascending numeric
+ * first (V8 enumerates those before string keys), then the rest in code-unit order. */
+function canonicalKeys(o) {
+	const ints = []
+	const strs = []
+	for (const k of Object.keys(o)) (ARRAY_INDEX_KEY.test(k) && +k < 4294967295 ? ints : strs).push(k)
+	if (ints.length) ints.sort((a, b) => a - b)
+	strs.sort()
+	return ints.length ? ints.concat(strs) : strs
+}
+
+function canonicalPart(v) {
+	if (v && typeof v === 'object' && typeof v.toJSON === 'function') v = v.toJSON()
+	if (v === null || typeof v !== 'object') {
+		if (typeof v === 'number') return Number.isFinite(v) ? String(v) : 'null'
+		if (typeof v === 'boolean') return v ? 'true' : 'false'
+		return JSON.stringify(v) // string, null; undefined/function/symbol → undefined (skipped by the caller); bigint throws as before
+	}
+	if (Array.isArray(v)) {
+		let out = '['
+		for (let i = 0; i < v.length; i++) out += (i ? ',' : '') + (canonicalPart(v[i]) ?? 'null')
+		return out + ']'
+	}
+	let out = '{'
+	let first = true
+	for (const k of canonicalKeys(v)) {
+		const part = canonicalPart(v[k])
+		if (part === undefined) continue
+		out += (first ? '' : ',') + (SAFE_KEY.test(k) ? '"' + k + '"' : JSON.stringify(k)) + ':' + part
+		first = false
+	}
+	return out + '}'
+}
+
+/** WO-981: hand-rolled, byte-identical to the old `JSON.stringify(v, replacer-that-sorts-keys)` (checked against it on
+ * every stored project; tools/smoke/smoke-wo981-canonical-json.test.js) — that replacer rebuilt + sorted every object through
+ * Object.fromEntries, several times slower. */
 function canonicalJson(v) {
-	return JSON.stringify(v, (_k, x) =>
-		x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x,
-	)
+	return canonicalPart(v)
 }
 
 function projectContentEquals(a, b) {
@@ -272,13 +310,13 @@ function persistProject(ctx, project, opts = {}) {
 	projectStore.migrateLegacySingleProject(persistence)
 	// WO-868: into this box's channel scheme BEFORE the mirror / deck / broadcast see it (not only the file)
 	project = require('./project-channel-scheme').adaptProjectOnWrite(project)
+	const storedProject = projectStore.readProjectFile(slug) // WO-981: one read+parse (was two back-to-back, nothing writes between)
 	if (opts.authoritativeCredentials !== true) {
-		project = preserveProjectCredentials(project, projectStore.readProjectFile(slug))
+		project = preserveProjectCredentials(project, storedProject)
 	}
 	if (!inactive) applyStreamCredentialMigration(ctx, project)
 	const normalized = normalizeProjectMediaRefs(project, ctx.config, persistence)
 	const stamped = projectStore.withProjectSlug(normalized, slug)
-	const storedProject = projectStore.readProjectFile(slug)
 	/* WO-329B (owner decision: last-write-wins + reliable push): an unchanged-content persist is a
 	 * full no-op — no rev bump, no disk write, and the caller skips the project_sync broadcast
 	 * (`unchanged: true`). Without this, every idle autosave echo would bump the rev (409ing the
@@ -303,7 +341,7 @@ function persistProject(ctx, project, opts = {}) {
 	} else if (projectRevOf(stamped) == null && storedRev > 0) {
 		stamped.rev = storedRev
 	}
-	projectStore.writeProjectFile(slug, stamped)
+	const diskJson = projectStore.writeProjectFile(slug, stamped)
 	if (!inactive) {
 		projectStore.setActiveSlug(persistence, slug)
 		ensureProjectMediaDir(ctx.config, slug, persistence)
@@ -311,7 +349,7 @@ function persistProject(ctx, project, opts = {}) {
 	}
 	if (opts.writeAutosave !== false) {
 		try {
-			projectStore.writeAutosaveFile(slug, stamped)
+			projectStore.writeAutosaveFile(slug, stamped, diskJson) // WO-981: same payload — serialize once
 		} catch (e) {
 			if (typeof ctx.log === 'function') {
 				ctx.log('warn', '[project] autosave write: ' + (e?.message || e))

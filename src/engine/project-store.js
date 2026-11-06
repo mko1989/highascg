@@ -263,20 +263,26 @@ function writeProjectFile(slug, project) {
 	const payload = channelScheme().adaptProjectOnWrite(withProjectSlug(project, slug))
 	const p = projectFilePath(slug)
 	const tmp = p + '.tmp'
-	fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf8')
+	const json = JSON.stringify(payload, null, 2)
+	fs.writeFileSync(tmp, json, 'utf8')
 	fs.renameSync(tmp, p)
+	return json // WO-981: persistProject hands it to writeAutosaveFile (identical payload)
 }
 
 /**
  * @param {string} slug
  * @param {object} project
+ * @param {string} [serialized] already-serialized payload (writeProjectFile's return) — skips the second stringify
  */
-function writeAutosaveFile(slug, project) {
+function writeAutosaveFile(slug, project, serialized) {
 	if (!slug || !isSafeProjectSlug(slug)) return
-	const payload = channelScheme().adaptProjectOnWrite(withProjectSlug(project, slug))
 	const p = autosaveFilePath(slug)
 	const tmp = p + '.tmp'
-	fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf8')
+	const json =
+		typeof serialized === 'string'
+			? serialized // WO-981: writeProjectFile's text of this very payload
+			: JSON.stringify(channelScheme().adaptProjectOnWrite(withProjectSlug(project, slug)), null, 2)
+	fs.writeFileSync(tmp, json, 'utf8')
 	fs.renameSync(tmp, p)
 }
 
