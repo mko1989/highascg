@@ -59,7 +59,26 @@ func _process(delta: float) -> void:
 			var a: Array = _acc[k]
 			parts.append("%s cpu %.2f gpu %.2f ms" % [k, a[0] / maxi(1, a[2]), a[1] / maxi(1, a[2])])
 		print("[perf] ", " | ".join(parts))
+		_print_processors()
 		_acc.clear()
 		_proc_acc = 0.0
 		_frames = 0
 		_t = 0.0
+
+
+## WO-798: which scripts have _process / _physics_process switched on (count per script path), top 12.
+func _print_processors() -> void:
+	var by := {}
+	var stack: Array[Node] = [get_tree().root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n.is_processing() or n.is_physics_processing():
+			var sc: Variant = n.get_script()
+			var k: String = (sc as Script).resource_path.get_file() if sc != null else n.get_class()
+			by[k] = int(by.get(k, 0)) + 1
+		stack.append_array(n.get_children())
+	var rows := []
+	for k in by:
+		rows.append([by[k], k])
+	rows.sort_custom(func(a, b): return a[0] > b[0])
+	print("[perf] processors: ", rows)

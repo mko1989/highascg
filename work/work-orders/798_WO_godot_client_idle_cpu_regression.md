@@ -137,3 +137,39 @@ playing on PGM 1, nothing else driving the window), `/proc/<pid>/stat` utime+sti
 So the regression is down from ~40 points to ~8 points over the 21.10 baseline; the remaining ~8 points are not
 attributed yet (candidates from the investigation above: the per-frame PGM/PRV thumbnail uploads while a clip plays,
 the progress text). Status left IN PROGRESS for that remainder.
+
+## Sweep 07.11 (Sonnet) — patch status, per-tab idle, attribution
+
+**Patch status:** `/home/casparcg/highascg-wo798.patch` WAS applied: `6a47eb71` ("Times overlay redraws only itself; the ✕
+glyph is shaped once", `git log -S`), idle-measured in `1d331291`. Nothing left of it to apply.
+
+**Method:** the ONE owner client, relaunched under box2.lock (setsid, Live tab restored), CPU = `/proc/<pid>/stat`
+utime+stime over 15–20 s; `--probe-perf` extended (below); per-script cost by switching a script's `_process` off at runtime
+(temporary probe hook, removed again) and re-measuring. Project a_s, Times on, 100 fps (project max_fps, vsync off).
+
+**Per-tab idle (% of a core, 15 s windows, ±2 noise):** Live 18.4–20.9, Timeline 20.8, Visuals 17.8, Previs 21.6, Audio 18.0,
+Devices 12.2 (an earlier 25.2 sample was transient), Settings 10.8–14.0. The 07.11 00:30 "41 %" did not reproduce: 18–20 %
+on Live for the same project after the 29.10 fix (a fresh client; 41 % was probably a long-running client or a clip playing).
+
+**Attribution (Live, 18 %):**
+| Part | Cost |
+|---|---|
+| `video_surfaces.gd` (opgui 1920x1080 native upload 0.32 ms, plus the redraw each new frame causes) | ~5 points |
+| `core/ws.gd` (osc 21/s x ~14 kB = 300 kB/s JSON.parse; `OscMirror._ingest` + `updated` consumers only 5 ms/s) | ~2 points |
+| audio tab/dock meters | ~1 point |
+| every other `_process` (28 scripts, ~34 nodes; stage_builder, mvr_scene, tracking, canvases, cable layer, deck, …) | within noise (±0.3 each, group-off tests) |
+| Engine floor with every script `_process` and ws off, Settings tab, 10 fps | 5.3 points (stime ≈ 45 % of it: driver/X syscalls) |
+| Frame rate: Settings 100/30/10 fps = 10.8 / 8.7 / 6.8; Live 100 vs 30 = 18.4 vs 14.0 | ~0.04–0.06 points per fps |
+
+**Conclusions:** no hidden-tab script is burning CPU (hidden tabs' `_process` are already off or negligible); no per-frame work
+found that is behaviour-preserving to cut. What remains is (1) the real video upload + redraw of the held opgui surface,
+(2) the OSC payload size, (3) the engine/driver floor. Nothing in godot/client changed except the probe (below).
+
+**Proposals (not done):**
+1. Node lane (WO-980): the `osc` snapshot is ~14 kB x 21/s; a slimmer/delta-only payload cuts ~2 points of JSON.parse on the client.
+2. Capping idle redraw to 60 fps would save ~2 points but changes smoothness: owner's call.
+3. Opgui held at 1080p on Live: a half-size upload would save most of the 5 points but changes preview sharpness: owner's call.
+
+**Changed:** `godot/client/app/perf_probe.gd` only: `--probe-perf` now also prints, every 5 s, the scripts that have
+`_process` / `_physics_process` on (count per script). Tests: Godot suite 26079 passed, 0 failed; max-lines 0 over 500.
+After relaunch the client is up on Live at 17.5 %. Status stays IN PROGRESS (remainder = proposals above).
