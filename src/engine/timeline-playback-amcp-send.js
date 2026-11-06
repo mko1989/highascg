@@ -176,6 +176,7 @@ module.exports = {
 						!transportStale &&
 						prev.frame !== meta.frame &&
 						!meta.isRoute &&
+						!meta.isStill && // WO-974: Caspar never answers CALL SEEK on an image (15 s AMCP stall)
 						(!meta.loopAlways || loopSeekIsSafe(meta))
 					let transportSent = false
 					let hasDeferredLines = false // T173.2: track deferred tween
@@ -243,8 +244,8 @@ module.exports = {
 							loopClip: !!meta.loopClip,
 							frame: transportSent ? meta.frame : (prev?.frame ?? meta.frame),
 						})
-					} else if (playing && !force && prev?.clipId === clip.id) {
-						this._prevKey.set(key, { ...prev, frame: meta.frame })
+					} else if ((playing && !force && prev?.clipId === clip.id) || (meta.isStill && prev?.clipId === clip.id)) {
+						this._prevKey.set(key, { ...prev, frame: meta.frame }) // WO-974: an unseeked still is at every frame
 					}
 
 					// T173.4: collect lines per channel instead of sending immediately
@@ -335,7 +336,7 @@ module.exports = {
 			 * playhead (`ffmpeg_producer.cpp:302` aliases SEEK onto IN). `loopSeekIsSafe` carries the
 			 * source proof and refuses the last ~2 frames, where the producer would hold rather than
 			 * wrap. */
-			if (meta.frame > 0 && loopSeekIsSafe(meta)) {
+			if (meta.frame > 0 && !meta.isStill && loopSeekIsSafe(meta)) {
 				self.amcp.call(ch, caspLayer, 'SEEK', String(meta.caspFrame)).catch(_err => {
 					this._logDebug(`SEEK ${ch}-${caspLayer} frame=${meta.frame} (LOOP) failed: ${_err.message}`)
 				})

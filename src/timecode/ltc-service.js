@@ -9,7 +9,7 @@ const { normalizeLtcConfig, inputProblem, outputProblem } = require('./ltc-confi
 const { probeLibltc, setLibPath, APT_HINT } = require('./ltc-helper')
 const { createLtcInput } = require('./ltc-input')
 const { createLtcOutput } = require('./ltc-output')
-const { decideChase } = require('./ltc-lock')
+const { decideChase, chaseOps } = require('./ltc-lock')
 const { fpsMode, tcToFrames, parseTc } = require('./timecode-math')
 
 const CHASE_TICK_MS = 40
@@ -25,7 +25,17 @@ function createLtcService({ appCtx, log = () => {} }) {
 	let lib = null
 	let timers = []
 	let onPlayback = null
-	const chase = { engaged: false, lastActionAt: 0, lastAction: null, timelineId: null, actions: 0 }
+	const chase = { engaged: false, lastActionAt: 0, lastAction: null, timelineId: null, actions: 0, position: null, errorMs: null, error: null, busyUntil: 0, timer: null }
+	/** Chase error (timeline − LTC, ms) since the last chase action: what "in sync" measured, for status + tests. */
+	function noteError(ms) {
+		const e = chase.error || (chase.error = { n: 0, sumAbs: 0, maxAbs: 0, min: Infinity, max: -Infinity })
+		e.n++
+		e.sumAbs += Math.abs(ms)
+		e.maxAbs = Math.max(e.maxAbs, Math.abs(ms))
+		e.min = Math.min(e.min, ms)
+		e.max = Math.max(e.max, ms)
+		chase.errorMs = Math.round(ms * 10) / 10
+	}
 
 	const engine = () => appCtx.timelineEngine || null
 	let hydrateAt = 0
@@ -57,12 +67,49 @@ function createLtcService({ appCtx, log = () => {} }) {
 		return { id, pb: { position: pb?.position ?? 0, playing: !!pb?.playing, duration: tl.duration } }
 	}
 
+	/** Run a chaseOps list; a `wait` defers the rest (the preroll) and holds further chase decisions until then. */
+	function runOps(id, ops, moving, now) {
+		const eng = engine()
+		// a running LTC moved on while we decided and while the engine ran the previous op (box: 8–11 ms late)
+		const at = (x) => (moving && x != null ? x + (Date.now() - now) : x)
+		let seekAt = Date.now()
+		for (let i = 0; i < ops.length; i++) {
+			const [op, arg] = ops[i]
+			if (op === 'wait') {
+				// the preroll counts from when the seek target was taken, not from after the engine's seek work (~10 ms)
+				const delay = Math.max(0, arg - (Date.now() - seekAt))
+				chase.busyUntil = Date.now() + delay + CHASE_TICK_MS
+				const rest = ops.slice(i + 1)
+				chase.timer = setTimeout(() => {
+					chase.timer = null
+					try {
+						runOps(id, rest, false, Date.now())
+					} catch (e) {
+						log('warn', `[LTC chase] preroll resume failed: ${e instanceof Error ? e.message : e}`)
+					}
+				}, delay)
+				return
+			}
+			if (op === 'play') eng.play(id, at(arg))
+			else if (op === 'seek') {
+				seekAt = Date.now()
+				eng.seek(id, at(arg))
+			}
+			else if (op === 'pause') eng.pause(id)
+		}
+	}
+
 	function chaseTick() {
 		if (!input) return
 		const t = chaseTarget()
 		chase.timelineId = t?.id || null
 		if (!t) return
 		const now = Date.now()
+		chase.position = Math.round(t.pb.position)
+		if (chase.timer || now < chase.busyUntil) {
+			chase.errorMs = null // a preroll locate is running: the timeline is parked on purpose
+			return
+		}
 		const c = cfg.input.chase
 		const mode = fpsMode(cfg.fps)
 		const snap = input.lock.snapshot(now)
@@ -74,20 +121,18 @@ function createLtcService({ appCtx, log = () => {} }) {
 			engaged: chase.engaged,
 			now,
 			lastActionAt: chase.lastActionAt,
+			latencyMs: c.latencyMs,
 		})
+		if (d.errorMs != null) noteError(d.errorMs)
+		else chase.errorMs = null
 		if (d.action === 'none') return
-		const eng = engine()
-		const ms = d.ms != null ? Math.max(0, d.ms + c.latencyMs) : undefined
+		chase.error = null
+		const ms = d.ms
 		try {
-			if (d.action === 'play') {
-				eng.play(t.id, ms)
-				chase.engaged = true
-			} else if (d.action === 'seek') eng.seek(t.id, ms)
-			else if (d.action === 'pause') {
-				eng.pause(t.id)
-				if (ms != null) eng.seek(t.id, ms)
-				if (d.reason !== 'ltc_still') chase.engaged = false
-			}
+			const ops = chaseOps(d, t.pb, ms, mode.fps, { prerollMs: c.prerollMs })
+			runOps(t.id, ops, d.action === 'play' || d.action === 'seek', now)
+			if (d.action === 'play') chase.engaged = true
+			else if (d.action === 'pause' && d.reason !== 'ltc_still') chase.engaged = false
 		} catch (e) {
 			log('warn', `[LTC chase] ${d.action} failed: ${e instanceof Error ? e.message : e}`)
 		}
@@ -105,23 +150,32 @@ function createLtcService({ appCtx, log = () => {} }) {
 		return pb ? { playing: !!pb.playing, position: pb.position ?? 0 } : null
 	}
 
+	function chaseStatus() {
+		const e = chase.error
+		const r = (x) => Math.round(x * 10) / 10
+		const error = e && e.n ? { n: e.n, meanAbsMs: r(e.sumAbs / e.n), maxAbsMs: r(e.maxAbs), minMs: r(e.min), maxMs: r(e.max) } : null
+		const { timer: _timer, ...rest } = chase
+		return { ...rest, error, preroll: !!_timer }
+	}
+
 	function status() {
 		return {
 			libltc: lib,
 			config: cfg,
 			input: input ? input.status() : { enabled: cfg.input.enabled, problem: cfg.input.enabled ? inputProblem(cfg) || null : null },
 			output: output ? output.status() : { enabled: cfg.output.enabled, problem: cfg.output.enabled ? outputProblem(cfg) || null : null },
-			chase: cfg.input.chase.enabled ? { ...chase } : null,
+			chase: cfg.input.chase.enabled ? chaseStatus() : null,
 		}
 	}
 
 	function start() {
 		cfg = normalizeLtcConfig(appCtx.config?.ltc)
+		setLibPath(cfg.libPath)
+		lib = null // re-probed below: a status must never show the library of an earlier config
 		if (!cfg.input.enabled && !cfg.output.enabled) {
 			log('info', '[LTC] in/out disabled')
 			return
 		}
-		setLibPath(cfg.libPath)
 		lib = probeLibltc({ fresh: true })
 		if (!lib.ok) {
 			log('warn', `[LTC] libltc unavailable (${lib.error}) — ${APT_HINT}`)
@@ -158,6 +212,11 @@ function createLtcService({ appCtx, log = () => {} }) {
 		input = null
 		output = null
 		chase.engaged = false
+		chase.error = null
+		chase.errorMs = null
+		if (chase.timer) clearTimeout(chase.timer)
+		chase.timer = null
+		chase.busyUntil = 0
 	}
 
 	function restart() {

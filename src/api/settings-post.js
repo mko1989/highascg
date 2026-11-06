@@ -160,6 +160,7 @@ async function handlePost(path, body, ctx) {
 	}
 	if (settings.casparServer) { cfg.casparServer = { ...defaults.casparServer, ...cfg.casparServer, ...settings.casparServer }; normalizeCasparServerConfigPath(cfg.casparServer); warnings.push(...validateDecklinkCasparSlice(cfg.casparServer).warnings); warnings.push(...validateV4l2CasparSlice(cfg.casparServer).warnings) }
 	if (settings.dmx) cfg.dmx = { ...defaults.dmx, ...settings.dmx }
+	const ltcBefore = JSON.stringify(normalizeLtcConfig(cfg.ltc)) // WO-974: the web modal re-posts every section (…prevAll)
 	if (settings.ltc && typeof settings.ltc === 'object') cfg.ltc = normalizeLtcConfig(require('../timecode/routes-ltc').merge(normalizeLtcConfig(cfg.ltc), settings.ltc), normalizeLtcConfig(cfg.ltc)) // WO-974
 	if (settings.rtmp) cfg.rtmp = normalizeRtmpConfig({ ...defaults.rtmp, ...(cfg.rtmp || {}), ...settings.rtmp })
 	if (settings.companion) {
@@ -420,7 +421,7 @@ async function handlePost(path, body, ctx) {
 		syncOperatorPointerConfine(newConfig, { log: (level, msg) => ctx.log?.(level, msg) })
 	}
 
-	if (settings.ltc && ctx._ltcService) { ctx._ltcService.restart(); sideEffects.push('LTC restarted') } // WO-974
+	if (settings.ltc && ctx._ltcService && JSON.stringify(normalizeLtcConfig(cfg.ltc)) !== ltcBefore) { ctx._ltcService.restart(); sideEffects.push('LTC restarted') } // WO-974: only on a real change — a restart drops the chase lock and LTC out
 	let oscRestarted = false; if (settings.osc && typeof ctx.restartOscSubsystem === 'function') { ctx.restartOscSubsystem(); oscRestarted = true }
 	if (oldC.host !== cfg.caspar.host || oldC.port !== cfg.caspar.port) { if (ctx.casparConnection) { sideEffects.push('Reconnecting to CasparCG…'); ctx.casparConnection.reconnect(cfg.caspar.host, cfg.caspar.port) } }
 	const sChanged = (oldS.enabled !== cfg.streaming.enabled || oldS.quality !== cfg.streaming.quality || oldS.basePort !== cfg.streaming.basePort || oldS.hardware_accel !== cfg.streaming.hardware_accel || oldS.captureMode !== cfg.streaming.captureMode || oldS.ndiNamingMode !== cfg.streaming.ndiNamingMode || oldS.ndiSourcePattern !== cfg.streaming.ndiSourcePattern || JSON.stringify(oldS.ndiChannelNames || {}) !== JSON.stringify(cfg.streaming.ndiChannelNames || {}) || oldS.localCaptureDevice !== cfg.streaming.localCaptureDevice || oldS.x11Display !== cfg.streaming.x11Display || oldS.drmDevice !== cfg.streaming.drmDevice || oldS.autoRelocateBasePort !== cfg.streaming.autoRelocateBasePort)

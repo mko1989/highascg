@@ -86,5 +86,6 @@ module.exports = [
 	'tools/smoke/smoke-wo974-timecode-math.test.js', // WO-974 LTC in/out
 	'tools/smoke/smoke-wo974-ltc-lock-chase.test.js',
 	'tools/smoke/smoke-wo974-ltc-roundtrip.test.js', // skips without libltc11
+	'tools/smoke/smoke-wo974-timeline-still-seek.test.js', // Caspar never answers CALL SEEK on an image
 	'tools/smoke/smoke-wo975-nvidia-sync-auto.test.js',
 ]

@@ -18,6 +18,15 @@ const {
 	shouldSendInstantKeyframeMixer,
 } = require('./timeline-keyframe-mixer')
 
+/* WO-974: Caspar never answers `CALL … SEEK` on an image producer (box 06.11: no reply in 4 s; PLAY/CLEAR answer in
+ * ms) and AMCP sends are serialized, so ONE scrub seek on a still under the playhead stalled every Caspar command —
+ * PGM included — for the 15 s response timeout (the LTC chase seeks often: the PRV film lagged 6 s, then froze).
+ * A still has no position: it is never seeked. */
+const STILL_EXT_RE = /\.(png|jpe?g|gif|bmp|tga|tiff?|webp|exr)$/i
+function isStillClip(clip, src) {
+	return clip?.source?.kind === 'still' || STILL_EXT_RE.test(src)
+}
+
 /**
  * @param {object} clip
  * @param {number} ms timeline position
@@ -43,6 +52,7 @@ function clipTransportMeta(clip, ms, tl, self, opts = {}) {
 			return clipParamForPlay(transport.isRoute ? src : resolveSceneClipForAmcp(src, self))
 		},
 		isRoute: transport.isRoute,
+		isStill: !transport.isRoute && isStillClip(clip, src), // WO-974: never CALL SEEK an image layer
 		frame: transport.frame,
 		implicitLoop: transport.implicitLoop,
 		loopSpanFrames: transport.loopSpanFrames,

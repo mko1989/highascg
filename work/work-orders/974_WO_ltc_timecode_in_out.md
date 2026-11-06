@@ -1,7 +1,7 @@
 # WO-974 — LTC timecode in (reader + timeline chase) and out (generator)
 
 **Area:** audio, engine, godot-client
-**Status: IN PROGRESS** (code + offline tests + FIFO loopback/chase proven on the live node; needs `sudo apt install libltc11` on the box and a real-audio-device test)
+**Status: DONE (07.11.2026; LTC timeline campaign against the system libltc11 on the live box at 25/24/30/29.97 DF, FIFO audio path, on-glass screenshots; real sound-card audio NOT proven — needs `sudo modprobe snd-aloop` or a cable, see OPEN)**
 
 Owner show note 06.11.2026: *"LTC timecode in and out support."*
 
@@ -36,6 +36,65 @@ Owner show note 06.11.2026: *"LTC timecode in and out support."*
   Opening a FIFO with no reader blocks a libuv threadpool thread in `open(2)`. On TERM, node could not exit until
   systemd's SIGKILL, about **4 min later (22:48:29)**. A repro of the old pattern under `timeout` exits 124 (hangs).
   Rule now: **node never open()s a FIFO**. A child process (`cat`/`dd`) does, and teardown SIGKILLs it.
+
+### Timeline campaign 06–07.11 (system libltc11, owner: *"i also want you to run ltc tests. this is mostly for timeline i think."*)
+
+Test rig (scratchpad `wo974/`: `campaign.js`, `analyze.js`, `tl.py`; raw runs and reports in `wo974/camp/`):
+- A real timeline was added to the a&s project, "WO-974 LTC test" (`tmwo974ltcab`). It is 11 min long at 25 fps,
+  sent to **PRV only** (ch3, Dioda 2560x640). Clips:
+  - layer Film: the 4K H.264 Linc film, then `wss-partnerzy.mp4`, then Linc again;
+  - layer Logo: `wss_logo_statyk.png` over the whole timeline.
+- An external generator (`ltc_helper encode --realtime`) feeds FIFO B → node LTC in → chase. Node LTC out (playhead +
+  offset) → FIFO A → a second decoder.
+- `/api/ltc` was polled at 10 Hz. Caspar `INFO 3` (layer 210 file time) was sampled every 500 ms to measure what is
+  really on PRV.
+
+Findings, each fixed below:
+1. **Caspar never answers `CALL x-y SEEK n` on an image producer.** This is a pre-existing engine bug that LTC chase
+   exposed, because every chase locate is a timeline seek.
+   - Probe: `PLAY 3-250 <png>` → 202 in 38 ms; `CALL 3-250 SEEK 100` → no reply in 4 s; `CLEAR` OK.
+   - AMCP sends are serialized with a 15 s response timeout. So one scrub or seek with a still under the playhead
+     stalled **every** Caspar command for 15 s, PGM included.
+   - First pilot run: PRV content 6 s behind the timeline, then frozen.
+2. **Stale frame after silence.** libltc hands over the last frame before a gap only when the signal returns
+   (measured 1.04 s late). `LtcLock` counted it as the first frame of a run and re-locked instantly on a frame
+   ~1 s old. Result: two wrong 1 s seeks per dropout, and one `play` to 76 s when the real TC was 300 s.
+3. **Engine RESUME ignores `fromMs`.** `play(id, fromMs)` on a paused air timeline resumes from the parked position.
+   So a chase resume after a hold landed −224 ms off and triggered an extra seek.
+4. **Caspar content lags the engine clock after a transport change** (4K H.264 on ch3). Caspar file time − engine:
+
+   | Transport | Lag |
+   |---|---|
+   | stopped → play | −519…−645 ms |
+   | playing seek | −326…−645 ms |
+   | pause + seek + immediate resume | −122…−202 ms |
+   | pause + seek(+300) + wait 300 + resume | −84 ms |
+   | pause + seek(+600) + wait 600 + resume | −50 ms |
+
+   The engine clock is wall time, so this is landing latency in Caspar, not drift. Hence the chase **preroll**: park,
+   seek ahead, resume when the LTC gets there.
+   - 500 ms was not enough for a backward jump into another clip: −212 and −252 ms in two DF runs.
+   - 800 ms landed the same jump at −90 ms.
+5. **`latencyMs` caused a re-seek loop.** It was added after the threshold check, so every tick saw the timeline
+   `latencyMs` ahead.
+6. **Processing lag.** The chase tick's own work (8–11 ms) was not counted into the seek target.
+7. **LTC out repeated one frame after an event-loop stall** (30 fps run, ~80 ms node stall). Encoder progress reports
+   were judged against the playhead of *now*, not of when they were written. Two stale reports looked like a
+   2-frame error and re-located a healthy encoder.
+8. **The status read `libltc` as `null` after a config change** (start() returned before re-probing).
+9. **Any settings save restarted LTC.** `settings-post.js` restarted the service whenever the body carried `ltc`.
+   The web settings modal re-posts every section (`buildSettingsPayload` spreads `...prevAll`), so any web settings
+   save would drop the chase lock and LTC out mid-show.
+10. **The generator had no "parked deck" mode and no closing edge** (test tool). Without a closing transition the
+    receiver could not finish the last frame before silence.
+11. **Box audio (for the real-audio test).** No PipeWire or PulseAudio. Device status:
+    - Free capture devices: `hw:0,0c` and `hw:0,2c` (PCH ALC1220).
+    - PCH playback `hw:0,0` is held by Caspar and Godot.
+    - NVIDIA HDMI 3/7/8/9 are closed but on-air (off limits).
+    - The DM3 is not attached.
+
+    So there is no free playback → capture path without a cable or the `snd-aloop` module, which needs sudo.
+    `~/.asoundrc` and the Caspar config use `hw:2,0` (SC60), so the loopback card must not take index 2.
 
 ## What was done
 
@@ -110,6 +169,47 @@ service that owns the processes, the lock state machine and the chase, and has n
     `run-client.sh --check`.
 - Regenerated `docs/wiki/api/contract/{http,ws}.md` (+2 routes, +1 WS type) for the WO-598 contract smoke.
 
+### Campaign fixes (06–07.11)
+
+- **Still layers are never `CALL SEEK`ed** (finding 1).
+  - `src/engine/timeline-playback-amcp-schedule.js:25-28,55`: `clipTransportMeta().isStill` is set for
+    `source.kind === 'still'` or an image extension.
+  - `src/engine/timeline-playback-amcp-send.js:179` (scrub seek), `:339` (loop seek) and `:247`: a still keeps its
+    prevKey, so the next RESUME does not re-PLAY it (no flash).
+  - Smoke: `tools/smoke/smoke-wo974-timeline-still-seek.test.js` (new, curated).
+- **`src/timecode/ltc-lock.js`:**
+  - `:44`: a frame that arrives after more than `dropoutMs` of silence restarts acquisition (finding 2).
+  - `snapshot().pos`: the fractional, extrapolated LTC position.
+  - `decideChase` targets `pos` and puts `latencyMs` inside the target (`:130`, finding 5). It returns `errorMs` (`:141`).
+  - `chaseOps()` (`:161`) turns a decision into engine ops:
+    - start from stopped: `seek(ms+pre)` → wait → `play`;
+    - jump while playing: `pause` → `seek(ms+pre)` → wait → `play`;
+    - without preroll: seek first, then play (finding 3).
+- **`src/timecode/ltc-service.js`:**
+  - `runOps()` (`:71`) executes the ops. It compensates processing lag (finding 6) and counts the preroll from the seek
+    (`:75-95`).
+  - While a preroll runs, the chase is busy and `errorMs` is null (`:109`).
+  - Chase error statistics go to `status().chase.error` (`noteError`, `:30`).
+  - `start()` re-probes libltc before the disabled early return (`:173`, finding 8).
+- **`src/timecode/ltc-config.js:35`**: `chase.prerollMs`, default **800** (0–2000), with the measurements in the comment.
+- **`src/timecode/ltc-output.js:34`**: `targetFramesAt()`. An encoder report is judged at its own `at` timestamp
+  (finding 7). `tools/ltc/ltc_helper.py` reports now carry `at`.
+- **`src/api/settings-post.js:163,424`**: LTC restarts only when the normalized `ltc` section really changed (finding 9).
+- **`tools/ltc/ltc_helper.py`:**
+  - `hold` command: repeats the current frame, i.e. a parked deck.
+  - Closing edge: one half-bit transition before silence (`:193`). The last frame now decodes 0.48 s after stop
+    instead of 1.48 s.
+- **Smokes:** `tools/smoke/smoke-wo974-ltc-lock-chase.test.js` gained tests for:
+  - the stale frame after a gap;
+  - the fractional target and `errorMs`;
+  - seek-first resume, preroll ops, and latency without a loop;
+  - a stale encoder report;
+  - an unchanged `ltc` re-post not restarting the service.
+
+  Negative controls:
+  - still guard removed → 4 of 5 still-seek tests fail;
+  - settings guard removed → the restart test fails.
+
 ## What was VERIFIED
 
 **Offline:**
@@ -142,19 +242,112 @@ Logs are in `/tmp/claude-1000/-home-casparcg/2c8389df-06bf-48f2-a6e2-f30036bbf7b
 - **Restored afterwards.** The live `ltc` section is back at factory defaults (all off, sink `alsa`, no FIFO paths, no
   `libPath`), checked via `GET /api/ltc`. The test timeline was stopped and the scratchpad FIFOs removed.
 
+### Timeline LTC campaign, 06–07.11 (system `libltc.so.11`, no `libPath` / `HIGHASCG_LIBLTC`; status `"lib":"libltc.so.11"`)
+
+Chase of the real 11-min test timeline on **PRV ch3 only** (PGM ch2 never touched). Reports are in
+`/tmp/claude-1000/-home-casparcg/2c8389df-06bf-48f2-a6e2-f30036bbf7b0/scratchpad/wo974/camp/*.txt`. Times are measured
+from the generator command; chase error = engine position − LTC position.
+
+| | 25 (`run-25-short`) | 24, in-offset 01:00:00:00 (`run-24-offset`) | 30 (`run-30-short2`) | 29.97 DF (`run-2997df-df`) |
+|---|---|---|---|---|
+| lock → play | +239 ms | +278 ms | +229 ms | +215 ms |
+| jump fwd: seek at / error after | +215 ms / −5 ms | +257 ms / −2 ms | +177 ms / −3 ms | +163 ms / −2 ms |
+| jump back: seek at / error after | +215 ms / −7 ms | +215 ms / −5 ms | +187 ms / −4 ms | +183 ms / −6 ms |
+| hold (LTC still) → pause, parked error | +255 ms, 0 ms | +259 ms, 0 ms | +221 ms, 0 ms | +204 ms, 0 ms |
+| resume error | −2 ms | −3 ms | −4 ms | −5 ms |
+| 1.0 s dropout (< freewheel 2 s) | freewheel, **no action** | same | same | same |
+| loss → pause `ltc_lost` (expected 2400) | +2443 ms | +2478 ms | +2434 ms | +2424 ms |
+| restart → play / error | +240 ms / −9 ms | +219 ms / −4 ms | +220 ms / −3 ms | +185 ms / −4 ms |
+
+The analyzer's error is sampled 0.5–3 s after each action.
+
+- **29.97 DF boundaries** (10 Hz polls). The timeline position matched the LTC within **−2…−6 ms** at:
+  - 00:00:59;29 → 00:01:00;04 (frames ;00/;01 dropped);
+  - 00:09:59;27 → 00:10:00;00 (ten-minute boundary, no drop);
+  - 00:01:59;27 → 00:02:00;02 (backward jump target).
+
+  The second decoder read node's LTC out as Δ 1 frame across 01:00:59;29 → 01:01:00;02, 01:09:59;29 → 01:10:00;00
+  and 01:01:59;29 → 01:02:00;02.
+- **Steady state over 170 s** (`run-25-glass2`, 25 fps, preroll 800):
+  - chase error mean −3.4 ms, |mean| 4.5 ms, 0 chase actions;
+  - Caspar − engine −58.9 ms with slope **0.1 ms/min, i.e. no drift**;
+  - LTC out: one continuous run of 4436 frames, 0 discontinuities.
+
+  The earlier 130 s window (`run-25-full`) gave the same: −9.7 ms mean, slope 0.1 ms/min.
+- **What is really on PRV** (Caspar ch3-210 file time − LTC, clip-mapped, preroll 800):
+  - start −61 / −63 ms, jumps −84 / −92 ms, resume −65 ms, restart −67 ms;
+  - DF: backward cross-clip jump −90 ms (it was −212 / −252 ms at preroll 500);
+  - start from stopped was −645 ms before the preroll.
+
+  The remaining −50…−95 ms is Caspar's own output latency vs the engine clock. `chase.latencyMs` can absorb it per show.
+- **LTC out from the playing timeline** (second decoder): see the table below.
+- **Sub-threshold offset after a dropout.** After the test generator's dropout it resumed ~1 frame off. The chase
+  then ran +28…+38 ms ahead, below the 3-frame threshold, so no seek happened (by design, since a seek is a visible
+  glitch on 4K H.264).
+- **Box disturbances survived:**
+  - During a Godot relaunch the input blipped locked → freewheel twice (CPU load). No chase action resulted.
+  - Another agent restarted node mid-run (23:54:05). Node was back in 6 s (systemd restart counter; the FIFO shutdown
+    guard held). The chase target was re-hydrated from the stored project.
+
+LTC out results:
+
+| | |
+|---|---|
+| Continuity | 0 discontinuities without a silence gap in every run after the `targetFramesAt` fix (`run-30-short2`). Before the fix, `run-30-short` had one repeated frame at an ~80 ms node stall. |
+| Offset | out − in = −0.7…+0.8 frames mean (leadMs 60 plus two decoder paths). |
+| Timeline seek | ~530–580 ms of silence (the preroll park), then the new TC with no garbage frames. |
+| Pause/hold | Silent while parked (~4.5 s). Restarts on the right frame. |
+| Level | −18.6 dB. |
+
+- **On glass** (Godot `:0`, a&s project), scratchpad
+  `/tmp/claude-1000/-home-casparcg/2c8389df-06bf-48f2-a6e2-f30036bbf7b0/scratchpad/`:
+  - `wo974_settings_timecode.png`: Settings → Timecode with the status line
+    `LTC — In 00:01:50:07 locked -19 dB · Out 01:01:50:06` during the chase.
+  - `wo974_timeline_chase.png`: the Timeline tab on "WO-974 LTC test", playhead 00:02:06:17 (API LTC 00:02:06:16),
+    PRV only.
+  - `wo974_timeline.png`: an earlier Timeline shot.
+  - The GUI was left on the **Live** tab (`wo974_live_tabs.png`).
+- **Gates (07.11):**
+  - curated offline suite **5425 tests, 5420 pass, 0 fail, 5 skipped**;
+  - WO-974 smokes 46/46 with the system libltc;
+  - Godot `--test` **26079 passed, 0 failed**;
+  - `check-max-file-lines` 0;
+  - eslint 0 errors (3 pre-existing warnings in `timeline-playback-amcp-schedule.js`, also present at HEAD);
+  - `format:check` clean, `gen-api-contract --check` OK, `check-wos` OK;
+  - `check-unwired-exports`: nothing from WO-974.
+- **Cleanup:**
+  - Test timeline **deleted**: removed from the project via autosave (rev 436, activeId back to `tmw3u7epoydr`),
+    then stopped and DELETEd in the engine.
+  - PRV ch3 is clean (no test clips in `INFO 3`).
+  - `GET /api/ltc` config deep-equals `normalizeLtcConfig({})` (all off, no paths, no `libPath`).
+  - No FIFOs or helper processes left; `projects/_trash` unchanged.
+
 **NOT proven:**
-- Real audio hardware in either direction: `arecord`/`aplay` devices, and the DM3 bridge-tee input on the box.
-- A live drop-frame chase. 29.97 DF is covered offline only.
-- The Godot pane on glass. No screenshot: the test-agent driver would start an extra Godot/Xvfb, which the batch
-  contract forbids. The pane compiles (`--check`) and the model is tested.
+- **Real audio through a sound card** in either direction. The campaign used the FIFO PCM path, which feeds the same
+  decoder and encoder code as ALSA; only `arecord`/`aplay` are untested. No free playback → capture pair exists
+  without sudo (Investigation, finding 11).
+- The DM3 bridge-tee input (the DM3 is not attached).
+- A real external deck. The generator is libltc itself, so a different encoder's quirks are untested.
 
 ## OPEN
 
-1. Owner: `sudo apt install libltc11`. Then clear `ltc.libPath` (or leave it empty) and re-run
-   `smoke-wo974-ltc-roundtrip`. eggs clones the host package set, so the ISO picks it up on the next produce. The
-   install gates should check the payload file `/usr/lib/x86_64-linux-gnu/libltc.so.11`, not dpkg (WO-431).
-2. Hardware test:
-   - LTC in through the bridge tee on the DM3 slot (any channel carrying LTC).
-   - LTC out to an ALSA device Caspar does not hold. Not DM3 or HDMI on-air routing.
-3. Live 29.97 DF chase against an external deck or generator.
-4. Optional: a web-client UI. Godot is the only UI today.
+1. ~~Owner: `sudo apt install libltc11`~~: done (system `libltc.so.11`, campaign 06–07.11). eggs clones the host
+   package set. The install gates should check the payload file `/usr/lib/x86_64-linux-gnu/libltc.so.11`, not dpkg
+   (WO-431).
+2. **Real-audio loopback** without a cable needs the owner to run:
+   `sudo modprobe snd-aloop index=10 id=Loopback`
+   - `index=10` keeps it off `hw:2`, which is the SC60 in `~/.asoundrc` and the Caspar config.
+   - Then LTC out device `hw:Loopback,0,0` and LTC in device `hw:Loopback,1,0`.
+   - Re-run `wo974/campaign.js` with the sinks set to `alsa`.
+
+   With a cable instead: PCH line-out is held by Caspar, so use a free capture device (`hw:0,0c`) fed from an external
+   LTC source.
+3. A hardware test with the DM3 bridge tee and a real deck at 29.97 DF.
+4. UX proposals (not built, the owner decides):
+   - an **LTC badge in the Timeline transport bar**, next to the timecode: `LTC 00:02:06:16 locked` or `chasing`,
+     red on loss;
+   - a **"Chase this timeline" toggle** in the timeline menu, which writes `ltc.input.chase.timelineId`, instead of
+     the bare id field in Settings;
+   - showing the chase error and lock state in the Settings → Timecode status line.
+5. Follow-up candidate: an engine-level transport landing lead. The operator's own playing seeks on 4K H.264 still
+   land 0.3–0.6 s late (finding 4). The chase works around it with its preroll; manual timeline seeks don't.

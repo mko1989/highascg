@@ -7,11 +7,11 @@ library path (offline verification against an extracted .deb).
 decode  stdin: s16le PCM (--channels N, LTC on --channel k, 1-based)
         stdout: one JSON line per decoded frame
             {"tc":"HH:MM:SS:FF","h":..,"m":..,"s":..,"f":..,"df":0|1,"start":n,"end":n,"rev":0|1,"vol":dBFS}
-encode  stdin: control lines  `locate HH:MM:SS:FF` | `run` | `stop` | `quit`
+encode  stdin: control lines  `locate HH:MM:SS:FF` | `run` | `hold` (repeat the current frame) | `stop` (silence) | `quit`
         stdout: continuous s16le PCM (LTC on --channel k of --channels N, silence elsewhere and while stopped).
         Paced by the sink's back-pressure (the stdout pipe is shrunk to one page), or by the system clock with
         --realtime (a FIFO/file sink has no audio clock).
-        stderr: JSON status lines {"out":"HH:MM:SS:FF","running":bool,"frames":n} every --report frames.
+        stderr: JSON status lines {"out":"HH:MM:SS:FF","running":bool,"frames":n,"at":epoch_ms} every --report frames.
 probe   prints {"ok":true,"lib":path} or {"ok":false,"error":...} and exits 0/1.
 """
 
@@ -174,6 +174,7 @@ def cmd_encode(lib, a):
 
     locate(a.start)
     running = not a.stopped
+    hold = False  # `hold`: keep sending the current frame (a parked deck), `run` resumes
     fd_out = sys.stdout.fileno()
     try:
         fcntl.fcntl(fd_out, F_SETPIPE_SZ, 4096)  # keep the lead small: back-pressure ≈ the sink buffer
@@ -186,6 +187,11 @@ def cmd_encode(lib, a):
     silence_len = int(round(a.rate / a.fps))
     frames = 0
     frame_s = 1.0 / a.fps
+    # A receiver completes an LTC frame on the NEXT bit edge: going straight to silence left our last frame pending
+    # until the signal came back (box 06.11: emitted 1.04 s late at -24.6 dB). Stopping ends on one bit cell of the
+    # opposite level, so the last frame decodes on time.
+    edge_len = max(1, int(round(a.rate / (80.0 * a.fps))))
+    last_level = 0
     t_next = time.monotonic()
     while True:
         if a.realtime:  # no audio clock behind the sink (FIFO / file): pace by the system clock, 2 frames ahead
@@ -213,19 +219,28 @@ def cmd_encode(lib, a):
                     except ValueError as e:
                         sys.stderr.write(json.dumps({"error": str(e)}) + "\n")
                 elif words[0] == "run":
-                    running = True
+                    running, hold = True, False
+                elif words[0] == "hold":
+                    running, hold = True, True
                 elif words[0] == "stop":
-                    running = False
+                    running, hold = False, False
         if running:
             lib.ltc_encoder_get_timecode(enc, ctypes.byref(stime))
             cur = fmt_tc(stime.hours, stime.mins, stime.secs, stime.frame)
             lib.ltc_encoder_encode_frame(enc)
             n = lib.ltc_encoder_get_bufferptr(enc, ctypes.byref(ptr), 1)
             mono = array("h", ((ptr[i] - 128) * 256 for i in range(n)))
-            lib.ltc_encoder_inc_timecode(enc)
+            if not hold:
+                lib.ltc_encoder_inc_timecode(enc)
+            last_level = mono[-1] if n else 0
         else:
             cur = None
             mono = array("h", bytes(2 * silence_len))
+            if last_level:
+                edge = max(-32767, min(32767, -last_level))
+                for i in range(min(edge_len, silence_len)):
+                    mono[i] = edge
+                last_level = 0
         if nch > 1:
             pcm = array("h", bytes(2 * len(mono) * nch))
             pcm[ch::nch] = mono
@@ -237,7 +252,7 @@ def cmd_encode(lib, a):
             return
         frames += 1
         if a.report and frames % a.report == 0:
-            sys.stderr.write(json.dumps({"out": cur, "running": running, "frames": frames}) + "\n")
+            sys.stderr.write(json.dumps({"out": cur, "running": running, "frames": frames, "at": int(time.time() * 1000)}) + "\n")
             sys.stderr.flush()
 
 

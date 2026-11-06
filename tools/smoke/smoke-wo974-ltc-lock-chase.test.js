@@ -8,7 +8,7 @@
 
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
-const { LtcLock, decideChase } = require('../../src/timecode/ltc-lock')
+const { LtcLock, decideChase, chaseOps } = require('../../src/timecode/ltc-lock')
 const { normalizeLtcConfig } = require('../../src/timecode/ltc-config')
 
 function feed(lock, from, count, t0, frameMs = 40) {
@@ -40,6 +40,18 @@ describe('WO-974: LtcLock', () => {
 		for (let i = 1; i <= 5; i++) l.push(5004, t + i * 40)
 		assert.equal(l.state(t + 200), 'still')
 		assert.equal(l.positionFrames(t + 200), 5004)
+	})
+	it('the stale frame a decoder hands over after silence does not re-lock (box 06.11 campaign)', () => {
+		const l = new LtcLock({ fps: 25, lockFrames: 4, dropoutMs: 400, freewheelMs: 2000 })
+		const t = feed(l, 1000, 10, 0)
+		assert.equal(l.state(t), 'locked')
+		// 1 s of silence, then the frame from before it arrives (one step after the last): acquisition restarts
+		l.push(1010, t + 1000)
+		assert.equal(l.state(t + 1000), 'acquiring', 'a stale +1 frame after a gap must not continue the run')
+		l.push(1035, t + 1040)
+		const t2 = feed(l, 1036, 3, t + 1080)
+		assert.equal(l.state(t2), 'locked', 'four fresh consecutive frames lock again')
+		assert.equal(l.snapshot(t2).frames, 1039)
 	})
 	it('locks across midnight', () => {
 		const l = new LtcLock({ fps: 25 })
@@ -77,9 +89,56 @@ describe('WO-974: decideChase', () => {
 		assert.equal(decideChase({ state: 'locked', frames: 25 * 70 }, pb(0, false), cfg).action, 'none')
 		assert.equal(decideChase({ state: 'locked', frames: 25 * 70 }, pb(59000, true), { ...cfg, engaged: true }).action, 'pause')
 	})
+	it('targets the fractional LTC position and reports the chase error', () => {
+		const d = decideChase({ state: 'locked', frames: 250, pos: 250.5 }, pb(0, false), cfg)
+		assert.equal(d.ms, 10020, 'floor(frames) alone lagged the reader by half a frame on average')
+		assert.deepEqual(decideChase({ state: 'locked', frames: 250, pos: 250 }, pb(10012, true), cfg), { action: 'none', errorMs: 12 })
+		assert.equal(decideChase({ state: 'locked', frames: 250, pos: 250 }, pb(9800, true), cfg).errorMs, -200)
+	})
+	it('a resume off the parked frame seeks first (engine RESUME ignores the from-position)', () => {
+		assert.deepEqual(chaseOps({ action: 'play' }, pb(45000, false), 45218, 25), [['seek', 45218], ['play', 45218]])
+		assert.deepEqual(chaseOps({ action: 'play' }, pb(45010, false), 45018, 25), [['play', 45018]], 'within half a frame: plain resume')
+		assert.deepEqual(chaseOps({ action: 'pause' }, pb(1, true), 45000, 25), [['pause'], ['seek', 45000]])
+		assert.deepEqual(chaseOps({ action: 'pause' }, pb(1, true), undefined, 25), [['pause']])
+		assert.deepEqual(chaseOps({ action: 'none' }, pb(1, true), 5, 25), [])
+	})
+	it('preroll: a locate parks, seeks ahead and resumes when the LTC gets there', () => {
+		const o = { prerollMs: 500 }
+		assert.deepEqual(chaseOps({ action: 'seek' }, pb(1000, true), 40000, 25, o), [['pause'], ['seek', 40500], ['wait', 500], ['play']])
+		assert.deepEqual(chaseOps({ action: 'play' }, pb(45000, false), 45200, 25, o), [['seek', 45700], ['wait', 500], ['play']])
+		assert.deepEqual(chaseOps({ action: 'play' }, pb(0, false), 5000, 25, { prerollMs: 500 }), [['seek', 5500], ['wait', 500], ['play']], 'stopped: the seek loads it paused')
+		assert.deepEqual(chaseOps({ action: 'seek' }, pb(1000, false), 40000, 25, o), [['seek', 40000]], 'a parked timeline just seeks')
+		assert.deepEqual(chaseOps({ action: 'pause' }, pb(1, true), 45000, 25, o), [['pause'], ['seek', 45000]])
+	})
+	it('latency is part of the target: no re-seek loop once applied', () => {
+		const c = { ...cfg, latencyMs: 500 }
+		const d = decideChase({ state: 'locked', frames: 250, pos: 250 }, pb(0, false), c)
+		assert.equal(d.ms, 10500)
+		assert.equal(decideChase({ state: 'locked', frames: 250, pos: 250 }, pb(10500, true), c).action, 'none', 'the timeline at LTC + latency is in sync')
+	})
 	it('29.97 DF: positions are real time, not labels', () => {
 		const d = decideChase({ state: 'locked', frames: 900 }, pb(0, false), { ...cfg, fps: '29.97df' })
 		assert.equal(Math.round(d.ms), 30030)
+	})
+})
+
+describe('WO-974: LTC out judges an encoder report at its own time', () => {
+	const { targetFramesAt } = require('../../src/timecode/ltc-output')
+	const { fpsMode } = require('../../src/timecode/timecode-math')
+	const m30 = fpsMode('30')
+	const cfg = { source: 'timeline', leadMs: 60 }
+	it('a report read 90 ms late (event-loop stall) is not a 2-frame error (box 06.11: one repeated frame)', () => {
+		const pb = { playing: true, position: 70000 }
+		const now = 1e12
+		const late = targetFramesAt(cfg, m30, 0, pb, now)
+		const atReport = targetFramesAt(cfg, m30, 0, pb, now, now - 90)
+		assert.ok(late - atReport >= 2, 'judged against NOW the healthy encoder looks 2+ frames behind')
+		assert.equal(atReport, Math.floor(((70000 - 90 + 60) * 30) / 1000))
+	})
+	it('silence while paused; the age is capped', () => {
+		assert.equal(targetFramesAt(cfg, m30, 0, { playing: false, position: 5000 }, 1e12, 1e12 - 50), null)
+		const pb = { playing: true, position: 5000 }
+		assert.equal(targetFramesAt(cfg, m30, 0, pb, 1e12, 1e12 - 60000), targetFramesAt(cfg, m30, 0, pb, 1e12, 1e12 - 1000))
 	})
 })
 
@@ -121,6 +180,15 @@ describe('WO-974: settings POST persists ltc', () => {
 		assert.equal(saved[0].ltc.output.leadMs, 60, 'untouched fields keep defaults')
 		await handlePost('/api/settings', JSON.stringify({ usbIngest: { enabled: true } }), ctx)
 		assert.equal(saved[1].ltc.output.device, 'plughw:3,0', 'an unrelated save keeps it')
+	})
+	it('a save that re-posts an unchanged ltc section does not restart LTC (the web modal re-posts …prevAll)', async () => {
+		let restarts = 0
+		const config = { streaming: {}, ...JSON.parse(JSON.stringify(defaults)) }
+		const ctx = { config, configManager: { get: () => JSON.parse(JSON.stringify(defaults)), save: () => {} }, log: () => {}, _ltcService: { restart: () => restarts++ } }
+		await handlePost('/api/settings', JSON.stringify({ ltc: { output: { enabled: true } } }), ctx)
+		assert.equal(restarts, 1, 'a real change restarts')
+		await handlePost('/api/settings', JSON.stringify({ usbIngest: { enabled: true }, ltc: JSON.parse(JSON.stringify(config.ltc)) }), ctx)
+		assert.equal(restarts, 1, 'the same section again: the chase lock and LTC out keep running')
 	})
 	it('GET /api/settings returns the section (the clients hydrate their Timecode pane from it)', async () => {
 		const { handleGet } = require('../../src/api/settings-get')

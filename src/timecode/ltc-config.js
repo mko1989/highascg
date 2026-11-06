@@ -28,6 +28,11 @@ const LTC_DEFAULTS = Object.freeze({
 			thresholdFrames: 3,
 			stopOnLoss: true,
 			latencyMs: 0,
+			/** Chase locate = pause, seek this far ahead, resume when the LTC gets there: Caspar lands the seek while
+			 * paused (box 06.11, 4K H.264 on PRV: content −50…−95 ms vs −326…−645 ms for a playing seek). 500 ms was
+			 * too short for a backward jump into another clip (−212 / −252 ms, two runs); 800 lands it at −90 ms.
+			 * 0 = seek in place. */
+			prerollMs: 800,
 		}),
 	}),
 	output: Object.freeze({
@@ -100,6 +105,7 @@ function normalizeLtcConfig(raw, prev) {
 				thresholdFrames: int(c.thresholdFrames, 1, 250, D.input.chase.thresholdFrames),
 				stopOnLoss: c.stopOnLoss !== false,
 				latencyMs: int(c.latencyMs, -1000, 1000, 0),
+				prerollMs: int(c.prerollMs, 0, 2000, D.input.chase.prerollMs),
 			},
 		},
 		output: {

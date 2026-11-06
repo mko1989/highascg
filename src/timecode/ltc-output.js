@@ -26,6 +26,18 @@ function msSinceLocalMidnight(now) {
 /**
  * @param {{ cfg: object, fps: unknown, log?: Function, getPlayhead?: () => ({ playing: boolean, position: number } | null) }} deps
  */
+/**
+ * Frame count LTC should be writing at wall time `at` (null = silent). An encoder report is read after a node or
+ * pipe delay; judging it against the playhead of NOW made an 80 ms event-loop stall look like a 2-frame error and
+ * re-located a healthy encoder (box 06.11, 30 fps: one repeated frame). So the playhead is taken back to `at`.
+ */
+function targetFramesAt(cfg, mode, offsetFrames, pb, now, at = now) {
+	const age = Math.max(0, Math.min(1000, now - at))
+	if (cfg.source === 'clock') return msToFrames(msSinceLocalMidnight(now - age) + cfg.leadMs, mode)
+	if (!pb || !pb.playing) return null
+	return offsetFrames + msToFrames(Math.max(0, pb.position - age) + cfg.leadMs, mode)
+}
+
 function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null }) {
 	const mode = fpsMode(fps)
 	const offsetFrames = tcToFrames(parseTc(cfg.offset, mode) || { h: 0, m: 0, s: 0, f: 0 }, mode)
@@ -41,12 +53,10 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null })
 	let offReports = 0
 	let starts = 0
 
-	/** Frame count LTC should be writing now (null = silent). */
-	function targetFrames(now = Date.now()) {
-		if (cfg.source === 'clock') return msToFrames(msSinceLocalMidnight(now) + cfg.leadMs, mode)
-		const pb = getPlayhead()
-		if (!pb || !pb.playing) return null
-		return offsetFrames + msToFrames(Math.max(0, pb.position) + cfg.leadMs, mode)
+	/** Frame count LTC should be writing (null = silent); `at` = when the encoder reported. */
+	function targetFrames(at) {
+		const now = Date.now()
+		return targetFramesAt(cfg, mode, offsetFrames, getPlayhead(), now, Number.isFinite(at) ? at : now)
 	}
 
 	function send(line) {
@@ -62,9 +72,9 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null })
 	}
 
 	/** Re-evaluate run/stop + position (playback change, report line, 1 s timer). */
-	function sync(reported) {
+	function sync(reported, at) {
 		if (!enc) return
-		const tgt = targetFrames()
+		const tgt = targetFrames(reported == null ? undefined : at)
 		if (tgt == null) {
 			if (running) send('stop')
 			running = false
@@ -163,7 +173,7 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null })
 			if (!rec.out) return
 			lastOut = { tc: rec.out, at: Date.now() }
 			const p = parseTc(rec.out, mode)
-			if (p) sync(tcToFrames(p, mode))
+			if (p) sync(tcToFrames(p, mode), Number(rec.at))
 		})
 		try {
 			sink = attachSink(e)
@@ -205,4 +215,4 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null })
 	return { start: begin, stop, sync: () => sync(), status, mode }
 }
 
-module.exports = { createLtcOutput }
+module.exports = { createLtcOutput, targetFramesAt }
