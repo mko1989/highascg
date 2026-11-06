@@ -2,7 +2,6 @@
 
 const fs = require('fs')
 const path = require('path')
-const { execFileSync } = require('child_process')
 const { loadExfatSyncMapFromDisk } = require('../system/exfat-sync-map')
 const { copyFilePreserveTimes } = require('../system/exfat-sync-fs')
 const { shouldAllowExfatPullShowData } = require('../replication/replication-show-authority')
@@ -21,16 +20,21 @@ const AUTOSAVE_SUBDIR = '_autosave'
 
 /** @typedef {{ slug: string, name: string, savedAt: string | null, path: string, source: string, sizeBytes?: number, conflict?: boolean, conflictSlugs?: string[], corrupt?: boolean, error?: string, isSyncConflict?: boolean, baseSlug?: string }} ProjectCatalogEntry */
 
+/**
+ * True when `mountPath` is itself a mount point. WO-980: read /proc/self/mountinfo (the table findmnt reads) instead
+ * of spawning `findmnt -T` — every project read ran 3 spawnSyncs (≈3 ms each in the 300 MB node, event loop blocked).
+ * Same answer: a mount point is listed by its canonical path (field 5, octal escapes), so a symlink path stays false.
+ */
 function isVolumeMountedSync(mountPath) {
 	if (process.platform !== 'linux') return false
 	const target = path.resolve(String(mountPath || ''))
 	if (!target) return false
 	try {
-		const out = execFileSync('findmnt', ['-n', '-o', 'TARGET', '-T', target], {
-			encoding: 'utf8',
-			timeout: 3000,
-		}).trim()
-		return path.resolve(out) === target
+		for (const line of fs.readFileSync('/proc/self/mountinfo', 'utf8').split('\n')) {
+			const mp = line.split(' ')[4]
+			if (mp && mp.replace(/\\([0-7]{3})/g, (_, o) => String.fromCharCode(parseInt(o, 8))) === target) return true
+		}
+		return false
 	} catch {
 		return false
 	}

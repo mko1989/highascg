@@ -261,4 +261,5 @@ module.exports = [
 	'tools/smoke/smoke-wo978-puppet-psn.test.js',
 	'tools/smoke/smoke-wo979-linked-roles.test.js',
 	'tools/smoke/smoke-wo981-canonical-json.test.js',
+	'tools/smoke/smoke-wo980-node-hot-paths.test.js',
 ]

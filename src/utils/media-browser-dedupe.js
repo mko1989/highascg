@@ -73,6 +73,13 @@ function canonicalMediaRowKey(id) {
 }
 
 /**
+ * WO-980: one collator for every id sort. `localeCompare(b, undefined, { sensitivity: 'base' })` builds an ICU collator
+ * per call (V8 caches only the no-options form): ~5 ms to sort the ~1000 media rows vs 0.2 ms here, same order (spec:
+ * localeCompare = new Intl.Collator(locales, options).compare).
+ */
+const ID_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base' })
+
+/**
  * Prefer rows with resolution/ffprobe metadata and ids that include a file extension.
  * @param {{ id?: string, resolution?: string, codec?: string, durationMs?: number, fps?: number, type?: string, fileSize?: number, cinf?: string, label?: string }} m
  */
@@ -103,7 +110,7 @@ function mergeMediaRows(rows) {
 		if (d !== 0) return d
 		const extDiff = Number(basenameHasExtension(b.id)) - Number(basenameHasExtension(a.id))
 		if (extDiff !== 0) return extDiff
-		return String(a.id).localeCompare(String(b.id), undefined, { sensitivity: 'base' })
+		return ID_COLLATOR.compare(String(a.id), String(b.id))
 	})
 	const out = { ...sorted[0] }
 	for (let i = 1; i < sorted.length; i++) {
@@ -142,7 +149,7 @@ function dedupeMediaList(media) {
 		if (rows.length === 1) out.push({ ...rows[0] })
 		else out.push(mergeMediaRows(rows))
 	}
-	return out.sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { sensitivity: 'base' }))
+	return out.sort((a, b) => ID_COLLATOR.compare(String(a.id), String(b.id)))
 }
 
 module.exports = { dedupeMediaList, canonicalMediaBasenameKey, canonicalMediaRowKey, MEDIA_FILE_EXT }

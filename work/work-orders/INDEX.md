@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-891 live WOs (28 open, 123 in progress, 740 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+892 live WOs (28 open, 123 in progress, 741 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (171)
+## engine — Looks, takes, timeline, playback (174)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -177,6 +177,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 968 DONE [engine+godot-client] A playlist look on PRV plays its items (option B), not just the first → 968_WO_prv_playlist_plays_all_items.md
 - 970 DONE [engine] A layer leaving PGM cut instead of fading when the rest of the look kept playin… → 970_WO_exit_only_take_cuts_leaving_layer.md
 - 973 DONE [engine+amcp,godot-client] Per-layer clip playback speed → 973_WO_clip_playback_speed_per_layer.md
+- 980 DONE [engine+process,media] Optimization sweep: node server hot paths (polled project reads, findmnt spawns… → 980_WO_node_hot_paths_sweep.md
 - 981 DONE [engine] take / project / autosave path latency and cost (optimization sweep 07.11) → 981_WO_take-project-autosave-path-cost.md
 
 ## amcp — AMCP client and protocol (20)

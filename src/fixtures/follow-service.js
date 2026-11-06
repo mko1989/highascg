@@ -90,6 +90,19 @@ function inputUniverse(ctx) {
 	}
 }
 
+/** WO-980: [inputPortAddress, inputUniverse] from ONE resolveArtnetPatch — each call is a full project read from disk,
+ * and the guard below polls both every 5 s. Same values as the two functions (null when off, 0 on error). */
+function inputPatchPair(ctx) {
+	const dmx = ctx?.config?.dmx || {}
+	if (dmx.artnetInputEnabled === false) return [null, null]
+	try {
+		const p = require('../artnet/artnet-slot-config').resolveArtnetPatch(ctx, dmx)
+		return [((p.net & 0x7f) << 8) | ((p.subnet & 0x0f) << 4) | (p.universe & 0x0f), p.universe & 0x0f]
+	} catch (_) {
+		return [0, 0]
+	}
+}
+
 /** WO-845: how often the loop guard's inputs (input patch, box addresses) are re-compared. */
 const GUARD_RECHECK_MS = 5000
 
@@ -148,7 +161,7 @@ function createFollowService(ctx, hub, deps = {}) {
 	 * It used to be evaluated only in engine.configure(), which `apply` skips for an unchanged slice, so changing the
 	 * input universe to a fixture's left the engine broadcasting into our own input (artnet-out-loops memory).
 	 */
-	const guardKey = () => JSON.stringify([inputPortAddress(ctx), inputUniverse(ctx), [...localTargets()].sort()])
+	const guardKey = () => JSON.stringify([...inputPatchPair(ctx), [...localTargets()].sort()])
 	let lastGuard = ''
 	let looks = {} // WO-615 T8: fixtures.looks — fixture states stored per look
 	const apply = (project) => {
