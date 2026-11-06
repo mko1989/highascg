@@ -181,10 +181,10 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 	 * on isMergeTransition). So this whole block — the ONLY place that builds crossfadeLines,
 	 * including the timeline's own fade-in at L239 — was skipped entirely, leaving the layers
 	 * `startSceneTimelineLayer` already preset to OPACITY 0 with no write ever following: the
-	 * timeline stays invisible forever. The `takeJobs.length === 0` branch below (L278, "Timeline-
-	 * only / exit-only crossfade") was already written to handle exactly this case — it just could
-	 * never be reached. */
-	if (takeJobs.length > 0 || mergeMixerExtras.length > 0 || (shouldRunBankCrossfade && timelineFadeInPhys.length > 0)) {
+	 * timeline stays invisible forever. The `takeJobs.length === 0` branch below ("Timeline-only /
+	 * exit-only crossfade") handles it. WO-970: same for an EXIT-ONLY take (B = A minus a layer, the
+	 * rest visually equal → skipped): no job, so the leaving layer was STOPped by the teardown = a cut. */
+	if (takeJobs.length > 0 || mergeMixerExtras.length > 0 || (shouldRunBankCrossfade && (timelineFadeInPhys.length > 0 || exitMedia?.length > 0))) {
 		await sendTakeJobsLoadAndMixerBatch(amcp, {
 			self,
 			channel,
