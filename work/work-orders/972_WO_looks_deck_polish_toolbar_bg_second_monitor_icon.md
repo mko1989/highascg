@@ -1,7 +1,7 @@
 # WO-972 — looks deck polish: no "Looks" toolbar toggle, lighter deck background, send-to-second-monitor icon only with a second operator monitor
 
 **Area:** godot-client
-**Status: IN PROGRESS (06.11.26 — code + Godot suite 26011/0 + smoke 4/0 done; on-glass check NOT done: the box lock was held by an unseen holder for 20+ min, so the GUI was not relaunched; it still runs the pre-WO build)**
+**Status: DONE (06.11.26 — Godot suite 26011/0, smoke 4/0; glass after a GUI relaunch at 22:56: no "Looks" toggle in the deck toolbar, deck bg #161b22 vs preview #000000 (pixel-sampled), no send-to-2 arrow with operator monitor 1 only (DP-6 operator, DP-2 Caspar); the arrow appearing WITH a 2nd operator monitor is unit-tested only)**
 
 Owner show notes 06.11.26 (batch WO-970…975):
 1. *"In the top bar of looks deck there is a Looks button that hides all the looks… WHY?! Remove that button."*
@@ -65,3 +65,11 @@ Files changed: `godot/client/features/live/live_tab.gd`, `godot/client/features/
 `tools/smoke/smoke-wo781-look-preset-destinations.test.js`, new `work/work-orders/972_WO_looks_deck_polish_toolbar_bg_second_monitor_icon.md`.
 
 OPEN_ISSUES one-liner: `| WO-972 | Looks deck polish: remove toolbar Looks toggle, lighter deck bg, send-to-2 icon only with a second operator monitor | WO-972 | IN PROGRESS — code+suite done, glass pending (box lock) |`
+
+## Glass check (coordinator, 06.11.26 22:56)
+
+GUI relaunched from the committed tree (`flock -o box2.lock`, setsid, `3>&-`), Live tab screenshot:
+- deck toolbar: Default transition · Apply to all looks · Screens. There is no "Looks" toggle.
+- pixel samples: the deck panel is `#161b22`, the live preview background `#000000`, the sources panel `#141618`.
+- tab strip: no send-to-second-monitor arrow. `xrandr --listmonitors` shows DP-6 (operator, 1920×1080) and
+  DP-2 (Dioda, 2560×640), with no operator monitor 2 cabled in Devices.
