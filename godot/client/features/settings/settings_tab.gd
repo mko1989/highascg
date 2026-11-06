@@ -20,6 +20,7 @@ const LiveAudioPane := preload("res://features/settings/live_audio_pane.gd")
 const NetworkPane := preload("res://features/settings/network_pane.gd")
 const LibraryPane := preload("res://features/settings/library_pane.gd")  # WO-825
 const LockscreenPane := preload("res://features/settings/lockscreen_pane.gd")
+const LtcPane := preload("res://features/settings/ltc_pane.gd")  # WO-974
 
 signal logs_requested
 
@@ -67,6 +68,7 @@ func _ready() -> void:
 	Panes.diagnostics(_pane("Diagnostics"), _bundle, logs, _bundle_status)
 	_pane("Tailscale").add_child(TailscalePane.new())
 	_pane("Live audio").add_child(LiveAudioPane.new())
+	LtcPane.build(_pane("Timecode"))  # WO-974 LTC in / out
 	_pane("Variables").add_child(VariablesPane.new())
 	_pane("Lockscreen").add_child(LockscreenPane.new())  # WO-838
 	var nuclear := _pane("Nuclear")

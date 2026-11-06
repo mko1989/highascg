@@ -187,6 +187,15 @@ function buildLiveAudioBridgeFfmpegArgs(cfg, slot, device) {
 			`udp://127.0.0.1:${audioFftPcmUdpPort(slot)}?pkt_size=1316`
 		)
 	}
+	// WO-974: LTC reader fed by this slot — tee the chosen capture channel as raw s16le mono (no async resampling:
+	// LTC is a biphase square wave, inserted/dropped samples would corrupt bits). Same single-opener rule as above.
+	const ltcIn = cfg?.ltc?.input
+	if (ltcIn?.enabled === true && ltcIn.source === 'bridge' && parseInt(String(ltcIn.slot), 10) === parseInt(String(slot), 10)) {
+		const ch = Math.max(0, Math.min(1, (parseInt(String(ltcIn.channel), 10) || 1) - 1)) // the capture is stereo
+		const { ltcBridgeUdpPort } = require('../timecode/ltc-input')
+		args.push('-map', '0:a', '-af', `pan=mono|c0=c${ch},aresample=48000`, '-c:a', 'pcm_s16le', '-f', 's16le')
+		args.push(`udp://127.0.0.1:${ltcBridgeUdpPort(slot)}?pkt_size=1316`)
+	}
 	return args
 }
 

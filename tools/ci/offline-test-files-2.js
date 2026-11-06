@@ -83,5 +83,8 @@ module.exports = [
 	'tools/smoke/smoke-wo933-fanout-checks-before-replay.test.js',
 	'tools/smoke/smoke-wo962-layer-transport.test.js',
 	'tools/smoke/smoke-wo973-clip-speed.test.js',
+	'tools/smoke/smoke-wo974-timecode-math.test.js', // WO-974 LTC in/out
+	'tools/smoke/smoke-wo974-ltc-lock-chase.test.js',
+	'tools/smoke/smoke-wo974-ltc-roundtrip.test.js', // skips without libltc11
 	'tools/smoke/smoke-wo975-nvidia-sync-auto.test.js',
 ]

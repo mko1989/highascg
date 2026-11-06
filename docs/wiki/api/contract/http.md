@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-547 routes.
+549 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -205,6 +205,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/lower-thirds/stop` | handler | `src/api/routes-lower-thirds.js` |
 | GET | `/api/lower-thirds/templates` | handler | `src/api/routes-lower-thirds.js` |
 | POST | `/api/lower-thirds/update` | handler | `src/api/routes-lower-thirds.js` |
+| GET | `/api/ltc` | registry | `src/timecode/routes-ltc.js` |
+| POST | `/api/ltc/config` | registry | `src/timecode/routes-ltc.js` |
 | GET | `/api/media` | registry | `src/api/router.js` |
 | POST | `/api/media/*` | registry | `src/api/router.js` |
 | POST | `/api/media/cinf` | registry | `src/api/router.js`, `src/api/routes-media.js` |
@@ -628,5 +630,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/server/auth.js` |  |
 | `src/server/ws-server.js` | WebSocket server on the same HTTP port (upgrade `/api/ws`, `/ws`, and Companion-style `/instance/<id>/api/ws`). |
 | `src/show-timers/show-timers-routes.js` | WO-734 — `GET /api/show-timers` (the timers as JSON) and `GET /api/show-timers/widget.js` (the strip the served pages include: `<div id="show-timers"></div><scr |
+| `src/timecode/routes-ltc.js` | WO-974 — LTC timecode API. |
 | `src/tracking/auto-routes.js` | WO-708 / WO-709 — HTTP + WS of the Auto director (auto-director.js), wired from register.js. |
 | `src/tracking/register.js` | Tracking module registration (WO-616; WO-19 / WO-30 boundaries). |

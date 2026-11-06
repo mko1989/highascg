@@ -52,6 +52,7 @@ async function handleGet(path, ctx) {
 			channelMap: buildChannelMap(ctx),
 			offline_mode: !!cfg.offline_mode,
 			dmx: { ...defaults.dmx, ...(cfg.dmx || {}) },
+			ltc: require('../timecode/ltc-config').normalizeLtcConfig(cfg.ltc), // WO-974
 			rtmp: normalizeRtmpConfig(cfg.rtmp),
 			decklinkInputsStatus: ctx._decklinkInputsStatus ?? null,
 			casparServer: cs,

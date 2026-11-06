@@ -4,6 +4,7 @@ const { casparServerDefaults } = require('./defaults-caspar-server')
 const { editorDefaultsDefaults } = require('./editor-defaults')
 const { replicationDefaults } = require('./defaults-replication')
 const { resolveDefaultTopologyForGpu } = require('../utils/known-gpu-topology')
+const { normalizeLtcConfig } = require('../timecode/ltc-config')
 
 /** Top-level defaults excluding casparServer (merged in defaults.js). */
 function coreDefaults() {
@@ -94,6 +95,8 @@ function coreDefaults() {
 			gain: 1,
 			emitHz: 30,
 		},
+		/** WO-974: LTC timecode in (reader + timeline chase) / out (generator). All off; see src/timecode/ltc-config.js. */
+		ltc: normalizeLtcConfig({}),
 		ui: {
 			oscFooterVu: true,
 			rundownPlaybackTimer: true,

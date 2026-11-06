@@ -420,6 +420,8 @@ function main() {
 		const { createAudioCaptureLifecycle } = require('./src/bootstrap/audio-capture-lifecycle')
 		appCtx._audioCaptureLifecycle = createAudioCaptureLifecycle({ appCtx, config, logger })
 		appCtx._audioCaptureLifecycle.startAudioCapture()
+		// WO-974: LTC timecode in (reader + timeline chase) / out (generator) — config.ltc, off by default.
+		appCtx._ltcService = require('./src/timecode/ltc-service').createLtcService({ appCtx, log: (l, m) => appCtx.log(l, m) }); appCtx._ltcService.start()
 
 		const shutdown = Shutdown.createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSubsystem, stopOscSubsystem, wsHandle, httpServer, persistence })
 		process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown)
