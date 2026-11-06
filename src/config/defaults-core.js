@@ -80,6 +80,7 @@ function coreDefaults() {
 			peakHoldMs: 2000,
 			emitIntervalMs: 50,
 			staleTimeoutMs: 5000,
+			wsDeltaBroadcast: true, // WO-985: clients replace delta channels (a delta channel is complete) — 202 → 65 KB/s per client
 		},
 		/**
 		 * WO-333: line-in/USB ALSA capture → FFT frames broadcast on WS (`type:'audio_fft'`)

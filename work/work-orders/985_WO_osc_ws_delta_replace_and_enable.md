@@ -63,3 +63,6 @@ the delta are kept; a non-delta payload replaces everything. No server change (t
 - Web client on glass (dist-web rebuilt; unit-tested only). Multiview/playback-timer templates: unit-tested by source pin only, none were running.
 - The old-merge regression on glass was not reproduced (it was proven by unit test only; the GUI hides stale layers after 12 s anyway).
 - Follow-up idea (not done): the server still builds one full `getSnapshot()` clone per tick in delta mode for the StateManager mirror (osc-lifecycle.js:66-72).
+
+## Coordinator follow-up (07.11, Claude)
+- Factory default: `src/config/defaults-core.js` `osc.wsDeltaBroadcast: true` (the one reset root: New Project starter + factory/stick reset), and the tracked `config/osc.json` carries the same `true` (its only diff), so a fresh ISO or reset keeps delta mode. defaults-core smokes 91/91.
