@@ -48,8 +48,9 @@ async function handleMultiviewApply(body, ctx) {
 	}
 
 	const n = Math.max(1, parseInt(b.n || 1, 10) || 1)
+	let timeoutTimer
 	const timeoutPromise = new Promise((_, reject) => {
-		setTimeout(() => reject(new Error('Multiview apply timed out')), MULTIVIEW_APPLY_TIMEOUT_MS)
+		timeoutTimer = setTimeout(() => reject(new Error('Multiview apply timed out')), MULTIVIEW_APPLY_TIMEOUT_MS)
 	})
 
 	try {
@@ -81,6 +82,8 @@ async function handleMultiviewApply(body, ctx) {
 		const msg = e?.message || String(e)
 		const status = /not connected|CasparCG is not connected/i.test(msg) ? 503 : 502
 		return { status, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
+	} finally {
+		clearTimeout(timeoutTimer)
 	}
 }
 
