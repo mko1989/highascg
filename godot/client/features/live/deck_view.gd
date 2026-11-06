@@ -17,6 +17,7 @@ const DeckHead := preload("res://features/live/deck_head.gd")
 const Destinations := preload("res://features/live/destinations.gd")
 const DeckOverlay := preload("res://features/live/deck_overlay.gd")
 const DeckHidden := preload("res://features/live/deck_hidden.gd")
+const DeckScroll := preload("res://features/live/deck_scroll.gd")
 const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
@@ -60,8 +61,7 @@ func _process(_delta: float) -> void:
 
 
 func rebuild() -> void:
-	for c in _columns.get_children():
-		c.queue_free()
+	DeckScroll.free_columns(_columns)  # WO-971: keeps each column's scroll offset
 	var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
 	var live: Dictionary = Store.get_value("scene.live", {}) if Store.get_value("scene.live") is Dictionary else {}
 	var ps: Dictionary = Store.project.get("scenes", {}) if Store.project.get("scenes") is Dictionary else {}
@@ -100,7 +100,7 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	grid.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var scroll := ScrollContainer.new()  # WO-905: the header and timer stay put; blank space below the cards stays drop space
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	DeckScroll.setup(scroll, main)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.mouse_filter = Control.MOUSE_FILTER_PASS
 	scroll.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))
