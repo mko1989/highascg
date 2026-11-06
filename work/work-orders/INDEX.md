@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-879 live WOs (28 open, 122 in progress, 729 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+887 live WOs (29 open, 123 in progress, 735 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (168)
+## engine — Looks, takes, timeline, playback (170)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -175,6 +175,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 956 DONE [engine] The same loop on the same layer in two looks is reloaded on every take (relativ… → 956_WO_shared_loop_across_looks_reloads_every_take.md
 - 961 DONE [engine+godot-client] Changing a look layer's content sizing restarts its clip on PRV → 961_WO_content_sizing_change_restarts_prv_clip.md
 - 968 DONE [engine+godot-client] A playlist look on PRV plays its items (option B), not just the first → 968_WO_prv_playlist_plays_all_items.md
+- 970 DONE [engine] A layer leaving PGM cut instead of fading when the rest of the look kept playin… → 970_WO_exit_only_take_cuts_leaving_layer.md
+- 973 DONE [engine+amcp,godot-client] Per-layer clip playback speed → 973_WO_clip_playback_speed_per_layer.md
 
 ## amcp — AMCP client and protocol (20)
 
@@ -214,7 +216,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 881 DONE [caspar-build+engine] Caspar came up without CEF after a supervisor tree-kill, and nothing said so → 881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md
 - 888 DONE [caspar-build+os-iso] PGM micro stutter on alt-tab: Caspar's window never takes focus; frame sync sti… → 888_WO_caspar_window_no_focus_sync_follows_pgm.md
 
-## audio — Audio routing, devices, meters (46)
+## audio — Audio routing, devices, meters (48)
 
 - 06 DONE [audio] Multi-Channel Audio Playout Architecture (CasparCG on Ubuntu) → 06_WO_AUDIO_PLAYOUT.md
 - 16 DONE [audio] Yamaha DM3 Audio Integration → 16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md
@@ -262,6 +264,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 879 DONE [audio+godot-client] Tap tempo: the operator's beat when the tracker cannot lock (and when the feed… → 879_WO_tap_tempo_beat_override.md
 - 884 DONE [audio+engine] Live audio playing, audio-reactive visuals still: the FFT engine never followed… → 884_WO_fft_engine_missed_slot_routed_by_project_apply.md
 - 898 DONE [audio+devices-config] Audio-only channels: tiny custom video mode at the rate of the channel they feed → 898_WO_audio_only_channel_tiny_rate_matched_mode.md
+- 974 IN PROGRESS [audio+engine,godot-client] LTC timecode in (reader + timeline chase) and out (generator) → 974_WO_ltc_timecode_in_out.md
+- 976 OPEN [audio+engine,godot-client] A Caspar channel / screen destination (e.g. Dioda PGM) as the audio-reactive FF… → 976_WO_caspar_channel_as_fft_source.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (32)
 
@@ -379,7 +383,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (132)
+## godot-client — Godot client (135)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -513,6 +517,9 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 965 DONE [godot-client] A media file dropped into the look editor brings the new layer's Inspector page… → 965_WO_media_drop_opens_layer_inspector.md
 - 966 DONE [godot-client] The media file Inspector gets "Set in" / "Set out" buttons at the preview posit… → 966_WO_media_inspector_set_in_out_buttons.md
 - 967 DONE [godot-client] Dragging a media file into a layer's playlist: the file's Inspector page no lon… → 967_WO_media_drag_to_playlist_not_covered_by_inspector.md
+- 971 DONE [godot-client] Looks deck: scroll position kept across every deck action → 971_WO_deck_scroll_kept_across_rebuild.md
+- 972 DONE [godot-client] looks deck polish: no "Looks" toolbar toggle, lighter deck background, send-to-… → 972_WO_looks_deck_polish_toolbar_bg_second_monitor_icon.md
+- 977 DONE [godot-client] Devices tab wider than the window: Inspector pushed off the right edge → 977_WO_devices_tab_wider_than_window.md
 
 ## web-client — Web client (82)
 
@@ -682,7 +689,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
 - 958 DONE [devices-config+godot-client] Devices tab shows every server as "2026.05.20": the cluster read package.json's… → 958_WO_devices_tab_shows_frozen_package_version.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (85)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (86)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -769,6 +776,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 937 DONE [os-iso+network,godot-client] Live ISO: the boot network apply left the wired port with no manager (no IP, ma… → 937_WO_live_wired_port_stranded_by_network_helper_and_launcher_window.md
 - 938 DONE [os-iso+devices-config] The mouse arrow's tail showed on the Dioda wall when parked at the operator mon… → 938_WO_pointer_sprite_shows_on_program_output_past_barrier.md
 - 939 DONE [os-iso+caspar-build] Calamares installs keep a locale the image does not carry (en_US.UTF-8) and Cas… → 939_WO_calamares_install_locale_not_installed_caspar_cannot_start.md
+- 975 DONE [os-iso+godot-client] NVIDIA "sync to display" auto-on for the first GPU port feeding a PGM → 975_WO_nvidia_sync_auto_first_pgm_port.md
 
 ## network — Cluster, replication, Tailscale, auth (41)
 
