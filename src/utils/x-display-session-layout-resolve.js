@@ -7,6 +7,7 @@ const {
 const {
 	OPERATOR_MONITOR_1,
 	resolvePhysicalPortIndexForDestination,
+	PGM_DESTINATION_MODES,
 } = require('../config/screen-consumer-port-resolve')
 const { resolveOperatorMonitorPort } = require('./operator-monitor-resolve')
 
@@ -107,6 +108,39 @@ function operatorMonitorPortIndex(config) {
 function nvidiaSyncToDisplayPortIndex(config) {
 	for (let n = 1; n <= 4; n++) {
 		if (portFlagEnabled(config, `screen_${n}_nvidia_sync_to_display`)) return n
+	}
+	return null
+}
+
+/**
+ * WO-975: the tick's tri-state. Explicit ON = a `screen_N_nvidia_sync_to_display` true (legacy meaning kept);
+ * explicit OFF = `nvidia_sync_to_display_off` true; otherwise AUTO. Absent / false per-port values are NOT an
+ * explicit off (old configs carry `false` on every port from the single-select save loop).
+ * @param {object} config
+ * @returns {{ mode: 'on' | 'off' | 'auto', port: number | null }}
+ */
+function nvidiaSyncToDisplayMode(config) {
+	const explicit = nvidiaSyncToDisplayPortIndex(config)
+	if (explicit) return { mode: 'on', port: explicit }
+	if (portFlagEnabled(config, 'nvidia_sync_to_display_off')) return { mode: 'off', port: null }
+	return { mode: 'auto', port: nvidiaSyncAutoPortIndex(config) }
+}
+
+/**
+ * WO-975 auto rule: the FIRST screen destination (config order) in a PGM mode (pgm_prv / pgm_only) that has a PGM
+ * cable (outputLayer < 2, through pixel-map hops) to a GPU port -> that port (first cable in graph order). The
+ * operator GUI / multiview / stream destinations never count; a port that is the operator monitor is skipped.
+ * @param {object} config
+ * @returns {number | null} 1-based physical GPU port index
+ */
+function nvidiaSyncAutoPortIndex(config) {
+	const ctx = createDestinationWiringContext(config || {})
+	const opPort = operatorMonitorPortIndex(config)
+	for (let i = 0; i < ctx.destinations.length; i++) {
+		const dest = ctx.destinations[i]
+		if (!PGM_DESTINATION_MODES.has(String(dest?.mode || 'pgm_prv').toLowerCase())) continue
+		const port = resolvePhysicalPortIndexForDestination(dest, i, ctx, { pgmOnly: true })
+		if (port && port !== opPort) return port
 	}
 	return null
 }
@@ -378,6 +412,8 @@ module.exports = {
 	multiviewInteractiveEnabled,
 	operatorMonitorPortIndex,
 	nvidiaSyncToDisplayPortIndex,
+	nvidiaSyncToDisplayMode,
+	nvidiaSyncAutoPortIndex,
 	resolveLayoutRectForOperatorPort,
 	evaluateOperatorPointerConfineDesire,
 	isOperatorPointerConfineDesired,

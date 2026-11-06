@@ -72,13 +72,16 @@ function resolveGlSyncDisplay(config) {
 	//    WO-888: a tick on the OPERATOR MONITOR is ignored (stale ticks pinned caspar to the GUI head's vblank, owner
 	//    31.10) — caspar's frame sync sticks to a real PGM screen; the owner may still tick any other screen.
 	try {
-		const { nvidiaSyncToDisplayPortIndex } = require('./x-display-session-layout-resolve')
-		const port = nvidiaSyncToDisplayPortIndex(config)
+		const { nvidiaSyncToDisplayMode } = require('./x-display-session-layout-resolve')
+		// WO-975: tri-state — explicit OFF = no sync device at all; explicit ON = that port; AUTO = the first
+		// connected GPU port feeding the PGM of the first screen destination (nvidiaSyncAutoPortIndex).
+		const { mode, port } = nvidiaSyncToDisplayMode(config)
+		if (mode === 'off') return null
 		if (port) {
 			const { resolveGpuPortIndexToXrandrOutput } = require('./xrandr-output-resolve')
 			const sid =
 				String(cs[`screen_${port}_system_id`] || '').trim() ||
-				planSysId(port) ||
+				(mode === 'on' ? planSysId(port) : '') ||
 				resolveGpuPortIndexToXrandrOutput(config, port)
 			if (sid && !isOperatorMonitorPort(config, port, sid, ensurePlan())) return sid
 		}

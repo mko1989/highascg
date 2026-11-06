@@ -10,6 +10,7 @@ const S := preload("res://features/devices/cable_seed.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const GM := preload("res://features/devices/gpu_modeline_model.gd")
 const DM := preload("res://features/devices/destinations_model.gd")
+const DV := preload("res://features/devices/devices_model.gd")
 const STRETCH_OPTIONS := ["none", "fill", "uniform", "uniform_to_fill"]
 const COLOUR_OPTIONS := ["RGB", "datavideo-full", "datavideo-limited"]
 ## [key, label, tooltip] in the web's toggle-row order (Fullscreen / Windowed / Border / V-sync are the base flags).
@@ -18,7 +19,7 @@ const TOGGLES := [
 	["aot", "Always on top", "Keep window always on top"],
 	["operator_monitor", "Operator monitor", "Primary X11 output, confine cursor here, and enable interactive on this consumer"],
 	["interactive", "Interactive", "Caspar interactive mouse/keyboard on this screen consumer (confine also allows pointer here)"],
-	["nvidia_sync", "NVIDIA sync to display", "Sync to this display: NVIDIA OpenGL/XVideo target AND Caspar GL swap vblank (WO-407). Unticked everywhere = automatic: the first PGM screen (WO-888). Ignored on the operator monitor"],
+	["nvidia_sync", "NVIDIA sync to display", "Sync to this display: NVIDIA OpenGL/XVideo target AND Caspar GL swap vblank (WO-407). Automatic (WO-975): on, marked (auto), for the first connected GPU port feeding the PGM of the first screen destination until you tick or untick it yourself (unticking = off). Ignored on the operator monitor"],
 	["sbs_key", "SBS Key", "Side-by-side key"],
 	["force_linear", "Force linear filter", "Force linear filtering"],
 	["mipmaps", "Enable mipmaps", "Enable mipmaps for scaling"],
@@ -192,7 +193,9 @@ static func consumer_state(cs: Dictionary, _settings: Variant, conn: Dictionary,
 	st.aot = (false if seed_mv else _flag(cs.get("multiview_always_on_top"))) if st.mv else _not_false(cs.get(k + "always_on_top"))
 	st.interactive = _flag(cs.get(key(n, "interactive", st.mv)))
 	st.operator_monitor = _flag(cs.get(k + "operator_monitor"))
-	st.nvidia_sync = _flag(cs.get(k + "nvidia_sync_to_display"))
+	var ns := nvidia_sync_state(cs, payload, n)
+	st.nvidia_sync = ns.on
+	st.nvidia_auto = ns.auto
 	st.sbs_key = _flag(cs.get(k + "sbs_key"))
 	st.colour = _str_or(cs.get(k + "colour_space"), "RGB")
 	st.force_linear = _not_false(cs.get(k + "force_linear_filter"))
@@ -203,6 +206,61 @@ static func consumer_state(cs: Dictionary, _settings: Variant, conn: Dictionary,
 	st.pos_x = GM.js_num_str(H.coalesce([cs.get(k + "x"), 0]))
 	st.pos_y = GM.js_num_str(H.coalesce([cs.get(k + "y"), 0]))
 	return st
+
+
+## WO-975 (mirror of src/utils/x-display-session-layout-resolve.js nvidiaSyncToDisplayMode): the tick's resolved
+## state for port `n` -> {on, auto}. Explicit tick on any port wins; else `nvidia_sync_to_display_off` = off; else AUTO
+## = the port `auto_sync_port` returns (never the operator monitor).
+static func nvidia_sync_state(cs: Dictionary, payload: Dictionary, n: int) -> Dictionary:
+	for i in range(1, 5):
+		if _flag(cs.get("screen_%d_nvidia_sync_to_display" % i)):
+			return {"on": i == n, "auto": false}
+	if _flag(cs.get("nvidia_sync_to_display_off")):
+		return {"on": false, "auto": false}
+	var op := 0
+	for i in range(1, 5):
+		if _flag(cs.get("screen_%d_operator_monitor" % i)):
+			op = i
+			break
+	var ap := auto_sync_port(payload, op)
+	return {"on": ap == n, "auto": ap == n}
+
+
+## First screen destination (config order) in a PGM mode (pgm_prv / pgm_only) with a PGM cable (outputLayer < 2,
+## through pixel-map hops) to a GPU port -> that 1-based port (first cable in graph order); 0 if none.
+static func auto_sync_port(payload: Dictionary, operator_port: int) -> int:
+	var g := R.d(payload.get("graph"))
+	var edges := R.a(g.get("edges"))
+	var by_id := {}
+	for c in R.a(g.get("connectors")):
+		if c is Dictionary:
+			by_id[R.s(c.get("id"))] = c
+	for d in R.a(R.d(payload.get("screenDestinations")).get("destinations")):
+		if not d is Dictionary:
+			continue
+		var mode := R.s(d.get("mode")).to_lower() if H.truthy(d.get("mode")) else "pgm_prv"
+		if mode != "pgm_prv" and mode != "pgm_only":
+			continue
+		var queue := ["dst_in_" + R.s(d.get("id"))]
+		var seen := {}
+		while not queue.is_empty():
+			var cur: String = queue.pop_front()
+			if cur == "" or seen.has(cur):
+				continue
+			seen[cur] = true
+			for e in edges:
+				if not e is Dictionary or R.s(e.get("sourceId")) != cur or DV.output_layer(e) >= 2:
+					continue
+				var sink: Dictionary = R.d(by_id.get(R.s(e.get("sinkId"))))
+				if sink.get("kind") == "gpu_out":
+					var port := S.physical_screen_index(sink, payload)
+					if port != operator_port:
+						return port
+				elif sink.get("kind") == "pixel_map_in":
+					for no in by_id.values():
+						if R.s(no.get("deviceId")) == R.s(sink.get("deviceId")) and no.get("kind") == "pixel_map_out":
+							queue.append(R.s(no.get("id")))
+	return 0
 
 
 ## saveCasparSettings' body. `ui` = the live control values: windowed / vsync / border / the TOGGLES keys (bools),
@@ -224,11 +282,21 @@ static func caspar_patch(st: Dictionary, ui: Dictionary) -> Dictionary:
 		k + "x": _pos(ui.pos_x), k + "y": _pos(ui.pos_y)}
 	p[key(n, "interactive", mv)] = true if ui.operator_monitor else bool(ui.interactive)
 	for spec in [["operator_monitor", "operator_monitor"], ["nvidia_sync", "nvidia_sync_to_display"]]:
+		if spec[0] == "nvidia_sync" and ui.nvidia_sync and st.get("nvidia_auto", false):
+			continue  # WO-975: still showing the AUTO tick -> a save of other fields must not pin it explicit
 		if ui[spec[0]]:
 			for i in range(1, 5):
 				p["screen_%d_%s" % [i, spec[1]]] = i == n
 		else:
 			p[k + spec[1]] = false
+	# WO-975 tri-state: ticking pins an explicit port (clears "off"); unticking the port that was showing ticked
+	# (explicit or auto) is an explicit OFF; unticking a port that never showed ticked changes nothing.
+	if ui.nvidia_sync and st.get("nvidia_auto", false):
+		pass
+	elif ui.nvidia_sync:
+		p["nvidia_sync_to_display_off"] = false
+	elif st.get("nvidia_sync", false):
+		p["nvidia_sync_to_display_off"] = true
 	return {"casparServer": p}
 
 
@@ -259,6 +327,7 @@ static func reset_patch(st: Dictionary) -> Dictionary:
 		p[k + suffix] = null
 	p[key(n, "always_on_top", st.mv)] = null
 	p[key(n, "interactive", st.mv)] = null
+	p["nvidia_sync_to_display_off"] = null  # reset = back to AUTO
 	for suffix in ["operator_monitor", "nvidia_sync_to_display", "sbs_key", "colour_space", "force_linear_filter", "enable_mipmaps",
 			"high_bitdepth", "name", "aspect_ratio", "x", "y"]:
 		p[k + suffix] = null

@@ -75,6 +75,7 @@ func _setup(c: Dictionary) -> Dictionary:
 			"push":
 				o[last].append(op[3].duplicate(true))
 	var cs: Dictionary = s.get("casparServer", {})
+	cs["nvidia_sync_to_display_off"] = true  # WO-975: the goldens are the pre-auto web port -> pin the explicit-OFF branch
 	var cst := GO.consumer_state(cs, s, conn, p)
 	var display := GO.detected_display(conn, p, s)
 	var mst := GM.state(conn, p, cs, s, display, cst.screen_n, cst.port_n, GO.physical_mode(conn, p, display))
@@ -177,7 +178,9 @@ func test_edits_replay() -> void:
 			var got_calls := []
 			if st.has("button"):
 				if st.button == "Reset all settings for this screen":
-					got_calls = [["POST", "/api/settings", GO.reset_patch(env.cst)], ["LOAD"]]
+					var rp: Dictionary = GO.reset_patch(env.cst)
+					rp.casparServer.erase("nvidia_sync_to_display_off")  # WO-975 key, covered by test_nvidia_sync_auto
+					got_calls = [["POST", "/api/settings", rp], ["LOAD"]]
 					status = "Settings for GPU port %d cleared" % env.cst.port_n
 				else:  # "Show advanced…" only re-runs the preview
 					got_calls = [["GET", _preview(env).query]]
@@ -210,7 +213,9 @@ func test_edits_replay() -> void:
 			got.sort()
 			t.eq(got, kinds, what + ": effects")
 			if "caspar" in effects:
-				t.eq(_norm(GO.caspar_patch(env.cst, env.ui)), _norm(want.caspar[2]), what + ": caspar body")
+				var body: Dictionary = GO.caspar_patch(env.cst, env.ui)
+				body.casparServer.erase("nvidia_sync_to_display_off")  # WO-975 key (not in the web goldens); own test below
+				t.eq(_norm(body), _norm(want.caspar[2]), what + ": caspar body")
 				status = GO.save_status(env.ui, env.cst)
 			if "os" in effects:
 				t.eq(_norm(GO.os_patch(env.cst, env.mst, env.ui)), _norm(want.os[2]), what + ": OS body")
@@ -220,3 +225,44 @@ func test_edits_replay() -> void:
 			t.eq(status, a.status, what + ": status")
 			t.eq((a.calls.filter(func(x: Array) -> bool: return x[0] == "DIRTY").size() > 0), "caspar" in effects or "os" in effects, what + ": dirty")
 			_same_controls(env, a, what)
+
+
+## WO-975: the tick is tri-state — AUTO (first PGM screen destination's first PGM-cabled GPU port, never the operator
+## monitor), explicit ON (any ticked port wins), explicit OFF (`nvidia_sync_to_display_off`).
+func test_nvidia_sync_auto() -> void:
+	var payload := {"graph": {"connectors": [
+		{"id": "dst_in_gui", "kind": "destination_in"}, {"id": "dst_in_dioda", "kind": "destination_in"},
+		{"id": "dst_in_proj", "kind": "destination_in"},
+		{"id": "gpu_p1", "kind": "gpu_out"}, {"id": "gpu_p2", "kind": "gpu_out"}, {"id": "gpu_p3", "kind": "gpu_out"}],
+		"edges": [{"sourceId": "dst_in_gui", "sinkId": "gpu_p3"},
+			{"sourceId": "dst_in_proj", "sinkId": "gpu_p2"},
+			{"sourceId": "dst_in_dioda", "sinkId": "gpu_p1", "note": "{\"outputLayer\":2}"},
+			{"sourceId": "dst_in_dioda", "sinkId": "gpu_p2"}]},
+		"screenDestinations": {"destinations": [{"id": "gui", "mode": "operator_gui"}, {"id": "dioda", "mode": "pgm_prv"},
+			{"id": "proj", "mode": "pgm_prv"}]}}
+	t.eq(GO.auto_sync_port(payload, 4), 3, "PRV-only cable skipped; first screen destination's PGM port (gpu_p2 = port 3)")
+	t.eq(GO.nvidia_sync_state({}, payload, 3), {"on": true, "auto": true}, "auto on, flagged auto")
+	t.eq(GO.nvidia_sync_state({}, payload, 2).on, false, "other ports not on")
+	t.eq(GO.nvidia_sync_state({"screen_4_operator_monitor": true}, payload, 3).on, true, "operator monitor on another port")
+	t.eq(GO.nvidia_sync_state({"screen_3_operator_monitor": true}, payload, 3).on, false, "never the operator monitor port")
+	t.eq(GO.nvidia_sync_state({"screen_2_nvidia_sync_to_display": true}, payload, 2), {"on": true, "auto": false}, "explicit tick wins")
+	t.eq(GO.nvidia_sync_state({"screen_2_nvidia_sync_to_display": true}, payload, 3).on, false, "explicit tick moves it")
+	t.eq(GO.nvidia_sync_state({"nvidia_sync_to_display_off": true}, payload, 3).on, false, "explicit off wins over auto")
+	t.eq(GO.nvidia_sync_state({"screen_3_nvidia_sync_to_display": false}, payload, 3).on, true, "stored false is NOT an explicit off")
+	# save paths: leaving the auto tick alone writes nothing about it; unticking = off; ticking pins + clears off
+	var st := {"port_n": 3, "screen_n": 3, "mv": false, "nvidia_sync": true, "nvidia_auto": true}
+	var ui := {"windowed": true, "vsync": false, "border": true, "mode": "1080p5000", "custom_w": "1920", "custom_h": "1080",
+		"custom_fps": "50", "stretch": "none", "key_only": false, "aot": true, "sbs_key": false, "colour": "RGB", "force_linear": true,
+		"mipmaps": false, "high_bitdepth": false, "name": "", "ar": "", "pos_x": "0", "pos_y": "0", "operator_monitor": false,
+		"interactive": false, "nvidia_sync": true}
+	var body: Dictionary = GO.caspar_patch(st, ui).casparServer
+	t.eq(body.has("screen_3_nvidia_sync_to_display") or body.has("nvidia_sync_to_display_off"), false, "auto tick left alone on save")
+	ui.nvidia_sync = false
+	body = GO.caspar_patch(st, ui).casparServer
+	t.eq([body.get("screen_3_nvidia_sync_to_display"), body.get("nvidia_sync_to_display_off")], [false, true], "untick auto = explicit off")
+	st.nvidia_sync = false
+	st.nvidia_auto = false
+	ui.nvidia_sync = true
+	body = GO.caspar_patch(st, ui).casparServer
+	t.eq([body.get("screen_3_nvidia_sync_to_display"), body.get("nvidia_sync_to_display_off")], [true, false], "tick = explicit port, off cleared")
+	t.eq(GO.reset_patch(st).casparServer.get("nvidia_sync_to_display_off", "missing"), null, "reset = back to auto")

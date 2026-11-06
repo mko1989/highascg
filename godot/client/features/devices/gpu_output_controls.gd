@@ -158,9 +158,12 @@ func _toggles() -> Control:
 	f.add_theme_constant_override("v_separation", 0)
 	var add := func(field: String, label: String, tip: String) -> void:
 		var on: bool = (not ui.windowed) if field == "fullscreen" else ui[field]
-		var cb := _check(label, on, tip)
+		var cb := _check(label + (" (auto)" if field == "nvidia_sync" and on and _env.cst.get("nvidia_auto", false) else ""), on, tip)
 		cb.add_theme_font_size_override("font_size", 10)
-		cb.toggled.connect(func(v: bool) -> void: _edit(field, v))
+		cb.toggled.connect(func(v: bool) -> void:
+			if field == "nvidia_sync":
+				cb.text = label  # WO-975: a hand edit ends the "(auto)" marker
+			_edit(field, v))
 		_w[field] = cb
 		f.add_child(cb)
 	for c in BASE_CHECKS:
