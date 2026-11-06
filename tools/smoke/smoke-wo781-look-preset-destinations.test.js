@@ -90,9 +90,8 @@ describe('WO-781 empty destinations', () => {
 		assert.match(read('look_preset_page.gd'), /Destinations\.set_only\(M\.mains_of\(p\)\)/)
 		assert.match(read('look_preset_strip.gd'), /var bus: Dictionary = page\.true_buses\(\)/)
 		const tab = read('live_tab.gd')
-		assert.match(tab, /for k in \["looks"\]:/) // WO-783: presets left the card section for the right column's tab
 		assert.match(tab, /InspectorPanel\.current\.add_tab\("Look presets", presets\)/)
-		assert.match(tab, /cfg\.set_value\("live", "show_" \+ kind, on\)/)
-		assert.match(read('deck_view.gd'), /for s in \(looks if show_looks else \[\]\):/)
+		assert.doesNotMatch(tab, /show_looks|_show_btns/) // WO-972: the toolbar "Looks" toggle is gone (looks always shown)
+		assert.match(read('deck_view.gd'), /for s in looks:/)
 	})
 })

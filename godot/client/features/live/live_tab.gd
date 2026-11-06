@@ -18,7 +18,6 @@ const ScreensMenu := preload("res://features/live/screens_menu.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
 const LivePreview := preload("res://features/live/live_preview.gd")
-const UI_CFG := "user://ui.cfg"
 const ACTION_HINT := "Click a look: stage on PRV · double-click: TAKE"
 
 var preview: LivePreview  # WO-789: the 2D / 3D preview, shared with the Timeline tab
@@ -29,7 +28,6 @@ var timers: ScreenTimerPanel
 var border: GlobalBorderPanel
 var presets: LookPresetPage
 var layer_presets: LayerPresetPage  # WO-952: the right column's "Layer presets" tab
-var _show_btns := {}  # WO-781: deck toolbar "Looks" toggle (WO-783: presets moved to the right column's tab)
 var _action: Label
 var _slug := ""  # WO-918 F24: the project the status line talks about
 var osc: Node  # the shell's OscMirror (set before _ready)
@@ -71,6 +69,7 @@ func _ready() -> void:
 	deck.osc_mirror = osc
 	deck.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	deck.custom_minimum_size.y = 260  # a ScrollContainer has no content minimum — without this it collapses
+	deck.add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_PANEL, ThemeBuilder.BORDER, 0, 0))  # WO-972: lighter than the black preview beside it
 	var inner := HSplitContainer.new()
 	inner.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bottom.add_child(inner)
@@ -138,10 +137,6 @@ func _ready() -> void:
 		_action.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR)
 		if editor.visible:  # the action line hides with the deck (WO-621 N5); the editor TAKE answers in its own status
 			editor.show_status(text))
-	var cfg := ConfigFile.new()
-	cfg.load(UI_CFG)
-	for k in _show_btns:  # WO-781: which cards the card section shows (this client's view)
-		_set_shown(k, bool(cfg.get_value("live", "show_" + k, true)), false)
 
 
 ## WO-606 — Shader Live on / off (header logo, deck toolbar). `on` null = toggle.
@@ -167,15 +162,6 @@ func _transition_toolbar() -> Control:
 	all.tooltip_text = "Set the default transition on every look (with 2+ mains: the active main's deck)"
 	all.pressed.connect(func() -> void: deck.apply_default_to_all())
 	bar.add_child(all)
-	for k in ["looks"]:  # WO-781: show / hide the look cards in the card section (presets: the right column's tab)
-		var b := Button.new()
-		b.text = "Looks"
-		b.toggle_mode = true
-		b.button_pressed = true
-		b.tooltip_text = "Show the look cards in each screen's column"
-		b.toggled.connect(func(on: bool) -> void: _set_shown(k, on, true))
-		bar.add_child(b)
-		_show_btns[k] = b
 	bar.add_child(ScreensMenu.new())  # WO-959: destinations + eyes per screen (WO-953 hide)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _sync_default_row())
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
@@ -183,17 +169,6 @@ func _transition_toolbar() -> Control:
 			_sync_default_row())
 	_sync_default_row.call_deferred()
 	return bar
-
-
-func _set_shown(kind: String, on: bool, persist: bool) -> void:
-	(_show_btns[kind] as Button).set_pressed_no_signal(on)
-	if kind == "looks":
-		deck.show_looks = on
-	if persist:
-		var cfg := ConfigFile.new()
-		cfg.load(UI_CFG)
-		cfg.set_value("live", "show_" + kind, on)
-		cfg.save(UI_CFG)
 
 
 ## The project's default transition with the auto sentinel resolved to frames at screen 0's fps

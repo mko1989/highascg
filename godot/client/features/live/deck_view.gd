@@ -31,10 +31,6 @@ var _dirty := true
 var _main_for_card := 0
 var _press_id := ""  # the card a left press landed on (WO-762: PRV on release, not on a drag)
 var osc_mirror: Node  # WO-600 O: set by the live tab before the first rebuild
-var show_looks := true:  # WO-781: deck toolbar "Looks" — the columns keep their header, timer and blank space
-	set(v):
-		show_looks = v
-		_dirty = true
 
 
 func _ready() -> void:
@@ -106,8 +102,7 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	scroll.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))
 	scroll.add_child(grid)
 	col.add_child(scroll)
-	grid.visible = show_looks
-	for s in (looks if show_looks else []):
+	for s in looks:
 		grid.add_child(_card(s, bus))
 	grid.add_child(_add_tile(main))
 	BlankClear.wire(col, main, cm, action_result.emit)

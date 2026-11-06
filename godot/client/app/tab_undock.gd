@@ -37,6 +37,7 @@ var _save_t: Timer
 var _poll_t: Timer
 var _main_btn: Button  # the main workspace's corner: send the current tab to the second monitor
 var _win_btn: Button  # the second window's corner: send its current tab back
+var _has_second := false  # WO-972: a second operator monitor is there (Devices cable / second screen off the box)
 
 
 func _ready() -> void:
@@ -61,6 +62,7 @@ func setup(tabs: TabContainer) -> void:
 			move_to_second(str(c.name)))
 	tabs.tab_changed.connect(func(_i: int) -> void: _refresh_buttons())
 	_refresh_buttons()
+	_probe_second()
 
 
 ## ui.cfg → the tabs that were on the second monitor go back there (no saved tabs: the window stays closed).
@@ -151,9 +153,27 @@ func _move(p: Control, to: TabContainer, pick: bool) -> void:
 ## the second window shows any.
 func _refresh_buttons() -> void:
 	var c := main_tabs.get_current_tab_control()
-	_main_btn.visible = c != null and M.movable(str(c.name))
+	_main_btn.visible = _has_second and c != null and M.movable(str(c.name))
 	if win != null:
 		_win_btn.visible = win.tabs.get_current_tab_control() != null
+
+
+## WO-972: no second operator monitor → no send-to-2 arrow. On the box the Devices cable (operator monitor 2, WO-920)
+## must sit on a screen this machine has; off the box any second screen counts. Re-asked on every config change
+## (recheck), so the arrow follows the Devices tab, not only the startup.
+func set_has_second(on: bool) -> void:
+	_has_second = on
+	_refresh_buttons()
+
+
+func _probe_second() -> void:
+	if api == null:
+		set_has_second(DisplayServer.get_screen_count() > 1)
+		return
+	var r: Dictionary = await api.get_json("/api/system/operator-screen")
+	if r.ok and r.data is Dictionary:
+		var matched := ScreenModel.match_outputs((r.data as Dictionary).get("outputs", []), _screens())
+		set_has_second(M.cabled_screen(matched) >= 0)
 
 
 ## An icon button over the right end of a tab container's strip — a child of its TabBar (spans the full width): a child
@@ -235,6 +255,7 @@ static func _screens() -> Array:
 ## WO-920: the cables may have changed (shell.gd: a Devices write, a project switch) — the X layout poll never sees a
 ## cable, so ask the server again and move the window only when its pick did (dot 2 cabled to another monitor).
 func recheck() -> void:
+	_probe_second()
 	if win == null or api == null:
 		return
 	var screens := _screens()

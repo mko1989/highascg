@@ -120,6 +120,7 @@ func _rig() -> Dictionary:
 	u.cfg_path = CFG
 	t.root.add_child(u)
 	u.setup(tabs)
+	u.set_has_second(true)  # WO-972: the send-to-2 arrow needs a second operator monitor (headless: one screen)
 	return {"tabs": tabs, "u": u, "probe": probe}
 
 
@@ -141,6 +142,10 @@ func test_move_to_second_and_back() -> void:
 	await t.process_frame
 	r.probe.flips.clear()
 	t.ok(u._main_btn.visible, "it shows on a movable tab")
+	u.set_has_second(false)  # WO-972: no second operator monitor in the Devices config → no send-to-2 icon
+	t.ok(not u._main_btn.visible, "the send-to-2 icon is hidden without a second operator monitor")
+	u.set_has_second(true)
+	t.ok(u._main_btn.visible, "and it comes back when the second monitor does")
 	t.eq(tabs.get_tab_button_icon(0), null, "no per-tab strip buttons (owner 31.10: one corner button)")
 	t.eq(tabs.get_tab_count(), tabs.get_children().size(), "the corner button is not a tab")
 	u.set_title(u.page("Devices"), "Devices (1)")
