@@ -45,6 +45,7 @@ func _ready() -> void:
 	_list = OptionButton.new()
 	_list.tooltip_text = "Playlists in the looks (look · layer · channel) — ● playing on program"
 	_list.fit_to_longest_item = false
+	_list.clip_text = true  # WO-977: a long clip name must not set the Inspector's minimum width
 	_list.item_selected.connect(func(i: int) -> void:
 		_sel_key = str(_list.get_item_metadata(i))
 		_render())
@@ -52,6 +53,7 @@ func _ready() -> void:
 	_items = OptionButton.new()
 	_items.tooltip_text = "Items — selecting one jumps to it (live) or sets where playout starts (not live)"
 	_items.fit_to_longest_item = false
+	_items.clip_text = true
 	_items.item_selected.connect(_on_item)
 	_content.add_child(_items)
 	var tl := HBoxContainer.new()
