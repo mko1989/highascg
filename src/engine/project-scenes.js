@@ -227,8 +227,8 @@ function canonicalKeys(o) {
 	return ints.length ? ints.concat(strs) : strs
 }
 
-function canonicalPart(v) {
-	if (v && typeof v === 'object' && typeof v.toJSON === 'function') v = v.toJSON()
+function canonicalPart(v, key = '') {
+	if (v && typeof v === 'object' && typeof v.toJSON === 'function') v = v.toJSON(key)
 	if (v === null || typeof v !== 'object') {
 		if (typeof v === 'number') return Number.isFinite(v) ? String(v) : 'null'
 		if (typeof v === 'boolean') return v ? 'true' : 'false'
@@ -236,13 +236,13 @@ function canonicalPart(v) {
 	}
 	if (Array.isArray(v)) {
 		let out = '['
-		for (let i = 0; i < v.length; i++) out += (i ? ',' : '') + (canonicalPart(v[i]) ?? 'null')
+		for (let i = 0, n = v.length; i < n; i++) out += (i ? ',' : '') + (canonicalPart(v[i], String(i)) ?? 'null')
 		return out + ']'
 	}
 	let out = '{'
 	let first = true
 	for (const k of canonicalKeys(v)) {
-		const part = canonicalPart(v[k])
+		const part = canonicalPart(v[k], k)
 		if (part === undefined) continue
 		out += (first ? '' : ',') + (SAFE_KEY.test(k) ? '"' + k + '"' : JSON.stringify(k)) + ':' + part
 		first = false
@@ -250,7 +250,7 @@ function canonicalPart(v) {
 	return out + '}'
 }
 
-/** WO-981: hand-rolled, byte-identical to the old `JSON.stringify(v, replacer-that-sorts-keys)` (checked against it on
+/** WO-981: hand-rolled, byte-identical (for JSON data: no getters with side effects) to the old `JSON.stringify(v, replacer-that-sorts-keys)` (checked against it on
  * every stored project; tools/smoke/smoke-wo981-canonical-json.test.js) — that replacer rebuilt + sorted every object through
  * Object.fromEntries, several times slower. */
 function canonicalJson(v) {
