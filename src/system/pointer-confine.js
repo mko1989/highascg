@@ -7,9 +7,8 @@
  *
  * There is deliberately NO fallback. The old xdotool warp poll (80 ms setInterval → two subprocess
  * spawns per tick) was removed in WO-391b — see the block comment below `tryBarrierConfine`. If
- * barriers cannot start, the pointer is left unconfined and the 8 s watchdog retries.
- *
- * HIGHASCG_POINTER_CONFINE_XGRAB=1 still opts into legacy XGrabPointer (breaks interactive).
+ * barriers cannot start, the pointer is left unconfined and the 8 s watchdog retries. (The opt-in XGrabPointer
+ * path, HIGHASCG_POINTER_CONFINE_XGRAB + confine-cursor.py, broke multiview/interactive and was removed in WO-995.)
  */
 'use strict'
 
@@ -21,7 +20,6 @@ const {
 	resolveOperatorMonitorRect,
 	evaluateOperatorPointerConfineDesire,
 	resolveConfineBarriersScript,
-	resolveConfineCursorScript,
 	displaySessionEnv,
 } = require('../utils/x-display-session')
 const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
@@ -67,11 +65,6 @@ let lastSyncFailed = false
 let noRectRetry = null
 const NO_RECT_RETRIES = 3
 const NO_RECT_RETRY_MS = 3000
-
-function envTruthy(name) {
-	const v = String(process.env[name] || '').trim().toLowerCase()
-	return v === '1' || v === 'true' || v === 'yes'
-}
 
 function confineKey(rect) {
 	if (!rect?.sysId) return null
@@ -262,32 +255,6 @@ async function tryBarrierConfine(rect, env, log) {
  * expensively) is neither.
  */
 
-async function pythonXlibAvailable(env) {
-	try {
-		await execFileAsync('python3', ['-c', 'from Xlib import X'], { env, timeout: 4000 })
-		return true
-	} catch {
-		return false
-	}
-}
-
-async function tryPythonXgrabConfine(config, rect, env, log, opts, layout) {
-	const script = resolveConfineCursorScript()
-	if (!script || !rect.sysId || !(await pythonXlibAvailable(env))) return null
-	stopBarrierProc(env)
-	confineProc = spawn('python3', [script, rect.sysId], { env, detached: true, stdio: 'ignore' })
-	confineProc.unref()
-	await waitMs(500)
-	if (confineProc.exitCode == null && !confineProc.killed) {
-		log?.('warn', `[Pointer confine] XGrabPointer on ${rect.sysId} — may break Caspar interactive`)
-		activeConfineKey = confineKey(rect)
-		activeConfineRect = rect
-		return { ok: true, rect, mode: 'xgrab' }
-	}
-	stopBarrierProc(env)
-	return null
-}
-
 /**
  * @param {object} config
  * @param {{ log?: Function, layout?: object, steadyTick?: boolean }} [opts] — steadyTick marks the
@@ -335,11 +302,6 @@ async function startPointerConfine(config, opts = {}) {
 	watchOpts = opts
 	// WO-568: operator monitor is set — leave the cursor visible, don't auto-hide it.
 	await ensureUnclutterStopped(env, log)
-
-	if (envTruthy('HIGHASCG_POINTER_CONFINE_XGRAB')) {
-		const xgrab = await tryPythonXgrabConfine(config, rect, env, log, opts, layout)
-		if (xgrab) return xgrab
-	}
 
 	const barriers = await tryBarrierConfine(rect, env, log)
 	if (barriers) {

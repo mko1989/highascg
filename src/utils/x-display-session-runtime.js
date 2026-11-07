@@ -17,7 +17,6 @@ const {
 	displaySessionEnv,
 	lookupCommandPath,
 	commandExists,
-	resolveConfineCursorScript,
 	resolveConfineBarriersScript,
 	resolveXdotoolBin,
 } = require('./x-display-session-runtime-env')
@@ -188,7 +187,6 @@ async function applyOperatorDisplaySession(config, opts = {}) {
 }
 
 module.exports = {
-	resolveConfineCursorScript,
 	resolveConfineBarriersScript,
 	resolveXdotoolBin,
 	buildConfineCursorShellLines,

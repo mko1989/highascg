@@ -45,8 +45,6 @@ EOF
 
 	install -m 755 "${PLAYOUT}/tools/runtime/highascg-nvidia-x-apply.sh" /usr/local/bin/highascg-nvidia-x-apply.sh
 	chmod 755 /usr/local/bin/highascg-nvidia-x-apply.sh
-	install -m 755 "${PLAYOUT}/tools/runtime/confine-cursor.py" /usr/local/bin/confine-cursor.py
-	chmod 755 /usr/local/bin/confine-cursor.py
 	install -m 755 "${PLAYOUT}/tools/runtime/confine-pointer-barriers.py" /usr/local/bin/confine-pointer-barriers.py
 	chmod 755 /usr/local/bin/confine-pointer-barriers.py
 	ok "nvidia-x-apply + confine-pointer-barriers installed"

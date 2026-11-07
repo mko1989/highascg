@@ -186,7 +186,6 @@ async function runDisplaySession(opts) {
 				displaySessionEnv: () => ({ DISPLAY: ':0' }),
 				lookupCommandPath: () => null,
 				commandExists: async () => true,
-				resolveConfineCursorScript: () => null,
 				resolveConfineBarriersScript: () => null,
 				resolveXdotoolBin: () => 'xdotool',
 			},

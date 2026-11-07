@@ -26,24 +26,6 @@ async function commandExists(bin) {
 }
 
 /**
- * @returns {string|null}
- */
-function resolveConfineCursorScript() {
-	const candidates = [
-		path.join(REPO_ROOT, 'tools/runtime/confine-cursor.py'),
-		'/usr/local/bin/confine-cursor.py',
-	]
-	for (const p of candidates) {
-		try {
-			if (fs.existsSync(p) && fs.statSync(p).isFile()) return p
-		} catch {
-			/* ignore */
-		}
-	}
-	return null
-}
-
-/**
  * XFixes pointer barriers — confines cursor without XGrabPointer (Caspar-safe).
  * @returns {string|null}
  */
@@ -81,7 +63,6 @@ module.exports = {
 	FALLBACK_PATH,
 	lookupCommandPath,
 	commandExists,
-	resolveConfineCursorScript,
 	resolveConfineBarriersScript,
 	resolveXdotoolBin,
 }
