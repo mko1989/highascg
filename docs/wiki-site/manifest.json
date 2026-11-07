@@ -1,7 +1,7 @@
 {
   "version": 2,
   "standalone": true,
-  "generatedAt": "2026-10-30T10:58:09.091Z",
+  "generatedAt": "2026-11-07T18:17:23.969Z",
   "defaultPage": "wiki--README",
   "categories": [
     "Home",
@@ -680,6 +680,14 @@
       "order": 900
     },
     {
+      "id": "install-cef",
+      "title": "CEF for CasparCG: what Caspar loads, how to check it, how to roll back",
+      "file": "install-cef.md",
+      "category": "Reference",
+      "description": "Work order: [WO-848](../work/work-orders/848_WO_install_cef_casparonly_pinning_symlinks.md).",
+      "order": 900
+    },
+    {
       "id": "DEFAULT_LOGINS",
       "title": "Default logins",
       "file": "DEFAULT_LOGINS.md",
@@ -741,14 +749,6 @@
       "file": "WALKTHROUGH_ARTNET_LED_WALL.md",
       "category": "Reference",
       "description": "**Badge:** [CONFIG+CASPAR-RESTART] — every step in this doc that changes fixtures requires a Caspar restart.",
-      "order": 900
-    },
-    {
-      "id": "WALKTHROUGH_PIXELMAP_FIXTURES",
-      "title": "Walkthrough — live-editable pixel-map fixtures (HighAsCG JS pipeline)",
-      "file": "WALKTHROUGH_PIXELMAP_FIXTURES.md",
-      "category": "Reference",
-      "description": "**Badge:** [DEPRECATED — legacyJsPixelmap flag] · [LIVE-EDITABLE] — everything here re-applies on save with **no Caspar restart** and no config regen.",
       "order": 900
     },
     {

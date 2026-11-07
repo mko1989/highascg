@@ -54,9 +54,6 @@ function coreDefaults() {
 			cefInteractiveBridge: true,
 			cefInteractiveLayer: 999,
 			cefRemoteDebuggingPort: 9222,
-			// WO-317/382/569: gated the kiosk's multi-helper taskbar. Nothing reads it since WO-646 deleted the kiosk
-			// helper-window runtime; kept so saved settings and POST /api/settings still round-trip it.
-			multiHelperTaskbar: true,
 		},
 		projectScopedMedia: {
 			enabled: true,
@@ -104,14 +101,6 @@ function coreDefaults() {
 			nuclearRequirePassword: false,
 			nuclearPassword: '',
 			nuclearPasswordHash: '',
-			/**
-			 * WO-242: JS pixel-mapping (Pixel Map tab editor + fixture DMX Art-Net/sACN output engine,
-			 * src/sampling/dmx-*) is deprecated in favor of native `pixelmap` screen destinations.
-			 * Default off/absent hides the legacy editor's UI entry points; the code itself is untouched
-			 * and this flag restores it (sACN output + restart-free remapping only exist on the legacy
-			 * path — native is Art-Net + config+restart only, see docs/ARTNET_PIXEL_MAPPING.md).
-			 */
-			legacyJsPixelmap: false,
 		},
 		composePreview: {
 			// Factory default is the simple canvas thumbnails (todos28.07.26 §2, owner) — the

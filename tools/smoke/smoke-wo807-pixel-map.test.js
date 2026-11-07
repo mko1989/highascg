@@ -245,9 +245,9 @@ describe('WO-807 project key and wiring', () => {
 		assert.match(svc, /pixelMap\.stop\(\)/)
 	})
 
-	it('routes are registered on an existing router line; the legacy JS pixel-map flag stays off', () => {
+	it('routes are registered on an existing router line; no legacy sampler', () => {
 		assert.match(SRC('src/api/router.js'), /require\('\.\/routes-pixel-map'\)\.register\(routes\)/)
-		assert.match(SRC('src/config/defaults-core.js'), /legacyJsPixelmap:\s*false/)
+		assert.doesNotMatch(SRC('src/config/defaults-core.js'), /legacyJsPixelmap/)
 		assert.doesNotMatch(SRC('src/fixtures/pixel-map-service.js'), /require\('\.\.\/sampling\//, 'no legacy sampler, no dmxnet')
 	})
 })

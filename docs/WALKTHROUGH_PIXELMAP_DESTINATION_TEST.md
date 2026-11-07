@@ -102,9 +102,8 @@ the only remaining variables on real hardware are the controller's patch and wir
 
 - **Every fixture-field edit needs Apply + Caspar restart.** The restart-dirty affordance on
   the Apply button tracks this.
-- **Native path is Art-Net only.** sACN and restart-free remapping exist only on the
-  deprecated JS pipeline (`legacyJsPixelmap` flag) — see the comparison in
-  [ARTNET_PIXEL_MAPPING.md](ARTNET_PIXEL_MAPPING.md).
+- **Native path is Art-Net only.** sACN and restart-free remapping existed only on the JS
+  pipeline removed in WO-831 — see [ARTNET_PIXEL_MAPPING.md](ARTNET_PIXEL_MAPPING.md).
 - **One whole-frame fixture group per destination.** Multiple groups, partial regions,
   rotation, serpentine/mirroring are NOT modeled by the destination UI — hand-edit per
   [WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md) (and know regen loses

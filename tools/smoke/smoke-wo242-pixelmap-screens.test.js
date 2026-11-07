@@ -383,16 +383,9 @@ describe('WO-242 T242.5/T242.6: UI wiring + legacy-flag deprecation gate (source
 		assert.match(read('client/components/device-view-actions.js'), /o\.type === 'pixelmap'/)
 	})
 
-	it('legacyJsPixelmap settings flag exists, defaults off, and gates the JS pixel-map UI entry points', () => {
-		assert.match(read('src/config/defaults-core.js'), /legacyJsPixelmap:\s*false/)
-		// Note: WO-253 removed the gates from pixel-map-editor.js and device-view-mappings-render.js.
-		// The flag remains defined but unused; see WO-253 T253.1.
-	})
-
-	it('docs badge the JS pipeline deprecated and document the native pixelmap screen flow', () => {
+	it('docs say the JS pipeline is gone and document the native pixelmap screen flow', () => {
 		const docs = read('docs/ARTNET_PIXEL_MAPPING.md')
-		assert.match(docs, /DEPRECATED/i)
-		assert.match(docs, /legacyJsPixelmap/)
+		assert.match(docs, /removed in WO-831/)
 		assert.match(docs, /Pixel-map screen \(native\)/i)
 	})
 })
@@ -439,9 +432,4 @@ describe('WO-253 T253.1/T253.2/T253.4: Un-deprecate mapping nodes + rename + doc
 		assert.doesNotMatch(docs, /Pixel Map editor overlay, ".*Add mapping node/, 'old incorrect description removed')
 	})
 
-	it('T253.3: walkthroughs clarify mapping nodes are not the JS engine', () => {
-		const fixtures = read('docs/WALKTHROUGH_PIXELMAP_FIXTURES.md')
-		assert.match(fixtures, /mapping nodes.*separate canvas-splitting/, 'walkthrough clarifies the distinction')
-		assert.doesNotMatch(fixtures, /UI entry points.*Pixel Map editor overlay.*Add mapping node/, 'old incorrect JS UI list corrected')
-	})
 })

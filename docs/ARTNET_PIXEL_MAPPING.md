@@ -1,7 +1,11 @@
 # Art-Net & pixel mapping — capability landscape (WO-241, updated WO-242)
 
 **Status:** Canonical reference (2026-07) | **Binary:** `bin/casparcg` highascg-build-v1, deployed 2026-07-15 — see [CASPARCG_BUILD_PROVENANCE.md](CASPARCG_BUILD_PROVENANCE.md)
-**Walkthroughs:** [WALKTHROUGH_PIXELMAP_DESTINATION_TEST.md](WALKTHROUGH_PIXELMAP_DESTINATION_TEST.md) (Pixel Map destination: real-world hookup + hardware-free testing, WO-438) · [WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md) (native engines, primary flow) · [WALKTHROUGH_PIXELMAP_FIXTURES.md](WALKTHROUGH_PIXELMAP_FIXTURES.md) (live JS pipeline, [DEPRECATED — legacyJsPixelmap flag])
+**Walkthroughs:** [WALKTHROUGH_PIXELMAP_DESTINATION_TEST.md](WALKTHROUGH_PIXELMAP_DESTINATION_TEST.md) (Pixel Map destination: real-world hookup + hardware-free testing, WO-438) · [WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md) (native engines, primary flow)
+
+> **The JS sampling pipeline (engine 1 below) was removed in WO-831 (30.10.26)** together with `src/sampling/`
+> and its `legacyJsPixelmap` flag (WO-995). Averaging a screen region into fixture pixels now lives in the WO-807
+> pixel-map service (`src/fixtures/pixel-map-service.js`). Engine 1 and its table column are kept as history.
 
 This rig has **three independent engines** that turn live video into DMX-over-network (Art-Net / sACN). They coexist; pick per production. Everything below is read from the code actually deployed — source cites are `file:line` into the built Caspar tree (`/home/casparcg/caspar-build/src-tree/`) and this repo.
 
@@ -28,17 +32,16 @@ the block being wiped by the next regen (that gap, flagged in WO-241 below, is c
    path — same mechanism as any "PGM only" destination), so it appears in decks/screen selectors,
    respects custom screen labels (WO-222), and takes onto it run the pgm-only path automatically. No
    preview bus is allocated for it.
-5. **What you lose vs. the legacy JS pipeline:** Art-Net only (no sACN), and every fixture-array
-   change needs a config regen + Caspar restart (no live remapping mid-show). If you need either of
-   those, re-enable the legacy engine below via `settings.ui.legacyJsPixelmap` instead.
+5. **What you lose vs. the removed JS pipeline:** Art-Net only (no sACN), and every fixture-array
+   change needs a config regen + Caspar restart (no live remapping mid-show).
 
 ---
 
 ## The three engines
 
-### 1. HighAsCG JS sampling pipeline — [LIVE-EDITABLE] · [DEPRECATED — legacyJsPixelmap flag]
+### 1. HighAsCG JS sampling pipeline — [REMOVED — WO-831]
 
-**WO-242:** this engine's fixture inspector (in the "Pixel Map" tab) is now hidden by default — the code is untouched and still fully functional, but new fixtures can't be created from the UI unless `settings.ui.legacyJsPixelmap` is set to `true` (default `false`/absent).
+History only: `src/sampling/` was deleted in WO-831; the text below describes it as it was.
 (Note: mapping nodes — the "+ Add mapping node" button in Device View — are NOT part of this pipeline; they are the canvas-splitting output feature and remain fully active.)
 Prefer the native "Pixel-map screen" flow above unless you specifically need sACN output or
 restart-free live remapping (see the walkthrough for the honest trade-off).
@@ -91,7 +94,7 @@ Also compiled in (provenance row 9). The opposite philosophy: **no regions, no a
 Concrete production ideas, each pointing at the right engine.
 
 1. **LED wall behind the stage, fed by a dedicated Caspar channel** — add a channel that carries wall content (loops, generative looks, a routed PGM copy), attach a native `<artnet>` consumer with one `fixture-count="WxH"` group per panel section. Area-averaged, restart-once, then rock solid all show. → [WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md).
-2. **Pixel-tape stage outlines sampled from PGM edges** — thin fixtures (e.g. 128×1) whose sample regions hug the top/side edges of the program frame, so the tape "continues" the picture beyond the screen. Live-editable placement matters here (you re-aim regions after the set changes) → JS pipeline, `sampleMode: 'average'`. → [WALKTHROUGH_PIXELMAP_FIXTURES.md](WALKTHROUGH_PIXELMAP_FIXTURES.md).
+2. **Pixel-tape stage outlines sampled from PGM edges** — thin fixtures (e.g. 128×1) whose sample regions hug the top/side edges of the program frame, so the tape "continues" the picture beyond the screen. Live-editable placement matters here (you re-aim regions after the set changes) → the WO-807 pixel-map service (the JS pipeline that did this was removed in WO-831).
 3. **Matrix / blinder walls driven by a looks layer** — play stingers/looks on a dedicated layer of a small channel and let the native `<artnet>` consumer's DIMMER type drive blinder cells (luma-weighted 0.279/0.547/0.106, `artnet_consumer.cpp:429`); RGBW matrix cells get proper white extraction (`min(r,g,b)`, `artnet_consumer.cpp:436-443`).
 4. **House-light color washes via sACN from PGM's dominant colors** — one or two big-region fixtures averaging the whole frame (or its left/right halves), protocol `sacn`, pointed at the house console's input universes. Only the JS pipeline speaks sACN, and it multicasts natively (`dmx-output.js:72-91`).
 5. **Floor grids / dance-floor pixels** — mid-size grid (e.g. 24×16): either engine. Choose native `<artnet>` when the floor is rigged once per venue; choose JS when the floor mapping is re-blocked between acts.
