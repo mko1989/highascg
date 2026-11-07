@@ -64,7 +64,8 @@ reporter that sums top-level durations per file, and a pool runner that times ev
   Two further runs (a second 4-core run of 81 s, and the box run) each reported 1 failure: the WO-846 hygiene check.
   I had created this WO file mid-run, before its INDEX entry existed. That is not a flake. No timing-sensitive test
   failed under the higher concurrency in 3 runs.
-- CI result after the push: see the coordinator note below.
+- **CI after the push** (run 42321313419, head `6bc00cfd`, green): Offline tests **4 m 02 s → 1 m 27 s**, `verify` job
+  4 m 50 s → 2 m 10 s, so push → green dropped from ~5 m 40 s to ~2 m 50 s.
 
 ## Proposals (not built)
 
