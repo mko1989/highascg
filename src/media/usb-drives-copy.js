@@ -20,9 +20,22 @@ function resolveUnderMount(mountRoot, relPath) {
 
 function collectFilesForImport(mountRoot, items, maxFiles = 50000) {
 	const root = path.resolve(mountRoot); const files = []
-	const walk = rel => {
+	let realRoot = null
+	const walk = (rel, selected) => {
 		const full = resolveUnderMount(root, rel); if (!full) return { error: 'Invalid path' }
 		let st; try { st = fs.lstatSync(full) } catch (e) { return { error: e.message } }
+		if (st.isSymbolicLink()) return {} // Keep skipping link entries during ordinary directory scans.
+		// WO-986: lstat only checks the leaf; an explicitly selected item can have a symlinked parent. Children are
+		// reached through a checked, non-link directory, so only the selected items need the realpath check.
+		if (selected) {
+			try {
+				if (realRoot === null) realRoot = fs.realpathSync(root)
+				const relative = path.relative(realRoot, fs.realpathSync(full))
+				if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
+					return { error: 'Path escapes drive' }
+				}
+			} catch (e) { return { error: e.message } }
+		}
 		if (st.isFile()) {
 			if (files.length >= maxFiles) return { error: 'Limit reached' }
 			files.push({ src: full, rel: path.relative(root, full).split(path.sep).join('/') })
@@ -30,14 +43,14 @@ function collectFilesForImport(mountRoot, items, maxFiles = 50000) {
 			try {
 				for (const d of fs.readdirSync(full, { withFileTypes: true })) {
 					if (d.name === '.' || d.name === '..') continue
-					const w = walk(rel ? `${rel}/${d.name}` : d.name); if (w.error) return w
+					const w = walk(rel ? `${rel}/${d.name}` : d.name, false); if (w.error) return w
 				}
 			} catch (e) { return { error: e.message } }
 		}
 		return {}
 	}
 	for (const it of items) {
-		const w = walk(String(it || '').replace(/\\/g, '/').replace(/^\/+/, ''))
+		const w = walk(String(it || '').replace(/\\/g, '/').replace(/^\/+/, ''), true)
 		if (w.error) return { files, error: w.error }
 	}
 	return { files }

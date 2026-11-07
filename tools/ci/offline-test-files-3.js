@@ -267,4 +267,6 @@ module.exports = [
 	'tools/smoke/smoke-983-timecode-scene-math.test.js',
 	'tools/smoke/smoke-983-timeline-schedule.test.js',
 	'tools/smoke/smoke-984-multiview-deadline.test.js',
+	'tools/smoke/smoke-984-resource-findings.test.js',
+	'tools/smoke/smoke-986-security.test.js',
 ]
