@@ -87,11 +87,7 @@
 		"exfat:starter-zip": "bash tools/eggs/live-usb/pack-exfat-starter-zip.sh",
 		"bridge:starter-zip": "bash tools/eggs/live-usb/pack-bridge-starter-zip.sh",
 		"eggs:build": "sudo bash tools/eggs/live-usb/build-highascg-egg.sh",
-		"eggs:build-flash": "sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh",
-		"eggs:clone-flash-tmux": "bash work/run-eggs-clone-flash-tmux.sh --attach",
-		"eggs:clone-flash": "sudo -E bash work/run-eggs-clone-flash.sh -y",
-		"deploy:mirror-tmux": "bash work/run-deploy-mirror-tmux.sh --attach",
-		"deploy:parallel-eggs-sync": "bash work/run-parallel-eggs-and-sync.sh"
+		"deploy:mirror-tmux": "bash work/run-deploy-mirror-tmux.sh --attach"
 	},
 	"engines": {
 		"node": ">=20"

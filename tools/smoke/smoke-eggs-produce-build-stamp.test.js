@@ -1,6 +1,6 @@
 'use strict'
 
-/* WO-471 — every produce must stamp the build, not just the flash wrapper.
+/* WO-471 — every produce must stamp the build, not just the flash wrapper (retired in WO-996).
  *
  * WO-432 wrote BUILD_STAMP in build-produce-flash-stick.sh. But `npm run eggs:build`
  * (build-highascg-egg.sh) is the main workflow and bypasses that wrapper, so ISOs built that way
@@ -9,8 +9,7 @@
  * 2026.05.20, and a same-day ISO reported that in Settings -> Updates. compareBuildStamps() then
  * weighed the bogus value against real release stamps — the WO-424 failure mode again.
  *
- * The write now lives in the produce script (single writer); the wrapper only exports the stamp so
- * both phases print the same one. */
+ * The write now lives in the produce script (single writer). */
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
@@ -22,7 +21,6 @@ const ROOT = path.join(__dirname, '..', '..')
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8')
 
 const EGG = 'tools/eggs/live-usb/build-highascg-egg.sh'
-const WRAPPER = 'tools/eggs/live-usb/build-produce-flash-stick.sh'
 
 test('WO-471: the produce script itself writes BUILD_STAMP, before eggs produce', () => {
 	const src = read(EGG)
@@ -39,13 +37,15 @@ test('WO-471: the produce script itself writes BUILD_STAMP, before eggs produce'
 	assert.match(src, /HIGHASCG_BUILD_STAMP:-\$\(date -u \+%Y-%m-%d_%H%M%S\)/, 'honours HIGHASCG_BUILD_STAMP')
 })
 
-test('WO-471: the flash wrapper defers to the produce script (single writer)', () => {
-	const src = read(WRAPPER)
-	assert.match(src, /export HIGHASCG_BUILD_STAMP=/, 'wrapper exports the stamp for the produce script')
-	assert.ok(
-		!src.includes('>"${REPO_ROOT}/BUILD_STAMP"'),
-		'wrapper must NOT write BUILD_STAMP itself — two writers can disagree on the timestamp',
-	)
+/* WO-996 retired the flash wrapper; the single-writer rule now covers every eggs script. */
+test('WO-471: the produce script is the only BUILD_STAMP writer', () => {
+	const dir = 'tools/eggs/live-usb'
+	const writers = fs
+		.readdirSync(path.join(ROOT, dir))
+		.filter((f) => f.endsWith('.sh'))
+		.map((f) => `${dir}/${f}`)
+		.filter((rel) => read(rel).includes('>"${REPO_ROOT}/BUILD_STAMP"'))
+	assert.deepEqual(writers, [EGG], 'two writers can disagree on the timestamp')
 })
 
 test('WO-471: BUILD_STAMP is not excluded from the squashfs', () => {

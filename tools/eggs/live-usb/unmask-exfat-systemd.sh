@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reverse runtime masks from unmount-usb-for-partitioning.sh / stop-and-unmount-wo47-for-eggs-produce.sh
+# Reverse runtime masks from stop-and-unmount-wo47-for-eggs-produce.sh (and a hand-set USB auto-mount inhibit)
 [[ "$(id -u)" -eq 0 ]] || {
 	echo "Run as root: sudo $0" >&2
 	exit 1

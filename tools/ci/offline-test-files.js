@@ -129,7 +129,6 @@ module.exports = [
 	'tools/smoke/smoke-wo429-iso-secrets-excluded.test.js',
 	'tools/smoke/smoke-wo430-decklink-kernel-module-excluded.test.js',
 	'tools/smoke/smoke-wo433-headers-ship-downloads-scan.test.js',
-	'tools/smoke/smoke-wo434-no-drop-seed-embed-server.test.js',
 	'tools/smoke/smoke-wo436-mapping-inspector-cache-revert.test.js',
 	'tools/smoke/smoke-wo437-mapping-dims-gl-sync.test.js',
 	'tools/smoke/smoke-wo439-nvidia-sync-tick-mapping-rig.test.js',

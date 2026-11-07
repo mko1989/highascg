@@ -12,8 +12,8 @@
 set -euo pipefail
 
 HERE_VERIFY="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-# shellcheck source=flash-stick-common.sh
-source "${HERE_VERIFY}/flash-stick-common.sh"
+# shellcheck source=iso-find-lib.sh
+source "${HERE_VERIFY}/iso-find-lib.sh"
 # shellcheck source=iso-read-lib.sh
 source "${HERE_VERIFY}/iso-read-lib.sh"
 # shellcheck source=eggs-cli-lib.sh

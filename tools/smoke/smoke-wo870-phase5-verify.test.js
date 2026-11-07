@@ -47,7 +47,7 @@ function fakeBzImage(file, release) {
 
 describe('WO-870 P5: find_newest_iso_since accepts both flavors', () => {
 	const find = (nest, since, prefix) =>
-		bash(`source "${EGGS}/flash-stick-common.sh"; find_newest_iso_since ${since} "${prefix}"`, { EGGS_NEST: nest })
+		bash(`source "${EGGS}/iso-find-lib.sh"; find_newest_iso_since ${since} "${prefix}"`, { EGGS_NEST: nest })
 
 	it('new name in the nest, legacy name in mnt/, exact prefix, symlink dated by its target', () => {
 		const nest = path.join(tmp, 'nest')
@@ -85,12 +85,17 @@ describe('WO-870 P5: find_newest_iso_since accepts both flavors', () => {
 	})
 
 	it('every ISO lookup site uses the shared finder or the eggs-cli-lib glob (no 595 literals)', () => {
+		/* WO-996: the dd-flash callers are gone; the finder moved to iso-find-lib.sh. */
+		assert.ok(!fs.existsSync(path.join(EGGS, 'flash-stick-common.sh')), 'the dd-flash lib stays retired')
 		for (const f of [
-			'build-produce-flash-stick.sh',
-			'create-operator-stick-from-dd.sh',
-			'legacy-persistence/build-flash-and-persist.sh',
+			'build-highascg-egg.sh',
+			'preview-live-iso-qemu.sh',
+			'verify-iso-boot-branding.sh',
+			'verify-iso-squashfs-excludes.sh',
 		]) {
-			assert.match(code(`tools/eggs/live-usb/${f}`), /find_(latest_iso|newest_iso_since)/, f)
+			const src = code(`tools/eggs/live-usb/${f}`)
+			assert.match(src, /\/iso-find-lib\.sh"/, `${f} sources the shared finder`)
+			assert.match(src, /find_(latest_iso|newest_iso_since)/, f)
 		}
 		const egg = code('tools/eggs/live-usb/build-highascg-egg.sh')
 		assert.match(egg, /highascg_eggs_iso_glob "\$BASENAME"/, 'Done/next-step lines use the flavor glob')
@@ -100,11 +105,6 @@ describe('WO-870 P5: find_newest_iso_since accepts both flavors', () => {
 		assert.ok(!/nvidia-595/.test(code('work/run-eggs-produce-clone-only.sh')), 'clone-only runner detects the branch')
 	})
 
-	it('ISO sizes follow the coa symlink (partitioning and the size floor)', () => {
-		assert.ok(code('tools/eggs/live-usb/flash-stick-common.sh').includes('stat -L -c%s "$iso"'))
-		const dd = code('tools/eggs/live-usb/create-operator-stick-from-dd.sh')
-		assert.ok(dd.includes('du -mL "$ISO"') && dd.includes('stat -L -c%s "$ISO"'))
-	})
 })
 
 describe('WO-870 P5: liveroot busy guard sees the new build processes', () => {

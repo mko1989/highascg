@@ -9,8 +9,7 @@
 #   sudo bash work/run-eggs-prepare-safe.sh
 #   sudo HIGHASCG_NVIDIA_DRIVER=595 bash work/run-eggs-produce-from-host.sh
 #
-# Flash stick (includes drop-update seed with dist-web):
-#   sudo bash tools/eggs/live-usb/create-operator-stick-from-dd.sh /dev/sdX
+# Then copy the ISO onto a Ventoy stick (docs/STICK_QUICK_START.md).
 set -euo pipefail
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -57,5 +56,5 @@ echo
 echo "Next:"
 echo "  sudo bash work/run-eggs-prepare-safe.sh"
 echo "  sudo HIGHASCG_NVIDIA_DRIVER=595 bash work/run-eggs-produce-from-host.sh"
-echo "  sudo bash tools/eggs/live-usb/create-operator-stick-from-dd.sh /dev/sdX"
+echo "  copy the ISO onto a Ventoy stick (docs/STICK_QUICK_START.md)"
 echo

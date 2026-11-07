@@ -4,7 +4,7 @@
 
 > **This file used to duplicate that procedure using Balena Etcher and a fixed 6 GiB offset.** Both are retired. Ventoy keeps the ISO as a file on its own partition, so operator data must live on a **separate third partition** — while the machine is booted from the stick, Ventoy holds its own partition open and Linux cannot mount it. Duplicated procedures are how the old offset rule survived in three places at once; this document is now the **contents** reference only.
 
-Union **persistence is legacy** and not for production: see [legacy-persistence/FLASH_AND_PERSIST.md](./legacy-persistence/FLASH_AND_PERSIST.md).
+Union **persistence is retired** and not for production; durable data lives on `HIGHASCGEXF`.
 
 ---
 

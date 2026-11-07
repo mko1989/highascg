@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-904 live WOs (28 open, 121 in progress, 755 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+905 live WOs (28 open, 121 in progress, 756 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -702,7 +702,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
 - 958 DONE [devices-config+godot-client] Devices tab shows every server as "2026.05.20": the cluster read package.json's… → 958_WO_devices_tab_shows_frozen_package_version.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (85)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (86)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -789,6 +789,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 938 DONE [os-iso+devices-config] The mouse arrow's tail showed on the Dioda wall when parked at the operator mon… → 938_WO_pointer_sprite_shows_on_program_output_past_barrier.md
 - 939 DONE [os-iso+caspar-build] Calamares installs keep a locale the image does not carry (en_US.UTF-8) and Cas… → 939_WO_calamares_install_locale_not_installed_caspar_cannot_start.md
 - 975 DONE [os-iso+godot-client] NVIDIA "sync to display" auto-on for the first GPU port feeding a PGM → 975_WO_nvidia_sync_auto_first_pgm_port.md
+- 996 DONE [os-iso+process] Retire the dd-flash / scripted-partition stick tools (sticks are Ventoy-only) → 996_WO_retire_dd_flash_stick_tools.md
 
 ## network — Cluster, replication, Tailscale, auth (42)
 

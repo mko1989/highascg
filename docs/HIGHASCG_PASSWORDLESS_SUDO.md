@@ -132,6 +132,6 @@ sudo -n -u casparcg /usr/bin/true
 
 ## See also
 
-- `tools/eggs/live-usb/build-flash-and-persist.sh` — build + flash USB (run as **root**, not via Web UI)
+- `tools/eggs/live-usb/build-highascg-egg.sh` — build the ISO (run as **root**, not via Web UI)
 - `scripts/README.md` — install overview
 - [reference/SUDO_UBUNTU_SETUP.md](reference/SUDO_UBUNTU_SETUP.md) — historical / audio-related sudo notes

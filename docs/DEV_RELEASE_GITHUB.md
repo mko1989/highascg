@@ -94,7 +94,7 @@ Useful variants:
 
 ## ISO discovery
 
-The helper uses **`find_latest_iso`** from [`flash-stick-common.sh`](../tools/eggs/live-usb/flash-stick-common.sh) (same rule as flashing tools — typically **`/home/eggs/**/*.iso`** newest). Align **`BASENAME`** with Eggs output if you renamed the image. ISO names follow **`highascg_amd64_YYYY-MM-DD_HHMM.iso`**.
+The helper uses **`find_latest_iso`** from [`iso-find-lib.sh`](../tools/eggs/live-usb/iso-find-lib.sh) (typically **`/home/eggs/**/*.iso`** newest). Align **`BASENAME`** with Eggs output if you renamed the image. ISO names follow **`highascg_amd64_YYYY-MM-DD_HHMM.iso`**.
 
 ## Operator path: Stick Studio + release tarball
 

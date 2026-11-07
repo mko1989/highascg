@@ -274,7 +274,7 @@ describe('WO-832: 26.04 package names', () => {
 
 describe('WO-832 §7e: findmnt and stick QA', () => {
 	it('no script uses the non-existent `findmnt -L`', () => {
-		for (const f of ['tools/startup/stick-boot-test/stick-test-lib.sh', 'tools/startup/stick-boot-test/tests/test-03-exfat-operator.sh', 'tools/eggs/live-usb/flash-stick-common.sh']) {
+		for (const f of ['tools/startup/stick-boot-test/stick-test-lib.sh', 'tools/startup/stick-boot-test/tests/test-03-exfat-operator.sh']) {
 			const t = read(f)
 			assert.ok(!/findmnt[^\n]* -L /.test(t), f)
 			assert.match(t, /findmnt[^\n]*-S "?LABEL=/, f)

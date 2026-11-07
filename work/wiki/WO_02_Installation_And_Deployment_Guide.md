@@ -28,11 +28,10 @@ Running `sudo ./scripts/install.sh` sequentially sources five phases. It assumes
    ```
 6. **MOTD Injection**: Rewrites `/etc/update-motd.d/99-highascg` to print the Tailscale IP and Web UI link (`http://<host>:4200/`) when an operator SSHes into the box.
 
-**Operator stick seeding** (after `finish-operator-stick.sh`):
+**Operator stick seeding** (after preparing the Ventoy stick per `docs/STICK_QUICK_START.md`):
 
 ```bash
 sudo bash tools/eggs/live-usb/seed-exfat-operator-layout.sh /home/casparcg/exfat
-sudo bash tools/eggs/live-usb/seed-stick-config-from-host.sh /dev/sda   # optional: push configs/
 ```
 
 Creates `projects/`, `configs/`, `drop-update/`, etc. on `HIGHASCGEXF`. See [`docs/BRIDGE_DISK_AND_USB_EXFAT.md`](../../docs/BRIDGE_DISK_AND_USB_EXFAT.md).

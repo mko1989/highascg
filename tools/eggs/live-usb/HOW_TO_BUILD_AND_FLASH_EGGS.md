@@ -28,5 +28,5 @@ bash tools/eggs/live-usb/verify-stick-iso.sh /media/$USER/Ventoy/highascg-nvidia
 Preparing the stick itself (Ventoy install with reserved space, plus the `HIGHASCGEXF` data
 partition) is in **[`docs/STICK_QUICK_START.md`](../../../docs/STICK_QUICK_START.md)**.
 
-`build-produce-flash-stick.sh` still exists and still `dd`s an ISO onto a whole stick. That is the
-**pre-Ventoy** flow — it destroys the Ventoy layout and the operator data partition with it.
+Flashing an ISO onto a whole stick with `dd` / Etcher is deprecated: it destroys the Ventoy layout and the
+`HIGHASCGEXF` data partition.

@@ -61,7 +61,7 @@ On the machine that clones the live image:
    test ! -f /etc/systemd/system/home-casparcg-highascg-media.mount && echo OK
    ```
 
-4. Rebuild ISO and flash stick as usual (`build-produce-flash-stick.sh` or your pipeline).
+4. Rebuild the ISO (`build-highascg-egg.sh`) and copy it to the Ventoy stick (`docs/STICK_QUICK_START.md`).
 
 5. **Bridge disk on playout hardware** (not the USB stick): format or relabel internal data partition:
 
@@ -118,7 +118,7 @@ Logs: **`/var/log/highascg-exfat-boot.log`**, **`/var/log/highascg-bridge-boot.l
 | Step | Build host | Playout laptop |
 |------|------------|----------------|
 | WO-52 units in `/etc` before `eggs produce` | Required | — |
-| USB `HIGHASCGEXF` exFAT slot | `finish-operator-stick.sh` | Mounts at `~/exfat` |
+| USB `HIGHASCGEXF` exFAT slot | Ventoy third partition (`docs/STICK_QUICK_START.md`) | Mounts at `~/exfat` |
 | Internal `HIGHASCGDAT` partition | Optional on build host | Format + label on laptop |
 | `apply-bridge-label-highascgdat.sh` | Optional test | Run once per machine |
 | Media files | — | Under `bridge/media/`, visible via `media/bridge` bind |

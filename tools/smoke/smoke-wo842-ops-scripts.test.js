@@ -2,11 +2,10 @@
 
 /**
  * WO-842 — sweep 29.10 ops-script findings. Every script runs against stubs in a temp dir (fake ssh / systemctl /
- * mountpoint / dpkg / mkfs.exfat / clock); nothing here installs, mounts, formats or restarts anything.
+ * mountpoint / dpkg / clock); nothing here installs, mounts, formats or restarts anything.
  *  - dev-push.sh remote cleanup must not delete data/, .private/, projects/ (4k)
  *  - highascg-exfat-arrive.sh waits for the queued mount job
  *  - decklink_install_vendor_pair fails when dpkg fails twice
- *  - usb_mkfs_exfat_labeled returns non-zero when the format failed
  *  - Caspar crash-loop give-up can fire
  *  - tailscale-up with an empty hostname passes no --hostname
  *  - the power button listener checks the KEY_POWER capability bit
@@ -138,18 +137,6 @@ if decklink_install_vendor_pair "${deb}" "" ""; then echo RESULT=ok; else echo R
 	stub(bin, 'dpkg', `if [[ -e "${flag}" ]]; then exit 0; fi; touch "${flag}"; exit 1`)
 	const r2 = bash(script, { PATH: `${bin}:${process.env.PATH}` })
 	assert.match(r2.stdout, /RESULT=ok/, r2.stdout + r2.stderr)
-})
-
-test('usb_mkfs_exfat_labeled reports failure (the rc was read after the closing fi → always 0)', () => {
-	const bin = path.join(TMP, 'fs/bin')
-	stub(bin, 'mkfs.exfat', 'exit 3')
-	const lib = path.join(REPO, 'tools/eggs/live-usb/flash-stick-common.sh')
-	const r = bash(
-		`source "${lib}"; usb_prepare_partition_for_mkfs() { :; }; usb_partition_has_exfat_label() { return 1; }
-usb_mkfs_exfat_labeled /dev/null/fake LABEL 2>/dev/null; echo "rc=$?"`,
-		{ PATH: `${bin}:${process.env.PATH}` },
-	)
-	assert.match(r.stdout, /rc=3/, r.stdout + r.stderr)
 })
 
 test('Caspar crash-loop give-up fires when the crashes are quick (fake clock, dash)', () => {

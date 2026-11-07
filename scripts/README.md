@@ -106,7 +106,6 @@ Utility functions (listed above)
 #### `tools/eggs/live-usb/` — ISO/squashfs build helpers
 **High-level orchestrators:**
 - `build-highascg-egg.sh` — Full ISO bake (prepare → build → compress squashfs)
-- `build-produce-flash-stick.sh` — Clone ISO to USB + flash bootloader
 - `prepare-eggs-clone-with-exfat.sh` — Calamares + theme + exFAT prep
 
 **ISO content assembly:**
@@ -125,7 +124,6 @@ Utility functions (listed above)
 **ISO verification:**
 - `verify-startup-on-host.sh` — Boot-test before produce
 - `verify-iso-squashfs-excludes.sh` — Verify ISO contents
-- `verify-config-persistence.sh` — Test exFAT persistence
 - `verify-calamares-installed.sh` — Verify ISO installer
 
 **ExFAT helpers:**
@@ -141,9 +139,6 @@ Utility functions (listed above)
 
 #### `work/run-eggs-*.sh` — High-level orchestrators
 **Main wrappers (≤4 variants):**
-- `run-eggs-clone-flash.sh` — Clone ISO + flash to USB (plain terminal, no tmux)
-- `run-eggs-clone-flash-tmux.sh` — Clone ISO + flash (tmux multiplexed for monitoring)
-- `run-eggs-clone-flash-inner.sh` — Inner loop (called by clone-flash; do not run directly)
 - `run-eggs-prepare-safe.sh` — Prepare host (Calamares + theme; safe for build host)
 - `run-eggs-produce-from-host.sh` — Produce ISO (requires `eggs produce` on build host)
 - `run-eggs-produce-clone-only.sh` — ISO only (no flash to USB)
@@ -267,7 +262,6 @@ These are installed by `fix-calamares-shellprocess.sh` into the live-USB squashf
 | `scripts/deprecated/` | **The single archive** — everything retired lives here (WO-273) | Archive. WO-831 (owner 30.10: "delete anything dead") removed everything with no live caller; what remains is `legacy/` (still behind `scripts/install.sh`) and `nvidia/install-nvidia-gsp-rpc-workaround.sh` (called by `scripts/fix/fix-host-boot-display-hang.sh`). |
 | `scripts/deprecated/legacy/` | Old install phases (1–5), was `scripts/legacy/` | Superseded by `scripts/setup/01-16` ordered flow |
 | `scripts/fix/` | Duplicate sources of root `fix-*.sh` | Keep newest; deprecate pair |
-| `tools/eggs/live-usb/legacy-persistence/` | Old persistence schemes | Not used in current ISO |
 | `tools/eggs/unused/` | Unused eggs modules | Audit trail only |
 | `work/deprecated/` | Retired wrappers + stray helpers | Moved items only; do not reference |
 

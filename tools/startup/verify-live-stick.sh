@@ -71,7 +71,7 @@ if blkid -L persistence &>/dev/null; then
 		bad "persistence partition missing persistence.conf with '/ union'"
 	fi
 else
-	warn "no LABEL=persistence — run finish-operator-stick.sh after dd"
+	warn "no LABEL=persistence partition (expected on a Ventoy stick: durable config lives on HIGHASCGEXF)"
 fi
 
 echo
@@ -265,7 +265,7 @@ echo "  Optional marker: VERIFY_MARKER=my-test-key bash $0"
 
 echo
 if ((FAIL)); then
-	echo "Some checks failed — see FLASH_AND_PERSIST.md and rebuild/flash if branding failed."
+	echo "Some checks failed — see docs/STICK_QUICK_START.md; rebuild the ISO and recopy it to the Ventoy stick if branding failed."
 	exit 1
 fi
 echo "Checks complete."

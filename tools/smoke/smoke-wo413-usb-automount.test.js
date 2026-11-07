@@ -132,30 +132,17 @@ test('WO-416: inhibit file blocks mounting while present, resumes when removed',
 	assert.equal(h.calls.length, 1, 'mounts resume after the inhibit file is removed')
 })
 
-test('WO-416: flash pipeline sets/clears the inhibit the poller watches (source pins)', () => {
+/* WO-996: the dd-flash scripts that set the inhibit are gone (Ventoy-only); the poller gate and the unmask
+ * cleanup stay so a hand-set inhibit (touch before Ventoy2Disk.sh on the box) still works. */
+test('WO-416: the poller watches the inhibit path that unmask clears (source pins)', () => {
 	const INHIBIT = '/run/highascg/usb-automount-inhibit'
 
-	// Poller side: the gate checks the exact path the shell scripts touch.
+	// Poller side: the gate checks the exact path unmask removes.
 	const poller = read('src/media/usb-automount.js')
 	assert.match(poller, new RegExp(`INHIBIT_FILE = '${INHIBIT}'`), 'poller watches the shared path')
 
-	// Mask helper touches it, unmask removes it — both sides of the handshake.
-	const common = read('tools/eggs/live-usb/flash-stick-common.sh')
-	assert.match(common, new RegExp(`USB_AUTOMOUNT_INHIBIT=${INHIBIT}`), 'shell side pins the same path')
-	assert.match(common, /usb_mask_exfat_automount\(\) \{\n\tusb_inhibit_highascg_automount_poller/, 'mask sets the inhibit first')
 	const unmask = read('tools/eggs/live-usb/unmask-exfat-systemd.sh')
 	assert.match(unmask, /rm -f \/run\/highascg\/usb-automount-inhibit/, 'unmask clears the inhibit')
-
-	// TOCTOU guard: the unmount script verifies across a window longer than one
-	// 3 s poller tick and re-unmounts anything that reappears.
-	const unmount = read('tools/eggs/live-usb/unmount-usb-for-partitioning.sh')
-	assert.match(unmount, /for attempt in 1 2 3; do\n\tsleep 4/, 'settle window outlasts POLL_MS')
-	assert.match(unmount, /usb_umount_disk_partitions "\$DEV"/, 're-unmounts on reappearance')
-
-	// The full-flash script holds the inhibit through seed phases and always releases it.
-	const create = read('tools/eggs/live-usb/create-operator-stick-from-dd.sh')
-	assert.match(create, /trap 'rm -f "\$USB_AUTOMOUNT_INHIBIT"[^']*' EXIT/, 'inhibit released on exit')
-	assert.match(create, /finish-operator-stick\.sh" "\$DEV" --iso "\$ISO" --prune-stale\n# finish-operator-stick's unmask removed the inhibit — re-assert for seed phases 3-5\.\n(usb_inhibit_highascg_automount_poller)/, 're-asserted after finish unmasks')
 })
 
 test('WO-413: wiring + defaults + sanitizer passthrough (source pins)', () => {

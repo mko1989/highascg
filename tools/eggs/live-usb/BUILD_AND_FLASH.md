@@ -1,20 +1,17 @@
-# HighAsCG live USB — build and flash
+# HighAsCG live USB — build the ISO and put it on a stick
 
 **What is inside the ISO?** Stack from Ubuntu → nodm/Openbox → NVIDIA → DeckLink → CasparCG → HighAsCG (and WO‑47 exFAT split): **[`docs/ISO_CONTENTS.md`](../../../docs/ISO_CONTENTS.md)**.
 
-> ## Sticks are made with Ventoy now
+> ## Sticks are Ventoy-only
 >
-> The `dd`/Etcher flow below is **pre-Ventoy**. It writes the ISO over the whole device, which
-> destroys a Ventoy stick's layout **and the `HIGHASCGEXF` operator data partition with it**.
+> Procedure: **[`docs/STICK_QUICK_START.md`](../../../docs/STICK_QUICK_START.md)** — install Ventoy
+> reserving space at the end of the disk, create `HIGHASCGEXF` in that space, then copy each new ISO
+> onto the Ventoy partition. No reflash per build, and the previous ISO stays as a fallback.
 >
-> Current procedure: **[`docs/STICK_QUICK_START.md`](../../../docs/STICK_QUICK_START.md)** —
-> install Ventoy reserving space at the end of the disk, create `HIGHASCGEXF` in that space, then
-> copy each new ISO onto the Ventoy partition. No reflash per build, and the previous ISO stays
-> as a fallback.
->
-> The `dd` sections below are kept for recovery and non-Ventoy media, not for operator sticks.
+> Flashing the ISO with `dd` / Etcher is deprecated and its scripts were removed: it destroys the
+> Ventoy layout and the `HIGHASCGEXF` partition.
 
-**Build the ISO only (what you want with Ventoy):**
+**Build the ISO:**
 
 ```bash
 cd ~/highascg
@@ -26,22 +23,7 @@ Wait for **`Done. ISO:`** — the file appears minutes earlier and is still bein
 `<iso>.sha256` sidecar is written last and is the ready signal. Then copy to the stick's Ventoy
 partition, `sync`, and verify with `verify-stick-iso.sh`.
 
-**All-in-one build + `dd` (legacy — destroys a Ventoy stick):**
-
-```bash
-sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh
-# non-interactive dd confirm: add -y
-```
-
-Picks the **newest ISO from this build** under `/home/eggs/` and `/home/eggs/mnt/`, then runs **`create-operator-stick-from-dd.sh`** (4 GiB persistence, exFAT remainder, seed layout).
-
-**Alternate** (legacy interactive flash): `sudo bash tools/eggs/live-usb/legacy-persistence/build-flash-and-persist.sh --help`
-
-### Operator stick — one command (`build-operator-stick`) — **deprecated**
-
-> **Deprecated.** The script now lives at **`work/deprecated/tools/build-operator-stick.sh`** and builds the old exFAT **+ union persistence** layout. For current sticks use **`tools/eggs/live-usb/finish-operator-stick.sh`** (exFAT-only) after `dd`, or the all-in-one `build-produce-flash-stick.sh` above.
-
-The finish/partition scripts place **exFAT `HIGHASCGEXF`** with start **≥ hybrid ISO tail** and **≥ ceil(ISO MiB)+`EXFAT_AFTER_ISO_MARGIN_MIB`** (**1536** MiB default — adjust if your ISO grows). The build warns if Blackmagic **`desktopvideo*`** packages are missing from the clone source; **`--decklink-required`** exits non‑zero unless they’re installed (*`sudo bash scripts/install.sh`* with Desktop Video tarball). The string **`highascg-data`** cannot be the literal exFAT volume label (**11 characters max**); operators still call it “data”; **`HIGHASCGEXF`** is what systemd mounts.
+The `HIGHASCGEXF` partition is the **third** partition of the stick (see `docs/STICK_QUICK_START.md`); systemd mounts it by label. The build warns if Blackmagic **`desktopvideo*`** packages are missing from the clone source; **`--decklink-required`** exits non‑zero unless they’re installed (*`sudo bash scripts/install.sh`* with Desktop Video tarball). The string **`highascg-data`** cannot be the literal exFAT volume label (**11 characters max**); operators still call it “data”; **`HIGHASCGEXF`** is what systemd mounts.
 
 See **[`docs/CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md`](../../../docs/CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md)** for how a **Caspar-only** squashfs coexists with **HighAsCG synced from exFAT**. (The desktop Stick Studio, `client/tools/stick-tools`, was removed in WO-995.)
 
@@ -87,61 +69,20 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
 7. **Tailscale / tailnet identity**: A cloned ISO is **not** automatically “logged out.” If `tailscaled` state existed on the build host when `eggs remaster` ran, that **machine key** is copied into the squashfs unless every storage path is excluded. The laptop then joins the tailnet **as the same node** as the builder (same key → same identity; it effectively replaces that machine until you fix it).  
    - `.deb` installs often use **`/var/lib/tailscale/`**, but **snap** layouts use **`/var/snap/tailscale/…`** — so “no `/var/lib/tailscale`” does **not** prove there is no shipped identity.  
    - Custom locations: check **`systemctl cat tailscaled`** and **`/etc/default/tailscaled`** for `--statedir=` / `--state=`. Add matching paths to **`tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list`**, run **`merge-penguins-eggs-exclude-highascg.sh`**, rebuild.  
-   - **Legacy persistence** ([`legacy-persistence/FLASH_AND_PERSIST.md`](./legacy-persistence/FLASH_AND_PERSIST.md), `/ union`) saves overlays too — once state exists on the stick, it keeps coming back until you delete or reflash.  
    - Sanity-check the ISO/squashfs: mount or `unsquashfs -ll` and search for **`tailscaled.state`** (and anything under **`var/snap/tailscale/`**).
 
 ---
 
-## Flash to USB
+## Copy to the stick
 
-1. **Identify the stick** (whole disk, e.g. `/dev/sdb` — **not** a partition):
+Copy the ISO to the **Ventoy** partition, `sync`, and verify (details: [`HOW_TO_BUILD_AND_FLASH_EGGS.md`](./HOW_TO_BUILD_AND_FLASH_EGGS.md)):
 
-   ```bash
-   lsblk -dpno NAME,SIZE,MODEL,TRAN
-   ```
+```bash
+cp /home/eggs/highascg*.iso /media/$USER/Ventoy/ && sync
+bash tools/eggs/live-usb/verify-stick-iso.sh /media/$USER/Ventoy/<iso>
+```
 
-2. **Unmount** anything on that disk:
-
-   ```bash
-   sudo umount /dev/sdX?* 2>/dev/null || true
-   ```
-
-3. **Write ISO** (replace `ISO` and `USB`):
-
-   ```bash
-   shopt -s globstar
-   ISO="$(ls -t /home/eggs/**/*.iso | head -1)"   # or set the full filename explicitly
-   USB=/dev/sdc
-
-   sudo dd if="$ISO" of="$USB" bs=4M status=progress oflag=sync conv=fsync
-   sudo sync
-   sudo partprobe "$USB"
-   ```
-
-4. **Required for production sticks — exFAT data partition** (persistence is **legacy opt-in**, not production)
-
-   After `dd` + `sync` + `partprobe`, add the **exFAT `HIGHASCGEXF`** partition. Do **not** use partition **2** for operator data if it is a tiny leftover slice — remove stale partitions 2+ from a previous attempt, then run the finish script.
-
-   ```bash
-   USB=/dev/sdX
-   ISO=/home/eggs/mnt/highascg_amd64_YYYY-MM-DD_HHMM.iso
-
-   sudo bash tools/eggs/live-usb/finish-operator-stick.sh "$USB" --iso "$ISO" --prune-stale
-   ```
-
-   Or manually: **`EXFAT_FILL_DISK=1 add-exfat-data-partition.sh`** → **`seed-exfat-operator-layout.sh`**. Legacy union persistence (opt-in **`HIGHASCG_LEGACY_UNION_PERSIST=1`** only, not for production): **`legacy-persistence/add-union-persistence-partition.sh`** ( **`PERSIST_SIZE_MIB=4096`** ) before the exFAT step. On a **32 GiB** stick: ~5 GiB ISO · ~4 GiB persistence · ~22 GiB exFAT.
-
-   Legacy persistence reference: **[legacy-persistence/FLASH_AND_PERSIST.md](./legacy-persistence/FLASH_AND_PERSIST.md)** · Etcher / macOS / Windows: **[MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md)**.
-
-   **Narrow alternative (not production playout):** persist only **`~/highascg`** on a separate ext4 — **[HIGHASCG_FOLDER_USB_PARTITION.md](./HIGHASCG_FOLDER_USB_PARTITION.md)**. Skips NVIDIA/Tailscale/system-wide persistence.
-
-5. **Long flash in tmux** (optional):
-
-   ```bash
-   tmux new -s flash
-   # run dd here; detach: Ctrl+b then d
-   tmux attach -t flash
-   ```
+Stick contents and server drops: [`MANUAL_STICK_WINDOWS_MACOS.md`](./MANUAL_STICK_WINDOWS_MACOS.md).
 
 ---
 
@@ -160,7 +101,7 @@ sudo eggs calamares
 
 Follow prompts so Calamares is installed **and** configured for eggs, then run `build-highascg-egg.sh` again.
 
-After flashing the new ISO, boot live and start the graphical installer from the desktop/menu (exact label depends on your calamares theme).
+After copying the new ISO to the stick, boot live and start the graphical installer from the desktop/menu (exact label depends on your calamares theme).
 
 ### Option B — Krill (TUI install from the live USB, no rebuild)
 
@@ -173,24 +114,9 @@ sudo eggs krill
 
 That installs to disk without Calamares in the ISO.
 
-### Option C — No install — **full USB persistence (legacy opt-in, not production)**
+### Option C — No install — only `~/highascg` on a data partition (advanced / narrow)
 
-Production sticks are **exFAT-only, no union persistence** — durable data lives on `HIGHASCGEXF`. If you deliberately need the legacy layout (`HIGHASCG_LEGACY_UNION_PERSIST=1`), **`/ union`** persistence makes the stick remember NVIDIA drivers, DeckLink-related OS state, Tailscale, **`/etc`**, **`/var`**, **`/home`**, and HighAsCG. After `dd`, run **`legacy-persistence/add-union-persistence-partition.sh`** and boot **Live with persistence**: **[legacy-persistence/FLASH_AND_PERSIST.md](./legacy-persistence/FLASH_AND_PERSIST.md)**, [flash step 4](#flash-to-usb).
-
-### Option D — No install — **only `~/highascg` on a data partition (advanced / narrow)**
-
-When you **deliberately** do **not** want full-root persistence: **[HIGHASCG_FOLDER_USB_PARTITION.md](./HIGHASCG_FOLDER_USB_PARTITION.md)** and [flash step 4 optional](#flash-to-usb). **Does not** preserve NVIDIA/Tailscale/system-wide changes.
-
----
-
-## Windows / macOS — write ISO + exFAT
-
-**Etcher + system partitioning (macOS / Windows):** [MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md).
-
-If you already have a **`*.iso`** built elsewhere:
-
-The macOS/Windows stick scripts (`client/tools/live-usb/`) were removed in WO-995; sticks are Ventoy sticks now (see above).
-
+Union (whole-stick) persistence is retired; durable data lives on `HIGHASCGEXF`. For the narrow case of an ext4 partition holding only `~/highascg`, see [HIGHASCG_FOLDER_USB_PARTITION.md](./HIGHASCG_FOLDER_USB_PARTITION.md). It does **not** preserve NVIDIA/Tailscale/system-wide changes.
 
 ---
 

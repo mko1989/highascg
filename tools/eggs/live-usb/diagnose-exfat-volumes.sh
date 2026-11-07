@@ -56,5 +56,5 @@ done
 echo ""
 echo "Notes:"
 echo "  HIGHASCGDAT = internal bridge disk → ~/bridge (not on USB-only live boot)"
-echo "  HIGHASCGEXF = USB stick data partition → ~/exfat (slot 3 after create-operator-stick-from-dd.sh)"
+echo "  HIGHASCGEXF = USB stick data partition → ~/exfat (p3 of a Ventoy stick, docs/STICK_QUICK_START.md)"
 echo "  RAM-only boot is OK when neither label exists; config stays in ISO/squashfs until USB mounts."

@@ -73,10 +73,6 @@ libndi.so.6
 casparcg.config
 config/casparcg.config
 
-# Local live-USB flash settings (copy from flash-iso.conf.example)
-tools/live-usb/flash-iso.conf
-tools/eggs/live-usb/flash-iso.conf
-
 # Runtime configs: factory defaults tracked in git (regenerate: npm run config:write-defaults)
 config/*.json
 !config/general.json

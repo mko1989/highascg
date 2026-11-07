@@ -1,7 +1,7 @@
 'use strict'
 /**
  * WO-926 — every package the server requires is a declared `dependencies` entry. The ISO build prunes with
- * `npm prune --omit=dev --omit=optional` (build-produce-flash-stick.sh), so a module that only arrives under a dev or
+ * `npm prune --omit=dev --omit=optional` (the produce path, eggs-produce-prunes-node-modules), so a module that only arrives under a dev or
  * optional dependency is missing on a stick boot: WO-825's `require('jszip')` (exceljs's, optional) made node exit
  * with MODULE_NOT_FOUND on every boot of the 01.11 ISO (box .31, 02.11).
  */

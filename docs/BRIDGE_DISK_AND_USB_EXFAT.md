@@ -102,7 +102,7 @@ tail /var/log/highascg-bridge-boot.log
 
 | Label | On stick? | On live boot |
 |-------|-----------|--------------|
-| **HIGHASCGEXF** | Yes — MBR **slot 3** after `create-operator-stick-from-dd.sh` | Should mount at **`/home/casparcg/exfat`** |
+| **HIGHASCGEXF** | Yes — third partition of the Ventoy stick (`docs/STICK_QUICK_START.md`) | Should mount at **`/home/casparcg/exfat`** |
 | **HIGHASCGDAT** | **No** — internal NVMe/SATA bridge disk only | Absent unless you created that partition on the **machine’s internal drive** |
 
 Settings showing `map: /etc/highascg/exfat-sync.json` with **bridge not mounted** is normal on USB-only boots. Bridge pairs in the table stay **volume not mounted** until `HIGHASCGDAT` exists.
@@ -115,7 +115,7 @@ sudo systemctl start highascg-exfat-boot.service
 lsblk -f
 ```
 
-If **`HIGHASCGEXF`** is missing from `lsblk`, the stick has no data partition (plain `dd` without `finish-operator-stick` / `create-operator-stick-from-dd.sh` step 2). Re-flash with the full operator script.
+If **`HIGHASCGEXF`** is missing from `lsblk`, the stick has no data partition (Ventoy installed without reserved space, or `HIGHASCGEXF` never created). Follow [`STICK_QUICK_START.md`](STICK_QUICK_START.md) to add it.
 
 ## Related
 

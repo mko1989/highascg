@@ -178,8 +178,8 @@ THEME_ABS="$(cd "${HERE}/highascg-eggs-theme" && pwd)"
 echo "==> Stop highascg + companion during squashfs (avoid state changing mid-pack; free RAM)"
 systemctl stop highascg.service companion.service 2>/dev/null || true
 
-# WO-471: stamp EVERY produce, not just the flash wrapper. WO-432 put this write in
-# build-produce-flash-stick.sh, but a bare `npm run eggs:build` (this script) is the main
+# WO-471: stamp EVERY produce. WO-432 put this write in the flash wrapper
+# (build-produce-flash-stick.sh, retired in WO-996), but a bare `npm run eggs:build` (this script) is the main
 # workflow and never stamped — so clones fell through src/system/build-stamp.js's precedence
 # (BUILD_STAMP -> .highascg-build-stamp -> package.json.version) to the frozen legacy value and
 # Settings -> Updates reported 2026.05.20 on a same-day ISO. Worse, compareBuildStamps() then
@@ -272,8 +272,8 @@ echo "==> Restore dev dependencies on the build host (post-produce; does not aff
 sudo -u "${USER_CASPAR:-casparcg}" -H bash -lc "cd '${REPO_ROOT}' && npm install --include=optional" \
 	|| echo "WARN: npm install --include=optional failed — run it manually before the offline suite" >&2
 
-# shellcheck source=flash-stick-common.sh
-source "${HERE}/flash-stick-common.sh" 2>/dev/null || true
+# shellcheck source=iso-find-lib.sh
+source "${HERE}/iso-find-lib.sh" 2>/dev/null || true
 BUILT_ISO=""
 if declare -F find_latest_iso >/dev/null 2>&1; then
 	BUILT_ISO="$(find_latest_iso 2>/dev/null || true)"
@@ -303,10 +303,3 @@ else
 	# WO-870: name per flavor — new `${BASENAME}-<date>.iso`, legacy `${BASENAME}_<arch>_<date>.iso`.
 	echo "Done. ISO is under $(highascg_eggs_nest)/ (name $(highascg_eggs_iso_glob "$BASENAME" | paste -sd' ' | sed 's/ / or /g'), nvidia-${BR})"
 fi
-echo
-echo "Full build + flash /dev/sda:"
-echo "  sudo HIGHASCG_NVIDIA_DRIVER=${BR} bash ${HERE}/build-produce-flash-stick.sh -y"
-echo
-echo "Flash only (this ISO):"
-echo "  sudo bash ${HERE}/create-operator-stick-from-dd.sh /dev/sda --iso ${BUILT_ISO:-$(highascg_eggs_nest)/$(highascg_eggs_iso_glob "$BASENAME" | head -n1)}"
-echo "  (see tools/eggs/live-usb/FLASH_AND_PERSIST.md)"

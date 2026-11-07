@@ -1,7 +1,7 @@
 # Persist only `/home/casparcg/highascg` on a second USB partition
 
-> **When you need the whole stick to remember** — NVIDIA drivers, DeckLink-related OS config, Tailscale, **`/etc`**, **`/var`**, etc. — use **full Debian Live persistence** (`/ union`): **[`FLASH_AND_PERSIST.md`](FLASH_AND_PERSIST.md)** plus **`add-union-persistence-partition.sh`** and boot **Live with persistence**.  
-> This doc is for the **narrow** case: durability for **`~/highascg` only**.
+> **Not a production stick layout.** Production sticks are Ventoy with durable data on **`HIGHASCGEXF`** ([`docs/STICK_QUICK_START.md`](../../../docs/STICK_QUICK_START.md)). Whole-stick union persistence is retired and its scripts are gone.
+> This doc is for the **narrow** case: durability for **`~/highascg` only** on a separate ext4 partition.
 
 Most operator-visible **HighAsCG + Caspar *settings*** live under this one tree:
 
@@ -11,15 +11,15 @@ Most operator-visible **HighAsCG + Caspar *settings*** live under this one tree:
 
 The **CasparCG server binaries** themselves are normally under **`/opt/casparcg`** on the cloned ISO — they stay on the **read‑only squashfs**. You persist **paths and XML HighAsCG writes**, not `/opt`, by keeping **`~/highascg`** on durable storage.
 
-For **live USB**, this layout is **simpler and smaller than `/ union`**: tiny data partition, less OS state across boots, and one clear **`rsync`** target — **when** you deliberately **do not** need full-stick persistence (see blockquote above).
+For **live USB**, this layout is simple and small: tiny data partition, less OS state across boots, and one clear **`rsync`** target — when you only need the HighAsCG tree to persist.
 
 **You do *not* get persistence** (unless you add something else) for things **outside** that mount:
 
 - **`/var/lib/highascg/**` (e.g. NVIDIA first-boot picker markers)
 - **`apt` / `dkms` overlays**, random **`/etc`** edits, other users’ homes
-- **`/opt/casparcg`** contents (unless you reinstall or use **full `persistence`/`/ union`**)
+- **`/opt/casparcg`** contents (unless you reinstall)
 
-Use **full [`FLASH_AND_PERSIST.md`](FLASH_AND_PERSIST.md) (`/ union`)** if those must survive reboot without re-running setup.
+Re-run setup after boot if those must be present.
 
 **Upside:** reboot-safe **`~/highascg`** tree (**code + config + Caspar XML paths HighAsCG owns + media/templates/projects**); easy **`rsync`** / partition image backups.
 
@@ -29,7 +29,7 @@ Use **full [`FLASH_AND_PERSIST.md`](FLASH_AND_PERSIST.md) (`/ union`)** if those
 
 | USB partition | Role |
 |---------------|------|
-| First region(s) | ISO / live image (as produced by `dd` or eggs) |
+| First region(s) | Ventoy partitions (ISO as a file) |
 | **Last ext4** | Label **`HIGHASCG_PERSIST`** — holds the **contents** of `highascg/` |
 
 The live root still provides `/home/casparcg` (and often an empty or template
@@ -43,7 +43,7 @@ that directory with the partition’s root (normal Linux mount behaviour).
 Do this on a **build machine** or **once** from a running live session that
 already has the tree you want.
 
-1. **Leave free space** on the stick after flashing the ISO (same idea as Step 2 in [`FLASH_AND_PERSIST.md`](FLASH_AND_PERSIST.md): `parted … print free`, `mkpart`, `mkfs.ext4`).
+1. **Leave free space** at the end of the stick (Ventoy2Disk → Option → Partition Configuration → "Preserve some space at the end of the disk"), then `parted … print free`, `mkpart`, `mkfs.ext4`.
 
 2. **Format with a fixed label** (required by the sample unit):
 
@@ -83,14 +83,3 @@ already has the tree you want.
 - **Empty partition** → empty app tree until you **seed** with `rsync` (above) or restore from backup.
 
 ---
-
-## When full persistence is simpler
-
-If you need **NVIDIA picker markers**, **`/etc`**, **`/var`**, and the rest of the
-OS to survive reboot, use **`persistence` + `persistence.conf` + `/ union`** in
-[`FLASH_AND_PERSIST.md`](FLASH_AND_PERSIST.md). That already persists
-**`/home/casparcg/highascg`** along with everything else—no separate partition
-for the folder required.
-
-This guide is for teams that want **only** the HighAsCG tree USB-backed and are
-fine with the rest of the live session staying ephemeral.

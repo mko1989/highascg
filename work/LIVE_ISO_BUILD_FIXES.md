@@ -56,17 +56,16 @@ systemctl status home-casparcg-exfat.mount \
 
 ### Fix before next eggs / stick build
 
-**On the build/flash host (after `dd`):**
+**On the build host (after the ISO is built):**
 
 ```bash
 cd ~/highascg
 ISO=/home/eggs/highascg_*.iso   # your built image
 
-# Production layout: exFAT tail partition (HIGHASCGEXF)
-sudo bash tools/eggs/live-usb/finish-operator-stick.sh /dev/sdX --iso "$ISO"
-
-# Re-flash leftover partitions from an old stick:
-# sudo bash tools/eggs/live-usb/finish-operator-stick.sh --prune-stale /dev/sdX --iso "$ISO"
+# Production layout: Ventoy stick, ISO copied to the Ventoy partition, HIGHASCGEXF as partition 3
+# See docs/STICK_QUICK_START.md
+cp "$ISO" /media/$USER/Ventoy/ && sync
+bash tools/eggs/live-usb/verify-stick-iso.sh /media/$USER/Ventoy/$(basename "$ISO")
 ```
 
 **On the imaging host (before `eggs produce`):**
@@ -240,7 +239,7 @@ Run on the **imaging host** before `eggs produce`, and on the **flash host** aft
 
 ### USB stick (after ISO written)
 
-- [ ] `sudo bash tools/eggs/live-usb/finish-operator-stick.sh /dev/sdX --iso /path/to.iso`
+- [ ] Copy ISO to the Ventoy partition, then `bash tools/eggs/live-usb/verify-stick-iso.sh <copied iso>`
 - [ ] `lsblk -f` → `HIGHASCGEXF`
 - [ ] Boot once → verify `findmnt /home/casparcg/exfat` (plain **Live** GRUB entry)
 - [ ] Audio: `aplay -l` + analog `speaker-test` on PCH card

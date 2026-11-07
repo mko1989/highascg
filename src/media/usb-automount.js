@@ -20,11 +20,10 @@
  * Config gate: `usbIngest.enabled` and `usbIngest.autoMount` (both default true),
  * re-read every tick so a settings change needs no restart.
  *
- * Inhibit file (WO-416): the flash pipeline repartitions sticks and must not race
- * this poller. `usb_mask_exfat_automount` (tools/eggs/live-usb/flash-stick-common.sh)
- * touches /run/highascg/usb-automount-inhibit; while it exists no mount is attempted.
- * unmask-exfat-systemd.sh removes it; /run is tmpfs so a crashed flash run can leave
- * it at worst until reboot.
+ * Inhibit file (WO-416): while /run/highascg/usb-automount-inhibit exists no mount is
+ * attempted. The dd-flash pipeline that set it is gone (WO-996, sticks are Ventoy-only);
+ * touch it by hand before repartitioning a stick on the box (e.g. Ventoy2Disk.sh).
+ * unmask-exfat-systemd.sh removes it; /run is tmpfs, so it never outlives a reboot.
  *
  * Held partitions (WO-702): a device with entries in /sys/class/block/<name>/holders is
  * claimed by device-mapper (Ventoy's ISO map on the boot stick, LVM, LUKS) and opened
