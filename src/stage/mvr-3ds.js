@@ -4,10 +4,12 @@
  * WO-612 T2 — Autodesk 3DS mesh reader → GLB. MVR (and older GDTF) geometry may be 3DS: 1 unit = 1 mm, Z-up.
  * The GLB comes out in glTF's frame (Y-up, metres) so every MVR mesh, glb or 3ds, is placed the same way.
  * Chunks: MAIN 4D4D → EDIT 3D3D → OBJECT 4000 (name) → TRIMESH 4100: VERTICES 4110, FACES 4120 (+ MSH_MAT_GROUP
- * 4130); MATERIAL AFFF: NAME A000, DIFFUSE A020 (COLOR_24 0011 / COLOR_F 0010). Pure.
+ * 4130, SMOOTH_GROUP 4150); MATERIAL AFFF: NAME A000, DIFFUSE A020 (COLOR_24 0011 / COLOR_F 0010). Pure.
+ * WO-994: normals come from the smoothing groups, else a crease angle (mesh-crease.js) — hard edges stay hard.
  */
 
 const { writeGlb } = require('./glb-write')
+const { creaseNormals } = require('./mesh-crease')
 
 /** WO-678: a fixture body the GDTF gives no colour is black (owner 22.10). */
 const FIXTURE_BODY = [0.01, 0.01, 0.01, 1]
@@ -43,7 +45,8 @@ function readColor(buf, start, end) {
 	return null
 }
 
-/** → { objects: [{ name, vertices: Float32Array (mm, Z-up), faces: Uint32Array, groups: [{ material, faces: [] }] }],
+/** → { objects: [{ name, vertices: Float32Array (mm, Z-up), faces: Uint32Array, groups: [{ material, faces: [] }],
+ *      smoothing: Uint32Array | null (one mask per face) }],
  *      materials: Map(name → rgba) } */
 function parse3ds(buf) {
 	const objects = []
@@ -66,7 +69,7 @@ function parse3ds(buf) {
 			const { text: name, next } = cstring(buf, e.start, e.end)
 			for (const t of chunks(buf, next, e.end)) {
 				if (t.id !== 0x4100) continue
-				const obj = { name, vertices: new Float32Array(0), faces: new Uint32Array(0), groups: [] }
+				const obj = { name, vertices: new Float32Array(0), faces: new Uint32Array(0), groups: [], smoothing: null }
 				for (const d of chunks(buf, t.start, t.end)) {
 					if (d.id === 0x4110) {
 						const n = buf.readUInt16LE(d.start)
@@ -83,6 +86,10 @@ function parse3ds(buf) {
 							obj.faces[i * 3 + 2] = buf.readUInt16LE(at + 4)
 						}
 						for (const g of chunks(buf, d.start + 2 + n * 8, d.end)) {
+							if (g.id === 0x4150 && g.end - g.start >= n * 4) {
+								obj.smoothing = new Uint32Array(n)
+								for (let i = 0; i < n; i++) obj.smoothing[i] = buf.readUInt32LE(g.start + i * 4)
+							}
 							if (g.id !== 0x4130) continue
 							const { text: material, next: at } = cstring(buf, g.start, g.end)
 							const k = buf.readUInt16LE(at)
@@ -108,26 +115,35 @@ function threeDsToGlb(buf, opts = {}) {
 		const nv = o.vertices.length / 3
 		const nf = o.faces.length / 3
 		if (!nv || !nf) continue
-		const positions = new Float32Array(o.vertices.length)
+		const glPos = new Float32Array(o.vertices.length)
 		for (let i = 0; i < nv; i++) {
-			positions[i * 3] = o.vertices[i * 3] / 1000
-			positions[i * 3 + 1] = o.vertices[i * 3 + 2] / 1000
-			positions[i * 3 + 2] = -o.vertices[i * 3 + 1] / 1000
+			glPos[i * 3] = o.vertices[i * 3] / 1000
+			glPos[i * 3 + 1] = o.vertices[i * 3 + 2] / 1000
+			glPos[i * 3 + 2] = -o.vertices[i * 3 + 1] / 1000
 		}
+		const ok = (f) => o.faces[f * 3] < nv && o.faces[f * 3 + 1] < nv && o.faces[f * 3 + 2] < nv
 		const used = new Uint8Array(nf)
 		const groups = o.groups.map((g) => ({ color: materials.get(g.material) || null, faces: g.faces.filter((f) => f < nf) }))
 		for (const g of groups) for (const f of g.faces) used[f] = 1
 		const rest = []
 		for (let f = 0; f < nf; f++) if (!used[f]) rest.push(f)
 		if (rest.length) groups.push({ color: null, faces: rest })
+		for (const g of groups) g.faces = g.faces.filter(ok)
+		// WO-994: one crease pass over the faces of every group, so a seam between two materials keeps its shading.
+		const order = groups.flatMap((g) => g.faces)
+		if (!order.length) continue
+		const src = new Uint32Array(order.length * 3)
+		order.forEach((f, i) => src.set(o.faces.subarray(f * 3, f * 3 + 3), i * 3))
+		const smoothing = o.smoothing ? Uint32Array.from(order, (f) => o.smoothing[f]) : null
+		const { positions, normals, indices: all } = creaseNormals(glPos, src, { smoothing })
 		const primitives = []
+		let at = 0
 		for (const g of groups) {
 			if (!g.faces.length) continue
-			const indices = new Uint32Array(g.faces.length * 3)
-			g.faces.forEach((f, i) => indices.set(o.faces.subarray(f * 3, f * 3 + 3), i * 3))
-			if (indices.some((v) => v >= nv)) continue
+			const indices = all.slice(at * 3, (at + g.faces.length) * 3)
+			at += g.faces.length
 			const color = opts.fixtureBody && unspecified(g.color) ? FIXTURE_BODY : g.color
-			primitives.push({ positions, indices, color: color || undefined })
+			primitives.push({ positions, normals, indices, color: color || undefined })
 		}
 		meshes.push({ name: o.name || 'mesh', primitives })
 	}
