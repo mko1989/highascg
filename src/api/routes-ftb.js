@@ -102,13 +102,9 @@ async function handlePost(path, body, ctx) {
 			ctx
 		)
 
-		if (screenIdx != null) {
-			liveSceneState.clearChannel(map.programCh(screenIdx + 1))
-		} else {
-			for (const ch of map.programChannels) {
-				liveSceneState.clearChannel(ch)
-			}
-		}
+		// Forget every channel just blacked, PRV too: a kept PRV entry made the next preview-push of that look a mixer
+		// nudge onto an empty Caspar channel, so PRV stayed black (found 07.11 during the WO-979 two-box run).
+		for (const ch of channels) await liveSceneState.clearChannel(ch)
 		liveSceneState.broadcastSceneLive(ctx)
 
 		return {

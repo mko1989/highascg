@@ -73,3 +73,15 @@ reporter that sums top-level durations per file, and a pool runner that times ev
   N s. This needs a reporter hook or a per-file wrapper; worth it only if lingerers creep back.
 - `--test-isolation=none` would remove most per-file process cost but shares module state across 837 files (env,
   singletons, monkeypatched globals). Not worth the flake risk.
+
+## Follow-up 07.11 (later): two flakes the higher concurrency exposed
+
+Two box runs at concurrency 32 on 07.11 (~10:20, with Caspar just restarted) failed files that pass alone:
+- `smoke-hap-encode-queue` REAL ffmpeg. `finished()` polled 400 × 5 ms, a fixed ~2 s budget, for jobs that really
+  encode several files. It is now deadline-based (`finished(q, id, ms = 2000)`), and the two waits in the real-encode
+  test get 20 s. Under 28 CPU burners the test now passes in 13.5 s; before, it failed at 2 s.
+- `smoke-wo731-desk-drivers`. The fake OSC desk's `osc.readPacket` threw on a stray datagram after its test ended
+  (another file reusing the ephemeral port), which became an uncaughtException. The fake desk now ignores
+  undecodable datagrams, as the real driver already does (`src/audio-desk/drivers/osc-udp.js:22-26`).
+
+Both are test-only, with the assertions untouched. The next full run gave **5514 pass / 0 fail / 3 todo**.

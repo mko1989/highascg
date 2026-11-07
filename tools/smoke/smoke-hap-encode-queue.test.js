@@ -121,13 +121,16 @@ function makeQueue(dir, over = {}) {
 	return { q, ctx, events, rescans, logs, log }
 }
 
-async function finished(q, jobId) {
-	for (let i = 0; i < 400; i++) {
+// A deadline, not a poll count: the REAL ffmpeg test encodes several files per job and, at the offline suite's
+// concurrency (WO-988), took over the old fixed 2 s on 07.11.
+async function finished(q, jobId, ms = 2000) {
+	const until = Date.now() + ms
+	while (Date.now() < until) {
 		const j = q.list().find((x) => x.jobId === jobId)
 		if (j?.finished) return j
 		await new Promise((r) => setTimeout(r, 5))
 	}
-	throw new Error('job did not finish')
+	throw new Error(`job did not finish within ${ms} ms`)
 }
 
 const states = (j) => Object.fromEntries(j.items.map((i) => [i.id, i.state]))
@@ -417,7 +420,7 @@ test(
 			]) {
 				const ids = Object.values(files).map((f) => path.basename(f))
 				const snap = q.enqueue({ ids, ...opts })
-				const j = await finished(q, snap.jobId)
+				const j = await finished(q, snap.jobId, 20000)
 				const bad = j.items.filter((i) => i.state !== 'done' && !(i.state === 'skipped' && /already exists/.test(i.reason)))
 				assert.deepStrictEqual(bad, [], `${combo}: ${JSON.stringify(bad)}`)
 				// second combo finds the first's outputs; remove them so each combo really encodes
@@ -426,7 +429,7 @@ test(
 			}
 			// One clean run to inspect the results
 			const snap = q.enqueue({ ids: Object.values(files).map((f) => path.basename(f)), alpha: true })
-			const j = await finished(q, snap.jobId)
+			const j = await finished(q, snap.jobId, 20000)
 			assert.ok(
 				j.items.every((i) => i.state === 'done'),
 				JSON.stringify(j.items)

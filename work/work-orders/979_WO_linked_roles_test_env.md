@@ -1,7 +1,7 @@
 # WO-979 — Linked-servers role-split test environment: media playout ↔ camera tracking / previs
 
 **Area:** testing-ci, network, tracking-vr
-**Status: IN PROGRESS (07.11.2026; sandbox leg DONE — `run-cluster-e2e --scenario=duties` 15 pass / 0 skipped / 0 failed on two node-only sandboxes, smoke 23/23, offline 5443 pass / 0 fail / 5 skipped; the two-box `--live --peer` leg is code-complete but not run: no reachable peer (.4 .31 .35 .64 silent))**
+**Status: IN PROGRESS (07.11.2026; sandbox leg DONE 15/0/0; live two-box leg RUN 07.11 against highascg5867 @ 192.168.0.10: link/master/overlay/impose/unlink pass, 6 tracking-dependent steps fail because neither show tracks (no camera); WO-725 general scenario live 9 pass / 0 fail — the tracking half needs a tracking show on one box)**
 
 The owner asked on 06.11: *"i also want you to create a test enviroment to check server linking in a way where one
 is responsible for media playout the other is responisible for camera tracking and previs etc."*
@@ -157,6 +157,46 @@ is responsible for media playout the other is responisible for camera tracking a
   - WO-712's design lists "markers / zones / detections summary". The sender hook belongs in
     `src/tracking/register.js`, which is WO-978's file and is at 499 lines. This is a follow-up.
 
+## Live two-box leg (07.11, ~10:00)
+
+Peer found by scanning :4200 (WO-990: never scan :5250): **highascg5867 at 192.168.0.10**, a different machine
+(MAC 2c:f0:5d:3b:16:eb) running the 03.11 build (`appVersion 2026-11-03T105448Z`, i.e. before f7aeb180).
+Both were unlinked, with Auto senders, before the run. This box = media, `--look=` WSS-10s, under the box2 lock.
+
+**`linked-roles.sh live 192.168.0.10 --self=media --look=b5c5…`: 6 pass, 3 skipped, 6 failed.**
+- Passed on the real wire: clocks (spread 23 ms), link (18 ms, invite accepted), master (epoch 1, follow 6 ms),
+  overlay signed calls (`home` forced on the peer), impose (signed `look.take` on air in 1 ms; unknown look 404;
+  `system.shutdown` refused), unlink (duties back in 1 ms, data gone in 18 ms).
+- The 6 failures all have **one cause: neither show tracks.** `previs.tracking.cameras` is empty on both, so
+  `duties.tracking` is false everywhere and the duties never split. Then by design (`cluster-exchange.js:9-15`)
+  `air` goes only to a server that holds `zones`, and `tracking.auto` only comes from an `auto` server to an
+  `auto: false` one. So nothing was exchanged: alone (assertion), duties, exchange, air seed, refusal, and the relay
+  `tracking: true` assertion (the relay itself answered 200).
+- Skipped: psn, rules, restart (sandbox only).
+
+**`run-cluster-e2e --live=192.168.0.17:4200,192.168.0.10:4200 --yes` (WO-725 scenario): 9 pass, 0 fail, 3 skipped**
+(restart and failover are sandbox only).
+- alone and linked API timing, no errors; clocks spread 7 ms; link 53 ms.
+- Refusals; master on each in turn (agree 5–55 ms).
+- Signed calls **7579 → 5867 p50 43 ms / p95 55 ms, 5867 → 7579 p50 3 ms**. The peer answers signed calls about
+  14× slower. Unexplained: older build or hardware; worth a look if it grows.
+- Sender choice 2 ms; unlink 6 ms.
+
+**After both runs:** peers 0, epoch 0, follows false, fanout off, senders `""` on both boxes.
+- While this box was master the fan-out connected to the peer's Caspar, but it forwarded nothing. The only
+  destination id both boxes share is `dst_operator_gui`, which is not a main bus; the PGM/PRV destinations are
+  `dst_mw3u8hcn_1` vs `dst_mw2fn9wr_1`.
+- The peer's empty PGM layers predate the run: its log shows the `zz_loopcode` media deleted on 05.11.
+- This box's PGM/PRV was put back (PGM empty, PRV neon loop). That restore found **WO-989**, an FTB state bug, fixed.
+- The scan that found the peer had also wedged both Caspars' AMCP acceptors: **WO-990**. This box was recovered with
+  a Caspar restart; the peer still needs one.
+
+**Still to prove live:** the tracking half (duties split, exchange, air → rules, refusal, the relay `tracking`).
+That needs one box with a tracking show: `previs.tracking.cameras` with a camera surface and detection on.
+Neither box has a camera set up, and building one into a show is the owner's call. Fail-fast idea for the runner:
+in `--live` duties mode, check `duties.tracking` on the tracking box first and stop with one clear message instead of
+6 cascading failures.
+
 ## Runbook
 
 ```
@@ -179,4 +219,4 @@ out of 127.0.0.1.
 - An exchange topic for raw hub markers from tracking to media. It needs a hook beside WO-978's register.js.
 - `/api/project/load` without `broadcastProject` leaves the tracking, follow and zone services on the old show.
   Decide whether load should always notify them.
-- Run the live leg the first time a second box answers on :4200.
+- Live leg run 07.11 (above); re-run with a tracking show on one box for the tracking half.

@@ -26,7 +26,14 @@ async function oscDesk(answer) {
 	const sock = dgram.createSocket('udp4')
 	const got = []
 	sock.on('message', (buf, rinfo) => {
-		const m = osc.readPacket(buf, { metadata: true })
+		let m
+		try {
+			m = osc.readPacket(buf, { metadata: true })
+		} catch {
+			// a stray datagram from another file on this reused ephemeral port (seen 07.11 at concurrency 32), not the
+			// driver: ignore it like the real driver does (src/audio-desk/drivers/osc-udp.js)
+			return
+		}
 		got.push(m)
 		const args = answer(m)
 		if (args) sock.send(Buffer.from(osc.writePacket({ address: m.address, args })), rinfo.port, rinfo.address)

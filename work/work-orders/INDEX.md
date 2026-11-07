@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-898 live WOs (28 open, 123 in progress, 747 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+900 live WOs (29 open, 123 in progress, 748 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (174)
+## engine — Looks, takes, timeline, playback (175)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -181,6 +181,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 981 DONE [engine] take / project / autosave path latency and cost (optimization sweep 07.11) → 981_WO_take-project-autosave-path-cost.md
 - 983 DONE [engine+amcp,testing-ci] Test-coverage + correctness sweep of AMCP planning and timecode/scene math → 983_WO_amcp_timecode_scene_math_sweep.md
 - 984 DONE [engine+testing-ci,network,process] Code-health sweep of src/ and tools/ → 984_WO_src_tools_code_health_sweep.md
+- 989 DONE [engine] FTB blacks PRV in Caspar but kept its look in the server state, so the next pre… → 989_WO_ftb_forgets_preview_state.md
 
 ## amcp — AMCP client and protocol (20)
 
@@ -205,7 +206,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 867 DONE [amcp+os-iso] Caspar build: CasparCG/server#1762 effects (BLUR / SHARPEN / GRAIN) brought up… → 867_WO_caspar_pr1762_effects_fixes.md
 - 943 DONE [amcp+mapping] "APPLY 1-65535 SLICES CLEAR … 403 APPLY FAILED" logged as an error on every Cas… → 943_WO_caps_probe_apply_noise_without_gpu_mapping.md
 
-## caspar-build — CasparCG server build and binaries (13)
+## caspar-build — CasparCG server build and binaries (14)
 
 - 233 DONE [caspar-build] Caspar rebuild research: CasparCG_Enhanced base + improved-artnet + live-events… → 233_WO_CASPAR_REBUILD_RESEARCH.md
 - 234 DONE [caspar-build] Assemble + build the final (for now) CasparCG for highascg → 234_WO_CASPAR_FINAL_BUILD.md
@@ -220,6 +221,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 881 DONE [caspar-build+engine] Caspar came up without CEF after a supervisor tree-kill, and nothing said so → 881_WO_caspar_cef_init_fail_after_tree_kill_unseen.md
 - 888 DONE [caspar-build+os-iso] PGM micro stutter on alt-tab: Caspar's window never takes focus; frame sync sti… → 888_WO_caspar_window_no_focus_sync_follows_pgm.md
 - 982 DONE [caspar-build+engine] Optimization sweep: what is HighAsCG's load on CasparCG (251 % CPU on 07.11) → 982_WO_caspar_cpu_attribution_07_11.md
+- 990 OPEN [caspar-build+amcp] Caspar's AMCP acceptor dies when a client resets the connection immediately (a… → 990_WO_caspar_amcp_acceptor_dies_on_reset.md
 
 ## audio — Audio routing, devices, meters (48)
 
