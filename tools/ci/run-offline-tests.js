@@ -30,7 +30,11 @@ for (const check of ['check-dom-escape-duplicates.js', 'check-tdz-reads.js']) {
 // test process a throwaway one so an unguarded caller can never mint the box's cluster key or its presenter roster.
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'highascg-test-ci-'))
 const testTimeout = `--test-timeout=${process.env.NODE_TEST_TIMEOUT || '60000'}`
-const result = spawnSync(process.execPath, ['--test', testTimeout, ...FILES], {
+// WO-988: oversubscribe the cores. Many files mostly wait (supervisor/LTC/cluster smokes sleep on real timers), so
+// node's default (cores - 1 = 3 on a 4-vCPU CI runner) leaves the CPU idle: on 4 pinned cores 3 → 229 s, 6 → 132 s.
+const cores = require('os').availableParallelism()
+const concurrency = Number(process.env.HIGHASCG_TEST_CONCURRENCY) || Math.min(Math.ceil(cores * 1.5), cores + 4)
+const result = spawnSync(process.execPath, ['--test', testTimeout, `--test-concurrency=${concurrency}`, ...FILES], {
 	cwd: REPO_ROOT,
 	stdio: 'inherit',
 	env: {

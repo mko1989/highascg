@@ -36,7 +36,13 @@ const assert = require('node:assert/strict')
 const { TimelineEngine } = require('../../src/engine/timeline-engine')
 
 const originalFetch = global.fetch
+// Engines that play keep a real 40 ms tick interval; clear them so the file exits with its tests (07.11 suite sweep).
+const startedEngines = []
 after(() => {
+	for (const e of startedEngines) {
+		if (e._ticker) clearInterval(e._ticker)
+		e._ticker = null
+	}
 	global.fetch = originalFetch
 })
 
@@ -65,7 +71,9 @@ function makeEngine(logSink) {
 			sendBatch: noop,
 		},
 	}
-	return new TimelineEngine(self)
+	const eng = new TimelineEngine(self)
+	startedEngines.push(eng)
+	return eng
 }
 
 function makeFlagTimeline(eng, flagOverrides = {}) {

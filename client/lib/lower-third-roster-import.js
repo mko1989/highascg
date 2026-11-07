@@ -53,12 +53,13 @@ function rowFromCells(headers, cells) {
  * @returns {Promise<T>}
  */
 function withParseTimeout(promise, ms, label) {
+	let timer
 	return Promise.race([
 		promise,
 		new Promise((_, reject) => {
-			setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+			timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
 		}),
-	])
+	]).finally(() => clearTimeout(timer)) // a finished parse must not leave the 15 s timer armed
 }
 
 /**

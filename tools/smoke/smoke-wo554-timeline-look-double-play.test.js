@@ -42,7 +42,17 @@
  * never skips one as "unchanged"), and now sends the ONLY `PLAY` line each channel gets.
  */
 
-const { describe, it } = require('node:test')
+const { describe, it, after } = require('node:test')
+
+// Every engine these fixtures start keeps a real 40 ms tick interval; clear them so the file exits when its tests do
+// instead of idling until the timeline ends (~60 s per file in CI, found by the 07.11 suite-time sweep).
+const startedEngines = []
+after(() => {
+	for (const e of startedEngines) {
+		if (e._ticker) clearInterval(e._ticker)
+		e._ticker = null
+	}
+})
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -73,6 +83,7 @@ function makeEngine() {
 		},
 	}
 	const eng = new TimelineEngine(self)
+	startedEngines.push(eng)
 	self.timelineEngine = eng // startSceneTimelineLayer reads the engine off self, not a closure
 	eng.create({
 		id: 'tl1',
