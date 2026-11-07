@@ -24,10 +24,6 @@ func test_track_heights() -> void:
 	var tl := {"layers": [{}, {}, {}], "layerHeights": [10, 200, "x"]}
 	TM.ensure_heights(tl)
 	t.eq(tl.layerHeights, [54, 120, 54], "below-min/invalid → default, above → max (web: 10 → 54, not 28)")
-	t.eq(TM.track_top(tl, 2, 5, 30), 199.0, "trackTopForLayer")
-	t.eq(TM.total_height(tl), 228, "totalTracksHeight")
-	t.eq(TM.layer_at_y(tl, 120, 0, 30), 1, "layerIndexAtCanvasY")
-	t.eq(TM.layer_at_y(tl, 500, 0, 30), 3, "below all tracks → n")
 	t.eq(TM.hit_divider(tl, 84, 0, 30), 0, "hitLayerDivider")
 
 

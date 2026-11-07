@@ -56,7 +56,6 @@ func test_routing_kind() -> void:
 	t.eq(DM.routing(ROWS[3], [1]), "", "one screen: no Screens buttons")
 	t.eq(DM.routing(ROWS[3], [1, 3]), "screens", "a look layer with two screens")
 	t.eq(DM.routing(ROWS[4], [1, 3]), "", "audio-only look: no cross-screen")
-	t.ok(DM.routes_inline([1, 2, 3, 4]) and not DM.routes_inline([1, 2, 3, 4, 5]), "inline up to 4 toggles")
 
 
 func test_eight_channel_masters_fit_the_column() -> void:

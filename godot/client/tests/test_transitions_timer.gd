@@ -31,9 +31,8 @@ func test_duration_golden() -> void:
 
 
 func test_formats_golden() -> void:
-	for c in [[0, 50, "00:00:00:00", "0:00"], [61.5, 50, "00:01:01:25", "1:01"], [3725.98, 25, "01:02:05:24", "62:05"], [-1, 50, "--:--:--:--", "--:--"], [59.999, 50, "00:00:59:49", "0:59"], [1.02, 0, "00:00:01:01", "0:01"]]:
-		t.eq(P.format_hmsf(float(c[0]), float(c[1])), c[2], "hmsf %s @%s" % [c[0], c[1]])
-		t.eq(P.format_mmss(float(c[0])), c[3], "mmss %s" % c[0])
+	for c in [[0, "0:00"], [61.5, "1:01"], [3725.98, "62:05"], [-1, "--:--"], [59.999, "0:59"], [1.02, "0:01"]]:
+		t.eq(P.format_mmss(float(c[0])), c[1], "mmss %s" % c[0])
 
 
 ## Same inputs/expectations as tools/smoke/smoke-wo250-timer-bank-mv-bars.test.js and smoke-wo297-idle-top-layer-footer.test.js.

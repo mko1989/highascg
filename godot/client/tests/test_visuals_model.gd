@@ -98,7 +98,7 @@ func test_slice_screens_and_bodies() -> void:
 	t.eq(s.shader, "", "no shader picked in an old project")
 	t.eq(M.slice_of({"visuals": {"scene": "shader", "shader": "sh-sa-ribbons"}}).shader, "sh-sa-ribbons", "shader id kept")
 	t.eq(M.slice_of({"visuals": {"shader": 7}}).shader, "", "a non-string id → none")
-	t.ok("shader" in M.scene_ids(), "Shader is in the picker")
+	t.ok(M.SCENES.any(func(sc: Array) -> bool: return sc[0] == "shader"), "Shader is in the picker")
 
 
 func test_tab_builds_headless() -> void:

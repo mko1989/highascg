@@ -66,23 +66,6 @@ static func normalize_pins(raw: Variant) -> Array:
 	return out.slice(maxi(0, out.size() - MAX_PINS))
 
 
-## beam-offset.js blend: inverse distance² of the pins in (pan, tilt) space; exact on a pin; {0, 0} without pins.
-static func blend(pins: Array, pan: float, tilt: float) -> Dictionary:
-	if pins.is_empty():
-		return {"pan": 0.0, "tilt": 0.0}
-	var w := 0.0
-	var dp := 0.0
-	var dt := 0.0
-	for p in pins:
-		var d2 := (float(p.pan) - pan) ** 2 + (float(p.tilt) - tilt) ** 2
-		if d2 < 1e-12:
-			return {"pan": float(p.dpan), "tilt": float(p.dtilt)}
-		w += 1.0 / d2
-		dp += float(p.dpan) / d2
-		dt += float(p.dtilt) / d2
-	return {"pan": dp / w, "tilt": dt / w}
-
-
 static func normalize_camera(src: Variant, i := 0) -> Dictionary:
 	var o: Dictionary = src if src is Dictionary else {}
 	var pose: Dictionary = o.get("pose") if o.get("pose") is Dictionary else {}
@@ -141,39 +124,6 @@ static func new_camera(existing: Array) -> Dictionary:
 	while used.has("ptz%d" % n):
 		n += 1
 	return normalize_camera({"id": "ptz%d" % n, "name": "PTZ %d" % n}, n - 1)
-
-
-static func wrap180(d: float) -> float:
-	var r := fposmod(d + 180.0, 360.0) - 180.0
-	return 180.0 if r == -180.0 else r
-
-
-## {pan, tilt}: the pure geometry (unclamped, pan wrapped) pointing the camera at target {x, y, z} (aim_z added).
-static func geom_angles(cam: Dictionary, target: Dictionary) -> Dictionary:
-	var dx := float(target.x) - float(cam.pose.x)
-	var dy := float(target.y) - float(cam.pose.y)
-	var dz := float(target.z) + float(cam.aim_z) - float(cam.pose.z)
-	var horiz := sqrt(dx * dx + dy * dy)
-	var bearing: float = float(cam.pose.yaw) if horiz < 1e-6 else rad_to_deg(atan2(dx, dy))
-	return {"pan": wrap180(bearing - float(cam.pose.yaw)), "tilt": rad_to_deg(atan2(dz, horiz)) - float(cam.pose.pitch)}
-
-
-## {pan, tilt, clamped}: degrees (+ right / + up) pointing the camera at target {x, y, z} (aim_z added): the geometry
-## plus the offset_map blend at those geometric angles, clamped to the ranges.
-static func aim_angles(cam: Dictionary, target: Dictionary) -> Dictionary:
-	var g := geom_angles(cam, target)
-	var o := blend(cam.get("offset_map", []), g.pan, g.tilt)
-	var pan_want: float = g.pan + o.pan
-	var tilt_want: float = g.tilt + o.tilt
-	var pan := clampf(pan_want, cam.pan.min, cam.pan.max)
-	var tilt := clampf(tilt_want, cam.tilt.min, cam.tilt.max)
-	return {"pan": pan, "tilt": tilt, "clamped": pan != pan_want or tilt != tilt_want}
-
-
-## Degrees → signed 16-bit camera units.
-static func to_units(axis: Dictionary, deg: float) -> int:
-	var u := int(floorf(deg * float(axis.units_per_deg) + 0.5)) * (-1 if axis.invert else 1)
-	return clampi(u, -32768, 32767)
 
 
 ## One line for the server's per-camera status (GET /api/tracking/auto `ptz`: {id, name, enabled, state, pan?, tilt?, error?}).

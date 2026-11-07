@@ -12,7 +12,6 @@ const DENSE_BARS := 4  # > 4 bus channels → dense master
 const DENSE_ROWS := 4  # > 4 layers in a group → tighter rows
 const BAR_W := 9  # meter_bank.gd's width per bar
 const BAR_W_DENSE := 6
-const INLINE_ROUTES := 4  # up to this many routing toggles sit on the row itself, more go on a line of their own
 const COLUMN_W := 400  # shell.gd: the Inspector column's minimum width
 
 
@@ -57,10 +56,6 @@ static func routing(r: Dictionary, programs: Array) -> String:
 	if AA.cross_screen(r) and programs.size() > 1:
 		return "screens"
 	return ""
-
-
-static func routes_inline(programs: Array) -> bool:
-	return programs.size() <= INLINE_ROUTES
 
 
 ## What a rebuild depends on (values sync in place).

@@ -46,29 +46,6 @@ func test_thumbnails_answer_from_the_data_set() -> void:
 		t.ok(str(k).begins_with("demo/") and _jpeg(Marshalls.base64_to_raw(th.thumbs[k])) != null, "%s payload is a JPEG" % k)
 
 
-func test_look_still_composites_the_layers() -> void:
-	var s := _server()
-	var opener: Dictionary = {}
-	var black_wall: Dictionary = {}
-	for l in s.project.scenes.scenes:
-		if str(l.id) == "look-opener":
-			opener = l
-		elif str(l.id) == "look-black-wall":
-			black_wall = l
-	var img := Video.look_still(opener, 960, 448)
-	t.eq(img.get_size(), Vector2i(960, 448), "still size")
-	var src := Video.thumb_image("demo/opener.mov")
-	var a := _px(img, 480, 224)
-	var b := _px(src, src.get_width() >> 1, src.get_height() >> 1)
-	t.ok(absf(a.r - b.r) < 0.08 and absf(a.g - b.g) < 0.08 and absf(a.b - b.b) < 0.08, "full-frame layer = its still (%s vs %s)" % [a, b])
-	t.ok(a.get_luminance() > 0.05, "not black")
-	var bw := Video.look_still(black_wall, 960, 448)
-	t.eq(_px(bw, 480, 224), Color.BLACK, "the black look is black")
-	t.eq(_px(Video.look_still({"layers": []}, 64, 32), 10, 10), Color.BLACK, "an empty look is black")
-	var audio_only := {"layers": [{"layerNumber": 10, "source": {"type": "media", "value": "demo/click.wav"}}]}
-	t.eq(_px(Video.look_still(audio_only, 64, 32), 32, 16), Color.BLACK, "audio draws nothing")
-
-
 func test_role_channels_and_sizes() -> void:
 	var cm := {"programChannels": [1, 3], "previewChannels": [2, 3], "channelResolutionsByChannel": {"1": {"w": 3840, "h": 1792}}}
 	t.eq(Video.role_channel("pgm1", cm), 1, "pgm1")

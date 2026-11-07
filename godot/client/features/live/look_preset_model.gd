@@ -143,22 +143,6 @@ static func source_label(kind: String) -> String:
 	return "—"
 
 
-## Card meta line: "PRV · mains 1, 2" / "PGM · main 1", plus "· look missing".
-static func meta_line(preset: Dictionary, look_exists: bool) -> String:
-	var mains := mains_of(preset)
-	var hint := ""
-	if (preset.get("items", []) as Array).size() > 1:
-		hint = " · mains " + ", ".join(mains.map(func(m: int) -> String: return str(m + 1)))
-	elif preset.get("targetMain") is float or preset.get("targetMain") is int:
-		hint = " · main %d" % (int(preset.targetMain) + 1)
-	return source_label(str(preset.get("sourceKind", ""))) + hint + ("" if look_exists else " · look missing")
-
-
-## web isLoadedOnPrv: every item's look is the one on its screen's PRV now.
-static func loaded_on_prv(preset: Dictionary, buses: Dictionary) -> bool:
-	return loaded_on_bus(preset, buses, "prv")
-
-
 ## Every destination of the preset shows its look on `key` ("prv" / "pgm") now — an empty one, nothing (WO-781).
 static func loaded_on_bus(preset: Dictionary, buses: Dictionary, key: String) -> bool:
 	var items: Array = preset.get("items", [])

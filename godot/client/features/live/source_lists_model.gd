@@ -53,21 +53,6 @@ static func template_rows(templates: Variant, names: Dictionary, filter := "") -
 	return rows
 
 
-## WO-661 — GET /api/shaders `gpu` {running, setting} → the ⚠ text on shaders, "" when Caspar renders WebGL
-## (web shaderGpuWarning). running null = INFO CONFIG not gathered yet → trust the setting.
-static func gpu_warning(resp: Variant) -> String:
-	var g: Variant = (resp as Dictionary).get("gpu") if resp is Dictionary else null
-	if not g is Dictionary:
-		return ""
-	var running: Variant = g.get("running")
-	var setting: bool = g.get("setting") == true
-	if running == true or (running == null and setting):
-		return ""
-	if setting:
-		return "GPU acceleration is on in settings, but CasparCG is still running without it: apply the Caspar config and restart Caspar. Until then shaders render nothing on air."
-	return "GPU acceleration is off in CasparCG, so shaders render nothing on air (they need WebGL). Turn on \"Enable GPU in CEF templates\" in Devices → Caspar server, then apply and restart Caspar."
-
-
 ## project.timelines.timelines → rows {id: t.id || t.name, label: t.name || t.id}; filter on label (else id).
 static func timeline_rows(timelines: Variant, filter := "") -> Array:
 	var f := filter.strip_edges().to_lower()

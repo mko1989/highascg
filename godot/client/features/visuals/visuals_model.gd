@@ -214,10 +214,6 @@ static func with_layers(slice: Dictionary, layers: Array) -> Dictionary:
 	return slice
 
 
-static func scene_ids() -> Array:
-	return SCENES.map(func(s: Array) -> String: return s[0])
-
-
 ## The screens Send can target: [{label, channel}] from channelMap.programChannels + screenLabels.
 static func screens(cm: Variant) -> Array:
 	var out := []

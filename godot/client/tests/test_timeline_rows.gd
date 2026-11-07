@@ -20,9 +20,9 @@ func _names(tl: Dictionary) -> Array:
 func test_without_screens_the_rows_are_the_layers() -> void:
 	var tl := {"layers": [{"name": "A"}, {"name": "B"}, {"name": "C"}]}
 	t.eq(_names(tl), ["A", "B", "C"], "no divider, array order")
-	t.eq(RW.top(tl, 2, 0), 30.0 + 2 * 54, "same as TM.track_top")
-	t.eq(RW.top(tl, 2, 20), TM.track_top(tl, 2, 20), "scrolled")
-	t.eq(RW.layer_at(tl, 100, 0), TM.layer_at_y(tl, 100, 0), "layer_at matches")
+	t.eq(RW.top(tl, 2, 0), 30.0 + 2 * 54, "track top below the lanes")
+	t.eq(RW.top(tl, 2, 20), 30.0 + 2 * 54 - 20, "scrolled")
+	t.eq(RW.layer_at(tl, 100, 0), 1, "layer_at")
 	t.eq(RW.layer_at(tl, 500, 0), 3, "below the last = n")
 	t.eq(RW.hit_divider(tl, 30 + 54, 0), [0, 1], "height divider between layers")
 
@@ -63,8 +63,6 @@ func test_viewport_lane_and_scroll() -> void:
 	var tall := {"layers": [{}, {}, {}, {}, {}, {}, {}, {}]}  # 432 px
 	vp = RW.viewport(tall, 300, 2)  # avail 270, lane 72 → layers 198
 	t.eq([vp.pinned, vp.lane_top, vp.max_scroll], [true, 228.0, 234.0], "pinned to the bottom, layers scroll")
-	t.eq(RW.clamp_scroll(tall, 300, 2, 999), 234.0, "clamped")
-	t.eq(RW.clamp_scroll(tl, 400, 1, 50), 0.0, "nothing to scroll")
 	var th := RW.thumb(vp, 432, 0)
 	t.eq(th[0], 30.0, "thumb at the top")
 	t.ok(th[1] < 198.0 and th[1] >= 24.0, "thumb shorter than the track")

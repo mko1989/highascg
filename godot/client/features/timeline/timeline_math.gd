@@ -95,37 +95,6 @@ static func layer_h(tl: Dictionary, li: int) -> int:
 	return int(tl.layerHeights[li]) if li >= 0 and li < (tl.layerHeights as Array).size() else DEFAULT_LAYER_H
 
 
-static func track_top(tl: Dictionary, li: int, scroll_y: float, ruler_h := RULER_H) -> float:
-	ensure_heights(tl)
-	var y := float(ruler_h)
-	for i in li:
-		y += layer_h(tl, i)
-	return y - scroll_y
-
-
-static func total_height(tl: Dictionary) -> int:
-	ensure_heights(tl)
-	var s := 0
-	for h in tl.layerHeights:
-		s += int(h)
-	return s
-
-
-## layerIndexAtCanvasY: below all tracks → n (the "+ drop here" row)
-static func layer_at_y(tl: Dictionary, y: float, scroll_y: float, ruler_h := RULER_H) -> int:
-	ensure_heights(tl)
-	var n: int = (tl.layers as Array).size()
-	var top := ruler_h - scroll_y
-	for i in n:
-		var th := layer_h(tl, i)
-		if y >= top and y < top + th:
-			return i
-		top += th
-	if n <= 0:
-		return 0
-	return n if y >= top else n - 1
-
-
 ## hitLayerDivider → divider index above layer i+1, or -1
 static func hit_divider(tl: Dictionary, y: float, scroll_y: float, ruler_h := RULER_H, hit_px := 5.0) -> int:
 	if y < ruler_h:

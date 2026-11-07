@@ -15,40 +15,6 @@ static func snap_value(v: float, candidates: Array, threshold: float) -> float:
 	return best
 
 
-## WO-611 #4 (fixed in the web too, client snapMoveAxis): snap along one axis by EITHER edge, nearest
-## edge that actually snaps wins (tie → start edge).
-static func snap_move_axis(v: float, size: float, candidates: Array, threshold: float) -> float:
-	var a := snap_value(v, candidates, threshold)
-	var end := v + size
-	var e := snap_value(end, candidates, threshold)
-	var da := absf(a - v) if a != v else INF
-	var db := absf(e - end) if e != end else INF
-	if is_inf(da) and is_inf(db):
-		return v
-	return a if da <= db else e - size
-
-
-## Move by (dx, dy) canvas fractions; snap the left/right (top/bottom) edge to the canvas borders and
-## the other layers' edges within `thr` (web: 10 px / frame size). Result clamped to ±5 like the web.
-static func move_fill(start: Dictionary, dx: float, dy: float, others: Array, thr_x: float, thr_y: float) -> Dictionary:
-	var sx := float(start.get("scaleX", 0.0))
-	var sy := float(start.get("scaleY", 0.0))
-	var nx := clampf(float(start.get("x", 0.0)) + dx, -5.0, 5.0)
-	var ny := clampf(float(start.get("y", 0.0)) + dy, -5.0, 5.0)
-	var xc: Array = [0.0, 1.0]
-	var yc: Array = [0.0, 1.0]
-	for f in others:
-		if f is Dictionary:
-			xc.append_array([float(f.get("x", 0)), float(f.get("x", 0)) + float(f.get("scaleX", 0))])
-			yc.append_array([float(f.get("y", 0)), float(f.get("y", 0)) + float(f.get("scaleY", 0))])
-	nx = snap_move_axis(nx, sx, xc, thr_x)
-	ny = snap_move_axis(ny, sy, yc, thr_y)
-	var out := start.duplicate()
-	out["x"] = nx
-	out["y"] = ny
-	return out
-
-
 ## edgeResizeDeltaToFill: `edge` in n/s/e/w/ne/nw/se/sw; dx, dy in canvas fractions.
 static func edge_resize(edge: String, start_fill: Dictionary, dx: float, dy: float, lock_aspect := true, min_s := 0.02,
 		snap_x: Callable = Callable(), snap_y: Callable = Callable()) -> Dictionary:

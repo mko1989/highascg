@@ -24,15 +24,3 @@ func test_edge_resize_snap_golden() -> void:
 	var want: Dictionary = {"x": 0.1, "y": 0.1, "scaleX": 0.9, "scaleY": 0.5}
 	var got := C.edge_resize("e", {"x": 0.1, "y": 0.1, "scaleX": 0.5, "scaleY": 0.5}, 0.393, 0.0, false, 0.02, snap, snap)
 	t.ok(_near(got, want), "east edge snaps to the canvas border: %s got %s" % [want, got])
-
-
-func test_move_snaps_to_borders_and_neighbours() -> void:
-	var f := {"x": 0.0, "y": 0.0, "scaleX": 0.5, "scaleY": 0.5}
-	var m := C.move_fill(f, 0.004, 0.3, [], 0.01, 0.01)
-	t.eq(m.x, 0.0, "x snaps back to the left border within 10 px")
-	t.ok(absf(m.y - 0.3) < 1e-9, "y moves freely")
-	m = C.move_fill(f, 0.495, 0.0, [], 0.01, 0.01)
-	t.ok(absf(m.x - 0.5) < 1e-9, "right edge snaps to the canvas right border")
-	m = C.move_fill(f, 0.26, 0.0, [{"x": 0.75, "y": 0.0, "scaleX": 0.25, "scaleY": 0.25}], 0.02, 0.02)
-	t.ok(absf(m.x - 0.25) < 1e-9, "right edge snaps to a neighbour's left edge")
-	t.eq(C.move_fill(f, 9.0, 0.0, [], 0.0, 0.0).x, 5.0, "clamped to ±5 like the web")

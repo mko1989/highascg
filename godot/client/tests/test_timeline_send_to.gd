@@ -18,7 +18,6 @@ func test_normalize_and_coerce() -> void:
 	t.ok(not S.prv_available({"programChannels": [1], "previewChannels": [2], "previewEnabledByMain": [false]}, {"screenIdx": 0}))
 	t.eq(S.coerce(both, {"preview": true, "program": false, "screenIdx": 1}), {"preview": false, "program": false, "screenIdx": 1},
 		"PGM-only drops PRV and leaves PGM off (todos06.08)")
-	t.eq(S.default_for({"programChannels": [1], "previewChannels": [2]}).preview, true)
 
 
 func test_screens_fps_take() -> void:

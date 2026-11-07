@@ -221,11 +221,6 @@ static func front_rect(o: Dictionary) -> Rect2:
 	return Rect2(lo, float(o.position[1]), maxf(hi - lo, 0.01), size_m(o).y)
 
 
-## Projector position in world XZ (projection objects).
-static func projector_world_xz(o: Dictionary) -> Vector2:
-	return _to_world_xz(o, projector_offset(o))
-
-
 static func _to_world_xz(o: Dictionary, local: Vector3) -> Vector2:
 	var w := local.rotated(Vector3.UP, deg_to_rad(float(o.rotation[1])))
 	return Vector2(float(o.position[0]) + w.x, float(o.position[2]) + w.z)

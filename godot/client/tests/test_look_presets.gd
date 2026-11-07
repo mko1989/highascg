@@ -32,15 +32,7 @@ func test_overwrite_remove_and_card() -> void:
 	t.ok(M.remove(list, "id1") and list.size() == 1, "removed")
 	t.ok(not M.remove(list, "nope"), "unknown id")
 	var two := M.make_preset([], "Both", M.capture_items("pgm", [0, 1], BUSES, ""), "id2", 1)
-	t.eq(M.meta_line(two, true), "PGM · mains 1, 2", "multi-screen meta")
-	t.eq(M.meta_line({"sourceKind": "editing", "targetMain": 0, "items": [{"mainIdx": 0}]}, false), "Open look · main 1 · look missing", "single + missing")
 	t.eq(M.mains_of({"targetMain": 1}), [1], "legacy preset")
-
-
-func test_loaded_on_prv() -> void:
-	t.ok(M.loaded_on_prv({"items": [{"mainIdx": 0, "sceneId": "A"}]}, BUSES), "A is on PRV 1")
-	t.ok(not M.loaded_on_prv({"items": [{"mainIdx": 0, "sceneId": "A"}, {"mainIdx": 1, "sceneId": "C"}]}, BUSES), "every item must be")
-	t.ok(M.loaded_on_prv({"sceneId": "A", "targetMain": 0}, BUSES), "legacy single look")
 
 
 ## WO-781 — E2 destinations: an empty highlighted screen is saved (recall clears it), PRV = PGM still captures,

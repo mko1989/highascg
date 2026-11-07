@@ -139,15 +139,6 @@ func test_same_layer_same_source_is_left_alone() -> void:
 func test_layer_opacity_in_the_composed_frame() -> void:
 	var s := _server()
 	var look: Dictionary = (Demo.new(Demo.load_dir(Demo.DATA_DIR)) as RefCounted).project.scenes.scenes[1].duplicate(true)  # Loop A, layer 10 opacity 1
-	var full: Image = Video.look_still(look, 96, 54)
-	look.layers[0]["opacity"] = 0.5
-	var half: Image = Video.look_still(look, 96, 54)
-	var a := _px(full, 48, 27)
-	var b := _px(half, 48, 27)
-	t.ok(a.get_luminance() > 0.1, "the full-opacity frame has the still")
-	t.ok(absf(b.r - a.r * 0.5) < 0.04 and absf(b.g - a.g * 0.5) < 0.04 and absf(b.b - a.b * 0.5) < 0.04, "half opacity = half the still over black (%s vs %s)" % [b, a])
-	look.layers[0]["opacity"] = 0.0
-	t.eq(_px(Video.look_still(look, 96, 54), 48, 27), Color.BLACK, "opacity 0: nothing")
 	look.layers[0]["opacity"] = 1
 	look.layers[0]["rotation"] = 15
 	var items: Array = Bus.settled_items(look, Vector2i(960, 540))

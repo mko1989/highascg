@@ -72,18 +72,5 @@ static func trim_all(texts: Array, budget: float, measure: Callable, size: int) 
 	return {"titles": cur, "fits": false}
 
 
-## One text into `width` px: the longest head + "…" that fits (the text itself when it already does).
-static func trim_to(text: String, width: float, measure: Callable, size: int) -> String:
-	if measure.call(text, size) <= width:
-		return text
-	var n := text.length()
-	while n > 1:
-		n -= 1
-		var s := text.substr(0, n).strip_edges(false, true) + ELLIPSIS
-		if measure.call(s, size) <= width:
-			return s
-	return text.substr(0, 1) + ELLIPSIS
-
-
 static func _chrome(chrome: Variant, size: int) -> float:
 	return float(chrome.call(size)) if chrome is Callable else float(chrome)

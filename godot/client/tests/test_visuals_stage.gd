@@ -44,7 +44,7 @@ func test_layers() -> void:
 
 
 func test_every_scene_steps_and_bursts() -> void:
-	for id in M.scene_ids():
+	for id in M.SCENES.map(func(sc: Array) -> String: return sc[0]):
 		t.ok(Stage.SCENES.has(id), "%s: the stage knows the model's scene" % id)
 		var s := _stage()
 		s.set_layers(id, "particles" if id != "particles" else "rings")

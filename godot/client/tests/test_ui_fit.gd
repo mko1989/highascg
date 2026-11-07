@@ -74,13 +74,6 @@ func test_hopeless_width_reports_not_fitting() -> void:
 		t.ok(str(s).length() >= 2, "a label keeps one character and the ellipsis: %s" % s)
 
 
-func test_trim_to_longest_head_that_fits() -> void:
-	t.eq(UiFit.trim_to("project only", 200.0, _m(), 11), "project only", "fits → untouched")
-	var s := UiFit.trim_to("project only", 30.0, _m(), 11)  # 30 / 5.5 = 5 chars
-	t.eq(s, "proj…", "4 chars + …: %s" % s)
-	t.eq(UiFit.trim_to("abc", 1.0, _m(), 11), "a…", "never empty")
-
-
 func test_real_font_five_tabs_in_the_sources_column() -> void:
 	var font := ThemeBuilder.load_font()
 	var measure := func(text: String, size: int) -> float:

@@ -14,17 +14,6 @@ const COLORS := {
 }
 
 
-static func format_hmsf(sec: float, fps: float) -> String:
-	if is_nan(sec) or is_inf(sec) or sec < 0.0:
-		return "--:--:--:--"
-	var f := fps if not is_nan(fps) and fps > 0.0 else 50.0
-	var h := int(floor(sec / 3600.0))
-	var m := int(floor(fmod(sec, 3600.0) / 60.0))
-	var s := int(floor(fmod(sec, 60.0)))
-	var ff := int(minf(f - 1.0, floor((sec - floor(sec)) * f)))
-	return "%02d:%02d:%02d:%02d" % [h, m, s, ff]
-
-
 static func format_mmss(sec: float) -> String:
 	if is_nan(sec) or is_inf(sec) or sec < 0.0:
 		return "--:--"

@@ -42,11 +42,6 @@ static func thumb_image(media_id: String) -> Image:
 	return Media.thumb_image(media_id)
 
 
-## A look's still at w × h: its layers bottom → top, each media still where the look card would draw it.
-static func look_still(look: Dictionary, w: int, h: int) -> Image:
-	return raster(Bus.settled_items(look, Vector2i(w, h)), w, h, Vector2i(w, h))
-
-
 ## Draw items (demo_bus.gd frame) bus-sized `bus_size` onto a w × h black canvas: each still scaled to its dst, faded by its
 ## alpha, in order. No rotation, clip or motion (the GPU path has them).
 static func raster(items: Array, w: int, h: int, bus_size: Vector2i) -> Image:

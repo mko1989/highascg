@@ -49,10 +49,6 @@ static func coerce(cm: Dictionary, st: Dictionary) -> Dictionary:
 	return st
 
 
-static func default_for(cm: Dictionary) -> Dictionary:
-	return coerce(cm, DEFAULT.duplicate())
-
-
 ## The Dest list: [[label, screenIdx]], "All screens" (null) first when there are 2+ screens.
 static func screen_options(cm: Dictionary) -> Array:
 	var n := DeckModel.screen_count(cm)

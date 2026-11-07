@@ -57,8 +57,3 @@ static func remember(list: Array, hex_: String) -> Array:
 		if str(h) != hex_ and out.size() < HISTORY_MAX:
 			out.append(str(h))
 	return out
-
-
-## Text (black / white) readable on `c`.
-static func ink(c: Color) -> Color:
-	return Color.BLACK if c.get_luminance() > 0.55 else Color.WHITE

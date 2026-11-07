@@ -63,12 +63,6 @@ static func cards(snap: Variant, cams: Array, pick := {}, now := NAN) -> Array:
 	return out
 
 
-## The view a cut-out shows best (ranked_views' first), {} when no camera sees them.
-static func best_view(wp: Dictionary, views: Dictionary, by_id: Dictionary) -> Dictionary:
-	var r := ranked_views(wp, views, by_id)
-	return r[0] if not r.is_empty() else {}
-
-
 ## Every view of the person, best first: the picture's size in raster pixels, a coasting view (age_s > 0) × 0.25, and
 ## (WO-701) when their body pose is known, × how squarely they face that camera — BACK_WEIGHT … 1 from behind to
 ## straight on (an unsolved camera, whose place is unknown, sits halfway).

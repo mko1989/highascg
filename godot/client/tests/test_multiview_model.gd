@@ -57,7 +57,6 @@ func test_defaults_and_api_layout() -> void:
 		_ok(L.migrate_preview_route_sources(c.cells, gd.maps[c.map]), c.out, "migrate routes")
 	for c in gd.channel:
 		_ok(G.parse_route(G._src_str(_cell(c.cell))), c.parsed, "parse %s" % c.cell)
-		_ok(L.mv_cell_source_channel(_cell(c.cell), c.parsed, gd.maps[c.map]), c.ch, "source channel %s" % c.cell)
 
 
 func test_overlay_and_contained_rects() -> void:

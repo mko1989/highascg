@@ -153,10 +153,6 @@ static func viewport(tl: Dictionary, view_h: float, lane_rows: int) -> Dictionar
 		"max_scroll": maxf(0.0, content - layers_h), "pinned": true}
 
 
-static func clamp_scroll(tl: Dictionary, view_h: float, lane_rows: int, scroll_y: float) -> float:
-	return clampf(scroll_y, 0.0, float(viewport(tl, view_h, lane_rows).max_scroll))
-
-
 ## The vertical scrollbar thumb as [top, height] in screen y (empty when nothing scrolls).
 static func thumb(vp: Dictionary, content: float, scroll_y: float) -> Array:
 	if float(vp.max_scroll) <= 0.0:

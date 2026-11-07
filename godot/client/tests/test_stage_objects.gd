@@ -100,8 +100,6 @@ func test_2d_footprint_and_front_rect() -> void:
 	o = S.normalize(o)
 	t.ok(S.front_rect(o).size.x < 0.02, "yaw 90°: edge-on in the front view")
 	t.ok(_near(absf(S.footprint(o)[0].y - S.footprint(o)[1].y), 1.4391, 1e-3), "…and full width along z in the plan")
-	var p := S.normalize({"type": "projection", "screen_m": [4.0, 2.25], "throw": 1.5})
-	t.ok(_near(S.projector_world_xz(p).y, 6.0), "projector 6 m in front (plan)")
 	var wall := S.normalize({"type": "led_wall", "panels": [6, 2], "curve_deg": 10.0})
 	t.eq(S.footprint(wall).size(), 7, "curved wall footprint = column edges")
 

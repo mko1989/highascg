@@ -46,16 +46,6 @@ func test_template_rows() -> void:
 	t.eq(M.GROUPS.map(func(g: Array) -> String: return g[0]), ["templates", "lower_thirds", "shaders"], "group order")
 
 
-func test_gpu_warning() -> void:
-	t.eq(M.gpu_warning({"gpu": {"running": true, "setting": false}}), "", "Caspar runs with GPU → no warning")
-	t.eq(M.gpu_warning({"gpu": {"running": null, "setting": true}}), "", "not gathered yet, setting on → trust it")
-	t.ok(M.gpu_warning({"gpu": {"running": false, "setting": false}}).begins_with("GPU acceleration is off"), "off")
-	t.ok(M.gpu_warning({"gpu": {"running": null, "setting": false}}).begins_with("GPU acceleration is off"), "unknown + off")
-	t.ok(M.gpu_warning({"gpu": {"running": false, "setting": true}}).contains("restart Caspar"), "on but not applied")
-	t.eq(M.gpu_warning({"shaders": []}), "", "older server: no gpu field")
-	t.eq(M.gpu_warning(null), "", "request failed")
-
-
 func test_template_filter() -> void:
 	var names := M.shader_names(SHADERS)
 	t.eq(M.template_rows(TLS, names, "  count ").map(func(r: Dictionary) -> String: return r.text), ["COUNTDOWN/COUNTDOWN"], "case-insensitive, trimmed")

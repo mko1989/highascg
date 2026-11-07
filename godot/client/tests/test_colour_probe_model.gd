@@ -1,6 +1,6 @@
 extends RefCounted
-## WO-950 — colour_probe_model.gd: the copy formats, the averaged sample (clipped at the image edge), the recent list,
-## the readable ink. (The overlay / panel windows need a display and screen_get_image — owner QA.)
+## WO-950 — colour_probe_model.gd: the copy formats, the averaged sample (clipped at the image edge), the recent list.
+## (The overlay / panel windows need a display and screen_get_image — owner QA.)
 
 const M := preload("res://app/colour_probe_model.gd")
 var t
@@ -38,5 +38,3 @@ func test_history_and_ink() -> void:
 	t.eq(h[0], "#00000B", "newest first")
 	h = M.remember(h, "#000005")
 	t.eq([h[0], h.count("#000005")], ["#000005", 1], "a repeat moves to the front, not doubled")
-	t.eq(M.ink(Color.WHITE), Color.BLACK)
-	t.eq(M.ink(Color8(0, 84, 144)), Color.WHITE)

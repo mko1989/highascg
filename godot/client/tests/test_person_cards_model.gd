@@ -38,17 +38,17 @@ func test_estimate_height_nan_without_a_view() -> void:
 	t.ok(is_nan(M.estimate_height(_cam("a", "ch1", bad), [0.4, 0.2, 0.5, 0.8], [0, 0, 0])), "no valid view → NAN")
 
 
-func test_best_view_largest_live_box_wins() -> void:
+func test_ranked_views_largest_live_box_wins() -> void:
 	var by_id := {"a": _cam("a", "ch1", C.camera()), "b": _cam("b", "ch2", C.camera())}
 	var small := {"cam": {"id": "a"}, "person": {"box": [0.4, 0.4, 0.45, 0.5], "age_s": 0.0}}
 	var big := {"cam": {"id": "b"}, "person": {"box": [0.2, 0.2, 0.4, 0.8], "age_s": 0.0}}
 	var views := {"a:1": small, "b:7": big}
-	t.eq(M.best_view({"keys": ["a:1", "b:7"]}, views, by_id), big, "the bigger picture wins")
+	t.eq(M.ranked_views({"keys": ["a:1", "b:7"]}, views, by_id)[0], big, "the bigger picture wins")
 	big.person.age_s = 0.5
 	var coast := {"cam": {"id": "b"}, "person": {"box": [0.4, 0.4, 0.46, 0.5], "age_s": 0.5}}
-	t.eq(M.best_view({"keys": ["a:1", "b:7"]}, {"a:1": small, "b:7": coast}, by_id), small,
+	t.eq(M.ranked_views({"keys": ["a:1", "b:7"]}, {"a:1": small, "b:7": coast}, by_id)[0], small,
 		"a coasting view of similar size loses to a live one")
-	t.eq(M.best_view({"keys": ["z:1"]}, views, by_id), {}, "no camera sees them → {}")
+	t.ok(M.ranked_views({"keys": ["z:1"]}, views, by_id).is_empty(), "no camera sees them → none")
 
 
 ## WO-701: COCO joints of someone at (x, y) facing `dir` (plan, unit): shoulders / hips across their front.
@@ -78,11 +78,11 @@ func test_ranked_views_prefer_the_camera_they_face() -> void:
 	var views := {"f:1": {"cam": {"id": "f"}, "person": {"box": [0.4, 0.3, 0.45, 0.6], "age_s": 0.0}},
 		"b:1": {"cam": {"id": "b"}, "person": {"box": [0.4, 0.2, 0.47, 0.7], "age_s": 0.0}}}
 	var wp := {"x": 0.0, "y": 0.0, "keys": ["f:1", "b:1"]}
-	t.eq(str(M.best_view(wp, views, by_id).cam.id), "b", "no pose: the bigger picture")
+	t.eq(str(M.ranked_views(wp, views, by_id)[0].cam.id), "b", "no pose: the bigger picture")
 	wp.joints = _joints(0, 0, Vector2(0, -1))
-	t.eq(str(M.best_view(wp, views, by_id).cam.id), "f", "facing downstage: the camera in front, though smaller")
+	t.eq(str(M.ranked_views(wp, views, by_id)[0].cam.id), "f", "facing downstage: the camera in front, though smaller")
 	wp.joints = _joints(0, 0, Vector2(0, 1))
-	t.eq(str(M.best_view(wp, views, by_id).cam.id), "b", "turned round: the upstage camera")
+	t.eq(str(M.ranked_views(wp, views, by_id)[0].cam.id), "b", "turned round: the upstage camera")
 
 
 func test_sticky_camera_waits_before_cutting() -> void:
