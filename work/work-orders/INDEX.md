@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-904 live WOs (28 open, 122 in progress, 754 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+904 live WOs (28 open, 121 in progress, 755 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -702,11 +702,10 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 903 DONE [devices-config+testing-ci] Two operator monitors: the pointer fence goes round both heads (DP-4 + DP-6) → 903_WO_pointer_confine_spans_operator_heads.md
 - 958 DONE [devices-config+godot-client] Devices tab shows every server as "2026.05.20": the cluster read package.json's… → 958_WO_devices_tab_shows_frozen_package_version.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (86)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (85)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
-- 50 IN PROGRESS [os-iso] Windows & macOS desktop executables — run HighAsCG from exFAT in simulation mode → 50_WO_WINDOWS_MAC_EXFAT_SIMULATION_LAUNCHERS.md
 - 52 IN PROGRESS [os-iso+media] Bridge disk partition (media + configs) vs USB stick (ingest + configs) → 52_WO_BRIDGE_DISK_PARTITION_AND_USB_SYNC.md
 - 66 IN PROGRESS [os-iso+network] Robust boot drop-update/, build stamp, GitHub release check, Web UI update → 66_WO_BOOT_DROP_UPDATE_VERSION_AND_WEBUI_UPDATE.md
 - 69 OPEN [os-iso] Clean-slate full reset (internal wipe, preserve bridge + exFAT) → 69_WO_CLEAN_SLATE_FULL_RESET.md
@@ -930,7 +929,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 979 DONE [testing-ci+network,tracking-vr] Linked-servers role-split test environment: media playout ↔ camera tracking / p… → 979_WO_linked_roles_test_env.md
 - 988 DONE [testing-ci] Offline test suite runtime: lingering timers + CI concurrency (optimization swe… → 988_WO_offline_suite_runtime.md
 
-## process — Docs, wiki, audits, work-order tooling (27)
+## process — Docs, wiki, audits, work-order tooling (28)
 
 - 33 DONE [process] (legacy filename) — use the index → 33_WO_DEVICE_VIEW_CASPAR_AND_PIXELHUE.md
 - 83 DONE [process+web-client] Interactive Project Architecture Map: index & dependency order → 83_WO_INTERACTIVE_PROJECT_MAP.md
@@ -959,14 +958,16 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 831 DONE [process] Dead code removal (sweep §6) → 831_WO_dead_code_removal.md
 - 846 DONE [process] Work-order housekeeping: categorize, index, deprecate → 846_WO_work_order_housekeeping_index.md
 - 923 DONE [process+godot-client,amcp] Full test run 01.11: test:live hung forever, stale live probes, two GUI e2e fai… → 923_WO_full_test_run_fixes.md
+- 995 DONE [process+testing-ci] Sanitization sweep: delete dead and deprecated code (Electron launcher, kiosk l… → 995_WO_dead_and_deprecated_code_sweep.md
 
-## Deprecated (48)
+## Deprecated (49)
 
 - 11 DEPRECATED [os-iso+devices-config] Boot Orchestrator & OS Setup → deprecated/11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md
 - 19 DEPRECATED [tracking-vr] Person Tracking — Stage Performer Detection from Camera Inputs & 3D Previs → deprecated/19_WO_PERSON_TRACKING.md
 - 31 DEPRECATED [tracking-vr+video-io] Stage Auto-Follow — PTZ Cameras & Moving-Heads from Tracking → deprecated/31_WO_STAGE_AUTOFOLLOW_PTZ.md
 - 34 DEPRECATED [engine] Switcher-style bus transition rebuild (3-channel model) → deprecated/34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md
 - 38 DEPRECATED [os-iso+media] Mount internal disk partition to media folder (live USB) → deprecated/38_WO_MEDIA_PARTITION_MOUNT_LIVE_USB.md
+- 50 DEPRECATED [os-iso] Windows & macOS desktop executables — run HighAsCG from exFAT in simulation mode → deprecated/50_WO_WINDOWS_MAC_EXFAT_SIMULATION_LAUNCHERS.md
 - 51 DEPRECATED [web-client+network] Decoupling Frontend & Backend Architecture → deprecated/51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md
 - 89 DEPRECATED [video-io+web-client] CEF operator control (X11 bridge, host-target CDP, HTTP API) → deprecated/89_WO_CEF_OPERATOR_CONTROL.md
 - 149 DEPRECATED [web-client+engine] Operator GUI on live CasparCG output (design exploration) → deprecated/149_WO_OPERATOR_GUI_ON_LIVE_OUTPUT_DESIGN.md

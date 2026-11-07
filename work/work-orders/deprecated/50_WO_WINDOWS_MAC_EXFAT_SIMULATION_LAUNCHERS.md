@@ -1,7 +1,7 @@
 # Work Order 50: Windows & macOS desktop executables — run HighAsCG from exFAT in simulation mode
 
 **Area:** os-iso
-**Status: IN PROGRESS (no status line before WO-846; classified from its content)**
+**Status: DEPRECATED (the desktop Electron/exFAT simulation tooling it built in client/tools was deleted, unused since the Godot client and Ventoy sticks; successor WO-995)**
 
 
 > **AGENT COLLABORATION PROTOCOL**  
