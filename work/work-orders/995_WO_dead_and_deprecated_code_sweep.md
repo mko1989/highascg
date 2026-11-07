@@ -1,6 +1,6 @@
 # WO-995 — Sanitization sweep: delete dead and deprecated code (Electron launcher, kiosk leftovers, never-called exports)
 **Area:** process, testing-ci
-**Status: DONE (07.11.26, removals checked by whole-repo reference search plus AST checks; curated suite 5522 pass / 0 fail, Godot 26145 pass / 0 fail, all gates clean; owner-call items listed below were left in place)**
+**Status: DONE (07.11.26, removals checked by whole-repo reference search plus AST checks; curated suite 0 fail, Godot 25972 pass / 0 fail, all gates clean; phase 2 settled the owner-call list — see the Phase 2 section)**
 
 Owner, 07.11: *"Want you to run a sanitization sweep. Looking for dead and deprecated code. Like the electron launcher etc."*
 
@@ -88,7 +88,7 @@ WO-50 (exFAT simulation launchers) moved to `deprecated/`, with this WO as succe
 - `docs/PLAN_SERVER_CLIENT_SPLIT.md`, a historical WO-51 plan.
 - The `client/tools` lines in the eggs exclude list (harmless).
 
-**Owner call (found, not removed):**
+**Owner call (found, not removed in phase 1; see Phase 2 for the outcome):**
 - **Admin routes with no in-repo caller** (curl/ops use is possible): `/api/streaming/*`, `ltc/config`, the
   gpu-nvidia/xrandr apply routes, `host-live/migration`, `POST /api/system/pointer-confine`.
 - **`screen_N_vsync` keys.** Removing them needs a coordinated Godot change.
@@ -102,6 +102,44 @@ WO-50 (exFAT simulation launchers) moved to `deprecated/`, with this WO as succe
 - **Server broadcasts nobody consumes:** `record_stopped`, `playback.reconcile`, `ltc.status`, `caspar-apply-pending`.
 - **Test-only Godot helper functions.**
 - **Follow-up:** the `shm_texture.free_gpu` leak.
+
+## Phase 2 — owner call list (07.11)
+
+Owner: *"The LTC ones are new so might be unfinished. The rest seems obsolete but make sure first."* The LTC
+items (`ltc/config` route, `ltc.status` broadcast) were left alone. Before each remaining item was removed, it was
+checked against:
+- a whole-repo search (client, godot, tools, scripts);
+- the Companion module in `~/companion-module-dev`, which calls only `/api/streaming-channel`;
+- git history and WO status.
+
+The journal does not log every request, so it was not used as evidence either way.
+
+| commit | removed | why it was dead |
+|---|---|---|
+| 3958c54e | `/api/streaming/{ndi-sources,toggle,restart}`, the `gpu-nvidia/apply` 410 stub, `xrandr-layout/apply`, `POST /api/system/pointer-confine`, `host-live/migration`, the `caspar-apply-pending` broadcast, `tools/startup/place-screen-consumers.sh` | no caller in repo or Companion; the stub already answered 410; the script was superseded by WO-483 `screen-consumer-placement.js` |
+| 35ca0877 | the XGrabPointer confine path (`HIGHASCG_POINTER_CONFINE_XGRAB`, `confine-cursor.py`, its installer line) | WO-87 marked it do-not-use (it breaks multiview) and nothing set the flag; the `pkill` cleanup for old `/usr/local/bin` copies stays |
+| bada938f | `screen_N_vsync` / `multiview_vsync` in the server defaults, the web defaults/seed/inspector save and the Godot cable_seed/gpu_output model+ui; golden fixtures updated | the generator always writes vsync off (WO-716) and both clients only round-tripped the keys; the saved keys in live settings are ignored |
+| dd503558 | 21 Godot functions that only tests called, plus 5 cascades (the PTZ aim mirror `aim_angles`/`to_units`/`geom_angles`/`blend`/`wrap180`; the server aims in `src/ptz/ptz-model.js`) | their callers went in earlier refactors, or they were never wired |
+| 9ecec8e4 | the dd-flash stick cluster → **WO-996** | Ventoy-only since 01.11 |
+
+**Kept after checking:**
+- `GET /api/system/gpu-nvidia` and `GET xrandr-layout` (diagnostics used by the WO-919 and WO-468 checks).
+- `/api/streams` (the web client calls it).
+- The `record_stopped` broadcast (planned WO-79 hook) and `playback.reconcile` (WO-146 visibility event).
+- `highascg-nvidia-persistence.service` (enabled and active on the box).
+- `dev-mode.sh` (Companion dev workflow) and `discover-recovery-sources.sh` (WO-870 tool).
+- Godot test hooks: `node_at`, `player_count`, `surface_size`, `can_redo`, `writer_dropped`, `pose_from`,
+  `vfov_to_hfov`.
+
+**Phase 2 verification:**
+- Godot `--check` boots clean. `--test` gives **25972 passed, 0 failed**, down from 26145 by the removed assertions.
+- The vsync and stick smokes pass (42 + 330), and the routes unit ran its touched smokes.
+- Node restarted cleanly and `/api/settings` answers. The old keys stay in live settings and are ignored. The
+  generator's `<vsync>false</vsync>` is proven by smoke-wo716/wo447. The live `casparcg.config` (written 06.11)
+  carries it too.
+- The full curated suite was run before the push (see below).
+
+**Follow-up (not dead code):** `shm_texture.free_gpu` leaks. It needs its own WO.
 
 ## What was VERIFIED
 
