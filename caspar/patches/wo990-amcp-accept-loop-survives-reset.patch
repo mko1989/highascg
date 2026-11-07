@@ -1,0 +1,166 @@
+From cd177d36982135928e62eb229bfed6e2b7143e3e Mon Sep 17 00:00:00 2001
+From: HighAsCG Assembly <assembly@highascg.local>
+Date: Sat, 7 Nov 2026 12:36:34 +0100
+Subject: [PATCH 1/2] =?UTF-8?q?protocol:=20keep=20the=20AMCP=20accept=20lo?=
+ =?UTF-8?q?op=20alive=20when=20a=20peer=20resets=20at=20once=20=E2=80=94?=
+ =?UTF-8?q?=20HighAsCG=20WO-990?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A connect+RST (any port scan) left the accepted socket without a remote endpoint; the throwing
+remote_endpoint() in the connection's log line escaped handle_accept before start_accept(), so the
+server never accepted another client until restart. Use the error_code overloads for every
+endpoint query and guard the per-connection setup so the accept is always re-armed.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01MxpJi7ZHbr5bkwDuaHmchx
+---
+ src/protocol/util/AsyncEventServer.cpp | 67 ++++++++++++++++++++------
+ 1 file changed, 52 insertions(+), 15 deletions(-)
+
+diff --git a/src/protocol/util/AsyncEventServer.cpp b/src/protocol/util/AsyncEventServer.cpp
+index e9f9411ce..3646a7ddb 100644
+--- a/src/protocol/util/AsyncEventServer.cpp
++++ b/src/protocol/util/AsyncEventServer.cpp
+@@ -132,11 +132,28 @@ class connection : public spl::enable_shared_from_this<connection>
+ 
+     std::wstring print() const { return L"async_event_server[:" + listen_port_ + L"]"; }
+ 
+-    std::wstring address() const { return u16(socket_->local_endpoint().address().to_string()); }
++    // Non-throwing endpoint queries: a peer that connects and resets at once (a port scan) has no remote endpoint
++    // by the time we look; the throwing overloads used to escape handle_accept and kill the accept loop (HighAsCG
++    // WO-990).
++    std::wstring address() const
++    {
++        boost::system::error_code ec;
++        auto                      ep = socket_->local_endpoint(ec);
++        return ec ? L"no-address" : u16(ep.address().to_string());
++    }
+ 
+     std::wstring ipv4_address() const
+     {
+-        return socket_->is_open() ? u16(socket_->remote_endpoint().address().to_string()) : L"no-address";
++        boost::system::error_code ec;
++        auto                      ep = socket_->remote_endpoint(ec);
++        return ec ? L"no-address" : u16(ep.address().to_string());
++    }
++
++    static std::wstring local_port(const tcp::socket& socket)
++    {
++        boost::system::error_code ec;
++        auto                      ep = socket.local_endpoint(ec);
++        return ec ? L"no-port" : std::to_wstring(ep.port());
+     }
+ 
+     void send(std::string&& data)
+@@ -203,7 +220,7 @@ class connection : public spl::enable_shared_from_this<connection>
+                const spl::shared_ptr<connection_set>&          connection_set)
+         : socket_(socket)
+         , io_context_(io_context)
+-        , listen_port_(socket_->is_open() ? std::to_wstring(socket_->local_endpoint().port()) : L"no-port")
++        , listen_port_(local_port(*socket_))
+         , connection_set_(connection_set)
+         , protocol_factory_(protocol_factory)
+         , is_writing_(false)
+@@ -321,19 +338,39 @@ struct AsyncEventServer::implementation : public spl::enable_shared_from_this<im
+             return;
+ 
+         if (!error) {
+-            boost::system::error_code ec;
+-            socket->set_option(boost::asio::socket_base::keep_alive(true), ec);
+-
+-            if (ec)
+-                CASPAR_LOG(warning) << print() << L" Failed to enable TCP keep-alive on socket";
+-
+-            auto conn = connection::create(io_context_, socket, protocol_factory_, connection_set_);
+-            connection_set_->insert(conn);
+-
+-            for (auto& lifecycle_factory : lifecycle_factories_) {
+-                auto lifecycle_bound = lifecycle_factory(u8(conn->ipv4_address()));
+-                conn->add_lifecycle_bound_object(lifecycle_bound.first, lifecycle_bound.second);
++            // Whatever one connection does, the accept loop below must be re-armed (HighAsCG WO-990).
++            try {
++                boost::system::error_code ec;
++
++                // The peer may already be gone (connect + RST, e.g. a port scan): there is nobody to serve and the
++                // lifecycle factories (OSC subscription by peer address) cannot parse "no-address", so drop it.
++                socket->remote_endpoint(ec);
++                if (ec) {
++                    CASPAR_LOG(debug) << print() << L" Peer left before the connection was set up: " << ec.message();
++                    socket->close(ec);
++                    start_accept();
++                    return;
++                }
++
++                socket->set_option(boost::asio::socket_base::keep_alive(true), ec);
++
++                if (ec)
++                    CASPAR_LOG(warning) << print() << L" Failed to enable TCP keep-alive on socket";
++
++                auto conn = connection::create(io_context_, socket, protocol_factory_, connection_set_);
++                connection_set_->insert(conn);
++
++                for (auto& lifecycle_factory : lifecycle_factories_) {
++                    auto lifecycle_bound = lifecycle_factory(u8(conn->ipv4_address()));
++                    conn->add_lifecycle_bound_object(lifecycle_bound.first, lifecycle_bound.second);
++                }
++            } catch (...) {
++                CASPAR_LOG_CURRENT_EXCEPTION();
++                boost::system::error_code ec;
++                socket->close(ec);
+             }
++        } else if (error == boost::asio::error::operation_aborted) {
++            return;
+         }
+         start_accept();
+     }
+-- 
+2.53.0
+
+
+From 379d819171a6defb262e6463cf6b512735197628 Mon Sep 17 00:00:00 2001
+From: HighAsCG Assembly <assembly@highascg.local>
+Date: Sat, 7 Nov 2026 12:41:22 +0100
+Subject: [PATCH 2/2] =?UTF-8?q?protocol:=20hand=20the=20lifecycle=20factor?=
+ =?UTF-8?q?ies=20the=20peer=20address=20read=20at=20accept=20=E2=80=94=20H?=
+ =?UTF-8?q?ighAsCG=20WO-990?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A peer resetting between the accept-time check and the OSC subscription left ipv4_address() at
+"no-address", which make_address_v4 rejects (caught since cd177d369, but logged with a backtrace).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01MxpJi7ZHbr5bkwDuaHmchx
+---
+ src/protocol/util/AsyncEventServer.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/protocol/util/AsyncEventServer.cpp b/src/protocol/util/AsyncEventServer.cpp
+index 3646a7ddb..048f1d9b4 100644
+--- a/src/protocol/util/AsyncEventServer.cpp
++++ b/src/protocol/util/AsyncEventServer.cpp
+@@ -344,7 +344,7 @@ struct AsyncEventServer::implementation : public spl::enable_shared_from_this<im
+ 
+                 // The peer may already be gone (connect + RST, e.g. a port scan): there is nobody to serve and the
+                 // lifecycle factories (OSC subscription by peer address) cannot parse "no-address", so drop it.
+-                socket->remote_endpoint(ec);
++                const auto peer = socket->remote_endpoint(ec);
+                 if (ec) {
+                     CASPAR_LOG(debug) << print() << L" Peer left before the connection was set up: " << ec.message();
+                     socket->close(ec);
+@@ -361,7 +361,8 @@ struct AsyncEventServer::implementation : public spl::enable_shared_from_this<im
+                 connection_set_->insert(conn);
+ 
+                 for (auto& lifecycle_factory : lifecycle_factories_) {
+-                    auto lifecycle_bound = lifecycle_factory(u8(conn->ipv4_address()));
++                    // The address read once above: the socket may be closed by now if the peer reset meanwhile.
++                    auto lifecycle_bound = lifecycle_factory(peer.address().to_string());
+                     conn->add_lifecycle_bound_object(lifecycle_bound.first, lifecycle_bound.second);
+                 }
+             } catch (...) {
+-- 
+2.53.0
+

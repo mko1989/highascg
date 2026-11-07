@@ -1,6 +1,6 @@
 # WO-990 — Caspar's AMCP acceptor dies when a client resets the connection immediately (a port scan locks out new clients)
 **Area:** caspar-build, amcp
-**Status: OPEN (root cause in source, fix written below; needs a Caspar rebuild + swap; both boxes hit 07.11)**
+**Status: DONE (07.11.26, repro kills AMCP on the old binary; on 379d81917 200 connect+RST and an nmap scan leave VERSION answering with 0 log errors on both boxes)**
 
 ## Investigation
 
@@ -32,40 +32,56 @@ Effects:
 - `local_endpoint()` in the constructor (`:206`, `listen_port_`) and `address()` (`:135`) use the throwing overloads
   too.
 
-## Proposed fix (not built)
+## What was done
 
-Use the non-throwing overloads, and keep the accept loop alive whatever a single connection does:
+The owner (07.11) said the HighAsCG Caspar build has essential additions that every build must carry, with no clean
+branch: find what's there and add to it. So:
 
-```cpp
-std::wstring ipv4_address() const
-{
-    boost::system::error_code ec;
-    auto ep = socket_->remote_endpoint(ec);
-    return ec ? L"no-address" : u16(ep.address().to_string());
-}
-// listen_port_: same with local_endpoint(ec) → L"no-port"; address(): local_endpoint(ec).
-void handle_accept(…)
-{
-    if (!acceptor_.is_open()) return;
-    if (!error) {
-        try { /* existing body */ }
-        catch (...) { CASPAR_LOG_CURRENT_EXCEPTION(); }
-    }
-    start_accept();
-}
-```
+- **Kept the build branch and committed what was only in the worktree.** The `src-v2` worktree held the WO-800
+  (per-layer audio meters) and WO-820 (native NotchLC) changes uncommitted. They are identical to
+  `caspar/patches/wo800…`/`wo820…`: both reverse-apply cleanly. The deployed binary (md5 ab668967) was built from
+  them. Now committed as `d6519d5d3` and `dd7862fba`. The branch was renamed `wo742-shm-producer` → **`highascg-main`**,
+  so its name says what it is.
+- **`cd177d369`** `src/protocol/util/AsyncEventServer.cpp`:
+  - `address()`, `ipv4_address()` and the constructor's listen port use the `error_code` overloads (new
+    `local_port()` helper).
+  - `handle_accept` first checks `remote_endpoint(ec)`. A peer that is already gone is closed and logged at debug,
+    and the accept is re-armed.
+  - The per-connection setup is wrapped in try/catch, which closes the socket. `start_accept()` always runs, except
+    on `operation_aborted` and when the acceptor is closed.
+- **`379d81917`** passes the address read at accept time to the lifecycle factories (OSC subscription by peer).
+  - Why: 5867 still logged one caught `make_address_v4: Invalid argument` after `cd177d369`. A remote peer reset
+    between the check and the OSC factory, so `ipv4_address()` had become `no-address` by then.
+- **`caspar/README.md`** (new) records the build itself:
+  - the branch, build, deploy and distribution rules (`bin/` is ignored, ISOs clone it, peers get a copy);
+  - a table of everything the build carries beyond v2.5.1, by commit and WO.
+- **`caspar/patches/wo990-amcp-accept-loop-survives-reset.patch`**: both commits as `format-patch`.
 
-**Why it isn't built yet:** the `src-v2` worktree has uncommitted changes from other work (screen slices: mixer,
-stage, image_mixer). Building there now would ship those too. The patch belongs on a clean branch off the deployed
-`deac375bb`, then build-v2, swap per the caspar-build-v2 procedure (cp `.new`, `mv -f`, `RESTART`, node restart),
-keeping `casparcg.prev`. It is worth upstreaming: any LAN scanner or a flapping client takes AMCP away.
+Why the server-side fix and not just a "never scan" rule: any LAN scanner, flapping client or health check that
+connects and drops took AMCP away until a restart, and nothing showed until node reconnected.
 
-**Repro to verify the fix** (not run on purpose yet; the 07.11 link to the scan is the timestamp match plus the code path. Dev box only; it kills AMCP on an unfixed build): open and reset a socket against
-:5250 (`python3 -c 'import socket,struct;s=socket.socket();s.setsockopt(socket.SOL_SOCKET,socket.SO_LINGER,struct.pack("ii",1,0));s.connect(("127.0.0.1",5250));s.close()'`),
-then a fresh `VERSION` must still get `201`.
+## What was VERIFIED
 
-## Mitigation until then
+- **Repro on the old binary (this box, 12:36):**
+  - `scratchpad/amcp-reset-repro.py 127.0.0.1 5` (SO_LINGER 0 connect+close ×5): `before: 201 VERSION OK` →
+    `after: NO REPLY (timeout)`.
+  - `ss -ltn` :5250 Recv-Q 5; log `remote_endpoint: Transport endpoint is not connected`.
+  - The root cause is proven, not just matched by timestamp.
+- **First fixed build `cd177d369`:** 50 resets → `201`, Recv-Q 0. The log showed caught `make_address_v4` backtraces,
+  which led to the remote_endpoint pre-check.
+- **`379d81917` (built with `build-26.sh`, md5 a8ffaf14), deployed to both boxes** (rollback `bin/casparcg.pre-wo990`
+  on each; `casparcg.prev` kept):
+  - 200 connect+RST against 127.0.0.1 and 200 against 192.168.0.10 → both `201 VERSION OK 2.5.1 379d81917`;
+    **0 `[error]` lines** in either Caspar log since the swap.
+  - `nmap -Pn -p 5250` of both boxes (the 07.11 trigger) → both still answer `VERSION`.
+- **This box after the swaps:**
+  - node reconnected, PRV ch3 layer 10 = ffmpeg (the neon loop, as found);
+  - `:0` screenshot: GUI on Live with the PRV thumbnail playing.
+- **highascg5867:** node active, GUI pid alive.
+  - Caspar PGM/PRV are empty, as found: the last `CLEAR 3-10/11` was 05.11 13:09.
+  - Its node still lists ch3 = "zz_loopcode (copy 2)" from before that. Stale server state, not caused here.
 
-- Never port-scan the shop LAN's :5250 (memory rule added). Find HighAsCG servers on :4200 only (node handles
-  resets fine), or use `/api/replication/ping`.
-- highascg5867: Caspar restarted 07.11 ~12:04 (done).
+## Notes
+
+- Worth upstreaming (CasparCG/server `AsyncEventServer.cpp` is unchanged on master in this area).
+- The memory rule "never scan :5250" stays as manners, but it no longer takes AMCP down.
