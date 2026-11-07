@@ -70,6 +70,12 @@ func _init() -> void:  # built up front: the stage may step a scene before it en
 	_reader = ShmNative.new(path) if _native else ShmReader.new(path)
 
 
+## WO-997: the ring's RD texture is ours; the stage frees scenes on every set_layers and each thumbnail batch.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_tex.free_gpu()
+
+
 ## Backdrop (main, opaque) or layer 2 (black keyed out, drawn over the main scene).
 func set_overlay(on: bool) -> void:
 	overlay = on
