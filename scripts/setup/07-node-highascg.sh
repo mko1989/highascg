@@ -83,4 +83,4 @@ echo "Next:"
 echo "  sudo bash ${SCRIPT_DIR}/08-caspar-cef-scanner.sh"
 echo "  sudo bash ${SCRIPT_DIR}/09-openbox-autostart.sh"
 echo
-echo "Optional later: Tailscale / Syncthing / UFW — scripts/install-phase4.sh + install-phase5.sh"
+echo "Optional later: Tailscale / Syncthing / UFW — scripts/deprecated/legacy/install-phase4.sh + install-phase5.sh (legacy)"

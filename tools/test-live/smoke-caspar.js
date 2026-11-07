@@ -51,7 +51,7 @@ async function main() {
 
 	let r = await req('GET', '/api/state')
 	if (r.status === 503) {
-		console.error('[smoke-caspar] Caspar not connected (GET /api/state → 503). Skip or use tools/http-smoke.js without Caspar.')
+		console.error('[smoke-caspar] Caspar not connected (GET /api/state → 503). Skip or use tools/test-live/http-smoke.js without Caspar.')
 		process.exit(1)
 	}
 	if (r.status !== 200) fail(`GET /api/state expected 200, got ${r.status}`)

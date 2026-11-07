@@ -13,7 +13,7 @@ one override-redirect window per output, waits for one of
 then destroys every window and exits. Nothing is persisted here — the caller resolves the click to
 a GPU port and writes the config, so the decision logic stays offline-testable.
 
-Style/dependency follows tools/runtime/operator-shape-overlay.py (python-xlib, log under
+Style/dependency: python-xlib only (log under
 ~/.highascg/log/, pid under ~/.highascg/run/, DISPLAY defaults to :0) — no GUI toolkit.
 
 PROTOCOL
@@ -99,8 +99,8 @@ def emit(obj) -> None:
 
 
 def read_request(timeout_sec: float = 10.0):
-    """Read the single JSON request line from stdin (raw fd + own buffer, per the
-    operator-shape-overlay.py note about buffered readline() stranding payloads)."""
+    """Read the single JSON request line from stdin (raw fd + own buffer: a buffered
+    readline() can strand the payload in Python's buffer)."""
     fd = sys.stdin.fileno()
     buf = b""
     deadline = time.time() + timeout_sec

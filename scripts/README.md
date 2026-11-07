@@ -170,7 +170,7 @@ These are invoked by the Node.js application at runtime. Each lists its call sit
 | `casparcg-supervisor-lib.sh` | `run.sh` (startup loader) | Supervisor daemon functions |
 | `confine-pointer-barriers.py` | `src/system/pointer-confine.js` | XFixes pointer barrier confinement (playout UI lock) |
 | `cef-interactive-x11.py` | `src/system/cef-bridge-subprocess.js` | CEF subprocess sandbox control |
-| `highascg-launch-operator-firefox.sh` | `src/api/routes-system-browser.js` | Launch operator Firefox on :1 |
+| `highascg-launch-operator-firefox.sh` | `src/api/system-hardware-gui-resolve.js` (gui-launch "firefox" action) | Launch operator Firefox on :1 |
 | `highascg-network-apply.sh` | **Installed to `/usr/local/lib/highascg/`** then called from `src/api/system-hardware-network.js` | Apply network config |
 | `highascg-network-reset.sh` | `src/api/system-hardware-network.js` | Reset network to defaults |
 | `highascg-nvidia-x-apply.sh` | `src/utils/nvidia-display-policy.js` | Apply NVIDIA X11 config |

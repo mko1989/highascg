@@ -2,7 +2,7 @@
 # Avoid spurious "Failed to start nvidia-persistenced" during boot when /dev/nvidia0
 # appears a moment after the PCI driver unit fires.
 #
-# Usage: sudo bash scripts/install-nvidia-persistenced-boot-order.sh
+# Usage: sudo bash scripts/boot/install-nvidia-persistenced-boot-order.sh
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {

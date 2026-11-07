@@ -6,8 +6,8 @@
 #   permanent — for lean imaging hosts: remove swap file + fstab line (see prepare-eggs-minimal.sh)
 #
 # Usage:
-#   sudo bash tools/live-usb/strip-host-swap-for-live-iso.sh prepare
-#   sudo bash tools/live-usb/strip-host-swap-for-live-iso.sh restore
+#   sudo bash tools/eggs/live-usb/strip-host-swap-for-live-iso.sh prepare
+#   sudo bash tools/eggs/live-usb/strip-host-swap-for-live-iso.sh restore
 set -euo pipefail
 
 if [[ "$(id -u)" -ne 0 ]]; then

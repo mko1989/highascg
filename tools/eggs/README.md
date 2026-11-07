@@ -10,8 +10,8 @@ Build-host scripts for a **minimal squashfs** + exFAT operator payload (WO-47).
 
 ```bash
 npm run clean:eggs-host
-sudo npm run eggs:prepare    # work/run-eggs-prepare-safe.sh → prepare-eggs-clone-with-exfat.sh
-sudo npm run eggs:build      # work/run-eggs-produce-from-host.sh → build-highascg-egg.sh
+sudo npm run eggs:prepare    # → tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh
+sudo npm run eggs:build      # → tools/eggs/live-usb/build-highascg-egg.sh
 ```
 
 Mac/Windows stick imaging: [**highascg-client**](https://github.com/mko1989/highascg-client) live-usb tools.

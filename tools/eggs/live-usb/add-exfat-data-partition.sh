@@ -3,9 +3,9 @@
 # Run after add-union-persistence-partition.sh on production sticks (exFAT fills the tail).
 #
 # Usage:
-#   sudo bash tools/live-usb/add-exfat-data-partition.sh [/dev/sdX]
-#   sudo bash tools/live-usb/add-exfat-data-partition.sh --dry-run [/dev/sdX]
-# Omit /dev/sdX to use DEVICE= from tools/live-usb/flash-iso.conf (override path: FLASH_ISO_CONF).
+#   sudo bash tools/eggs/live-usb/add-exfat-data-partition.sh [/dev/sdX]
+#   sudo bash tools/eggs/live-usb/add-exfat-data-partition.sh --dry-run [/dev/sdX]
+# Omit /dev/sdX to use DEVICE= from tools/eggs/live-usb/legacy-persistence/flash-iso.conf (override path: FLASH_ISO_CONF).
 #
 # Optional: EXFAT_ISO_PATH + EXFAT_AFTER_ISO_MARGIN_MIB — never place exFAT before ceil(ISO MiB)+margin (safe gap after dd).
 # Optional: EXFAT_LABEL (≤11 chars; default HIGHASCGEXF matches systemd WO-47 USB mount).
@@ -27,7 +27,7 @@ SLOTS_PY="${HERE}/usb-partition-slots.py"
 
 usage() {
 	echo "Usage: sudo $0 [--dry-run] [/dev/sdX]" >&2
-	echo "If /dev/sdX is omitted, reads DEVICE= from tools/live-usb/flash-iso.conf (or FLASH_ISO_CONF)." >&2
+	echo "If /dev/sdX is omitted, reads DEVICE= from tools/eggs/live-usb/legacy-persistence/flash-iso.conf (or FLASH_ISO_CONF)." >&2
 	echo "Creates a primary exFAT partition after the last MBR partition (LABEL=HIGHASCGEXF)." >&2
 	echo "Production: persistence first, then EXFAT_FILL_DISK=1 (see finish-operator-stick.sh)." >&2
 	echo "Legacy fixed slice: EXFAT_SIZE_MIB=4096 without EXFAT_FILL_DISK." >&2

@@ -15,12 +15,11 @@ if (!liveGuard(__filename)) return // WO-836: live-box category — opt-in via H
  * screenshot itself is unaffected by that taint, so this is the reliable way to check alpha here.
  *
  * This test does NOT talk to CasparCG/AMCP — the CEF interactive bridge is a separate, already
- * proven path (see tools/smoke/smoke-cef-cdp-input.live.test.js and
- * template/cef_input_test.html); this test only proves the page itself paints transparent.
+ * proven path (see template/cef_input_test.html); this test only proves the page itself paints transparent.
  *
  * Named *.live.test.js on purpose: launches a real browser process, so it is excluded from
  * tools/ci/run-offline-tests.js. Run manually:
- *   node --test tools/smoke/smoke-wo232-mario-transparent.live.test.js
+ *   node --test tools/test-live/smoke-wo232-mario-transparent.live.test.js
  *
  * If headless Chrome cannot launch in this environment (no sandbox, missing libs, no GPU/display
  * for --headless=new, etc.) the test skips itself with a diagnostic instead of failing the gate —
