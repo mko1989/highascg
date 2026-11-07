@@ -8,13 +8,14 @@ const DEFAULTS := {
 	"enabled": false, "model": "yolo26n.onnx", "pose_model": "", "confidence": 0.2, "interval_ms": 67, "max_persons": 10,
 	"grace_ms": 500, "threads": 4, "pin_mode": "assist", "pin_marker_id": 1, "pin_point": "top",
 	"smoothing": 0.15, "prediction": 8, "assist_radius_m": 1.0, "assist_strength": 0.5,
+	"simulate": false, "sim_persons": 1,  # WO-979: the server's imitated camera (detect-sim.js)
 }
 const LIMITS := {
 	"confidence": [0.1, 0.95], "interval_ms": [20, 2000], "max_persons": [1, 50], "grace_ms": [0, 10000],
 	"threads": [1, 16], "pin_marker_id": [1, 65535], "smoothing": [0.01, 1], "prediction": [0, 30],
-	"assist_radius_m": [0.1, 10], "assist_strength": [0, 1],
+	"assist_radius_m": [0.1, 10], "assist_strength": [0, 1], "sim_persons": [0, 4],
 }
-const INTS := ["interval_ms", "max_persons", "grace_ms", "threads", "pin_marker_id"]
+const INTS := ["interval_ms", "max_persons", "grace_ms", "threads", "pin_marker_id", "sim_persons"]
 const PIN_MODES := ["assist", "replace", "off"]
 const PIN_LABELS := {"assist": "Assist — nudge my marker onto the nearest person",
 	"replace": "Replace — the marker follows one detected person", "off": "Off — boxes only"}
@@ -24,6 +25,7 @@ const MODEL_RE := "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,80}\\.onnx$"
 static func normalize(src: Variant) -> Dictionary:
 	var out: Dictionary = (src as Dictionary).duplicate(true) if src is Dictionary else {}
 	out["enabled"] = out.get("enabled") == true
+	out["simulate"] = out.get("simulate") is bool and out.get("simulate") == true  # a String == bool compare is a script error
 	var re := RegEx.create_from_string(MODEL_RE)
 	var model := str(out.get("model", ""))
 	out["model"] = model if re.search(model) != null and not model.contains("..") else DEFAULTS.model
@@ -77,16 +79,17 @@ static func status_line(snap: Dictionary, cam_id: String) -> String:
 	if snap.get("enabled") != true:
 		return "Detection off"
 	var err := str(snap.get("error", ""))
+	var run := "Running (imitated camera)" if snap.get("simulated") == true else "Running"  # WO-979: never pass a fake as real
 	if snap.get("running") != true:
 		return "Starting the detector…" if err.is_empty() else "Detector not running — " + err
 	for c in snap.get("cameras", []):
 		if c is Dictionary and str(c.get("id", "")) == cam_id:
 			if c.get("stale") == true:
-				return "Running — no frames from %s (%s) yet" % [cam_id, str(c.get("role", ""))]
+				return "%s — no frames from %s (%s) yet" % [run, cam_id, str(c.get("role", ""))]
 			var ps: Array = c.get("persons", [])
 			var pinned: int = ps.filter(func(p: Variant) -> bool: return p is Dictionary and p.has("marker")).size()
-			return "Running — %d person%s%s%s" % [ps.size(), "" if ps.size() == 1 else "s", " · %d pinned" % pinned if pinned > 0 else "", world_line(snap)]
-	return "Running — this camera is not watched (no surface role, or switched off)"
+			return "%s — %d person%s%s%s" % [run, ps.size(), "" if ps.size() == 1 else "s", " · %d pinned" % pinned if pinned > 0 else "", world_line(snap)]
+	return run + " — this camera is not watched (no surface role, or switched off)"
 
 
 ## Camera `cam_id`'s ROI masks: {masks_enabled, masks: [{enabled, vertices: [[x, y] 0–1 of the picture]…]}} (copies).

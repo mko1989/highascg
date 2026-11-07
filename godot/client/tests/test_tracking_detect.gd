@@ -78,6 +78,11 @@ func test_status_line_states() -> void:
 	t.ok(stale.contains("no frames"), "stale camera reports no frames")
 	var other := D.status_line({"enabled": true, "running": true, "cameras": cams}, "cam_9")
 	t.ok(other.contains("not watched"), "camera missing from the list is not watched")
+	var sim := D.status_line({"enabled": true, "running": true, "simulated": true, "cameras": cams}, "cam_1")
+	t.ok(sim.begins_with("Running (imitated camera)"), "WO-979: an imitated camera says so")
+	t.ok(not run.contains("imitated"), "a real camera does not")
+	t.eq(D.normalize({"simulate": true, "sim_persons": 9}).sim_persons, 4, "sim_persons clamps to 4")
+	t.eq(D.normalize({"simulate": "yes"}).simulate, false, "simulate only on a real true")
 
 
 func test_position_of_assist_steers_the_anchor() -> void:

@@ -261,6 +261,7 @@ module.exports = [
 	'tools/smoke/smoke-wo976-fft-channel-source.test.js',
 	'tools/smoke/smoke-wo978-puppet-psn.test.js',
 	'tools/smoke/smoke-wo979-linked-roles.test.js',
+	'tools/smoke/smoke-wo979-detect-simulate.test.js',
 	'tools/smoke/smoke-wo981-canonical-json.test.js',
 	'tools/smoke/smoke-wo980-node-hot-paths.test.js',
 	'tools/smoke/smoke-983-amcp-edges.test.js',

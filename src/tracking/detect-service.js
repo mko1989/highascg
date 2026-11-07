@@ -30,6 +30,7 @@ const STALE_MS = 1000
 const BACKOFF_MIN_MS = 1000
 const BACKOFF_MAX_MS = 30000
 const SCRIPT = path.join(__dirname, '..', '..', 'tools', 'tracking-detect', 'sidecar.py')
+const SIM = path.join(__dirname, 'detect-sim.js') // WO-979: detection.simulate → the imitated camera
 const DATA = path.join(os.homedir(), '.local', 'share', 'highascg')
 
 function createDetectService(ctx, deps = {}) {
@@ -73,7 +74,8 @@ function createDetectService(ctx, deps = {}) {
 	const modelPath = () => path.join(modelsDir, det.model)
 
 	function renewLease() {
-		const roles = wanted() ? [...new Set(cams.map((c) => c.role))] : []
+		const roles = wanted() && !det.simulate ? [...new Set(cams.map((c) => c.role))] : [] // the imitated camera reads no surface
+		if (wanted() && det.simulate && !child && !restartTimer) start()
 		const key = roles.join(',')
 		if (roles.length && !child && !restartTimer) start() // retries a missing venv / model every LEASE_MS
 		if (!roles.length && !leased) return
@@ -86,7 +88,7 @@ function createDetectService(ctx, deps = {}) {
 	function sendConfig() {
 		if (!child?.stdin?.writable) return
 		const cfg = { type: 'config', model: modelPath(), pose_model: det.pose_model ? path.join(modelsDir, det.pose_model) : '', confidence: det.confidence, interval_ms: det.interval_ms,
-			max_persons: det.max_persons, grace_ms: det.grace_ms, threads: det.threads, faces, bodies,
+			max_persons: det.max_persons, grace_ms: det.grace_ms, threads: det.threads, faces, bodies, sim_persons: det.sim_persons,
 			cameras: cams.map((c) => ({ id: c.id, path: `/dev/shm/highascg-${c.role}`, masks: c.masks })) }
 		child.stdin.write(JSON.stringify(cfg) + '\n')
 	}
@@ -134,19 +136,22 @@ function createDetectService(ctx, deps = {}) {
 
 	function start() {
 		if (child || restartTimer || !wanted()) return
-		if (!exists(python)) return void (error = `no Python at ${python} — run tools/tracking-detect/setup-venv.sh`)
-		if (!exists(modelPath())) return void (error = `no model ${det.model} in ${modelsDir} — run tools/tracking-detect/export-models.sh`)
+		const sim = det.simulate
+		if (!sim && !exists(python)) return void (error = `no Python at ${python} — run tools/tracking-detect/setup-venv.sh`)
+		if (!sim && !exists(modelPath())) return void (error = `no model ${det.model} in ${modelsDir} — run tools/tracking-detect/export-models.sh`)
 		buf = ''
 		ready = false
 		let proc
 		try {
-			proc = spawn(python, ['-u', SCRIPT], { stdio: ['pipe', 'pipe', 'pipe'] })
+			proc = sim
+				? spawn(process.execPath, [SIM], { stdio: ['pipe', 'pipe', 'pipe'] })
+				: spawn(python, ['-u', SCRIPT], { stdio: ['pipe', 'pipe', 'pipe'] })
 		} catch (e) {
 			error = 'spawn: ' + (e?.message || e)
 			return scheduleRestart()
 		}
 		child = proc
-		log('info', `[detect] sidecar started (pid ${proc.pid}), ${cams.length} camera(s)`)
+		log('info', `[detect] ${sim ? 'imitated camera (detection.simulate)' : 'sidecar'} started (pid ${proc.pid}), ${cams.length} camera(s)`)
 		proc.stdout.setEncoding('utf8')
 		proc.stdout.on('data', onStdout)
 		proc.stderr.setEncoding('utf8')
@@ -203,7 +208,9 @@ function createDetectService(ctx, deps = {}) {
 		const json = JSON.stringify([tracking?.detection ?? null, tracking?.cameras ?? null, tracking?.grid?.z_offset ?? 0])
 		if (json === lastJson) return
 		lastJson = json
+		const wasSim = det.simulate
 		det = normalizeDetection(tracking?.detection)
+		if (child && wasSim !== det.simulate) halt() // switching real ↔ imitated camera: a different process
 		cams = detectCameras(tracking, det)
 		planeZ = Number(tracking?.grid?.z_offset) || 0
 		for (const id of [...latest.keys()]) if (!cams.some((c) => c.id === id)) latest.delete(id)
@@ -240,6 +247,7 @@ function createDetectService(ctx, deps = {}) {
 		const t = now()
 		return {
 			enabled: det.enabled,
+			simulated: det.simulate,
 			running: !!child && ready,
 			error: !det.enabled ? '' : error,
 			cameras: cams.map((c) => {

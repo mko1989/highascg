@@ -39,6 +39,8 @@ const DETECTION_DEFAULTS = Object.freeze({
 	prediction: 8,
 	assist_radius_m: 1,
 	assist_strength: 0.5,
+	simulate: false, // WO-979: the imitated camera (detect-sim.js) instead of the Python sidecar — tests without a camera
+	sim_persons: 1,
 })
 const PIN_MODES = ['assist', 'replace', 'off']
 const LIMITS = {
@@ -52,6 +54,7 @@ const LIMITS = {
 	prediction: [0, 30],
 	assist_radius_m: [0.1, 10],
 	assist_strength: [0, 1],
+	sim_persons: [0, 4],
 }
 const MODEL_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,80}\.onnx$/
 const ROLE_RE = /^(pgm[1-4]|prv[1-4]|in([1-9]|1[0-6])|ch[1-9][0-9]?)$/
@@ -77,6 +80,8 @@ function normalizeDetection(src) {
 	for (const k of Object.keys(LIMITS)) out[k] = clamp(s[k], LIMITS[k], DETECTION_DEFAULTS[k])
 	out.max_persons = Math.round(out.max_persons)
 	out.threads = Math.round(out.threads)
+	out.sim_persons = Math.round(out.sim_persons)
+	out.simulate = s.simulate === true
 	out.pin_marker_id = Math.round(out.pin_marker_id)
 	const pm = String(s.pose_model || '')
 	out.pose_model = MODEL_RE.test(pm) && !pm.includes('..') ? pm : '' // WO-667: '' = no body keypoints

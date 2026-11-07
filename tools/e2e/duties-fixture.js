@@ -101,6 +101,17 @@ function trackingProject(psnPort) {
 	}
 }
 
+/**
+ * The tracking show for a LIVE box (no fake sidecar via env there): the same show with detection.simulate, so the
+ * server runs the imitated camera (src/tracking/detect-sim.js) itself. Copy it into the box's projects dir and load it
+ * with broadcastProject (WO-979 runbook).
+ */
+function liveTrackingProject(psnPort = 56599) {
+	const doc = trackingProject(psnPort)
+	doc.previs.tracking.detection.simulate = true
+	return doc
+}
+
 /** startSandbox options for a role (before the server starts: the models dir must exist for detect-service). */
 function sandboxOptions(role, root) {
 	if (role === 'media') return { tracking: true, config: sandboxConfig(root) }
@@ -218,6 +229,7 @@ async function prepare(nodes, log = () => {}) {
 }
 
 module.exports = {
+	liveTrackingProject,
 	prepare,
 	GROUP,
 	LOOKS,
