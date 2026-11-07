@@ -1,7 +1,7 @@
 # WO-979 — Linked-servers role-split test environment: media playout ↔ camera tracking / previs
 
 **Area:** testing-ci, network, tracking-vr
-**Status: IN PROGRESS (07.11.2026; sandbox leg DONE 15/0/0; live two-box leg RUN 07.11 against highascg5867 @ 192.168.0.10: link/master/overlay/impose/unlink pass, 6 tracking-dependent steps fail because neither show tracks (no camera); WO-725 general scenario live 9 pass / 0 fail — the tracking half needs a tracking show on one box)**
+**Status: DONE (07.11.2026; sandbox leg 15/0/0; live two-box leg with the imitated camera (detection.simulate) on highascg5867: 12 pass / 0 fail / 3 sandbox-only skips; WO-725 general scenario live 9/0)**
 
 The owner asked on 06.11: *"i also want you to create a test enviroment to check server linking in a way where one
 is responsible for media playout the other is responisible for camera tracking and previs etc."*
@@ -211,6 +211,67 @@ Neither box has a camera set up, and building one into a show is the owner's cal
 in `--live` duties mode, check `duties.tracking` on the tracking box first and stop with one clear message instead of
 6 cascading failures.
 
+## Imitated camera + live tracking half (07.11, ~12:50)
+
+Owner, 07.11: *"We need to run tests without the tracking camera for now. Imitate it."*
+
+**Investigation.**
+- The sandboxes already imitate the camera. `duties-fixture.js` points `HIGHASCG_TRACKING_PYTHON` at
+  `tools/test-env/fake-detect-sidecar.js` and `HIGHASCG_TRACKING_MODELS` at an empty model file
+  (`src/tracking/detect-service.js:48-49` reads both env vars).
+- Neither works on a live box:
+  - node runs from the system unit `highascg.service`, and its environment needs root to change (only the restart is
+    in the NOPASSWD allowlist);
+  - releases don't ship `tools/test-env/` (absent on highascg5867, a release install);
+  - 5867 has no `~/.local/share/highascg/tracking-venv` or `models` at all.
+- So the imitation had to become a server feature, switched from the show, not from the environment.
+
+**What was done** (commit 5967f7aa):
+- `src/tracking/detect-sim.js`: the fake sidecar moved here, so it ships in releases. `tools/test-env/fake-detect-sidecar.js`
+  stays as a 9-line shim, so the sandboxes are unchanged. The walkers come from config `sim_persons`, else
+  `FAKE_DETECT_PERSONS`.
+- `detect-model.js`: `detection.simulate` (only a real `true`) and `sim_persons` (0–4, default 1).
+- `detect-service.js`, when `simulate` is set:
+  - spawns `process.execPath detect-sim.js` instead of `python -u sidecar.py`, with no venv or model check;
+  - leases **no** camera surface, because nothing reads `/dev/shm`;
+  - a real ↔ imitated switch halts the running child and starts the other;
+  - the snapshot carries `simulated`, and the config line carries `sim_persons`.
+- Godot `detect_model.gd` mirrors the two keys. Its status line reads **"Running (imitated camera) — …"**, so a fake is
+  never taken for a camera. A `String == bool` compare is a GDScript error, hence the `is bool` guard.
+- `duties-fixture.js`: `liveTrackingProject()` is the tracking show with `simulate: true`, for a live box.
+
+**What was VERIFIED.**
+- `smoke-wo979-detect-simulate.test.js` 5/5 (in the curated list), including one end-to-end run with the real child:
+  2 persons with floor points within 100 ms. The full offline suite: 5527 tests, 5519 pass, 0 fail (the rest are the
+  known WO-983/986 todos). `smoke-wo616-tracking-detect` defaults updated. Godot `run-client.sh --test`: **26186
+  passed, 0 failed**.
+- Lint, prettier and the line limit are clean. CI run 42369767487 is green, giving release `2026-11-07_115214` (= 5967f7aa).
+- highascg5867:
+  - Backed up (`~/backups/pre-update-20261107-125301`), then updated through `/api/system/update/apply`. It was on the
+    new build after 60 s, and its Caspar stayed on 379d81917 (WO-990).
+  - `e2e_duties_tracking.json` (`liveTrackingProject()`) was copied into its projects dir and loaded with
+    `broadcastProject`.
+  - `/api/tracking/detections` → `enabled, simulated, running`, no error, camera `cam_fake` fresh, 1 person at floor
+    [-0.92, -2.85, 0].
+- **`linked-roles.sh live 192.168.0.10 --self=media --look=b5c5a625… --out=…`: 12 pass / 0 fail / 3 skipped**
+  (psn, rules, restart are sandbox only). The morning's 6 tracking failures all pass now:
+  - alone: tracking server `tracking:true`;
+  - duties resolve in 2 ms: media defers everything except `artnet_in` and `accept_remote`;
+  - exchange: the imitated person on the media server, API 104 ms, WS at once;
+  - overlay pin `cam_fake:1`, round trip 202 ms;
+  - air: tracking server 2 ms after the take;
+  - refusal: both ways "this server refuses remote actions";
+  - relay: 9 relayed answers;
+  - unlink: 13 ms.
+- **Restored afterwards:**
+  - This box: FTB, then preview-push of the neon look → PGM empty, PRV ch3 layer 10 = ffmpeg, as found.
+  - 5867: `new_project_1` loaded again, the test show file removed, detection off, no `detect-sim` process, GUI
+    still running.
+
+**Use:** in a show, set `previs.tracking.detection = { enabled: true, simulate: true, sim_persons: 1 }` with a
+camera that has a surface role and a solved pose. Turn it off before a show with a real camera; the status line
+says when it is on.
+
 ## Runbook
 
 ```
@@ -233,4 +294,6 @@ out of 127.0.0.1.
 - An exchange topic for raw hub markers from tracking to media. It needs a hook beside WO-978's register.js.
 - `/api/project/load` without `broadcastProject` leaves the tracking, follow and zone services on the old show.
   Decide whether load should always notify them.
-- Live leg run 07.11 (above); re-run with a tracking show on one box for the tracking half.
+- Live leg run 07.11 (above); the tracking half ran with the imitated camera (above). A run with the real camera
+  stays to do once one is set up.
+- Fail-fast idea (not built): in `--live` duties mode, check `duties.tracking` on the tracking box first.

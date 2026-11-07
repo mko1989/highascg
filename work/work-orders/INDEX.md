@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-900 live WOs (28 open, 123 in progress, 749 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+900 live WOs (28 open, 122 in progress, 750 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -923,7 +923,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 756 DONE [testing-ci+os-iso] The rest of the 2026-08-03 tools review: the clock-setting test, the eggs clean… → 756_WO_review_tools_findings_6_to_10.md
 - 761 DONE [testing-ci] smoke-ws-restart-reconnect: a reconnect race failed it, and the failure hung te… → 761_WO_ws_reconnect_smoke_race_hung_test_ci_full.md
 - 836 DONE [testing-ci] Test categories: offline / live-box, and a GUI release suite with screenshot +… → 836_WO_test_categories_live_box_and_release_gui_suite.md
-- 979 IN PROGRESS [testing-ci+network,tracking-vr] Linked-servers role-split test environment: media playout ↔ camera tracking / p… → 979_WO_linked_roles_test_env.md
+- 979 DONE [testing-ci+network,tracking-vr] Linked-servers role-split test environment: media playout ↔ camera tracking / p… → 979_WO_linked_roles_test_env.md
 - 988 DONE [testing-ci] Offline test suite runtime: lingering timers + CI concurrency (optimization swe… → 988_WO_offline_suite_runtime.md
 
 ## process — Docs, wiki, audits, work-order tooling (27)
