@@ -46,6 +46,7 @@ start a fresh branch off upstream: the binary would silently lose these features
 | cd177d369, 379d81917 | AMCP accept loop survives a connect+reset (a port scan used to lock out every new client) | WO-990 |
 | e8bbf87f3 | FFmpeg producer: plain plane copies (no per-row TBB tasks), fps duplicates reuse the made frame + its textures, thread names cut to 15 bytes (4K ProRes loop 260 → 166 % CPU) | WO-991 |
 | 4838ab393 | No TBB hand-off per frame: `make_frame` copies video then audio inline; FFmpeg consumers only `parallel_invoke` with both streams (the "AMCPCommandQueue" 16 → 1.7 % pool spin) | WO-992 |
+| 2476644c4 | Native DXV (Resolume DXV2/DXV3): CPU unpack to BC blocks, GPU shader decode; DXV3 HQ in correct colours (`ffmpeg.producer.dxv-gpu`) | WO-993 |
 
 Run `git -C ~/caspar-build/src-v2 log --oneline v2.5.1-stable..highascg-main` for the live list. Update this table
 when you add a commit.
