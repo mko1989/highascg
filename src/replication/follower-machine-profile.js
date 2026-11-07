@@ -184,9 +184,6 @@ async function regenerateFollowerCasparFromDeviceView(ctx) {
 	return { ok: res.status < 300 && body.ok !== false, body }
 }
 
-/** @type {NodeJS.Timeout | null} */
-let followerCasparSyncTimer = null
-
 /**
  * Follower: materialize Device View output wiring into casparServer + regenerate casparcg.config.
  * @param {object} ctx
@@ -213,24 +210,6 @@ async function syncFollowerDeviceViewToCaspar(ctx) {
 	return regen
 }
 
-/**
- * Debounced follower Caspar regen after Device View cable / connector edits.
- * @param {object} ctx
- * @param {number} [delayMs]
- */
-function scheduleFollowerDeviceViewCasparSync(ctx, delayMs = 1500) {
-	if (!isFollowerRole(ctx)) return
-	if (followerCasparSyncTimer) clearTimeout(followerCasparSyncTimer)
-	followerCasparSyncTimer = setTimeout(() => {
-		followerCasparSyncTimer = null
-		syncFollowerDeviceViewToCaspar(ctx).catch((e) => {
-			if (typeof ctx.log === 'function') {
-				ctx.log('warn', '[replication] follower device-view caspar sync: ' + (e?.message || e))
-			}
-		})
-	}, delayMs)
-}
-
 module.exports = {
 	LOCAL_PROFILE_PATH,
 	isFollowerRole,
@@ -244,5 +223,4 @@ module.exports = {
 	applyLocalMachineProfileToConfig,
 	regenerateFollowerCasparFromDeviceView,
 	syncFollowerDeviceViewToCaspar,
-	scheduleFollowerDeviceViewCasparSync,
 }

@@ -108,9 +108,6 @@ const DEVICE_HARDWARE_SLICES = [
 	'deviceGraph',
 ]
 
-/** Show output definitions replicated leader → follower (channel ids/modes must match). */
-const SHOW_DESTINATION_SLICES = ['screenDestinations']
-
 /** Slices the follower keeps from its on-disk project when merging leader show data. */
 const FOLLOWER_LOCAL_PROJECT_SLICES = [...DEVICE_HARDWARE_SLICES, ...SHOW_ROUTING_HARDWARE_SLICES]
 
@@ -147,7 +144,6 @@ module.exports = {
 	DEVICE_TOP_LEVEL_KEYS,
 	SHOW_TOP_LEVEL_KEYS,
 	DEVICE_HARDWARE_SLICES,
-	SHOW_DESTINATION_SLICES,
 	SHOW_ROUTING_HARDWARE_SLICES,
 	FOLLOWER_LOCAL_PROJECT_SLICES,
 }

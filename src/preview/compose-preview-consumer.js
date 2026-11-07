@@ -265,15 +265,6 @@ async function syncComposeFileConsumers(ctx) {
 /**
  * @param {object} ctx
  */
-async function attachAllComposeFileConsumers(ctx) {
-	if (!isFfmpegJpegComposePreview(ctx?.config)) return
-	if (!ctx?.amcp?.isConnected) return
-	await syncComposeFileConsumers(ctx)
-}
-
-/**
- * @param {object} ctx
- */
 async function detachAllComposeFileConsumers(ctx) {
 	const channels = new Set(_everAttachedChannels)
 	for (const ch of _channels.keys()) channels.add(ch)
@@ -315,17 +306,6 @@ function composeConsumersSettled(config) {
  */
 function isComposeConsumerAttached(channel) {
 	return !!_channels.get(parseInt(String(channel), 10))?.attached
-}
-
-/**
- * True when every monitored channel currently has its FILE consumer attached.
- * @param {object} config
- * @returns {boolean}
- */
-function allComposeConsumersAttached(config) {
-	const channels = resolveMonitoredChannels(config || {})
-	if (!channels.length) return false
-	return channels.every((ch) => !!_channels.get(ch)?.attached)
 }
 
 function getComposeConsumerStats(config) {
@@ -389,10 +369,8 @@ module.exports = {
 	COMPOSE_FILE_CONSUMER_INDEX,
 	buildComposeFileAddParams,
 	attachComposeFileConsumer,
-	attachAllComposeFileConsumers,
 	syncComposeFileConsumers,
 	isComposeConsumerAttached,
-	allComposeConsumersAttached,
 	truncateComposePreviewJpg,
 	getTruncationGeneration,
 	composeConsumersSettled,

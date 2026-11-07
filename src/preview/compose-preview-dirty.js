@@ -94,28 +94,10 @@ function clearDirty(channel, hash) {
 
 /**
  * @param {number|string} channel
- * @param {string} [error]
- */
-function markCaptureFailed(channel, error) {
-	const st = _state(channel)
-	if (!st) return
-	st.inFlight = false
-	if (error) st.lastReason = error
-}
-
-/**
- * @param {number|string} channel
  */
 function isDirty(channel) {
 	const st = _state(channel)
 	return !!st?.dirty
-}
-
-/**
- * @param {Iterable<number>} channels
- */
-function forceAllDirty(channels) {
-	for (const ch of channels) bumpDirty(ch, 'manual.refresh')
 }
 
 function reset() {
@@ -134,20 +116,12 @@ function getStats() {
 	return { tracked: _channels.size, dirty, inFlight }
 }
 
-function getLastHash(channel) {
-	const st = _state(channel)
-	return st?.lastHash ?? null
-}
-
 module.exports = {
 	bumpDirty,
 	shouldCapture,
 	markCaptureStart,
 	clearDirty,
-	markCaptureFailed,
 	isDirty,
-	getLastHash,
-	forceAllDirty,
 	reset,
 	getStats,
 }

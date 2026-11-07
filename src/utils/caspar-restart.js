@@ -130,13 +130,6 @@ async function killStuckCasparMainProcess(ctx) {
 	}
 }
 
-function resolveDisconnectWaitMs() {
-	const raw = process.env.HIGHASCG_CASPAR_RESTART_DISCONNECT_WAIT_MS
-	if (raw === undefined || raw === '') return 45_000
-	const n = parseInt(String(raw), 10)
-	return Number.isFinite(n) && n >= 0 ? Math.min(n, 180_000) : 45_000
-}
-
 function resolveReconnectWaitMs() {
 	const raw = process.env.HIGHASCG_CASPAR_RESTART_RECONNECT_WAIT_MS
 	if (raw === undefined || raw === '') return 120_000
@@ -156,101 +149,6 @@ function resolveApplyReconnectWaitMs() {
 	if (raw === undefined || raw === '') return 45_000
 	const n = parseInt(String(raw), 10)
 	return Number.isFinite(n) && n >= 0 ? Math.min(n, 180_000) : 45_000
-}
-
-/**
- * Send AMCP RESTART and wait for Caspar to exit (AMCP down) then come back.
- * If teardown hangs, kill the main casparcg process so run.sh can relaunch.
- * @param {object} ctx
- * @param {{ log?: Function }} [opts]
- */
-async function sendRestartAndWaitForCaspar(ctx, opts = {}) {
-	const log = typeof opts.log === 'function' ? opts.log : () => {}
-	const onDisconnected = typeof opts.onDisconnected === 'function' ? opts.onDisconnected : null
-	if (!ctx?.amcp?.query?.restart) {
-		throw new Error('AMCP client unavailable')
-	}
-
-	const disconnectMs =
-		typeof opts.disconnectMs === 'number' && opts.disconnectMs >= 0
-			? opts.disconnectMs
-			: resolveDisconnectWaitMs()
-	const reconnectMs =
-		typeof opts.reconnectMs === 'number' && opts.reconnectMs >= 0 ? opts.reconnectMs : resolveReconnectWaitMs()
-	const clientWaitMs =
-		typeof opts.clientWaitMs === 'number' && opts.clientWaitMs >= 0
-			? opts.clientWaitMs
-			: Math.min(8_000, reconnectMs)
-
-	log('info', '[Caspar restart] Sending AMCP RESTART…')
-	await ctx.amcp.query.restart()
-
-	let disconnected = await waitForAmcpDisconnect(ctx, disconnectMs)
-	if (!disconnected) {
-		if (await isAmcpPortListening()) {
-			log('info', '[Caspar restart] AMCP port cycle complete — treating as reloaded in-process')
-			disconnected = true
-		} else {
-			log('warn', `[Caspar restart] AMCP still connected after ${disconnectMs}ms — killing main casparcg`)
-			await killStuckCasparMainProcess(ctx)
-			disconnected = await waitForAmcpDisconnect(ctx, 8_000)
-		}
-	}
-
-	if (!disconnected) {
-		log('warn', '[Caspar restart] Caspar did not release AMCP after kill attempt')
-		return { restartSent: true, disconnected: false, reconnected: false }
-	}
-
-	if (onDisconnected) {
-		try {
-			await onDisconnected()
-		} catch (e) {
-			log('warn', `[Caspar restart] onDisconnected hook failed: ${e.message}`)
-		}
-	} else {
-		nudgeCasparConnectionReconnect(ctx)
-	}
-
-	log('info', '[Caspar restart] AMCP disconnected — waiting for Caspar to relaunch via run.sh…')
-	const waitOpts = {
-		log,
-		progressIntervalMs: 5000,
-		acceptPortListening: opts.acceptPortListening !== false,
-	}
-	let reconnected = reconnectMs > 0 ? await waitForAmcpReady(ctx, reconnectMs, waitOpts) : false
-
-	if (reconnected && !isAmcpTcpConnected(ctx)) {
-		log('info', '[Caspar restart] AMCP port up — waiting briefly for client session…')
-		const clientOk = await waitForAmcpReady(ctx, clientWaitMs, {
-			log,
-			progressIntervalMs: 3000,
-			acceptPortListening: false,
-		})
-		reconnected = clientOk || (await isAmcpPortListening())
-	}
-
-	if (!reconnected && !(await isAmcpPortListening())) {
-		log('warn', `[Caspar restart] AMCP still down after ${reconnectMs}ms — killing hung casparcg`)
-		await killStuckCasparMainProcess(ctx)
-		if (!(await isCasparSystemdServerActive())) {
-			await restartCasparViaSystemd(log)
-		}
-		reconnected = await waitForAmcpReady(ctx, Math.min(reconnectMs, 30_000), waitOpts)
-		if (reconnected) {
-			log('info', '[Caspar restart] AMCP reconnected after kill')
-		} else {
-			log('warn', '[Caspar restart] AMCP still down after kill')
-		}
-	} else if (reconnected && isAmcpTcpConnected(ctx)) {
-		log('info', '[Caspar restart] AMCP reconnected')
-	} else if (reconnected) {
-		log('info', '[Caspar restart] AMCP port up (client session still settling)')
-	} else {
-		log('warn', '[Caspar restart] AMCP did not return within wait window — apply may continue')
-	}
-
-	return { restartSent: true, disconnected: true, reconnected: !!reconnected }
 }
 
 /**
@@ -374,14 +272,6 @@ async function reloadCasparAfterConfigWrite(ctx, opts = {}) {
 	}
 }
 
-/**
- * @param {object} ctx
- * @param {{ log?: Function }} [opts]
- */
-async function finishCasparAfterApply(ctx, opts = {}) {
-	return reloadCasparAfterConfigWrite(ctx, opts)
-}
-
 module.exports = {
 	isAmcpTcpConnected,
 	isAmcpPortListening,
@@ -390,13 +280,10 @@ module.exports = {
 	isCasparSystemdControlInstalled,
 	restartCasparViaSystemd,
 	waitForAmcpReady,
-	waitForAmcpTcp: waitForAmcpReady,
 	waitForAmcpDisconnect,
 	killStuckCasparMainProcess,
 	nudgeCasparConnectionReconnect,
-	sendRestartAndWaitForCaspar,
 	reloadCasparAfterConfigWrite,
-	finishCasparAfterApply,
 	resolveReconnectWaitMs,
 	resolveApplyDisconnectWaitMs,
 	resolveApplyReconnectWaitMs,

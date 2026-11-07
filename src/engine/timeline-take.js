@@ -27,53 +27,6 @@ async function holdForTransportAcks(acks, marginMs, capMs = 1000) {
 }
 
 /**
- * @param {import('../caspar/amcp-client').AmcpClient} amcp
- * @param {number} channel
- * @param {number[]} layerNums
- * @param {number} durationFrames
- * @param {string} [tween]
- */
-async function fadePhysicalLayersOut(amcp, channel, layerNums, durationFrames, tween) {
-	if (!amcp || !layerNums.length || durationFrames <= 0) return
-	const lines = []
-	for (const L of layerNums) {
-		const cl = `${channel}-${L}`
-		let p = `0 ${durationFrames}`
-		if (tween) p += ` ${param(tween)}`
-		lines.push(`MIXER ${cl} OPACITY ${p} DEFER`)
-	}
-	await amcp.batchSendChunked(lines, { skipMixerPreCommit: true })
-	await amcp.mixerCommit(channel)
-}
-
-/**
- * Fade timeline layers in from 0→1 over durationFrames.
- * Sets initial opacity to 0 then schedules a deferred tween to 1.
- * @param {import('../caspar/amcp-client').AmcpClient} amcp
- * @param {number} channel
- * @param {number[]} layerNums
- * @param {number} durationFrames
- * @param {string} [tween]
- */
-async function fadePhysicalLayersIn(amcp, channel, layerNums, durationFrames, tween) {
-	if (!amcp || !layerNums.length || durationFrames <= 0) return
-	const lines = []
-	for (const L of layerNums) {
-		const cl = `${channel}-${L}`
-		// Set initial opacity to 0 (instant)
-		lines.push(`MIXER ${cl} OPACITY 0 0`)
-	}
-	for (const L of layerNums) {
-		const cl = `${channel}-${L}`
-		let p = `1 ${durationFrames}`
-		if (tween) p += ` ${param(tween)}`
-		lines.push(`MIXER ${cl} OPACITY ${p} DEFER`)
-	}
-	await amcp.batchSendChunked(lines, { skipMixerPreCommit: true })
-	await amcp.mixerCommit(channel)
-}
-
-/**
  * Collect physical CasparCG layer numbers used by a timeline.
  * @param {object} tl timeline model
  * @returns {number[]}
@@ -393,8 +346,6 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 
 module.exports = {
 	runTimelineDirectTake,
-	fadePhysicalLayersOut,
-	fadePhysicalLayersIn,
 	transitionIsCut,
 	collectTimelinePhysicalLayers,
 	collectClipOpacityFadeLayers,

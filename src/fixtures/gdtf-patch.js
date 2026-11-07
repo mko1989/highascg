@@ -21,8 +21,6 @@
 
 const net = require('net')
 
-const DMX_PROTOCOLS = ['artnet', 'sacn']
-
 function pickAxis(channels, attribute) {
 	for (const c of channels) {
 		const f = c.functions[c.initial] || c.functions[0]
@@ -145,4 +143,4 @@ function normalizeDmx(raw) {
 		iface: net.isIPv4(iface) ? iface : '' } // WO-698: the NIC the output leaves by ('' = OS default route)
 }
 
-module.exports = { DMX_PROTOCOLS, applyType, gdtfFootprint, valueFor, encodeValue, writeGdtf, cleanValue, normalizeDmx }
+module.exports = { applyType, gdtfFootprint, valueFor, encodeValue, writeGdtf, cleanValue, normalizeDmx }

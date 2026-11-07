@@ -2,7 +2,6 @@
 
 const { escapeXml } = require('./config-generator-builders')
 const { casparChannelLayoutId } = require('./audio-channel-layouts')
-const { STANDARD_VIDEO_MODES } = require('./config-modes')
 
 const DECKLINK_LATENCY_VALUES = new Set(['normal', 'low', 'default'])
 const DECKLINK_COLOR_SPACE_VALUES = new Set(['bt709', 'bt601', 'bt2020'])
@@ -24,19 +23,6 @@ const DECKLINK_BUFFER_DEPTH_MAX = 3
 const KEYER_VALUES = new Set(['internal', 'external', 'external_separate_device', 'default'])
 /** Caspar fill-only SDI: no hardware keyer (not internal/external). */
 const FILL_ONLY_KEYER = 'default'
-
-/**
- * Caspar DeckLink UHD outputs require explicit YUV pixel format on many builds.
- * @param {string} videoMode
- * @returns {boolean}
- */
-function decklinkRequiresYuvPixelFormat(videoMode) {
-	const mode = String(videoMode || '').trim().toLowerCase()
-	if (!mode) return false
-	if (/^2160p/.test(mode) || /^dci2160p/.test(mode)) return true
-	const spec = STANDARD_VIDEO_MODES[mode]
-	return !!(spec && spec.height >= 2160 && spec.width >= 3840)
-}
 
 /**
  * WO-487: whether to WRITE a `<pixel-format>` at all.
@@ -356,7 +342,6 @@ module.exports = {
 	normalizeDecklinkKeyer,
 	resolveDecklinkConsumerKeyer,
 	decklinkPixelFormatXml,
-	decklinkRequiresYuvPixelFormat,
 	FILL_ONLY_KEYER,
 	DEFAULT_DECKLINK_CONSUMER_SETTINGS,
 	normalizeDecklinkPixelFormat,

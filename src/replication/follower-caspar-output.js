@@ -14,7 +14,7 @@ const { addEdgeToGraph } = require('../config/device-graph-edges')
 const { DEFAULT_DEVICE_ID, DEST_DEVICE_ID } = require('../config/device-graph-constants')
 const { destinationsFromConfig } = require('../config/screen-destinations')
 const { destinationHasDecklinkOutput } = require('../config/device-graph-destination-wiring')
-const { isFollowerRole, regenerateFollowerCasparFromDeviceView } = require('./follower-machine-profile')
+const { isFollowerRole } = require('./follower-machine-profile')
 
 const DEFAULT_CASPAR_CONFIG_PATH = path.join(REPO_ROOT, 'config', 'casparcg.config')
 
@@ -237,33 +237,6 @@ function repairFollowerDecklinkGraph(ctx) {
 }
 
 /**
- * Follower: repair graph then regenerate Caspar when SDI output is not ready.
- * @param {object} ctx
- */
-async function repairFollowerDecklinkOutput(ctx) {
-	if (!isFollowerRole(ctx)) return { ok: true, skipped: true, changed: false }
-
-	const { changed, readiness } = repairFollowerDecklinkGraph(ctx)
-	if (readiness.ok && !changed) {
-		return { ok: true, changed: false, readiness }
-	}
-
-	if (typeof ctx.log === 'function' && (changed || !readiness.ok)) {
-		ctx.log('info', '[replication] Follower DeckLink SDI repair — regenerating casparcg.config')
-	}
-
-	const regen = await regenerateFollowerCasparFromDeviceView(ctx)
-	const after = assessFollowerCasparOutputReadiness(ctx)
-	return {
-		ok: after.ok && regen.ok !== false,
-		changed,
-		regenerateOk: !!regen.ok,
-		readiness: after,
-		regenerateError: regen.ok ? null : regen.body?.error || 'regenerate failed',
-	}
-}
-
-/**
  * Follower: DeckLink may be selected in Device View but omitted from casparcg.config when SDI format is unset.
  * @param {object} ctx
  */
@@ -324,7 +297,6 @@ function assessFollowerCasparOutputReadiness(ctx) {
 module.exports = {
 	assessFollowerCasparOutputReadiness,
 	repairFollowerDecklinkGraph,
-	repairFollowerDecklinkOutput,
 	resolveSdiModeFromDestination,
 	CASPAR_CONFIG_PATH: DEFAULT_CASPAR_CONFIG_PATH,
 }

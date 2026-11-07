@@ -105,14 +105,8 @@ function resolveEffectiveProgramLayout(audioRouting, _audioOutputs, config, scre
 	return normalizeProgramLayout(String(audioRouting?.programLayout || 'stereo'))
 }
 
-/** @deprecated Use {@link cabledPortAudioLayoutsByMain} */
-function resolveCabledLayoutsByMain(config) {
-	return cabledPortAudioLayoutsByMain(config)
-}
-
 module.exports = {
 	cabledPortAudioLayoutsByMain,
-	resolveCabledLayoutsByMain,
 	resolveProgramAudioLayoutsForConfig,
 	resolveProgramLayoutForMain,
 	resolveProgramLayoutForProgramChannel,

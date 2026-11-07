@@ -13,8 +13,6 @@
 const liveSceneState = require('../state/live-scene-state')
 const { isTimelessPlaylistItem } = require('../engine/scene-take-lbg-playlist')
 const { clipMissing } = require('../media/media-exists')
-
-const DEFAULT_TIMELESS_SECS = 20
 /** Web timelessSecsOf: the first timeless item's positive duration, else 20 (one copy: engine/playlist-edit.js). */
 const { timelessSecsOf } = require('../engine/playlist-edit')
 
@@ -91,4 +89,4 @@ async function setTimeless(b, ctx, deps = {}) {
 	return { status: 200, body: { ok: true, sceneId, layerNumber, ...plan, patched } }
 }
 
-module.exports = { DEFAULT_TIMELESS_SECS, timelessSecsOf, panelItems, mediaIndexFor, planTimeless, patchLivePlaylist, setTimeless }
+module.exports = { timelessSecsOf, panelItems, mediaIndexFor, planTimeless, patchLivePlaylist, setTimeless }

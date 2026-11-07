@@ -125,9 +125,6 @@ function flushSync() {
 	_writeToDisk()
 }
 
-async function hydrateFromAmcp() { return _load() }
-function bindAmcp() {}
-
 function get(key) {
 	const state = _load()
 	return state[key] !== undefined ? state[key] : null
@@ -175,8 +172,6 @@ module.exports = {
 	setImmediate,
 	remove,
 	getAll,
-	bindAmcp,
-	hydrateFromAmcp,
 	flush,
 	flushSync,
 }

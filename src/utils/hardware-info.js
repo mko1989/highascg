@@ -208,18 +208,6 @@ async function getDisplayDetailsAsync() {
 	return buildDisplayDetailsFrom(xr, catalog)
 }
 
-/**
- * Returns names of all connected displays (xrandr output names when X is up).
- */
-function getConnectedDisplayNames() {
-	const xr = getDisplaysXrandr()
-	if (xr && xr.length > 0) return xr.map((d) => d.name)
-
-	return (getGpuConnectorInventory() || [])
-		.filter((c) => c.connected)
-		.map((c) => c.xrandrName || c.shortName)
-}
-
 /** WO-397: the GPU model cannot change at runtime, but this ran 3× per layout computation
  * (a blocking ~50-100 ms execSync each). Memoize forever; a null (nvidia-smi missing/failed)
  * is memoized too — a box without the tool must not re-fork on every layout pass. */
@@ -252,7 +240,6 @@ module.exports = {
 	getDisplaysXrandrVerboseRawAsync,
 	getGpuConnectorInventory,
 	getGpuConnectorInventoryAsync,
-	getConnectedDisplayNames,
 	getDisplayDetails,
 	getDisplayDetailsAsync,
 	getGpuModel,

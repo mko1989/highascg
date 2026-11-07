@@ -1,7 +1,6 @@
 'use strict'
 
 const crypto = require('crypto')
-const path = require('path')
 const { buildProjectMediaManifest } = require('../media/project-media-root')
 const { getReplicationConfig } = require('../config/replication-config')
 
@@ -100,10 +99,6 @@ async function getProjectMediaPingSummary(ctx) {
 	}
 	_pingMediaCache.set(ctx, { at: now, summary })
 	return summary
-}
-
-function invalidateProjectMediaPingCache(ctx) {
-	_pingMediaCache.delete(ctx)
 }
 
 /**
@@ -314,7 +309,6 @@ module.exports = {
 	compareProjectMediaManifests,
 	getLocalProjectMediaManifest,
 	getProjectMediaPingSummary,
-	invalidateProjectMediaPingCache,
 	fetchPeerProjectMediaManifest,
 	compareProjectMediaWithPeer,
 }

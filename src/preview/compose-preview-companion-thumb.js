@@ -31,9 +31,6 @@ function isCompanionThumbEnabled(config) {
 	return config?.composePreview?.companionThumbEnabled === true
 }
 
-/** @alias isCompanionThumbEnabled */
-const isCompanionPreviewEnabled = isCompanionThumbEnabled
-
 /**
  * @param {object} [config]
  * @returns {number}
@@ -311,9 +308,6 @@ function clearCompanionPreviewVariables(ctx) {
 	}
 }
 
-/** @deprecated Timer removed — updates are driven by compose preview frame changes. */
-function startCompanionThumbTimer(_ctx) {}
-
 /** @deprecated */
 function stopCompanionThumbTimer() {
 	_inFlight.clear()
@@ -369,7 +363,6 @@ function getCompanionThumbStats(config) {
 
 module.exports = {
 	isCompanionThumbEnabled,
-	isCompanionPreviewEnabled,
 	companionThumbSize,
 	companionThumbIntervalMs,
 	getCompanionPreviewVariableKey,
@@ -377,11 +370,9 @@ module.exports = {
 	resolveCompanionThumbOutputPath,
 	jpegBufferToDataUri,
 	resizePreviewToSquareJpegBuffer,
-	resizePreviewToPngBuffer: resizePreviewToSquareJpegBuffer,
 	onComposePreviewUpdated,
 	bootstrapCompanionPreviewVariables,
 	clearCompanionPreviewVariables,
-	startCompanionThumbTimer,
 	stopCompanionThumbTimer,
 	getCompanionPreviewJpegBuffer,
 	getCompanionThumbStats,

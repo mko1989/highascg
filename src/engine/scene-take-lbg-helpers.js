@@ -7,19 +7,6 @@ const STRAIGHT_ALPHA_VIDEO_EXT = new Set(['mov', 'webm', 'mkv', 'mxf'])
 /** Still image formats that may carry straight alpha (premultiplied keyer off). */
 const STRAIGHT_ALPHA_STILL_EXT = new Set(['png', 'webp', 'tiff', 'tif', 'tga'])
 
-const STILL_IMAGE_LOADBG_NO_TRANSITION_EXT = new Set([
-	'png',
-	'jpg',
-	'jpeg',
-	'gif',
-	'bmp',
-	'webp',
-	'tiff',
-	'tif',
-	'tga',
-	'dpx',
-])
-
 /* WO-830b: one builder for look takes, timeline playback and the PRV nudge — the take copy interpolated look JSON
  * (project import, cluster replication) raw into MIXER lines; the playback builder coerces numbers and quotes strings. */
 function buildEffectAmcpLines(type, params, cl) {
@@ -70,7 +57,6 @@ module.exports = {
 	chLayerAmcp,
 	extFromPath,
 	shouldApplyStraightAlphaKeyer,
-	STILL_IMAGE_LOADBG_NO_TRANSITION_EXT,
 	STRAIGHT_ALPHA_STILL_EXT,
 	STRAIGHT_ALPHA_VIDEO_EXT,
 }

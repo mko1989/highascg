@@ -190,11 +190,6 @@ function timelineCasparLayer(layerIndex, log) {
 const TICK_MS = 40
 /** WS `timeline.tick` throttle — client extrapolates between ticks; ~150–180ms reduces jitter over high-latency links. */
 const TIMELINE_TICK_BROADCAST_MS = 165
-/**
- * Stretched-timeline clips (file shorter than clip duration) loop in Caspar via PLAY LOOP.
- * CALL SEEK only on loop-boundary crossings — not every UI tick (see timeline-playback-amcp.js).
- */
-const TIMELINE_AMCP_DRIFT_MS = 500
 
 /** Match client `normalizeSendTo` — program is opt-in; preview defaults on. */
 function normalizeTimelineSendTo(raw) {
@@ -225,6 +220,5 @@ module.exports = {
 	timelineCasparLayer,
 	TICK_MS,
 	TIMELINE_TICK_BROADCAST_MS,
-	TIMELINE_AMCP_DRIFT_MS,
 	normalizeTimelineSendTo,
 }

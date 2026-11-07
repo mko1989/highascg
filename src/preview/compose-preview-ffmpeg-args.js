@@ -50,16 +50,6 @@ function buildScaleFilter(resolutionScale) {
 }
 
 /**
- * Square thumb for Companion Stream Deck buttons (letterboxed, aspect preserved).
- * Caspar rejects pad offsets like (ow-iw)/2; -1:-1 centers in this ffmpeg build.
- * @param {number} size
- */
-function buildCompanionThumbScaleFilter(size) {
-	const s = Math.max(32, Math.min(512, parseInt(String(size), 10) || 144))
-	return `scale=${s}:${s}:force_original_aspect_ratio=decrease,pad=${s}:${s}:-1:-1`
-}
-
-/**
  * MJPEG FILE consumer pixel format — mjpeg requires full-range YUV (yuvj420p).
  * Limited-range yuv420p fails avcodec_open2 on current Caspar/ffmpeg (strict_std_compliance).
  * @returns {string}
@@ -128,7 +118,6 @@ module.exports = {
 	clampJpegQuality,
 	normalizeResolutionScale,
 	buildScaleFilter,
-	buildCompanionThumbScaleFilter,
 	buildComposeFfmpegFilterChain,
 	buildComposeFfmpegConsumerArgs,
 	buildMjpegPixelFormatFilter,

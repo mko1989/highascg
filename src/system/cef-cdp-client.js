@@ -200,21 +200,6 @@ const VK_CODE = {
 for (let i = 0; i < 12; i++) VK_CODE[`F${i + 1}`] = 112 + i
 
 /**
- * @param {string|null} key
- * @returns {number}
- */
-function vkCodeForKey(key) {
-	if (!key) return 0
-	if (Object.prototype.hasOwnProperty.call(VK_CODE, key)) return VK_CODE[key]
-	if (key.length === 1) {
-		const upper = key.toUpperCase()
-		if (upper >= 'A' && upper <= 'Z') return 65 + (upper.charCodeAt(0) - 65)
-		if (key >= '0' && key <= '9') return 48 + (key.charCodeAt(0) - 48)
-	}
-	return 0
-}
-
-/**
  * Minimal page-session wrapper over a CDP target's WebSocket, exposing only
  * what the CEF interactive forwarding code needs.
  * @param {{ targetInfo: object, wsUrl: string }} opts
@@ -277,7 +262,6 @@ async function createCefPage({ targetInfo, wsUrl }) {
 module.exports = {
 	connectCdp,
 	createCefPage,
-	vkCodeForKey,
 	VK_CODE,
 	CDP_COMMAND_TIMEOUT_MS,
 }

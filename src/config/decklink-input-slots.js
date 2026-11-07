@@ -65,16 +65,6 @@ function decklinkInputSlotsFromDeviceGraph(config) {
 }
 
 /**
- * @param {object | null | undefined} config
- * @param {number} slot — 1-based
- */
-function isLegacyImplicitDecklinkInputSlot(config, slot, decklinkCount) {
-	if (slot < 1 || slot > decklinkCount) return false
-	const dir = normalizeDecklinkIoDirection({ ioDirection: readCasparSetting(config, `decklink_input_${slot}_direction`) })
-	return dir !== 'out' && dir !== 'in'
-}
-
-/**
  * Slots that receive dedicated Caspar host channels / DeckLink producers.
  * @param {object | null | undefined} config
  * @returns {number[]}
@@ -150,7 +140,6 @@ module.exports = {
 	DECKLINK_MVR_SENTINEL_SLOT,
 	decklinkSlotFromConnector,
 	decklinkInputSlotsFromDeviceGraph,
-	isLegacyImplicitDecklinkInputSlot,
 	resolveDecklinkInputSlots,
 	recomputeDecklinkInputCount,
 	configuredDecklinkInputCount,

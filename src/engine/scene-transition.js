@@ -8,7 +8,6 @@ const { toCasparTween } = require('../caspar/caspar-tween')
 const { normalizeSpeed } = require('../caspar/clip-speed') // WO-973
 const { normalizeProgramLayerBank } = require('./program-layer-bank')
 const sceneExitLayers = require('./scene-exit-layers')
-const { runExitLayers } = sceneExitLayers
 const { pipOverlaysFromLayer } = require('./pip-overlay')
 
 /** Second PGM stack for crossfading looks: scene layer N → Caspar N (bank a) or N+100 (bank b), e.g. 10 vs 110. */
@@ -234,77 +233,8 @@ function isTimelineOnlyScene(incoming) {
 	return ids.size === 1 && [...ids][0] !== ''
 }
 
-/**
- * All layers with content are the same timeline — uses TimelineEngine (layers 1…N on program).
- * @param {object} self - module instance (timelineEngine, amcp, config)
- */
-async function runTimelineOnlyTake(self, opts) {
-	const channel = parseInt(opts.channel, 10)
-	if (!channel || channel < 1) throw new Error('channel required')
-	const incoming = opts.incomingScene
-	const current = opts.currentScene || null
-	if (!incoming?.layers?.length) throw new Error('incomingScene.layers required')
-
-	const eng = self.timelineEngine
-	if (!eng) throw new Error('Timeline engine not available')
-
-	const framerate = Math.max(1, resolveChannelFramerateForMixerTween(self, channel, opts.framerate))
-	const forceCut = !!opts.forceCut
-	const globalT = normalizeTransition(incoming.defaultTransition, forceCut)
-	const diff = diffScenes(current, incoming)
-	const currentMap = new Map((current?.layers || []).map((l) => [l.layerNumber, l]))
-
-	const withTl = (incoming.layers || []).filter(layerHasContent).find((l) => l.source?.type === 'timeline')
-	const tlId = withTl && String(withTl.source.value)
-	if (!tlId || !eng.get(tlId)) throw new Error(`Timeline not found on server: ${tlId}`)
-
-	const screenIdx = programChannelToScreenIdx(self.config, channel)
-	const amcp = self.amcp
-
-	const pbNow = eng.getPlayback()
-	for (const layer of diff.exit) {
-		if (layerHasContent(layer) && layer.source?.type === 'timeline' && pbNow?.timelineId === layer.source.value) {
-			eng.stop(layer.source.value)
-		}
-	}
-
-	const mediaExit = diff.exit.filter((l) => layerHasContent(l) && l.source?.type !== 'timeline')
-	await runExitLayers(amcp, channel, mediaExit, framerate, globalT, forceCut, self)
-
-	for (const layer of diff.update) {
-		const cur = currentMap.get(layer.layerNumber)
-		if (cur && layerHasContent(cur) && cur.source?.type !== 'timeline' && layer.source?.type === 'timeline') {
-			await runExitLayers(amcp, channel, [cur], framerate, globalT, forceCut, self)
-		}
-	}
-
-	const pb = eng.getPlayback()
-	if (pb?.timelineId && pb.timelineId !== tlId) {
-		try {
-			eng.stop(pb.timelineId)
-		} catch {}
-	}
-
-	eng.setSendTo({ preview: true, program: true, screenIdx }, tlId)
-	eng.setLoop(tlId, !!(withTl && withTl.loop))
-	eng.play(tlId, 0)
-	await amcp.mixerCommit(channel)
-
-	return {
-		ok: true,
-		timeline: true,
-		diff: {
-			update: diff.update.length,
-			enter: diff.enter.length,
-			exit: diff.exit.length,
-			unchanged: diff.unchanged.length,
-		},
-	}
-}
-
 module.exports = {
 	diffScenes,
-	runTimelineOnlyTake,
 	runExitLayers: sceneExitLayers.runExitLayers,
 	isTimelineOnlyScene,
 	programChannelToScreenIdx,

@@ -60,20 +60,6 @@ function findMediaRow(media, value) {
 	return null
 }
 
-function nativeFillNorm(contentW, contentH, channelW, channelH) {
-	const w = channelW > 0 ? channelW : 1920
-	const h = channelH > 0 ? channelH : 1080
-	if (!(contentW > 0 && contentH > 0)) {
-		return { x: 0, y: 0, scaleX: 1, scaleY: 1 }
-	}
-	const s = Math.min(w / contentW, h / contentH)
-	const scaleX = (contentW * s) / w
-	const scaleY = (contentH * s) / h
-	const x = (1 - scaleX) / 2
-	const y = (1 - scaleY) / 2
-	return { x, y, scaleX, scaleY }
-}
-
 /**
  * Pixel size of a Caspar channel for scene FILL math.
  * Prefer live INFO CONFIG via HTTP state (`channelMap`) so PGM/PRV match running outputs;
@@ -418,7 +404,6 @@ async function getResolvedFillForSceneLayer(self, layer, channel, incomingScene)
 }
 
 module.exports = {
-	nativeFillNorm,
 	getChannelResolutionForChannel,
 	getMediaResolutionFromSelf,
 	fetchCinfResolutionFromAmcp,

@@ -330,7 +330,6 @@ async function runExfatSync(opts) {
 }
 
 module.exports = {
-	DEFAULT_EXFAT_ROOT: '/home/casparcg/exfat',
 	mapCandidatePaths,
 	loadExfatSyncMapFromDisk,
 	getExfatSyncDashboard,

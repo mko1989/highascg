@@ -45,32 +45,12 @@ function composePreviewImageKey(channel) {
 }
 
 /**
- * Server-side variable key for a compose preview quadrant.
- * @param {number} channel
- * @param {ComposePreviewQuadrant} quadrant
- * @returns {string}
- */
-function composePreviewQuadrantKey(channel, quadrant) {
-	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
-	return `compose_preview_ch${ch}_quad_${quadrant}`
-}
-
-/**
  * Server-side variable key for per-look on-air still (Stream Deck look buttons).
  * @param {string} lookId
  * @returns {string}
  */
 function lookAirFrameKey(lookId) {
 	return `look_air_frame_${lookIdSlug(lookId) || 'unknown'}`
-}
-
-/**
- * Companion-prefixed variable id (module surface).
- * @param {string} serverKey
- * @returns {string}
- */
-function companionVariableId(serverKey) {
-	return `highascg_${String(serverKey ?? '')}`
 }
 
 /**
@@ -116,9 +96,7 @@ module.exports = {
 	PREVIEW,
 	lookIdSlug,
 	composePreviewImageKey,
-	composePreviewQuadrantKey,
 	lookAirFrameKey,
-	companionVariableId,
 	isComposePreviewServerKey,
 	normalizeHelloPreview,
 }

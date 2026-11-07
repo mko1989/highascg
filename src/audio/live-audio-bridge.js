@@ -332,22 +332,6 @@ async function restartLiveAudioBridge(ctx, slot) {
 	return ensureLiveAudioBridge(ctx, slot, { force: true })
 }
 
-/**
- * @param {number} slot
- * @returns {{ running: boolean, port?: number, device?: string, lastError?: string }}
- */
-function liveAudioBridgeStatus(slot) {
-	const entry = _bridges.get(parseInt(String(slot), 10))
-	if (!entry) return { running: false }
-	const running = !!(entry.proc && entry.proc.exitCode == null && !entry.proc.killed)
-	return {
-		running,
-		port: entry.port,
-		device: entry.device,
-		lastError: entry.lastError,
-	}
-}
-
 module.exports = {
 	LIVE_AUDIO_BRIDGE_UDP_PORT_BASE,
 	AUDIO_FFT_PCM_UDP_PORT_BASE,
@@ -364,6 +348,5 @@ module.exports = {
 	stopAllLiveAudioBridges,
 	ensureLiveAudioBridge,
 	restartLiveAudioBridge,
-	liveAudioBridgeStatus,
 	BRIDGE_WARMUP_MS,
 }

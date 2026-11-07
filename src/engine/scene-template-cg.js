@@ -411,18 +411,6 @@ function untrackTemplateHosts(channel, hostsToUntrack) {
 	}
 }
 
-/**
- * WO-207 T207.3: Get all tracked template hosts across all channels (for startup/reconnect sweep).
- * @returns {Map<number, Set<number>>} — copy of tracked hosts by channel
- */
-function getAllTrackedTemplateHosts() {
-	const result = new Map()
-	for (const [ch, hosts] of _trackedTemplateHostsByChannel.entries()) {
-		result.set(ch, new Set(hosts))
-	}
-	return result
-}
-
 module.exports = {
 	isSceneTemplateLayer,
 	resolveCgTemplateName,
@@ -441,5 +429,4 @@ module.exports = {
 	clearAllTrackedTemplateHosts,
 	quarantineAllTrackedTemplateHosts,
 	reconcileQuarantinedTemplateHosts,
-	getAllTrackedTemplateHosts,
 }

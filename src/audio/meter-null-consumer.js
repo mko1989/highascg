@@ -115,22 +115,6 @@ async function ensureMeterNullConsumer(amcp, channel, opts = {}) {
 }
 
 /**
- * @param {import('../caspar/amcp-client').AmcpClient} amcp
- * @param {number} channel
- */
-async function removeMeterNullConsumer(amcp, channel) {
-	if (!amcp?.isConnected) return
-	const ch = parseInt(String(channel), 10)
-	if (!Number.isFinite(ch) || ch < 1) return
-	const uri = meterNullStreamUri(ch)
-	try {
-		await amcp.raw(`REMOVE ${ch}-${METER_NULL_CONSUMER_INDEX} STREAM ${uri}`)
-	} catch {
-		/* ok if absent */
-	}
-}
-
-/**
  * All Caspar channel indices that should receive a meter-null consumer on startup.
  * Prefer live INFO CONFIG (authoritative channel list); fall back to routing map.
  * @param {object} [config]
@@ -217,6 +201,5 @@ module.exports = {
 	listMeterNullTargetChannels,
 	ensureAllMeterNullConsumers,
 	ensureMeterNullConsumer,
-	removeMeterNullConsumer,
 	ensureMeterNullConsumersForChannels,
 }

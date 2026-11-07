@@ -82,10 +82,6 @@ function corsHeadersForRequest(req) {
 	return { ...BASE }
 }
 
-function corsHeaders() {
-	return { ...BASE }
-}
-
 /**
  * @param {Record<string, string> | undefined} [extra]
  * @param {import('http').IncomingMessage | null | undefined} [req]
@@ -94,4 +90,4 @@ function mergeCors(extra, req) {
 	return { ...corsHeadersForRequest(req), ...(extra || {}) }
 }
 
-module.exports = { BASE, corsHeaders, corsHeadersForRequest, mergeCors, parseAllowedOrigins }
+module.exports = { BASE, corsHeadersForRequest, mergeCors, parseAllowedOrigins }

@@ -26,10 +26,6 @@ function getReplicationCtx() {
 	return _ctx
 }
 
-function getReplicationRuntimeRef() {
-	return _runtime
-}
-
 /**
  * @param {import('./replication-service').ReplicationRuntime|null} runtime
  * @param {object|null} ctx
@@ -48,7 +44,6 @@ module.exports = {
 	hashConfig,
 	getReplicationRuntime,
 	getReplicationCtx,
-	getReplicationRuntimeRef,
 	setReplicationRuntime,
 	clearReplicationRuntime,
 }

@@ -20,27 +20,6 @@ function isSkippableDrmConnector(shortName) {
 	return false
 }
 
-function pickPrimaryDrmCard(connectors, preferredCard) {
-	const pref = String(preferredCard || '').trim().toLowerCase()
-	if (pref && connectors.some((c) => cardFromDrmName(c?.name) === pref)) return pref
-
-	const counts = new Map()
-	for (const c of connectors) {
-		const card = cardFromDrmName(c?.name)
-		if (!card) continue
-		counts.set(card, (counts.get(card) || 0) + 1)
-	}
-	let best = ''
-	let bestN = 0
-	for (const [card, n] of counts) {
-		if (n > bestN) {
-			bestN = n
-			best = card
-		}
-	}
-	return best
-}
-
 function groupConnectorsByDrmCard(connectors) {
 	const groups = new Map()
 	for (const c of connectors) {
@@ -130,7 +109,6 @@ module.exports = {
 	cardFromDrmName,
 	cardSortKey,
 	isSkippableDrmConnector,
-	pickPrimaryDrmCard,
 	groupConnectorsByDrmCard,
 	adjacentDrmDpPair,
 	adjacentEdpPair,

@@ -148,16 +148,6 @@ function getLivePlayheadFrames(ctx, channel, physicalLayer, fps) {
 }
 
 /**
- * @param {object} ctx app ctx
- * @param {number} channel
- * @param {number} physicalLayer
- * @param {number} fps
- */
-function elapsedFramesFromPlayback(ctx, channel, physicalLayer, fps) {
-	return getLivePlayheadFrames(ctx, channel, physicalLayer, fps) ?? 0
-}
-
-/**
  * Timeline clip at take / inherit — beginning → in-point; relativeToPrevious → live PGM then timeline offset.
  * @param {object} clip
  * @param {number} positionMs
@@ -391,7 +381,6 @@ module.exports = {
 	resolveEffectiveStartBehaviour,
 	getLivePlayheadFrames,
 	getActiveTimelineForTake,
-	elapsedFramesFromPlayback,
 	resolvePlaySeekFramesForSceneLayer,
 	resolvePlayInFramesForSceneLayer,
 	fitRelativeSeekToIncomingClip,

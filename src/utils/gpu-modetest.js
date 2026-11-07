@@ -375,34 +375,6 @@ function matchModetestToXrandr(modetestConnectors, xrandrOutputs) {
 	return matches
 }
 
-function modetestModesToDisplayModes(modetestModes, currentResolution, currentHz) {
-	const [curW, curH] = String(currentResolution || '')
-		.split('x')
-		.map((n) => parseInt(n, 10))
-	const modes = []
-	const seen = new Set()
-	for (const m of modetestModes || []) {
-		const key = `${m.width}x${m.height}@${m.hz}`
-		if (seen.has(key)) continue
-		seen.add(key)
-		const current =
-			Number.isFinite(curW) &&
-			Number.isFinite(curH) &&
-			m.width === curW &&
-			m.height === curH &&
-			(!Number.isFinite(currentHz) || Math.abs(m.hz - currentHz) < 0.2)
-		modes.push({
-			width: m.width,
-			height: m.height,
-			hz: m.hz,
-			current,
-			preferred: !!m.preferred,
-			modetestIndex: m.index,
-		})
-	}
-	return modes
-}
-
 /**
  * Probe connectors via modetest and correlate to xrandr outputs.
  * @param {{ modetestRaw?: string, xrandrVerboseRaw?: string, driverModule?: string }} [opts]
@@ -430,7 +402,6 @@ module.exports = {
 	parseModetestConnectors,
 	parseXrandrVerboseOutputs,
 	matchModetestToXrandr,
-	modetestModesToDisplayModes,
 	probeModetestConnectors,
 	inferConnectorType,
 }

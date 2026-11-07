@@ -230,12 +230,6 @@ async function getCasparPidCached() {
 	return pid
 }
 
-/** Test-only: reset cached PID/sample state between unit tests. */
-function _resetCachesForTest() {
-	_casparPidCache = { pid: null, at: 0 }
-	_lastSample.clear()
-}
-
 /** @type {Map<number, { utime: number, stime: number, atMs: number }>} */
 const _lastSample = new Map()
 
@@ -299,5 +293,4 @@ module.exports = {
 	discoverCasparPid,
 	getCasparPidCached,
 	getProcessUsage,
-	_resetCachesForTest,
 }

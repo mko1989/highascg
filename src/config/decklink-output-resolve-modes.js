@@ -80,13 +80,6 @@ function resolveEffectiveDecklinkVideoMode(feed, connectorOverride = '') {
 	return { decklinkVideoMode: null, source: 'none', mappedFromCustom: false, autoTier: null }
 }
 
-function buildDecklinkPassthroughSubregion(feed) {
-	const width = Math.max(0, parseInt(String(feed?.width ?? 0), 10) || 0)
-	const height = Math.max(0, parseInt(String(feed?.height ?? 0), 10) || 0)
-	if (width <= 0 || height <= 0) return null
-	return { srcX: 0, srcY: 0, destX: 0, destY: 0, width, height }
-}
-
 function resolveDecklinkTileVideoMode(tile) {
 	const width = Math.max(0, parseInt(String(tile?.width ?? 0), 10) || 0)
 	const height = Math.max(0, parseInt(String(tile?.height ?? 0), 10) || 0)
@@ -140,7 +133,6 @@ module.exports = {
 	pickAutoDecklinkSdiFormatForFeed,
 	readConnectorDecklinkOutputVideoMode,
 	resolveEffectiveDecklinkVideoMode,
-	buildDecklinkPassthroughSubregion,
 	resolveDecklinkTileVideoMode,
 	pickDecklinkParentVideoMode,
 	channelVideoModeForDecklinkConsumer,

@@ -242,20 +242,11 @@ function resolveMonitoredChannelsForSnap(map, sceneLive, lookId) {
 	return out
 }
 
-function resetLookAirFrames(ctx) {
-	for (const lookId of [..._lastHashByLook.keys()]) {
-		clearLookFrame(ctx, lookId)
-	}
-	_lastHashByLook.clear()
-	_lastSceneLiveSnapshot = {}
-}
-
 module.exports = {
 	buildLookAirFrameUpdates,
 	onChannelComposeFrame,
 	onSceneLiveBroadcast,
 	clearLookFrame,
-	resetLookAirFrames,
 	looksOnChannel,
 	collectOnAirLookIds,
 }

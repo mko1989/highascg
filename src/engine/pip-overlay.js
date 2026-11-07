@@ -19,11 +19,9 @@ const {
 	TEMPLATE_MAP,
 	resolvePipOverlayCasparLayer,
 	pipOverlaysFromLayer,
-	mergeOverlayParams,
 	buildPipOverlayCgPayload,
 	shouldStripPipSlotBeforeAdd,
 	computePipOverlayPlacement,
-	computePipRouterPlacement,
 } = utils
 
 /**
@@ -190,84 +188,6 @@ function buildPipOverlayUpdateLines(
 }
 
 /**
- * Collapses all overlays for a layer into a single "router" command.
- */
-function buildPipOverlayRouterAmcpLines(
-	overlays,
-	channel,
-	contentPhysicalLayer,
-	contentFill,
-	appCtx,
-	nextContentLayer,
-	contentRotation = 0,
-) {
-	if (!Array.isArray(overlays) || overlays.length === 0) return []
-
-	const res = getChannelResolutionForChannel(appCtx?.config, channel, appCtx)
-	const chW = res?.w > 0 ? res.w : 1920
-	const chH = res?.h > 0 ? res.h : 1080
-	const { inner, mixFill, oLayer, effects } = computePipRouterPlacement(
-		overlays,
-		contentFill,
-		chW,
-		chH,
-		contentPhysicalLayer,
-		nextContentLayer,
-	)
-
-	const cl = `${channel}-${oLayer}`
-	const data = JSON.stringify({
-		inner,
-		radius: overlays[0]?.params?.radius || overlays[0]?.radius || 0,
-		effects: effects || overlays.map((o) => ({ type: o.type, params: mergeOverlayParams(o) })),
-	})
-
-	return [
-		`CG ${cl} ADD 0 "pip_router" 1 "${data.replace(/"/g, '\\"')}"`,
-		`CG ${cl} PLAY 0`,
-		`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`,
-		...pipOverlayMixerLines(cl, mixFill, contentRotation),
-	]
-}
-
-/**
- * Update the router command.
- */
-function buildPipOverlayRouterUpdateLines(
-	channel,
-	contentPhysicalLayer,
-	overlays,
-	contentFill,
-	appCtx,
-	nextContentLayer,
-	contentRotation = 0,
-) {
-	if (!Array.isArray(overlays) || overlays.length === 0) return []
-
-	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, 0, nextContentLayer)
-	const res = getChannelResolutionForChannel(appCtx?.config, channel, appCtx)
-	const chW = res?.w > 0 ? res.w : 1920
-	const chH = res?.h > 0 ? res.h : 1080
-	const { inner, mixFill, effects } = computePipRouterPlacement(
-		overlays,
-		contentFill,
-		chW,
-		chH,
-		contentPhysicalLayer,
-		nextContentLayer,
-	)
-
-	const cl = `${channel}-${oLayer}`
-	const data = JSON.stringify({
-		inner,
-		radius: overlays[0]?.params?.radius || overlays[0]?.radius || 0,
-		effects: effects || overlays.map((o) => ({ type: o.type, params: mergeOverlayParams(o) })),
-	})
-
-	return [`CG ${cl} UPDATE 0 "${data.replace(/"/g, '\\"')}"`, ...pipOverlayMixerLines(cl, mixFill, contentRotation)]
-}
-
-/**
  * @param {number|undefined} [nextContentLayer] - Same as apply/take; controls which aligned layers were used
  */
 function buildPipOverlayRemoveLines(channel, contentPhysicalLayer, nextContentLayer, maxStack = PIP_OVERLAY_MAX_STACK) {
@@ -383,8 +303,6 @@ module.exports = {
 	buildPipOverlayAmcpLines,
 	buildPipOverlayAmcpLinesAll,
 	buildPipOverlayUpdateLines,
-	buildPipOverlayRouterAmcpLines,
-	buildPipOverlayRouterUpdateLines,
 	buildPipOverlayRemoveLines,
 	buildPipOverlayRemoveLinesForTakeJobSet,
 	buildPipOverlayOpacityFadeDeferLines,

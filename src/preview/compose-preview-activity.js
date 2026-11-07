@@ -197,11 +197,6 @@ function analyzeChannelFallback(ctx, channel) {
 	return { hasContent, hasActiveRemaining, contentSig: sigParts.join('|') }
 }
 
-/** @deprecated use analyzeChannelOsc */
-function channelHasPlayingVideo(ctx, channel) {
-	return analyzeChannelOsc(ctx, channel).hasActiveRemaining
-}
-
 /**
  * @param {number|string} channel
  * @param {number} ms
@@ -217,7 +212,6 @@ function scheduleSettle(channel, ms) {
 function onProgramMutation(ctx, channel, opts = {}) {
 	scheduleSettle(channel, transitionMsFromOpts(opts, ctx?.config))
 }
-
 
 function onPlaybackPlay() {}
 
@@ -235,17 +229,6 @@ function onChannelClear(channel) {
 	st.lastContentSig = ''
 	st.wasOscLive = false
 }
-
-function onSceneTake(channel, fadeDurFrames, fps) {
-	const rate = fps > 0 ? fps : DEFAULT_FPS
-	const ms =
-		fadeDurFrames > 0 ? Math.ceil((fadeDurFrames / rate) * 1000) + SETTLE_BUFFER_MS : STILL_SETTLE_MS
-	scheduleSettle(channel, ms)
-}
-
-function onTimelinePlaying() {}
-
-function onTimelinePaused() {}
 
 /**
  * True when compose preview WS broadcast is allowed (transition settle complete).
@@ -331,17 +314,6 @@ function onCaptureComplete(ctx, channel) {
 	}
 }
 
-function requestInitialCapture(channels) {
-	for (const ch of channels) {
-		scheduleSettle(ch, STILL_SETTLE_MS)
-		const st = _st(ch)
-		if (st) {
-			st.idleCaptured = false
-			st.pendingFinal = true
-		}
-	}
-}
-
 function reset() {
 	_channels.clear()
 }
@@ -363,7 +335,6 @@ function getStats() {
 module.exports = {
 	isStillImageClip,
 	analyzeChannelOsc,
-	channelHasPlayingVideo,
 	resolveFileRemainingSec,
 	fileHasActiveRemaining,
 	scheduleSettle,
@@ -372,13 +343,9 @@ module.exports = {
 	onPlaybackPaused,
 	onPlaybackStop,
 	onChannelClear,
-	onSceneTake,
-	onTimelinePlaying,
-	onTimelinePaused,
 	isComposePreviewSettled,
 	shouldCaptureOnTick,
 	onCaptureComplete,
-	requestInitialCapture,
 	reset,
 	getStats,
 	transitionMsFromOpts,

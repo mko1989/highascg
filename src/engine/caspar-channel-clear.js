@@ -16,23 +16,6 @@ function isPreviewCasparChannel(cfg, ch) {
 }
 
 /**
- * Whether a Caspar channel is the multiview (MVR) output bus.
- * @param {object} [cfg]
- * @param {number} ch
- */
-function isMultiviewCasparChannel(cfg, ch) {
-	const map = getChannelMap(cfg || {})
-	const n = parseInt(ch, 10)
-	if (!Number.isFinite(n)) return false
-	const mvChs = Array.isArray(map.multiviewChannels)
-		? map.multiviewChannels
-		: map.multiviewCh != null
-			? [map.multiviewCh]
-			: []
-	return mvChs.some((c) => Number(c) === n)
-}
-
-/**
  * Caspar `CLEAR <channel>` — one command clears every layer on the channel.
  * @param {import('../caspar/amcp-client').AmcpClient} amcp
  * @param {number|string} channel
@@ -59,4 +42,4 @@ async function clearCasparChannel(amcp, channel, self, opts = {}) {
 	}
 }
 
-module.exports = { clearCasparChannel, isPreviewCasparChannel, isMultiviewCasparChannel }
+module.exports = { clearCasparChannel, isPreviewCasparChannel }

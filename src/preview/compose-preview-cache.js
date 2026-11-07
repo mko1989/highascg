@@ -82,62 +82,6 @@ function resolvePreviewPngPath(config, channel) {
 }
 
 /**
- * @param {string} fp
- * @returns {Promise<string | null>}
- */
-async function sha256File(fp) {
-	try {
-		const buf = await fs.promises.readFile(fp)
-		return crypto.createHash('sha256').update(buf).digest('hex')
-	} catch {
-		return null
-	}
-}
-
-/**
- * @param {string} fp
- * @param {number} sinceMs
- * @param {{ timeoutMs?: number, intervalMs?: number, minBytes?: number }} [opts]
- * @returns {Promise<{ path: string, stat: fs.Stats } | null>}
- */
-async function waitForPngStable(fp, sinceMs, opts = {}) {
-	const timeoutMs = Math.max(100, opts.timeoutMs ?? 2500)
-	const intervalMs = Math.max(5, opts.intervalMs ?? 25)
-	const minBytes = Math.max(256, opts.minBytes ?? 4096)
-	const deadline = Date.now() + timeoutMs
-	let lastSize = 0
-	let stableReads = 0
-	while (Date.now() <= deadline) {
-		try {
-			const st = await fs.promises.stat(fp)
-			if (st.size >= minBytes && st.mtimeMs >= sinceMs - 50) {
-				if (st.size === lastSize) {
-					stableReads += 1
-					if (stableReads >= 2) return { path: fp, stat: st }
-				} else {
-					stableReads = 0
-					lastSize = st.size
-				}
-			} else {
-				stableReads = 0
-				lastSize = 0
-			}
-		} catch {
-			stableReads = 0
-			lastSize = 0
-		}
-		await new Promise((r) => setTimeout(r, intervalMs))
-	}
-	try {
-		const st = await fs.promises.stat(fp)
-		if (st.size >= minBytes) return { path: fp, stat: st }
-	} catch {
-		/* ignore */
-	}
-	return null
-}
-
-/**
  * Ensure preview scratch folder exists under media ingest.
  * @param {object} config
  */
@@ -345,16 +289,6 @@ async function handleComposePreviewImageGet(ctx, channel, query = {}) {
 }
 
 /**
- * Test / lifecycle hook — drops the memoized frames, the in-flight joins and the
- * per-channel backoff state.
- */
-function resetComposePreviewServeState() {
-	_frameMemo.clear()
-	_previewSingleFlight.clear()
-	_previewBackoff.clear()
-}
-
-/**
  * Introspection for `/api/compose-preview/stats` and the offline smoke test.
  */
 function getComposePreviewServeStats() {
@@ -435,9 +369,7 @@ module.exports = {
 	resolvePreviewJpgPath,
 	resolvePreviewJpgOutputPath,
 	resolvePreviewImagePath,
-	waitForPngStable,
 	ensurePreviewDir,
-	sha256File,
 	etagFromStat,
 	isComposePreviewFrameStale,
 	handleComposePreviewMetaGet,
@@ -445,6 +377,5 @@ module.exports = {
 	handleComposePreviewPngGet,
 	handleComposePreviewCompanionGet,
 	readComposePreviewFrame,
-	resetComposePreviewServeState,
 	getComposePreviewServeStats,
 }

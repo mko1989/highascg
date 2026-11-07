@@ -15,14 +15,6 @@ let _maxLines = DEFAULT_MAX
 let _onNewLine = null
 
 /**
- * @param {number} [n]
- */
-function setMaxLines(n) {
-	const v = parseInt(String(n || DEFAULT_MAX), 10)
-	_maxLines = Number.isFinite(v) && v >= 100 && v <= 50000 ? v : DEFAULT_MAX
-}
-
-/**
  * @param {((record: object) => void) | null} fn
  */
 function setOnNewLine(fn) {
@@ -88,6 +80,5 @@ module.exports = {
 	clearHighasLines,
 	getHighasLines,
 	getHighasRecords,
-	setMaxLines,
 	setOnNewLine,
 }

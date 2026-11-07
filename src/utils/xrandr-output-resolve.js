@@ -248,18 +248,6 @@ function resolveSysIdToXrandrOutput(sysId, opts = {}) {
 	return raw
 }
 
-/**
- * Resolve all layout head sysIds to xrandr names (mutates copies only).
- * @param {{ sysId: string, [key: string]: unknown }} head
- * @param {{ inventory?: ReturnType<typeof getGpuConnectorInventory>, config?: object }} [opts]
- */
-function resolveLayoutHeadSysId(head, opts = {}) {
-	if (!head || typeof head !== 'object') return head
-	const resolved = resolveSysIdToXrandrOutput(head.sysId, opts)
-	if (!resolved || resolved === head.sysId) return head
-	return { ...head, sysId: resolved, resolvedFrom: head.sysId }
-}
-
 module.exports = {
 	looksLikeDrmConnectorName,
 	looksLikeDrmStylePortName,
@@ -270,6 +258,5 @@ module.exports = {
 	resolveViaPortPair,
 	resolveGpuPortIndexToXrandrOutput,
 	resolveSysIdToXrandrOutput,
-	resolveLayoutHeadSysId,
 	normalizePortName,
 }

@@ -17,16 +17,6 @@ function resolveV4l2BridgeJpgPath(config, channel) {
 }
 
 /**
- * AMCP path under media/ (Caspar resolves relative to media-path).
- * @param {object} config
- * @param {number} channel
- * @returns {string}
- */
-function getV4l2BridgeJpgAmcpPath(config, channel) {
-	return `media/${getV4l2BridgeJpgBasename(config, channel)}`
-}
-
-/**
  * Ensure media dir + empty stub exist before ADD FILE (same pattern as compose preview).
  * @param {object} config
  * @param {number} channel
@@ -63,7 +53,6 @@ async function waitForV4l2BridgeJpgReady(filePath, timeoutMs = 5000) {
 
 module.exports = {
 	resolveV4l2BridgeJpgPath,
-	getV4l2BridgeJpgAmcpPath,
 	ensureV4l2BridgeJpgStub,
 	waitForV4l2BridgeJpgReady,
 }

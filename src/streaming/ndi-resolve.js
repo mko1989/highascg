@@ -1,37 +1,6 @@
 'use strict'
 
 const { spawnSync } = require('child_process')
-const streamLog = require('../utils/buffered-logger').streaming
-
-/**
- * Ensure system `ffmpeg` can use the NDI demuxer (libndi_newtek_input).
- * Uses `ffmpeg -formats` — do **not** use `-list_sources` / `-find_sources` here; option names vary by build.
- * @returns {{ ok: boolean, error?: string }}
- */
-function validateFfmpegNdiInput() {
-	let r
-	try {
-		r = spawnSync('ffmpeg', ['-hide_banner', '-formats'], {
-			encoding: 'utf8',
-			timeout: 12000,
-			maxBuffer: 12 * 1024 * 1024,
-		})
-	} catch (e) {
-		return { ok: false, error: `ffmpeg spawn failed: ${e.message || e}` }
-	}
-	if (r.error && r.error.code === 'ENOENT') {
-		return { ok: false, error: 'ffmpeg not found in PATH' }
-	}
-	const combined = `${r.stderr || ''}\n${r.stdout || ''}`
-	if (!/libndi_newtek_input/i.test(combined)) {
-		return {
-			ok: false,
-			error:
-				'ffmpeg has no libndi_newtek_input demuxer (see ffmpeg -formats). Install NDI-enabled FFmpeg or use captureMode "udp".',
-		}
-	}
-	return { ok: true }
-}
 
 /**
  * Probe argument lists for listing NDI sources — FFmpeg builds differ (`find_sources` vs `list_sources`, `libndi_newtek` vs `libndi_newtek_input`).
@@ -180,43 +149,10 @@ function resolveNdiSourceName(config, channelNum) {
 	return (config.ndiSourcePattern || 'CasparCG Channel {ch}').replace('{ch}', ch)
 }
 
-/**
- * Populate `_ndiDiscoveredSources` and `_ndiResolvedNames` on `config` for NDI tier.
- * @param {object} config — streaming config (mutated)
- * @param {Array<{channel: number}>} targets
- */
-function prepareNdiStreaming(config, targets) {
-	delete config._ndiDiscoveredSources
-	delete config._ndiResolvedNames
-
-	const mode = config.ndiNamingMode || 'auto'
-	if (mode === 'pattern' || mode === 'custom') return
-
-	// auto: try FFmpeg discovery
-	const { sources, ok } = listNdiSources()
-	if (ok && sources.length) {
-		config._ndiDiscoveredSources = sources
-		config._ndiResolvedNames = {}
-		for (const t of targets) {
-			const m = matchCasparChannelFromSources(sources, t.channel)
-			if (m) config._ndiResolvedNames[String(t.channel)] = m
-		}
-		if (Object.keys(config._ndiResolvedNames).length) {
-			streamLog.info('[NDI] Auto-matched sources: ' + JSON.stringify(config._ndiResolvedNames))
-		} else {
-			streamLog.info('[NDI] No CasparCG Channel N in discovered list; using default name pattern.')
-		}
-	} else {
-		streamLog.info('[NDI] Source listing unavailable or empty; using default name pattern.')
-	}
-}
-
 module.exports = {
 	listNdiSources,
 	parseNdiListOutput,
 	matchCasparChannelFromSources,
 	resolveNdiSourceName,
-	prepareNdiStreaming,
-	validateFfmpegNdiInput,
 	runNdiListProbe,
 }

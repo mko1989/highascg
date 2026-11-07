@@ -64,11 +64,6 @@ function tryLoad(name, log) {
 	}
 }
 
-/** @returns {string[]} names of currently-registered modules */
-function listNames() {
-	return _modules.map((m) => m.name)
-}
-
 /**
  * @param {string} name
  * @returns {boolean}
@@ -307,7 +302,6 @@ module.exports = {
 	unregister,
 	tryLoad,
 	tryUnload,
-	listNames,
 	isLoaded,
 	get,
 	bootOne,

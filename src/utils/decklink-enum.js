@@ -11,27 +11,6 @@ let lastProbe = null
 const DEFAULT_LOG_DIR = '/home/casparcg/highascg/log'
 
 /**
- * @param {string} text
- * @returns {Array<{ index: number, label: string }>}
- */
-function parseDecklinkDevicesFromFfmpegText(text) {
-	const out = []
-	const seen = new Set()
-	const lines = String(text || '').split(/\r?\n/)
-	for (const line of lines) {
-		const m = line.match(/"([^"]*decklink[^"]*)"/i)
-		if (!m || !m[1]) continue
-		const label = String(m[1]).trim()
-		if (!label) continue
-		const key = label.toLowerCase()
-		if (seen.has(key)) continue
-		seen.add(key)
-		out.push({ index: out.length + 1, label })
-	}
-	return out
-}
-
-/**
  * Parse CasparCG startup log lines with DeckLink devices and Screen consumers.
  *
  * @param {string} text
@@ -398,5 +377,4 @@ module.exports = {
 	probeDecklinkDriverHealth,
 	parseCasparLogHardware,
 	parseInfoConfigForDecklinks,
-	parseDecklinkDevicesFromFfmpegText,
 }
