@@ -1,0 +1,108 @@
+From 4838ab393e629ef47097f3e3c271d2887a4bf786 Mon Sep 17 00:00:00 2001
+From: HighAsCG Assembly <assembly@highascg.local>
+Date: Sat, 7 Nov 2026 13:27:48 +0100
+Subject: [PATCH] ffmpeg: no TBB hand-off per frame in make_frame and
+ single-stream consumers (WO-992)
+
+make_frame ran its video and audio copies under tbb::parallel_invoke for every frame of
+every FFmpeg, DeckLink, NDI and image layer, and the FFmpeg consumer did the same for
+video+audio sends even when it had only one stream. Each hand-off woke the 15-worker TBB
+pool, which spun (~1400 involuntary context switches/s per worker). The pool was created
+from an AMCP thread, so top -H blamed "AMCPCommandQueu" for ~16 % of a core on an idle box
+(three audio-only s16le preview consumers + one clip + a DeckLink input).
+
+- av_util.cpp make_frame: video, then audio, on the calling thread.
+- ffmpeg_consumer.cpp: parallel_invoke only when both a video and an audio stream exist.
+
+Measured on the dev box: AMCP-named threads 16.0 % -> 1.7 %, Caspar 168 % -> 152 %.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01MxpJi7ZHbr5bkwDuaHmchx
+---
+ .../ffmpeg/consumer/ffmpeg_consumer.cpp       | 22 +++++++++----------
+ src/modules/ffmpeg/util/av_util.cpp           | 15 ++++++++-----
+ 2 files changed, 20 insertions(+), 17 deletions(-)
+
+diff --git a/src/modules/ffmpeg/consumer/ffmpeg_consumer.cpp b/src/modules/ffmpeg/consumer/ffmpeg_consumer.cpp
+index d9a23c439..65109eb6a 100644
+--- a/src/modules/ffmpeg/consumer/ffmpeg_consumer.cpp
++++ b/src/modules/ffmpeg/consumer/ffmpeg_consumer.cpp
+@@ -681,17 +681,17 @@ struct ffmpeg_consumer : public core::frame_consumer
+                                       static_cast<double>(frame_buffer_.size() + 0.001) / frame_buffer_.capacity());
+ 
+                     caspar::timer frame_timer;
+-                    tbb::parallel_invoke(
+-                        [&] {
+-                            if (video_stream) {
+-                                video_stream->send(data, format_desc, packet_cb);
+-                            }
+-                        },
+-                        [&] {
+-                            if (audio_stream) {
+-                                audio_stream->send(data, format_desc, packet_cb);
+-                            }
+-                        });
++                    // HighAsCG: only hand work to the TBB pool when there are two streams to overlap. A video-only
++                    // consumer (HighAsCG's per-channel preview UDP streams) used to wake and spin the whole 15-worker
++                    // pool on every frame for nothing (WO-992).
++                    if (video_stream && audio_stream) {
++                        tbb::parallel_invoke([&] { video_stream->send(data, format_desc, packet_cb); },
++                                             [&] { audio_stream->send(data, format_desc, packet_cb); });
++                    } else if (video_stream) {
++                        video_stream->send(data, format_desc, packet_cb);
++                    } else if (audio_stream) {
++                        audio_stream->send(data, format_desc, packet_cb);
++                    }
+                     graph_->set_value("frame-time", frame_timer.elapsed() * format_desc.fps * 0.5);
+ 
+                     if (!std::get<0>(data)) {
+diff --git a/src/modules/ffmpeg/util/av_util.cpp b/src/modules/ffmpeg/util/av_util.cpp
+index 45c4fce86..bd29b4073 100644
+--- a/src/modules/ffmpeg/util/av_util.cpp
++++ b/src/modules/ffmpeg/util/av_util.cpp
+@@ -24,7 +24,6 @@ extern "C" {
+ #include <algorithm>
+ #include <array>
+ #include <tbb/parallel_for.h>
+-#include <tbb/parallel_invoke.h>
+ 
+ #include <tuple>
+ 
+@@ -88,8 +87,11 @@ core::mutable_frame make_frame(void*                            tag,
+         frame.geometry() = core::frame_geometry::get_default(scale_mode);
+     }
+ 
+-    tbb::parallel_invoke(
+-        [&]() {
++    // HighAsCG: video then audio on this thread. parallel_invoke handed one of the two to the TBB pool for every
++    // frame of every FFmpeg, DeckLink, NDI and image layer, and each hand-off woke and spun the whole 15-worker pool
++    // (≈15 % of a core with nothing but a 50p DeckLink input and one clip, WO-992). The audio copy is a few µs.
++    {
++        {
+             if (video) {
+                 for (int n = 0; n < static_cast<int>(pix_desc.planes.size()); ++n) {
+                     auto frame_plan_index = data_map.empty() ? n : data_map.at(n);
+@@ -110,8 +112,8 @@ core::mutable_frame make_frame(void*                            tag,
+                     }
+                 }
+             }
+-        },
+-        [&]() {
++        }
++        {
+             if (audio) {
+                 const int channel_count = 16;
+                 frame.audio_data()      = std::vector<int32_t>(audio->nb_samples * channel_count, 0);
+@@ -138,7 +140,8 @@ core::mutable_frame make_frame(void*                            tag,
+                     }
+                 }
+             }
+-        });
++        }
++    }
+ 
+     return frame;
+ }
+-- 
+2.53.0
+

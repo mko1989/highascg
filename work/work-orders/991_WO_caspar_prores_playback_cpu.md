@@ -83,7 +83,8 @@ All on this box, PRV playing the neon clip, under the box2 lock:
 - `nmap`/reset and WO-990 behaviour are unchanged (same AsyncEventServer).
 - The OAL "Failed to initialize audio device" exception at every Caspar start predates this; it also appears at
   10:11 on the old binary.
-- **Newly visible thanks to the names:** `AMCPCommandQueue` uses ~15.6 % steady. That is AMCP traffic from node,
-  worth a look in an optimisation sweep. `decklink_producer` uses ~6 %.
+- **Newly visible thanks to the names:** `AMCPCommandQueue` uses ~15.6 % steady. That was first read as AMCP
+  traffic from node; it is the TBB pool, which inherited the name and was still woken per frame (fixed in WO-992).
+  `decklink_producer` uses ~6 %.
 
 Rollback: `bin/casparcg.pre-wo991` on both boxes (379d81917).
