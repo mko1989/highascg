@@ -24,7 +24,6 @@ function walk(dir, out = []) {
 
 const hits = []
 for (const file of walk(CLIENT)) {
-	if (file.includes(`${path.sep}electron-launcher${path.sep}`)) continue
 	const text = fs.readFileSync(file, 'utf8')
 	if (/function\s+escapeHtml\s*\(/.test(text) && !ALLOW.has(file)) {
 		hits.push(path.relative(REPO, file))

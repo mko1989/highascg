@@ -2,7 +2,7 @@
 
 /**
  * WO-844: web client sweep fixes — video-mode matching, shortcut focus guard, numbered ids, cached-GET RMW,
- * MIX + MERGE migration, device-graph-suggest DeckLink ids, electron launcher markup.
+ * MIX + MERGE migration, device-graph-suggest DeckLink ids.
  */
 
 const test = require('node:test')
@@ -158,11 +158,4 @@ test('MIX + MERGE migrates to MIX + ANIMATE (space kept), not a CUT', () => {
 	assert.equal(t.migrateTransitionTypeToAnimate('WIPE +MERGE'), 'WIPE + ANIMATE')
 	assert.deepEqual(t.normalizeTransitionForPgmOnly({ type: 'MIX + MERGE', duration: 25 }), { type: 'MIX + ANIMATE', duration: 25, tween: 'linear' })
 	for (const ty of t.TRANSITION_TYPES) assert.ok(ty === t.migrateTransitionTypeToAnimate(ty), `${ty} unchanged`)
-})
-
-test('4o: electron launcher markup uses ASCII quotes in tags', () => {
-	const html = read('client/tools/electron-launcher/index.html')
-	const tags = html.match(/<[^>]*>/g) || []
-	assert.deepEqual(tags.filter((t) => /[“”‘’]/.test(t)), [])
-	assert.match(html, /<section class="tab-pane" id="tab-partition" data-partial="partials\/tab-partition\.html">/)
 })

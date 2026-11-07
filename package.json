@@ -36,9 +36,6 @@
 		"wiki:open": "xdg-open docs/wiki-site/index.html 2>/dev/null || open docs/wiki-site/index.html 2>/dev/null || echo 'Open docs/wiki-site/index.html in your browser'",
 		"smoke:wiki": "node --test tools/smoke/smoke-wiki.test.js",
 		"cg-studio": "node scripts/cg-studio-run.js",
-		"launcher": "npx electron --no-sandbox client/tools/electron-launcher",
-		"portable:sim": "node client/tools/portable-desktop/launch-sim-from-exfat.cjs",
-		"portable:sim:check": "node --check client/tools/portable-desktop/launch-sim-from-exfat.cjs && node --check client/tools/portable-desktop/sim-app-root.cjs",
 		"smoke": "node tools/test-live/http-smoke.js",
 		"smoke:caspar": "node tools/test-live/smoke-caspar.js",
 		"thumbnails:lt": "node tools/runtime/generate-lt-thumbnails.js",
@@ -99,7 +96,7 @@
 	"engines": {
 		"node": ">=20"
 	},
-	"notes": "Unified repo: client/ (canonical UI) + src/ (API) on one Ubuntu playout host. Node serves dist-web/ + API on :4200. Build UI: npm run build:client. highascg-client is optional Electron packaging (sim, multiserver, modules) — not the UI source tree. HIGHASCG_HEADLESS=true is API-only debug.",
+	"notes": "Unified repo: client/ (canonical UI) + src/ (API) on one Ubuntu playout host. Node serves dist-web/ + API on :4200. Build UI: npm run build:client. HIGHASCG_HEADLESS=true is API-only debug.",
 	"dependencies": {
 		"busboy": "^1.6.0",
 		"casparcg-connection": "^6.3.3",
@@ -133,7 +130,6 @@
 		"@eslint/js": "^10.0.1",
 		"acorn": "^8.17.0",
 		"acorn-walk": "^8.3.5",
-		"electron": "^43.0.0",
 		"eslint": "^10.6.0",
 		"globals": "^17.7.0",
 		"prettier": "^3.9.4",

@@ -21,8 +21,6 @@ const IGNORES = [
 	'work/**',
 	'template/**',
 	'client/assets/map-data.json',
-	'client/tools/electron-launcher/**',
-	'client/tools/portable-desktop/**',
 	'**/*.sync-conflict-*',
 	'eslint.config.js',
 ]
@@ -131,13 +129,7 @@ module.exports = [
 		},
 	},
 	{
-		// Node-side helpers that live under client/tools (operator CLI): node globals, not browser.
-		files: ['client/tools/operator-desktop/**/*.js'],
-		languageOptions: { globals: { ...globals.node } },
-	},
-	{
-		// CG Studio's served UI: plain browser scripts under src/ (same code also synced into
-		// client/tools/electron-launcher/cg-studio/). Without this block they inherit the node
+		// CG Studio's served UI: plain browser scripts under src/. Without this block they inherit the node
 		// globals from the server block above and every `document` use warns no-undef.
 		files: ['src/cg-studio/public/**/*.js'],
 		languageOptions: {
