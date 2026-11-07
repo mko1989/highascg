@@ -23,12 +23,6 @@ function createPlaybackCell(position = 0) {
 	return { position, playing: false, loop: false, _t0: t, _p0: position }
 }
 
-function setCellPosition(cell, pos) {
-	cell.position = pos
-	cell._p0 = pos
-	cell._t0 = Date.now()
-}
-
 /** @param {new (self: object) => object} TimelineEngineClass */
 function applyPlaybackMixin(TimelineEngineClass) {
 	Object.assign(TimelineEngineClass.prototype, {

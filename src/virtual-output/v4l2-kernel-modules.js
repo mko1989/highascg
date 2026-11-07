@@ -2,7 +2,7 @@
 
 const fs = require('fs')
 const path = require('path')
-const { execFile, execFileSync } = require('child_process')
+const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { normalizeVirtualCameraConfig } = require('./v4l2-bridge-config')
 const { resolveAlsaLoopbackConfig, alsaLoopbackCardPresent } = require('./v4l2-bridge-audio-sink')

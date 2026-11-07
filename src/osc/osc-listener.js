@@ -1,7 +1,6 @@
 'use strict'
 
 const osc = require('osc')
-const { OscState } = require('./osc-state')
 const { createFloatEndianNormalizer } = require('./osc-float-endian')
 
 /**

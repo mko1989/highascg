@@ -19,7 +19,6 @@ const { execFile, spawn } = require('child_process')
 const { promisify } = require('util')
 const {
 	resolveOperatorMonitorRect,
-	isOperatorPointerConfineDesired,
 	evaluateOperatorPointerConfineDesire,
 	resolveConfineBarriersScript,
 	resolveConfineCursorScript,
@@ -43,7 +42,6 @@ const execFileAsync = promisify(execFile)
  */
 const UNCLUTTER_IDLE_SEC = 2
 
-const BARRIER_LOG_PATH = path.join(process.env.HOME || '/home/casparcg', '.highascg/log/confine-pointer-barriers.log')
 const BARRIER_PID_PATH = path.join(process.env.HOME || '/home/casparcg', '.highascg/run/confine-pointer-barriers.pid')
 
 /** @type {import('child_process').ChildProcess | null} */
@@ -78,25 +76,6 @@ function envTruthy(name) {
 function confineKey(rect) {
 	if (!rect?.sysId) return null
 	return `${rect.sysId}@${rect.x},${rect.y},${rect.width}x${rect.height}`
-}
-
-function barrierLogShowsActive() {
-	try {
-		const tail = fs.readFileSync(BARRIER_LOG_PATH, 'utf8').slice(-2000)
-		if (!tail.includes('Pointer barriers active')) return false
-		const m = tail.match(/\[pid=(\d+)\][^\n]*Pointer barriers active/)
-		if (!m) return false
-		const pid = parseInt(m[1], 10)
-		if (!Number.isFinite(pid)) return false
-		try {
-			process.kill(pid, 0)
-			return true
-		} catch {
-			return false
-		}
-	} catch {
-		return false
-	}
 }
 
 async function isBarrierDaemonRunning(sysId, env) {

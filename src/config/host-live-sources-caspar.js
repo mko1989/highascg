@@ -1,7 +1,7 @@
 'use strict'
 
 const fs = require('fs')
-const { isHostLiveSource, listHostLiveChannelEntries } = require('./host-live-sources')
+const { listHostLiveChannelEntries } = require('./host-live-sources')
 const { buildConfigXml } = require('./config-generator')
 const { buildCasparGeneratorFlatConfig } = require('./build-caspar-generator-config')
 

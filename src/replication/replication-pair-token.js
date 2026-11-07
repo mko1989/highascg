@@ -1,6 +1,6 @@
 'use strict'
 
-const { getReplicationConfig, normalizeReplicationConfig } = require('../config/replication-config')
+const { getReplicationConfig } = require('../config/replication-config')
 
 /**
  * Persist updated peer.token after realign (pairing must stay enabled).

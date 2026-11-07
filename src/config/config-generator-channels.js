@@ -1,7 +1,6 @@
 'use strict'
 
 const { channelXmlComment } = require('./config-generator-xml-comments')
-const { STANDARD_VIDEO_MODES } = require('./config-modes')
 const { pushCustomMode } = require('./config-generator-custom-modes')
 const { buildChannelPlan } = require('./config-generator-channel-plan')
 const {

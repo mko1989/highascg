@@ -60,17 +60,8 @@ function restoreConfine(ctx, deps) {
 }
 
 /**
- * WO-891: outputs the layout plan puts a Caspar screen consumer on (PGM / PRV / multiview / pixel-mapping head). The
- * Godot client's second operator window never opens on one by default.
- * @param {object} config
- * @returns {Set<string>}
- */
-function casparOutputNames(config) {
-	return planRoles(config).caspar
-}
-
-/**
- * The layout plan's view of each output: `caspar` as above, `gui` name → operator monitor number (WO-920: the Godot
+ * The layout plan's view of each output: `caspar` = outputs the plan puts a Caspar screen consumer on (PGM / PRV /
+ * multiview / pixel-mapping head; WO-891: the Godot second operator window never opens on one by default), `gui` name → operator monitor number (WO-920: the Godot
  * second window opens on the output cabled from the Operator GUI card's dot 2).
  * @param {object} config
  * @returns {{ caspar: Set<string>, gui: Map<string, number> }}

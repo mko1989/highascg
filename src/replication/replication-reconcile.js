@@ -2,9 +2,9 @@
 
 const { getReplicationConfig } = require('../config/replication-config')
 const { peerHttpRequest, SYNC_REQUEST_TIMEOUT_MS } = require('./peer-client')
-const { pushProjectToPeer, reconcileProjectsToPeer, receiveProjectFromPeer } = require('./replicate-projects')
+const { reconcileProjectsToPeer, receiveProjectFromPeer } = require('./replicate-projects')
 const { pushTimelineToPeer, receiveTimelineFromPeer } = require('./replicate-timelines')
-const { applyLiveIntentOnFollower, scheduleLiveIntentApply } = require('./mirror-apply')
+const { applyLiveIntentOnFollower } = require('./mirror-apply')
 
 /**
  * @param {import('./replication-service').ReplicationRuntime} runtime

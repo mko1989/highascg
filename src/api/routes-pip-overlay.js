@@ -12,7 +12,6 @@ const {
 	buildPipOverlayUpdateLines,
 	buildPipOverlayRemoveLines,
 	sendPipOverlayLinesSerial,
-	PIP_OVERLAY_TEMPLATE_FILES,
 	TEMPLATE_MAP,
 } = require('../engine/pip-overlay')
 

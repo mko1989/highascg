@@ -15,7 +15,6 @@ const { listDecklinkOutputStatuses } = require('../config/decklink-output-resolv
 const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('../config/decklink-io-direction')
 const { buildGpuPhysicalMap } = require('../utils/gpu-physical-map')
 const { resolveOperatorMonitorPort } = require('../utils/operator-monitor-resolve')
-const { listPortAudioDevices } = require('../audio/audio-devices')
 const { resolveDecklinkInputDeviceIndex } = require('../config/routing-map')
 const { resolveDecklinkInputSlots } = require('../config/decklink-input-slots')
 

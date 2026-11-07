@@ -3,7 +3,7 @@
 const fs = require('fs')
 const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
-const { normalizeReplicationConfig, replicationPairConfigured } = require('../config/replication-config')
+const { normalizeReplicationConfig } = require('../config/replication-config')
 
 /** exFAT sync pairs that carry active show slug + project JSON (not modular operator config). */
 const SHOW_DATA_PAIR_IDS = new Set([

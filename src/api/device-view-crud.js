@@ -3,7 +3,7 @@
  */
 'use strict'
 
-const { normalizeDeviceGraph, validateDeviceGraph, ensureConnectorsFromSuggested, addEdgeToGraph, removeEdgeById, mergeHardwareSync, pruneDestinationFromGraph } = require('../config/device-graph')
+const { normalizeDeviceGraph, ensureConnectorsFromSuggested, addEdgeToGraph, removeEdgeById, mergeHardwareSync, pruneDestinationFromGraph } = require('../config/device-graph')
 const { normalizeScreenDestinations, destinationsFromConfig } = require('../config/screen-destinations')
 const { getDestinationOutputWiring } = require('../config/device-graph-destination-wiring')
 const { resolveProjectFps, defaultVideoModeForProjectFps } = require('../config/project-fps')

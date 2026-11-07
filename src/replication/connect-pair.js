@@ -7,7 +7,6 @@ const { getLocalSyncthingDeviceId } = require('./syncthing-client')
 const { syncProjectMediaToPeer } = require('./sync-project-media')
 const { reconcileFromLeader } = require('./replication-reconcile')
 const { peerHttpRequest, SYNC_REQUEST_TIMEOUT_MS } = require('./peer-client')
-const { loadFullProject } = require('../engine/project-scenes')
 const { getCasparEndpointForPeer } = require('./caspar-endpoint')
 const {
 	ensureReplicationSshKey,

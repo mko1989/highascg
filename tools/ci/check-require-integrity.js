@@ -12,7 +12,6 @@ const path = require('path')
 
 const REPO_ROOT = path.resolve(__dirname, '../..')
 
-const SCAN_ROOTS = ['src', 'client', 'index.js', 'tools']
 const JS_SCAN_DIRS = ['src', 'client', 'tools']
 const REQUIRE_RE = /require\(\s*['"](\.[^'"]+)['"]\s*\)/g
 

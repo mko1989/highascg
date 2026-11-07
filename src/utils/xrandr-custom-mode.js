@@ -2,7 +2,6 @@
 
 const { execFileSync } = require('child_process')
 const { runTimingGenerator, parseModelineFromGeneratorOutput } = require('./modeline-timings')
-const { resolveEffectiveOsModeSource } = require('./os-mode-source')
 
 /** @param {string} text */
 function parseModelineFromCvtOutput(text) {

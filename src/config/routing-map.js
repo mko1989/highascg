@@ -196,7 +196,6 @@ function getChannelMap(config, activeBuses = null) {
 		readCasparSetting(config, 'decklink_inputs_host_channel_enabled') === 'true' ||
 		readCasparSetting(config, 'live_audio_inputs_host_channel_enabled') === true ||
 		readCasparSetting(config, 'live_audio_inputs_host_channel_enabled') === 'true'
-	const inputsEnabled = decklinkInputSlots.length > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled
 	const extraAudioCount = Math.min(4, Math.max(0, parseInt(String(config?.extra_audio_channel_count ?? cs.extra_audio_channel_count ?? 0), 10) || 0))
 
 	// WO-414: stored host-live sources PIN their channel (pins never move, WO-377/381), so

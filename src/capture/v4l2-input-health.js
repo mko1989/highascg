@@ -1,7 +1,7 @@
 'use strict'
 
 const { amcpInfoText } = require('../streaming/caspar-ffmpeg-setup')
-const { listConfiguredV4l2Slots, listV4l2PlayClipVariants } = require('./v4l2-input-config')
+const { listV4l2PlayClipVariants } = require('./v4l2-input-config')
 const { isV4l2CaptureBridgeEnabled, restartV4l2InputBridge, stopV4l2InputBridge } = require('./v4l2-input-bridge')
 
 const DEFAULT_VERIFY_MS = 1200

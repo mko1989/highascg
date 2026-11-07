@@ -21,9 +21,6 @@ const { getChannelMap } = require('../config/routing')
 /** CG sub-layer index for consistency with scene take. */
 const CG_SUBLAYER = 0
 
-/** Caspar CG template path. */
-const COUNTDOWN_CG_NAME = 'countdown/countdown'
-
 /** Band guard: timers must use layers 980-989 only */
 const TIMER_LAYER_MIN = 980
 const TIMER_LAYER_MAX = 989

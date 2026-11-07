@@ -16,8 +16,6 @@ const {
 	MV_STAGE_H,
 	routeForCell,
 	overlayType,
-	inferPgmScreen,
-	inferPrvScreen,
 	containFillInPictureRect,
 	chromeReserveForCellLayout,
 	resolveCellContentResolution,

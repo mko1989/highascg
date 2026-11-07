@@ -174,7 +174,6 @@ module.exports = {
 			this._lastKfValues.set(kFill, curStr)
 			if (playing && inAnimatedSpan) this._lastKfSegment.set(kFillSeg, fillSegIdx)
 			else if (!playing) this._lastKfSegment.delete(kFillSeg)
-			const cl = `${ch}-${layer}`
 			// T173.4: instant (non-segment) FILL values still sent immediately, not collected
 			self.amcp.mixerFill(ch, layer, cur.fx, cur.fy, cur.sx, cur.sy, 0).catch(() => {})
 			sent = true
@@ -362,8 +361,6 @@ module.exports = {
 			 * is 1, and this write is what gives a clip its own base opacity. Suppressing it there is
 			 * exactly the invisible-CUT regression WO-139 T139.1 had to patch. */
 			if (extra.takeFade && !extra.isVolume) return false
-			const cl = `${ch}-${layer}`
-			const keyword = extra.isVolume ? 'VOLUME' : 'OPACITY'
 			// T173.4: instant (non-segment) values still sent immediately, not collected
 			if (extra.isVolume) {
 				self.amcp.mixerVolume(ch, layer, val, 0).catch(() => {})

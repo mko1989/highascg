@@ -425,7 +425,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 		log('[WS] replication peer connected')
 		try {
 			const { registerPeerWsClient, getReplicationRuntime } = require('../replication/replication-service')
-			const { snapshotLiveState, broadcastLiveState } = require('../replication/live-state-feed')
+			const { snapshotLiveState } = require('../replication/live-state-feed')
 			registerPeerWsClient(ws)
 			const rt = getReplicationRuntime(ctx)
 			if (rt) {

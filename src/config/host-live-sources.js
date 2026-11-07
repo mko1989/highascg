@@ -1,7 +1,6 @@
 'use strict'
 
 const { getChannelMap, getRouteString } = require('./routing-map')
-const { getModeDimensions } = require('./config-modes')
 const { normalizeNdiSourceName, ndiDisplayLabel, buildNdiHostPlayCommands } = require('./ndi-playback')
 const { browserCapturePlayClip } = require('../capture/browser-capture-args')
 

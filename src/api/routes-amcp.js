@@ -48,7 +48,7 @@ const { defaultProgramChannel } = require('../config/operator-gui-first')
 const { notifyProgramMutationMayInvalidateLive } = require('../state/live-scene-state')
 const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('../engine/audio-route')
 const { coalescePerLayerClearStorm } = require('../caspar/amcp-coalesce-clears')
-const { normalizeDecklinkPlayAmcpLine, normalizeDecklinkPlayAmcpLines } = require('../config/decklink-amcp')
+const { normalizeDecklinkPlayAmcpLines } = require('../config/decklink-amcp')
 const { normalizeClipPlayAmcpLines } = require('../caspar/amcp-clip-resolve')
 const { resolveSceneClipForAmcp } = require('../engine/scene-take-lbg-helpers')
 

@@ -112,7 +112,6 @@ function assignTimerToScreen(opts) {
 	loadRegistry()
 
 	let record = _registry.get(timerId)
-	const isNewRecord = !record
 
 	// Check if already assigned to this screen
 	if (record && record.screens && record.screens[String(screenIdx)]) {
