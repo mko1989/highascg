@@ -12,7 +12,6 @@
  *
  * Layout: tools/test-live/*.test.js  node:test files        (run together under `node --test`)
  *         tools/test-live/<name>.js|mjs  HTTP/AMCP probes   (exit code = result, run one by one)
- *         tools/test-live/manual/        hand-run spikes and raw-socket helpers (guarded, never run here)
  * The GUI release suite (WO-836 part 3) slots in as a third group of the same kind; `npm run test:release` chains
  * offline + live + GUI (tools/ci/run-release-tests.js).
  */
