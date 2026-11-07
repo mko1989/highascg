@@ -43,7 +43,8 @@ start a fresh branch off upstream: the binary would silently lose these features
 | ce7132e50, deac375bb | AMCP APPLY (#1638); screen slices (perspective quads, live over APPLY) | WO-869 |
 | d6519d5d3 | Per-layer audio meters over OSC | WO-800 |
 | dd7862fba | Native NotchLC: CPU unpack, GPU shader decode (`ffmpeg.producer.notchlc-gpu`) | WO-820 |
-| cd177d369 | AMCP accept loop survives a connect+reset (a port scan used to lock out every new client) | WO-990 |
+| cd177d369, 379d81917 | AMCP accept loop survives a connect+reset (a port scan used to lock out every new client) | WO-990 |
+| e8bbf87f3 | FFmpeg producer: plain plane copies (no per-row TBB tasks), fps duplicates reuse the made frame + its textures, thread names cut to 15 bytes (4K ProRes loop 260 → 166 % CPU) | WO-991 |
 
 Run `git -C ~/caspar-build/src-v2 log --oneline v2.5.1-stable..highascg-main` for the live list. Update this table
 when you add a commit.

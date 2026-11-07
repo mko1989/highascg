@@ -1,0 +1,130 @@
+From e8bbf87f33dcf1caf3ca7711e956d27bb36064c6 Mon Sep 17 00:00:00 2001
+From: HighAsCG Assembly <assembly@highascg.local>
+Date: Sat, 7 Nov 2026 13:00:32 +0100
+Subject: [PATCH] =?UTF-8?q?ffmpeg:=20plain=20plane=20copies=20in=20make=5F?=
+ =?UTF-8?q?frame;=20reuse=20the=20made=20frame=20for=20fps=20duplicates;?=
+ =?UTF-8?q?=20thread=20names=20cut=20to=2015=20bytes=20=E2=80=94=20HighAsC?=
+ =?UTF-8?q?G=20WO-991?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- make_frame: one memcpy per plane (per row only when strides differ) instead of a tbb::parallel_for task per row,
+  which woke the whole TBB pool for every frame (~72 % of a core for 4K at 50 fps vs ~16 % serial).
+- av_producer: a video-only output frame on the same refcounted buffer as the previous one (the fps filter's
+  duplicate of a 25/30p picture on a 50p channel) reuses the frame already made, with its GPU textures: no host copy,
+  no upload, no NotchLC re-decode.
+- set_thread_name: Linux caps names at 15 bytes and pthread_setname_np failed outright on longer ones.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01MxpJi7ZHbr5bkwDuaHmchx
+---
+ src/common/os/linux/thread.cpp              | 14 ++++++++++-
+ src/modules/ffmpeg/producer/av_producer.cpp | 28 +++++++++++++++++++--
+ src/modules/ffmpeg/util/av_util.cpp         | 19 ++++++++++----
+ 3 files changed, 53 insertions(+), 8 deletions(-)
+
+diff --git a/src/common/os/linux/thread.cpp b/src/common/os/linux/thread.cpp
+index 17e12c574..b88cb768f 100644
+--- a/src/common/os/linux/thread.cpp
++++ b/src/common/os/linux/thread.cpp
+@@ -5,7 +5,19 @@
+ 
+ namespace caspar {
+ 
+-void set_thread_name(const std::wstring& name) { pthread_setname_np(pthread_self(), u8(name).c_str()); }
++void set_thread_name(const std::wstring& name)
++{
++    // Linux caps thread names at 15 bytes; a longer one made pthread_setname_np fail (ERANGE) and the thread stayed
++    // "casparcg" in top -H — e.g. [ffmpeg::av_producer]. Keep the first 15 bytes, on a UTF-8 boundary (HighAsCG).
++    auto n = u8(name);
++    if (n.size() > 15) {
++        size_t cut = 15;
++        while (cut > 0 && (static_cast<unsigned char>(n[cut]) & 0xC0) == 0x80)
++            --cut;
++        n.resize(cut);
++    }
++    pthread_setname_np(pthread_self(), n.c_str());
++}
+ 
+ void set_thread_realtime_priority()
+ {
+diff --git a/src/modules/ffmpeg/producer/av_producer.cpp b/src/modules/ffmpeg/producer/av_producer.cpp
+index 9a2315008..e3238a0a0 100644
+--- a/src/modules/ffmpeg/producer/av_producer.cpp
++++ b/src/modules/ffmpeg/producer/av_producer.cpp
+@@ -858,6 +858,10 @@ struct AVProducer::Impl
+ 
+     int                              seekable_ = 2;
+     core::frame_geometry::scale_mode scale_mode_;
++
++    // HighAsCG: the last video-only frame made, kept to recognise fps-filter duplicates (same refcounted buffer).
++    std::shared_ptr<AVFrame> prev_video_;
++    core::draw_frame         prev_draw_;
+     int64_t                          frame_count_    = 0;
+     bool                             frame_flush_    = true;
+     int64_t                          frame_time_     = AV_NOPTS_VALUE;
+@@ -1104,8 +1108,28 @@ struct AVProducer::Impl
+                 frame.duration   = av_rescale_q(frame.audio->nb_samples, {1, sr}, TIME_BASE_Q);
+             }
+ 
+-            frame.frame = core::draw_frame(
+-                make_frame(this, *frame_factory_, frame.video, frame.audio, get_color_space(frame.video), scale_mode_));
++            // HighAsCG: a 25/30p clip on a 50p channel gets every picture twice from the fps filter, as a new AVFrame
++            // on the SAME refcounted buffer. Reuse the frame already made for it: it keeps its GPU textures (made at
++            // commit, image_mixer), so the host copy, the upload and a NotchLC GPU decode are skipped. prev_video_
++            // holds a reference, so an equal data pointer cannot be a recycled buffer. Video-only frames only: an
++            // audio frame carries this output frame's own samples.
++            const bool dup = frame.video && !frame.audio && prev_video_ && static_cast<bool>(prev_draw_) &&
++                             frame.video->data[0] == prev_video_->data[0] &&
++                             frame.video->format == prev_video_->format && frame.video->width == prev_video_->width &&
++                             frame.video->height == prev_video_->height;
++            if (dup) {
++                frame.frame = prev_draw_;
++            } else {
++                frame.frame = core::draw_frame(make_frame(
++                    this, *frame_factory_, frame.video, frame.audio, get_color_space(frame.video), scale_mode_));
++                if (frame.video && !frame.audio) {
++                    prev_video_ = frame.video;
++                    prev_draw_  = frame.frame;
++                } else {
++                    prev_video_.reset();
++                    prev_draw_ = core::draw_frame{};
++                }
++            }
+             frame.frame_count = frame_count_++;
+ 
+             graph_->set_value("decode-time", decode_timer.elapsed() * format_desc_.fps * 0.5);
+diff --git a/src/modules/ffmpeg/util/av_util.cpp b/src/modules/ffmpeg/util/av_util.cpp
+index 5028de542..45c4fce86 100644
+--- a/src/modules/ffmpeg/util/av_util.cpp
++++ b/src/modules/ffmpeg/util/av_util.cpp
+@@ -94,11 +94,20 @@ core::mutable_frame make_frame(void*                            tag,
+                 for (int n = 0; n < static_cast<int>(pix_desc.planes.size()); ++n) {
+                     auto frame_plan_index = data_map.empty() ? n : data_map.at(n);
+ 
+-                    tbb::parallel_for(0, pix_desc.planes[n].height, [&](int y) {
+-                        std::memcpy(frame.image_data(n).begin() + y * pix_desc.planes[n].linesize,
+-                                    video->data[frame_plan_index] + y * video->linesize[frame_plan_index],
+-                                    pix_desc.planes[n].linesize);
+-                    });
++                    // HighAsCG: plain copies, no per-row tbb::parallel_for. One task per row woke the whole TBB
++                    // pool for every frame (15 spinning workers ≈ 72 % of a core for 4K at 50 fps vs 16 % serial,
++                    // ProRes study 07.11); a 4K frame copies in ~3 ms on one core, well inside the producer buffer.
++                    const auto  dst_ls = pix_desc.planes[n].linesize;
++                    const auto  src_ls = video->linesize[frame_plan_index];
++                    const auto  rows   = pix_desc.planes[n].height;
++                    auto        dst    = frame.image_data(n).begin();
++                    const auto* src    = video->data[frame_plan_index];
++                    if (src_ls == dst_ls) {
++                        std::memcpy(dst, src, static_cast<size_t>(dst_ls) * rows);
++                    } else {
++                        for (int y = 0; y < rows; ++y)
++                            std::memcpy(dst + static_cast<size_t>(y) * dst_ls, src + static_cast<size_t>(y) * src_ls, dst_ls);
++                    }
+                 }
+             }
+         },
+-- 
+2.53.0
+

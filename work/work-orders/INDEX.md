@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-900 live WOs (28 open, 122 in progress, 750 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+901 live WOs (28 open, 122 in progress, 751 done) and 48 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -206,7 +206,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 867 DONE [amcp+os-iso] Caspar build: CasparCG/server#1762 effects (BLUR / SHARPEN / GRAIN) brought up… → 867_WO_caspar_pr1762_effects_fixes.md
 - 943 DONE [amcp+mapping] "APPLY 1-65535 SLICES CLEAR … 403 APPLY FAILED" logged as an error on every Cas… → 943_WO_caps_probe_apply_noise_without_gpu_mapping.md
 
-## caspar-build — CasparCG server build and binaries (14)
+## caspar-build — CasparCG server build and binaries (15)
 
 - 233 DONE [caspar-build] Caspar rebuild research: CasparCG_Enhanced base + improved-artnet + live-events… → 233_WO_CASPAR_REBUILD_RESEARCH.md
 - 234 DONE [caspar-build] Assemble + build the final (for now) CasparCG for highascg → 234_WO_CASPAR_FINAL_BUILD.md
@@ -222,6 +222,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 888 DONE [caspar-build+os-iso] PGM micro stutter on alt-tab: Caspar's window never takes focus; frame sync sti… → 888_WO_caspar_window_no_focus_sync_follows_pgm.md
 - 982 DONE [caspar-build+engine] Optimization sweep: what is HighAsCG's load on CasparCG (251 % CPU on 07.11) → 982_WO_caspar_cpu_attribution_07_11.md
 - 990 DONE [caspar-build+amcp] Caspar's AMCP acceptor dies when a client resets the connection immediately (a… → 990_WO_caspar_amcp_acceptor_dies_on_reset.md
+- 991 DONE [caspar-build+engine] ProRes (and every FFmpeg clip) playback CPU in Caspar: the per-row TBB copy and… → 991_WO_caspar_prores_playback_cpu.md
 
 ## audio — Audio routing, devices, meters (48)
 
