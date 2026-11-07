@@ -5,13 +5,13 @@
 
 'use strict'
 
-const { gpuNvidiaGet, handleGpuNvidiaApply } = require('./system-hardware-nvidia')
+const { gpuNvidiaGet } = require('./system-hardware-nvidia')
 const { handleGpuLayoutGet } = require('./system-hardware-gpu-layout')
 const { decklinkGet } = require('./system-hardware-decklink')
 const { handleDecklinkInstallPost, handleDecklinkUploadPost } = require('./system-hardware-decklink-install')
 const { handleGuiLaunchPost } = require('./system-hardware-gui')
 const { handleGpuPortsReset } = require('./system-hardware-gpu-ports')
-const { handleXrandrLayoutGet, handleXrandrLayoutApplyPost } = require('./system-hardware-xrandr-layout')
+const { handleXrandrLayoutGet } = require('./system-hardware-xrandr-layout')
 const { handleIdentifyDisplaysPost } = require('./system-hardware-identify-displays')
 const { operatorDisplayGet } = require('./system-hardware-operator-display')
 const { handleHardwareSummaryGet } = require('./system-hardware-summary')
@@ -49,15 +49,9 @@ async function hardwareHandleGet(p, ctx, query) {
  * @param {*} ctx
  */
 async function hardwareHandlePost(p, body, ctx, req) {
-	if (p === '/api/system/gpu-nvidia/apply') return handleGpuNvidiaApply(body, ctx)
 	if (p === '/api/system/gui-launch') return handleGuiLaunchPost(body, ctx, req) // WO-811: req for the os-password local check
-	if (p === '/api/system/pointer-confine') {
-		const { handlePointerConfinePost } = require('./system-hardware-gui')
-		return handlePointerConfinePost(body, ctx)
-	}
 	if (p === '/api/system/gpu-ports-reset') return handleGpuPortsReset(body, ctx)
 	if (p === '/api/system/time') return handleSystemTimePost(body, ctx)
-	if (p === '/api/system/xrandr-layout/apply') return handleXrandrLayoutApplyPost(ctx)
 	if (p === '/api/system/identify-displays') return handleIdentifyDisplaysPost(body, ctx)
 	if (p === '/api/system/network/apply') return handleNetworkApplyPost(body, ctx)
 	if (p === '/api/system/network/reset') return handleNetworkResetPost(body, ctx)

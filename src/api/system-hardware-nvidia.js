@@ -10,7 +10,7 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 const { promisify } = require('util')
 
-const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { JSON_HEADERS, jsonBody } = require('./response')
 
 const execFileAsync = promisify(require('child_process').execFile)
 
@@ -159,23 +159,6 @@ async function gpuNvidiaGet() {
 	}
 }
 
-/**
- * @param {string} body
- */
-async function handleGpuNvidiaApply(body) {
-	parseBody(body)
-	return {
-		status: 410,
-		headers: JSON_HEADERS,
-		body: jsonBody({
-			error:
-				'NVIDIA driver branch switching was removed. Build or flash the correct single-driver ISO (HIGHASCG_NVIDIA_DRIVER=535|580|595). See GET /api/system/gpu-nvidia for recommendations.',
-			driverSwitchSupported: false,
-		}),
-	}
-}
-
 module.exports = {
 	gpuNvidiaGet,
-	handleGpuNvidiaApply,
 }

@@ -5,9 +5,6 @@
 | Method | Path | Caspar | Description |
 |--------|------|--------|-------------|
 | GET | `/api/streams` | optional | Pipeline status, ports |
-| GET | `/api/streaming/ndi-sources` | optional | NDI source names for streaming UI |
-| POST | `/api/streaming/toggle` | optional | Start/stop consumers |
-| POST | `/api/streaming/restart` | optional | Restart streaming |
 
 ```bash
 curl -s http://127.0.0.1:4200/api/streams | jq .

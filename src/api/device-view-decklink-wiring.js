@@ -207,11 +207,6 @@ async function syncDeviceViewToCaspar(ctx, opts = {}) {
 				'[device-view] output wiring changed casparServer — config saved, Caspar restart deferred to the operator (Apply & restart)',
 			)
 		}
-		try {
-			if (typeof ctx._wsBroadcast === 'function') ctx._wsBroadcast('caspar-apply-pending', { pending: true })
-		} catch {
-			/* optional */
-		}
 		return { casparServerChanged: true, restarted: false, restartDeferred: true }
 	}
 

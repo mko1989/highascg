@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-548 routes.
+537 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -166,8 +166,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/host-live/browser/interact` | registry | `src/api/router.js` |
 | POST | `/api/host-live/decklink` | registry | `src/api/router.js` |
 | POST | `/api/host-live/layer` | registry | `src/api/router.js` |
-| GET | `/api/host-live/migration` | registry | `src/api/router.js`, `src/api/routes-host-live.js` |
-| POST | `/api/host-live/migration` | registry | `src/api/router.js` |
 | POST | `/api/host-live/ndi` | registry | `src/api/router.js` |
 | GET | `/api/host-live/operator-fullscreen` | registry | `src/api/router.js` |
 | POST | `/api/host-live/operator-fullscreen` | registry | `src/api/router.js` |
@@ -410,9 +408,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/streaming-channel/*` | registry | `src/api/router.js` |
 | GET | `/api/streaming-channel/record` | handler | `src/api/routes-streaming-channel.js` |
 | GET | `/api/streaming-channel/rtmp` | handler | `src/api/routes-streaming-channel.js` |
-| GET | `/api/streaming/ndi-sources` | registry | `src/api/router.js`, `src/api/routes-streaming.js` |
-| POST | `/api/streaming/restart` | registry | `src/api/router.js`, `src/api/routes-streaming.js` |
-| POST | `/api/streaming/toggle` | registry | `src/api/router.js`, `src/api/routes-streaming.js` |
 | GET | `/api/streams` | registry | `src/api/router.js`, `src/api/routes-streaming.js` |
 | GET | `/api/support/bundle` | registry | `src/api/router.js` |
 | POST | `/api/support/bundle` | registry | `src/api/router.js` |
@@ -429,8 +424,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/system/gpu-layout` | registry | `src/api/router.js` |
 | * | `/api/system/gpu-nvidia` | handler | `src/api/routes-system-hardware.js` |
 | GET | `/api/system/gpu-nvidia` | registry | `src/api/router.js` |
-| * | `/api/system/gpu-nvidia/apply` | handler | `src/api/routes-system-hardware.js` |
-| POST | `/api/system/gpu-nvidia/apply` | registry | `src/api/router.js` |
 | * | `/api/system/gpu-ports-reset` | handler | `src/api/routes-system-hardware.js` |
 | POST | `/api/system/gpu-ports-reset` | registry | `src/api/router.js` |
 | * | `/api/system/gui-launch` | handler | `src/api/routes-system-hardware.js` |
@@ -464,8 +457,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/system/operator-helper-icon` | registry | `src/api/router.js` |
 | GET | `/api/system/operator-screen` | registry | `src/api/routes-operator-screen.js` |
 | POST | `/api/system/operator-screen` | registry | `src/api/routes-operator-screen.js` |
-| * | `/api/system/pointer-confine` | handler | `src/api/routes-system-hardware.js` |
-| POST | `/api/system/pointer-confine` | registry | `src/api/router.js` |
 | GET | `/api/system/setup` | registry | `src/api/router.js` |
 | POST | `/api/system/setup/caspar/restart` | registry | `src/api/router.js`, `src/api/routes-system-setup.js` |
 | POST | `/api/system/setup/caspar/start` | registry | `src/api/router.js`, `src/api/routes-system-setup.js` |
@@ -491,8 +482,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/system/version` | registry | `src/api/router.js`, `src/api/routes-system-update.js` |
 | * | `/api/system/xrandr-layout` | handler | `src/api/routes-system-hardware.js` |
 | GET | `/api/system/xrandr-layout` | registry | `src/api/router.js` |
-| * | `/api/system/xrandr-layout/apply` | handler | `src/api/routes-system-hardware.js` |
-| POST | `/api/system/xrandr-layout/apply` | registry | `src/api/router.js` |
 | * | `/api/templates` | handler | `src/cg-studio/routes.js` |
 | GET | `/api/templates` | registry | `src/api/router.js` |
 | * | `/api/thumbnail` | handler | `src/api/routes-media.js` |
@@ -588,7 +577,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-fixture-types.js` | WO-615 T2 — GDTF fixture types (src/fixtures/gdtf-store.js): GET    /api/fixtures/types                       → { types: [summary] }  (name, maker, modes: name  |
 | `src/api/routes-gdtf-library.js` | WO-825 — the GDTF Share library (src/fixtures/gdtf-library.js), registered by routes-gdtf-share.js: GET    /api/fixtures/library/status       → { library: { rea |
 | `src/api/routes-gdtf-share.js` | WO-637 — GDTF Share (src/fixtures/gdtf-share.js): GET  /api/fixtures/share/account               → { user, set }  (the password is never returned) POST /api/fix |
-| `src/api/routes-host-live.js` |  |
 | `src/api/routes-lighting.js` | WO-837 — lighting consoles (Devices tab) for the timeline `light` flags. |
 | `src/api/routes-lower-thirds.js` | routes-lower-thirds.js — CRUD + playback API for lower-third templates. |
 | `src/api/routes-media.js` | GET thumbnails, local-media probe/waveform, POST media refresh. |

@@ -157,7 +157,6 @@ routes.post('/api/system/time', ({ path, body, ctx }) => routesSystemHardware.ha
 routes.post('/api/system/decklink/install', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 // WO-427: multipart — needs the raw req stream (http-server skips body consumption on multipart)
 routes.post('/api/system/decklink/upload', ({ req }) => routesSystemHardware.handleDecklinkUploadPost(req), { requireCaspar: false })
-routes.post('/api/system/gpu-nvidia/apply', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/gui-launch', ({ path, body, ctx, req }) => routesSystemHardware.hardwareHandlePost(path, body, ctx, req), { requireCaspar: false })
 routes.get('/api/system/dock', () => routesOperatorDock.handleGet(), { requireCaspar: false }) // WO-628
 routes.post('/api/system/dock/launch', ({ body, ctx }) => routesOperatorDock.handleLaunch(body, ctx), { requireCaspar: false })
@@ -165,9 +164,7 @@ routes.get('/api/system/operator-first', ({ ctx }) => routesOperatorFirst.handle
 routes.post('/api/system/operator-first', ({ body, ctx }) => routesOperatorFirst.handlePost(body, ctx), { requireCaspar: false })
 routes.get('/api/led-test-card/settings', ({ ctx }) => routesLedTestControl.handleGet(ctx), { requireCaspar: false }) // WO-629
 routes.post('/api/led-test-card/:op', ({ params, body, ctx }) => routesLedTestControl.handlePost(params.op, body, ctx), { requireCaspar: false })
-routes.post('/api/system/pointer-confine', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/gpu-ports-reset', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
-routes.post('/api/system/xrandr-layout/apply', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/network/apply', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/network/reset', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/network/refresh-splash-ip', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
@@ -273,7 +270,6 @@ routes.post('/api/device-view/gpu-map-debug', ({ body, ctx }) => routesDeviceVie
 routes.post('/api/device-view/snapshot', ({ body, ctx }) => routesDeviceView.handlePost(body, ctx), { requireCaspar: false })
 
 routes.get('/api/host-live/operator-fullscreen', ({ path, ctx }) => routesHostLive.handleGet(path, ctx), { requireCaspar: false })
-routes.get('/api/host-live/migration', ({ path, ctx }) => routesHostLive.handleGet(path, ctx), { requireCaspar: false })
 routes.post('/api/host-live/operator-fullscreen', ({ body, ctx }) => routesHostLive.handlePost(body, ctx), { requireCaspar: true })
 routes.post('/api/host-live/webpage', ({ body, ctx }) => routesHostLive.handleWebpagePost(body, ctx), { requireCaspar: true })
 routes.post('/api/host-live/ndi', ({ body, ctx }) => routesHostLive.handleNdiPost(body, ctx), { requireCaspar: true })
@@ -284,7 +280,6 @@ routes.post('/api/host-live/browser', ({ body, ctx }) => routesHostLive.handleBr
 routes.post('/api/host-live/browser/interact', ({ body, ctx }) => routesHostLive.handleBrowserInteractPost(body, ctx), {
 	requireCaspar: false,
 })
-routes.post('/api/host-live/migration', ({ body, ctx }) => routesHostLive.handlePost(body, ctx), { requireCaspar: false })
 
 // WO-243 T243.2: Operator GUI channel — routed preview-hole layout apply/clear.
 routes.post('/api/operator-gui/layout', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
@@ -302,9 +297,6 @@ routes.get('/api/hardware/modeline-preview', ({ path, query }) => routesSettings
 
 // Streams
 routes.get('/api/streams', ({ path, ctx }) => routesStreaming.handleGet(path, ctx), { requireCaspar: false })
-routes.get('/api/streaming/ndi-sources', ({ path, ctx }) => routesStreaming.handleGet(path, ctx), { requireCaspar: false })
-routes.post('/api/streaming/toggle', ({ path, body, ctx }) => routesStreaming.handlePost(path, body, ctx).catch(e => ({ status: 502, headers: JSON_HEADERS, body: jsonBody({ error: String(e) }) })), { requireCaspar: false })
-routes.post('/api/streaming/restart', ({ path, body, ctx }) => routesStreaming.handlePost(path, body, ctx).catch(e => ({ status: 502, headers: JSON_HEADERS, body: jsonBody({ error: String(e) }) })), { requireCaspar: false })
 
 // Config reset (WO-831: POST /api/config/apply removed — ctx.applyServerConfigAndRestart was never defined, every call was a 501)
 routes.post('/api/config/reset', ({ path, body, ctx }) => routesConfig.handlePost(path, body, ctx), { requireCaspar: false })

@@ -33,28 +33,6 @@ function runNdiListProbe() {
 }
 
 /**
- * List NDI sources using FFmpeg (requires libndi-enabled ffmpeg).
- * @returns {{ ok: boolean, sources: string[], raw?: string, error?: string }}
- */
-function listNdiSources() {
-	try {
-		const probe = runNdiListProbe()
-		if (!probe) {
-			return { ok: false, sources: [], error: 'NDI list probe failed' }
-		}
-		const out = probe.out
-		const sources = parseNdiListOutput(out)
-		return {
-			ok: sources.length > 0 || /ndi/i.test(out),
-			sources,
-			raw: out.slice(0, 8000),
-		}
-	} catch (e) {
-		return { ok: false, sources: [], error: e.message || String(e) }
-	}
-}
-
-/**
  * @param {string} text
  * @returns {string[]}
  */
@@ -150,7 +128,6 @@ function resolveNdiSourceName(config, channelNum) {
 }
 
 module.exports = {
-	listNdiSources,
 	parseNdiListOutput,
 	matchCasparChannelFromSources,
 	resolveNdiSourceName,

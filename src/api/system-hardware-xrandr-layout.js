@@ -1,7 +1,7 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody } = require('./response')
-const { checkXrandrLayout, applyX11Layout, calculateLayoutPositions } = require('../utils/os-config')
+const { checkXrandrLayout, calculateLayoutPositions } = require('../utils/os-config')
 const { plannedHeadsFromLayout, needsNodmRestartForLayout } = require('../utils/xrandr-layout-verify')
 
 /**
@@ -23,22 +23,4 @@ function handleXrandrLayoutGet(ctx) {
 	}
 }
 
-/**
- * @param {*} ctx
- */
-async function handleXrandrLayoutApplyPost(ctx) {
-	const res = await applyX11Layout(ctx.config)
-	return {
-		status: 200,
-		headers: JSON_HEADERS,
-		body: jsonBody({
-			ok: !!res.applied,
-			layoutApplied: !!res.applied,
-			layoutPersisted: !!res.persisted,
-			xrandrCommand: res.xrandrCommand || null,
-			verify: res.verify || null,
-		}),
-	}
-}
-
-module.exports = { handleXrandrLayoutGet, handleXrandrLayoutApplyPost }
+module.exports = { handleXrandrLayoutGet }

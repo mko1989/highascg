@@ -170,43 +170,6 @@ function spawnOperatorFirefox(url, opts = {}) {
 	return spawnGuiDetached('firefox', { ...opts, url })
 }
 
-/**
- * @param {string} body
- * @param {*} ctx
- */
-async function handlePointerConfinePost(body, ctx) {
-	const pw = checkNuclearPassword(body, ctx)
-	if (!pw.ok) return { status: pw.status || 403, headers: JSON_HEADERS, body: jsonBody({ error: pw.error }) }
-
-	const b = parseBody(body)
-	const enabled = b?.enabled === true || b?.enabled === 'true'
-	const {
-		startPointerConfine,
-		stopPointerConfine,
-		isPointerConfineActive,
-	} = require('../system/pointer-confine')
-	const log = (level, msg) => {
-		if (typeof ctx.log === 'function') ctx.log(level, msg)
-	}
-	if (enabled) {
-		const r = await startPointerConfine(ctx.config || {}, { log })
-		if (!r.ok) {
-			return {
-				status: 400,
-				headers: JSON_HEADERS,
-				body: jsonBody({ error: 'No operator display (multiview or screen consumer) to confine pointer to.' }),
-			}
-		}
-		return {
-			status: 200,
-			headers: JSON_HEADERS,
-			body: jsonBody({ ok: true, enabled: true, rect: r.rect }),
-		}
-	}
-	stopPointerConfine()
-	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, enabled: false, active: isPointerConfineActive() }) }
-}
-
 /* todos27.07.26: taskbar chips show the real app icons; WO-387 extends that to every installed
  * app by resolving the .desktop `Icon=` through the standard icon directories. The five pinned
  * tools keep their exact hard-coded paths. Path safety and the candidate order live in
@@ -315,6 +278,5 @@ module.exports = {
 	spawnOperatorFirefox,
 	handleGuiLaunchPost,
 	handleOperatorHelperIconGet,
-	handlePointerConfinePost,
 	OS_PASSWORD_SCRIPT,
 }

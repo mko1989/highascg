@@ -48,7 +48,6 @@ curl -s http://127.0.0.1:4200/api/settings | jq .caspar.host
 | POST | `/api/virtual-camera/config` | Persist virtual cam settings |
 | POST | `/api/virtual-camera/start` | Start v4l2loopback bridge (+ optional ALSA mic) |
 | POST | `/api/virtual-camera/stop` | Stop bridge |
-| POST | `/api/system/gpu-nvidia/apply` | Apply NVIDIA layout |
 | POST | `/api/system/gpu-ports-reset` | Reset port mapping |
 | POST | `/api/system/gui-launch` | Launch GUI helper |
 
@@ -159,8 +158,6 @@ Same bundle as the **Support bundle** button in the connection-eye logs modal, o
 |--------|------|-------------|
 | GET | `/api/host-live/operator-fullscreen` | Operator fullscreen video route state |
 | POST | `/api/host-live/operator-fullscreen` | Toggle fullscreen route (`{ sourceId, action }`) |
-| GET | `/api/host-live/migration` | Preview legacy NDI/browser migration |
-| POST | `/api/host-live/migration` | Apply migration (`{ migrateHostLiveSources: true }`) |
 
 WO-257 removed the CEF interactive bridge (`/api/cef-interactive/*`, `/api/cef/arm-input`,
 `/api/cef/release-input`) and its keyboard/mouse/eval forwarding into embedded CEF HTML. Operator
