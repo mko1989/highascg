@@ -1,11 +1,8 @@
 'use strict'
 
-const fs = require('fs')
-const path = require('path')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
-const { REPO_ROOT } = require('../repo-paths')
-const { resolveOperatorDisplayRect, resolveHelperWindowRect } = require('./x-display-session-layout')
+const { resolveOperatorDisplayRect } = require('./x-display-session-layout')
 const { displaySessionEnv, commandExists } = require('./x-display-session-runtime-env')
 
 const execFileAsync = promisify(execFile)
@@ -141,110 +138,6 @@ async function isUsableWindowSize(wid, env) {
 }
 
 /**
- * WO-283. Put a helper window OVER the operator kiosk and give it focus.
- *
- * Why this is not just `windowraise`: the kiosk client permanently carries `_NET_WM_STATE_ABOVE`
- * (set by tools/runtime/operator-shape-overlay.py's `lock_window_above`; verified live with
- * `xprop -id <kiosk> _NET_WM_STATE`), and Openbox clamps every restack request to the window's own
- * layer. A NORMAL-layer helper therefore CANNOT be raised over it — the raise silently does
- * nothing. So we promote the helper into the same ABOVE layer first, then raise, then focus.
- * `windowactivate` last is load-bearing too: the kiosk's FULLSCREEN state lifts it into Openbox's
- * fullscreen layer only while it is FOCUSED, so handing focus to the helper drops the kiosk back
- * to ABOVE where the helper can actually sit on top.
- *
- * Separate from {@link raiseOperatorGuiWindows} on purpose: that one is the pre-existing
- * gui-launch path and keeps its exact behaviour, so nothing is promoted unless the operator asked.
- *
- * @param {string} action
- * @param {object} config
- * @param {{ log?: Function, excludeTitle?: string }} [opts]
- * @returns {Promise<boolean>}
- */
-async function promoteGuiWindowsAboveKiosk(action, config, opts = {}) {
-	const log = typeof opts.log === 'function' ? opts.log : () => {}
-	const ids = await findGuiWindowIds(action, { excludeTitle: opts.excludeTitle })
-	if (!ids.length) return false
-	const env = displaySessionEnv()
-	// PLACEMENT IS THE THING THAT KEEPS PGM CLEAR — not the stacking. Since PGM screen consumers also
-	// default to always-on-top, helper and PGM share the ABOVE layer and raise order alone can no
-	// longer protect program output. `resolveHelperWindowRect` pins the helper INSIDE the operator
-	// monitor (the shared `resolveOperatorMonitorRect` SSOT) and refuses to place at all when that
-	// monitor is unknown. It deliberately replaces `resolveOperatorDisplayRect` here: that helper's
-	// documented fallback is the FIRST PGM SCREEN CONSUMER HEAD, i.e. it moved helpers onto air.
-	const placement = resolveHelperWindowRect(config)
-	const rect = placement.rect
-	// ABOVE-promotion goes through the python/EWMH helper, NOT `xdotool windowstate`: that
-	// subcommand only exists in xdotool >= 3.20211022 and this box ships 3.20160805.1, where it
-	// errors with "Unknown command: windowstate". The old `.catch(() => {})` hid that, so the one
-	// step that makes WO-283 work was a silent no-op and the helper stayed stuck under the kiosk.
-	const promoter = resolveWindowAbovePromoter()
-	let promoted = 0
-	for (const wid of ids) {
-		let ok = false
-		if (promoter) {
-			try {
-				await execFileAsync('python3', [promoter, wid], { env, timeout: 5000 })
-				ok = true
-			} catch (e) {
-				log('warn', `[X-Display] ABOVE promote helper failed for ${wid}: ${e?.message || e}`)
-			}
-		}
-		if (!ok) {
-			// Only useful on a newer xdotool; harmless (and still logged) where the verb is missing.
-			await execFileAsync('xdotool', ['windowstate', '--add', 'ABOVE', wid], { env, timeout: 3000 }).catch((e) =>
-				log('warn', `[X-Display] xdotool windowstate fallback failed for ${wid}: ${e?.message || e}`),
-			)
-		}
-		if (ok) promoted += 1
-		await execFileAsync('xdotool', ['windowraise', wid], { env, timeout: 3000 }).catch(() => {})
-		if (rect) {
-			// Move AND size. Moving alone left a window wider than the operator head hanging over the
-			// neighbouring output — on this box that neighbour is the program head.
-			await execFileAsync('xdotool', ['windowmove', wid, String(rect.x), String(rect.y)], { env, timeout: 3000 }).catch(
-				() => {},
-			)
-			await execFileAsync('xdotool', ['windowsize', wid, String(rect.width), String(rect.height)], {
-				env,
-				timeout: 3000,
-			}).catch(() => {})
-		}
-		await execFileAsync('xdotool', ['windowactivate', wid], { env, timeout: 3000 }).catch(() => {})
-	}
-	if (rect) {
-		log('info', `[X-Display] Helper ${action} confined to the operator monitor @ ${rect.x},${rect.y} ${rect.width}x${rect.height}`)
-	} else {
-		// Loud, because this is the state in which a helper CAN end up over program output: we do not
-		// know where the operator monitor is, so we leave the window wherever the app opened it rather
-		// than guess (guessing is what put a browser on PGM in the first place).
-		log(
-			'warn',
-			`[X-Display] Helper ${action} NOT repositioned (${placement.reason}) — cannot guarantee it stays off the ${placement.programRects.length} program consumer head(s); set Device View → GPU port → Operator monitor`,
-		)
-	}
-	log(
-		promoted === ids.length ? 'info' : 'warn',
-		`[X-Display] Promoted ${action} ABOVE the kiosk (${promoted}/${ids.length} window(s) got the ABOVE layer)`,
-	)
-	return true
-}
-
-/** @returns {string|null} tools/runtime/highascg-window-above.py, or its installed copy */
-function resolveWindowAbovePromoter() {
-	for (const p of [
-		path.join(REPO_ROOT, 'tools/runtime/highascg-window-above.py'),
-		'/usr/local/lib/highascg/highascg-window-above.py',
-		'/usr/local/bin/highascg-window-above.py',
-	]) {
-		try {
-			if (fs.existsSync(p) && fs.statSync(p).isFile()) return p
-		} catch {
-			/* ignore */
-		}
-	}
-	return null
-}
-
-/**
  * @param {string} action
  * @param {object} config
  * @param {{ log?: Function }} [opts]
@@ -356,8 +249,6 @@ module.exports = {
 	windowClassesFor,
 	findGuiWindowIds,
 	raiseOperatorGuiWindows,
-	resolveWindowAbovePromoter,
-	promoteGuiWindowsAboveKiosk,
 	positionGuiWindowForAction,
 	scheduleGuiWindowPosition,
 }

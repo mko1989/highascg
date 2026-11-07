@@ -229,21 +229,6 @@ function handleOperatorHelperIconGet(query) {
 }
 
 /**
- * WO-387 — GET /api/system/apps. The installed-application catalog behind the operator's "Open
- * window" menu: every launchable .desktop entry on the box, name + action only. Read-only and
- * unauthenticated like the other operator GET routes (the launch POST keeps the nuclear-password
- * gate); it discloses nothing an `ls /usr/share/applications` would not.
- */
-function handleSystemAppsGet() {
-	try {
-		const { listAppsForMenu } = require('../utils/desktop-app-catalog')
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, apps: listAppsForMenu() }) }
-	} catch (e) {
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: false, apps: [], error: e?.message || String(e) }) }
-	}
-}
-
-/**
  * @param {string} body
  * @param {*} ctx
  */
@@ -330,7 +315,6 @@ module.exports = {
 	spawnOperatorFirefox,
 	handleGuiLaunchPost,
 	handleOperatorHelperIconGet,
-	handleSystemAppsGet,
 	handlePointerConfinePost,
 	OS_PASSWORD_SCRIPT,
 }

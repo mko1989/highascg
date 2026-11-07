@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-550 routes.
+548 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -416,8 +416,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/streams` | registry | `src/api/router.js`, `src/api/routes-streaming.js` |
 | GET | `/api/support/bundle` | registry | `src/api/router.js` |
 | POST | `/api/support/bundle` | registry | `src/api/router.js` |
-| * | `/api/system/apps` | handler | `src/api/routes-system-hardware.js` |
-| GET | `/api/system/apps` | registry | `src/api/router.js` |
 | * | `/api/system/decklink` | handler | `src/api/routes-system-hardware.js` |
 | GET | `/api/system/decklink` | registry | `src/api/router.js` |
 | * | `/api/system/decklink/install` | handler | `src/api/routes-system-hardware.js` |

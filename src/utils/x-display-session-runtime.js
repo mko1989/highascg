@@ -25,8 +25,6 @@ const {
 	parkPointerOnOperatorDisplay,
 	findGuiWindowIds,
 	raiseOperatorGuiWindows,
-	resolveWindowAbovePromoter,
-	promoteGuiWindowsAboveKiosk,
 	positionGuiWindowForAction,
 	scheduleGuiWindowPosition,
 } = require('./x-display-session-gui-windows')
@@ -202,8 +200,6 @@ module.exports = {
 	raiseOperatorGuiWindows,
 	findGuiWindowIds,
 	lookupCommandPath,
-	resolveWindowAbovePromoter,
-	promoteGuiWindowsAboveKiosk,
 	positionGuiWindowForAction,
 	scheduleGuiWindowPosition,
 	displaySessionEnv,

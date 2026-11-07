@@ -147,7 +147,6 @@ routes.get('/api/system/operator-display', ({ path, ctx }) => routesSystemHardwa
 routes.get('/api/system/hardware', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 // WO-317: the taskbar handlers shipped in routes-system-hardware without this registration — every call 404'd.
 routes.get('/api/system/operator-helper-icon', ({ path, ctx, query }) => routesSystemHardware.hardwareHandleGet(path, ctx, query), { requireCaspar: false })
-routes.get('/api/system/apps', ({ path, ctx, query }) => routesSystemHardware.hardwareHandleGet(path, ctx, query), { requireCaspar: false })
 routes.post('/api/shader-stack', ({ body, ctx }) => require('./routes-shader-stack').handlePost(body, ctx))
 routes.get('/api/system/time', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/system/v4l2-devices', ({ path, query, ctx }) => routesV4l2Input.handleGet(path, query, ctx), { requireCaspar: false })

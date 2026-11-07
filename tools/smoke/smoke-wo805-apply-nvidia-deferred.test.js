@@ -176,7 +176,6 @@ async function runDisplaySession(opts) {
 				isOperatorPointerConfineDesired: () => true,
 				resolveOperatorMonitorRect: () => ({ sysId: 'DP-2', kind: 'gpu', index: 2, x: 1000, y: 0, width: 1920, height: 1080 }),
 				resolveOperatorDisplayRect: () => null,
-				resolveHelperWindowRect: () => null,
 			},
 		],
 		// WO-888: the NVIDIA sync head is the same display caspar's GL swaps gate on (caspar-gl-sync-env.js).
