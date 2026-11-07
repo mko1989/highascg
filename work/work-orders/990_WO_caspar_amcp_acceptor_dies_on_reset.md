@@ -19,7 +19,7 @@ Effects:
   (`201 VERSION OK 2.5.1 deac375bb`). Then a node restart; PRV came back and the GUI reconnected.
 - **highascg5867 (192.168.0.10) was scanned too.** A raw `VERSION` to 192.168.0.10:5250 at ~10:05 connected and got
   no reply: the same state. Its node still drives its Caspar over the old connection; its **next node restart will
-  lose Caspar** until that Caspar restarts. Not touched (owner's call, see below).
+  lose Caspar** until that Caspar restarts. Restarted 07.11 ~12:04 with the owner's go (`sudo systemctl restart casparcg-server` over SSH); its listen queue went back to 0 and `VERSION` answered after 12 s.
 
 **Root cause** (`~/caspar-build/src-v2`, upstream 2.5.1 code, HEAD deac375bb):
 
@@ -68,5 +68,4 @@ then a fresh `VERSION` must still get `201`.
 
 - Never port-scan the shop LAN's :5250 (memory rule added). Find HighAsCG servers on :4200 only (node handles
   resets fine), or use `/api/replication/ping`.
-- highascg5867: restart its Caspar once (its own GUI, or `POST http://192.168.0.10:4200/api/restart`, AMCP RESTART
-  over the connection that still works). Owner's go needed: that box shows a `visuals` shm feed on its PGM.
+- highascg5867: Caspar restarted 07.11 ~12:04 (done).

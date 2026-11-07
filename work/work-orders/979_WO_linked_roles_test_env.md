@@ -191,6 +191,20 @@ Both were unlinked, with Auto senders, before the run. This box = media, `--look
 - The scan that found the peer had also wedged both Caspars' AMCP acceptors: **WO-990**. This box was recovered with
   a Caspar restart; the peer still needs one.
 
+**highascg5867 updated, then re-run (07.11, ~12:05).** The owner allowed updating 5867 and restarting anything on both
+(unattended warehouse dev boxes).
+- 5867's config and projects were backed up to `~/backups/pre-update-<stamp>/` first.
+- Its Caspar was restarted (WO-990 dead acceptor), then `POST /api/system/update/apply {confirm:true}` installed
+  release `2026-11-07_110413` (= 06ec34e0, CI run 42366406554 green). It was on the new build 35 s later.
+- Post-update sweep: 25 pass / 2 warn / 0 fail / 3 skip. The warnings: `highascg-network-apply.sh` under
+  /usr/local/lib differs (needs the install script with sudo), and Caspar "DeckLink 8K Pro failed to enable external
+  keyer". Its project was unchanged (`new_project_1`, 0 looks before and after). The GUI was relaunched on the new
+  client and is on Live.
+- Its OS watchdog now warns "DP-2/DP-3 connected expected=connected actual=null". That is not the update:
+  boots on 05.11 saw 2 displays and matched; xrandr now shows only HDMI-0, so DP-2 is unplugged or off.
+- WO-725 live again on the same build: **9 pass / 0 fail / 3 skip**. Signed calls 7579 → 5867 dropped from **p50 43 ms
+  to 2.7 ms** (5867 → 7579 3.2 ms), so the 43 ms belonged to the 03.11 build. Clocks spread 4 ms, link 17 ms.
+
 **Still to prove live:** the tracking half (duties split, exchange, air → rules, refusal, the relay `tracking`).
 That needs one box with a tracking show: `previs.tracking.cameras` with a camera surface and detection on.
 Neither box has a camera set up, and building one into a show is the owner's call. Fail-fast idea for the runner:
