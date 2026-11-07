@@ -378,7 +378,10 @@ async function runExitLayersStopAndClear(amcp, channel, exitLayers, framerate, g
 					}
 				}
 				await amcp.mixerCommit(channel)
-			} catch {}
+			} catch (e) {
+				const layers = exitLayers.map((layer) => `${ch}-${physicalProgramLayer(Number(layer.layerNumber), bank)}`)
+				self?.log?.('warn', `[exit] STOP/CLEAR ${layers.join(', ')} failed: ${e?.message || String(e)}`)
+			}
 			resolve()
 		}, fadeMs + 5)
 	})

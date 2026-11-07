@@ -114,6 +114,15 @@ function get(name) {
 	return mod || null
 }
 
+function observeBoot(m, ctx) {
+	const result = m.onBoot(ctx)
+	if (result && typeof result.then === 'function') {
+		Promise.resolve(result).catch((e) => {
+			if (ctx && typeof ctx.log === 'function') ctx.log('warn', `[modules] onBoot("${m.name}") failed: ${e?.message || String(e)}`)
+		})
+	}
+}
+
 /**
  * Call onBoot for one module if present.
  * @param {string} name
@@ -125,7 +134,7 @@ function bootOne(name, ctx) {
 	if (!m) return false
 	if (typeof m.onBoot !== 'function') return true
 	try {
-		m.onBoot(ctx)
+		observeBoot(m, ctx)
 		return true
 	} catch (e) {
 		const msg = e && e.message ? e.message : String(e)
@@ -163,7 +172,7 @@ function bootAll(ctx) {
 	for (const m of _modules) {
 		if (typeof m.onBoot !== 'function') continue
 		try {
-			m.onBoot(ctx)
+			observeBoot(m, ctx)
 		} catch (e) {
 			const msg = e && e.message ? e.message : String(e)
 			if (ctx && typeof ctx.log === 'function') ctx.log('warn', `[modules] onBoot("${m.name}") failed: ${msg}`)

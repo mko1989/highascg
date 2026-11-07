@@ -55,11 +55,29 @@ function readOperstate(iface) {
 	return null
 }
 
+/** WO-984: 5 s TTL per interface — the network status GET polls this; apply/reset POSTs invalidate it. */
+const nmcliCache = new Map()
+function invalidateNmcliModeCache() {
+	nmcliCache.clear()
+}
+
 /**
  * @param {string} iface
  * @returns {{ mode: 'dhcp' | 'static' | 'unknown', connection: string | null }}
  */
 function readNmcliMode(iface) {
+	const now = Date.now()
+	const cached = nmcliCache.get(iface)
+	if (cached && now - cached.at < 5000) return { ...cached.value }
+	for (const [key, entry] of nmcliCache) {
+		if (now - entry.at >= 5000) nmcliCache.delete(key)
+	}
+	const value = queryNmcliMode(iface)
+	nmcliCache.set(iface, { at: Date.now(), value })
+	return { ...value }
+}
+
+function queryNmcliMode(iface) {
 	try {
 		const out = execFileSync(
 			'nmcli',
@@ -195,6 +213,7 @@ function buildNetworkStatus(networkCfg) {
 }
 
 module.exports = {
+	invalidateNmcliModeCache,
 	listEthernetInterfaces,
 	buildNetworkStatus,
 	readNmcliMode,

@@ -19,6 +19,13 @@ function runRsync(cwd, args, opts = {}) {
 		let stdout = ''
 		let stderr = ''
 		let settled = false
+		let exited = false
+		let killTimer = null
+		const cap = (text) => {
+			let tail = Buffer.from(text).subarray(-256 * 1024).toString('utf8')
+			while (Buffer.byteLength(tail) > 256 * 1024) tail = tail.slice(1)
+			return tail
+		}
 
 		const finish = (out) => {
 			if (settled) return
@@ -28,6 +35,12 @@ function runRsync(cwd, args, opts = {}) {
 		}
 
 		const timer = setTimeout(() => {
+			killTimer = setTimeout(() => {
+				if (!exited) {
+					try { proc?.kill('SIGKILL') } catch { /* already gone */ }
+				}
+			}, 3000)
+			if (killTimer.unref) killTimer.unref()
 			try {
 				proc?.kill('SIGTERM')
 			} catch {
@@ -37,7 +50,7 @@ function runRsync(cwd, args, opts = {}) {
 				ok: false,
 				code: null,
 				stdout,
-				stderr: `${stderr}\nrsync timed out after ${timeoutMs}ms`.trim(),
+				stderr: cap(`${stderr}\nrsync timed out after ${timeoutMs}ms`.trim()),
 				timedOut: true,
 			})
 		}, timeoutMs)
@@ -51,15 +64,23 @@ function runRsync(cwd, args, opts = {}) {
 		}
 
 		proc.stdout?.on('data', (chunk) => {
-			stdout += chunk.toString('utf8')
+			if (!settled) stdout = cap(stdout + chunk.toString('utf8'))
 		})
 		proc.stderr?.on('data', (chunk) => {
-			stderr += chunk.toString('utf8')
+			if (!settled) stderr = cap(stderr + chunk.toString('utf8'))
 		})
 		proc.on('error', (e) => {
 			finish({ ok: false, code: null, stdout, stderr: e?.message || String(e), timedOut: false })
 		})
+		proc.on('exit', () => {
+			// Keep the deadline `timer`: a grandchild (ssh) can hold the pipes open after rsync exits, and then
+			// 'close' never comes — the deadline is what still settles the promise.
+			exited = true
+			if (killTimer) clearTimeout(killTimer)
+		})
 		proc.on('close', (code) => {
+			exited = true
+			if (killTimer) clearTimeout(killTimer)
 			finish({ ok: code === 0, code: code ?? 1, stdout, stderr, timedOut: false })
 		})
 	})

@@ -59,6 +59,9 @@ function allowBrowse(ctx, req) {
 	const max = 40
 	let arr = ctx._usbBrowseHits.get(ip)
 	if (!arr) {
+		for (const [identity, hits] of ctx._usbBrowseHits) {
+			if (!hits.length || hits[hits.length - 1] < now - winMs) ctx._usbBrowseHits.delete(identity)
+		}
 		arr = []
 		ctx._usbBrowseHits.set(ip, arr)
 	}

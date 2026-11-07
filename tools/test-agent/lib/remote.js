@@ -17,28 +17,42 @@ function send(port, cmd, timeoutMs = 30000) {
 	return new Promise((resolve, reject) => {
 		const sock = net.connect(port, '127.0.0.1')
 		let buf = ''
+		let settled = false
+		const finish = (error, answer) => {
+			if (settled) return
+			settled = true
+			clearTimeout(timer)
+			if (error) reject(error)
+			else resolve(answer)
+		}
 		const timer = setTimeout(() => {
+			finish(new Error(`the Godot client did not answer '${cmd.cmd}' within ${timeoutMs / 1000}s (hung? try: ui state, or ui stop && ui start)`))
 			sock.destroy()
-			reject(new Error(`the Godot client did not answer '${cmd.cmd}' within ${timeoutMs / 1000}s (hung? try: ui state, or ui stop && ui start)`))
 		}, timeoutMs)
 		sock.setEncoding('utf8')
 		sock.on('connect', () => sock.write(JSON.stringify(cmd) + '\n'))
 		sock.on('data', (d) => {
+			if (settled) return
 			buf += d
 			const nl = buf.indexOf('\n')
 			if (nl >= 0) {
-				clearTimeout(timer)
-				sock.end()
 				try {
-					resolve(JSON.parse(buf.slice(0, nl)))
+					finish(null, JSON.parse(buf.slice(0, nl)))
 				} catch {
-					reject(new Error(`bad answer from the client: ${buf.slice(0, 200)}`))
+					finish(new Error(`bad answer from the client: ${buf.slice(0, 200)}`))
 				}
+				sock.end()
 			}
 		})
+		const eof = () => {
+			if (settled) return
+			finish(new Error('the Godot client closed before sending a complete answer'))
+			sock.destroy()
+		}
+		sock.on('end', eof)
+		sock.on('close', eof)
 		sock.on('error', (e) => {
-			clearTimeout(timer)
-			reject(new Error(`cannot reach the Godot client on 127.0.0.1:${port} (${e.code || e.message}) — is the driver running? tools/test-agent/ui start`))
+			finish(new Error(`cannot reach the Godot client on 127.0.0.1:${port} (${e.code || e.message}) — is the driver running? tools/test-agent/ui start`))
 		})
 	})
 }

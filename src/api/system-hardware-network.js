@@ -5,7 +5,7 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { normalizeNetworkSettings, isAllowedEthernetIface, isValidIpv4 } = require('../config/network-settings')
-const { buildNetworkStatus } = require('../system/network-inventory')
+const { buildNetworkStatus, invalidateNmcliModeCache } = require('../system/network-inventory')
 const { listNetworkInterfaces } = require('../system/network-interfaces')
 
 const APPLY_SCRIPT = '/usr/local/lib/highascg/highascg-network-apply.sh'
@@ -114,6 +114,8 @@ function handleNetworkApplyPost(body, ctx) {
 				log: stderr,
 			}),
 		}
+	} finally {
+		invalidateNmcliModeCache()
 	}
 
 	if (isPrimary) {
@@ -175,6 +177,8 @@ function handleNetworkResetPost(body, ctx) {
 				log: stderr,
 			}),
 		}
+	} finally {
+		invalidateNmcliModeCache()
 	}
 
 	const status = buildNetworkStatus(prev)

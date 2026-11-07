@@ -1,6 +1,6 @@
 # WO-984 — Code-health sweep of src/ and tools/
 **Area:** engine, testing-ci, network, process
-**Status: DONE (07.11.26, 21 offline subtests and 4 normal-runner files pass; eslint and line/export gates pass)**
+**Status: DONE (07.11.26, Round 2: 90 smoke tests pass; eslint, line and export gates pass)**
 
 ## Investigation
 
@@ -218,3 +218,103 @@ No live QA or restart. These limits do not block the small timer cleanup's isola
 6. Follow WO-446 for exact helper consolidation; review dead bodies separately from unused exports.
 7. Coordinator: register new smoke files in tools/ci/offline-test-files.js, rebuild index with
    tools/wo/build-index.js, then run check-wos and the normal isolated tests outside this sandbox.
+
+## Round 2 (fixes)
+
+07.11.26. The six round-1 diagnostic tests are now regression contracts asserting correct
+behavior. This section supersedes their deferred status and corresponding proposals above.
+No git state operation, live service command, socket, deployment or PGM change was used.
+INDEX and curated lists remain coordinator-owned under the explicit assignment.
+
+### Investigation
+
+Ranked by potential control-path impact; references below are repaired-source locations.
+Before changing production code, changed the six assertions and ran:
+`node --test --test-isolation=none tools/smoke/smoke-984-resource-findings.test.js`.
+Result: **0 pass, 6 fail, 0 skipped**. Captured runner output in `/tmp/wo984-before.txt`
+(ephemeral); durable assertion evidence is recorded here. No stash or replacement checkout.
+
+1. `src/system/network-inventory.js:67`: two fallback eth0 reads ran six synchronous nmcli
+   commands instead of three (assertion actual 6, expected 3). Now two reads within five
+   seconds make three calls; expiry at exactly five seconds makes three more; explicit
+   invalidation makes three more. `src/api/system-hardware-network.js:117,180` invalidates
+   after apply/reset helper attempts, including failure because helpers can partly apply.
+2. `src/engine/scene-exit-layers.js:383`: rejecting STOP/CLEAR for layer 1-10 produced zero
+   warning logs (expected one). Now warning includes 1-10 and AMCP transport failed; promise
+   still resolves, no commit on failure. Success still sends commands and commits without
+   adding warnings.
+3. `src/replication/rsync-exec.js:38`: timeout left zero escalation timers (expected one).
+   Now SIGTERM is followed by SIGKILL after 3000 ms unless exit/close cancels escalation.
+   A 1 MiB ASCII chunk on each stream is retained as only the last 256 KiB each; late data
+   is not even decoded after settlement. Normal exit clears timers before close. Timeout
+   still resolves promptly with timedOut=true; this does not await process-tree reaping.
+4. `src/module-registry.js:117`: async boot rejection produced zero logs (expected one).
+   Now bootOne and bootAll both observe rejected promises and warn with the error. bootOne
+   remains synchronous: true for invoked async hooks, false for sync throws/missing module.
+5. `src/api/routes-usb-ingest.js:62`: 1000 old identities plus a new client retained 1001
+   entries (expected one). Now inserting a new identity prunes entries whose last hit is
+   older than the existing 10-second window. No timer and no rate-window boundary change.
+6. `tools/test-agent/lib/remote.js:47`: end/close cleared zero deadlines (expected one).
+   Now EOF rejects immediately with a closed-before-complete-answer error; subsequent
+   close/deadline callbacks cannot settle again. No real Godot connection was made.
+
+### What was done
+
+- `src/system/network-inventory.js`: five-second per-interface cache, expired-entry cleanup,
+  copied return objects and explicit invalidation export; lookup remains synchronous.
+- `src/api/system-hardware-network.js`: invalidate in both helper finally blocks, before
+  rebuilding response status, including failed/partially applied commands.
+- `src/engine/scene-exit-layers.js`: warn with affected physical channel-layers and error.
+- `src/replication/rsync-exec.js`: unref'd escalation deadline, exit/close cleanup, bounded
+  UTF-8 output tails and no post-settlement appends; original success/result shape retained.
+- `src/module-registry.js`: shared promise observer; synchronous hook semantics retained.
+- `src/api/routes-usb-ingest.js`: prune expired identities when inserting a new identity.
+- `tools/test-agent/lib/remote.js`: shared settle-once handling and immediate EOF failure.
+- `tools/smoke/smoke-984-resource-findings.test.js`: replace all six defect-pinning tests;
+  add output/cleanup and apply/reset invalidation coverage (eight total regression tests).
+- This work order: preserve round-1 history and append before/after evidence and limits.
+
+### What was VERIFIED
+
+Final commands (all exit 0):
+
+```
+node --test tools/smoke/smoke-984-resource-findings.test.js tools/smoke/smoke-wo708-auto-split.test.js tools/smoke/smoke-project-fps-network.test.js tools/smoke/smoke-wo830a-parsers.test.js tools/smoke/smoke-scene-exit-orphans.test.js tools/smoke/smoke-wo265-cg-studio-tab.test.js tools/smoke/smoke-wo419-review-rows-6-7-10.test.js tools/smoke/smoke-wo830b-injection-validation.test.js tools/smoke/smoke-wo616-tracking-marker-hub.test.js
+npx eslint src/engine/scene-exit-layers.js src/replication/rsync-exec.js src/api/routes-usb-ingest.js tools/test-agent/lib/remote.js src/module-registry.js src/system/network-inventory.js src/api/system-hardware-network.js tools/smoke/smoke-984-resource-findings.test.js
+node tools/ci/check-max-file-lines.js
+node tools/ci/check-unwired-exports.js
+```
+
+Normal runner: **90 pass, 0 fail, 0 skipped**, 18 suites (8 repaired/new regressions plus
+82 existing tests). Existing files discovered with
+`rg -l 'scene-exit-layers|rsync-exec|routes-usb-ingest|lib/remote|module-registry|network-inventory|system-hardware-network' tools/smoke`.
+ESLint: zero diagnostics. Line gate: zero files over 500. Export gate: no new orphans,
+1393 files scanned, 685 current / 691 baseline; baseline left untouched.
+
+Intermediate isolation-disabled existing-smoke run: 81 pass, 1 fail; WO-708 expects the
+normal test runner's temp storage context but resolved ~/.highascg/tracking-auto.json.
+Normal runner subsequently passed all 90 tests twice. This failure was not suppressed or
+fixed by changing its assertion. No listen/connect test hit EPERM in these runs.
+
+Not proven: real nmcli latency, SIGTERM-resistant real rsync/process-tree termination,
+full offline suite, on-air output/audio, or production memory measurements. All injected
+process/socket tests are offline. Unrelated working-tree changes belong to other engineers;
+no edits were made to their reserved lanes, configuration, index or curated CI files.
+
+### Proposals (not built)
+
+- Convert network inventory to asynchronous/coalesced commands; TTL still allows one
+  synchronous miss per interface per five seconds and unknown results may be cached that long.
+- Validate real rsync escalation/reaping outside the live sweep; descendants are not targeted.
+- Bound remote reply size and failed-thumbnail cache retention (round-1 follow-ups).
+- Coordinator: regenerate INDEX after review; no new test file needs curated registration
+  for this round (the existing WO-984 file still needs registration if round 1 was not added).
+
+## Coordinator follow-up (07.11, Claude)
+- Review of `rsync-exec.js`: round 2 cleared the deadline `timer` in the `exit` handler. When rsync exits while a grandchild
+  (its ssh) still holds stdout/stderr, `close` never fires and the promise would hang forever (the old code at least
+  timed out). The `exit` handler now clears only the SIGKILL escalation timer; the deadline stays until `close`/settle.
+  The round-2 test that pinned "exit clears timers before close" now asserts the deadline survives `exit`, plus a new
+  case: exit without close still settles `timedOut` at the deadline.
+- `network-inventory.js`: JSDoc moved back onto `readNmcliMode` (it had ended up above the cache Map).
+- Registered `smoke-984-resource-findings.test.js` in `tools/ci/offline-test-files-3.js`: 9 pass.
