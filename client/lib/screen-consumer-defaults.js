@@ -1,13 +1,12 @@
 /**
  * Default CasparCG screen-consumer flags when settings keys are unset.
- * Windowed + borderless, V-sync OFF when keys are unset (todos06.08.26: GL sync via
- * CASPAR_GL_SYNC_DISPLAY paces the frames; consumer vsync on top adds competing waits).
+ * Windowed + borderless when keys are unset. No vsync flag: the generator always writes vsync off (WO-716) and the
+ * screen_N_vsync key is gone (WO-995).
  */
 import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from './project-fps.js'
 export const SCREEN_CONSUMER_DEFAULTS = {
 	windowed: true,
 	borderless: true,
-	vsync: false,
 }
 
 /** Multiview screen consumer: not always-on-top unless explicitly enabled. */
@@ -22,15 +21,12 @@ export const MULTIVIEW_CONSUMER_DEFAULTS = {
 export function screenConsumerFlagsFromCasparServer(cs, screenN) {
 	const n = Math.max(1, Number(screenN) || 1)
 	const w = cs[`screen_${n}_windowed`]
-	const v = cs[`screen_${n}_vsync`]
 	const b = cs[`screen_${n}_borderless`]
 	return {
 		windowed:
 			w === undefined || w === null
 				? SCREEN_CONSUMER_DEFAULTS.windowed
 				: w !== false && w !== 'false',
-		vsync:
-			v === undefined || v === null ? SCREEN_CONSUMER_DEFAULTS.vsync : v === true || v === 'true',
 		borderless:
 			b === undefined || b === null
 				? SCREEN_CONSUMER_DEFAULTS.borderless
@@ -38,18 +34,17 @@ export function screenConsumerFlagsFromCasparServer(cs, screenN) {
 	}
 }
 
-/** @param {number} screenN @param {{ windowed?: boolean, borderless?: boolean, vsync?: boolean }} [overrides] */
+/** @param {number} screenN @param {{ windowed?: boolean, borderless?: boolean }} [overrides] */
 export function screenConsumerCasparPatch(screenN, overrides = {}) {
 	const n = Math.max(1, Number(screenN) || 1)
 	const flags = { ...SCREEN_CONSUMER_DEFAULTS, ...overrides }
 	return {
 		[`screen_${n}_windowed`]: !!flags.windowed,
 		[`screen_${n}_borderless`]: !!flags.borderless,
-		[`screen_${n}_vsync`]: !!flags.vsync,
 	}
 }
 
-/** POST /api/settings body fragment for default windowed + borderless + vsync on a screen index. */
+/** POST /api/settings body fragment for default windowed + borderless on a screen index. */
 export function screenConsumerDefaultsSettingsPatch(screenN, overrides = {}) {
 	return { casparServer: screenConsumerCasparPatch(screenN, overrides) }
 }
@@ -72,14 +67,13 @@ export function screenConsumerKeysUnset(cs, screenN) {
 	const n = Math.max(1, Number(screenN) || 1)
 	return (
 		(cs[`screen_${n}_windowed`] === undefined || cs[`screen_${n}_windowed`] === null) &&
-		(cs[`screen_${n}_borderless`] === undefined || cs[`screen_${n}_borderless`] === null) &&
-		(cs[`screen_${n}_vsync`] === undefined || cs[`screen_${n}_vsync`] === null)
+		(cs[`screen_${n}_borderless`] === undefined || cs[`screen_${n}_borderless`] === null)
 	)
 }
 
 /**
  * Only writes consumer keys that are still unset (or legacy bordered-window → borderless only).
- * Never overwrites an explicit user value such as vsync off.
+ * Never overwrites an explicit user value such as borderless off.
  * @param {Record<string, unknown>} cs
  * @param {number} screenN
  * @returns {Record<string, boolean>}

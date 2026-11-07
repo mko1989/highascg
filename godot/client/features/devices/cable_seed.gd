@@ -11,7 +11,7 @@ const R := preload("res://features/devices/cable_rules.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const F := preload("res://features/devices/replication_format.gd")
 const PROJECT_FPS := [23.98, 24.0, 25.0, 29.97, 30.0, 50.0, 59.94, 60.0]
-const SCREEN_DEFAULTS := {"windowed": true, "borderless": true, "vsync": false}
+const SCREEN_DEFAULTS := {"windowed": true, "borderless": true}
 const MODE_DIMS := {"576": [720, 576], "720": [1280, 720], "1080": [1920, 1080], "1556": [2048, 1556],
 	"2160": [3840, 2160], "dci1080": [2048, 1080], "dci2160": [4096, 2160]}
 const ALL_RATES := [2398, 2400, 2500, 2997, 3000, 5000, 5994, 6000]
@@ -222,9 +222,8 @@ static func _unset(v: Variant) -> bool:
 static func screen_seed_caspar_patch(cs: Dictionary, n: int) -> Dictionary:
 	n = maxi(1, n)
 	var k := "screen_%d_" % n
-	if _unset(cs.get(k + "windowed")) and _unset(cs.get(k + "borderless")) and _unset(cs.get(k + "vsync")):
-		return {k + "windowed": SCREEN_DEFAULTS.windowed, k + "borderless": SCREEN_DEFAULTS.borderless,
-			k + "vsync": SCREEN_DEFAULTS.vsync}
+	if _unset(cs.get(k + "windowed")) and _unset(cs.get(k + "borderless")):
+		return {k + "windowed": SCREEN_DEFAULTS.windowed, k + "borderless": SCREEN_DEFAULTS.borderless}
 	var w: Variant = cs.get(k + "windowed")
 	var windowed: bool = SCREEN_DEFAULTS.windowed if _unset(w) else not (w is bool and not w) and not (w is String and w == "false")
 	var b: Variant = cs.get(k + "borderless")

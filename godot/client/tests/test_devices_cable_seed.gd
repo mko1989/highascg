@@ -108,7 +108,7 @@ func test_gpu_sink_writes() -> void:
 	_eq(bare.settings.casparServer.get("screen_1_mode"), "1080p5000", "without the new edge the screen is guessed (1)")
 	p.graph.edges.append({"id": "e_new", "sourceId": "dst_in_dst_a", "sinkId": "gpu_p3"})  # as after addEdge
 	var w := S.gpu_sink_writes(p, {}, "dst_in_dst_a", "gpu_p3", "")
-	_eq(w.settings, {"casparServer": {"screen_4_windowed": true, "screen_4_borderless": true, "screen_4_vsync": false,
+	_eq(w.settings, {"casparServer": {"screen_4_windowed": true, "screen_4_borderless": true,
 		"screen_2_mode": "1080p5000", "screen_2_custom_width": 3840, "screen_2_custom_height": 1080, "screen_2_custom_fps": 50.0}},
 		"PGM onto gpu_p3: seed port 4 consumer, inherit into screen 2 (the destination's main screen)")
 	_eq(w.connector, {"caspar": {"mode": "1080p5000", "outputBinding": {"type": "screen", "index": 2}}}, "PGM binding")

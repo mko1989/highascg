@@ -10,7 +10,7 @@ const GO := preload("res://features/devices/gpu_output_model.gd")
 const GM := preload("res://features/devices/gpu_modeline_model.gd")
 const GP := preload("res://features/devices/gpu_modeline_preview.gd")
 const GU := preload("res://features/devices/gpu_output_ui.gd")
-const CHECKS := {"Fullscreen": "fullscreen", "Windowed": "windowed", "Border": "border", "V-sync": "vsync", "Override": "override"}
+const CHECKS := {"Fullscreen": "fullscreen", "Windowed": "windowed", "Border": "border", "Override": "override"}
 const INPUTS := {"customW": "custom_w", "customH": "custom_h", "customFps": "custom_fps", "osW": "os_w", "osH": "os_h",
 	"osFps": "os_fps", "edid": "edid", "name": "name", "ar": "ar", "posX": "pos_x", "posY": "pos_y"}
 const NUMERIC := ["custom_w", "custom_h", "custom_fps", "os_w", "os_h", "os_fps"]
@@ -251,7 +251,7 @@ func test_nvidia_sync_auto() -> void:
 	t.eq(GO.nvidia_sync_state({"screen_3_nvidia_sync_to_display": false}, payload, 3).on, true, "stored false is NOT an explicit off")
 	# save paths: leaving the auto tick alone writes nothing about it; unticking = off; ticking pins + clears off
 	var st := {"port_n": 3, "screen_n": 3, "mv": false, "nvidia_sync": true, "nvidia_auto": true}
-	var ui := {"windowed": true, "vsync": false, "border": true, "mode": "1080p5000", "custom_w": "1920", "custom_h": "1080",
+	var ui := {"windowed": true, "border": true, "mode": "1080p5000", "custom_w": "1920", "custom_h": "1080",
 		"custom_fps": "50", "stretch": "none", "key_only": false, "aot": true, "sbs_key": false, "colour": "RGB", "force_linear": true,
 		"mipmaps": false, "high_bitdepth": false, "name": "", "ar": "", "pos_x": "0", "pos_y": "0", "operator_monitor": false,
 		"interactive": false, "nvidia_sync": true}

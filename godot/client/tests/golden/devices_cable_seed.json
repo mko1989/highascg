@@ -820,15 +820,13 @@
     {
      "casparServer": {
       "screen_2_windowed": true,
-      "screen_2_borderless": true,
-      "screen_2_vsync": false
+      "screen_2_borderless": true
      }
     },
     {
      "casparServer": {
       "screen_2_windowed": true,
       "screen_2_borderless": true,
-      "screen_2_vsync": false,
       "screen_2_mode": "1080p2500"
      }
     },
@@ -868,20 +866,6 @@
    ],
    [
     {
-     "screen_2_vsync": true
-    },
-    {
-     "casparServer": {}
-    },
-    {
-     "casparServer": {
-      "screen_2_mode": "1080p2500"
-     }
-    },
-    false
-   ],
-   [
-    {
      "screen_2_borderless": false,
      "screen_2_windowed": "false"
     },
@@ -902,15 +886,13 @@
     {
      "casparServer": {
       "screen_2_windowed": true,
-      "screen_2_borderless": true,
-      "screen_2_vsync": false
+      "screen_2_borderless": true
      }
     },
     {
      "casparServer": {
       "screen_2_windowed": true,
-      "screen_2_borderless": true,
-      "screen_2_vsync": false
+      "screen_2_borderless": true
      }
     },
     true

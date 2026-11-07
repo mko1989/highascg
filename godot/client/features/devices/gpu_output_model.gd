@@ -13,7 +13,7 @@ const DM := preload("res://features/devices/destinations_model.gd")
 const DV := preload("res://features/devices/devices_model.gd")
 const STRETCH_OPTIONS := ["none", "fill", "uniform", "uniform_to_fill"]
 const COLOUR_OPTIONS := ["RGB", "datavideo-full", "datavideo-limited"]
-## [key, label, tooltip] in the web's toggle-row order (Fullscreen / Windowed / Border / V-sync are the base flags).
+## [key, label, tooltip] in the web's toggle-row order (Fullscreen / Windowed / Border are the base flags).
 const TOGGLES := [
 	["key_only", "Key only", "Output only key channel"],
 	["aot", "Always on top", "Keep window always on top"],
@@ -25,7 +25,7 @@ const TOGGLES := [
 	["mipmaps", "Enable mipmaps", "Enable mipmaps for scaling"],
 	["high_bitdepth", "High bitdepth", "Use high bitdepth"],
 ]
-const RESET_TIP := "Clears CasparCG mode, windowed/vsync toggles, and OS-level system ID / resolution for this screen index."
+const RESET_TIP := "Clears CasparCG mode, windowed/border toggles, and OS-level system ID / resolution for this screen index."
 
 
 static func _flag(v: Variant) -> bool:
@@ -179,13 +179,11 @@ static func consumer_state(cs: Dictionary, _settings: Variant, conn: Dictionary,
 	var flags := cs.duplicate()
 	flags.merge(seed, true)
 	var k := "screen_%d_" % n
-	if flags.get(k + "windowed") == null and flags.get(k + "borderless") == null and flags.get(k + "vsync") == null:
+	if flags.get(k + "windowed") == null and flags.get(k + "borderless") == null:
 		st.windowed = S.SCREEN_DEFAULTS.windowed
-		st.vsync = S.SCREEN_DEFAULTS.vsync
 		st.borderless = S.SCREEN_DEFAULTS.borderless
 	else:
 		st.windowed = S.SCREEN_DEFAULTS.windowed if flags.get(k + "windowed") == null else _not_false(flags.get(k + "windowed"))
-		st.vsync = S.SCREEN_DEFAULTS.vsync if flags.get(k + "vsync") == null else _flag(flags.get(k + "vsync"))
 		st.borderless = S.SCREEN_DEFAULTS.borderless if flags.get(k + "borderless") == null else _not_false(flags.get(k + "borderless"))
 	st.edid_override = _str_or(cs.get("screen_%d_edid_override" % st.screen_n), _str_or(R.d(conn.get("caspar")).get("edidOverride"), ""))
 	st.stretch = _str_or(cs.get(k + "stretch"), "none")
@@ -263,14 +261,14 @@ static func auto_sync_port(payload: Dictionary, operator_port: int) -> int:
 	return 0
 
 
-## saveCasparSettings' body. `ui` = the live control values: windowed / vsync / border / the TOGGLES keys (bools),
+## saveCasparSettings' body. `ui` = the live control values: windowed / border / the TOGGLES keys (bools),
 ## mode / custom_w / custom_h / custom_fps / stretch / colour / name / ar / pos_x / pos_y (texts).
 static func caspar_patch(st: Dictionary, ui: Dictionary) -> Dictionary:
 	var n: int = st.port_n
 	var mv: bool = st.mv
 	var k := "screen_%d_" % n
 	var selected := _str_or(ui.get("mode"), "1080p5000").strip_edges()
-	var p := {k + "windowed": bool(ui.windowed), k + "vsync": bool(ui.vsync), k + "borderless": not ui.border,
+	var p := {k + "windowed": bool(ui.windowed), k + "borderless": not ui.border,
 		"screen_%d_mode" % st.screen_n: selected,
 		"screen_%d_custom_width" % st.screen_n: GM._int_or(ui.custom_w, 1920, 64),
 		"screen_%d_custom_height" % st.screen_n: GM._int_or(ui.custom_h, 1080, 64),
@@ -319,8 +317,7 @@ static func reset_patch(st: Dictionary) -> Dictionary:
 	var n: int = st.port_n
 	var sn: int = st.screen_n
 	var k := "screen_%d_" % n
-	var p := {"screen_%d_mode" % sn: null, k + "windowed": S.SCREEN_DEFAULTS.windowed, k + "borderless": S.SCREEN_DEFAULTS.borderless,
-		k + "vsync": S.SCREEN_DEFAULTS.vsync}
+	var p := {"screen_%d_mode" % sn: null, k + "windowed": S.SCREEN_DEFAULTS.windowed, k + "borderless": S.SCREEN_DEFAULTS.borderless}
 	for suffix in ["custom_width", "custom_height", "custom_fps", "edid_override"]:
 		p["screen_%d_%s" % [sn, suffix]] = null
 	for suffix in ["system_id", "os_mode", "os_rate", "os_backend", "os_timing_source", "stretch", "key_only"]:

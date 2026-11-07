@@ -70,7 +70,6 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	const osScreenN = portN
 	const isMultiviewOutput = gpuOutputIsMultiviewBound(conn, lastPayload)
 	const keyWindowed = `screen_${portN}_windowed`
-	const keyVsync = `screen_${portN}_vsync`
 	const keyBorderless = `screen_${portN}_borderless`
 	const keyEdid = `screen_${screenN}_edid_override`
 	const keyStretch = `screen_${portN}_stretch`
@@ -99,7 +98,7 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	const consumerFlags = screenConsumerKeysUnset(csForFlags, portN)
 		? SCREEN_CONSUMER_DEFAULTS
 		: screenConsumerFlagsFromCasparServer(csForFlags, portN)
-	const { windowed: windowedOn, vsync: vsyncOn, borderless: borderlessOn } = consumerFlags
+	const { windowed: windowedOn, borderless: borderlessOn } = consumerFlags
 	const edidOverride = String(cs[keyEdid] || conn?.caspar?.edidOverride || '')
 	const stretchVal = String(cs[keyStretch] || 'none')
 	const keyOnlyOn = cs[keyKeyOnly] === true || cs[keyKeyOnly] === 'true'
@@ -138,8 +137,7 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	const borderIn = Object.assign(document.createElement('input'), { type: 'checkbox' })
 	borderIn.checked = !borderlessOn
 	borderCk.append(borderIn, document.createTextNode('Border'))
-	// WO-716: no V-sync control — the generator always writes vsync off. This only round-trips the saved key.
-	const vsyncIn = { checked: !!vsyncOn }
+	// WO-716: no V-sync control — the generator always writes vsync off (the screen_N_vsync key is gone, WO-995).
 
 	// Advanced screen consumer controls
 	const stretchSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
@@ -302,7 +300,6 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 		await Actions.saveSettingsPatch({
 			casparServer: {
 				[keyWindowed]: !!windowedIn.checked,
-				[keyVsync]: !!vsyncIn.checked,
 				[keyBorderless]: !borderIn.checked,
 				[keyMode]: isCustom ? 'custom' : selectedMode,
 				[keyCustomWidth]: Math.max(64, parseInt(String(customWidthIn.value || 1920), 10) || 1920),
@@ -353,7 +350,7 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	const resetBtn = Object.assign(document.createElement('button'), {
 		className: 'header-btn device-view__destinations-reset',
 		textContent: 'Reset all settings for this screen',
-		title: 'Clears CasparCG mode, windowed/vsync toggles, and OS-level system ID / resolution for this screen index.',
+		title: 'Clears CasparCG mode, windowed/border toggles, and OS-level system ID / resolution for this screen index.',
 	})
 	resetBtn.style.marginTop = '1rem'
 	resetBtn.style.opacity = '0.7'

@@ -9,7 +9,7 @@ const GO := preload("res://features/devices/gpu_output_model.gd")
 const GM := preload("res://features/devices/gpu_modeline_model.gd")
 const MI := preload("res://core/math_input.gd")
 ## The controls whose edits re-save the consumer patch (the web's saveCasparSettings listeners).
-const CASPAR_FIELDS := ["windowed", "fullscreen", "vsync", "border", "key_only", "aot", "operator_monitor", "interactive",
+const CASPAR_FIELDS := ["windowed", "fullscreen", "border", "key_only", "aot", "operator_monitor", "interactive",
 	"nvidia_sync", "sbs_key", "force_linear", "mipmaps", "high_bitdepth", "mode", "custom_w", "custom_h", "custom_fps",
 	"edid", "stretch", "colour", "name", "ar", "pos_x", "pos_y"]
 const OS_FIELDS := ["display", "os_w", "os_h", "os_fps", "timing", "override", "backend"]
@@ -20,7 +20,7 @@ const PREVIEW_FIELDS := ["mode", "custom_w", "custom_h", "custom_fps", "display"
 ## cst = GO.consumer_state, mst = gpu_modeline_model.state. Texts are what the inputs show (math inputs format on
 ## attach: W/H 0 decimals, rates 2).
 static func initial(cst: Dictionary, mst: Dictionary) -> Dictionary:
-	var ui := {"windowed": cst.windowed, "vsync": cst.vsync, "border": not cst.borderless, "edid": cst.edid_override,
+	var ui := {"windowed": cst.windowed, "border": not cst.borderless, "edid": cst.edid_override,
 		"stretch": cst.stretch, "colour": cst.colour, "name": cst.name, "ar": cst.ar, "pos_x": cst.pos_x, "pos_y": cst.pos_y,
 		"mode": mst.mode, "prev_standard": mst.prev_standard,
 		"custom_w": MI.fixed(mst.custom.w, 0), "custom_h": MI.fixed(mst.custom.h, 0), "custom_fps": MI.fixed(mst.custom.fps, 2),
