@@ -6,6 +6,7 @@ extends Control
 
 const TM := preload("res://features/live/look_thumb_math.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const Clock := preload("res://features/live/timeline_clock.gd")
 
 static var _cache := {}    # path → Texture2D, or null when the fetch failed
 static var _waiters := {}  # path → Array[Callable] while the fetch runs
@@ -31,10 +32,16 @@ func setup(look_: Dictionary, res: Vector2, cm_: Dictionary) -> void:
 func refresh(look_: Dictionary) -> void:
 	look = look_
 	for l in TM.sorted_layers(look):
-		var p := TM.thumb_path(l.get("source"), cm)
+		var p := _path(l.get("source"))
 		if p != "" and not _cache.has(p):
 			_fetch(p, queue_redraw)
 	queue_redraw()
+
+
+## WO-998: a timeline layer shows its first clip's thumbnail (look_thumb_math.gd timeline_cover).
+func _path(src: Variant) -> String:
+	var cover := TM.timeline_cover(src, Clock.project_timelines(), cm)
+	return TM.thumb_path(cover if not cover.is_empty() else src, cm)
 
 
 static func _fetch(path: String, cb: Callable) -> void:
@@ -80,7 +87,7 @@ func _draw() -> void:
 		if rot != 0.0:
 			var c := box.get_center()
 			draw_set_transform_matrix(Transform2D(rot, c) * Transform2D(0.0, -c))
-		var p := TM.thumb_path(l.get("source"), cm)
+		var p := _path(l.get("source"))
 		var has_src: bool = l.get("source") is Dictionary and str(l.source.get("value", "")) != ""
 		var tex: Texture2D = _cache.get(p) if p != "" else null
 		if tex != null:

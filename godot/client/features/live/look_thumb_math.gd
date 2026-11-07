@@ -30,6 +30,27 @@ static func thumb_path(src: Variant, cm: Dictionary) -> String:
 	return "/api/thumbnail/live/%d" % ch
 
 
+## WO-998: a timeline layer's card picture is one of its clips: the earliest-starting clip that has a thumbnail (ties →
+## the first timeline layer). {} when the timeline is unknown or holds no such clip (the card keeps its label box).
+static func timeline_cover(src: Variant, timelines: Array, cm: Dictionary) -> Dictionary:
+	if not (src is Dictionary) or str(src.get("type", "")).to_lower() != "timeline":
+		return {}
+	var best: Dictionary = {}
+	var best_t := INF
+	for tl in timelines:
+		if not (tl is Dictionary) or str(tl.get("id", "")) != str(src.get("value", "")):
+			continue
+		for ly in (tl.get("layers") if tl.get("layers") is Array else []):
+			for c in ((ly as Dictionary).get("clips", []) if ly is Dictionary and ly.get("clips") is Array else []):
+				if not (c is Dictionary) or thumb_path(c.get("source"), cm) == "":
+					continue
+				var at := float(c.get("startTime", 0)) if c.get("startTime") is float or c.get("startTime") is int else 0.0
+				if at < best_t:
+					best_t = at
+					best = c.source
+	return best
+
+
 static func live_channel(src: Dictionary) -> int:
 	var v := str(src.get("value", ""))
 	if src.get("useDirect") == true and v.strip_edges().to_lower().begins_with("ndi://"):

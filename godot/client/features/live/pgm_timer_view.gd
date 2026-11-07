@@ -5,6 +5,7 @@ extends VBoxContainer
 
 const P := preload("res://features/live/pgm_timer_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const Clock := preload("res://features/live/timeline_clock.gd")
 
 var main := 0
 var mirror: Node
@@ -22,6 +23,7 @@ func setup(osc_mirror: Node, main_idx: int) -> void:
 
 
 func _ready() -> void:
+	Clock.listen()
 	add_theme_constant_override("separation", 3)
 	var line := HBoxContainer.new()
 	add_child(line)
@@ -49,6 +51,14 @@ func refresh() -> void:
 	var pgm := P.resolve_pgm(cm, Store.get_value("scene"), main)
 	var ch: Variant = mirror.channels.get(str(pgm.channel)) if mirror != null else null
 	var now := Time.get_unix_time_from_system() * 1000.0
+	# WO-998: a timeline on PGM plays above every look layer (bank 210+, outside pick_top_layer's range); its own clock.
+	var tl := Clock.on_air(Store.get_value("timeline.playback"), Clock.project_timelines(), true, main, now)
+	if not tl.is_empty():
+		var tdur: float = tl.duration
+		var tel: float = tl.elapsed
+		_show(str(tl.name), tel, tdur, tdur - tel, clampf(tel / tdur, 0.0, 1.0),
+			"PGM timeline %s: %s — elapsed / duration" % ["playing" if tl.playing else "holding its end", tl.name])
+		return
 	var top := P.pick_top_layer(ch, pgm.bank, now, true)
 	if top.layer == null:
 		var idle := P.pick_top_layer(ch, pgm.bank, now, false)
@@ -70,7 +80,10 @@ func refresh() -> void:
 		pct = clampf(_f(f.get("progress")), 0.0, 1.0)
 	elif not is_nan(dur) and dur > 0.0 and not is_nan(el):
 		pct = clampf(el / dur, 0.0, 1.0)
-	var label := P.file_label(f)
+	_show(P.file_label(f), el, dur, rem, pct, "PGM ch %d layer %d: %s — elapsed / duration" % [pgm.channel, top.layer, P.file_label(f)])
+
+
+func _show(label: String, el: float, dur: float, rem: float, pct: float, tip: String) -> void:
 	var txt := "%s / %s" % [P.format_mmss(el), P.format_mmss(dur)]
 	if not is_nan(rem):
 		txt += "  (−%s)" % P.format_mmss(rem)
@@ -79,7 +92,7 @@ func refresh() -> void:
 	_row.text = label
 	_time.text = txt
 	_time.add_theme_color_override("font_color", c.text)
-	_row.tooltip_text = "PGM ch %d layer %d: %s — elapsed / duration" % [pgm.channel, top.layer, label]
+	_row.tooltip_text = tip
 	_row.add_theme_color_override("font_color", c.text)
 	_bar.visible = true
 	_bar.color = c.bar

@@ -19,6 +19,7 @@ signal auto_changed(on: bool)  # WO-658: a manual move / resize / remove turns A
 
 const TM := preload("res://features/live/compose_tile_math.gd")
 const CT := preload("res://features/live/compose_times_model.gd")
+const Clock := preload("res://features/live/timeline_clock.gd")
 const P := preload("res://features/live/pgm_timer_model.gd")
 const DeckModel := preload("res://features/live/deck_model.gd")
 const AL := preload("res://features/live/compose_auto_layout.gd")
@@ -57,6 +58,7 @@ var _x_font: Font  # walked the system-font fallback (~1.3 ms each, 4 windows ×
 
 
 func _ready() -> void:
+	Clock.listen()
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_over = Control.new()
 	_over.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -312,7 +314,9 @@ func _time_rows(c: Dictionary) -> Array:
 			id = staged  # the deck blanks a PRV that holds the PGM look; its times still show
 	if not looks.has(id) or osc == null:
 		return []
-	return CT.rows(looks[id], osc.channels.get(str(ch)), bank, pgm, Time.get_unix_time_from_system() * 1000.0)
+	var now := Time.get_unix_time_from_system() * 1000.0
+	var tl := Clock.on_air(Store.get_value("timeline.playback"), Clock.project_timelines(), pgm, mi, now)  # WO-998
+	return CT.rows(looks[id], osc.channels.get(str(ch)), bank, pgm, now, tl)
 
 
 ## WO-658 Auto: one PGM (top) + PRV (bottom) window per screen, tiled into what the panel shows of the canvas.

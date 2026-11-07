@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-906 live WOs (28 open, 121 in progress, 757 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+907 live WOs (28 open, 121 in progress, 758 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -393,7 +393,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (139)
+## godot-client — Godot client (140)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -534,6 +534,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 987 DONE [godot-client] Code-health sweep of the Godot client → 987_WO_godot_client_code_health.md
 - 994 DONE [godot-client+lighting] Previs models look low quality: 3DS meshes shaded with one averaged normal per… → 994_WO_previs_3ds_hard_edge_normals.md
 - 997 DONE [godot-client] ShmTexture never frees its RenderingDevice texture (Visuals game scenes leak VR… → 997_WO_shm_texture_rd_leak.md
+- 998 DONE [godot-client] A look holding a timeline: its deck card is blank, and the deck timer and compo… → 998_WO_timeline_in_look_card_and_timer.md
 
 ## web-client — Web client (82)
 

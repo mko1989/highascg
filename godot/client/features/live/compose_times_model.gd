@@ -10,7 +10,9 @@ const PIP_TEMPLATES := ["pip_border", "pip-border", "pip_shadow", "pip-shadow", 
 
 ## [{num, label, running, elapsed, duration, top}] for `look` on `channel` (an OSC mirror channel). PGM layers sit
 ## +100 on bank 'b'; PRV is bank-less (physical = logical, WO-195.4). Stale OSC counts as not running.
-static func rows(look: Dictionary, channel: Variant, bank: Variant, is_pgm: bool, now_ms: float) -> Array:
+## WO-998: a timeline layer has no producer at its own number (the clips play at 210+); `timeline` is the timeline on
+## this bus (timeline_clock.gd on_air) and times that layer when it is the same timeline.
+static func rows(look: Dictionary, channel: Variant, bank: Variant, is_pgm: bool, now_ms: float, timeline := {}) -> Array:
 	var osc: Dictionary = channel.get("layers") if channel is Dictionary and channel.get("layers") is Dictionary else {}
 	var out := []
 	for l in (look.get("layers") if look.get("layers") is Array else []):
@@ -21,6 +23,11 @@ static func rows(look: Dictionary, channel: Variant, bank: Variant, is_pgm: bool
 		if value == "" or value.contains("playback_timers.html") or _is_pip(value):
 			continue
 		var num := int(l.get("layerNumber", 0))
+		if str(src.get("type", "")) == "timeline":
+			var on: bool = str(timeline.get("id", "")) == value
+			out.append({"num": num, "label": "L%d  %s" % [num, str(timeline.name) if on else source_name(src)], "running": on,
+				"elapsed": float(timeline.elapsed) if on else 0.0, "duration": float(timeline.duration) if on else 0.0, "top": false})
+			continue
 		var ly: Variant = osc.get(str(num + 100 if is_pgm and bank == "b" else num))
 		if ly is Dictionary and P.is_stale(ly, now_ms):
 			ly = null
