@@ -318,3 +318,6 @@ no edits were made to their reserved lanes, configuration, index or curated CI f
   case: exit without close still settles `timedOut` at the deadline.
 - `network-inventory.js`: JSDoc moved back onto `readNmcliMode` (it had ended up above the cache Map).
 - Registered `smoke-984-resource-findings.test.js` in `tools/ci/offline-test-files-3.js`: 9 pass.
+- Box (07.11 01:33): node restarted under box2.lock with round 2 loaded (pid 643219 → 805314): API up after 6 s, no
+  `[modules] onBoot` warnings, both WS clients reconnected. `GET /api/system/network`: 62 ms cold → 40–47 ms within
+  the 5 s TTL → 60 ms after expiry (the remainder is `listNetworkInterfaces`, not nmcli).

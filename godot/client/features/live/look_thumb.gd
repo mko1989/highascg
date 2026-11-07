@@ -39,7 +39,11 @@ func refresh(look_: Dictionary) -> void:
 
 static func _fetch(path: String, cb: Callable) -> void:
 	if _waiters.has(path):
-		(_waiters[path] as Array).append(cb)
+		# WO-987: edits can refresh a card many times before HTTP completes; keep one live redraw per card.
+		var waiting: Array = (_waiters[path] as Array).filter(func(c: Callable) -> bool: return c.is_valid())
+		if not cb in waiting:
+			waiting.append(cb)
+		_waiters[path] = waiting
 		return
 	_waiters[path] = [cb]
 	var r: Dictionary = await Api.get_bytes(path)
