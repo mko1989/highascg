@@ -208,8 +208,6 @@ ${NM_NOTE}
 
 **Start:** \`node index.js\` — **\`http://<playout-ip>:4200/\`** (API + UI). \`HIGHASCG_HEADLESS=true\` is API-only debug.
 
-Optional [**highascg-client**](https://github.com/mko1989/highascg-client) Electron app: simulator, multiserver, modules — opens browser to playout; **not** the UI source tree.
-
 See [\`docs/ARCHITECTURE.md\`](docs/ARCHITECTURE.md) · [\`docs/DEV_RELEASE_GITHUB.md\`](docs/DEV_RELEASE_GITHUB.md)
 EOF
 

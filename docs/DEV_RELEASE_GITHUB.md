@@ -107,22 +107,11 @@ From the GitHub **Releases** page, download:
 - The **ISO** (from a **full** deprecated-helper run, or reuse an older ISO you keep on file).
 - **`highascg-server_<stamp>.tar.gz`** — the canonical server drop (every `release:github-server` prerelease has this).
 
-### 2. Flash ISO and carve exFAT (desktop)
+### 2. Prepare the stick
 
-On a workstation with UI (no npm wrapper — run the tool directly):
-
-```bash
-python3 client/tools/stick-tools/stick_studio.py
-```
-
-Documentation: **`client/tools/stick-tools/README.md`**.
-
-Rough order in the GUI:
-
-1. Point **ISO** at the downloaded file and **whole-disk USB**.
-2. Enable **Erase stick with ISO**, run **pkexec pipeline** (or flash first, then exFAT-only if you skipped dd).
-3. Enable **Append exFAT … HIGHASCGEXF** where appropriate.
-4. Mount the exFAT volume and set **mount path** in Stick Studio; create **`drop-update/`** (and operator dirs).
+Sticks are Ventoy sticks (ISO plus the **HIGHASCGEXF** exFAT partition at the end); see
+[`tools/eggs/live-usb/BUILD_AND_FLASH.md`](../tools/eggs/live-usb/BUILD_AND_FLASH.md). The desktop Stick Studio and the
+macOS/Windows stick scripts (`client/tools/`) were removed in WO-995. Mount the exFAT volume and create **`drop-update/`**.
 
 ### 3. Lay out server drop on the stick
 
@@ -143,13 +132,7 @@ If the archive omitted `node_modules`, run **`npm ci`** on the playout host afte
 
 ### 4. Simulation mode
 
-Stick Studio drives simulation against the **HighAsCG repo path** configured at the top of the window (point this at your **local git checkout** on the workstation, not necessarily the stick copy), using [`client/tools/portable-desktop/launch-sim-from-exfat.cjs`](../client/tools/portable-desktop/launch-sim-from-exfat.cjs) with exFAT paths.
-
-For headless / CI testing, from a repo that has the same mount layout available:
-
-```bash
-node client/tools/portable-desktop/launch-sim-from-exfat.cjs
-```
+The exFAT simulation launcher (`client/tools/portable-desktop/launch-sim-from-exfat.cjs`) was removed in WO-995.
 
 ### 5. Reference docs
 

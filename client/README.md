@@ -13,7 +13,6 @@ Static **HTML / CSS / ES modules** — the operator UI served on the playout mac
 | Global styles | `styles.css`, `styles/*.css` |
 | Components | `components/*.js` |
 | Assets | `assets/`, `fonts/` |
-| Electron hub (packaging only) | `tools/electron-launcher/` → [**highascg-client**](https://github.com/mko1989/highascg-client) |
 
 ## Production (playout machine)
 

@@ -7,7 +7,7 @@
 | [`make-dev-github-release-iso-quick.sh`](./make-dev-github-release-iso-quick.sh) | Fast ISO-only eggs produce |
 
 **Operator UI:** built from in-repo **`client/`** → **`dist-web/`** (`npm run build:client`).  
-**Optional Electron packaging:** [highascg-client](https://github.com/mko1989/highascg-client) — simulator, multiserver, modules from `client/tools/electron-launcher/`; opens browser to playout `:4200`.
+The optional Electron launcher (highascg-client, built from `client/tools/`) was removed in WO-995.  
 
 **Runbook:** [`docs/DEV_RELEASE_GITHUB.md`](../../docs/DEV_RELEASE_GITHUB.md)
 

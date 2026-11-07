@@ -2,7 +2,7 @@
 
 > **Production (WO-52):** API and UI both run on the **playout machine** at **`http://<host>:4200/`** (`dist-web/` + `/api/*`). The diagram below is the **logical** split (browser vs Node bridge), not separate physical hosts.
 >
-> **Electron launcher** ([highascg-client](https://github.com/mko1989/highascg-client)): optional packaging extract from `client/tools/electron-launcher/` — **simulator**, **multiserver**, **modules**; opens the system browser to `:4200`. **Canonical UI:** in-repo **`client/`** → `npm run build:client` → `dist-web/`.
+> The optional Electron launcher (highascg-client, built from `client/tools/`) was removed in WO-995. **Canonical UI:** in-repo **`client/`** → `npm run build:client` → `dist-web/`.
 
 This document defines the strict boundary of responsibilities between the **Node bridge (server)** and the **browser SPA (UI)**.
 

@@ -246,7 +246,7 @@ sudo bash scripts/setup/07-node-highascg.sh
 
 **API-only mode** (optional — **not** production default):
 
-> **Production (WO-52):** client and server on the **same playout machine**; Node serves API + web GUI (`dist-web/`) on **`:4200`**. Electron launcher = multiplatform **hub** (setup, links, sim) — not the UI host.
+> **Production (WO-52):** client and server on the **same playout machine**; Node serves API + web GUI (`dist-web/`) on **`:4200`**.
 
 ```ini
 # /etc/systemd/system/highascg.service.d/10-headless.conf

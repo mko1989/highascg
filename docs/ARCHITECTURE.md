@@ -21,9 +21,8 @@ Everything ships from **this repository** ([highascg](https://github.com/mko1989
 | **`client/map.html`** | **Interactive Project Map** sources (served at `/map`) |
 | **`dist-web/`** | Vite production build — **what playout serves** at `/` |
 | **`src/`**, **`index.js`** | Node API bridge (Caspar, OS, WebSocket, config) |
-| **`client/tools/electron-launcher/`** | Electron hub sources — packaged separately as [**highascg-client**](https://github.com/mko1989/highascg-client) |
 
-**highascg-client** is **not** a second UI development repo. It is an **optional Electron packaging extract** (simulator, multiserver workflow, modules such as CG Studio) built from `client/tools/electron-launcher/` and related tooling. Operators still control playout via the **browser** at `http://<playout-ip>:4200/`.
+The optional Electron launcher (**highascg-client**, built from `client/tools/`) was removed in WO-995. Operators control playout through the Godot client or the browser at `http://<playout-ip>:4200/`.
 
 **Develop UI here:** edit `client/` → `npm run build:client` → refresh browser.  
 **Do not** treat GitHub highascg-client as the canonical UI tree.

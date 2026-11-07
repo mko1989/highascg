@@ -42,7 +42,7 @@ For a **closed ISO** (no `src/` in squashfs), operators refresh the **Node serve
 
 Open **`http://<playout-ip>:4200/`** on the playout machine or LAN after deploy. Same origin — no separate client install on playout.
 
-Optional **Electron launcher** on Mac/Windows ([**highascg-client**](https://github.com/mko1989/highascg-client)) — simulator, multiserver, modules packaging from `client/tools/electron-launcher/`; opens the system browser to playout `:4200`. Operator UI is **`client/`** → `dist-web/` in this repo.
+The optional Electron launcher (highascg-client, built from `client/tools/`) was removed in WO-995. Operator UI is **`client/`** → `dist-web/` in this repo, or the Godot client.
 
 ## Disable / test
 

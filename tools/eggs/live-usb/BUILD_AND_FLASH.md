@@ -43,9 +43,7 @@ Picks the **newest ISO from this build** under `/home/eggs/` and `/home/eggs/mnt
 
 The finish/partition scripts place **exFAT `HIGHASCGEXF`** with start **≥ hybrid ISO tail** and **≥ ceil(ISO MiB)+`EXFAT_AFTER_ISO_MARGIN_MIB`** (**1536** MiB default — adjust if your ISO grows). The build warns if Blackmagic **`desktopvideo*`** packages are missing from the clone source; **`--decklink-required`** exits non‑zero unless they’re installed (*`sudo bash scripts/install.sh`* with Desktop Video tarball). The string **`highascg-data`** cannot be the literal exFAT volume label (**11 characters max**); operators still call it “data”; **`HIGHASCGEXF`** is what systemd mounts.
 
-### Desktop helper — Stick Studio (`client/tools/stick-tools`)
-
-On a workstation with a display (and **`python3-tk`**): flash ISO + optional exFAT + seed operator dirs + optional copy to `sim/highascg`, plus **Start simulation** — `python3 client/tools/stick-tools/stick_studio.py` from the repo root (no npm wrapper). Destructive steps use **pkexec**. Details: **`client/tools/stick-tools/README.md`**. See **[`docs/CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md`](../../../docs/CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md)** for how a **Caspar-only** squashfs coexists with **HighAsCG synced from exFAT**.
+See **[`docs/CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md`](../../../docs/CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md)** for how a **Caspar-only** squashfs coexists with **HighAsCG synced from exFAT**. (The desktop Stick Studio, `client/tools/stick-tools`, was removed in WO-995.)
 
 ### Automated dev prerelease on GitHub (ISO + ZIP)
 
@@ -191,12 +189,8 @@ When you **deliberately** do **not** want full-root persistence: **[HIGHASCG_FOL
 
 If you already have a **`*.iso`** built elsewhere:
 
-| OS | Script |
-|----|--------|
-| **Windows** (Admin PowerShell) | [`make-highascg-stick.ps1`](../../../client/tools/live-usb/windows/make-highascg-stick.ps1) |
-| **macOS** (sudo in Terminal) | [`make-highascg-stick.sh`](../../../client/tools/live-usb/macos/make-highascg-stick.sh) |
+The macOS/Windows stick scripts (`client/tools/live-usb/`) were removed in WO-995; sticks are Ventoy sticks now (see above).
 
-Both: **visible menu** of removable targets, **explicit confirmations**, raw **ISO** write, then **exFAT** labelled **`HIGHASCGEXF`** (WO‑47) and seeded folders (**`drop-config`**, **`media`**, **`templates`**, **`configs`**, **`snapshots/rear-panels`**, plus a `sim/highascg` simulation tree). Note on server-drop folders: the **canonical layout is `drop-update/`** (+ `drop-update/applied/`); today the macOS script still seeds legacy **`update/server/`** and the Windows script seeds neither — create `drop-update/` yourself until the scripts are aligned. Hybrid ISO + free-space detection varies by OS; macOS may require **Disk Utility** or **Linux `add-exfat-data-partition.sh`** fallback if `diskutil addPartition` fails.
 
 ---
 

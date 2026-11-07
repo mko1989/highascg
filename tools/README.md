@@ -2,7 +2,7 @@
 
 Production playout host and **eggs ISO build**. Operator UI is **`dist-web/`** on playout (`:4200`), built from in-repo **`client/`** (`npm run build:client`).
 
-Optional [**highascg-client**](https://github.com/mko1989/highascg-client) Electron packaging (simulator, multiserver, modules) is extracted from `client/tools/electron-launcher/` — **not** the canonical UI source tree.
+The optional Electron launcher (highascg-client, built from `client/tools/`) was removed in WO-995.
 
 | Path | Purpose |
 |------|---------|

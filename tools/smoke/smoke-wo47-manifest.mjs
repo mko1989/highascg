@@ -39,6 +39,8 @@ const embedMustOmit = [
 	'home/casparcg/highascg/package.json',
 	'home/casparcg/highascg/index.js',
 	'home/casparcg/highascg/src',
+	// dist-web/ is baked into the ISO (the box serves it; 250f3445), so the embed fragment must keep it.
+	'home/casparcg/highascg/dist-web',
 ]
 const embedText = readFileSync(embedFragmentPath, 'utf8')
 for (const n of embedMustOmit) {
@@ -46,7 +48,6 @@ for (const n of embedMustOmit) {
 }
 mustContain(embedFragmentPath, [
 	'home/casparcg/highascg/client',
-	'home/casparcg/highascg/dist-web',
 	'tools/eggs',
 ])
 

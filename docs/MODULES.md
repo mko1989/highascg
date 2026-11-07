@@ -167,11 +167,10 @@ Then boot. `GET /api/modules` returns `{ enabled: [] }`, the web client logs `lo
 
 ## CG Studio (server-hosted module)
 
-CG Studio runs **in-process on the playout server**. `src/cg-studio/register.js` mounts it through the module registry: static UI at `/cg-studio/index.html` (+ `/studio-assets/`), API under `/api/cg-studio`, and a workspace tab in the operator UI. It is **enabled by default** (WO-265); opt out with `features.cgStudio: false` in config or `HIGHASCG_CG_STUDIO=0` in the environment. The simulator (`node index.js --no-caspar`) serves the same module, so launcher-driven simulation gets CG Studio for free.
+CG Studio runs **in-process on the playout server**. `src/cg-studio/register.js` mounts it through the module registry: static UI at `/cg-studio/index.html` (+ `/studio-assets/`), API under `/api/cg-studio`, and a workspace tab in the operator UI. It is **enabled by default** (WO-265); opt out with `features.cgStudio: false` in config or `HIGHASCG_CG_STUDIO=0` in the environment. The simulator (`node index.js --no-caspar`) serves the same module, so simulation gets CG Studio for free.
 
 **Standalone dev mode** for module development still exists: `npm run cg-studio` (`scripts/cg-studio-run.js`) runs the studio on its own HTTP server, port **4300** (`cgStudio.httpPort`).
 
-The Electron launcher (`client/tools/electron-launcher/`) no longer hosts its own copy — its **CG Studio** button opens `http://<server>:<port>/cg-studio/index.html` on the connected (or simulated) server.
 
 The **operator UI** (dashboard, scenes, device view) is always **`client/`** in this repo → `dist-web/` on playout `:4200`.
 

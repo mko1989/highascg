@@ -290,8 +290,7 @@ function main() {
 					config.server.httpPort +
 					' (unified repo: client/ → dist-web/ on :' +
 					config.server.httpPort +
-					'). ' +
-					'Optional Electron launcher (highascg-client) = sim/multiserver/modules — see docs/ARCHITECTURE.md'
+					').'
 			)
 			if (process.env.HIGHASCG_WEB_DIR) {
 				logger.info(`[HTTP] UI directory override: HIGHASCG_WEB_DIR=${process.env.HIGHASCG_WEB_DIR}`)

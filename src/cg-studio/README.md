@@ -9,9 +9,9 @@ Source lives in **this repo**: `src/cg-studio/`.
 | Process | Port | Where |
 |---------|------|--------|
 | HighAsCG playout (API + operator UI) | 4200 | Playout server — `client/` → `dist-web/` |
-| CG Studio | 4300 | Operator machine (Electron module) |
+| CG Studio | 4300 | standalone dev server (`npm run cg-studio`); in production it is mounted on :4200 |
 
-The optional Electron launcher ([highascg-client](https://github.com/mko1989/highascg-client)) — packaged from `client/tools/electron-launcher/` — starts `studio-server.js` locally. Templates are read from and exported to `template/` in **this** checkout.
+Standalone, `npm run cg-studio` serves the studio on :4300. Templates are read from and exported to `template/` in **this** checkout. (The Electron launcher that used to start it was removed in WO-995.)
 
 **Do not confuse with the operator UI:** dashboard, scenes, and device view live in **`client/`** in this repo and run on playout `:4200`.
 

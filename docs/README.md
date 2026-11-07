@@ -64,4 +64,4 @@ Operator and integrator docs live at the **top level** of this folder. Deeper ma
 **On playout server:** **`dist-web/`** (built from in-repo **`client/`**, served on `:4200` on the **same machine** as the API), **`index.js`**, **`src/`**, **`config/`**, **`template/`**.  
 **Not on playout as sources:** raw **`client/`** tree (ship **`dist-web/`** only), **`work/`**.  
 **Canonical UI development:** edit **`client/`** in this repo → `npm run build:client`.  
-**highascg-client** (optional): Electron packaging extract (`client/tools/electron-launcher/`) — simulator, multiserver, modules; opens browser to playout `:4200`; **not** the operator UI source tree.
+The optional Electron launcher (highascg-client, built from `client/tools/`) was removed in WO-995.

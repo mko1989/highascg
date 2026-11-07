@@ -45,9 +45,8 @@ The Node service on port **4200** serves **both** the REST/WebSocket API and the
 | **Operator UI sources** | **`client/`** in this repo | Canonical UI — dashboard, scenes, device view, timeline, settings |
 | **Production UI bundle** | **`dist-web/`** | Vite build output — what `:4200` serves |
 | **API / Caspar / OS bridge** | **`src/`**, `index.js` | AMCP, GPU, exFAT, WebSocket, config |
-| **Electron launcher** | [**highascg-client**](https://github.com/mko1989/highascg-client) (optional, separate packaging) | Stick prep, **simulator**, **multiserver** workflow, optional modules (CG Studio, …) — extracted from `client/tools/electron-launcher/` here. Opens the **system browser** to playout `:4200`; does **not** host the control UI |
 
-> **Do not develop the operator UI in highascg-client.** That repo is an Electron packaging extract only. Edit **`client/`** in this repo, then `npm run build:client`.
+> The operator UIs live here: **`godot/client/`** (Godot) and **`client/`** (web, `npm run build:client`). The old Electron launcher (`client/tools/`, highascg-client) was removed in WO-995.
 
 ### 🧱 Architecture
 
@@ -169,7 +168,6 @@ See [`from_client/AGENT_SERVER_CLIENT_MERGE.md`](from_client/AGENT_SERVER_CLIENT
 | `dist-web/` | Built operator UI (served on `:4200`) | **Yes** |
 | `config/`, `template/`, `scripts/` | Settings, Caspar templates, systemd | **Yes** |
 | `tools/runtime/` | exFAT sync CLI, staged Caspar start | **Yes** |
-| `client/tools/electron-launcher/` | Electron hub sources (packaged in highascg-client) | **No** on playout |
 | `work/` | Work orders, planning | **No** |
 
 ### Verification
