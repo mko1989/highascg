@@ -26,13 +26,6 @@ func _init() -> void:
 		kind = "image-fallback"
 
 
-func format_supported() -> bool:
-	if _rd == null:
-		return false
-	var usage := RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT | RenderingDevice.TEXTURE_USAGE_CAN_UPDATE_BIT
-	return _rd.texture_is_format_supported_for_usage(RenderingDevice.DATA_FORMAT_B8G8R8A8_UNORM, usage)
-
-
 func update(data: PackedByteArray, w: int, h: int) -> void:
 	if data.size() < w * h * 4:
 		return
