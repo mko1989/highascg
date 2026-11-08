@@ -1,6 +1,6 @@
 # WO-999 — Run FragCoord shaders natively in Visuals (u_* uniforms, the 512×512 audio spectrogram, passes), no Shadertoy conversion
 **Area:** godot-client, engine, audio
-**Status: OPEN**
+**Status: IN PROGRESS (step 1 done 08.11: FragCoord u_audio rows on the server + the 512×512 history model in Godot, verified on live frames; steps 2-4 open)**
 
 Owner, 08.11, after the FragCoord feasibility check (`https://fragcoord.xyz/s/30gw2t1g`): *"Can we just use these
 shaders without converting them to shader toy's convention. I especially like the audio spectrogram instead of plain
@@ -94,7 +94,7 @@ FFT. Start a work order"*
 | `u_webcam`, `u_keyboard`, URL textures | virtual camera channel (WO-376) | webcam → the existing camera feed if routed; keyboard → black; URL textures fetched at import |
 | golf dialect | — | converted to GLSL at import via FragCoord's `convert_shader` |
 
-## Plan (not started)
+## Plan
 
 1. **Spectrogram texture** (Godot, `features/visuals/`):
    - A shared 512×512 RGBA8 history, advanced on render time at 60 rows/s with FragCoord's shift and gap rules.
@@ -120,8 +120,75 @@ FFT. Start a work order"*
 
 ## What was done
 
-(nothing yet)
+### Step 1 — the spectrogram (08.11)
+
+- **Why on the server, not a client re-map** (the plan's first idea): the Shadertoy bytes can't be turned back into
+  FragCoord's levels.
+  - They clip at −30 dB, where FragCoord keeps up to −10 dB.
+  - Their magnitude is 2|X|/N (`fft.js`), while the Web Audio analyser FragCoord reads uses |X|/N, so ours sit
+    6 dB hotter.
+  - They are smoothed at 0.6, not 0.8.
+  - A-weighting has to be added to the float dB before rounding.
+  - So the box computes FragCoord's two rows itself from the same sample ring.
+- **`src/audio/fft-fragcoord.js`** (new): `createFragcoordAnalyser({sampleRate, fftSize})` → `rows(samples)`
+  returns `{weighted, raw}`, each 512 bytes, plus `reset()`.
+  - Blackman window, |X|/N, its own smoothing state at 0.8, dB.
+  - **raw** maps −90..−10 dB to 0..255.
+  - **weighted** is dB plus the per-bin A table, then the same mapping. The table is FragCoord's: IEC 61672 with
+    +2 dB, made non-decreasing from −80 dB and capped at 0 dB.
+  - It is its own file because `audio-capture-fft.js` was at 491 lines; it is now 498.
+- **`audio-capture-fft.js`**: every fresh frame carries `fc: fc.rows(ring)`. The stale frame carries zero rows and
+  resets the smoothing.
+- **`audio-capture-lifecycle.js`**: the WS `audio_fft` frame gains `fcWeighted` and `fcRaw` (base64, 2 × 512 bytes
+  at `emitHz`).
+- **`godot/client/features/visuals/fc_spectrogram.gd`** (new): the history as FragCoord's player keeps it.
+  - 512×512, **row 0 newest**, R = weighted, G = wave, B = raw.
+  - Stored **RGBA8** with alpha 255, because RGB8 is not a sampled format on most Vulkan drivers.
+  - Step rules:
+    - The first step writes row 0.
+    - Elapsed time then accrues; every whole 1/60 s shifts the history down a row and writes the current row on top.
+    - A step shorter than a row rewrites row 0.
+    - A gap longer than the history (> 513/60 s) fills every row.
+  - `shared()` gives one instance per app. `pull(frame, dt)` advances it at most once per drawn frame, however many
+    layers read it.
+  - A feed silent for 1 s scrolls in silence (spectrum 0, wave 128).
+  - The WS frame is kept as-is and decoded only on `pull()`, so the feed costs nothing until a FragCoord layer
+    exists.
+  - A server without the rows gives a black spectrum and the wave only.
+- **`visuals_tab.gd`**: the `audio_fft` handler feeds `FcSpec.shared()`.
+- **Not in step 1:** the RD texture itself. It is a 1 MB `texture_update` per frame from `pull()`, made by the
+  FragCoord runner in step 2, which owns the uniform sets. Until then nothing reads the history.
+- **Known differences from FragCoord:**
+  - Our server sends 30 frames/s, so each row is written twice. FragCoord's analyser updates every browser frame.
+    `audio_fft.emitHz` goes up to 60 if the pair striping shows; this was not changed in live config.
+  - The wave is the newest 512 samples of the 1024 ring. FragCoord's is the first 512 of its analyser buffer.
+- **Tests:**
+  - `tools/smoke/smoke-wo999-fragcoord-audio-rows.test.js` (curated, `offline-test-files-3.js`), 10 tests: A-weight
+    reference points, table shape, silence, the Web Audio level of a full-scale tone, 6 dB headroom, smoothing 0.8,
+    the low cut, reset, and the wiring greps.
+  - `godot/client/tests/test_fc_spectrogram.gd`, 8 tests: layout, 60 rows/s scroll with leftovers, sub-row
+    rewrite, gap fill, once-per-frame pull, stale silence, old-server frames, the shared instance.
 
 ## What was VERIFIED
 
-(nothing yet)
+### Step 1
+
+- **Offline:** the new smoke has 10/10 passing, and the WO-333 FFT smoke still passes (26/26 together).
+  `run-offline-tests.js`: 5535 tests, 0 fail. No files are over 500 lines. ESLint is clean.
+  - Prettier flags `audio-capture-fft.js` and `audio-capture-lifecycle.js`, but both were already unformatted at
+    HEAD, and the gate covers `tools/ci` only.
+- **Godot:** `--check` boots clean. `--test`: **26057 passed, 0 failed**, 28 more than before.
+- **Live on the box** (node restarted on the new code):
+  - The FFT feed was switched to a bumper's music with `POST /api/audio/test-music
+    {file: "projects/a_s/BUMPERY/WSS-27s.mp4"}`; the live input had been silent.
+  - I captured `/api/ws` for 10 s: **300 frames in 9.9 s (30 Hz), all with 512-byte `fcWeighted`/`fcRaw`**.
+  - Peaks per row (median): the Shadertoy `freq` is **255 (clipped)**, while FragCoord's raw row is **195**, so the
+    loud end is kept.
+  - Bins 1-4 (47-188 Hz): raw 175.9, weighted 114.6. That is a 61-byte cut (≈19 dB), which is the A curve there.
+    Bins 64-67 (3 kHz): 91.2 for both, unweighted as intended.
+  - I fed the captured frames through `fc_spectrogram.gd` at 60 fps (headless `-s` script, 595 pulls) and saved
+    the history as a PNG. Its R and B planes show a real spectrogram: newest at row 0, the track's risers as
+    diagonal sweeps, beats as bands, and the bass columns dimmer in R than in B.
+  - **Left as found:** `{stop: true}` gave the FFT its live input back.
+  - The operator GUI was not relaunched (the owner is working in it). The new client code is the feed line in
+    `visuals_tab.gd`; `--check` covers it compiling, and it runs on the next relaunch.

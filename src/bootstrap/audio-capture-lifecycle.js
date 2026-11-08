@@ -96,6 +96,9 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 				appCtx._wsBroadcast('audio_fft', {
 					freq: Buffer.from(frame.freq).toString('base64'),
 					wave: Buffer.from(frame.wave).toString('base64'),
+					// WO-999: FragCoord's spectrogram rows — R weighted (A-curve), B raw; −90..−10 dB
+					fcWeighted: frame.fc ? Buffer.from(frame.fc.weighted).toString('base64') : undefined,
+					fcRaw: frame.fc ? Buffer.from(frame.fc.raw).toString('base64') : undefined,
 					rms: Math.round(frame.rms * 1000) / 1000,
 					device: frame.device,
 					// WO-662: beat {n, age, bpm, conf, phase, level} + bands [bass, mid, high] 0..1

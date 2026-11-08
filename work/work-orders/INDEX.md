@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-908 live WOs (29 open, 121 in progress, 758 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+908 live WOs (28 open, 122 in progress, 758 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -535,7 +535,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 994 DONE [godot-client+lighting] Previs models look low quality: 3DS meshes shaded with one averaged normal per… → 994_WO_previs_3ds_hard_edge_normals.md
 - 997 DONE [godot-client] ShmTexture never frees its RenderingDevice texture (Visuals game scenes leak VR… → 997_WO_shm_texture_rd_leak.md
 - 998 DONE [godot-client] A look holding a timeline: its deck card is blank, and the deck timer and compo… → 998_WO_timeline_in_look_card_and_timer.md
-- 999 OPEN [godot-client+engine,audio] Run FragCoord shaders natively in Visuals (u_ uniforms, the 512×512 audio spect… → 999_WO_fragcoord_native_shader_runtime.md
+- 999 IN PROGRESS [godot-client+engine,audio] Run FragCoord shaders natively in Visuals (u_ uniforms, the 512×512 audio spect… → 999_WO_fragcoord_native_shader_runtime.md
 
 ## web-client — Web client (82)
 

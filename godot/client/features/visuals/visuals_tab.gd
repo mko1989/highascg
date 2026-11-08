@@ -15,6 +15,7 @@ const Catalog := preload("res://features/visuals/visuals_catalog.gd")
 const Mixer := preload("res://features/visuals/visuals_mixer.gd")
 const Probes := preload("res://features/visuals/visuals_probes.gd")
 const Air := preload("res://features/visuals/visuals_air.gd")
+const FcSpec := preload("res://features/visuals/fc_spectrogram.gd")
 const ShowCtl := preload("res://features/visuals/visuals_show_ctl.gd")
 const ShaderMode := preload("res://features/visuals/visuals_shader_mode.gd")
 const CamCtl := preload("res://features/visuals/visuals_camera_ctl.gd")
@@ -132,6 +133,7 @@ func _ready() -> void:
 		_g("Ws").on("audio_fft", func(d: Variant) -> void:
 			_buses = M.buses_of(d)
 			mixer.audio_frame(d)
+			FcSpec.shared().frame_from_ws(d)  # WO-999: FragCoord's u_audio history
 			_audio_at = Time.get_ticks_msec()
 			show_ctl.audio(d)
 			Sync.observe(_sync_state, d, _buses, _audio_at))

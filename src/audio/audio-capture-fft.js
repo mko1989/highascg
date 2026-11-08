@@ -30,6 +30,7 @@
 const { spawn, execFileSync } = require('child_process')
 const dgram = require('dgram')
 const { pcmS16leToMonoFloats, analyserFreqBytes, waveformBytes, rmsOf } = require('./fft')
+const { createFragcoordAnalyser } = require('./fft-fragcoord')
 const { createBeatDetector, bandsOf } = require('./beat-detect')
 const { createAudioParts } = require('./audio-parts')
 const { createTapTempo } = require('./beat-tap')
@@ -186,6 +187,8 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 	const ring = new Float32Array(cfg.fftSize)
 	let ringFill = 0
 	const smoothState = new Float32Array(cfg.fftSize >> 1)
+	/** WO-999: FragCoord's u_audio rows (weighted + raw, −90..−10 dB, smoothing 0.8) off the same ring. */
+	const fc = createFragcoordAnalyser({ sampleRate: cfg.sampleRate, fftSize: cfg.fftSize })
 	/** S16 frame alignment across chunk boundaries. */
 	let pending = Buffer.alloc(0)
 	/** WO-662: onsets on every sample (≈11 ms hops), not on the 30 Hz frames. */
@@ -246,8 +249,11 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 			}
 			staleFrameSent = true
 			smoothState.fill(0)
+			fc.reset()
+			const zero = new Uint8Array(cfg.fftSize >> 1)
 			onFrame({
-				freq: new Uint8Array(cfg.fftSize >> 1),
+				freq: zero,
+				fc: { weighted: zero, raw: zero },
 				wave: waveformBytes(new Float32Array(0), cfg.fftSize >> 1),
 				rms: 0,
 				device: test ? `file:${test.file.split('/').pop()}` : activeDevice,
@@ -262,6 +268,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 		const wave = waveformBytes(ring, cfg.fftSize >> 1)
 		onFrame({
 			freq,
+			fc: fc.rows(ring),
 			wave,
 			rms: rmsOf(ring),
 			device: test ? `file:${test.file.split('/').pop()}` : activeDevice,
