@@ -202,7 +202,7 @@ func rename(p: Dictionary) -> void:
 func _on_view(v: Dictionary, rebuild: bool) -> void:
 	_view = v
 	_values = {}
-	for p in v.get("params", []):
+	for p in v.get("params", []) + v.get("uniforms", []):
 		_values[str(p.key)] = (p.values as Array).duplicate()
 	_dirty.visible = bool(v.get("dirty", false))
 	_save.disabled = not _dirty.visible
@@ -241,6 +241,9 @@ func _render() -> void:
 	_save.disabled = not _dirty.visible
 	if not _view.is_empty():
 		_main.add_child(_presets_bar())
+		var us: Array = _view.get("uniforms", [])
+		if not us.is_empty():
+			_main.add_child(W.group("Shader controls", _uniform_rows(us)))
 		var by := M.params_by_key(_view)
 		for sec in M.sections(_view):
 			var flow := HFlowContainer.new()
@@ -251,12 +254,45 @@ func _render() -> void:
 				_key_cards.append({"label": str(c.get("label", "")), "card": card})
 			_main.add_child(W.group(str(sec.title), flow))
 		var sum := HBoxContainer.new()
-		sum.add_child(W.muted(M.summary(_view)))
+		if not (us.size() > 0 and (_view.get("params", []) as Array).is_empty()):  # WO-1000: no "no controls" note over the uniforms
+			sum.add_child(W.muted(M.summary(_view)))
 		var hidden := int(_view.get("hiddenManual", 0))
 		if hidden > 0:
 			Kit.button(sum, "restore %d hidden" % hidden, func() -> void: post_op("unhide", {}))
 		_main.add_child(sum)
 	_render_advanced()
+
+
+## WO-1000: a FragCoord shader's own controls (`uniform … //d, [a, b]`), first in the panel and first for the MIDI knobs. The
+## value widgets post `set {key: "u:<name>"}`; the node changes `values` only, so a drag moves a UBO slot, never recompiles.
+func _uniform_rows(us: Array) -> Control:
+	var rows := VBoxContainer.new()
+	for u in us:
+		var key := str(u.key)
+		var row := HBoxContainer.new()
+		row.add_child(W.tool_btn("↺", "Back to the shader's value", func() -> void: post_op("reset", {"key": key})))
+		var name := Label.new()
+		name.text = str(u.name).trim_prefix("u_").replace("_", " ")
+		name.tooltip_text = "%s %s — default %s" % [str(u.get("type", "")), str(u.name), str(u.get("defaults", []))]
+		name.mouse_filter = Control.MOUSE_FILTER_STOP
+		name.custom_minimum_size.x = 140
+		if u.get("changed", false):
+			name.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
+		row.add_child(name)
+		var w: Control = W.value_widgets(self, u) if str(u.get("kind", "")) != "toggle" else _toggle(key, u)
+		w.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(w)
+		rows.add_child(row)
+		_key_cards.append({"label": name.text, "card": row})
+	return rows
+
+
+## A bool uniform: a checkbox posting 1 / 0.
+func _toggle(key: String, u: Dictionary) -> CheckBox:
+	var cb := CheckBox.new()
+	cb.button_pressed = float((u.get("values", [0.0]) as Array)[0]) != 0.0
+	cb.toggled.connect(func(on: bool) -> void: post_op("set", {"key": key, "values": [1.0 if on else 0.0]}, false))
+	return cb
 
 
 func _presets_bar() -> Control:

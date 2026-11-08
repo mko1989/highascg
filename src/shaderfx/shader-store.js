@@ -91,6 +91,7 @@ function normalizeShaderConfig(input) {
 					typeof payload.audio?.enabled === 'boolean' ? payload.audio.enabled : fragcoordUsesAudio(common, parts.passes),
 			},
 			opts: { alpha: payload.opts?.alpha === true },
+			...curationOf(payload, id), // WO-1000: presets / labels / Save-as-child parent survive like a Shadertoy shader's
 		}
 	}
 
@@ -135,6 +136,20 @@ function normalizeShaderConfig(input) {
 		}
 	}
 
+	const beat = normalizeBeatKnobs(payload.audio?.beat)
+	return {
+		id,
+		name,
+		common,
+		passes,
+		audio: { enabled: payload.audio?.enabled !== false, ...(beat ? { beat } : {}) },
+		opts: { alpha: payload.opts?.alpha === true },
+		...curationOf(payload, id),
+	}
+}
+
+/** The Shader Live curation of a config, either dialect: `{ paramLabels?, controls?, parentId? }`. */
+function curationOf(payload, id) {
 	/* todos27.07.26: operator-given display names for Shader Live parameters ("decode what each
 	 * parameter does"). Keyed by the editor's stable param key; bounded so a hostile payload
 	 * cannot bloat the config file. */
@@ -150,7 +165,6 @@ function normalizeShaderConfig(input) {
 	}
 
 	const controls = normalizeControlsManifest(payload.controls)
-	const beat = normalizeBeatKnobs(payload.audio?.beat)
 
 	/* todos27.07.26: child shaders — every Shader Live save is a NEW config pointing at the
 	 * shader it was derived from. One level: children attach to the root parent. */
@@ -160,12 +174,6 @@ function normalizeShaderConfig(input) {
 			: null
 
 	return {
-		id,
-		name,
-		common,
-		passes,
-		audio: { enabled: payload.audio?.enabled !== false, ...(beat ? { beat } : {}) },
-		opts: { alpha: payload.opts?.alpha === true },
 		...(Object.keys(paramLabels).length ? { paramLabels } : {}),
 		...(controls ? { controls } : {}),
 		...(parentId ? { parentId } : {}),

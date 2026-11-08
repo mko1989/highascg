@@ -273,4 +273,5 @@ module.exports = [
 	'tools/smoke/smoke-wo994-mesh-crease.test.js',
 	'tools/smoke/smoke-wo999-fragcoord-audio-rows.test.js',
 	'tools/smoke/smoke-wo999-fragcoord-import.test.js',
+	'tools/smoke/smoke-wo1000-fragcoord-uniform-controls.test.js',
 ]

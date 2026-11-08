@@ -206,3 +206,37 @@ func test_live_slider_commits_while_dragging() -> void:
 	t.eq([W._live(RefCounted.new()), W._live(Mode.new())], [0, 120], "the panel's live_ms, 0 without one")
 	live.free()
 	old.free()
+
+
+## WO-1000: a FragCoord shader's own controls — the view's `uniforms` drawn first ("Shader controls", a slider or colour each,
+## first for the MIDI knobs), their values readable by sibling sliders, and the working `values` merged over the library.
+func test_fragcoord_uniform_controls() -> void:
+	var lib := {"id": "sh-fc", "dialect": "fragcoord", "passes": {"main": {"source": "M"}}, "values": {"u_speed": 1.0}}
+	var m := Sync.merged(lib, {"common": "", "passes": {"main": {"source": "M"}}, "values": {"u_speed": 4.5}})
+	t.eq([m.values, m.dialect], [{"u_speed": 4.5}, "fragcoord"], "the working values win; the dialect stays")
+	t.eq(Sync.merged(lib, {"passes": {}}).values, {"u_speed": 1.0}, "no working values: the library's")
+	var mode: Mode = Mode.new()
+	mode.layer_cb = func() -> Dictionary: return {}
+	t.root.add_child(mode)
+	var v := {"id": "sh-fc", "name": "FC", "dirty": false, "sections": [], "controls": [], "params": [], "advanced": [],
+		"presets": [], "hiddenManual": 0,
+		"uniforms": [
+			{"key": "u:u_speed", "name": "u_speed", "type": "float", "vec": 1, "values": [4.5], "defaults": [1.5], "kind": "float",
+				"min": 0.0, "max": 6.0, "step": 0.03, "changed": true},
+			{"key": "u:u_tint", "name": "u_tint", "type": "vec3", "vec": 3, "values": [1.0, 0.5, 0.2], "defaults": [1.0, 0.5, 0.2],
+				"kind": "color", "min": 0.0, "max": 1.0, "step": 0.01, "changed": false},
+			{"key": "u:u_on", "name": "u_on", "type": "bool", "vec": 1, "values": [1.0], "defaults": [1.0], "kind": "toggle",
+				"min": 0.0, "max": 1.0, "step": 1.0, "changed": false}]}
+	mode._on_view(v, true)
+	var labels := mode._main.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	t.ok("Shader controls" in labels and "speed" in labels and "tint" in labels, "a group with one row per uniform")
+	t.eq(mode._main.find_children("*", "HSlider", true, false).size(), 1, "the float is a slider")
+	t.eq(mode._main.find_children("*", "ColorPickerButton", true, false).size(), 1, "the vec3 in 0..1 is a colour")
+	t.eq((mode._main.find_children("*", "HSlider", true, false)[0] as HSlider).value, 4.5, "at its current value")
+	t.eq(mode.current_values("u:u_tint"), [1.0, 0.5, 0.2], "sibling components read from the view")
+	var boxes := mode._main.find_children("*", "CheckBox", true, false)
+	t.eq([boxes.size(), (boxes[0] as CheckBox).button_pressed], [1, true], "a bool is a checkbox, on")
+	t.ok(not labels.any(func(x: String) -> bool: return x.begins_with("No obvious controls")), "no 'no controls' note over the uniforms")
+	var ks := mode.key_controls()
+	t.eq([ks.size(), ks[0].label], [1, "speed"], "the slider is the first MIDI knob (colours left out)")
+	mode.queue_free()

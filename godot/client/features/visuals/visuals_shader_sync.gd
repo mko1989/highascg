@@ -150,7 +150,7 @@ func _compile(working: Variant, gen: int) -> void:
 	compiled.emit(sid, merged(_lib[sid], working))
 
 
-## The library config with the working copy's GLSL over it (channels, opts and the rest stay the library's).
+## The library config with the working copy's GLSL (and FragCoord `values`) over it (channels, opts and the rest stay the library's).
 static func merged(lib: Dictionary, working: Dictionary) -> Dictionary:
 	var cfg := lib.duplicate(true)
 	cfg["common"] = str(working.get("common", ""))
@@ -163,4 +163,6 @@ static func merged(lib: Dictionary, working: Dictionary) -> Dictionary:
 		else:
 			ps[k] = {"source": src}
 	cfg["passes"] = ps
+	if working.get("values") is Dictionary:  # WO-1000: a FragCoord shader's own controls (fragcoord_rd.gd takes them without a recompile)
+		cfg["values"] = (working.values as Dictionary).duplicate(true)
 	return cfg

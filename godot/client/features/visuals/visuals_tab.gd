@@ -73,6 +73,8 @@ func _ready() -> void:
 	work = WorkArea.new()
 	add_child(work)
 	work.add_mode("shader", "Shader", ShaderMode.new(self), "Shader: the selected layer's shader controls · a change recompiles it")  # WO-894
+	if Config.args.has("visuals-mode"):  # dev (WO-1000): --visuals-mode=shader opens a mode at launch (box checks without the pointer)
+		work.set_mode.call_deferred(str(Config.args["visuals-mode"]))
 	mixer.switched.connect(func(_d: Node) -> void: _orbit_world())  # the orbit follows the live deck
 	flow = work.flow
 	flow.changed.connect(func(g: Dictionary) -> void:

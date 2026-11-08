@@ -7,6 +7,7 @@
  */
 
 const store = require('./shader-store')
+const U = require('./fragcoord-uniforms')
 const S = require('./shader-live-session')
 const { liveShaderInstances } = require('./shader-live-instances')
 
@@ -78,6 +79,13 @@ async function run(op, b, s, env) {
 		case 'set': {
 			const items = []
 			for (const it of Array.isArray(b.items) ? b.items : [b]) {
+				if (U.isUniformKey(it?.key)) {
+					// WO-1000: a FragCoord control — cfg.values only, no source rewrite (the runner refills its UBO slots)
+					const err = U.setUniform(s.cfg, it.key, Array.isArray(it.values) ? it.values : [], s.pristine.values)
+					if (err) return { error: err, status: 400 }
+					s.dirty = true
+					continue
+				}
 				const p = byKey.get(String(it?.key))
 				const vals = Array.isArray(it?.values) ? it.values.map(num) : null
 				if (!p || !vals || vals.length !== p.values.length || vals.some((v) => v == null)) return { error: `bad param ${it?.key}`, status: 400 }
@@ -95,6 +103,10 @@ async function run(op, b, s, env) {
 			return { items: macroItems(c, k, byKey, pristine) }
 		}
 		case 'reset': {
+			if (U.isUniformKey(b.key)) {
+				const err = U.setUniform(s.cfg, b.key, null, s.pristine.values)
+				return err ? { error: err, status: 400 } : {}
+			}
 			if (b.key != null) return { items: diffItems(params, (p) => (p.key === String(b.key) ? pristine.get(p.key) : null)) }
 			if (b.control != null) {
 				const c = controls().find((x) => x.id === String(b.control))
@@ -104,13 +116,21 @@ async function run(op, b, s, env) {
 			// Reset all: back to the library source verbatim (recovery for a broken shader), every pass pushed.
 			s.cfg.common = s.pristine.common
 			for (const [k, v] of Object.entries(s.pristine.passes)) if (v && s.cfg.passes?.[k]) s.cfg.passes[k].source = v.source
+			if (s.pristine.values) s.cfg.values = JSON.parse(JSON.stringify(s.pristine.values)) // WO-1000
 			s.dirty = false
 			return { passes: ['common', ...L.PASS_KEYS.filter((k) => s.cfg.passes?.[k]?.source)], timeScale: 1 }
 		}
 		case 'preset': {
-			if (b.original) return { items: diffItems(params, (p) => pristine.get(p.key)) }
+			if (b.original) {
+				if (s.pristine.values) s.cfg.values = JSON.parse(JSON.stringify(s.pristine.values)) // WO-1000
+				return { items: diffItems(params, (p) => pristine.get(p.key)) }
+			}
 			const v = m.presets.find((x) => x.name === String(b.name))?.v
 			if (!v) return { error: 'unknown preset', status: 404 }
+			for (const u of U.uniformParams(s.cfg, s.pristine.values)) {
+				U.setUniform(s.cfg, u.key, v[u.key] || null, s.pristine.values) // WO-1000: the preset's controls, the rest back
+				s.dirty = true
+			}
 			return { items: diffItems(params, (p) => v[p.key] || pristine.get(p.key)) }
 		}
 		case 'preset-save': {
@@ -118,6 +138,7 @@ async function run(op, b, s, env) {
 			if (!name) return { error: 'name required', status: 400 }
 			const v = {}
 			for (const p of params) if (pristine.get(p.key) && !S.same(pristine.get(p.key), p.values)) v[p.key] = [...p.values]
+			for (const u of U.uniformParams(s.cfg, s.pristine.values)) if (u.changed) v[u.key] = [...u.values] // WO-1000
 			m.presets = [...m.presets.filter((x) => x.name !== name), { name, v }].slice(-16)
 			return { manifest: m }
 		}

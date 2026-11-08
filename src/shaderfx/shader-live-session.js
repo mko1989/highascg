@@ -14,6 +14,7 @@
 const path = require('path')
 const { pathToFileURL } = require('url')
 const store = require('./shader-store')
+const { uniformParams } = require('./fragcoord-uniforms')
 const { liveShaderInstances } = require('./shader-live-instances')
 
 const LIB = path.join(__dirname, '..', '..', 'client', 'lib')
@@ -70,6 +71,7 @@ async function open(id) {
 		pristine: {
 			common: cfg.common || '',
 			passes: Object.fromEntries(Object.entries(cfg.passes || {}).map(([k, v]) => [k, v ? { source: v.source } : null])),
+			values: clone(cfg.values || {}), // WO-1000: a FragCoord shader's own controls
 		},
 		pristineByKey: new Map(L.scanShaderCfg(cfg).map((p) => [p.key, [...p.values]])),
 		dirty: false,
@@ -138,9 +140,10 @@ async function view(id, s) {
 			changed: !same(s.pristineByKey.get(p.key), p.values),
 		})),
 		advanced: advancedGroups(L, params),
+		uniforms: uniformParams(s.cfg, s.pristine.values), // WO-1000: FragCoord `uniform … //d, [a, b]` controls ('u:' keys)
 	}
 	// Reverting the last change (↺, Original) clears it — literal values, not source text (7.0 vs 7.).
-	out.dirty = s.dirty && out.params.some((p) => p.changed)
+	out.dirty = s.dirty && [...out.params, ...out.uniforms].some((p) => p.changed)
 	return out
 }
 
@@ -148,7 +151,7 @@ async function view(id, s) {
 function workingOf(s) {
 	const passes = {}
 	for (const [k, v] of Object.entries(s.cfg.passes || {})) if (v) passes[k] = { source: v.source || '' }
-	return { common: s.cfg.common || '', passes }
+	return { common: s.cfg.common || '', passes, ...(s.cfg.values ? { values: s.cfg.values } : {}) }
 }
 
 /** CG UPDATE one pass onto every live instance of the shader; a 403 (PLAY-hosted html) re-hosts via CG ADD once. */
