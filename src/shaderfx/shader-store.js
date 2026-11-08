@@ -21,6 +21,7 @@ const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
 const { atomicWriteFile } = require('../utils/atomic-file-write')
 const { buildShaderTemplateHtml } = require('./shader-template-export')
+const { normalizeFragcoordParts, fragcoordUsesAudio } = require('./fragcoord-config')
 
 const SHADERS_DATA_DIR = path.join(REPO_ROOT, 'data', 'shaders')
 const SHADERS_TEMPLATE_DIR = path.join(REPO_ROOT, 'template', 'shaders')
@@ -75,6 +76,23 @@ function normalizeShaderConfig(input) {
 
 	const common = String(payload.common || '')
 	if (common.length > MAX_SOURCE_LEN) throw new Error('common source too large')
+
+	/* WO-999: a FragCoord shader keeps its own pass layout (main + pass1..8), run natively by the Godot Visuals. */
+	if (payload.dialect === 'fragcoord') {
+		const parts = normalizeFragcoordParts(payload, { maxSource: MAX_SOURCE_LEN })
+		return {
+			id,
+			name,
+			dialect: 'fragcoord',
+			common,
+			...parts,
+			audio: {
+				enabled:
+					typeof payload.audio?.enabled === 'boolean' ? payload.audio.enabled : fragcoordUsesAudio(common, parts.passes),
+			},
+			opts: { alpha: payload.opts?.alpha === true },
+		}
+	}
 
 	/** @type {Record<string, {source: string, channels: Array<string|null>}|null>} */
 	const passes = {}
@@ -259,6 +277,7 @@ async function reconcileShaderStore() {
 		if (!isValidShaderId(id) || tplSet.has(id)) continue
 		try {
 			const raw = JSON.parse(await fsp.readFile(dataPath(id), 'utf8'))
+			if (raw?.dialect === 'fragcoord') continue // WO-999: Caspar's player cannot run it — no template by design
 			await atomicWriteFile(templatePath(id), buildShaderTemplateHtml(normalizeShaderConfig(raw)))
 			exported.push(id)
 		} catch {
@@ -310,6 +329,9 @@ async function listShaders() {
 				name: raw.name,
 				audio: !!raw.audio?.enabled,
 				alpha: !!raw.opts?.alpha,
+				...(raw.dialect === 'fragcoord'
+					? { dialect: 'fragcoord', license: raw.source?.license || '', licenseKind: raw.source?.licenseKind || 'none' }
+					: {}),
 				casparPath: `shaders/${raw.id}`,
 				updatedAt: st.mtime ? st.mtime.toISOString() : null,
 			})
@@ -342,6 +364,7 @@ async function saveShader(input) {
 	if (!fs.existsSync(SHADERS_DATA_DIR)) await fsp.mkdir(SHADERS_DATA_DIR, { recursive: true })
 	if (!fs.existsSync(SHADERS_TEMPLATE_DIR)) await fsp.mkdir(SHADERS_TEMPLATE_DIR, { recursive: true })
 	await atomicWriteFile(dataPath(config.id), JSON.stringify(config, null, '\t') + '\n')
+	if (config.dialect === 'fragcoord') return { config, casparPath: null } // WO-999: Visuals only, no Caspar template
 	await atomicWriteFile(templatePath(config.id), buildShaderTemplateHtml(config))
 	return { config, casparPath: `shaders/${config.id}` }
 }

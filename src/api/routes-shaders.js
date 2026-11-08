@@ -5,6 +5,7 @@
  *   POST   /api/shaders          → create/update (normalizes, persists, exports Caspar template)
  *   DELETE /api/shaders/:id      → remove config + exported template
  *   POST   /api/shaders/import   → WO-380: paste a Shadertoy share link, get the code layers back
+ *                                   WO-999: a FragCoord link is license-gated, converted and SAVED (native dialect)
  */
 
 'use strict'
@@ -15,6 +16,7 @@ const { htmlGpuState } = require('../shaderfx/caspar-html-gpu')
 const { liveShaderInstances } = require('../shaderfx/shader-live-instances')
 const { pushPayload } = require('../shaderfx/shader-live-session')
 const { shadertoyIdFromInput, shadertoyConfigFromApiJson, fetchShadertoyShader } = require('../shaderfx/shadertoy-import')
+const { isFragcoordInput, importFragcoordShader } = require('../shaderfx/fragcoord-import')
 
 /**
  * @param {string} p
@@ -42,6 +44,7 @@ async function handlePost(p, body, ctx) {
 	if (p === '/api/shaders/import') {
 		try {
 			const b = parseBody(body) || {}
+			if (isFragcoordInput(b.url || b.link)) return await importFragcoord(b, ctx)
 			const id = shadertoyIdFromInput(b.url || b.link || b.id)
 			if (!id) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'not a Shadertoy share link or id' }) }
 			const key = String(ctx?.config?.shadertoyApiKey || process.env.SHADERTOY_API_KEY || '')
@@ -61,6 +64,31 @@ async function handlePost(p, body, ctx) {
 		if (ctx && typeof ctx.log === 'function') ctx.log('info', `[shaderfx] saved "${config.id}" → template ${casparPath}`)
 		const live = await pushBeatKnobs(ctx, config)
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, id: config.id, casparPath, ...(live ? { live } : {}) }) }
+	} catch (e) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: String(e?.message || e) }) }
+	}
+}
+
+/**
+ * WO-999 — a FragCoord link: fetched, license-gated (none → refused, NC → only with `allowNonCommercial`), golf passes
+ * converted, then saved straight away. Unlike a Shadertoy import there is nothing to review in the web modal (it edits
+ * Shadertoy passes only); the Visuals run the shader in its own dialect. A re-import of the same link overwrites it.
+ */
+async function importFragcoord(b, ctx) {
+	try {
+		const { skipped, licenseKind, shareAlike, ...config } = await importFragcoordShader(b.url || b.link, {
+			allowNonCommercial: b.allowNonCommercial === true,
+		})
+		const saved = await store.saveShader(config)
+		const warnings = [
+			...(skipped.length ? [`passes beyond 8 not imported: ${skipped.join(', ')}`] : []),
+			...(licenseKind === 'nc' ? [`${config.source.license}: non-commercial use only`] : []),
+			...(shareAlike ? [`${config.source.license}: share-alike — derivatives keep this license`] : []),
+		]
+		if (ctx && typeof ctx.log === 'function') {
+			ctx.log('info', `[shaderfx] imported fragcoord ${config.source.slug} ("${config.name}", ${config.source.license}) → ${saved.config.id}`)
+		}
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, saved: saved.config.id, config: saved.config, warnings }) }
 	} catch (e) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: String(e?.message || e) }) }
 	}

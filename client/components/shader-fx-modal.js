@@ -193,6 +193,13 @@ export function showShaderFxModal(opts = {}) {
 			const r = await api.post('/api/shaders/import', { url })
 			if (!r?.ok || !r.config) throw new Error(r?.error || 'import failed')
 			const cfg = r.config
+			if (r.saved) {
+				// WO-999: a FragCoord shader is saved as is (its own dialect, run by the Godot Visuals) — nothing to edit here
+				await refreshList(r.saved)
+				const warn = Array.isArray(r.warnings) && r.warnings.length ? ` — ${r.warnings.join('; ')}` : ''
+				setStatus(`Imported "${cfg.name}" (${cfg.source?.license || 'FragCoord'}) into the library for the Visuals${warn}`, warn ? 'warn' : 'ok')
+				return
+			}
 			// A fresh id: an import is a NEW shader, never an overwrite of the open one.
 			currentId = null
 			el('shaderfx-name').value = cfg.name || ''

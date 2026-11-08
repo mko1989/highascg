@@ -9,6 +9,7 @@ extends Node3D
 ## dropped shader (WO-910).
 
 const Runner := preload("res://features/visuals/shadertoy_rd.gd")
+const FcRunner := preload("res://features/visuals/fragcoord_rd.gd")  # WO-999: `dialect: "fragcoord"` configs
 const Cam := preload("res://features/visuals/visuals_camera.gd")
 const FOV := 60.0  # the stage camera's (visuals_stage.gd)
 const FAR := 300.0  # behind every other scene (the tunnel ends 194 away)
@@ -26,7 +27,7 @@ void fragment() {
 }
 """
 
-var runner := Runner.new()
+var runner: RefCounted = Runner.new()
 var overlay := false
 var _quad: MeshInstance3D
 var _mat: ShaderMaterial
@@ -73,7 +74,12 @@ func set_camera(tf: Transform3D) -> void:
 
 ## A shader config (GET /api/shaders/:id); "" or the compile error.
 func set_shader(cfg: Variant) -> String:
-	var e := runner.use(cfg)
+	var fc: bool = cfg is Dictionary and cfg.get("dialect") == "fragcoord"
+	if fc != (runner.get_script() == FcRunner):  # WO-999: the other dialect gets its own runner
+		runner.release()
+		runner = FcRunner.new() if fc else Runner.new()
+		_mat.set_shader_parameter("tex", runner.texture)
+	var e: String = runner.use(cfg)
 	var id := str(cfg.get("id", "")) if cfg is Dictionary else ""
 	if id == "" or id != _cfg_id:  # WO-894: the same shader recompiled with edited values (Visuals ▸ Shader) keeps its clock
 		_time = 0.0

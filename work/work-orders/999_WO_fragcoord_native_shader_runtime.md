@@ -1,6 +1,6 @@
 # WO-999 — Run FragCoord shaders natively in Visuals (u_* uniforms, the 512×512 audio spectrogram, passes), no Shadertoy conversion
 **Area:** godot-client, engine, audio
-**Status: IN PROGRESS (step 1 done 08.11: FragCoord u_audio rows on the server + the 512×512 history model in Godot, verified on live frames; steps 2-4 open)**
+**Status: DONE (08.11 — headless suites + six openly licensed FragCoord shaders imported and rendered in the live Visuals stage with music on u_audio, screenshots; level A/B against FragCoord's own editor not done)**
 
 Owner, 08.11, after the FragCoord feasibility check (`https://fragcoord.xyz/s/30gw2t1g`): *"Can we just use these
 shaders without converting them to shader toy's convention. I especially like the audio spectrogram instead of plain
@@ -169,6 +169,75 @@ FFT. Start a work order"*
   - `godot/client/tests/test_fc_spectrogram.gd`, 8 tests: layout, 60 rows/s scroll with leftovers, sub-row
     rewrite, gap fill, once-per-frame pull, stale silence, old-server frames, the shared instance.
 
+### Step 2 — the FragCoord wrapper and runner (08.11)
+
+- **A sibling runner, not a mode of `shadertoy_rd.gd`.** The two dialects share almost nothing at bind time: names vs
+  channels, `pass1..8` + `main` vs `bufferA-D` + `image`, a 432-byte UBO vs Shadertoy's. Folding both into one file
+  would cross the 500-line limit and tangle two binding models. Only the ES→450 renames and zero-init are shared
+  (`shadertoy_glsl.gd` `_rename`).
+- **`godot/client/features/visuals/fragcoord_glsl.gd`** (new, 217 lines, pure):
+  - `BLOCK`: one std140 UBO with every FragCoord built-in. `u_frame` and the other ints are real `int`s; the custom
+    values ride in `vec4 _hgC[16]` from byte 176 (`UBO_SIZE` 432).
+  - `passes(cfg)`: pass1..8 in order, then main; empty sources are skipped; `format` falls back to rgba8.
+  - `uniforms(cfg)`: every `uniform` line in common + passes. Value uniforms get a slot with their defaults (an
+    initialiser or the `//d, [a,b]` comment; the last value fills the rest; no default → 0 clamped into the range).
+    Texture uniforms keep their type and the comment's URL/`proc3d:`. Built-ins and `u_passN` are left out; the
+    first declaration wins, common first.
+  - `fragment()`: strips `#version`, `precision`, `out vec4 fragColor;` and every `uniform` line, but keeps the
+    line itself so `#line 1` error lines match the editor. Each value uniform becomes a `#define u_x (_hgC[i].xyz)`
+    (int / bool wrapped). Only the samplers a pass actually names are declared, in binding order: built-ins,
+    passes, custom. A user `main` is renamed `fc_user_main`; `mainImage`'s `out` becomes `inout`, because SPIR-V
+    does not zero an out param the way WebGL does. The footer zeroes `fragColor` and calls the entry. The library's
+    alpha flag adds the existing alpha key to main.
+- **`godot/client/features/visuals/fragcoord_rd.gd`** (new, 305 lines): the same surface as `shadertoy_rd.gd`
+  (`texture`, `error`, `use`, `render`, `release`), so `scenes/shader.gd` swaps runners without other changes.
+  - `use()` recompiles only when common, passes or uniforms change. A value change just refills the slots.
+  - Targets: main renders into `image` (copied to `prev` after the draw when it reads `u_main`). Aux passes are
+    ping-pong pairs in their format (rgba8, or rgba16f/32f when named). A pass reads another pass's half drawn
+    earlier this frame, or last frame's.
+  - `u_audio` is the shared spectrogram from step 1, uploaded only when its `rev` changes and pulled once per drawn
+    frame however many layers use it.
+  - Unbound inputs: `u_keyboard` and `u_webcam` read black. URL, video and `proc3d:` textures read white of their
+    type (2D, 3D or cube), so the shader compiles and draws.
+  - The UBO fills `u_date` (0-based month, as FragCoord's), `u_refresh_rate` from the display, and a fixed camera
+    at (0,0,3) looking down −z.
+- **`scenes/shader.gd`**: `set_shader` picks `fragcoord_rd.gd` when `cfg.dialect == "fragcoord"`, else the
+  Shadertoy runner, releasing the old one and rebinding the material's texture.
+
+### Step 3 — library, import and the license gate (08.11)
+
+- **`src/shaderfx/fragcoord-config.js`** (new): the library shape. It has `dialect: 'fragcoord'`, passes `main` +
+  `pass1..8` with an optional format, `values`, and `source` provenance (site, slug, url, title, author, license,
+  licenseUrl, `licenseKind` open/nc/none, and the golf originals).
+- **`src/shaderfx/shader-store.js`**: normalisation branches on the dialect. FragCoord shaders get no Caspar
+  template export, because Caspar's HTML player runs Shadertoy configs only (`casparPath: null`). The list carries
+  `dialect`, `license` and `licenseKind`.
+- **`src/shaderfx/fragcoord-import.js`** (new): link or slug → MCP `get_shader`, falling back to `/s/<slug>.md` →
+  parse the header and pass headings → license gate → golf passes converted through `convert_shader` →
+  `sh-fc-<slug>-<words>` config.
+  - **Gate:** "none" (all rights reserved) and hidden-source marketplace shaders are always refused. NC is refused
+    unless `allowNonCommercial: true` is sent. Share-alike licenses come back as a warning.
+  - Golf is detected by its markers (`@(`, `f2`/`f3`/`f4`, `uniform f|f2|s2`), not by tags; a tag rule misfired on
+    plain GLSL.
+  - The converter wraps every body in `void main(){}`. Common gets that empty main stripped again
+    (`stripEmptyMain`), or every pass would carry two mains.
+  - The User-Agent is generic (`highascg-shader-import/1.0`).
+- **`src/api/routes-shaders.js`**: `POST /api/shaders/import` with a FragCoord link imports and saves straight away,
+  returning `{ok, saved, config, warnings}`. A Shadertoy link takes the old WO-380 path.
+- **`client/components/shader-fx-modal.js`**: the web modal's import box accepts the link and refreshes the list
+  (its pass editor is Shadertoy-only, so there is nothing to review).
+
+### Known limits (not in this WO)
+
+- URL, video and `proc3d:` textures read white; `u_keyboard` and `u_webcam` read black. `u_mouse`, `u_drag` and
+  `u_scroll` are 0, and the camera is fixed.
+- MRT, `u_passes[]` and non-2D buffers are not supported.
+- FragCoord's markdown does not carry pass formats, so imports run rgba8 everywhere. A shader that needs float
+  buffers needs its `format` set in the library.
+- There is no paste-link box in the Godot client yet; import goes through the API or the web modal.
+- `audio_fft.emitHz` stays 30, so each spectrogram row is written twice (step 1).
+- The library's shader files live in `data/shaders/` (gitignored, box-local), so imports are not in the repo.
+
 ## What was VERIFIED
 
 ### Step 1
@@ -192,3 +261,37 @@ FFT. Start a work order"*
   - **Left as found:** `{stop: true}` gave the FFT its live input back.
   - The operator GUI was not relaunched (the owner is working in it). The new client code is the feed line in
     `visuals_tab.gd`; `--check` covers it compiling, and it runs on the next relaunch.
+
+### Steps 2-3
+
+- **Godot:** `--check` boots clean. `--test`: **26109 passed, 0 failed**. That includes
+  `tests/test_fragcoord_glsl.gd` (6 tests): pass order and formats, custom uniforms → slots and overrides, the main
+  form, the mainImage form with redeclarations dropped, the UBO constants, and 3D/cube sampler types.
+- **Offline:** `tools/smoke/smoke-wo999-fragcoord-import.test.js` (curated), 14 tests: link → slug, markdown parsing, the
+  license classes and gate (none, NC, hidden source), golf detection (including the plain-GLSL regression), the empty-main strip, id shape, the store
+  round trip without a template, and the route wiring. `run-offline-tests.js`: **5540 passed, 0 failed**. No files
+  over 500 lines.
+- **Live import** (node restarted on the new code), `POST /api/shaders/import`:
+  - **Refused:** Cauldron `30gw2t1g` (license none) and an NC shader without the opt-in.
+  - **Saved:**
+    - `sh-fc-ao6dc217-audio-equalizer-demo` (CC0);
+    - `sh-fc-anl8jy1b-audioreactive-crossection` (MIT, sampler3D LUT);
+    - `sh-fc-u4uhc9b9-radiance-cascades-2d-gi` (MIT, main + 2 passes);
+    - `sh-fc-l34e0isf-lightwell` (CC BY 4.0, 3 passes);
+    - `sh-fc-bpg0gxcb-birds-flying` (MIT);
+    - `sh-fc-sclzvh0m-short-coding-for-unwind` (MIT, golf → GLSL).
+- **Live render in the owner's GUI** (relaunched on the Visuals tab with the new code):
+  - Each shader was put on a Visuals layer through the project autosave (stored doc + rev, same slug; no output
+    ring, so nothing went to air). The bumper music fed the FFT (`test-music`). `:0` was captured with `xwd`.
+  - **Equalizer:** the bars move with the music, so u_audio → spectrogram → RD texture works end to end.
+  - **Lightwell** (3 passes) and **birds** render as on the site. The converted golf shader renders its fractal.
+  - **Radiance cascades** draws its cascade pattern. With `u_mouse` at 0 it has no light source.
+  - **Crossection** draws a hard black/white silhouette, because its 3D LUT reads white (known limit).
+  - The client log has no shader or compile errors for the run.
+- **Left as found:**
+  - test-music was stopped.
+  - The Visuals slice was set back. `visuals` is Godot-owned (WO-863, `project-client-slices.js`), so an autosave
+    that omits the key keeps the stored copy. It was cleared with `visuals: null`, which `visuals_model.gd`
+    `slice_of` reads exactly like the missing key; the project was otherwise identical to the backup.
+  - `projects/_trash` stayed at 1 entry. The GUI was relaunched on Live.
+- **Not done:** a level A/B of the same music in FragCoord's editor against our spectrogram.
