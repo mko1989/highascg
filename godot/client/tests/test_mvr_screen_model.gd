@@ -85,6 +85,9 @@ func test_wall_object_panels() -> void:
 	t.eq(W.wall_object(f, [128, 256], W.panel_mm_for(f, false, [500, 1000]), "pgm1", []).panels, [20, 4],
 		"one object → the preset's panel")
 	t.eq(W.panel_px_for(Vector2(500, 1000), 500.0 / 128.0), [128, 256], "Narvill's 0.5 × 1 m panels at P3.9")
+	var narvil := {"cell": Vector2(0.5, 0.5029)}
+	t.eq(W.panel_mm_for(narvil, true, [500, 500]), Vector2(500, 500), "WO-1001: a 502.9 mm Capture panel is the 500 mm preset (8 rows × 128 px = 1024)")
+	t.eq(W.panel_mm_for(narvil, true, [500, 1000]), Vector2(500, 502.9), "a different panel keeps its own size")
 	t.eq(W.panel_px_for(Vector2(500, 500), 500.0 / 104.0), [104, 104])
 
 

@@ -217,3 +217,20 @@ static func source_options(descriptors: Dictionary, current: String) -> Array:
 	if current != "" and not roles.has(current):
 		out.append([current, "%s — not available" % source_label(current)])
 	return out
+
+
+## WO-1002 — Fit to selection (tracking_stage.gd): the grid over `objects` (mvr_scene.wall_boxes: per object [{xf, aabb}] in the stage frame): the PSN footprint of
+## every box corner, the floor at the highest corner. {} when there is nothing.
+static func grid_for(objects: Array) -> Dictionary:
+	var lo := Vector3(INF, INF, INF)
+	var hi := Vector3(-INF, -INF, -INF)
+	for o in objects:
+		for b in o:
+			for k in 8:
+				var p: Array = C.godot_to_psn((b.xf as Transform3D) * (b.aabb as AABB).get_endpoint(k))
+				lo = lo.min(Vector3(p[0], p[1], p[2]))
+				hi = hi.max(Vector3(p[0], p[1], p[2]))
+	if lo.x == INF:
+		return {}
+	return {"width": snappedf(hi.x - lo.x, 0.01), "depth": snappedf(hi.y - lo.y, 0.01), "x_offset": snappedf((lo.x + hi.x) / 2.0, 0.01),
+		"y_offset": snappedf((lo.y + hi.y) / 2.0, 0.01), "z_offset": snappedf(hi.z, 0.01)}

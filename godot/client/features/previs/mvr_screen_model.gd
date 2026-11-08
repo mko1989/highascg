@@ -49,6 +49,26 @@ static func cluster(items: Array, seed: String, gap := 0.05) -> Array:
 	return out
 
 
+## WO-1002 — how far along the ray (`dir` unit length) it first meets `mi`'s triangles; INF = it misses. Box tests
+## alone picked a venue's shell (Narvil's 28 × 45 m "Layer 22" object, its box around the camera) over the stage deck in
+## front: from inside, a ray meets the shell's far side. `cache`: mesh instance id → TriangleMesh (built on first use).
+static func ray_distance(mi: MeshInstance3D, from: Vector3, dir: Vector3, cache: Dictionary) -> float:
+	if mi.mesh == null:
+		return INF
+	var xf := mi.global_transform if mi.is_inside_tree() else mi.transform
+	if (xf * mi.get_aabb()).intersects_ray(from, dir) == null:
+		return INF
+	var id := mi.mesh.get_instance_id()
+	if not cache.has(id):
+		cache[id] = mi.mesh.generate_triangle_mesh()
+	var tm: TriangleMesh = cache[id]
+	if tm == null:
+		return INF
+	var inv := xf.affine_inverse()
+	var hit: Dictionary = tm.intersect_ray(inv * from, (inv.basis * dir).normalized())
+	return from.distance_to(xf * (hit.position as Vector3)) if not hit.is_empty() else INF
+
+
 ## WO-1001 — the MVR objects (mvr_scene.gd children: meta uuid + layer) on `layer`, in file order: the visible ones,
 ## or with `all` every one (a patched fixture's object is hidden while the rig draws its head). → uuids
 static func on_layer(nodes: Array, layer: String, all := false) -> Array:
@@ -59,24 +79,42 @@ static func on_layer(nodes: Array, layer: String, all := false) -> Array:
 	return out
 
 
-## WO-1001 — a Layers-row click: the layer's objects as walls, as if each were ctrl-clicked (one `cluster` per wall,
-## clustered among the layer's own objects only). `taken` uuids (already selected) are skipped. → [[uuids], …]
-static func layer_walls(items: Array, uuids: Array, taken := {}) -> Array:
+## WO-1001 — a Layers-row click: the layer's screens. Capture draws a wall as several parts per panel plus rigging, so a
+## wall = a connected group of the layer's objects (any model); its face (`uuids`, what the frame and the panel count
+## come from, as a 3D click on a panel would pick) = the group's largest same-model `cluster`, the rest of the group
+## `also`. A group whose face has under `min_face` objects (a leg, a bar) is not a screen: its objects go to the
+## largest wall's `also` (with no wall at all, each group stays its own). `taken` uuids are skipped. → [{uuids, also}]
+static func layer_walls(items: Array, uuids: Array, taken := {}, min_face := 4) -> Array:
 	var on := {}
 	for u in uuids:
 		on[str(u)] = true
-	var mine := items.filter(func(it: Dictionary) -> bool: return on.has(str(it.uuid)))
-	var seen := taken.duplicate()
-	var out := []
-	for it in mine:
-		var u := str(it.uuid)
-		if seen.has(u):
-			continue
-		var wall := cluster(mine, u)
-		for w in wall:
-			seen[w] = true
-		out.append(wall)
-	return out
+	var pool := items.filter(func(it: Dictionary) -> bool: return on.has(str(it.uuid)) and not taken.has(str(it.uuid)))
+	var groups := []
+	while not pool.is_empty():
+		var flat := pool.map(func(it: Dictionary) -> Dictionary: return {"uuid": it.uuid, "key": "", "box": it.box})
+		var members := {}
+		for u in cluster(flat, str(pool[0].uuid)):
+			members[u] = true
+		var mine := pool.filter(func(it: Dictionary) -> bool: return members.has(str(it.uuid)))
+		pool = pool.filter(func(it: Dictionary) -> bool: return not members.has(str(it.uuid)))
+		var face := []
+		var tried := {}
+		for it in mine:
+			if not tried.has(str(it.key)):
+				tried[str(it.key)] = true
+				var c := cluster(mine, str(it.uuid))
+				if c.size() > face.size():
+					face = c
+		var also := members.keys().filter(func(u: String) -> bool: return not face.has(u))
+		groups.append({"uuids": face, "also": also})
+	var walls := groups.filter(func(g: Dictionary) -> bool: return (g.uuids as Array).size() >= min_face)
+	if walls.is_empty():
+		return groups
+	walls.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return (a.uuids as Array).size() > (b.uuids as Array).size())
+	for g in groups:
+		if (g.uuids as Array).size() < min_face:
+			walls[0].also.append_array(g.uuids + g.also)
+	return walls
 
 
 static func _corners(b: Dictionary) -> Array:
@@ -176,7 +214,11 @@ static func panel_px_for(panel_mm: Vector2, pitch: float) -> Array:
 static func panel_mm_for(frame: Dictionary, multi: bool, preset_mm: Array) -> Vector2:
 	var cell: Vector2 = frame.cell
 	if multi and cell.x > 0.05 and cell.y > 0.05:
-		return cell * 1000.0
+		var mm := cell * 1000.0
+		for i in 2:  # WO-1001: Capture draws Narvil's 500 mm panel 502.9 tall — P3.9 then gave 129 px and 8 rows overflowed 1024
+			if absf(mm[i] - float(preset_mm[i])) <= 0.02 * float(preset_mm[i]):
+				mm[i] = float(preset_mm[i])
+		return mm
 	return Vector2(float(preset_mm[0]), float(preset_mm[1]))
 
 

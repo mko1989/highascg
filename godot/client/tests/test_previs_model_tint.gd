@@ -135,9 +135,56 @@ func test_layer_row_click_selects_its_objects() -> void:
 	t.eq([W.on_layer(kids, "Truss"), W.on_layer(kids, "Truss", true), W.on_layer(kids, "Nope")], [["a", "d"], ["a", "c", "d"], []],
 		"visible objects on the layer; `all` adds the hidden ones (patched heads)")
 	sc.free()
-	var box := func(x: float) -> AABB: return AABB(Vector3(x, 0, 0), Vector3(0.5, 0.5, 0.1))
-	var items := [{"uuid": "p1", "key": "panel", "box": box.call(0.0)}, {"uuid": "p2", "key": "panel", "box": box.call(0.5)},
-		{"uuid": "x", "key": "panel", "box": box.call(1.0)}, {"uuid": "p3", "key": "panel", "box": box.call(5.0)}]
-	t.eq(W.layer_walls(items, ["p1", "p2", "p3"]), [["p1", "p2"], ["p3"]],
-		"touching panels are one wall, a far one its own; a neighbour on another layer is not pulled in")
-	t.eq(W.layer_walls(items, ["p1", "p2", "p3"], {"p1": true, "p2": true}), [["p3"]], "already selected walls are kept, not doubled")
+	var box := func(x: float, y := 0.0, w := 0.5, h := 0.5) -> AABB: return AABB(Vector3(x, y, 0), Vector3(w, h, 0.1))
+	var items := []
+	for i in 4:  # a 2 m wall: 4 panels, each a face part and a body part, a bar on top; a lone leg off to the side
+		items.append({"uuid": "f%d" % i, "key": "face", "box": box.call(i * 0.5)})
+		items.append({"uuid": "b%d" % i, "key": "body", "box": box.call(i * 0.5)})
+	items.append({"uuid": "bar", "key": "bar", "box": box.call(0.0, 0.5, 2.0, 0.2)})
+	items.append({"uuid": "leg", "key": "leg", "box": box.call(9.0)})
+	items.append({"uuid": "x", "key": "face", "box": box.call(2.0)})  # touching, but on another layer
+	var layer := ["f0", "f1", "f2", "f3", "b0", "b1", "b2", "b3", "bar", "leg"]
+	var walls := W.layer_walls(items, layer)
+	t.eq(walls.size(), 1, "one wall, not one per part type (Narvill's 7 × 4 m Dioda came out as 70)")
+	t.eq(walls[0].uuids, ["f0", "f1", "f2", "f3"], "its face: the largest same-model cluster, as a click on a panel picks; the other layer's panel stays out")
+	var also: Array = walls[0].also.duplicate()
+	also.sort()
+	t.eq(also, ["b0", "b1", "b2", "b3", "bar", "leg"], "bodies, the bar and the lone leg ride along (hidden with it on Map)")
+	t.eq(W.layer_walls(items, layer, {"f0": true, "f1": true, "f2": true, "f3": true, "b0": true, "b1": true, "b2": true, "b3": true, "bar": true, "leg": true}), [],
+		"an already selected wall is not added twice")
+	var two := W.layer_walls(items, ["bar", "leg"])
+	t.eq(two.size(), 2, "no screen on the layer (truss bits): each connected group stays its own")
+
+
+## WO-1002 — Fit to selection: the tracking grid covers the selected objects' PSN footprint, its floor at their top.
+func test_tracking_stage_fits_the_selection() -> void:
+	const TS := preload("res://features/previs/tracking/tracking_model.gd")
+	t.eq(TS.grid_for([]), {}, "nothing selected, no grid")
+	# a 6 × 4 m deck, 1 m high, centred 2 m stage left and 25 m upstage (Godot: z = -25), in two objects
+	var deck := func(cx: float) -> Array: return [{"xf": Transform3D(Basis.IDENTITY, Vector3(cx, 0, -25)), "aabb": AABB(Vector3(-1.5, 0, -2), Vector3(3, 1, 4))}]
+	var g := TS.grid_for([deck.call(0.5), deck.call(3.5)])
+	t.eq(g, {"width": 6.0, "depth": 4.0, "x_offset": 2.0, "y_offset": 25.0, "z_offset": 1.0}, "footprint in PSN (Y upstage = −Godot Z), floor = the top")
+
+
+## WO-1002 — picking hits triangles: from inside a venue shell the stage deck in front wins (box tests picked the shell).
+func test_pick_hits_triangles_not_boxes() -> void:
+	const W := preload("res://features/previs/mvr_screen_model.gd")
+	var shell := MeshInstance3D.new()
+	var big := BoxMesh.new()
+	big.size = Vector3(40, 20, 40)
+	shell.mesh = big
+	var deck := MeshInstance3D.new()
+	var small := BoxMesh.new()
+	small.size = Vector3(6, 1, 4)
+	deck.mesh = small
+	deck.transform.origin = Vector3(0, -3, -10)
+	var cache := {}
+	var from := Vector3(0, 2, 0)
+	var dir := (Vector3(0, -2.5, -10) - from).normalized()
+	var d_shell := W.ray_distance(shell, from, dir, cache)
+	var d_deck := W.ray_distance(deck, from, dir, cache)
+	t.ok(d_deck < d_shell and d_shell < INF, "the deck (%.2f m) is nearer than the shell's far side (%.2f m)" % [d_deck, d_shell])
+	t.ok(is_inf(W.ray_distance(deck, from, Vector3.UP, cache)), "a ray that misses")
+	t.eq(cache.size(), 2, "one triangle mesh per mesh, built once")
+	shell.free()
+	deck.free()

@@ -71,7 +71,7 @@ func click(cam: Camera3D, at: Vector2, add: bool) -> bool:
 		return false
 	_note = ""
 	for i in _sel.size():
-		if (_sel[i].uuids as Array).has(uuid):
+		if (_sel[i].uuids as Array).has(uuid) or (_sel[i].get("also", []) as Array).has(uuid):
 			if add:
 				_sel.remove_at(i)
 			else:
@@ -99,10 +99,10 @@ func select_layer(layer: String, add: bool, patched: Dictionary, picked := Calla
 	var next: Array = _sel.duplicate() if add else []
 	var taken := {}
 	for s in next:
-		for u in s.uuids:
+		for u in s.uuids + s.get("also", []):
 			taken[u] = true
-	for uuids in W.layer_walls(scene.cluster_items(), W.on_layer(scene.get_children(), layer), taken):
-		next.append({"uuids": uuids, "frame": W.wall_frame(scene.wall_boxes(uuids), toward), "toward": toward})
+	for g in W.layer_walls(scene.cluster_items(), W.on_layer(scene.get_children(), layer), taken):
+		next.append({"uuids": g.uuids, "also": g.also, "frame": W.wall_frame(scene.wall_boxes(g.uuids), toward), "toward": toward})
 	var heads: Array = W.on_layer(scene.get_children(), layer, true).filter(func(u: String) -> bool: return patched.has(u)).map(
 		func(u: String) -> String: return "mvr-" + u)
 	Sel.shared().set_ids((Sel.shared().ids + heads) if add else heads)
@@ -135,11 +135,11 @@ func refresh() -> void:
 		scene.mark(_sel.map(func(s: Dictionary) -> Dictionary: return s.frame))
 	var parts := _sel.map(func(s: Dictionary) -> String:
 		var f: Dictionary = s.frame
-		var n := (s.uuids as Array).size()
+		var n := (s.uuids as Array).size() + (s.get("also", []) as Array).size()  # WO-1001: a layer's rigging rides along
 		return "%.2f × %.2f m%s" % [f.size.x, f.size.y, "" if n == 1 else " (%d objects)" % n])
 	var uuids := []
 	for s in _sel:
-		uuids.append_array(s.uuids)
+		uuids.append_array(s.uuids + s.get("also", []))
 	selection_changed.emit(uuids)
 	if not _sel.is_empty():
 		_info.text = "Selected: " + ", ".join(parts)
@@ -221,7 +221,7 @@ func _map() -> void:
 	Store.project["previs"] = previs
 	var gone := _hidden()
 	for s in _sel:
-		for u in s.uuids:
+		for u in s.uuids + s.get("also", []):  # WO-1001: the LED screen stands in for the wall's rigging too
 			if not gone.has(u):
 				gone.append(u)
 	var fit := W.fit_note(r.canvas, raster)

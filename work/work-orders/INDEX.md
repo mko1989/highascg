@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-910 live WOs (28 open, 121 in progress, 761 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+912 live WOs (29 open, 121 in progress, 762 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -393,7 +393,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (143)
+## godot-client — Godot client (145)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -538,6 +538,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 999 DONE [godot-client+engine,audio] Run FragCoord shaders natively in Visuals (u_ uniforms, the 512×512 audio spect… → 999_WO_fragcoord_native_shader_runtime.md
 - 1000 DONE [godot-client+engine] FragCoord custom uniforms as controls in Visuals ▸ Shader (sliders/colours, sav… → 1000_WO_fragcoord_custom_uniform_controls.md
 - 1001 DONE [godot-client] Previs Layers: clicking a layer row selects the objects on that layer → 1001_WO_previs_layer_row_selects_objects.md
+- 1002 DONE [godot-client+tracking-vr] Previs: a "Tracking stage" fold that puts the tracking grid on the MVR's stage;… → 1002_WO_previs_tracking_stage_fit_to_mvr.md
+- 1003 OPEN [godot-client] Previs: MVR for patch and lights + a Capture .glb for everything else, without… → 1003_WO_previs_mvr_plus_glb_without_duplicates.md
 
 ## web-client — Web client (82)
 

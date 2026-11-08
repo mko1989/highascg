@@ -490,6 +490,7 @@ func _build_panel() -> Control:
 	v.add_child(Fold.new("Screens (live texture)", [scroll, _status]))
 	mvr_section = MvrSection.new()
 	v.add_child(Fold.new("MVR scene", [mvr_section]))
+	v.add_child(preload("res://features/previs/tracking/tracking_stage.gd").fold(mvr_section))  # WO-1002
 	var fixtures_section := FixturesSection.new()
 	var inset := MarginContainer.new()  # WO-699: its own folds sit under "Lighting"
 	inset.add_theme_constant_override("margin_left", 12)

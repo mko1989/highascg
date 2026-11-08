@@ -10,6 +10,7 @@ const M := preload("res://features/previs/mvr_model.gd")
 const Tint := preload("res://features/previs/model_tint.gd")
 const LED_SHADER := preload("res://features/previs/led_screen.gdshader")
 const MoveModel := preload("res://features/previs/move/move_model.gd")
+const W := preload("res://features/previs/mvr_screen_model.gd")
 
 signal layer_colors_changed(cols: Dictionary)  ## WO-678: the patched heads (fixtures_3d.gd) follow their layer
 signal hidden_layers_changed(hidden: Dictionary)  ## WO-767: …and its eye (layer name → true)
@@ -28,6 +29,7 @@ var _patched := {}  # WO-615 T10: uuid (lower case) → true — the live patch 
 var fixture_uuids: Array = []  ## uuids (lower case) of the scene's fixtures, for Unpatch
 var _gone := {}  # WO-634: uuid → true — objects an LED screen replaced (project.previs.mvr.hidden_objects)
 var _marks: Array = []  # WO-634: selection boxes (top level, stage frame)
+var _tris := {}  # WO-1002: mesh instance id → TriangleMesh for pick()
 var _moved := {}  # WO-682: uuid → its node transform (project.previs.mvr.moved; none = where the file put it)
 
 
@@ -35,6 +37,7 @@ func show_scene(id: String) -> void:
 	if id == scene_id:
 		return
 	scene_id = id
+	_tris = {}
 	_gen += 1
 	var gen := _gen
 	for c in get_children():
@@ -248,7 +251,7 @@ func layer_of(uuid: String) -> String:
 	return ""
 
 
-## WO-634 — the visible object under a screen point (ray against its mesh boxes, nearest); "" = none.
+## WO-634 — the visible object under a screen point (ray against its meshes' triangles, nearest — WO-1002); "" = none.
 func pick(cam: Camera3D, at: Vector2) -> String:
 	var from := cam.project_ray_origin(at)
 	var dir := cam.project_ray_normal(at)
@@ -256,9 +259,9 @@ func pick(cam: Camera3D, at: Vector2) -> String:
 	var best_d := INF
 	for n in _objects():
 		for mi in (n as Node).find_children("*", "MeshInstance3D", true, false):
-			var hit: Variant = ((mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()).intersects_ray(from, dir)
-			if hit != null and from.distance_to(hit) < best_d:
-				best_d = from.distance_to(hit)
+			var d: float = W.ray_distance(mi as MeshInstance3D, from, dir, _tris)  # WO-1002: triangles, not boxes
+			if d < best_d:
+				best_d = d
 				best = str(n.get_meta("uuid"))
 	return best
 
