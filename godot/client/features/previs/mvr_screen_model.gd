@@ -49,6 +49,36 @@ static func cluster(items: Array, seed: String, gap := 0.05) -> Array:
 	return out
 
 
+## WO-1001 — the MVR objects (mvr_scene.gd children: meta uuid + layer) on `layer`, in file order: the visible ones,
+## or with `all` every one (a patched fixture's object is hidden while the rig draws its head). → uuids
+static func on_layer(nodes: Array, layer: String, all := false) -> Array:
+	var out := []
+	for c in nodes:
+		if c is Node3D and c.has_meta("uuid") and str(c.get_meta("layer", "")) == layer and (all or (c as Node3D).visible):
+			out.append(str(c.get_meta("uuid")))
+	return out
+
+
+## WO-1001 — a Layers-row click: the layer's objects as walls, as if each were ctrl-clicked (one `cluster` per wall,
+## clustered among the layer's own objects only). `taken` uuids (already selected) are skipped. → [[uuids], …]
+static func layer_walls(items: Array, uuids: Array, taken := {}) -> Array:
+	var on := {}
+	for u in uuids:
+		on[str(u)] = true
+	var mine := items.filter(func(it: Dictionary) -> bool: return on.has(str(it.uuid)))
+	var seen := taken.duplicate()
+	var out := []
+	for it in mine:
+		var u := str(it.uuid)
+		if seen.has(u):
+			continue
+		var wall := cluster(mine, u)
+		for w in wall:
+			seen[w] = true
+		out.append(wall)
+	return out
+
+
 static func _corners(b: Dictionary) -> Array:
 	var box: AABB = b.aabb
 	var xf: Transform3D = b.xf

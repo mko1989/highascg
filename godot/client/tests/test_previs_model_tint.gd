@@ -98,3 +98,46 @@ func test_heads_follow_their_layer() -> void:
 	var types := {"T1": "#ff0000"}
 	t.eq([F.head_color("mvr-ab12", "T1", types, layers, layer_of), F.head_color("hand-1", "T1", types, layers, layer_of)],
 		[Color.RED, Color.RED], "the type's Body colour wins")
+
+
+## WO-1001 — a click on a Layers row selects what it names: the row says so, the layer's objects are found, and its
+## walls come out as if each were ctrl-clicked (clustered among the layer's own objects).
+func test_layer_row_click_selects_its_objects() -> void:
+	const W := preload("res://features/previs/mvr_screen_model.gd")
+	var rows := ColorRows.new()
+	var got := []
+	rows.row_clicked.connect(func(n: String, add: bool) -> void: got.append([n, add]))
+	rows.fill(["Truss", "Empty"], {}, {}, [], ["Empty"])
+	var click := func(n: String, shift: bool) -> void:
+		var mb := InputEventMouseButton.new()
+		mb.button_index = MOUSE_BUTTON_LEFT
+		mb.pressed = true
+		mb.shift_pressed = shift
+		(rows._rows[n][3] as PanelContainer).gui_input.emit(mb)
+	click.call("Truss", false)
+	click.call("Truss", true)
+	click.call("Empty", false)
+	t.eq(got, [["Truss", false], ["Truss", true]], "a click selects, shift adds; an empty layer has nothing to select")
+	t.ok((rows._rows["Truss"][3] as PanelContainer).tooltip_text.contains("select"), "the row says it selects")
+	var plain := ColorRows.new()
+	plain.fill(["A"], {})
+	t.eq((plain._rows["A"][3] as PanelContainer).tooltip_text, "", "fixture Body colours (nothing connected) stay plain rows")
+	rows.free()
+	plain.free()
+	var sc := Node3D.new()
+	for spec in [["a", "Truss", true], ["b", "Walls", true], ["c", "Truss", false], ["d", "Truss", true]]:
+		var n := Node3D.new()
+		n.set_meta("uuid", spec[0])
+		n.set_meta("layer", spec[1])
+		n.visible = spec[2]
+		sc.add_child(n)
+	var kids := sc.get_children()
+	t.eq([W.on_layer(kids, "Truss"), W.on_layer(kids, "Truss", true), W.on_layer(kids, "Nope")], [["a", "d"], ["a", "c", "d"], []],
+		"visible objects on the layer; `all` adds the hidden ones (patched heads)")
+	sc.free()
+	var box := func(x: float) -> AABB: return AABB(Vector3(x, 0, 0), Vector3(0.5, 0.5, 0.1))
+	var items := [{"uuid": "p1", "key": "panel", "box": box.call(0.0)}, {"uuid": "p2", "key": "panel", "box": box.call(0.5)},
+		{"uuid": "x", "key": "panel", "box": box.call(1.0)}, {"uuid": "p3", "key": "panel", "box": box.call(5.0)}]
+	t.eq(W.layer_walls(items, ["p1", "p2", "p3"]), [["p1", "p2"], ["p3"]],
+		"touching panels are one wall, a far one its own; a neighbour on another layer is not pulled in")
+	t.eq(W.layer_walls(items, ["p1", "p2", "p3"], {"p1": true, "p2": true}), [["p3"]], "already selected walls are kept, not doubled")

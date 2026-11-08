@@ -14,6 +14,7 @@ const UNSET := Color(0.7, 0.7, 0.7)  # the server's default model grey (glb-writ
 signal previewed(name: String, color: Color)
 signal changed(name: String, color: Variant)
 signal visibility_toggled(name: String, shown: bool)  # WO-647
+signal row_clicked(name: String, add: bool)  # WO-1001: a click on a row's name (ctrl / shift = add); connect before fill()
 
 var eyes := false  # WO-647: an eye per row (set before the first fill)
 var _names: Array = []
@@ -79,6 +80,13 @@ func _row(name: String, text: String) -> void:
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.clip_text = true
 	row.add_child(l)
+	if not row_clicked.get_connections().is_empty():  # the name passes the click to the row; the swatch, ↺ and eye keep theirs
+		panel.tooltip_text = "Click: select the objects on %s (ctrl / shift-click adds)" % (text if text != "" else "no layer")
+		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		panel.gui_input.connect(func(e: InputEvent) -> void:
+			var mb := e as InputEventMouseButton
+			if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and not (_rows[name][0] as ColorPickerButton).disabled:
+				row_clicked.emit(name, mb.shift_pressed or mb.is_command_or_control_pressed()))
 	var pick := ColorPickerButton.new()
 	pick.custom_minimum_size = Vector2(48, 24)
 	pick.edit_alpha = false

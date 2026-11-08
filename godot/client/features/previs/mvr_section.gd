@@ -70,8 +70,7 @@ func _ready() -> void:
 	for spec in [["Import…", _import], ["Export…", _export], ["Remove", _ask_remove]]:
 		var b := Button.new()
 		b.text = spec[0]
-		if spec[0] == "Export…":
-			b.tooltip_text = "Save this project's stage (LED walls, TVs, projection) as an .mvr for Capture, consoles, Perastage"
+		if spec[0] == "Export…": b.tooltip_text = "Save this project's stage (LED walls, TVs, projection) as an .mvr for Capture, consoles, Perastage"
 		b.pressed.connect(spec[1])
 		row.add_child(b)
 		_remove_btn = b  # the loop ends on Remove
@@ -82,6 +81,7 @@ func _ready() -> void:
 		scene.set_layer_colors(Tint.with_color(Tint.colors(_cfg(), "layer_colors"), l, c)))
 	_colors.changed.connect(_set_layer_color)
 	_colors.visibility_toggled.connect(_set_layer_shown)
+	_colors.row_clicked.connect(func(l: String, add: bool) -> void: _screens.select_layer(l, add, M.patched_uuids(_fixtures_slice().patch), objects_picked.emit))  # WO-1001
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)

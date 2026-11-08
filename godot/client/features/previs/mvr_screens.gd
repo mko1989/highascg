@@ -11,6 +11,7 @@ const W := preload("res://features/previs/mvr_screen_model.gd")
 const S := preload("res://features/previs/stage_objects.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const M := preload("res://features/previs/mvr_model.gd")
+const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 
 const HINT := "Click an LED wall in the 3D view to map a screen onto it (ctrl / shift-click adds walls fed by the same output)."
 
@@ -85,6 +86,36 @@ func click(cam: Camera3D, at: Vector2, add: bool) -> bool:
 	_sel = _sel + [wall] if add else [wall]
 	refresh()
 	return true
+
+
+## WO-1001 — a click on a Layers row: the layer's visible objects become the selection (walls as if each were
+## ctrl-clicked, front faces towards the 3D view's camera) and its heads `patched` from this scene (uuid → true) the
+## fixture selection. `add` (ctrl / shift) keeps what was selected. → whether any object was selected (then `picked`).
+func select_layer(layer: String, add: bool, patched: Dictionary, picked := Callable()) -> bool:
+	if scene == null:
+		return false
+	var cam: Camera3D = scene.get_viewport().get_camera_3d() if scene.is_inside_tree() else null
+	var toward: Vector3 = scene.to_stage(cam.global_position) if cam != null else Vector3(0, 1.7, 20)  # else downstage
+	var next: Array = _sel.duplicate() if add else []
+	var taken := {}
+	for s in next:
+		for u in s.uuids:
+			taken[u] = true
+	for uuids in W.layer_walls(scene.cluster_items(), W.on_layer(scene.get_children(), layer), taken):
+		next.append({"uuids": uuids, "frame": W.wall_frame(scene.wall_boxes(uuids), toward), "toward": toward})
+	var heads: Array = W.on_layer(scene.get_children(), layer, true).filter(func(u: String) -> bool: return patched.has(u)).map(
+		func(u: String) -> String: return "mvr-" + u)
+	Sel.shared().set_ids((Sel.shared().ids + heads) if add else heads)
+	if next.is_empty() and _sel.is_empty():
+		return false
+	if _sel.is_empty() and not next.is_empty():
+		Settings.load_from_server()  # as click(): a destination added since
+	_note = ""
+	_sel = next
+	refresh()
+	if not next.is_empty() and picked.is_valid():
+		picked.call()
+	return not next.is_empty()
 
 
 ## forget: the scene changed — the last Map's note goes too (WO-681).
