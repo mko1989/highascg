@@ -92,6 +92,22 @@ Owner, 08.11: "clicking on the layer in layers in the inspector should select th
   - **Front camera with the test card on:** the panel grid and crosshair span both walls. The test card was switched
     off again afterwards.
   - The mapping stays in the project. The owner asked for it ("map my destination to the two dioda LED screens").
-- **Open for the owner:** the file draws "Dioda 8 x 4" as **7 m** (14 panels). 3328 px = 26 × 128 means 16 + 10
-  panels, so the real wall is probably 8 m. If so, set LED wall 1 to 16 × 8 in the Stage panel, and its crop to
-  x 1280, w 2048.
+- **Wall sizes settled by the owner (08.11):** "the led screen for that Narvil show should be 7m x 4m and 5 x 4. There
+  was a mistake in label of the MVR. Change the screen dest and map accordingly."
+  - The walls already were 14 × 8 and 10 × 8 panels. Only the destination was too wide: 3328 = 26 × 128 had room for
+    two panels that don't exist.
+  - PGM/PRV 1 changed to **3072 × 1024** (24 × 128) with the Devices tab's own call
+    (`POST /api/device-view {"updateDestination": {id, videoMode: "custom", width: 3072, height: 1024}}`), then
+    Apply (`/api/caspar-config/apply {"force": true}`).
+  - Verified: Caspar `INFO` gives `2 3072x1024 PLAYING`, `3 3072x1024 PLAYING` (PGM 2 / PRV 3 by `caspar channels`).
+    `casparcg.config` has the 3072 × 1024 custom mode. In the project, destination width = multiview canvas = 3072.
+  - The map now covers the channel exactly: LED wall 2 (5 m) is x 0–1280, LED wall 1 (7 m) is x 1280–3072. The
+    pixel-mapping proposal's wall rects match.
+  - Side effects of the apply on this bench box:
+    - The layout wanted DP-2 at 3072 × 1024. Its bench monitor has no such mode ("xrandr: cannot find mode
+      3072x1024"), and it was at 2560 × 640 before too, so the 3328 layout had never applied either. The show's LED
+      processor EDID decides that on site.
+    - The canvas grew (planned 5120 > 4480), so the apply restarted nodm. That restarted the X session's apps (the
+      Godot client came back by itself, and Firefox showed session restore).
+  - `config/device_graph.json`'s mirrored `dst_in_` source and `screen_1_custom_width` still say 3328. They are copies;
+    the generator and the layout read the destination (journal: "Layout screen_1: id=DP-2 mode=3072x1024").
