@@ -108,8 +108,34 @@ WO-999 runs those uniforms, with each value in a UBO slot (`fragcoord_glsl.gd` `
 - **Left as found:** the three test shaders were deleted. The Visuals slice was set back to `null` as in WO-999; the
   project diff against the backup is empty. `projects/_trash` stayed at 1. The GUI was relaunched on Live, and the
   client log has no script or shader errors for any of the five launches.
-- **Not covered:** a real mouse drag on the slider. `value_widgets` posting `set` is covered by the WO-894 tests,
-  and the drag path is the same widget.
+- **Real mouse and keyboard** (owner, 08.11: "you can do tests with real mouse"). These were xdotool events on `:0`
+  against the owner's GUI. After each step I read the session (`GET /api/shader-live/shaders/sh-fc-wo1000-test`)
+  and took a screenshot.
+  - **Drag** of the rings knob from 22% to 80% of the track: `u_rings` 6 → **19.72**, the stage shows dense rings, and
+    "● edited, not saved" is on.
+  - **Checkbox** click: `u_audio_on` 1 → 0. The picture brightens (the fixed 0.5 level replaces the quiet input).
+  - **↺** on rings: back to 6, and the knob follows.
+  - **Colour picker:** a click opens it; typing `ff4010` in the hex field + Enter gives `u_tint` (1, 0.251, 0.063)
+    and orange rings.
+  - **+ Preset** prompt, "Warm" + Enter: the preset is listed. **Original**: every control back, not dirty, Save as
+    child greyed. **Warm**: tint and checkbox back from the preset.
+  - **Speed** dragged to 0: the rings stand still.
+  - **Reset all**: defaults, not dirty.
+  - **Two bugs the mouse run found, both fixed and re-run:**
+    1. **After Save as child the stage went back to the library look**, while the controls still showed the edits.
+       Save clears `dirty`, and `edited()` (shader-live-session.js) compared sources only. The next view fetch (the
+       sync's recompile) reopened the session from the library, and the values were dropped. Fix: `edited()` also
+       compares `values` with `pristine.values`. Regression assert in the smoke: the session survives a reopen
+       after Save. Re-run: Warm → Save as child → **the stage stays orange**, and the session still holds the values.
+    2. **"Saved as … (a child of <null>)"** for a root shader. `v.get("parentId", …)` returned the null that is
+       present in the view. This was pre-existing for Shadertoy shaders too. Fix: fall back to the shader's own id;
+       a Godot assert names the parent in the existing Save test. Re-run: "a child of sh-fc-wo1000-test".
+  - The child file holds the values, `parentId` and the "Warm" preset with `u:` keys.
+  - The pointer was put back where it started.
+  - Gates after the fixes: offline **5547/0** (exit 0), Godot **26120/0**, `--check` clean, format:check clean, no files
+    over 500 lines.
+  - **Left as found again:** the test shaders deleted, the Visuals slice back to `null` (empty diff against the
+    backup), trash at 1, the GUI on Live, and no client errors.
 
 ## Limits
 

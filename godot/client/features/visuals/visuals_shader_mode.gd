@@ -208,7 +208,8 @@ func _on_view(v: Dictionary, rebuild: bool) -> void:
 	_save.disabled = not _dirty.visible
 	_note.visible = false
 	if str(v.get("saved_as", "")) != "":
-		_say("Saved as %s (a child of %s) in the library" % [str(v.saved_as), str(v.get("parentId", v.get("id", "")))], true)
+		var parent: Variant = v.get("parentId")  # a root shader's is null: then it is the shader itself
+		_say("Saved as %s (a child of %s) in the library" % [str(v.saved_as), str(parent if parent is String and parent != "" else v.get("id", ""))], true)
 	elif not _status.text.begins_with("Shader error"):
 		_say("", true)
 	if rebuild or _main.get_child_count() == 0:

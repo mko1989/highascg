@@ -124,6 +124,8 @@ test('presets carry the controls; Original and reset-all restore; Save as child 
 	assert.match(child.extra.savedAs, /^sh-fc-test-c\d+$/)
 	assert.equal(saved.at(-1).values.u_speed, 5, 'the child is saved with the controls')
 	assert.equal(saved.at(-1).dialect, 'fragcoord')
+	assert.equal(await S.open('sh-fc-test'), s, 'after Save as child the session keeps the values (mouse test 08.11: the stage went back)')
+	assert.equal(S.workingOf(s).values.u_speed, 5)
 	await Ops.run('set', { key: 'u:u_speed', values: [1] }, s, env)
 	await Ops.run('reset', {}, s, env)
 	assert.deepEqual(s.cfg.values, { u_gain: 2 }, 'reset all = the library values')

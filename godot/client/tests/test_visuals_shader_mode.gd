@@ -158,6 +158,7 @@ func test_mode_follows_the_selected_layer() -> void:
 	mode.post_op("save", {})
 	await _wait(mode.sync)
 	t.ok(mode._status.text.begins_with("Saved as sh-a-c2"), "Save as child names the child")
+	t.ok(mode._status.text.contains("(a child of sh-a)"), "a root shader's null parentId names the shader itself, not <null>")
 	# a shader with live edits already on the node compiles from them when its layer is picked
 	box.speed["sh-b"] = 1.0
 	box.dirty["sh-b"] = true

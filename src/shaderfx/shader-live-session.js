@@ -51,6 +51,9 @@ function setSource(cfg, passKey, src) {
 /** True while the working copy differs from the library source (still true after a Save-as-child). */
 function edited(s) {
 	if ((s.cfg.common || '') !== s.pristine.common) return true
+	// WO-1000: FragCoord control values are an edit too — without this a Save-as-child reopened the session from the
+	// library and the next recompile dropped them (the controls still showed the operator's values)
+	if (JSON.stringify(s.cfg.values || {}) !== JSON.stringify(s.pristine.values || {})) return true
 	return Object.entries(s.pristine.passes).some(([k, v]) => v && sourceOf(s.cfg, k) !== v.source)
 }
 
