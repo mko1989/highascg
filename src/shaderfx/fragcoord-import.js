@@ -265,9 +265,6 @@ module.exports = {
 	classifyLicense,
 	looksGolf,
 	fragcoordShaderId,
-	fragcoordConfigFromParsed,
-	fetchFragcoordMarkdown,
-	convertGolf,
 	stripEmptyMain,
 	importFragcoordShader,
 }

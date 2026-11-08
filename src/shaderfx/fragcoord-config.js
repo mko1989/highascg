@@ -97,4 +97,4 @@ function fragcoordUsesAudio(common, passes) {
 	return [common, ...Object.values(passes).map((p) => p?.source || '')].some((t) => /\bu_audio\b/.test(t))
 }
 
-module.exports = { FC_PASS_KEYS, FC_FORMATS, normalizeFragcoordParts, fragcoordUsesAudio }
+module.exports = { FC_PASS_KEYS, normalizeFragcoordParts, fragcoordUsesAudio }

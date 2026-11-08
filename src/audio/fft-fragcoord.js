@@ -94,4 +94,4 @@ function createFragcoordAnalyser(opts = {}) {
 	}
 }
 
-module.exports = { createFragcoordAnalyser, weightTable, aWeightDb, MIN_DB, MAX_DB, SMOOTHING }
+module.exports = { createFragcoordAnalyser, weightTable, aWeightDb }

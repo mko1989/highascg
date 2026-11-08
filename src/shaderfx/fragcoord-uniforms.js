@@ -131,4 +131,4 @@ function setUniform(cfg, key, next, pristine) {
 	return ''
 }
 
-module.exports = { SLOTS, PREFIX, fragcoordUniforms, uniformParams, isUniformKey, setUniform, valuesOf }
+module.exports = { SLOTS, PREFIX, fragcoordUniforms, uniformParams, isUniformKey, setUniform }
