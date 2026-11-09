@@ -14,6 +14,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
 const NV := preload("res://features/devices/node_view_model.gd")
 const Drop := preload("res://features/devices/decklink_drop_flow.gd")
+const ZoomControls := preload("res://features/devices/zoom_controls.gd")
 const COL_W := 200.0
 const GAP := Vector2(24, 14)
 const CARD := Color("#18181c")
@@ -25,6 +26,7 @@ const ARMED := Color(0.98, 0.8, 0.08, 0.7)
 var anchors := {}
 var _grid: GridContainer
 var _cards := {}  # cable id → card Button
+var _zoom := ZoomControls.new()  # WO-1012 E: the Zoom device (its page opens in the Inspector)
 
 
 func _init() -> void:
@@ -38,6 +40,7 @@ func _init() -> void:
 	_grid.add_theme_constant_override("h_separation", int(GAP.x))
 	_grid.add_theme_constant_override("v_separation", int(GAP.y))
 	add_child(_grid)
+	add_child(_zoom)
 	resized.connect(_fit)
 
 
@@ -54,6 +57,7 @@ func show_sections(sections: Array) -> void:
 	_cards = {}
 	for s in sections:
 		_grid.add_child(_section(s))
+	_grid.add_child(_zoom.card())
 	_fit()
 
 
