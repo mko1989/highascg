@@ -197,6 +197,7 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | WO-1014 | Header "Test card" tick button shows an extra blue border inside the button | [1014](work-orders/1014_WO_test_card_tick_button_inner_blue_border.md) | IN PROGRESS |
 | WO-1015 | Operator dock: the eyedropper opens a real colour picker app (Gpick) | [1015](work-orders/1015_WO_dock_eyedropper_opens_gpick.md) | IN PROGRESS |
 | WO-1016 | Devices settings: which Caspar can take live vs restart (audit + diff-apply proposal) | [1016](work-orders/1016_WO_devices_settings_live_vs_restart_audit.md) | IN PROGRESS |
+| WO-1017 | Screen destination rendered on the linked server (mapping → peer DeckLinks): stage 1 fan-out stale-layout guard; owner D0–D3 | [1017](work-orders/1017_WO_screen_destination_rendered_on_peer_server.md) | IN PROGRESS |
 | WO-1018 | Devices tab: rear panels scroll on their own (linked server at full size) + an unmistakable MASTER marker | [1018](work-orders/1018_WO_devices_split_scroll_and_master_marker.md) | IN PROGRESS |
 | WO-1019 | A second NDI sender (or RTMP output) on one channel silently replaces the first (fixed Caspar consumer index) | [1019](work-orders/1019_WO_second_ndi_or_rtmp_output_on_a_channel_replaces_the_first.md) | OPEN |
 | WO-977 | Devices tab pushed the Inspector off-screen: the Playlists footer dropdown (no clip_text) pinned the Inspector minimum at 622 px; clip_text → 400 px on every tab | [977](work-orders/977_WO_devices_tab_wider_than_window.md) | DONE (06.11) — Godot 26049/0; probe 622→400; glass Devices/DP-2 page/Live |

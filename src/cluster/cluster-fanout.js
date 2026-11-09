@@ -30,6 +30,7 @@
 const { shouldFanOutCommand, parseAmcpCommandChannel } = require('../replication/amcp-fanout')
 const { createAirJournal } = require('./cluster-air-journal')
 const { channelOnAir } = require('./cluster-peer-info')
+const { staleLayout } = require('./remote-destination')
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1'])
 
@@ -63,23 +64,33 @@ function cabledIds(view) {
 	return out
 }
 
-/** { map: Map<masterCh, peerCh>, destinations: [{ id, label, pgm: [a, b], prv: [a, b] | null }] } */
-function channelPlan(own, peer) {
+/**
+ * { map: Map<masterCh, peerCh>, destinations: [{ id, label, pgm: [a, b], prv: [a, b] | null }], held: [{ id, why }] }
+ * WO-1017: a destination whose channels do not run at the same size on both Caspars is held (one box has not applied
+ * the shared destination list yet, so its channel numbers belong to something else there).
+ */
+function channelPlan(own, peer, peerName) {
 	const mine = mainChannels(own)
 	const theirs = mainChannels(peer)
 	const map = new Map()
 	const destinations = []
+	const held = []
 	for (const id of cabledIds(peer)) {
 		const a = mine.get(id)
 		const b = theirs.get(id)
 		if (!a || !b) continue
+		const why = staleLayout(own, peer, id, peerName)
+		if (why) {
+			held.push({ id, why })
+			continue
+		}
 		map.set(a.pgm, b.pgm)
 		const prv = a.prv && b.prv ? [a.prv, b.prv] : null
 		if (prv) map.set(a.prv, b.prv)
 		destinations.push({ id, label: b.label, pgm: [a.pgm, b.pgm], prv })
 	}
 	destinations.sort((x, y) => x.pgm[0] - y.pgm[0])
-	return { map, destinations }
+	return { map, destinations, held }
 }
 
 /** One AMCP line for that server, or null when it does not go there. */
@@ -158,7 +169,7 @@ function createClusterFanout(deps) {
 				if (t) t.error = 'device view unavailable'
 				continue
 			}
-			const plan = channelPlan(own, view)
+			const plan = channelPlan(own, view, m.name || m.id)
 			const c = view.live?.caspar || {}
 			const host = LOOPBACK.has(String(c.host || '')) || !c.host ? m.host : String(c.host)
 			const port = Number(c.port) || 5250
@@ -179,7 +190,7 @@ function createClusterFanout(deps) {
 				log('info', `${m.name}: forwarding to its Caspar ${host}:${port}`)
 			}
 			t.plan = plan
-			t.error = plan.destinations.length ? '' : 'no shared destination is cabled there'
+			t.error = plan.destinations.length ? '' : plan.held[0]?.why || 'no shared destination is cabled there'
 			for (const ch of [...t.synced]) if (!plan.map.has(ch)) t.synced.delete(ch)
 			catchUp(t)
 		}
@@ -309,6 +320,7 @@ function createClusterFanout(deps) {
 				sent: t.sent,
 				error: t.error || '',
 				destinations: t.plan?.destinations || [],
+				held: t.plan?.held || [],
 				caught_up: t.caught_up,
 			}
 		}

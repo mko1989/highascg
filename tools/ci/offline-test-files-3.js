@@ -281,4 +281,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1012-zoom-host.test.js',
 	'tools/smoke/smoke-wo1012-zoom-audio.test.js',
 	'tools/smoke/smoke-wo1013-restore-on-screens.test.js',
+	'tools/smoke/smoke-wo1017-fanout-holds-stale-layout.test.js',
 ]

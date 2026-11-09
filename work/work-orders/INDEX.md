@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-927 live WOs (30 open, 126 in progress, 771 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+928 live WOs (30 open, 127 in progress, 771 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -813,7 +813,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 975 DONE [os-iso+godot-client] NVIDIA "sync to display" auto-on for the first GPU port feeding a PGM → 975_WO_nvidia_sync_auto_first_pgm_port.md
 - 996 DONE [os-iso+process] Retire the dd-flash / scripted-partition stick tools (sticks are Ventoy-only) → 996_WO_retire_dd_flash_stick_tools.md
 
-## network — Cluster, replication, Tailscale, auth (42)
+## network — Cluster, replication, Tailscale, auth (43)
 
 - 13 DONE [network+companion] Final Polish & Security Hardening → 13_WO_FINAL_POLISH_AND_HARDENING.md
 - 15 DONE [network+web-client] Client-Server Preshow Sync & Split Architecture → 15_WO_CLIENT_SERVER_SYNC.md
@@ -857,6 +857,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 929 DONE [network+testing-ci] Two-box cluster run with .31 (master / follower / failover on real servers); th… → 929_WO_two_box_cluster_run_dot31.md
 - 933 DONE [network+engine] The cluster fan-out replays its air journal to a follower whose Caspar never st… → 933_WO_fanout_replays_to_follower_that_kept_playing.md
 - 986 DONE [network+media,testing-ci] Security sweep of the node server and tools → 986_WO_security_sweep.md
+- 1017 IN PROGRESS [network+mapping] A screen destination rendered on the linked server (mapping node → the peer's D… → 1017_WO_screen_destination_rendered_on_peer_server.md
 
 ## media — Media library, thumbnails, ingest, transcode (25)
 
