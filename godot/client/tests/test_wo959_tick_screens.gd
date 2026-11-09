@@ -29,6 +29,17 @@ func test_tick_button_splits_switch_and_options() -> void:
 	b.free()
 
 
+func test_tick_button_has_one_frame() -> void:
+	# WO-1014: only the outer panel draws a frame; the inner tick and label must not carry the theme's accent boxes.
+	var b := TickButton.new("Test card", "on / off", "options")
+	for c in [b.tick, b.label]:
+		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+			t.ok(c.get_theme_stylebox(state) is StyleBoxEmpty, "%s %s is empty" % [c.get_class(), state])
+	b.set_on(true)
+	t.ok(b.get_theme_stylebox("panel") is StyleBoxFlat, "the outer panel keeps its frame")
+	b.free()
+
+
 func test_border_slot_helpers() -> void:
 	var p := {}
 	t.ok(not BorderSwitch.enabled_in(p, 1), "no scenes → off")
