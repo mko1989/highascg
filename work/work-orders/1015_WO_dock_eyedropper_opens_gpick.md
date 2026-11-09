@@ -1,5 +1,5 @@
 # WO-1015 — Operator dock: the eyedropper opens a real colour picker app (Gpick)
-**Area:** godot-client, setup
+**Area:** godot-client, os-iso
 **Status: IN PROGRESS (09.11) — waiting for `sudo apt install gpick` on the box**
 
 Owner, 09.11 (verbatim):

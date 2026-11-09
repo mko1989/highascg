@@ -551,7 +551,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1010 DONE [godot-client+tracking-vr] Previs: projector-beams toggle moves into the projection Inspector; Haze moves… → 1010_WO_previs_beams_toggle_to_projection_inspector_haze_into_quality_menu.md
 - 1011 DONE [godot-client+audio] Visuals Flow builder: ~40 node types and a preset library, the op logic based o… → 1011_WO_visuals_flow_node_library_and_presets_from_cables.md
 - 1014 IN PROGRESS [godot-client] Header "Test card" tick button shows an extra blue border inside the button → 1014_WO_test_card_tick_button_inner_blue_border.md
-- 1015 IN PROGRESS [godot-client+setup] Operator dock: the eyedropper opens a real colour picker app (Gpick) → 1015_WO_dock_eyedropper_opens_gpick.md
+- 1015 IN PROGRESS [godot-client+os-iso] Operator dock: the eyedropper opens a real colour picker app (Gpick) → 1015_WO_dock_eyedropper_opens_gpick.md
 
 ## web-client — Web client (82)
 
