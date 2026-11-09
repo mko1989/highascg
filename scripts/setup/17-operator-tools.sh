@@ -6,7 +6,7 @@
 # - tmux: Terminal multiplexer (eggs build monitoring)
 # - mc: Midnight Commander (file browser for exFAT)
 # - magic-wormhole: Secure file transfer (air-gapped media ingest)
-# - v4l2loopback-utils: Virtual camera utilities (v4l2loopback kernel module)
+# - v4l2loopback-utils + v4l2loopback-dkms: virtual camera (the module is out-of-tree; DKMS builds it per kernel)
 # - gpick: Colour picker (github.com/thezbyg/gpick) — the operator dock's eyedropper opens it (WO-1015)
 #
 # Usage:
@@ -35,6 +35,7 @@ apt-get install -y \
 	mc \
 	magic-wormhole \
 	v4l2loopback-utils \
+	v4l2loopback-dkms \
 	gpick
 
 echo "==> Verifying installations"
@@ -43,6 +44,7 @@ command -v tmux >/dev/null && echo "  ✓ tmux $(tmux -V)"
 command -v mc >/dev/null && echo "  ✓ mc $(mc --version 2>&1 | head -1)"
 command -v wormhole >/dev/null && echo "  ✓ wormhole"
 command -v v4l2loopback-ctl >/dev/null && echo "  ✓ v4l2loopback-utils"
+modinfo v4l2loopback >/dev/null 2>&1 && echo "  ✓ v4l2loopback module (DKMS, $(uname -r))"
 command -v gpick >/dev/null && echo "  ✓ gpick"
 
 echo
