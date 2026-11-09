@@ -244,3 +244,11 @@ merged from the glb."
   - Left corner, in a plan render of the shifted .glb: the rounded wall's end (2.2, −48.9) meets the short X-lattice
     piece that leads to the left wall.
   - The .glb file itself is unchanged. Capture would need the same fix for a later export.
+- **Cause (owner, 09.11, consistent with the data):** the room was moved in Capture while 3 layers were turned off.
+  - Only whole layers stayed behind: Ściana zaokrąglona (3 of 3 objects), Podłoga szara (1 of 1) and Sufit (1 of 1).
+    Every other layer moved by the same offset.
+  - **Not a parser issue:** the 3ds files carry no mesh matrix or keyframe pivot; no Layer or GroupObject has a
+    `<Matrix>`; and the .glb node matrices (e.g. grey floor node #2603: translation 24.4547 / 0 / −0.3768) equal the MVR
+    `<Matrix>` to 0.01 mm.
+  - **Source fix:** in Capture, move those 3 layers by (+3987.6, 0, +823.8) mm and re-export.
+  - **On re-import of the fixed files:** delete the 5 `previs.mvr.moved` entries above.
