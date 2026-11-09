@@ -56,6 +56,36 @@ static func cone_scale(zoom_deg: float, length := CONE_LENGTH) -> Vector3:
 	return Vector3(r, length, r)
 
 
+## WO-1006 — a beam's lens: the emitting face the rig gives (beam.lens [x, z, round] — the pixel's own model, or the
+## plate it sits on), else a disc of the beam radius. It sits just in front of the beam origin, deeper beams further
+## out (beam.layer), so a pixel never shares a plane with its plate or a body face (they flickered in and out). A beam
+## the mode does not drive (beam.driven false) lies at the back, behind the plate that the mode does light.
+const LENS_T := 0.001
+const LENS_GAP := 0.0015
+const LENS_STEP := 0.0015
+
+
+static func lens(beam: Dictionary) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var l: Array = beam.get("lens", []) if beam.get("lens") is Array else []
+	if l.size() >= 2 and not (l.size() > 2 and bool(l[2])):
+		var box := BoxMesh.new()
+		box.size = Vector3(maxf(float(l[0]), 0.002), LENS_T, maxf(float(l[1]), 0.002))
+		mi.mesh = box
+	else:
+		var disc := CylinderMesh.new()
+		var r := clampf(float(beam.get("radius", 0.05)), 0.005, 1.0)
+		disc.top_radius = r
+		disc.bottom_radius = r
+		disc.height = LENS_T
+		mi.mesh = disc
+		if l.size() >= 2:  # a round model: its own diameter (an oval when the sides differ)
+			mi.scale = Vector3(float(l[0]) / (2.0 * r), 1.0, float(l[1]) / (2.0 * r))
+	var layer := int(beam.get("layer", 0)) + 1 if beam.get("driven", true) != false else 0
+	mi.position.y = -(LENS_GAP + LENS_STEP * layer + LENS_T * 0.5)
+	return mi
+
+
 static func is_cell_rig(rig: Dictionary) -> bool:
 	var n := 0
 	for node in rig.get("nodes", []):

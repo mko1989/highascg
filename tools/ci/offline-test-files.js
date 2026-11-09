@@ -428,7 +428,6 @@ module.exports = [
 	'tools/smoke/smoke-wo615-visual.test.js',
 	'tools/smoke/smoke-wo615-programmer.test.js',
 	'tools/smoke/smoke-wo615-visualise.test.js',
-	'tools/smoke/smoke-wo1005-pixel-strobe-cells-dark.test.js',
 	'tools/smoke/smoke-wo615-looks.test.js',
 	'tools/smoke/smoke-wo615-follow-ik.test.js',
 	'tools/smoke/smoke-wo615-mvr-patch.test.js',

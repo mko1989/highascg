@@ -147,7 +147,7 @@ func _build(f: Dictionary, rig: Dictionary) -> void:
 			parts.axes[str(n.id)] = [node, node.transform, str(n.axis)]
 		if n.get("kind") == "Beam":
 			var beam: Dictionary = n.get("beam", {}) if n.get("beam") is Dictionary else {}
-			parts.beams[str(n.id)] = _beam(node, {"beamType": "Glow", "radius": beam.get("radius", 0.05)} if cells else beam, mesh)
+			parts.beams[str(n.id)] = _beam(node, beam.merged({"beamType": "Glow"}, true) if cells else beam, mesh)
 			parts.beams[str(n.id)].type = str(f.typeId)
 	if root.find_children("*", "MeshInstance3D", true, false).is_empty():
 		# WO-615 T10: Capture's GDTF export is a stub (one empty "Base" geometry) — the MVR scene's 0.3 m box stands in
@@ -325,15 +325,9 @@ func _mesh(type_id: String, key: String) -> Node3D:
 	return t.duplicate() as Node3D if t != null else null
 
 
-## Lens (emissive disc), cone and maybe a light under a Beam node — all along its −Y (GDTF −Z).
+## Lens (the beam's face, WO-1006), cone and maybe a light under a Beam node — all along its −Y (GDTF −Z).
 func _beam(node: Node3D, beam: Dictionary, body: Node3D) -> Dictionary:
-	var lens := MeshInstance3D.new()
-	var disc := CylinderMesh.new()
-	var r := clampf(float(beam.get("radius", 0.05)), 0.005, 1.0)
-	disc.top_radius = r
-	disc.bottom_radius = r
-	disc.height = 0.004
-	lens.mesh = disc
+	var lens := F.lens(beam)  # WO-1006: the beam's own face, just proud of its origin
 	var lmat := StandardMaterial3D.new()
 	lmat.albedo_color = Color(0.05, 0.05, 0.05)
 	lmat.emission_enabled = true
@@ -341,7 +335,7 @@ func _beam(node: Node3D, beam: Dictionary, body: Node3D) -> Dictionary:
 	lens.set_meta("no_tint", true)
 	node.add_child(lens)
 	var out := {"lens": lmat, "body": body if beam.get("beamType") == "Glow" else null}
-	if beam.get("beamType") == "Glow":
+	if beam.get("beamType") == "Glow" or beam.get("driven", true) == false:
 		return out
 	var cone := MeshInstance3D.new()
 	cone.mesh = _cone

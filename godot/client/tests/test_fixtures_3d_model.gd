@@ -72,3 +72,20 @@ func test_lights_off_renders_no_light() -> void:
 	var b := {"i": 1.0, "c": [1, 0.5, 0]}
 	t.eq(F.shown_tint(b, true), Color(1, 0.5, 0, 1), "on: the decoded beam")
 	t.eq(F.shown_tint(b, false).a, 0.0, "off: dark")
+
+
+## WO-1006 — a lens is the beam's own face, just in front of its origin; deeper beams further out, idle ones at the back.
+func test_lens_face_and_stacking() -> void:
+	var cell := F.lens({"lens": [0.062, 0.03, false], "layer": 1, "radius": 0.05})
+	t.ok(cell.mesh is BoxMesh, "a rectangular pixel is a box, not the 100 mm beam-radius disc")
+	t.eq((cell.mesh as BoxMesh).size, Vector3(0.062, F.LENS_T, 0.03))
+	var plate := F.lens({"lens": [0.16, 0.47, false], "layer": 0})
+	var idle := F.lens({"lens": [0.094, 0.094, false], "layer": 1, "driven": false})
+	t.ok(cell.position.y < plate.position.y and plate.position.y < idle.position.y and idle.position.y < -F.LENS_GAP,
+		"pixel in front of its plate, an undriven cell behind it, all clear of the origin plane")
+	var round := F.lens({"lens": [0.1, 0.1, true], "radius": 0.05})
+	t.ok(round.mesh is CylinderMesh and round.scale.is_equal_approx(Vector3.ONE), "a round model: a disc of its diameter")
+	var bare := F.lens({"radius": 0.07})
+	t.eq((bare.mesh as CylinderMesh).top_radius, 0.07, "no model: the beam radius as before")
+	for n in [cell, plate, idle, round, bare]:
+		n.free()

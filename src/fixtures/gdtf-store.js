@@ -15,6 +15,9 @@ const { parseGdtf } = require('./gdtf-parse')
 const { buildRig } = require('./gdtf-rig')
 const { compileVisual } = require('./gdtf-visual')
 const aliases = require('./gdtf-aliases')
+const { transposeRotation } = require('../stage/mvr-math')
+
+const GEOMETRY_MATRIX = 2 // WO-1006: records parsed before this read every GDTF rotation transposed
 
 const ID = /^[0-9a-f]{12}$/
 const _types = new Map() // id → parsed record (the engine's working set)
@@ -66,7 +69,7 @@ async function importGdtf(buf, name, opts = {}) {
 	fs.mkdirSync(dir(), { recursive: true })
 	fs.writeFileSync(fileOf(id, '.gdtf'), buf)
 	const rec = { id, file: String(name || `${type.manufacturer}@${type.name}.gdtf`).slice(0, 160),
-		importedAt: new Date().toISOString(), bytes: buf.length, type }
+		importedAt: new Date().toISOString(), bytes: buf.length, geometryMatrix: GEOMETRY_MATRIX, type }
 	if (opts.share) rec.share = { rid: Number(opts.share.rid), full: opts.share.full === true }
 	fs.writeFileSync(fileOf(id, '.json'), JSON.stringify(rec))
 	_types.set(id, rec)
@@ -87,8 +90,21 @@ function record(id) {
 	const f = fileOf(id, '.json')
 	if (!f || !fs.existsSync(f)) return null
 	const rec = JSON.parse(fs.readFileSync(f, 'utf8'))
+	if (rec.geometryMatrix !== GEOMETRY_MATRIX && rec.type) migrateGeometry(rec)
 	_types.set(id, rec)
 	return rec
+}
+
+/** WO-1006: an older record's geometry matrices → today's gdtfMatrix (in memory; the file stays as imported). */
+function migrateGeometry(rec) {
+	const fix = (gs) => {
+		for (const g of gs || []) {
+			if (Array.isArray(g.m) && g.m.length === 16) g.m = transposeRotation(g.m)
+			fix(g.children)
+		}
+	}
+	fix(rec.type.geometry)
+	rec.geometryMatrix = GEOMETRY_MATRIX
 }
 
 function list() {
@@ -131,7 +147,12 @@ function visual(id, name) {
 	const m = rec?.type.modes.find((x) => x.name === name)
 	if (!m) return null
 	const rig = buildRig(rec.type, m)
-	const out = { rig, plan: compileVisual(rec.type, m, rig) }
+	const plan = compileVisual(rec.type, m, rig)
+	// WO-1006: a beam no light channel of this mode reaches (Pixel Strobe 15 Ch cells) — the client draws its lens at the
+	// back, without cone or light, so it never covers the plate the mode does drive
+	const idle = new Set(plan.beams.filter((b) => !b.lit).map((b) => b.id))
+	if (idle.size) rig.nodes = rig.nodes.map((n) => (idle.has(n.id) && n.beam ? { ...n, beam: { ...n.beam, driven: false } } : n))
+	const out = { rig, plan }
 	_rigs.set(key, out)
 	return out
 }

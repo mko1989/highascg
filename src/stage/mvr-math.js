@@ -25,13 +25,18 @@ function mvrMatrix(text) {
 	return [n[0], n[1], n[2], 0, n[3], n[4], n[5], 0, n[6], n[7], n[8], 0, n[9] / 1000, n[10] / 1000, n[11] / 1000, 1]
 }
 
-/** GDTF Position="{r0}{r1}{r2}{r3}": rows, translation in the 4th column, metres. */
+/** GDTF Position="{r0}{r1}{r2}{r3}": translation in the 4th value of the first three groups, metres. WO-1006: the 3×3
+ * rotation is the transpose of the groups read as rows ("stored row-major, defined column-major" — BlenderDMX inverts
+ * it). Read as rows, the Brighter Pixel Strobe's beam plate sat on the head's back face shining into its own body. */
 function gdtfMatrix(text) {
 	const n = nums(text)
 	if (n.length !== 16 || n.some((v) => !Number.isFinite(v))) return [...IDENTITY]
-	const o = []
-	for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) o.push(n[r * 4 + c])
-	return o
+	return [n[0], n[1], n[2], 0, n[4], n[5], n[6], 0, n[8], n[9], n[10], 0, n[3], n[7], n[11], 1]
+}
+
+/** WO-1006: a matrix gdtfMatrix produced before the fix (rows as rows) → today's (rotation transposed). */
+function transposeRotation(m) {
+	return [m[0], m[4], m[8], m[3], m[1], m[5], m[9], m[7], m[2], m[6], m[10], m[11], m[12], m[13], m[14], m[15]]
 }
 
 // glTF (Y-up) → MVR (Z-up): x→x, y→z, z→−y. MVR → Godot: x→x, y→−z, z→y. GODOT_FROM_MVR · MVR_FROM_GLTF = identity.
@@ -50,4 +55,4 @@ function scale(x, y = x, z = x) {
 	return [x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]
 }
 
-module.exports = { IDENTITY, mul, mvrMatrix, gdtfMatrix, toGodot, scale, MVR_FROM_GLTF, GODOT_FROM_MVR }
+module.exports = { IDENTITY, mul, mvrMatrix, gdtfMatrix, transposeRotation, toGodot, scale, MVR_FROM_GLTF, GODOT_FROM_MVR }

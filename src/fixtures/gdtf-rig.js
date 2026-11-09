@@ -7,6 +7,8 @@
  *
  *   { mode, footprint, nodes: [{ id, parent (index, −1 = root), kind (Geometry | Axis | Beam | …), xf, mesh?, mesh_xf?,
  *                                axis? "pan" | "tilt", beam? }], meshes: [archive paths] }
+ *   WO-1006: beam.lens [x, z, round] = the emitting face (its primitive model, else its parent's flat plate), beam.layer =
+ *   its depth rank among the beams (the client draws deeper lenses further out).
  *
  * Transforms are 12 numbers (basis x, y, z columns, origin) in Godot's frame: a node's local GDTF transform L
  * (Z-up, metres) conjugated, C·L·C⁻¹ with C = GODOT_FROM_MVR, so GDTF Z (pan) is Godot Y and GDTF X (tilt) is
@@ -58,6 +60,26 @@ function buildRig(type, mode) {
 		if (md.type === 'Pigtail' || !(l > 0.005 && w > 0.005 && h > 0.005)) return null
 		return { mesh: 'prim:box', mesh_xf: twelve(mul(mul(GODOT_FROM_MVR, scale(l, w, h)), MVR_FROM_GLTF)) }
 	}
+	// WO-1006: the emitting face of a beam — its own primitive model (the pixel's rectangle / disc), else a flat primitive
+	// model of its parent it sits on unturned (Pixel Strobe ForeGround on the 160×470 mm "Beam" plate), in Godot's
+	// node frame: [x, z, round]. `own` = the model is the lens, so no box is drawn for it as well.
+	const plate = (name) => {
+		const md = type.models?.[name]
+		if (!md || md.file || md.type === 'Pigtail') return null
+		const [l, w] = md.size || [0, 0]
+		return l > 0.001 && w > 0.001 ? [r6(l), r6(w), /cylinder|sphere/i.test(md.type || '')] : null
+	}
+	const lensOf = (node, parentModelName, local) => {
+		if (node.model) {
+			const own = plate(node.model)
+			return own ? { size: own, own: true } : null
+		}
+		const md = type.models?.[parentModelName]
+		const unturned = [0, 1, 2].every((c) => [0, 1, 2].every((r) => Math.abs(local[c * 4 + r] - (c === r ? 1 : 0)) < 1e-6))
+		return unturned && md && (md.size?.[2] ?? 1) <= 0.005 ? (plate(parentModelName) ? { size: plate(parentModelName) } : null) : null
+	}
+	const parentModel = []
+	const depthOf = new Map()
 	const nodes = []
 	const add = (g, id, parent, m, depth, prefix) => {
 		if (depth > 32 || nodes.length >= MAX_NODES) return
@@ -70,16 +92,25 @@ function buildRig(type, mode) {
 			local = mul(m, t.m)
 		}
 		const n = { id, parent, kind: node.type, xf: conj(local) }
-		const mesh = node.model ? meshOf(node.model) : null
+		const lens = node.beam ? lensOf(node, parent >= 0 ? parentModel[parent] : '', local) : null
+		const mesh = node.model && !lens?.own ? meshOf(node.model) : null
 		if (mesh) Object.assign(n, mesh)
 		if (axes.has(id)) n.axis = axes.get(id)
-		if (node.beam) n.beam = node.beam
+		if (node.beam) {
+			n.beam = { ...node.beam }
+			if (lens) n.beam.lens = lens.size
+			depthOf.set(n, depth)
+		}
 		const at = nodes.push(n) - 1
+		parentModel[at] = node.model || ''
 		const under = g.type === 'GeometryReference' ? `${id}/` : prefix
 		for (const c of node.children || []) add(c, under + c.name, at, c.m, depth + 1, under)
 	}
 	const root = tops.get(mode.geometry) || (type.geometry || [])[0]
 	if (root) add(root, root.name, -1, root.m, 0, '')
+	// WO-1006: lenses at different depths of the tree stack (a pixel in front of the plate it sits on), not coplanar
+	const depths = [...new Set(depthOf.values())].sort((a, b) => a - b)
+	for (const [n, d] of depthOf) n.beam.layer = depths.indexOf(d)
 	return { mode: mode.name, footprint: mode.footprint, nodes, meshes: [...meshes] }
 }
 
