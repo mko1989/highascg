@@ -213,3 +213,34 @@ merged from the glb."
   - The owner's GUI (Front view) shows the MAC Quantums on top of the .glb towers, with the Pixel Lines on the tower legs.
 - **Not done:** an automatic "take positions from the venue .glb" action. Narvil was corrected as data. A tool would
   have to tell a moved group from the per-type pivots, which is what the per-type median does here.
+
+### Follow-up 09.11 ~17:00 — "walls … dont meet together on the right side of the stage … should be fixed in the glb"
+
+- **The GUI already draws the walls from the .glb.** The MVR section says "3302 objects drawn from it, 853 more only in
+  it". The owner saw no difference because the .glb repeats the MVR's mistake.
+- **Mesh bounds compared:** world AABBs of the server's MVR meshes (`/api/stage/mvr/<id>/mesh`) vs the .glb meshes.
+  - 3283 of 3302 are equal.
+  - The rest are the tower group above, plus 9 objects the MVR mesh conversion draws degenerate (zero width): rounded
+    wall piece d419f7a1 and 8 Layer 22 / Pipe and drape panels. The .glb draws those properly.
+- **Plan view of the .glb triangles:** Capture's file holds two room shells about 4 m apart:
+  - **The offset shell, 5 objects:**
+    - the rounded X wall ("Ściana zaokrąglona": f32a635a, 7ae6ae3c, d419f7a1), x −1.78…24.95, y 0…6;
+    - "Podłoga szara" cabe3b77, x −2.6193…24.4547;
+    - "Sufit" d8542064 (hidden).
+  - **Everything else:**
+    - the hotel carpet 935d7fe2, x 1.3684…28.4423, the same z;
+    - the Layer 22 left, front and right X walls (ea2dc819, ec7002a5, e2b232ef, 0aa4cb09), x 0.95…28.94, y 0.82…6.82;
+    - the stage deck, the dance floor, the trusses and the tables.
+  - **The offset:** carpet − grey floor = **+3.9877 m** at both edges, and the wall feet differ by **+0.8238 m**. So the
+    rounded wall ended 3.4 m short of the right X wall, and on the left it stuck 2.7 m through the left wall.
+- **What was done (data, Narvil only, `project.previs.mvr.moved`, the WO-682 per-object move, so the owner can still
+  adjust it):**
+  - The 3 rounded-wall pieces and the ceiling got +(3.9877, 0.8238, 0).
+  - The grey floor got +3.9877 in x only, so it stays under the carpet instead of z-fighting it.
+  - The older `moved` entry on ea2dc819 (−0.82, 0, +0.64), which predates this session, was removed.
+  - Backup: scratchpad `narvil.before-unmove.json`.
+- **Verified:**
+  - Right corner, in the owner's GUI view: the rounded wall now runs into the right X wall, with the top rails level.
+  - Left corner, in a plan render of the shifted .glb: the rounded wall's end (2.2, −48.9) meets the short X-lattice
+    piece that leads to the left wall.
+  - The .glb file itself is unchanged. Capture would need the same fix for a later export.
