@@ -23,6 +23,8 @@ const MULTIVIEW_TEMPLATE_HOST_FALLBACK = 10
 
 function broadcastLedTestPatternActive(ctx, active) {
 	ctx._ledTestPatternActive = !!active
+	// WO-1013: kept across node restarts (only the operator card's state is stored — see persistOnState).
+	require('../engine/led-test-card-control').persistOnState(ctx)
 	try {
 		if (typeof ctx._wsBroadcast === 'function') {
 			ctx._wsBroadcast('change', { path: 'ledTestPatternActive', value: !!active })
@@ -224,4 +226,4 @@ async function handlePost(path, body, ctx) {
 	}
 }
 
-module.exports = { handlePost }
+module.exports = { handlePost, broadcastLedTestPatternActive }

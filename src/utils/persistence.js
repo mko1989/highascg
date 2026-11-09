@@ -34,6 +34,7 @@ const FLUSH_DEBOUNCE_MS = Math.max(
 /** Keys flushed immediately (on-air / operator-critical). */
 const IMMEDIATE_KEYS = new Set([
 	'liveScenesByProgramChannel',
+	'ledTestCardOn', // WO-1013: the test card master survives a node restart
 	'liveAudioOnlyLooksByChannel',
 	'scene_deck',
 	'multiviewLayout',

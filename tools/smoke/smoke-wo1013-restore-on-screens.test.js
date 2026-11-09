@@ -249,6 +249,8 @@ describe('WO-1013 caspar-info-ready order', () => {
 		const undo = [
 			patch('../../src/engine/restore-on-screens', 'restoreProgramLooks', async (_c, o) => void seq.push(`program:${o.reconnect}`)),
 			patch('../../src/engine/restore-on-screens', 'restoreLedTestCard', async () => void seq.push('card')),
+			patch('../../src/engine/restore-on-screens', 'primeLedTestCardFromPersisted', () => void seq.push('prime')),
+			patch('../../src/engine/restore-on-screens', 'verifyPrimedLedTestCard', async () => void seq.push('verify')),
 			patch('../../src/config/routing-setup', 'restagePersistedPreviewLooks', async () => void seq.push('preview')),
 			patch('../../src/config/routing-setup', 'warmLookDeckThumbnails', async () => void seq.push('thumbs')),
 			patch('../../src/system/screen-consumer-placement', 'placeScreenConsumers', async () => ({ missing: 0 })),
@@ -268,9 +270,11 @@ describe('WO-1013 caspar-info-ready order', () => {
 				reconcileAfterInfoGather: async () => void seq.push('reconcile'),
 			})
 			const settle = () => new Promise((r) => setTimeout(r, 120))
+			assert.deepEqual(seq, ['prime'], 'the stored card state is primed when the hook is built, before any connect')
+			seq.length = 0
 			onReady()
 			await settle()
-			assert.deepEqual(seq, ['reconcile', 'routing', 'program:false', 'preview', 'thumbs'])
+			assert.deepEqual(seq, ['verify', 'reconcile', 'routing', 'program:false', 'preview', 'thumbs'])
 			seq.length = 0
 			onReady()
 			await settle()
@@ -278,5 +282,107 @@ describe('WO-1013 caspar-info-ready order', () => {
 		} finally {
 			for (const u of undo) u()
 		}
+	})
+})
+
+describe('WO-1013 follow-up: the operator card survives a NODE restart', () => {
+	const ctl = require('../../src/engine/led-test-card-control')
+	const persistence = require('../../src/utils/persistence')
+	const store = (v) => persistence.set('ledTestCardOn', v)
+	const deps = { getChannelMap: () => ({ programChannels: [2] }) }
+	const ctxWith = (xmlByCh, extra = {}) => {
+		const sent = []
+		return {
+			sent,
+			ctx: {
+				log: () => {},
+				_wsBroadcast: (type, p) => sent.push([type, p.path, p.value]),
+				amcp: {
+					isConnected: true,
+					info: async (ch) => {
+						if (xmlByCh === 'throw') throw new Error('INFO failed')
+						return { data: xmlByCh[ch] || xml('') }
+					},
+				},
+				...extra,
+			},
+		}
+	}
+
+	it('only the operator card is stored as on (splash / direct route paints never are)', () => {
+		ctl.persistOnState({ _ledTestPatternActive: true, _ledTestCardSource: 'control' })
+		assert.deepEqual(ctl.readOnState(), { on: true, source: 'control' })
+		ctl.persistOnState({ _ledTestPatternActive: true, _ledTestCardSource: null })
+		assert.deepEqual(ctl.readOnState(), { on: false, source: null })
+		ctl.persistOnState({ _ledTestPatternActive: false, _ledTestCardSource: 'control' })
+		assert.deepEqual(ctl.readOnState(), { on: false, source: null })
+	})
+
+	it('applyCard stores on/off; the route master-off stores off', async () => {
+		const ctx = { getState: () => ({ channelMap: { programChannels: [2] } }) }
+		// the real per-channel route sets the master flag on a successful paint
+		await ctl.applyCard(ctx, true, { post: async (_p, _b, c) => ((c._ledTestPatternActive = true), { status: 200 }) })
+		assert.equal(ctl.readOnState().on, true)
+		const route = require('../../src/api/routes-led-test-card')
+		ctx.amcp = { cg: { cgClear: async () => {} }, mixer: { mixerCommit: async () => {} } }
+		const r = await route.handlePost('/api/led-test-card', JSON.stringify({ enabled: false, channel: 2, masterOff: true }), ctx)
+		assert.equal(r.status, 200)
+		assert.equal(ctx._ledTestPatternActive, false)
+		assert.equal(ctl.readOnState().on, false)
+	})
+
+	it('prime: stored on → provisionally on + control; stored off → untouched', () => {
+		store({ on: true, source: 'control' })
+		const a = {}
+		assert.equal(restore.primeLedTestCardFromPersisted(a), true)
+		assert.deepEqual([a._ledTestPatternActive, a._ledTestCardSource, a._ledTestCardPrimed], [true, 'control', true])
+		store({ on: false, source: null })
+		const b = {}
+		assert.equal(restore.primeLedTestCardFromPersisted(b), false)
+		assert.equal(b._ledTestPatternActive, undefined)
+	})
+
+	it('node restart, Caspar still shows layer 999 → on, broadcast, still stored on', async () => {
+		store({ on: true, source: 'control' })
+		const { ctx, sent } = ctxWith({ 2: EMPTY_LOOKS })
+		restore.primeLedTestCardFromPersisted(ctx)
+		const r = await restore.verifyPrimedLedTestCard(ctx, { deps })
+		assert.deepEqual(r, { state: 'on', channels: [2] })
+		assert.equal(ctx._ledTestPatternActive, true)
+		assert.equal(ctx._ledTestCardSource, 'control')
+		assert.deepEqual(sent, [['change', 'ledTestPatternActive', true]])
+		assert.equal(ctl.readOnState().on, true)
+	})
+
+	it('box boot (fresh Caspar, no 999) → off, broadcast, stored off', async () => {
+		store({ on: true, source: 'control' })
+		const { ctx, sent } = ctxWith({ 2: xml(fileLayer(1, 'route://9', 'route')) })
+		restore.primeLedTestCardFromPersisted(ctx)
+		assert.deepEqual(await restore.verifyPrimedLedTestCard(ctx, { deps }), { state: 'off' })
+		assert.equal(ctx._ledTestPatternActive, false)
+		assert.equal(ctx._ledTestCardSource, null)
+		assert.deepEqual(sent, [['change', 'ledTestPatternActive', false]])
+		assert.equal(ctl.readOnState().on, false)
+	})
+
+	it('boot splash painted this boot → the splash owns the flag; stored operator state dropped, never "control"', async () => {
+		store({ on: true, source: 'control' })
+		const { ctx } = ctxWith({ 2: EMPTY_LOOKS })
+		restore.primeLedTestCardFromPersisted(ctx)
+		ctx._startupLedTestChannelIndices = [2, 4] // set by startup-led-test-pattern.js before info-ready
+		assert.deepEqual(await restore.verifyPrimedLedTestCard(ctx, { deps }), { state: 'splash' })
+		assert.equal(ctx._ledTestPatternActive, true, 'the splash is up')
+		assert.equal(ctx._ledTestCardSource, null, 'a later Caspar restart repaints the SPLASH, not the operator card')
+		assert.equal(ctl.readOnState().on, false)
+	})
+
+	it('no channel readable → keeps the stored on-state; not primed → no-op', async () => {
+		store({ on: true, source: 'control' })
+		const { ctx } = ctxWith('throw')
+		restore.primeLedTestCardFromPersisted(ctx)
+		assert.deepEqual(await restore.verifyPrimedLedTestCard(ctx, { deps }), { state: 'unknown' })
+		assert.equal(ctx._ledTestPatternActive, true)
+		assert.deepEqual(await restore.verifyPrimedLedTestCard({}, { deps }), { state: 'not primed' })
+		store({ on: false, source: null })
 	})
 })

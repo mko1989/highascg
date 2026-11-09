@@ -10,12 +10,25 @@
  * @param {Function} opts.reconcileAfterInfoGather
  */
 function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCasparConnected, setupAllRouting, reconcileAfterInfoGather }) {
+	/* WO-1013 follow-up: built once at boot, before Caspar connects — take the operator card's stored on-state
+	 * provisionally (a node restart must not forget a card Caspar still shows); checked on the first connect below. */
+	try {
+		require('../engine/restore-on-screens').primeLedTestCardFromPersisted(appCtx)
+	} catch (e) {
+		appCtx.log?.('warn', '[restore-on-screens] test card prime: ' + (e?.message || e))
+	}
 	return () => {
 		/* WO-1013: the first connect of this node process is a boot (nothing of ours was on that Caspar); every later
 		 * one is a reconnect — after Devices ▸ Apply & restart node still knows what was on the screens. */
 		appCtx._casparInfoReadyCount = (appCtx._casparInfoReadyCount || 0) + 1
 		const reconnect = appCtx._casparInfoReadyCount > 1
 		handleCasparConnected()
+		/* First connect: is the primed card really on air? (after the boot splash, which fetch-server-info-config ran) */
+		const cardChecked = reconnect
+			? Promise.resolve()
+			: require('../engine/restore-on-screens')
+					.verifyPrimedLedTestCard(appCtx)
+					.catch((e) => appCtx.log('warn', '[restore-on-screens] test card check: ' + (e?.message || e)))
 		const routingDone = Promise.resolve()
 			.then(() => setupAllRouting(appCtx))
 			.catch((e) => {
@@ -47,6 +60,7 @@ function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCas
 				 * audio buses exist), then the preview re-stage, then the test card LAST so layer 999 sits on top of
 				 * everything restored. Capped wait: a hung routing setup must not hold the restore forever. */
 				const restore = require('../engine/restore-on-screens')
+				await cardChecked
 				await Promise.race([
 					routingDone,
 					new Promise((r) => {

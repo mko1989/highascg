@@ -29,6 +29,7 @@ function defaultDeps() {
 		applyCard: (ctx, on) => require('./led-test-card-control').applyCard(ctx, on),
 		postCard: (path, body, ctx) => require('../api/routes-led-test-card').handlePost(path, body, ctx),
 		clearBorderType: (ch) => require('./global-border-live').clearCasparBorderType(ch),
+		cardControl: require('./led-test-card-control'),
 	}
 }
 
@@ -169,6 +170,87 @@ function splashCardBody(channel) {
 	}
 }
 
+/** Flag + source, stored (persistOnState) and broadcast — through the route's own setter, the one WS `change` sender. */
+function setCardActive(ctx, on, source) {
+	ctx._ledTestCardSource = on ? source : null
+	require('../api/routes-led-test-card').broadcastLedTestPatternActive(ctx, on)
+}
+
+/**
+ * WO-1013 follow-up — a NODE restart used to forget that the operator's card was on, while Caspar kept painting it
+ * (GUI "off", card on air; the next Caspar restart then did not repaint it). Called once at boot, before Caspar is
+ * connected: the stored on-state (led-test-card-control `ledTestCardOn`) is taken provisionally, so nothing that runs
+ * on connect (multiview apply clears layer 999 while the card is "off") wipes a card that is still up.
+ * {@link verifyPrimedLedTestCard} then checks it against Caspar on the first connect.
+ * @param {object} ctx
+ * @param {{ deps?: object }} [opts]
+ * @returns {boolean} primed
+ */
+function primeLedTestCardFromPersisted(ctx, { deps: injected } = {}) {
+	const deps = { ...defaultDeps(), ...(injected || {}) }
+	if (!ctx || ctx._ledTestPatternActive === true) return false
+	const st = deps.cardControl.readOnState()
+	if (!st.on) return false
+	ctx._ledTestPatternActive = true
+	ctx._ledTestCardSource = 'control'
+	ctx._ledTestCardPrimed = true
+	return true
+}
+
+/**
+ * First Caspar connect of this node process: is the primed operator card really on air?
+ *  - the boot splash painted this boot (`_startupLedTestChannelIndices`) → it is a fresh Caspar, the splash owns the
+ *    flag; the stored operator state is stale → stored off, source cleared (splash and operator card never mix);
+ *  - layer 999 has a producer on any planned target → on (node restart, Caspar kept the card), broadcast;
+ *  - none (box boot / Caspar restarted while node was down) → off, stored off, broadcast — as the looks are cleared;
+ *  - no channel readable → left as primed (uncertain: keep what the operator last chose).
+ * @param {object} ctx
+ * @param {{ deps?: object }} [opts]
+ * @returns {Promise<{ state: string, channels?: number[] }>}
+ */
+async function verifyPrimedLedTestCard(ctx, { deps: injected } = {}) {
+	const deps = { ...defaultDeps(), ...(injected || {}) }
+	if (!ctx?._ledTestCardPrimed) return { state: 'not primed' }
+	ctx._ledTestCardPrimed = false
+	const ctl = deps.cardControl
+	if (Array.isArray(ctx._startupLedTestChannelIndices) && ctx._startupLedTestChannelIndices.length) {
+		ctx._ledTestCardSource = null
+		ctl.persistOnState(ctx)
+		log(ctx, 'info', '[restore-on-screens] test card: boot splash is up — stored operator card state dropped')
+		return { state: 'splash' }
+	}
+	const map = deps.getChannelMap(ctx.config || {}) || {}
+	const targets = ctl.planTargets(ctl.getSettings(), map, true)
+	const { infoResponseToXml } = require('../caspar/channel-info-xml')
+	const { parseLayerFgProducerTypesFromChannelXml } = require('../state/live-scene-reconcile')
+	const onAir = []
+	let readable = 0
+	for (const ch of targets) {
+		try {
+			const xml = infoResponseToXml(await ctx.amcp.info(ch))
+			if (!xml || !xml.includes('<channel')) continue
+			const types = await parseLayerFgProducerTypesFromChannelXml(xml)
+			readable++
+			const t = types['999']
+			if (t && t !== 'empty') onAir.push(ch)
+		} catch {
+			/* unreadable channel: no evidence either way */
+		}
+	}
+	if (onAir.length) {
+		setCardActive(ctx, true, 'control')
+		log(ctx, 'info', `[restore-on-screens] test card: still on air after node restart (ch ${onAir.join(', ')}) — on`)
+		return { state: 'on', channels: onAir }
+	}
+	if (!readable) {
+		log(ctx, 'warn', '[restore-on-screens] test card: no target channel readable — keeping the stored on-state')
+		return { state: 'unknown' }
+	}
+	setCardActive(ctx, false, null)
+	log(ctx, 'info', '[restore-on-screens] test card: stored on, but no layer 999 on Caspar (fresh start) — off')
+	return { state: 'off' }
+}
+
 /**
  * Re-paint the test card on a fresh Caspar when node still has it on.
  * The boot splash counts when it is the card that is up: painted at boot and no operator switch since
@@ -219,4 +301,6 @@ module.exports = {
 	splashCardBody,
 	restoreProgramLooks,
 	restoreLedTestCard,
+	primeLedTestCardFromPersisted,
+	verifyPrimedLedTestCard,
 }

@@ -109,6 +109,30 @@ function saveSettings(patch) {
 	return next
 }
 
+/** WO-1013: the operator card's on-state, kept across NODE restarts (Caspar keeps painting layer 999 meanwhile). */
+const ON_STATE_KEY = 'ledTestCardOn'
+
+/**
+ * Persist whether the operator's card is up. Only the operator card counts (`source: 'control'`): the boot splash is
+ * re-decided every boot by startup-led-test-pattern.js and must never come back as "the operator's card".
+ * @param {object} ctx app ctx (`_ledTestPatternActive`, `_ledTestCardSource`)
+ */
+function persistOnState(ctx) {
+	const source = ctx?._ledTestCardSource === 'control' ? 'control' : null
+	try {
+		persistence.set(ON_STATE_KEY, { on: ctx?._ledTestPatternActive === true && source === 'control', source })
+	} catch {
+		/* a lost flag only costs the GUI tick after a node restart */
+	}
+}
+
+/** @returns {{ on: boolean, source: 'control'|null }} */
+function readOnState() {
+	const r = persistence.get(ON_STATE_KEY)
+	const on = r?.on === true && r?.source === 'control'
+	return { on, source: on ? 'control' : null }
+}
+
 function chans(list) {
 	return [...new Set((Array.isArray(list) ? list : []).map((x) => parseInt(String(x), 10)))].filter(
 		(n) => Number.isFinite(n) && n > 0
@@ -191,6 +215,7 @@ function applyCard(ctx, enabled, opts = {}) {
 			ctx._ledTestCardSource = 'control'
 			require('../bootstrap/led-test-layer-999').markLedTestLayerPainted(ctx)
 		} else if (ctx && !enabled && masterOff) ctx._ledTestCardSource = null
+		persistOnState(ctx)
 		return { ok, enabled: !!enabled, targets, failures }
 	}
 	const p = chain.then(run, run)
@@ -222,4 +247,6 @@ module.exports = {
 	cardBody,
 	applyCard,
 	setChannel,
+	persistOnState,
+	readOnState,
 }

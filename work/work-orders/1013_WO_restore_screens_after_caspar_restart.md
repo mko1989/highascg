@@ -68,6 +68,24 @@ Agent A additions (09.11), checked against the code before fixing:
   `kill -TERM` of node, `GET /api/led-test-card/settings` answered `active: false` while INFO 2 still showed
   `layer_999 html`. The GUI says "off" while the card is on air.
 
+Follow-up (agent A, 09.11 — the operator card across a NODE restart):
+
+- **Where the flag lives and who changes it.** `ctx._ledTestPatternActive` is only in memory. Two places set it:
+  - the route setter `broadcastLedTestPatternActive` (`src/api/routes-led-test-card.js:24`), which every per-channel
+    paint and every master-off goes through;
+  - the boot splash, directly (`startup-led-test-pattern.js:260`).
+- **No early hook in my files except the factory.** Nothing in my files runs when node starts but before Caspar
+  connects, except `createOnAfterInfoConfigReady`. `index.js:236` builds it at boot, and it returns the per-connect
+  hook.
+- **The flag has to be set before connect.** The multiview apply inside routing setup CLEARS layer 999 on routed
+  PGM/PRV channels whenever the flag is off (`multiview-apply.js:171`). Routing setup runs on connect from both the
+  gather finish and info-ready. So the flag must already be on when Caspar connects. Checking it only afterwards could
+  wipe a card that is still on air (this box has no multiview, but others do).
+- **At boot, a layer-999 check alone would mistake the splash for the operator card.** The splash has just painted
+  999 on every output (ch2 included) when info-ready runs. The discriminator is `_startupLedTestChannelIndices`. It is
+  set only when the splash painted in this node process, which happens only on the first node start after a box boot
+  (`DONE_KEY` = boot id).
+
 ## What was done
 
 Agent A, 09.11:
@@ -119,13 +137,46 @@ Agent A, 09.11:
   `applyCard` sets and clears the source. `caspar-info-ready` order with patched module exports: boot = `reconcile,
   routing, program:false, preview, thumbs`; reconnect = `reconcile, routing, program:true, preview, card, thumbs`.
 
+**Follow-up, 09.11 — the operator card's on-state survives a NODE restart:**
+- **`src/engine/led-test-card-control.js`.**
+  - New key `ledTestCardOn` = `{ on, source }`, written by `persistOnState(ctx)` and read by `readOnState()`.
+  - Only the operator card is stored as on: `on` = active AND `source === 'control'`. The splash and direct
+    web-route paints are never stored, so splash and operator card cannot mix up.
+  - `applyCard` stores the state after every switch.
+- **`src/api/routes-led-test-card.js`.** `broadcastLedTestPatternActive` stores the state too, which covers
+  master-off, including direct `POST /api/led-test-card {masterOff:true}`. It is exported so the restore broadcasts
+  through the one existing WS `change` sender; a second sender would have made the generated `ws.md` stale
+  (`smoke-wo598-api-contract`).
+- **`src/engine/restore-on-screens.js`.**
+  - `primeLedTestCardFromPersisted(ctx)`: stored on → provisionally `_ledTestPatternActive = true`,
+    `_ledTestCardSource = 'control'`, `_ledTestCardPrimed`.
+  - `verifyPrimedLedTestCard(ctx)` runs on the first connect:
+    - splash painted this boot → the splash owns the flag, the source is cleared and "off" is stored;
+    - a producer on layer 999 of any planned target (`planTargets(settings, map, true)`) → on + broadcast;
+    - none (box boot, or Caspar restarted while node was down) → off + broadcast + stored off, which matches the looks
+      being cleared at boot;
+    - no channel readable → the stored state is kept.
+- **`src/bootstrap/caspar-info-ready.js`.** The factory primes, at boot before any connect. The first connect starts
+  the verify immediately and the restore chain awaits it.
+- **Smoke.** 7 new tests, 24 in total:
+  - storage rules (splash and direct paints are never stored on);
+  - `applyCard` and route master-off store the state;
+  - prime from stored on and from stored off;
+  - node restart with 999 on air → on + broadcast;
+  - box boot without 999 → off + broadcast + stored off;
+  - splash painted this boot → source cleared, stored off;
+  - unreadable INFO → kept; not primed → no-op;
+  - the info-ready order now starts `prime` (factory), then `verify` first on connect.
+
 **Still open (not restored by node after a Caspar restart):**
 - Timeline looks on PGM. They are skipped on purpose; they need a "rejoin at the current position" from the
   timeline engine.
 - Overlay looks (`scene.liveOverlay`, WO-860) and audio-only looks (`scene.liveAudioOnly`, WO-572). Both have their
   own live maps and are not re-taken.
-- The node-restart loss of `_ledTestPatternActive` (Investigation above). Persisting it would need a decision on what
-  a node restart with Caspar down should do.
+- ~~The node-restart loss of `_ledTestPatternActive`~~. Fixed in the follow-up below.
+- A NODE restart while the boot splash (not the operator card) is up still forgets the splash flag. The splash is
+  painted by `startup-led-test-pattern.js` and is never stored. After a Caspar restart the splash comes back only if
+  node still has the flag.
 - A Caspar restart through the web/Companion paths behaves the same, because the restore keys on the connect, not on
   the apply route. Only the Devices apply was tested live.
 
@@ -184,3 +235,22 @@ Agent A, 09.11.
 **Not proven live:**
 - The boot-splash branch, the timeline skip and the first-connect clear are covered by the smoke only. The box had no
   splash up and no timeline look, and the first-connect case needs a box boot.
+
+**Follow-up, 09.11 — operator card across a NODE restart (no Caspar restart):**
+- Offline:
+  - `node --test tools/smoke/smoke-wo1013-restore-on-screens.test.js` → 24/24.
+  - `node tools/ci/run-offline-tests.js` → 5611 tests, 5604 pass, 0 fail (4 skipped, 3 todo).
+  - `npm run -s lint` → 0 errors. `check-unwired-exports` → no new orphan. `check-max-file-lines` → 0 over 500.
+  - The first suite run caught `smoke-wo598-api-contract` (`ws.md` stale from a direct `_wsBroadcast` in
+    restore-on-screens). It was fixed by using the route's setter; the contract doc was not regenerated.
+- Live, with the card on air on ch2 (INFO 2 = `layer_999 html`):
+  1. **Node restart 1 at 13:05:06** (loads the code). Nothing was stored yet, so `active: false`, as before the fix.
+  2. **`POST /api/led-test-card/master {"enabled":true}`** → `targets [2]`. `.highascg-state.json` then held
+     `ledTestCardOn: {on: true, source: "control"}`.
+  3. **Node restart 2 at 13:05:34.** The journal showed `13:05:40.572 [Caspar] INFO CONFIG loaded`, then
+     `13:05:40.578 [restore-on-screens] test card: still on air after node restart (ch 2) — on`.
+  4. **After the restart:** `GET /api/led-test-card/settings` → `active: true`; `GET /api/state` →
+     `ledTestPatternActive: true`. INFO 2 = `layer_999 html`. `caspar print 2` (print 420) shows the card still on air
+     with its animation running, so it was not repainted.
+  5. Left ON as found.
+- **Not proven live:** the box-boot "off" path and the splash path. Both need a reboot; the smoke covers them.
