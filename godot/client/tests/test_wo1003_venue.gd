@@ -78,3 +78,23 @@ func test_summary() -> void:
 		"Venue model v.glb: 3 objects drawn from it, 2 more only in it"), "counts")
 	t.ok(M.summary(base.merged({"venue": {"error": "boom"}})).ends_with("\nboom"), "an error is the line")
 	t.ok(not M.summary(base).contains("Venue"), "no venue, no line")
+
+
+## A .glb whose JSON chunk is `json` (header + chunk header; no BIN chunk needed for the check).
+func _glb(json: String) -> PackedByteArray:
+	var j := json.to_utf8_buffer()
+	var b := PackedByteArray()
+	b.resize(20)
+	b.encode_u32(0, 0x46546C67)  # "glTF"
+	b.encode_u32(4, 2)
+	b.encode_u32(8, 20 + j.size())
+	b.encode_u32(12, j.size())
+	b.encode_u32(16, 0x4E4F534A)  # "JSON"
+	return b + j
+
+
+func test_is_capture_reads_the_whole_json_chunk() -> void:
+	var pad := "\"x\":\"%s\"," % "ż".repeat(40000)  # 80 KB of UTF-8 before the marker
+	t.ok(Venue.is_capture(_glb("{%s\"extensionsUsed\":[\"CAPTURE_model\"]}" % pad)), "the marker at the end of a big JSON (Narvil: ~3.1 MB in)")
+	t.ok(not Venue.is_capture(_glb("{%s\"extensionsUsed\":[]}" % pad)), "no marker, not Capture")
+	t.ok(not Venue.is_capture("not a glb at all".to_utf8_buffer()), "not a .glb")

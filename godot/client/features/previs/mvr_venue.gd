@@ -73,11 +73,12 @@ static func meshes_by_uuid(json: Dictionary, gnodes: Array, meshes: Array) -> Di
 	return {"by": by, "meshes": count}
 
 
-## A Capture export (its glTF JSON names the CAPTURE_model extension) — the bytes of a .glb, first chunk only.
+## A Capture export (its glTF JSON names the CAPTURE_model extension) — the bytes of a .glb, its whole JSON chunk: Capture
+## lists extensionsUsed at the END (Narvil: 3.2 MB of JSON, the name first at ~3.1 MB — a 64 KB peek missed it, 09.11).
 static func is_capture(bytes: PackedByteArray) -> bool:
 	if bytes.size() < 20 or bytes.slice(0, 4).get_string_from_ascii() != "glTF":
 		return false
-	return bytes.slice(20, 20 + mini(bytes.decode_u32(12), 65536)).get_string_from_utf8().contains("\"CAPTURE_model\"")
+	return bytes.slice(20, 20 + bytes.decode_u32(12)).get_string_from_ascii().contains("\"CAPTURE_model\"")
 
 
 ## project.previs.mvr.venue_glb = `name` ("" = none); the MVR section and the 3D views follow on project_changed.

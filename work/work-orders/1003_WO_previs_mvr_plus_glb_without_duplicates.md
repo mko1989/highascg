@@ -147,3 +147,27 @@ parts from both."
 - **Layer colours still repaint the GLB's materials.** `model_tint.gd` overrides per layer, as before. Narvil's
   project sets several layers to black and "Parkiet" to orange; those were picked to make the flat MVR readable.
   Clearing a layer's colour (Layers ▸ colour reset) shows Capture's own look for that layer.
+
+### Follow-up 09.11 ~15:15 — the owner still saw the .glb in another place
+
+Owner: "glb still loads in a different place then the mvr already is. also loading the glb should merge with the mvr so
+from mvr stays fixtures and patch and ability to move them etc, also models from gdtf. and the rest should be matched and
+merged from the glb."
+
+- **What the owner's GUI showed:** the Models line read "4245 meshes, 0 screens". The Models click had taken the old
+  stage-root load, so a second copy sat at the stage origin, on top of the merged venue.
+- **Why:**
+  - `is_capture()` looked only at the first 64 KB of the glTF JSON.
+  - Capture writes `extensionsUsed` at the end. Narvil's JSON chunk is 3,199,756 bytes, and the first
+    `"CAPTURE_model"` is past 64 KB. So the check said "not Capture".
+- **Fix:** `is_capture()` reads the whole JSON chunk.
+- **Test:** `test_is_capture_reads_the_whole_json_chunk` puts the marker after 80 KB of padding.
+- **Verified:**
+  - Godot suite 26584/0.
+  - After relaunching the owner's GUI, the venue loads alone: one room, MVR fixtures on the GLB truss.
+  - An xdotool click on Models ▸ "narvil ide Marcin.glb" now shows "…is a Capture export of the scene: it is now the
+    MVR scene's venue model", and the 3D view is unchanged, with no second copy.
+- **The owner's merge rules (already how the venue works):**
+  - From the MVR: fixture nodes (patch, moves, GDTF models). Narvil's 5 GDTFs carry no model, so unpatched fixtures stay
+    boxes, and patched heads come from the live rig.
+  - From the .glb: every other object, matched by uuid, plus the .glb-only ones.
