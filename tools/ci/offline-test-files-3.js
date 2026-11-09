@@ -277,4 +277,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1005-pixel-strobe-cells-dark.test.js',
 	'tools/smoke/smoke-wo1006-gdtf-rotation-and-lens.test.js',
 	'tools/smoke/smoke-wo1009-project-files.test.js',
+	'tools/smoke/smoke-wo1012-zoom.test.js',
 ]

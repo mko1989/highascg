@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-921 live WOs (30 open, 121 in progress, 770 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+921 live WOs (29 open, 122 in progress, 770 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -311,7 +311,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 941 DONE [video-io+godot-client] DeckLink driver install reports "no response from the server" although the inst… → 941_WO_decklink_install_blocks_server_client_times_out.md
 - 942 DONE [video-io+mapping,caspar-build] DeckLink outputs fed by a mapping node show solid green on yuv (v210 ignores su… → 942_WO_decklink_yuv_subregion_solid_green.md
 - 947 DONE [video-io+godot-client] Record and stream outputs checked end to end; a stream that cannot reach its re… → 947_WO_record_stream_output_checks.md
-- 1012 OPEN [video-io+audio,devices-config,godot-client] Zoom integration via the Zoom desktop client: its windows on hidden virtual des… → 1012_WO_zoom_desktop_client_windows_as_live_inputs_and_return_feed.md
+- 1012 IN PROGRESS [video-io+audio,devices-config,godot-client] Zoom integration via the Zoom desktop client: its windows on hidden virtual des… → 1012_WO_zoom_desktop_client_windows_as_live_inputs_and_return_feed.md
 
 ## mapping — Pixel map, screens, multiview, destinations (42)
 

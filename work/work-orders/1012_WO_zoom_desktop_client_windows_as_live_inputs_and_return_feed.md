@@ -1,6 +1,6 @@
 # WO-1012 — Zoom integration via the Zoom desktop client: its windows on hidden virtual desktops as live inputs (presenter / share / gallery), the normal Zoom window on the operator monitor, two-way audio, and a program feed back into Zoom
 **Area:** video-io, audio, devices-config, godot-client
-**Status: OPEN — PLAN ONLY (09.11, owner: "write a wo (just this so i wont forget)"; no code yet)**
+**Status: IN PROGRESS (09.11, owner: "start work on zoom integration") — stage A done (window grabber, Zoom device API, sources as shm rings / Live sources); next: host channels, audio, return camera, inspector UI**
 
 Owner, 09.11 (verbatim):
 > write a wo (just this so i wont forget) for zoom plugin/integration.
@@ -90,6 +90,36 @@ future window grabbing from virtual screens"*.
   PipeWire path once both run.
 - x11grab (WO-258) stays the fallback if XComposite capture of Zoom's GL windows misbehaves.
 
+## Investigation — spikes on the box (09.11)
+
+- **Box facts.**
+  - Window manager: Openbox (`_OB_*` atoms on the root window), with 4 virtual desktops on one X screen 5120×1080.
+  - Monitors: DP-6 = operator, 1920×1080 at 0,0. DP-2 = program, 3072×1024 at 2048,0 (Caspar `Screen consumer [2|3072x1024]`).
+  - Zoom Workplace 7.1.0.3715 is installed and signed in to a free account. The main window is titled
+    "Zoom Workplace - Free account".
+  - The X dev headers for XComposite, XShm and XDamage are installed, along with g++ 15.
+- **Virtual desktops do not work under Openbox.** `xdotool set_desktop_for_window <zoom> 3` gave
+  `Map State: IsUnMapped`, because Openbox unmaps windows on other desktops. The grab then holds its last frame
+  (`mapped:false`, `published` still counting); there are no live pixels. The owner's first idea (Zoom windows on
+  virtual desktops) is therefore out on this box.
+- **Off-screen does not work either.** `xdotool windowmove <zoom> 5400 100` was clamped by Openbox to X=1792. Part of
+  the window then sat over DP-2 (the program monitor, showing the test card at the time) for about 3 s, then was moved
+  back. Never move a grabbed window "off-screen".
+- **What works: the BELOW layer, under the operator GUI.**
+  - `_NET_WM_STATE_BELOW` (+ SKIP_TASKBAR/PAGER), then `_NET_MOVERESIZE_WINDOW` into the operator GUI's rect
+    (`HighAsCG Operator`, 1920×1080 at 0,0).
+  - The window stays `IsViewable` and is covered by the GUI: a :0 screenshot of the operator screen showed only the
+    GUI.
+  - XComposite still reads it: the grab showed the live Zoom home page, with its clock ticking.
+  - The window can never reach a program monitor, because it is only ever placed inside the GUI's rect.
+- **Grab cost.** A 1920×1080 grab at 30 fps (XComposite pixmap + XShmGetImage, one memcpy into the ring) gave 0 drops
+  over 3+ s.
+- **Zoom stores its settings encrypted.** `zoomus.conf` has no dual-monitor key. "Use dual monitors" (which gives a
+  second meeting window, so Speaker and Gallery can run at once) is a Zoom Settings toggle the owner sets once.
+- **Meeting windows still need checking.** The titles of in-meeting windows (meeting / dual-monitor second window /
+  share) have not been seen yet, because no meeting was started (it needs a click in Zoom). Roles are a title guess
+  and the operator picks the window.
+
 ## Open questions
 
 - Does Zoom on Linux (X11) let the popped-out share or video windows be moved off-screen and still render? (Spike.)
@@ -102,9 +132,51 @@ future window grabbing from virtual screens"*.
 
 ## What was done
 
-Nothing yet (plan only, by owner instruction).
+### Stage A (09.11): window grabber, Zoom device API, sources as rings
+
+- **`tools/window-grab/window_grab.cpp`** + `build.sh`: a native grabber that copies one X window into one hshm v1
+  ring.
+  - It reads the window's XComposite pixmap (automatic redirect) over XShm and writes it with the existing
+    header-only `caspar/modules/shm/hshm_writer.h`.
+  - The ring has a **fixed size**: the window is centred, and cropped or padded with black. `hshm::writer::attach()`
+    unlinks the old name before re-attaching, so re-opening the same name on a resize would orphan the segment.
+  - The ring outlives the window. stdin commands switch it: `window <id>` / `none`, plus the EWMH requests `below` /
+    `normal` / `move X Y W H`, since there is no wmctrl on the box.
+  - It writes JSON status lines on stdout. EOF on stdin ends the grab and unlinks the ring.
+  - Built on first use; the build output is git-ignored and in `.stignore`.
+- **`src/zoom/zoom-windows.js`**: lists Zoom's windows in one shell call. It keeps the mapped ones of a useful size,
+  reports the BELOW state, guesses a role from the title, and finds the operator GUI's rect.
+- **`src/zoom/zoom-grab.js`**: one grabber child per source, with its status parsed from stdout and the binary built
+  lazily.
+- **`src/zoom/zoom-session.js`**: the Zoom device.
+  - Three fixed sources (presenter / share / gallery), each the ring `zoom-<source>`.
+  - Hidden = BELOW + placed at the GUI rect, sized to the ring. One window feeds one source.
+  - A 2 s re-bind check: when Zoom recreates a window, the source is re-bound by title (else by role) and hidden
+    again.
+  - `launch({ url })` takes a meeting link or number and turns it into `zoommtg://…join`, with the user-session env
+    per WO-780. `quit` stops every grab and the client.
+- **`src/api/routes-zoom.js`** (`GET /api/zoom`, `POST /api/zoom/{launch,quit,source}`), registered in `router.js`.
+  `docs/wiki/api/contract/http.md` was regenerated.
+- Each source ring is a Live-tab source at once (`/api/shm/sources` → `shm://zoom-<source>`, WO-744). Caspar plays it
+  with `PLAY <ch>-<layer> SHM NAME zoom-<source>` (WO-742).
 
 ## What was verified
 
-Box facts only (09.11): `/usr/bin/zoom` exists; v4l2loopback is not loaded (no `/dev/video*`); X screen `:0` is
-5120×1080.
+- **Offline.** `tools/smoke/smoke-wo1012-zoom.test.js`, 5/5, in the curated list. It covers:
+  - window-dump parsing (unmapped and tiny windows dropped, BELOW state, roles);
+  - join links;
+  - hide placement (`below`, `move 0 0 W H`);
+  - one window per source;
+  - unknown source and unknown window refused;
+  - un-hide, stop, re-bind by title, quit;
+  - routes with raw JSON bodies.
+- **Live on the box (09.11).**
+  - `POST /api/zoom/source {"source":"gallery","window":"0x2000013","hidden":true}` gave:
+    - the Zoom window resized to 1920×1080 at 0,0, with `below: true`;
+    - the ring publishing at 30 fps (63 frames in about 2 s, 0 dropped);
+    - `/api/shm/sources` listing `zoom-gallery` with `writer: window_grab` and `signal: true`.
+  - The ring dumped to PNG showed the Zoom page.
+  - `PLAY 3-990 SHM NAME zoom-gallery` on the preview channel: Caspar's INFO showed `producer shm`, `signal true`,
+    `frames 60`, `lapped 0`. The layer was then stopped and cleared.
+  - Before any of that, `/usr/bin/zoom` existed, v4l2loopback was not loaded (no `/dev/video*`), and the X screen was
+    5120×1080.

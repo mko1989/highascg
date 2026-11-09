@@ -102,3 +102,5 @@ Thumbs.db
 // WO-811 phase 1: the box's API password/token file (src/server/auth.js TOKEN_FILE, 0600). Per box — a peer must neither
 // receive it nor push its own back. The per-host .private/<host>/ folders keep syncing. MIRROR THIS ON THE MAC.
 /.private/api-token
+// WO-1012: the window grabber is built per machine (tools/window-grab/build.sh, on first Zoom use)
+/tools/window-grab/build
