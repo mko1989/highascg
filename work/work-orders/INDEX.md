@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-928 live WOs (30 open, 125 in progress, 773 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+929 live WOs (31 open, 125 in progress, 773 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -664,7 +664,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 791 DONE [companion] Companion: recall look presets to PRV, to PGM, or to PGM with auto take → 791_WO_companion_look_preset_recall.md
 - 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
 
-## devices-config — Devices tab, settings, config generation (57)
+## devices-config — Devices tab, settings, config generation (58)
 
 - 33 IN PROGRESS [devices-config+web-client] Device view (program): index & dependency order → 33_WO_DEVICE_VIEW_INDEX.md
 - 33a OPEN [devices-config+web-client] Device view: data model, persistence, and HTTP API → 33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md
@@ -723,6 +723,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 958 DONE [devices-config+godot-client] Devices tab shows every server as "2026.05.20": the cluster read package.json's… → 958_WO_devices_tab_shows_frozen_package_version.md
 - 1016 IN PROGRESS [devices-config+caspar-build] Which Devices settings can the running Caspar take live, and which really need… → 1016_WO_devices_settings_live_vs_restart_audit.md
 - 1019 OPEN [devices-config+video-io] A second NDI sender (or RTMP/ffmpeg output) on one channel silently replaces th… → 1019_WO_second_ndi_or_rtmp_output_on_a_channel_replaces_the_first.md
+- 1021 OPEN [devices-config+video-io] Route-heal points live sources at channels of a config that has not been applie… → 1021_WO_route_heal_points_live_sources_at_unapplied_channels.md
 
 ## os-iso — ISO, sticks, kernel, NVIDIA, boot (86)
 
