@@ -46,15 +46,28 @@ static func apply_env(env: Environment, h: float) -> void:
 	env.volumetric_fog_sky_affect = 0.0
 
 
-## The toolbar picker: No haze / Light haze / Haze / Thick haze.
-static func picker() -> OptionButton:
-	var o := OptionButton.new()
-	o.tooltip_text = "Haze in the 3D views — the beams show as shafts of light, as with a hazer in the venue."
+## The Haze submenu of the Quality menu (owner 09.11, WO-1010: "move haze into quality as another menu"): No haze /
+## Light haze / Haze / Thick haze, the current one checked.
+static func menu() -> PopupMenu:
+	var m := PopupMenu.new()
+	m.name = "Haze"
+	for i in LEVELS.size():
+		m.add_radio_check_item(LEVELS[i][0], i)
+	var sync := func() -> void:
+		for i in LEVELS.size():
+			m.set_item_checked(i, i == nearest(shared().level))
+	m.id_pressed.connect(func(i: int) -> void:
+		shared().set_level(float(LEVELS[i][1]))
+		sync.call())
+	m.about_to_popup.connect(sync)
+	sync.call()
+	return m
+
+
+## The LEVELS row closest to haze `h`.
+static func nearest(h: float) -> int:
 	var at := 0
 	for i in LEVELS.size():
-		o.add_item(LEVELS[i][0])
-		if absf(float(LEVELS[i][1]) - shared().level) < absf(float(LEVELS[at][1]) - shared().level):
+		if absf(float(LEVELS[i][1]) - h) < absf(float(LEVELS[at][1]) - h):
 			at = i
-	o.select(at)
-	o.item_selected.connect(func(i: int) -> void: shared().set_level(float(LEVELS[i][1])))
-	return o
+	return at

@@ -252,6 +252,9 @@ func _build_inspector() -> void:
 	var o: Dictionary = builder.objects[i]
 	for f in COMMON + FIELDS.get(str(o.type), []):
 		_field(o, f)
+	if str(o.type) == "projection":  # WO-1010 (owner 09.11): the beams switch sits with the projection, not on the toolbar
+		_label("Beams")
+		_inspector.add_child(preload("res://features/previs/projector_beams.gd").checkbox())
 	_label("Source")
 	var role := OptionButton.new()
 	for r in ROLES:

@@ -195,14 +195,34 @@ static func gpu_ms() -> float:
 ## The toolbar picker: Low / Medium / High / Ultra, and the views' measured GPU time beside it.
 static func picker() -> Control:
 	var box := HBoxContainer.new()
-	var o := OptionButton.new()
-	o.tooltip_text = "Render quality of the 3D views (this client only). Applies at once."
+	var o := MenuButton.new()  # WO-1010: a menu, so Haze sits in it as a submenu (it was its own toolbar picker)
+	o.flat = false
+	o.tooltip_text = "Render quality and haze of the 3D views (this client only). Applies at once."
+	var pm := o.get_popup()
 	for i in NAMES.size():
-		o.add_item("Quality: " + NAMES[i])
-		o.set_item_tooltip(i, TIPS[i])
-		o.set_item_disabled(i, i > max_level())
-	o.select(mini(shared().level, max_level()))
-	o.item_selected.connect(func(i: int) -> void: shared().set_level(i))
+		pm.add_radio_check_item(NAMES[i], i)
+		pm.set_item_tooltip(i, TIPS[i])
+		pm.set_item_disabled(i, i > max_level())
+	pm.add_separator()
+	var Haze := preload("res://features/previs/haze.gd")
+	pm.add_submenu_node_item("Haze", Haze.menu())
+	var haze_at := pm.item_count - 1
+	pm.set_item_tooltip(haze_at, "Haze in the 3D views: the beams show as shafts of light, as with a hazer in the venue.")
+	var sync := func() -> void:
+		if not is_instance_valid(o):  # Haze.shared() outlives a freed picker
+			return
+		var lv := mini(shared().level, max_level())
+		for i in NAMES.size():
+			pm.set_item_checked(i, i == lv)
+		pm.set_item_text(haze_at, "Haze: " + str(Haze.LEVELS[Haze.nearest(Haze.shared().level)][0]))
+		o.text = "Quality: " + NAMES[lv]
+	pm.id_pressed.connect(func(i: int) -> void:
+		if i < NAMES.size():
+			shared().set_level(i)
+		sync.call())
+	pm.about_to_popup.connect(sync)
+	Haze.shared().changed.connect(func(_h: float) -> void: sync.call())
+	sync.call()
 	box.add_child(o)
 	var lab := Label.new()
 	lab.tooltip_text = "Measured GPU time to draw the 3D views. The GPU is shared with the playout."

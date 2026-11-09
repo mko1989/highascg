@@ -19,9 +19,10 @@ func test_fog_follows_the_level() -> void:
 	Haze.apply_env(null, 1.0)  # a view not in a world yet: nothing to do
 
 
-func test_picker_levels() -> void:
-	var o := Haze.picker()
-	t.eq(o.item_count, Haze.LEVELS.size(), "one item per level")
-	t.eq(o.get_item_text(0), "No haze", "off first")
+func test_menu_levels() -> void:
+	var m := Haze.menu()
+	t.eq(m.item_count, Haze.LEVELS.size(), "one item per level")
+	t.eq(m.get_item_text(0), "No haze", "off first")
 	t.eq(float(Haze.LEVELS[0][1]), 0.0, "the first level is off")
-	o.free()
+	t.eq([Haze.nearest(0.0), Haze.nearest(0.4), Haze.nearest(1.0)], [0, 1, 3], "nearest level")
+	m.free()

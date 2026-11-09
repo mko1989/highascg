@@ -1,6 +1,7 @@
 extends RefCounted
 ## Projector beams in the 3D views: the lines from each projector to the picture it throws (stage_builder "projection").
-## One switch, like haze (ui.cfg [previs] projector_beams, default on). The toolbar checkbox sets it; every
+## One switch, like haze (ui.cfg [previs] projector_beams, default on). The checkbox in a projection's Stage inspector
+## sets it (WO-1010; it was on the toolbar); every
 ## StageBuilder shows or hides its beams in place (visibility, no rebuild).
 
 signal changed(on: bool)
@@ -30,10 +31,11 @@ func set_on(v: bool) -> void:
 	changed.emit(on)
 
 
-## The toolbar checkbox: "Projector beams", checked = the beams are drawn.
+## The checkbox in a projection's Stage inspector (WO-1010; it was on the previs toolbar): checked = the beams are drawn.
+## One switch for every projection.
 static func checkbox() -> CheckBox:
 	var c := CheckBox.new()
-	c.text = "Projector beams"
+	c.text = "Show (all projectors)"
 	c.tooltip_text = "The lines from each projector to the picture it throws, in the 3D views."
 	c.button_pressed = shared().on
 	c.toggled.connect(func(v: bool) -> void: shared().set_on(v))
