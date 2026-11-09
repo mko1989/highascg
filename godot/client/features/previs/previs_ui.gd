@@ -9,6 +9,13 @@ extends RefCounted
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 
+static func button(text: String, on_press: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.pressed.connect(on_press)
+	return b
+
+
 static func caption(text: String) -> Label:
 	var l := Label.new()
 	l.text = text

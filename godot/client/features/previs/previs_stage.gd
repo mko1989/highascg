@@ -20,6 +20,7 @@ var _pitch := 0.18
 var _dist := 12.0
 var _target := Vector3(0, 2.2, 0)
 var _orbiting := false
+var _panning := false  # WO-1008: middle button held
 var _fly_tween: Tween
 var sun: DirectionalLight3D
 var floor_mat: StandardMaterial3D
@@ -145,16 +146,33 @@ func handle_input(event: InputEvent) -> void:
 	if mb != null:
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			_orbiting = mb.pressed
+		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
+			_panning = mb.pressed
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
 			_dist = maxf(2.0, _dist * 0.9)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
 			_dist = minf(80.0, _dist * 1.1)
 		_update_camera()
 	var mm := event as InputEventMouseMotion
-	if mm != null and _orbiting:
+	if mm != null and _panning:
+		pan(mm.relative)
+	elif mm != null and _orbiting:
 		_yaw -= mm.relative.x * 0.005
 		_pitch = clampf(_pitch + mm.relative.y * 0.005, -0.2, 1.5)
 		_update_camera()
+
+
+## WO-1008 (owner 09.11: "holding midle mouse button should enter camera move, left rigth up down"): the orbit point
+## slides in the screen plane so the stage follows the mouse — at the orbit point's depth one pixel of drag is one
+## pixel of picture.
+func pan(px: Vector2) -> void:
+	var vh := float(get_viewport().get_visible_rect().size.y) if get_viewport() != null else 0.0
+	if _cam == null or vh <= 0.0:
+		return
+	var per_px := 2.0 * _dist * tan(deg_to_rad(_cam.fov) * 0.5) / vh
+	var b := _cam.global_transform.basis
+	_target += (-b.x * px.x + b.y * px.y) * per_px
+	_update_camera()
 
 
 func _update_camera() -> void:

@@ -61,6 +61,7 @@ var _coverage_cb: CheckBox
 var _coverage_note: Label
 var _side: Control  # the 3D mode Inspector page; parked hidden here until the Inspector adopts it
 var _position := preload("res://features/previs/move/position_card.gd").new()  # WO-682
+var _focus := preload("res://app/view_focus.gd").new()
 
 
 func _ready() -> void:
@@ -71,6 +72,7 @@ func _ready() -> void:
 	var stack := Control.new()
 	stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_child(stack)
+	left.get_child(0).add_child(_focus.setup(self, stack))  # WO-1008 full screen: only the view + the floating Inspector
 	_svc = SubViewportContainer.new()
 	_svc.stretch = true
 	_svc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -394,9 +396,7 @@ func _build_toolbar() -> Control:
 		_save_ui())
 	bar.add_child(_coverage_cb)
 	bar.add_child(cards.picker)
-	var fit := Button.new()
-	fit.text = "Fit"
-	fit.pressed.connect(func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))
+	var fit := UI.button("Fit", func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))
 	for c in [fit, preload("res://features/previs/haze.gd").picker(), preload("res://features/previs/previs_quality.gd").picker(), preload("res://features/previs/projector_beams.gd").checkbox(), preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button()]:
 		bar.add_child(c)  # WO-786 haze, WO-892 quality, projector beams, WO-770 VR
 	return bar

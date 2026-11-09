@@ -139,6 +139,11 @@ func release(page: Control) -> void:
 	_sync_empty()
 
 
+## WO-1008: the floating Inspector of a full-screen view leaves the footer sections out.
+func set_footer_shown(on: bool) -> void:
+	_footer.visible = on
+
+
 func showing(page: Control) -> bool:
 	return page.get_parent() == _body and page.visible
 

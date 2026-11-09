@@ -52,7 +52,8 @@ var _perf_btn: Button
 func _ready() -> void:
 	NumericField.install(get_tree())  # RULES.md: focus selects the value; number fields take + - * / ( )
 	add_theme_constant_override("separation", 0)
-	add_child(_build_header())
+	var header := _build_header()
+	add_child(header)
 	osc = OscMirror.new()  # one OSC mirror for the whole client (deck timers, media preview position)
 	add_child(osc)
 	var cols := HSplitContainer.new()
@@ -61,6 +62,7 @@ func _ready() -> void:
 	sources = MediaPanel.new()
 	sources.custom_minimum_size.x = int(Config.args.get("sources-w", 280))  # dev (WO-899): probe the Sources fit at a narrower column
 	cols.add_child(sources)
+	preload("res://app/view_focus.gd").chrome = [header, sources]  # WO-1008: hidden while a view is full screen
 	var right := HSplitContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cols.add_child(right)

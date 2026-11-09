@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-916 live WOs (29 open, 121 in progress, 766 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+917 live WOs (29 open, 121 in progress, 767 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -395,7 +395,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1005 DONE [lighting+godot-client] Previs: Pixel Strobe cells lit all the time in 15 Ch (a non-light channel count… → 1005_WO_pixel_strobe_15ch_cells_lit.md
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 
-## godot-client — Godot client (147)
+## godot-client — Godot client (148)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -544,6 +544,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1003 OPEN [godot-client] Previs: MVR for patch and lights + a Capture .glb for everything else, without… → 1003_WO_previs_mvr_plus_glb_without_duplicates.md
 - 1004 DONE [godot-client] Previs: picking a head no longer scrolls the Inspector away from the Programmer → 1004_WO_previs_head_pick_keeps_inspector_scroll.md
 - 1007 DONE [godot-client] Previs: LED walls without the dark panel-seam grid → 1007_WO_previs_led_wall_no_panel_seams.md
+- 1008 DONE [godot-client] Previs: full screen view with a floating, hideable Inspector; middle-drag pans… → 1008_WO_previs_full_screen_floating_inspector_and_middle_pan.md
 
 ## web-client — Web client (82)
 
