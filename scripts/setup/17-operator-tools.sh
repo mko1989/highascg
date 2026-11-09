@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install operator tools (gh, tmux, mc, magic-wormhole, v4l2loopback-utils).
+# Install operator tools (gh, tmux, mc, magic-wormhole, v4l2loopback-utils, gpick).
 #
 # These tools support ISO production, live-USB troubleshooting, and media ingest:
 # - gh: GitHub CLI (release uploads, repo management)
@@ -7,6 +7,7 @@
 # - mc: Midnight Commander (file browser for exFAT)
 # - magic-wormhole: Secure file transfer (air-gapped media ingest)
 # - v4l2loopback-utils: Virtual camera utilities (v4l2loopback kernel module)
+# - gpick: Colour picker (github.com/thezbyg/gpick) — the operator dock's eyedropper opens it (WO-1015)
 #
 # Usage:
 #   sudo bash scripts/setup/17-operator-tools.sh
@@ -22,7 +23,7 @@ set -euo pipefail
 # shellcheck source=lib/install-helpers.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/install-helpers.sh"
 
-echo "==> Installing operator tools (gh, tmux, mc, magic-wormhole, v4l2loopback-utils)"
+echo "==> Installing operator tools (gh, tmux, mc, magic-wormhole, v4l2loopback-utils, gpick)"
 
 # Ensure apt is up to date
 apt-get update -qq
@@ -33,7 +34,8 @@ apt-get install -y \
 	tmux \
 	mc \
 	magic-wormhole \
-	v4l2loopback-utils
+	v4l2loopback-utils \
+	gpick
 
 echo "==> Verifying installations"
 command -v gh >/dev/null && echo "  ✓ gh $(gh --version | head -1)"
@@ -41,6 +43,7 @@ command -v tmux >/dev/null && echo "  ✓ tmux $(tmux -V)"
 command -v mc >/dev/null && echo "  ✓ mc $(mc --version 2>&1 | head -1)"
 command -v wormhole >/dev/null && echo "  ✓ wormhole"
 command -v v4l2loopback-ctl >/dev/null && echo "  ✓ v4l2loopback-utils"
+command -v gpick >/dev/null && echo "  ✓ gpick"
 
 echo
 echo "OK: Operator tools installed"

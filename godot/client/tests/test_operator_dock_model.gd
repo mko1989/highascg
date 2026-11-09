@@ -44,3 +44,11 @@ func test_running_set() -> void:
 	t.eq(D.running_set(null), {"highascg": true}, "self always running")
 	t.eq(D.running_set({"running": ["firefox", "file-manager"]}), {"highascg": true, "firefox": true, "file-manager": true}, "pinned")
 	t.eq(D.running_set({"running": "junk"}), {"highascg": true}, "bad shape")
+
+
+func test_picker_app_prefers_gpick_else_built_in() -> void:
+	var apps := [{"action": "app:mc"}, {"action": "app:nl.hjdskes.gcolor3"}, {"action": "app:gpick"}]
+	t.eq(D.picker_app(apps), "app:gpick", "Gpick wins over the others, wherever it is in the list")
+	t.eq(D.picker_app([{"action": "app:nl.hjdskes.gcolor3"}]), "app:nl.hjdskes.gcolor3", "next best installed one")
+	t.eq(D.picker_app([{"action": "app:mc"}]), "", "none installed: the built-in picker")
+	t.eq(D.picker_app(null), "", "no app list yet: the built-in picker")

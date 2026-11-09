@@ -67,3 +67,22 @@ static func running_set(data: Variant) -> Dictionary:
 		for a in r:
 			out[str(a)] = true
 	return out
+
+
+## WO-1015 (owner 09.11: "the color picker has no gui … find an opensource color picker … make it work from the dock"):
+## the installed picker app the dock's eyedropper opens, best first — Gpick (github.com/thezbyg/gpick, BSD-3; apt
+## `gpick`, scripts/setup/17-operator-tools.sh), then GNOME Eyedropper, Gcolor3, KColorChooser. "" = none installed:
+## the eyedropper falls back to the built-in WO-950 picker.
+const PICKER_APPS := ["app:gpick", "app:com.github.finefindus.eyedropper", "app:nl.hjdskes.gcolor3", "app:org.kde.kcolorchooser"]
+
+
+static func picker_app(apps: Variant) -> String:
+	var have := {}
+	if apps is Array:
+		for a in apps:
+			if a is Dictionary:
+				have[str(a.get("action", ""))] = true
+	for p in PICKER_APPS:
+		if have.has(p):
+			return p
+	return ""

@@ -33,6 +33,8 @@ var _dots := {}  # action → the running dot under its button
 var _loaded := false  # WO-705: the app list is in the dock (once)
 var _loading := false
 var picker: Node  # WO-950: the colour picker, made on first use (a child of the root, not of this dock window)
+var _picker_btn: Button
+var _picker_app := ""  # WO-1015: the installed picker app (Gpick) the eyedropper opens; "" = the built-in one
 
 
 func _init() -> void:
@@ -126,6 +128,9 @@ func _load() -> void:
 		_icon_into(b, str(p.action))
 		_add_dot(b, str(p.action))
 	_apps = res.data.get("apps", []) if res.data.get("apps") is Array else []
+	_picker_app = D.picker_app(_apps)
+	if _picker_app != "":
+		_add_dot(_picker_btn, _picker_app)  # running dot, like the other apps
 	more_menu.fill(_apps)
 	_show_running(res.data)
 	var more := _button("More apps")
@@ -148,11 +153,16 @@ func _add_self_button() -> void:
 	_add_dot(b, "highascg")
 
 
-## WO-950: a built-in tool, not an installed app — the colour picker runs in this client (no server launch, no gate).
+## WO-950: the eyedropper. WO-1015: it opens the installed picker app (Gpick — D.picker_app, known once the app list
+## loads) like any dock app; with none installed it runs the built-in WO-950 picker in this client (no server launch).
 func _add_picker_button() -> void:
 	var b := _button("Colour picker")
+	_picker_btn = b
 	b.icon = Icons.texture("eyedropper", D.ICON)
 	b.pressed.connect(func() -> void:
+		if _picker_app != "":
+			launch(_picker_app, b)
+			return
 		set_expanded(false)  # out of the frozen picture
 		if picker == null:
 			picker = ColourPicker.new()
