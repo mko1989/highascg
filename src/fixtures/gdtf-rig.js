@@ -14,7 +14,7 @@
  * (Z-up, metres) conjugated, C·L·C⁻¹ with C = GODOT_FROM_MVR, so GDTF Z (pan) is Godot Y and GDTF X (tilt) is
  * Godot X with the same angle sign. mesh_xf places the mesh in its node: a glTF-frame file needs none (C·MVR_FROM_GLTF
  * = I), a box of the model's size is scaled to it — `mesh` is models/gltf/<File>.glb, else models/3ds/<File>.3ds, else
- * "prim:box" (as WO-612 mvr-gdtf.js). An Axis node carrying a Pan / Tilt channel of the mode is marked. Pure.
+ * "prim:box" (as WO-612 mvr-gdtf.js) — WO-1024: or the shape of its built-in primitive (primOf). An Axis node carrying a Pan / Tilt channel of the mode is marked. Pure.
  */
 
 const { IDENTITY, mul, scale, GODOT_FROM_MVR, MVR_FROM_GLTF } = require('../stage/mvr-math')
@@ -38,6 +38,16 @@ function axisKind(c) {
  * @param {object} type gdtf-parse.js result
  * @param {object} mode one of type.modes
  */
+/**
+ * WO-1024: a GDTF built-in primitive → the unit shape the client draws in its size box (glTF frame: x length, y height,
+ * z width; centred): a moving head's Yoke is a U hanging from its top bar, a Head / Cylinder / Conventional a cylinder
+ * along the beam axis, a Sphere a sphere. Base, Cube, Scanner, Undefined stay a box. X-DOT Max: no revision on GDTF Share
+ * has body meshes (09.11), its Base1_1 / Yoke / Head were three boxes.
+ */
+const PRIMS = { Yoke: 'prim:yoke', Head: 'prim:cylinder', Cylinder: 'prim:cylinder', Conventional: 'prim:cylinder',
+	Conventional1_1: 'prim:cylinder', Sphere: 'prim:sphere' }
+const primOf = (type) => PRIMS[String(type || '')] || 'prim:box'
+
 function buildRig(type, mode) {
 	const files = new Set((type.files || []).map((f) => f.toLowerCase()))
 	const tops = new Map((type.geometry || []).map((g) => [g.name, g]))
@@ -58,7 +68,7 @@ function buildRig(type, mode) {
 		}
 		const [l, w, h] = md.size || [0, 0, 0]
 		if (md.type === 'Pigtail' || !(l > 0.005 && w > 0.005 && h > 0.005)) return null
-		return { mesh: 'prim:box', mesh_xf: twelve(mul(mul(GODOT_FROM_MVR, scale(l, w, h)), MVR_FROM_GLTF)) }
+		return { mesh: primOf(md.type), mesh_xf: twelve(mul(mul(GODOT_FROM_MVR, scale(l, w, h)), MVR_FROM_GLTF)) }
 	}
 	// WO-1006: the emitting face of a beam — its own primitive model (the pixel's rectangle / disc), else a flat primitive
 	// model of its parent it sits on unturned (Pixel Strobe ForeGround on the 160×470 mm "Beam" plate), in Godot's

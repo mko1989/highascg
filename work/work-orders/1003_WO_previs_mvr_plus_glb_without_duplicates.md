@@ -171,3 +171,19 @@ merged from the glb."
   - From the MVR: fixture nodes (patch, moves, GDTF models). Narvil's 5 GDTFs carry no model, so unpatched fixtures stay
     boxes, and patched heads come from the live rig.
   - From the .glb: every other object, matched by uuid, plus the .glb-only ones.
+
+### Follow-up 09.11 ~15:30 — "when loading glb i still have mostly mvr models"
+
+- **What was wrong:** Capture's textured materials (22 of 86) sit on exactly the layers the project colours:
+  - wood floor `Drewno_Podloga` on Parkiet (orange);
+  - carpet `Dywan` on Podłoga hotelowa;
+  - `Truss` on Krata na górze (46/46 meshes);
+  - Default Layer.
+  `model_tint.gd` replaced them with the flat colour, so the room still looked like the MVR.
+- **Fix:** `mvr_venue.gd` `_fill` tags every .glb mesh `no_tint`. A layer colour now paints only what the MVR still
+  draws (the fixture boxes). Test: `test_apply_swaps_objects_keeps_fixtures_and_screens`, suite 26585/0.
+- **Verified in the owner's GUI after relaunch:** top and front views show Capture's carpet texture, the wood dance floor,
+  the table-and-chair sets and the truss, with fixtures hanging on the .glb trusses and one copy of everything.
+- **The owner's hidden layers:** the owner had hidden 14 of 21 layers while checking. On "make sure my gui ends up with
+  the mvr and glb loaded and everything matched", `hidden_layers` was set back to the earlier `["Sufit"]` (ceiling only)
+  via autosave. The GUI was left on the Front view.

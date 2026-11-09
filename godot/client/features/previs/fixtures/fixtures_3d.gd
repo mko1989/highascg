@@ -314,9 +314,9 @@ func hit(cam: Camera3D, pos: Vector2, only_type := "") -> String:
 
 
 func _mesh(type_id: String, key: String) -> Node3D:
-	if key == "prim:box":
+	if key.begins_with("prim:"):
 		var mi := MeshInstance3D.new()
-		mi.mesh = BoxMesh.new()
+		mi.mesh = preload("res://features/previs/fixtures/prim_shapes.gd").mesh(key)  # WO-1024: GDTF built-in shapes
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = Color(0.22, 0.22, 0.24)
 		mi.material_override = mat
