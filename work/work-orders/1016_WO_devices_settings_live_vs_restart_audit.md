@@ -6,9 +6,51 @@ Owner, 09.11 (verbatim):
 > i also want you to do a check against current version of casparcg server and see which of the settings from device
 > tab can be created dynamically at once and which actually need a restart.
 
+Owner follow-up, 09.11 (verbatim):
+> but doesnt caspar allow dynamic channels when they are standard video mode?
+
 Research only. No code was changed in HighAsCG or in Caspar.
 
 ## Investigation
+
+### Answer to the follow-up: no runtime channel add or remove exists, for any video mode
+
+The mode only decides whether an EXISTING channel can switch to it live (`SET MODE`). It never decides whether a channel
+can be created.
+
+- **One code path creates channels:** `setup_channels` at startup. The only `channels_->emplace_back` in the tree is
+  `src/shell/server.cpp:300`, reached from `start()` (`:128-152`).
+- **AMCP has no channel command:** the full registry (`src/protocol/amcp/AMCPCommandsImpl.cpp:1878-1960`) has no channel
+  ADD/REMOVE/CREATE. `ADD`/`REMOVE` (`:499-541`) add and remove consumers on a channel that already exists.
+- **Upstream doesn't have one either:**
+  - `upstream/master` (newest commit `fe19ac0e3`, 2026-10-15) has the same single startup `emplace_back`
+    (`server.cpp:332`) and the same command set. `git grep` over `upstream/master`, `enhanced/main` and `origin/master`
+    finds no channel-creation command.
+  - `git log --all -i --grep` for "dynamic channel", "add channel", "channel add", "runtime channel", "create channel"
+    and "new channel" finds no commits.
+- **Live probe:** `POST /api/amcp/raw {"cmd":"CHANNEL ADD 1080p5000"}` → `COMMAND_UNKNOWN_DATA`. `INFO` afterwards still
+  showed the same 8 channels.
+- **What "standard video mode" does change** is `SET <ch> MODE <id>` on an existing channel (`AMCPCommandsImpl.cpp:575-588`):
+  - Standard modes are always in the format repository, so they always work.
+  - A custom mode works only if it was declared in `<video-modes>` at boot (`server.cpp:180-254`). Live:
+    `SET 8 MODE 1234x567` → `403`.
+- **Smallest patch:** `CHANNEL ADD <mode-id> [8|16] [bt709|bt2020]`, append-only, so existing numbers never shift. About
+  80-120 lines:
+  1. Move the per-channel body of `setup_channels` (`server.cpp:262-300`) into a `make_channel(format, depth, colour_space)`.
+     Expose it to AMCP through a hook on `amcp_command_static_context`, the same way `shutdown_server_now` is exposed.
+  2. Guard `channels_` (`server.cpp:110`) with a `shared_mutex`, or at least `reserve()` it at startup so it never
+     reallocates. Today it is read without a lock:
+     - by command parsing (`amcp_command_repository.cpp:153,199`);
+     - by every batch (`AMCPCommandQueue.cpp:135-139` iterates all channels);
+     - by every `ctx.channels->at()`.
+  3. Grow the per-connection channel queues lazily. `AMCPProtocolStrategy.cpp:99-106` creates one queue per channel when
+     a connection opens, and dispatch is `commandQueues_.at(channel_index + 1)` (`:221`). Without this, node's
+     already-open connection cannot address the new channel until it reconnects.
+  4. The new command itself is about 30 lines.
+- **Removal is extra:** `CHANNEL REMOVE` (last channel only, refused while a `route://` from it is live) adds about
+  40 lines and is the riskier half. Parking an unused channel (no consumers, `CLEAR`) is the safe alternative.
+- **Modes:** any mode already registered works, standard or boot-declared custom. A new custom size also needs
+  `VIDEO-MODE ADD` (P-c in §4).
 
 ### 0. What was read, and what runs
 
@@ -202,7 +244,7 @@ Verdicts:
 | P-d | Refresh `route->format_desc` on SET MODE | `core/video_channel.cpp:216` | ~15 lines | Routes stay correct after a mode change. |
 | P-e | PortAudio per-consumer params (AMCP and XML) | `portaudio_consumer.cpp:629-642,997-1015` | ~40 lines | Live PortAudio device changes; more than one PortAudio output. |
 | P-f | `OSC SUBSCRIBE port [address]` | `AMCPCommandsImpl.cpp:1845-1862` | ~10 lines | Remote OSC targets live (still tied to the connection). |
-| P-g | `CHANNEL ADD mode [depth] [colour-space]`, append-only, plus `CHANNEL REMOVE` of the last channel only | `server.cpp:256-304`, `amcp_command_repository.cpp` (unlocked `channels_` → reserve at startup + guard) | ~150-250 lines, risky (thread safety, OSC, locks) | Host-live / input / screen channels without a restart, but only when appended. Any renumbering stays RESTART. A zero-patch alternative is a few parked spare channels (64x36, no consumers; idle cost is small, since the mixer is skipped without consumers, `video_channel.cpp:163`), claimed with `SET MODE` + PLAY + ADD. |
+| P-g | `CHANNEL ADD mode [depth] [colour-space]`, append-only, plus `CHANNEL REMOVE` of the last channel only | `server.cpp:256-304`, `amcp_command_repository.cpp` (unlocked `channels_` → reserve at startup + guard) | ~80-120 lines for add, plus ~40 for remove of the last channel (detail at the top of this WO); thread safety is the risk | Host-live / input / screen channels without a restart, but only when appended. Any renumbering stays RESTART. A zero-patch alternative is a few parked spare channels (64x36, no consumers; idle cost is small, since the mixer is skipped without consumers, `video_channel.cpp:163`), claimed with `SET MODE` + PLAY + ADD. |
 
 ### 5. Proposal: Apply diffs first and restarts only when it must
 
