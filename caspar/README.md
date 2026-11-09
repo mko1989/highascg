@@ -47,7 +47,7 @@ start a fresh branch off upstream: the binary would silently lose these features
 | e8bbf87f3 | FFmpeg producer: plain plane copies (no per-row TBB tasks), fps duplicates reuse the made frame + its textures, thread names cut to 15 bytes (4K ProRes loop 260 → 166 % CPU) | WO-991 |
 | 4838ab393 | No TBB hand-off per frame: `make_frame` copies video then audio inline; FFmpeg consumers only `parallel_invoke` with both streams (the "AMCPCommandQueue" 16 → 1.7 % pool spin) | WO-992 |
 | 2476644c4 | Native DXV (Resolume DXV2/DXV3): CPU unpack to BC blocks, GPU shader decode; DXV3 HQ in correct colours (`ffmpeg.producer.dxv-gpu`) | WO-993 |
-| 3c15fbe7a, 9e243d9b4, 2f168f91f, d8e02f9ef | Runtime CHANNEL ADD/REMOVE (tombstoned slots, COW channel list, generation-checked commands, lazy per-channel AMCP queues), VIDEO-MODE ADD, route format refresh on SET MODE + source_removed (black/silent instead of frozen loop), LOCK callback UAF fix, INFO CONFIG lists live channels — branch `wo1020-dynamic-channels`, not deployed until its live test | WO-1020 |
+| 3c15fbe7a, 9e243d9b4, 2f168f91f, d8e02f9ef | Runtime CHANNEL ADD/REMOVE (tombstoned slots, COW channel list, generation-checked commands, lazy per-channel AMCP queues), VIDEO-MODE ADD, route format refresh on SET MODE + source_removed (black/silent instead of frozen loop), LOCK callback UAF fix, INFO CONFIG lists live channels — branch `wo1020-dynamic-channels`, deployed 09.11 (`build-wo1020`, md5 6372ec07…, rollback `bin/casparcg.pre-wo1020`) | WO-1020 |
 | 5c3373ec5 | ADD ch[-idx] XML <consumer element> (quoted or base64; every XML consumer option live) — same branch | WO-1020 (WO-1016 P-a/P-b) |
 
 Run `git -C ~/caspar-build/src-v2 log --oneline v2.5.1-stable..highascg-main` for the live list. Update this table

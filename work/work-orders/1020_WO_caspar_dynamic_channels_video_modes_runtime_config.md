@@ -1,6 +1,6 @@
 # WO-1020 — Caspar fork: add/remove channels and video modes at runtime (dynamic config research + patch)
 **Area:** caspar-build, devices-config
-**Status: IN PROGRESS (09.11)**
+**Status: IN PROGRESS (09.11, Caspar patch deployed + live-tested 19/20 steps on the box; HighAsCG apply-diff side not started)**
 
 Owner, 09.11 (verbatim), answering the WO-1016 proposal of a `CHANNEL ADD` patch:
 > id like that. also i think its possible to distroy those channels so i dont know why removing would be tricky.
@@ -155,9 +155,33 @@ Five commits on `wo1020-dynamic-channels` (≈ +850/-172, 20 files), each with a
   (1 1080p5000, 2-3 3072x1024, 4 1080p5000, 5-6 7680x2160, 7-8 1080p5000, 9 64x36). So the first append on the
   box will be **10**. Node's AMCP parser already treats `201` as one data line (src/caspar/amcp-protocol.js:13).
 
-**Not verified (needs the live swap, scheduled by the lead):** no command of this patch has run against a real
-Caspar; GPU/CEF/DeckLink/screen teardown on REMOVE is by review only; intermediate commits were not built
-individually (only HEAD).
+**Live on the box (lead, 09.11 14:02-14:07).** Deployed per the plan: `bin/casparcg.pre-wo1020` = the 2476644c4
+binary (md5 e34b3bac…), `bin/casparcg` = md5 6372ec07…, `casparcg.prev` untouched; Caspar + node restarted;
+`VERSION` → `2.5.1 5c3373ec5 Stable`, same 9 channels, WO-1013 restore brought back test card, GUI cells, DeckLink
+7-1/8-2 and Zoom 7-23. Every command went through node's connection (`/api/amcp/raw`), opened before the adds.
+
+| # | Result |
+|---|---|
+| 1-2 | `CHANNEL ADD 1080p5000` → `201` / `10`; INFO 10 lines; journal `CHANNEL ADD: channel 10 1080p5000 8-bit bt709` |
+| 3-4 | `PLAY 10-1 #FFFF0000` 202; OSC :6250 carried `/channel/10/…` (602 messages in 2 s) |
+| 5-6 | `PLAY 9-20 route://10` 202; `CHANNEL REMOVE 10` → `403 … (1 live routes from it; STOP them or add FORCE)` |
+| 7-10 | `STOP 9-20`, `CHANNEL REMOVE 10` → 202 (`removed (0 consumers)`); INFO 9 lines; `PLAY 10-1` → `401` |
+| 11-12 | `INFO CONFIG` `<channels>` ends with `<channel removed="true"/>`; OSC: no `/channel/10` in 2 s |
+| 13 | `VIDEO-MODE ADD 1234x567 1234 567 50000 1000` 202, repeat 202, `… 568 …` → 403 |
+| 14-15 | `CHANNEL ADD 1234x567` → `11` (10 not reused); `PLAY 11-1` 202; INFO `11 1234x567 PLAYING` |
+| 16 | `CHANNEL ADD 1080p5000 AT 10` → `10`; `AT 3` → 403 |
+| 17 | Audio source: `CHANNEL ADD` → 12, `PLAY 12-1 BRIDGE/TALK2 LOOP`, `PLAY 10-20 route://12`, meter consumer `ADD 10-720 STREAM udp://…`. `/channel/10/mixer/audio/volume`: 100/100 messages non-zero before; after `CHANNEL REMOVE 12 FORCE` 150/150 zero over 3 s; `PRINT 10` max RGB 0, max A 0 (black, no frozen frame, no audio loop). Same on 9-20 from ch 11 (route producer stays, shows nothing) |
+| 18 | `ADD 10-777 XML "<ffmpeg><path>…/wo1020.ts</path><args>-codec:v libx264 -preset ultrafast -filter:a aformat=channel_layouts=stereo,aresample=48000 -codec:a aac -b:a 128k</args></ffmpeg>"` 202; 4 s later `REMOVE 10-777` 202; file h264 1920x1080 + aac. Two earlier tries failed inside the ffmpeg consumer (a 16-ch 9.1.6 layout into the `.ts` default mp2 encoder; `-an` is not honoured): consumer config, not the patch |
+| 20 | `CHANNEL ADD 720p5000` → 13, `PLAY 10-21 route://13`, `SET 13 MODE 1080p5000` 202. SET MODE clears the source's stage (upstream), so re-`PLAY 13-1 #FF00FF00`; `PRINT 10` green at all four corners and the centre: the route follows the new size, no stretch |
+| 19 | `CHANNEL REMOVE 13 FORCE` (`0 consumers, FORCE`), `CHANNEL REMOVE 10` (`1 consumers`) 202; INFO = the 9 boot channels |
+
+Existing outputs during adds/removes: OSC `/channel/2/output/port/600/screen/dropped_frames` 1 before and 1 after
+(int64), `/channel/1/output/port/740/shm/dropped` 0 → 0. No exception or destroyer warning in the Caspar journal
+apart from the two ffmpeg-consumer encoder errors above. Caspar restarted once more afterwards to drop the empty
+slots: 9 channels, everything restored, GUI screenshot normal.
+
+**Still not verified:** REMOVE of a channel with a screen or DeckLink consumer (only a STREAM consumer was torn down
+live); intermediate commits built individually (only HEAD); the HighAsCG side (below) does not exist yet.
 
 ## LIVE TEST PLAN
 
