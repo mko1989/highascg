@@ -287,5 +287,15 @@ live input."
   - `route://2-999` carried only the test-card layer;
   - two shm readers of one ring ran with lapped 0;
   - the 30 fps ring plays on a 50p channel.
-  The new route, replay and heal code is not yet live: that needs a node restart plus the Apply, which is held until
-  WO-1017 settles Screen 3.
+- **B2 live (09.11 13:42):** node restarted (B2 loaded), then `POST /api/caspar-config/apply {force:true}` (the
+  Devices Apply; WO-1017 D1(a) keeps Screen 3 as a mirror pair here):
+  - Caspar now runs 9 channels: 1 GUI, 2/3 PGM/PRV 1, 4 "to zoom", 5/6 PGM/PRV 3 7680x2160, 7 DeckLink 1,
+    8 DeckLink 2, 9 audio preview 64x36. The old Zoom host channel is gone.
+  - Journal: `[route-heal] extraLiveSources re-pointed: "DeckLink 2": route://9-2 → route://8-2; "Zoom gallery":
+    route://8-1 → route://7-23`, then `Host live sources: 1 started (zoom_host ch7)`.
+  - `INFO 7`: layer 1 `decklink` (DeckLink 8K Pro), layer 23 `shm` `zoom-gallery`. `GET /api/zoom/host`: gallery
+    `route://7-23`, `configured: true, live: true, needsRestart: false`.
+  - WO-1013 restore ran on the same restart: `test card (card) re-applied on ch 2`, `Operator GUI re-apply: 2 cell(s)`.
+  - GPU 17-18 % before and after (nvidia-smi), Caspar CPU 36 %.
+  - Not yet proven: a Live-tab take of the Zoom gallery onto PGM (the route carrying the hidden layer was proven over
+    AMCP in the B2 test above).

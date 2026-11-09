@@ -194,8 +194,8 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | WO-1011 | Visuals Flow builder: ~40 node types (Sources / Math / Animate / Triggers & logic) and ~29 preset patches, op logic after cables.gl (MIT) | [1011](work-orders/1011_WO_visuals_flow_node_library_and_presets_from_cables.md) | DONE |
 | WO-1012 | Zoom via the desktop client: windows on a hidden virtual desktop grabbed as host channels (presenter / share / gallery), main window on the operator monitor, two-way audio, program as Zoom camera | [1012](work-orders/1012_WO_zoom_desktop_client_windows_as_live_inputs_and_return_feed.md) | IN PROGRESS |
 | WO-1013 | After Devices ▸ Apply & restart, put back what was on the screens (test card, program looks) instead of clearing them | [1013](work-orders/1013_WO_restore_screens_after_caspar_restart.md) | DONE |
-| WO-1014 | Header "Test card" tick button shows an extra blue border inside the button | [1014](work-orders/1014_WO_test_card_tick_button_inner_blue_border.md) | IN PROGRESS |
-| WO-1015 | Operator dock: the eyedropper opens a real colour picker app (Gpick) | [1015](work-orders/1015_WO_dock_eyedropper_opens_gpick.md) | IN PROGRESS |
+| WO-1014 | Header "Test card" tick button shows an extra blue border inside the button | [1014](work-orders/1014_WO_test_card_tick_button_inner_blue_border.md) | DONE |
+| WO-1015 | Operator dock: the eyedropper opens a real colour picker app (Gpick) | [1015](work-orders/1015_WO_dock_eyedropper_opens_gpick.md) | DONE |
 | WO-1016 | Devices settings: which Caspar can take live vs restart (audit + diff-apply proposal) | [1016](work-orders/1016_WO_devices_settings_live_vs_restart_audit.md) | IN PROGRESS |
 | WO-1017 | Screen destination rendered on the linked server (mapping → peer DeckLinks): stage 1 fan-out stale-layout guard; owner D0–D3 | [1017](work-orders/1017_WO_screen_destination_rendered_on_peer_server.md) | IN PROGRESS |
 | WO-1018 | Devices tab: rear panels scroll on their own (linked server at full size) + an unmistakable MASTER marker | [1018](work-orders/1018_WO_devices_split_scroll_and_master_marker.md) | IN PROGRESS |

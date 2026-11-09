@@ -1,6 +1,6 @@
 # WO-1014 — Header "Test card" tick button shows an extra blue border inside the button
 **Area:** godot-client
-**Status: IN PROGRESS (09.11)**
+**Status: DONE (09.11, after-screenshot of the relaunched GUI shows one frame)**
 
 Owner, 09.11 (verbatim):
 > when working with the test card, there is a weird additional blue border inside the button.
@@ -32,4 +32,4 @@ the `focus` box never shows and no keyboard focus is lost by the fix. Same widge
 ## What was verified
 
 - `GODOT=~/.local/opt/godot/godot ./run-client.sh --test`: 26482 passed, 0 failed. `--check`: boot OK.
-- Live: before-screenshot only (above). The running GUI predates the edit; after-screenshot is pending the lead's relaunch.
+- Live (09.11 13:39, GUI relaunched from the live tree, Test card ticked): header crop 6x `/tmp/claude-1000/-home-casparcg/f090f1fe-27a9-499e-9de3-49634b7e60e6/scratchpad/r1-testcard.png` shows only the outer accent frame; the second rounded frame around the tick is gone.

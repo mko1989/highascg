@@ -1,6 +1,6 @@
 # WO-1015 — Operator dock: the eyedropper opens a real colour picker app (Gpick)
 **Area:** godot-client, os-iso
-**Status: IN PROGRESS (09.11) — waiting for `sudo apt install gpick` on the box**
+**Status: DONE (09.11, Gpick installed; the dock launch path opened Gpick live on :0)**
 
 Owner, 09.11 (verbatim):
 > the color picker has no gui.
@@ -36,4 +36,4 @@ Related: [WO-950](./950_WO_dock_colour_picker.md) (the built-in picker it replac
 ## What was verified
 
 - Godot suite: 26525 passed, 0 failed. `--check`: boot OK.
-- Live: pending the install and a GUI relaunch.
+- Live (09.11 13:41, after `apt install gpick` and a GUI relaunch): `GET /api/system/dock` lists `{action: "app:gpick", name: "Gpick"}`, so `picker_app` resolves to it. `POST /api/system/dock/launch {"action":"app:gpick"}` (the call the eyedropper makes) answered `launched: true, exe: /usr/bin/gpick`; the "New palette - Gpick" window (640x447, Color picker / Scheme generation / Layout preview tabs, Pick color, swatch) mapped over the GUI on DP-6. Screenshot: `/tmp/claude-1000/-home-casparcg/f090f1fe-27a9-499e-9de3-49634b7e60e6/scratchpad/r1-gpick.png`. Closed again afterwards. The physical click on the dock button was not made (no pointer automation while the owner works).
