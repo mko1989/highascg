@@ -9,7 +9,8 @@ extends RefCounted
 ## the .glb. So, per uuid:
 ##   - an MVR object (not a fixture, not a bound video screen) draws the .glb meshes of its uuid instead of its own parts;
 ##   - a fixture keeps the MVR's (the live rig hides it once patched); its .glb model is dropped;
-##   - a .glb mesh no MVR object owns becomes an object of its Capture layer (eye, colour, pick, move like the others).
+##   - a .glb mesh no MVR object owns becomes an object of its Capture layer (eye, pick, move like the others);
+##   - a .glb mesh keeps its own materials (no_tint): layer colours only paint what the MVR still draws.
 ## Matching is by uuid only — no distance guessing (the WO-1003 design's fallback, not needed for a Capture export).
 
 const PF := preload("res://core/project_files.gd")
@@ -134,6 +135,9 @@ static func _fill(node: Node3D, parts: Array) -> void:
 		var mi := MeshInstance3D.new()
 		mi.mesh = p.mesh
 		mi.transform = p.xf
+		# The .glb's own look wins: Capture's textures sit on exactly the layers a flat MVR needed colours for (Narvil:
+		# wood floor on Parkiet, carpet on Podłoga hotelowa, 46/46 Krata na górze trusses) — a layer colour hid them (09.11).
+		mi.set_meta("no_tint", true)
 		node.add_child(mi)
 		keys.append(str(p.mesh.get_instance_id()))
 	node.set_meta("model", "glb:" + ",".join(keys))  # WO-634: same .glb mesh = same model (one LED panel type)

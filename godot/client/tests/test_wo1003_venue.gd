@@ -61,6 +61,7 @@ func test_apply_swaps_objects_keeps_fixtures_and_screens() -> void:
 	t.eq(r.swapped, 1, "only the plain scene object is swapped")
 	t.eq(scene.get_child(0).get_child(0).name != &"mvr_part", true, "object a now draws the .glb mesh")
 	t.ok(str(scene.get_child(0).get_meta("model")).begins_with("glb:"), "its model key is the .glb mesh")
+	t.ok(scene.get_child(0).get_child(0).has_meta("no_tint"), "a .glb mesh keeps its own material under a layer colour")
 	t.eq(scene.get_child(1).get_child(0).name, &"mvr_part", "the fixture keeps the MVR's part")
 	t.eq(scene.get_child(2).get_child(0).name, &"mvr_part", "a bound video screen keeps its part")
 	t.eq(scene.get_child(3).get_child(0).name, &"mvr_part", "an object the .glb lacks keeps its part")
