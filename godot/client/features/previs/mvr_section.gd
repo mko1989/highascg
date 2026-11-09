@@ -1,7 +1,6 @@
 extends VBoxContainer
-## WO-612 — previs "MVR scene": Import… a .mvr from this machine (POST /api/stage/mvr; the server parses it and keeps
-## it in projects/_mvr), pick which imported scene this project shows (project.previs.mvr {id, name, hidden_layers},
-## ProjectSync autosave), hide layers, Remove one from the box.
+## WO-612 — previs "MVR scene": Import… a .mvr (POST /api/stage/mvr; kept in projects/_mvr), pick the scene this project
+## shows (project.previs.mvr {id, name, hidden_layers, venue_glb (WO-1003, mvr_venue_row.gd)}), hide layers, Remove.
 ## WO-612 T7: Export… saves this project's WO-614 stage as an .mvr (GET /api/stage/mvr-export, built on the server).
 ## WO-615 T10: Patch fixtures — the server imports the scene's GDTFs and builds patch entries (address, mode, pose from
 ## the file; POST /api/stage/mvr/<id>/patch); they are merged into project.fixtures and the live rig replaces the static
@@ -114,6 +113,7 @@ func _ready() -> void:
 	place.add_child(fit)
 	add_child(preload("res://features/previs/previs_ui.gd").caption("Scene position — stage left · upstage · up (m), turn (°)"))
 	add_child(place)
+	add_child(preload("res://features/previs/mvr_venue_row.gd").new())  # WO-1003: a .glb draws the room
 	_screens = MvrScreens.new()
 	_screens.selection_changed.connect(func(uuids: Array) -> void:
 		_screen_uuids = uuids

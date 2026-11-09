@@ -5,6 +5,7 @@ extends RefCounted
 ## Out of previs_tab.gd for the 500-line limit.
 
 const PF := preload("res://core/project_files.gd")
+const Venue := preload("res://features/previs/mvr_venue.gd")
 
 var list: ItemList
 var status: Label
@@ -19,6 +20,9 @@ func bind(l: ItemList, s: Label, st: Node3D) -> void:
 	stage = st
 	list.item_activated.connect(load_model)
 	list.item_selected.connect(load_model)
+	list.visibility_changed.connect(func() -> void:  # WO-1003: a .glb uploaded through Sources (no projectFiles event)
+		if list.is_visible_in_tree():
+			refresh())
 	Ws.on("change", func(d: Variant) -> void:
 		if d is Dictionary and str(d.get("path")) in [PF.EVENT_PATH, "project.activated"]:
 			refresh())
@@ -53,6 +57,11 @@ func load_model(idx: int) -> void:
 	var res: Dictionary = await Api.get_bytes(str(items[idx][1]))
 	if not res.ok:
 		status.text = "download failed: %s" % res.error
+		return
+	var name := str(items[idx][0]).trim_prefix("project:")
+	if glb_id.begins_with("project:") and Venue.is_capture(res.bytes) and Venue.save_venue(name):
+		stage.clear_model()  # WO-1003: one copy of the room — the MVR scene draws it from this .glb, in its place
+		status.text = "%s is a Capture export of the scene: it is now the MVR scene's venue model (MVR scene ▸ Venue model)" % name
 		return
 	if not stage.load_glb_bytes(res.bytes):
 		status.text = "not a glTF/GLB the runtime can read"

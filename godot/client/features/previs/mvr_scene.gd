@@ -11,6 +11,7 @@ const Tint := preload("res://features/previs/model_tint.gd")
 const LED_SHADER := preload("res://features/previs/led_screen.gdshader")
 const MoveModel := preload("res://features/previs/move/move_model.gd")
 const W := preload("res://features/previs/mvr_screen_model.gd")
+const Venue := preload("res://features/previs/mvr_venue.gd")
 
 signal layer_colors_changed(cols: Dictionary)  ## WO-678: the patched heads (fixtures_3d.gd) follow their layer
 signal hidden_layers_changed(hidden: Dictionary)  ## WO-767: …and its eye (layer name → true)
@@ -31,6 +32,7 @@ var _gone := {}  # WO-634: uuid → true — objects an LED screen replaced (pro
 var _marks: Array = []  # WO-634: selection boxes (top level, stage frame)
 var _tris := {}  # WO-1002: mesh instance id → TriangleMesh for pick()
 var _moved := {}  # WO-682: uuid → its node transform (project.previs.mvr.moved; none = where the file put it)
+var _venue := ""  # WO-1003: project.previs.mvr.venue_glb — a project .glb that draws the room (mvr_venue.gd)
 
 
 func show_scene(id: String) -> void:
@@ -98,15 +100,40 @@ func show_scene(id: String) -> void:
 				node.add_child(inst)
 				parts += 1
 		if M.screen_role(o) != "":
+			node.set_meta("screen", true)  # WO-1003: keeps its own parts under a venue model
 			_bind_screen(node, o.screen)
 		Tint.apply(node, Tint.parse(_layer_colors.get(node.get_meta("layer"))))
 	for t in templates.values():
 		(t as Node).free()
 	for l in sc.get("layers", []):
 		layers.append(str(l.get("name", "")))
+	var info := {"name": rec.get("name", ""), "objects": sc.get("objects", []).size(), "fixtures": fixtures, "parts": parts,
+		"meshes": templates.size(), "failed": failed, "report": sc.get("report", {}), "screens": _screens.size()}
+	if _venue != "":
+		var v: Dictionary = await Venue.fetch(self, _venue)
+		if gen != _gen:
+			return
+		info["venue"] = _with_venue(v)
+		info["venue_name"] = _venue
 	_sync_holds()
-	loaded.emit({"name": rec.get("name", ""), "objects": sc.get("objects", []).size(), "fixtures": fixtures, "parts": parts,
-		"meshes": templates.size(), "failed": failed, "report": sc.get("report", {}), "screens": _screens.size()})
+	loaded.emit(info)
+
+
+## WO-1003 — the venue .glb draws the room (mvr_venue.gd); its own objects join their layers like the MVR's.
+func _with_venue(v: Dictionary) -> Dictionary:
+	if v.has("error"):
+		return v
+	var r := Venue.apply(self, v)
+	for l in r.layers:
+		layer_sizes[l] = int(layer_sizes.get(l, 0)) + int(r.layers[l])
+		if not layers.has(l):
+			layers.append(l)
+	for c in get_children():
+		if c is Node3D and c.has_meta("uuid"):
+			(c as Node3D).transform = _moved.get(c.get_meta("uuid"), Transform3D.IDENTITY)
+			Tint.apply(c, Tint.parse(_layer_colors.get(c.get_meta("layer"))))
+			_show(c as Node3D)
+	return r
 
 
 ## The picture surface of a bound VideoScreen gets the LED shader (no seams: an MVR screen is not our panel grid).
@@ -340,6 +367,10 @@ func configure(c: Dictionary) -> void:
 	set_hidden_objects(c.get("hidden_objects", []) if c.get("hidden_objects") is Array else [])
 	set_layer_colors(Tint.colors(c, "layer_colors"))
 	set_moved(c.get("moved", {}) if c.get("moved") is Dictionary else {})
+	var venue := str(c.get("venue_glb", ""))
+	if venue != _venue:  # WO-1003: another (or no) venue model → rebuild the scene
+		_venue = venue
+		scene_id = ""
 	show_scene(str(c.get("id", "")))
 
 

@@ -191,6 +191,12 @@ static func summary(info: Dictionary) -> String:
 	var failed: Array = info.get("failed", []) if info.get("failed") is Array else []
 	if not failed.is_empty():
 		txt += "\nMeshes that failed to load: %d" % failed.size()
+	var v: Dictionary = info.venue if info.get("venue") is Dictionary else {}  # WO-1003 (mvr_venue.gd)
+	if v.has("error"):
+		txt += "\n" + str(v.error)
+	elif not v.is_empty():
+		txt += "\nVenue model %s: %d objects drawn from it, %d more only in it (fixtures and the patch stay the MVR's)." % [
+			info.get("venue_name", ""), int(v.get("swapped", 0)), int(v.get("extra", 0))]
 	return txt
 
 

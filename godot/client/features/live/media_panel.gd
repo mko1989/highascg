@@ -347,7 +347,9 @@ func _build() -> void:
 			it.set_metadata(0, {"folder": e.folder})
 			dirs[e.key] = it
 			continue
-		if docs.decorate(it, e.row):
+		if docs.decorate(it, e.row):  # WO-1003: its "3D model · 61.2 MB" sizes the column too (a docs-only folder showed "3")
+			it.set_custom_font_size(1, INFO_FONT)
+			_info_w = maxf(_info_w, _tree.get_theme_font("font").get_string_size(it.get_text(1), HORIZONTAL_ALIGNMENT_LEFT, -1, INFO_FONT).x)
 			continue
 		var r: Dictionary = e.row
 		var id := str(r.get("id", ""))

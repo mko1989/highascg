@@ -102,6 +102,15 @@ func load_glb_bytes(bytes: PackedByteArray) -> bool:
 	return true
 
 
+## WO-1003: no model on the stage (a Capture .glb became the MVR scene's venue model instead).
+func clear_model() -> void:
+	if _model != null:
+		_model.queue_free()
+		_model = null
+	screens.clear()
+	model_loaded.emit([])
+
+
 func set_screen(mi: MeshInstance3D, on: bool) -> void:
 	if on:
 		screens[mi] = true
