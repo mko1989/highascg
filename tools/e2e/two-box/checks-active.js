@@ -163,13 +163,16 @@ async function stream(report, ctx) {
 	const { main, peer } = ctx
 	const { str } = outputIds(ctx.snap.peer.stream)
 	let rx = null
+	let t0 = 0
+	let stop = null // the stop is sent in T6.3 (the sender must end before the receiver does), judged in T6.4
 	// Stream targets and keys are per server by design (`streaming` is volatile in the shared show, show-merge.js): they
 	// are set on the server that owns the output. Phase 1 (09.11) confirmed a target posted on the master does not travel.
 	await report.check('T6.1', 'stream target + key set on the second server (the output\'s owner) → its stream starts', async () => {
 		if (!str) return skip('no stream output on the second server')
 		const set = (await setStreamTarget(ctx, peer, str)).status
-		const s = await startStream(ctx, str, 12)
+		const s = await startStream(ctx, str, 12 + 30) // the receiver ends when the sender stops; -t is only a ceiling
 		rx = s.rx
+		t0 = Date.now()
 		if (!rx) return fail(`credentials on the second server (→ ${set}); start refused: ${s.r.status} ${j(s.r.data).slice(0, 300)}`, s.r.data)
 		return ok(`credentials on the second server → ${set}; started`, s.r.data)
 	})
@@ -187,6 +190,9 @@ async function stream(report, ctx) {
 	})
 	await report.check('T6.3', 'the receiver on main got h264 1920x1080 50p with audio', async () => {
 		if (!rx) return skip('stream not started')
+		await sleep(Math.max(0, 12000 - (Date.now() - t0)))
+		// stop first: a receiver that quits under a running stream is the sender's "Connection lost" in Caspar's log
+		stop = await peer.try('/api/streaming-channel/rtmp', { action: 'stop', outputId: str })
 		const file = await rx.done(20000)
 		const m = await P.probeMedia(main, file)
 		if (m.error) return fail(m.error, (await main.sh(`cat '${file}.log' | tail -5`)).out)
@@ -201,7 +207,7 @@ async function stream(report, ctx) {
 	await report.check('T6.4', 'stop: the stream ends and is reported off', async () => {
 		if (!str) return skip('no stream output')
 		if (!rx) return skip('stream not started')
-		const r = await peer.try('/api/streaming-channel/rtmp', { action: 'stop', outputId: str })
+		const r = stop || (await peer.try('/api/streaming-channel/rtmp', { action: 'stop', outputId: str }))
 		await sleep(1500)
 		const s = (await peer.get('/api/streaming-channel')).rtmp || {}
 		return r.status < 300 && !s.active ? ok() : fail(`stop → ${r.status}, active ${s.active}`, s)
@@ -268,6 +274,7 @@ async function soak(report, ctx) {
 		const marks = { main: await P.logMark(main), peer: await P.logMark(peer) }
 		// headroom: the receiver must outlive the sender, or its exit shows up as the sender's "Connection lost" errors
 		// (phase 2, 09.11: a secs + 4 receiver quit while the stream still ran through the recording's stop + probe)
+		await setStreamTarget(ctx, peer, ids.str) // again: T9.0 of an earlier run cleared it, and --only=T8 skips T6.1
 		const rx = await P.rtmpReceiver(main, `${ctx.rtmp}/${ctx.key}`, secs + 30, ctx.dir)
 		const st = await peer.try('/api/streaming-channel/rtmp', { action: 'start', outputId: ids.str })
 		if (st.status > 299) await rx.stop()

@@ -1,6 +1,6 @@
 # WO-1026 — Two-server workflow on the real boxes: tracking + stream/record on the second server, LED wall on main (test harness + runs)
 **Area:** testing-ci, network, video-io, tracking-vr
-**Status: IN PROGRESS (09.11 — phase 1: 31 pass / 11 fail, four bugs fixed, re-run 39 pass / 2 fail of 44; phase 2: 41 pass / 2 fail of 45, frame loss gone; last: the stream-argument fix on the second server)**
+**Status: DONE (09.11 — both settings run on the two boxes by Opus agents: phase 1 39 pass / 2 fail of 44 after four fixes; phase 2 final 43 pass / 0 fail / 2 hardware warnings of 45; open findings → WO-1027, WO-1028)**
 
 Owner, 09.11: update the second server, then test it "as doing part of the workflow":
 
@@ -194,6 +194,24 @@ afterwards. Full run: **41 passed, 2 failed, 2 warnings, 0 skipped** of 45 (`pha
     into a live RTMP output. Not a fault; filtered in the harness.
   - Soak again after the receiver fix: recording 3001 of 3000 frames, stream 2989 frames in 60.04 s.
 
+### Final run on release 2026-11-09T212433Z (second server updated; stream-argument fix + harness fixes)
+
+- **First run after the update: 42 passed, 1 failed, 2 warnings** of 45 (`phase2-final.json`). T5.6 passes once the
+  old look is cleared from the workflow destination before the run (`CLEAR 7-10`, `CLEAR 8-10` on the master). The one
+  failure, T8.1, was a single line in the second server's journal: `[cluster] highascg7579: look.take refused (look
+  wo730_sweep_no_such_look not found …)`. That is the post-update sweep's own signed-call check
+  (`tools/sweep/checks-cluster.js:78`), which runs 120 s after an update and finished inside the soak. Recording 3001
+  of 3000 frames, stream 2989 frames in 60.04 s.
+- **Second run, sweep over: 43 passed, 0 failed, 2 warnings, 0 skipped** of 45 (`phase2-final2.json`). The warnings
+  are the two "no SDI signal" rows.
+  - T6.3 stream alone: 591 frames in 12.04 s. T7.1 record alone: 501 frames in 10.02 s.
+  - T8.1 soak: recording 3000 of 3000 frames, stream 2991 frames in 60.06 s, 10 takes; no log line on either server.
+    Second server GPU 66 % average (71 % idle), API at most 14 ms; main GPU 48 % average, API at most 18 ms.
+  - Second server's Caspar log over the run: 0 `Unused option`, 0 `Connection lost`, no `[error]` line; the only
+    warnings are the flv header pair at each of the two stream stops.
+- **Do not run the suite within ~2.5 minutes of an update** on either server: the sweep's bogus `look.take` lands in
+  the log window.
+
 ### The phase 1 frame loss is gone
 
 Second server, 18 s per run (`framedelivery.json`), channel 7's screen consumer dropped 0 frames in each:
@@ -279,6 +297,9 @@ camera in main's copy (inference, not run). WO-1027.
   - Harness: the soak's receiver outlives the sender (`secs + 30`) and the stream stops with the recording, not after
     its probe; the log filter drops the flv header lines and lines that are a bare level tag;
     `set-look-source.js` (new) repoints a look's first layer over WS `scene_deck_sync` and reads it back.
+  - Harness, after the first run on the new release: T6 sends the stream stop before its receiver ends (the 12 s
+    receiver used to quit under a running stream — `Connection lost` in Caspar's log, in no check's window); the soak
+    sets the stream target itself, so `--only=T8,T9` can stream after an earlier run's T9.0 cleared it.
 
 ## Setup runbook
 
@@ -340,7 +361,8 @@ call; an op that answers an error has changed nothing.
 5. **Looks, before any take:** `node tools/e2e/two-box/set-look-source.js
    '{"sc_2box_mixer":"route://9-3","sc_2box_ppt":"route://10-4"}'` on the master; then clear what the restart put back
    on the workflow destination, or the first take's PGM → PRV exchange replays the old route once.
-6. Run `--phase=2 --static`, then the full run.
+6. Run `--phase=2 --static`, then the full run — not within ~2.5 minutes of an update on either server (the
+   post-update sweep logs a refused `look.take`).
 
 **Back to phase 1:** second server `removeEdge e_dst_in_<id>_dlsdi_2`, DeckLink 1 + 2 → `in`,
 `POST /api/settings {"casparServer":{"screen_4_decklink_device":0}}` (not cleared by itself), apply with
@@ -379,7 +401,8 @@ also in its `projects/_cluster/`. `POST /api/cluster/show {"on":false}` there re
   sync on hash 4b95966d45ed866d, no ffmpeg and no `Rec1_*` file left, both Godot clients on their old pids.
 - **Stream arguments:** `tools/smoke/smoke-streaming-channel-ffmpeg.test.js` +1 test (one `-format`, the container;
   no input option; RTMP and MPEG-TS). With the SRT / WO-172 / WO-418 / WO-261 stream smokes: 41 / 41.
-  **Not verified yet:** a stream start on the second server with this build (needs the next release there).
+  On the second server (release 2026-11-09T212433Z): 0 `Unused option` lines over four stream starts, the streams
+  received as before (h264 1080p50 + audio).
 - **`set-look-source.js`:** an unknown look id exits 1 and changes nothing; the current values written again answer
   `ok` for both looks and the follower stays in sync.
 - **Never measurable here:** picture on any SDI port. Nothing is connected to either DeckLink card, so every input
