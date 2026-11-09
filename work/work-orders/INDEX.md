@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-934 live WOs (30 open, 128 in progress, 776 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+935 live WOs (30 open, 129 in progress, 776 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -929,7 +929,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 969 IN PROGRESS [tracking-vr+godot-client] VR starts inside the loaded MVR room, facing its rig, not 8 m +Z of the origin… → 969_WO_vr_starts_inside_the_mvr_room.md
 - 978 DONE [tracking-vr+lighting,godot-client] Tracking → lighting desk test environment: puppet marker, PSN to ChamSys MagicQ → 978_WO_tracking_desk_test_env_puppet_psn_magicq.md
 
-## testing-ci — Tests and CI (27)
+## testing-ci — Tests and CI (28)
 
 - 77 IN PROGRESS [testing-ci+os-iso] Operator USB stick — post-boot QA test suite (read-only) → 77_WO_STICK_BOOT_QA_TEST_SUITE.md
 - 99 DONE [testing-ci] CI, lint, and format pipeline → 99_WO_CI_LINT_FORMAT_PIPELINE.md
@@ -958,6 +958,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 836 DONE [testing-ci] Test categories: offline / live-box, and a GUI release suite with screenshot +… → 836_WO_test_categories_live_box_and_release_gui_suite.md
 - 979 DONE [testing-ci+network,tracking-vr] Linked-servers role-split test environment: media playout ↔ camera tracking / p… → 979_WO_linked_roles_test_env.md
 - 988 DONE [testing-ci] Offline test suite runtime: lingering timers + CI concurrency (optimization swe… → 988_WO_offline_suite_runtime.md
+- 1026 IN PROGRESS [testing-ci+network,video-io,tracking-vr] Two-server workflow on the real boxes: tracking + stream/record on the second s… → 1026_WO_two_box_workflow_tests.md
 
 ## process — Docs, wiki, audits, work-order tooling (28)
 
