@@ -109,8 +109,8 @@ async function setZoomHost(ctx, b) {
 	const source = String(b?.source || '').trim().toLowerCase()
 	if (!ZOOM_SOURCES.includes(source)) return reply(400, { ok: false, error: `source must be one of ${ZOOM_SOURCES.join(', ')}` })
 	if (typeof b.enabled !== 'boolean') return reply(400, { ok: false, error: 'enabled must be true or false' })
-	ctx.config = ctx.config || {}
-	const list = Array.isArray(ctx.config.extraLiveSources) ? [...ctx.config.extraLiveSources] : []
+	// ctx.config is read-only on the live ctx (assigning it threw on the box, 09.11)
+	const list = Array.isArray(ctx.config?.extraLiveSources) ? [...ctx.config.extraLiveSources] : []
 	const mine = (x) => isZoomHostCandidate(x) && zoomSourceOf(x) === source
 	if (b.enabled && !list.some(mine)) {
 		let item

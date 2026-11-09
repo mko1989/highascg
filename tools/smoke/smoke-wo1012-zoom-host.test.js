@@ -144,7 +144,6 @@ describe('WO-1012 B: GET/POST /api/zoom/host', () => {
 		const broadcasts = []
 		let disk = factoryConfig({ casparServer: { configPath: casparPath }, extraLiveSources: [] })
 		const ctx = {
-			config: disk,
 			configManager: { get: () => disk, save: (c) => (saved.push(c), (disk = c), true) },
 			gatheredInfo: { channelIds: [1, 2, 3, 4, 5, 6, 7], channelXml: {} },
 			state: { getStateShared: () => ({ channels: [] }) },
@@ -153,6 +152,8 @@ describe('WO-1012 B: GET/POST /api/zoom/host', () => {
 			log() {},
 			...over,
 		}
+		// Like the live ctx: `config` cannot be assigned (the 09.11 box run threw on ctx.config = …).
+		if (!('config' in over)) Object.defineProperty(ctx, 'config', { get: () => disk, enumerable: true })
 		const get = async () => JSON.parse((await handlers['GET /api/zoom/host'].fn({ ctx })).body)
 		const post = async (b) => {
 			const res = await handlers['POST /api/zoom/host'].fn({ ctx, body: JSON.stringify(b) })
