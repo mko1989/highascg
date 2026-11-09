@@ -200,7 +200,10 @@ function createVideoSurfaceManager(deps) {
 		return surfaces
 	}
 
-	return { lease, sweep, onCasparReady, list, _state: { leases, active } }
+	/** WO-1026: does this server have a channel for `role` (a DeckLink input, a PGM / PRV, a Caspar channel)? */
+	const has = (role) => resolveRoleChannel(role, deps.getChannelMap()) != null
+
+	return { lease, sweep, onCasparReady, list, has, _state: { leases, active } }
 }
 
 let singleton = null

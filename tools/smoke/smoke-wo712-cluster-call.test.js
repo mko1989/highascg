@@ -229,7 +229,7 @@ describe('WO-712 R2 allow-list: each action runs the local handler', () => {
 		assert.deepEqual(seen, [
 			['master', 'look.take', { sceneId: 's1', target: 'program', relayed: true }],
 			['take', { sceneId: 's2', target: 'preview' }],
-			['take', { sceneId: 's3', target: 'program' }],
+			['take', { sceneId: 's3', target: 'program', relayed: true }], // WO-1026: so take-look never hands it on again
 		])
 	})
 

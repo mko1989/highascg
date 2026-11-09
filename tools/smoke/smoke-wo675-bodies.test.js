@@ -146,7 +146,7 @@ describe('WO-675 P2 wiring', () => {
 	it('the detect service forwards both kinds to the sink, nothing into its frames', () => {
 		const { createDetectService } = require('../../src/tracking/detect-service')
 		const project = { previs: { tracking: { cameras: [{ id: 'cam_1', role: 'ch1' }], detection: { enabled: true } } } }
-		const svc = createDetectService({ log: () => {} }, { spawn: () => null, exists: () => false, python: '/fake/python',
+		const svc = createDetectService({ log: () => {} }, { hasSurface: () => true, spawn: () => null, exists: () => false, python: '/fake/python',
 			modelsDir: '/fake/models', lease: () => Promise.resolve([]), autostart: false, project })
 		const got = []
 		svc.setFaces(false, (cam, list, kind = 'face') => got.push([cam, kind, list.map((x) => x.tid)]), true)

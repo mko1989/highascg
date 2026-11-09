@@ -210,6 +210,9 @@ function parseAmcpCommandChannel(cmd) {
  * @returns {boolean}
  */
 function shouldBlockLocalPgmAmcpCommand(ctx, cmd) {
+	// WO-1026: ADD / REMOVE are this server's own consumers (stream, record, shm, a screen) — never air content, and the
+	// leader never sends them (shouldFanOutCommand). Dropped here, a follower's stream and recording never started.
+	if (/^(?:ADD|REMOVE)\s/i.test(String(cmd || '').trim())) return false
 	const ch = parseAmcpCommandChannel(cmd)
 	if (ch == null) return false
 	return shouldFollowerSkipLocalPgmAmcp(ctx, ch, { previewOnly: false })

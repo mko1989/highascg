@@ -61,7 +61,7 @@ const projectWith = (detection = { enabled: true }) => ({
 function makeService(fake, extra = {}) {
 	const leases = []
 	let clock = 1000
-	const svc = createDetectService({ log: () => {} }, {
+	const svc = createDetectService({ log: () => {} }, { hasSurface: () => true,
 		spawn: fake.spawn, exists: () => true, python: '/fake/python', modelsDir: '/fake/models',
 		lease: (roles) => {
 			leases.push(roles)

@@ -85,7 +85,24 @@ function createAirJournal() {
 		return out
 	}
 
-	return { record, replay }
+	/** Forget everything (the Caspar these lines went to is gone). */
+	const reset = () => channels.clear()
+
+	return { record, replay, reset }
 }
 
-module.exports = { createAirJournal }
+/**
+ * WO-1026: a restarted Caspar has nothing on air, and after a config apply its channel numbers may mean something else
+ * (found 09.11: channel 7 had hosted a DeckLink input, became a destination's PGM, and the input's `PLAY 7-23 SHM …`
+ * was replayed into the other server's PGM). Called with this server's Caspar pid at every (re)connect: a new pid
+ * empties the journal; the same pid (a TCP blip — Caspar kept its layers) keeps it. → true when it was emptied.
+ */
+function forgetOnCasparRestart(ctx, pid) {
+	const last = ctx._airJournalCasparPid
+	if (pid != null) ctx._airJournalCasparPid = pid
+	if (pid == null || last == null || pid === last) return false
+	ctx._airJournal?.reset()
+	return true
+}
+
+module.exports = { createAirJournal, forgetOnCasparRestart }

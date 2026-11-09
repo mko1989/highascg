@@ -4,7 +4,8 @@
  * WO-712 R2 — the allow-list a linked server may run here over POST /api/cluster/call (cluster-call.js). Each one
  * goes through the same code as this server's own route, so a remote press is exactly a local press (owner D3):
  *
- *   look.take          { sceneId, target?: 'program'|'preview' }  → routes-scene-take-look.handleTakeLook
+ *   look.take          { sceneId, target?: 'program'|'preview', mainIdx?, forceCut?, transitionOverride?, timersVisibility? }
+ *                      → routes-scene-take-look.handleTakeLook
  *                      A follower does not take program itself (the follower PGM skip would drop it): it hands the
  *                      take to the master (callMaster), marked `relayed` so it is handed on at most once.
  *   tracking.auto.pin  { key, slot }                → the Auto director's POST /api/tracking/auto/pin (auto-routes.js)
@@ -53,14 +54,18 @@ function createCallActions(ctx, deps) {
 			const sceneId = String(args.sceneId || '').trim()
 			if (!sceneId) return { status: 400, body: { error: 'sceneId required' } }
 			const target = args.target === 'preview' ? 'preview' : 'program'
+			const { relayArgs } = require('../api/routes-scene-take-look')
 			if (target === 'program' && !args.relayed && deps.isFollower()) {
-				const r = await deps.callMaster('look.take', { sceneId, target, relayed: true })
+				const r = await deps.callMaster('look.take', relayArgs({ ...args, sceneId }))
 				return {
 					status: r.status || 502,
 					body: r.json && typeof r.json === 'object' ? r.json : { error: r.error || 'master unreachable' },
 				}
 			}
-			return asObj(await takeLook({ sceneId, target }))
+			// WO-1026: the take's own options travel with it (a follower's relayed press keeps its cut / screen / transition);
+			// `relayed` stays on a relayed take, so the take-look path here never hands it on again.
+			const { relayed: _r, target: _t, ...opts } = relayArgs({ ...args, sceneId })
+			return asObj(await takeLook({ ...opts, target, ...(args.relayed ? { relayed: true } : {}) }))
 		},
 		'tracking.auto.pin': auto('pin'),
 		'tracking.auto.slot': auto('slot'),

@@ -13,8 +13,9 @@
  * ~/.local/share/highascg/tracking-venv/bin/python, tools/tracking-detect/setup-venv.sh) and
  * HIGHASCG_TRACKING_MODELS (default ~/.local/share/highascg/models, tools/tracking-detect/export-models.sh).
  * WO-723 (replaces WO-712 R1's `detection` tick): no duty gate — wanted() IS this server's config check, and it is what
- * server-duties resolves `tracking` from (`deps.duties.provide`): a server whose project has detection on and cameras
- * does tracking, and its linked servers leave zones / Auto / presenters to it.
+ * server-duties resolves `tracking` from (`deps.duties.provide`): a server whose project has detection on and a camera
+ * it can read (WO-1026: a role with a channel HERE) does tracking, and its linked servers leave zones / Auto /
+ * presenters to it.
  */
 
 const childProcess = require('child_process')
@@ -70,10 +71,30 @@ function createDetectService(ctx, deps = {}) {
 	let onFaces = null // (cameraId, [{ tid, feature }], 'face' | 'body') — never stored in `latest`, never broadcast
 	let sidecarCams = {} // camera id → sidecar status { state, detail, fps, ms }
 
-	const wanted = () => !stopped && det.enabled && cams.length > 0
+	// WO-1026: under a shared show the detection config is on every linked server — the one that tracks is the one that
+	// can read a camera (a DeckLink input is on ONE server). Without this both ran the detector and held the duty.
+	const hasSurface = deps.hasSurface || ((role) => require('../system/video-surfaces').getVideoSurfaceManager(ctx).has(role))
+	const local = () => {
+		try {
+			return det.simulate || cams.some((c) => hasSurface(c.role))
+		} catch {
+			return false
+		}
+	}
+	const wanted = () => !stopped && det.enabled && cams.length > 0 && local()
+	let was = false // wanted() at the last look: it also follows the channel layout, which no project change announces
 	const modelPath = () => path.join(modelsDir, det.model)
 
 	function renewLease() {
+		const is = wanted()
+		if (is !== was) {
+			was = is
+			if (!is) {
+				halt()
+				error = ''
+			}
+			duties.refresh?.()
+		}
 		const roles = wanted() && !det.simulate ? [...new Set(cams.map((c) => c.role))] : [] // the imitated camera reads no surface
 		if (wanted() && det.simulate && !child && !restartTimer) start()
 		const key = roles.join(',')
@@ -223,6 +244,7 @@ function createDetectService(ctx, deps = {}) {
 			backoff = BACKOFF_MIN_MS
 			start()
 		}
+		was = wanted()
 		renewLease()
 		duties.refresh?.() // WO-723: `tracking` follows this config
 	}
@@ -301,6 +323,7 @@ function createDetectService(ctx, deps = {}) {
 		status: () => ({ ...snapshot(), config: det, model: det.model, models: listModels(), models_dir: modelsDir, python, providers, error,
 			pid: child?.pid ?? null, sidecar: sidecarCams }),
 		_handle: handle,
+		_renewLease: renewLease,
 		/** WO-675: ask the sidecar for face (and P2 body) features — resends the config only on a change — and where they go. */
 		setFaces(on, sink, bodiesOn = false) {
 			onFaces = sink || null

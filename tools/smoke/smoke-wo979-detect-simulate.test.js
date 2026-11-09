@@ -48,7 +48,7 @@ const projectWith = (detection) => ({
 
 function makeService(deps) {
 	const leases = []
-	const svc = createDetectService({ log: () => {} }, {
+	const svc = createDetectService({ log: () => {} }, { hasSurface: () => true,
 		python: '/no/such/python', modelsDir: '/no/such/models', exists: () => false,
 		lease: (roles) => {
 			leases.push(roles)

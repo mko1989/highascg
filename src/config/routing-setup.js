@@ -94,6 +94,13 @@ function syncAllTemplatesToDestination(self, destDir, label) {
 
 async function setupAllRouting(self) {
 	const { PIP_OVERLAY_TEMPLATE_FILES } = require('../engine/pip-overlay'); const map = routingMap.getChannelMap(self.config)
+	// WO-1026: before anything below re-sends its lines — a restarted Caspar empties the cluster's air journal.
+	try {
+		const pid = await require('../system/proc-stats').getCasparPidCached()
+		if (require('../cluster/cluster-air-journal').forgetOnCasparRestart(self, pid)) self.log('info', '[cluster] air journal emptied (Caspar restarted)')
+	} catch (e) {
+		self.log('warn', `[cluster] air journal: ${e?.message || e}`)
+	}
 	// WO-268: runs on boot AND every Caspar reconnect. Tracked template hosts are quarantined at
 	// disconnect (index.js status handler) so they stop vouching for WO-196 continuity; here the
 	// per-channel INFO XML from the connect gather decides their fate — restore hosts whose layer

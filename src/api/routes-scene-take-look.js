@@ -29,10 +29,42 @@ function bad(status, error) {
  */
 async function handleTakeLook(body, ctx, deps = {}) {
 	const b = parseBody(body)
+	const viaMaster = await relayToMaster(b, ctx, deps)
+	if (viaMaster) return viaMaster
 	const res = await takeLook(b, ctx, deps)
 	if (res.status >= 400 && !res.handedToTake) require('../engine/take-sync-barrier').joinTakeGroup(b.takeGroup)?.leave()
 	delete res.handedToTake
 	return res
+}
+
+/** What of a take travels to the master with it (cluster-call-actions `look.take` reads the same keys). */
+function relayArgs(b) {
+	const out = { sceneId: String(b.sceneId || '').trim(), target: 'program', relayed: true }
+	if (Number.isFinite(Number(b.mainIdx)) && b.mainIdx !== null && b.mainIdx !== '') out.mainIdx = Math.max(0, Math.floor(Number(b.mainIdx)))
+	if (b.forceCut === true) out.forceCut = true
+	if (b.transitionOverride && typeof b.transitionOverride === 'object') out.transitionOverride = b.transitionOverride
+	const tv = sanitizeVisibilityMap(b.timersVisibility)
+	if (tv) out.timersVisibility = tv
+	return out
+}
+
+/**
+ * WO-1026: a PROGRAM take pressed on a cluster follower is the master's to play — the follower's own PGM AMCP is
+ * skipped (the master's fan-out drives air), so taken here it answered ok and nothing went on air (the follower's
+ * GUI, a preset recall, Companion). It is handed to the master once (`relayed`), with its own options; the answer is
+ * the master's. A take group is not carried over: the screens of a preset recalled on a follower are the master's
+ * separate takes (the group slot is released here so nothing waits for it).
+ * → null when this server takes it itself.
+ */
+async function relayToMaster(b, ctx, deps) {
+	if (b.target === 'preview' || b.relayed) return null
+	const cluster = deps.cluster !== undefined ? deps.cluster : ctx?._clusterMaster ? require('./routes-cluster') : null
+	if (!cluster?.isClusterFollower(ctx)) return null
+	if (!String(b.sceneId || '').trim()) return bad(400, 'sceneId required')
+	require('../engine/take-sync-barrier').joinTakeGroup(b.takeGroup)?.leave()
+	const r = await cluster.callOf(ctx).callMaster('look.take', relayArgs(b))
+	const json = r?.json && typeof r.json === 'object' ? r.json : { ok: false, error: r?.error || 'master unreachable' }
+	return { status: r?.status || 502, headers: JSON_HEADERS, body: jsonBody({ ...json, viaMaster: true }) }
 }
 
 async function takeLook(b, ctx, deps) {
@@ -84,4 +116,4 @@ async function takeLook(b, ctx, deps) {
 	return { ...(await take(takeBody, ctx)), handedToTake: true }
 }
 
-module.exports = { handleTakeLook }
+module.exports = { handleTakeLook, relayArgs }

@@ -73,7 +73,7 @@ describe('WO-665 person cut-out cards', () => {
 			return proc
 		}
 		let clock = 1000
-		const svc = createDetectService({ log: () => {} }, {
+		const svc = createDetectService({ log: () => {} }, { hasSurface: () => true,
 			spawn, exists: () => true, python: '/fake/python', modelsDir: '/fake/models', lease: () => Promise.resolve([]),
 			autostart: false, now: () => clock,
 			project: { previs: { tracking: { grid: { z_offset: 0 }, cameras: [CE], detection: { enabled: true } } } },

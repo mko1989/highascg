@@ -61,7 +61,11 @@ async function link(report, ctx) {
 		const b = snap.peer.cluster.show || {}
 		if (!a.on || !b.on) return fail(`sharing: main ${a.on}, second ${b.on}`)
 		if (a.hash !== b.hash) return fail(`hash main ${a.hash} / second ${b.hash}`, { main: a, peer: b })
-		if (!a.in_sync) return fail(`main in_sync false: ${j(a.peers).slice(0, 200)}`)
+		// the master never `holds` a show (shared-show.js view(): in_sync = held.hash === mine), so its own in_sync is
+		// always false — its view of the follower is show.peers[<id>].in_sync; the follower's in_sync is its own
+		const acked = Object.values(a.peers || {})
+		if (!acked.length || !acked.every((p) => p.in_sync)) return fail(`master: follower not acked ${j(a.peers).slice(0, 200)}`)
+		if (!b.in_sync) return fail(`second server in_sync false (held ${b.held})`)
 		return ok(`${a.slug} rev ${a.rev} ${a.hash}`)
 	})
 	await report.check('T0.6', 'both servers hold the same destination list', () => {
@@ -174,7 +178,9 @@ async function outputs(report, ctx) {
 		if (!n.stream || !n.record) return fail(`outputs: ${n.stream} stream, ${n.record} record`)
 		if (!sinks.includes('stream_out') || !sinks.includes('record_out')) return fail(`destination is cabled to ${j(sinks)} — no stream_out / record_out cable`)
 		const idx = d.mainScreenIndex + 1
-		const src = { stream: s.videoSource, record: (s.outputs.record[0] || {}).source }
+		// GET /api/streaming-channel lists record outputs without their source: it lives on the record_out connector
+		const recConn = V.connector(snap.peer.dv, s.outputs.record[0]?.id)
+		const src = { stream: s.videoSource, record: recConn?.caspar?.source ?? (s.outputs.record[0] || {}).source }
 		const good = src.stream === `program_${idx}` && src.record === `program_${idx}`
 		return good ? ok(`program_${idx}, streaming ch ${s.channel}`) : fail(`sources ${j(src)}, expected program_${idx}`)
 	})

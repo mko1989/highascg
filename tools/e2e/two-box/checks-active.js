@@ -13,7 +13,7 @@ const { LOOKS } = require('./scenario')
 const { ok, fail, warn, skip, sleep, waitFor } = require('./lib')
 const { snapshot } = require('./checks-static')
 
-const LAYER = 10 // a look's first layer (scene layerNumber 10)
+const LAYER = 10 // a look's first layer (scene layerNumber 10) — Caspar layer 10 or 110 (bank A / B, P.lookLayer)
 const j = (v) => JSON.stringify(v)
 
 async function looksByName(main) {
@@ -25,8 +25,9 @@ async function looksByName(main) {
 
 const take = (box, sceneId, extra = {}) => box.try('/api/scene/take-look', { sceneId, forceCut: true, ...extra })
 
-/** What the second server's channel `ch` shows on the look layer. */
-const peerLayer = async (ctx, ch) => P.layerOf(await ctx.peer.amcp(`INFO ${ch}`), LAYER)
+/** What the second server's channel `ch` shows on the look layer (either bank). */
+const peerLayer = async (ctx, ch) => P.lookLayer(await ctx.peer.amcp(`INFO ${ch}`), LAYER)
+const mainLayer = async (ctx, ch) => (ch ? P.lookLayer(await ctx.main.amcp(`INFO ${ch}`), LAYER) : null)
 
 async function takes(report, ctx) {
 	const { main, peer, snap } = ctx
@@ -34,6 +35,9 @@ async function takes(report, ctx) {
 	const dest = V.destByLabel(snap.peer.dv, ctx.label)
 	const ch = dest && V.channelsOf(snap.peer.dv, dest.id)
 	const inputCh = (slot) => V.decklink(snap.peer.dv, slot).live?.hostChannel
+	const inputLayer = (slot) => V.decklink(snap.peer.dv, slot).live?.hostLayer ?? slot
+	const shows = (l, slot) => P.showsInput(l, slot, inputCh(slot), inputLayer(slot))
+	const mainCh = dest && V.channelsOf(snap.main.dv, dest.id)
 	const marks = { main: await P.logMark(main), peer: await P.logMark(peer) }
 
 	await report.check('T5.0', 'the test looks exist in the show, scoped to their destinations', () => {
@@ -54,11 +58,14 @@ async function takes(report, ctx) {
 			if (r.status > 299) return fail(`take refused: ${r.status} ${j(r.data).slice(0, 240)}`)
 			const shown = await waitFor(async () => {
 				const l = await peerLayer(ctx, ch.pgm)
-				return P.showsInput(l, L.slot, inputCh(L.slot)) ? l : null
+				return shows(l, L.slot) ? l : null
 			}, 6000)
 			const now = shown || (await peerLayer(ctx, ch.pgm))
-			const ev = { before, now, expected: `DeckLink ${L.slot} = channel ${inputCh(L.slot)} on the second server`, take: r.data }
-			return shown ? ok(`${now.producer}`, ev) : fail(`second server PGM ch ${ch.pgm} layer ${LAYER}: ${now.empty ? 'empty' : now.producer + ' ' + now.text.slice(0, 160)}`, ev)
+			// the master plays the look on its own (uncabled) channel for the destination too: what did that do?
+			const onMaster = await mainLayer(ctx, mainCh?.pgm)
+			const ev = { before, now, onMaster, source: looks[L.name].layers?.[0]?.source?.value, expected: `DeckLink ${L.slot} = channel ${inputCh(L.slot)}-${inputLayer(L.slot)} on the second server` }
+			const where = `${now.producer} bank ${now.bank}: ${now.text.replace(/\s+/g, ' ').slice(0, 120)}; master's own ch ${mainCh?.pgm}: ${onMaster?.empty ? 'empty' : onMaster?.producer}`
+			return shown ? ok(where, ev) : fail(`second server PGM ch ${ch.pgm} layer ${LAYER}: ${now.empty ? 'empty' : now.producer + ' ' + now.text.slice(0, 160)}`, ev)
 		})
 	}
 
@@ -69,11 +76,11 @@ async function takes(report, ctx) {
 		if (r.status > 299) return fail(`refused: ${r.status} ${j(r.data).slice(0, 240)}`)
 		const shown = await waitFor(async () => {
 			const l = await peerLayer(ctx, ch.prv)
-			return l.empty ? null : l
+			return shows(l, LOOKS.mixer.slot) ? l : null
 		}, 6000)
 		const pgmAfter = await peerLayer(ctx, ch.pgm)
-		if (!shown) return fail(`PRV ch ${ch.prv} layer ${LAYER} empty`)
-		return pgmAfter.text === pgmBefore.text || pgmAfter.producer === pgmBefore.producer ? ok(shown.producer, shown) : fail('PGM changed with a PRV stage', { pgmBefore, pgmAfter })
+		if (!shown) return fail(`PRV ch ${ch.prv} layer ${LAYER}/${LAYER + 100} does not show DeckLink ${LOOKS.mixer.slot}`, { prv: await peerLayer(ctx, ch.prv), take: r.data })
+		return pgmAfter.text === pgmBefore.text ? ok(`${shown.producer} bank ${shown.bank}; PGM unchanged`, shown) : fail('PGM changed with a PRV stage', { pgmBefore, pgmAfter })
 	})
 
 	await report.check('T5.4', 'take on the LED wall: on air on main, not sent to the second server', async () => {
@@ -85,7 +92,7 @@ async function takes(report, ctx) {
 		const r = await take(main, L.id)
 		if (r.status > 299) return fail(`refused: ${r.status} ${j(r.data).slice(0, 240)}`)
 		const onMain = await waitFor(async () => {
-			const l = P.layerOf(await main.amcp(`INFO ${led.pgm}`), LAYER)
+			const l = P.lookLayer(await main.amcp(`INFO ${led.pgm}`), LAYER)
 			return l.empty ? null : l
 		}, 6000)
 		if (!onMain) return fail(`main LED PGM ch ${led.pgm} layer ${LAYER} empty`)
@@ -98,12 +105,27 @@ async function takes(report, ctx) {
 		const L = LOOKS.ppt
 		if (!looks[L.name] || !ch?.pgm) return skip('no look / channel')
 		await take(main, looks[LOOKS.mixer.name].id)
-		await sleep(1500)
+		const mixerOn = await waitFor(async () => shows(await peerLayer(ctx, ch.pgm), LOOKS.mixer.slot), 6000)
+		if (!mixerOn) return fail('the master\'s Mixer take did not reach the second server first (T5.1)')
+		await sleep(1000)
 		const r = await take(peer, looks[L.name].id)
 		if (r.status > 299) return fail(`refused: ${r.status} ${j(r.data).slice(0, 240)}`)
-		const shown = await waitFor(async () => P.showsInput(await peerLayer(ctx, ch.pgm), L.slot, inputCh(L.slot)), 6000)
+		const shown = await waitFor(async () => shows(await peerLayer(ctx, ch.pgm), L.slot), 6000)
 		const air = (await main.get('/api/project'))?.scenes?.liveSceneIdByMain
 		return shown ? ok(`master's live looks: ${j(air)}`, r.data) : fail('the second server\'s PGM did not change', { take: r.data, now: await peerLayer(ctx, ch.pgm) })
+	})
+
+	await report.check('T5.5b', 'the same press relayed as a cluster call (POST /api/cluster/send look.take → the master) goes on air', async () => {
+		const L = LOOKS.ppt
+		if (!looks[L.name] || !ch?.pgm) return skip('no look / channel')
+		const master = (snap.peer.cluster.peers || []).find((p) => p.host === main.host)
+		if (!master) return fail(`the second server does not list ${main.host}`)
+		await take(main, looks[LOOKS.mixer.name].id)
+		if (!(await waitFor(async () => shows(await peerLayer(ctx, ch.pgm), LOOKS.mixer.slot), 6000))) return fail('the master\'s Mixer take did not reach the second server first (T5.1)')
+		const r = await peer.try('/api/cluster/send', { peer: master.id, action: 'look.take', args: { sceneId: looks[L.name].id, target: 'program' } })
+		if (r.status > 299) return fail(`refused: ${r.status} ${j(r.data).slice(0, 240)}`)
+		const shown = await waitFor(async () => shows(await peerLayer(ctx, ch.pgm), L.slot), 6000)
+		return shown ? ok(`via ${master.id}: PGM shows DeckLink ${L.slot}`) : fail('the second server\'s PGM did not change', { now: await peerLayer(ctx, ch.pgm) })
 	})
 
 	await report.check('T5.6', 'no Caspar or server errors on either box during the takes', async () => {
@@ -116,24 +138,33 @@ async function takes(report, ctx) {
 /** The second server's first stream / record output ids. */
 const outputIds = (stream) => ({ str: stream.outputs?.stream?.[0]?.id || '', rec: stream.outputs?.record?.[0]?.id || '' })
 
-async function setStreamTarget(ctx, id) {
-	const body = { outputId: id, rtmpServerUrl: ctx.rtmp, streamKey: ctx.key, clearKey: false }
-	const viaMaster = await ctx.main.try('/api/project/streaming-credentials', body)
-	return { viaMaster: viaMaster.status, body: { ...body, streamKey: '(set)' } }
+/** POST the throwaway stream target + key to `box` (/api/project/streaming-credentials: the active project) → status. */
+async function setStreamTarget(ctx, box, id, clear = false) {
+	const body = clear ? { outputId: id, rtmpServerUrl: '', clearKey: true } : { outputId: id, rtmpServerUrl: ctx.rtmp, streamKey: ctx.key, clearKey: false }
+	return (await box.try('/api/project/streaming-credentials', body)).status
+}
+
+/** Receiver on main + start on the second server → { rx, r } (the receiver is stopped again when the start is refused). */
+async function startStream(ctx, str, seconds) {
+	const rx = await P.rtmpReceiver(ctx.main, `${ctx.rtmp}/${ctx.key}`, seconds, ctx.dir)
+	const r = await ctx.peer.try('/api/streaming-channel/rtmp', { action: 'start', outputId: str })
+	if (r.status > 299) await rx.stop()
+	return { rx: r.status > 299 ? null : rx, r }
 }
 
 async function stream(report, ctx) {
 	const { main, peer } = ctx
 	const { str } = outputIds(ctx.snap.peer.stream)
 	let rx = null
-	await report.check('T6.1', 'stream target + key set on the master (show data); the second server starts its stream with them', async () => {
+	// Stream targets and keys are per server by design (`streaming` is volatile in the shared show, show-merge.js): they
+	// are set on the server that owns the output. Phase 1 (09.11) confirmed a target posted on the master does not travel.
+	await report.check('T6.1', 'stream target + key set on the second server (the output\'s owner) → its stream starts', async () => {
 		if (!str) return skip('no stream output on the second server')
-		const set = await setStreamTarget(ctx, str)
-		await sleep(4000) // the shared show reaches the follower
-		rx = await P.rtmpReceiver(main, `${ctx.rtmp}/${ctx.key}`, 12, ctx.dir)
-		const r = await peer.try('/api/streaming-channel/rtmp', { action: 'start', outputId: str })
-		if (r.status > 299) return fail(`start refused: ${r.status} ${j(r.data).slice(0, 300)}`, set)
-		return ok(`credentials via master → ${set.viaMaster}`, r.data)
+		const set = await setStreamTarget(ctx, peer, str)
+		const s = await startStream(ctx, str, 12)
+		rx = s.rx
+		if (!rx) return fail(`credentials on the second server (→ ${set}); start refused: ${s.r.status} ${j(s.r.data).slice(0, 300)}`, s.r.data)
+		return ok(`credentials on the second server → ${set}; started`, s.r.data)
 	})
 	await report.check('T6.2', 'while streaming: active, link healthy', async () => {
 		if (!rx) return skip('stream not started')
@@ -141,7 +172,11 @@ async function stream(report, ctx) {
 		const s = (await peer.get('/api/streaming-channel')).rtmp || {}
 		const link = typeof s.link === 'object' ? s.link?.state : s.link
 		if (!s.active) return fail(`not active: ${s.lastError}`, s)
-		return link && link !== 'connected' ? fail(`link ${link}`, s) : ok(`link ${link || 'n/a'}`)
+		// the API's word is not enough (a follower skipped the ADD and still said "started"): Caspar must run the consumer
+		const ports = P.consumersOf(await peer.amcp(`INFO ${ctx.snap.peer.stream.channel}`))
+		const on = ports.find((p) => p.port === Number(s.consumerIndex))
+		if (!on) return fail(`API says active, link ${link || 'n/a'}, but Caspar ch${ctx.snap.peer.stream.channel} has no port ${s.consumerIndex} (ports ${j(ports)})`, s)
+		return link && link !== 'connected' ? fail(`link ${link}`, s) : ok(`link ${link || 'n/a'}, Caspar port ${on.port} ${on.consumer}`)
 	})
 	await report.check('T6.3', 'the receiver on main got h264 1920x1080 50p with audio', async () => {
 		if (!rx) return skip('stream not started')
@@ -154,6 +189,7 @@ async function stream(report, ctx) {
 	})
 	await report.check('T6.4', 'stop: the stream ends and is reported off', async () => {
 		if (!str) return skip('no stream output')
+		if (!rx) return skip('stream not started')
 		const r = await peer.try('/api/streaming-channel/rtmp', { action: 'stop', outputId: str })
 		await sleep(1500)
 		const s = (await peer.get('/api/streaming-channel')).rtmp || {}
@@ -166,19 +202,25 @@ async function recordFor(ctx, rec, seconds) {
 	const r = await ctx.peer.try('/api/streaming-channel/record', { action: 'start', outputId: rec })
 	if (r.status > 299) return { error: `start refused: ${r.status} ${j(r.data).slice(0, 300)}` }
 	const file = r.data?.path || r.data?.record?.path || ''
-	await sleep(seconds * 1000)
+	await sleep(Math.min(3000, seconds * 1000))
+	const ch = ctx.snap.peer.stream.channel
+	const ports = ch ? P.consumersOf(await ctx.peer.amcp(`INFO ${ch}`)) : []
+	await sleep(Math.max(0, seconds * 1000 - 3000))
 	const stop = await ctx.peer.try('/api/streaming-channel/record', { action: 'stop', outputId: rec })
 	await sleep(5000) // WO-947: the MP4 is final ~2 s after the stop answers
-	const path = file || stop.data?.path || ''
-	if (!path) return { error: 'no file path in the start / stop answers', start: r.data, stop: stop.data }
-	return { path, media: await P.probeMedia(ctx.peer, path), stop: stop.status }
+	const rel = file || stop.data?.path || ''
+	if (!rel) return { error: 'no file path in the start / stop answers', start: r.data, stop: stop.data }
+	// the API answers a path relative to the server's repo (media/Rec1_…); the ssh shell starts in $HOME
+	const path = rel.startsWith('/') ? rel : `${ctx.peerRepo || '/home/casparcg/highascg'}/${rel}`
+	return { path, ports, media: await P.probeMedia(ctx.peer, path), stop: stop.status }
 }
 
 /** A recording of `seconds` at 50 fps: the size, the rate and every frame. */
 function judgeRecording(rec, seconds) {
 	if (rec.error) return fail(rec.error, rec)
 	const m = rec.media
-	if (m.error) return fail(`${rec.path}: ${m.error}`)
+	const cons = (rec.ports || []).map((p) => `${p.port} ${p.consumer}`).join(', ')
+	if (m.error) return fail(`${rec.path}: ${m.error} (Caspar ports while recording: ${cons || 'none'})`, rec)
 	const v = m.video
 	const want = m.duration * 50
 	const bad = []
@@ -211,9 +253,11 @@ async function soak(report, ctx) {
 		const looks = await looksByName(main)
 		const seq = [LOOKS.mixer, LOOKS.ppt].map((l) => looks[l.name]).filter(Boolean)
 		const led = looks[LOOKS.led.name]
+		const idle = { main: await P.gpu(main), peer: await P.gpu(peer) } // before stream + record start
 		const marks = { main: await P.logMark(main), peer: await P.logMark(peer) }
 		const rx = await P.rtmpReceiver(main, `${ctx.rtmp}/${ctx.key}`, secs + 4, ctx.dir)
 		const st = await peer.try('/api/streaming-channel/rtmp', { action: 'start', outputId: ids.str })
+		if (st.status > 299) await rx.stop()
 		const samples = { main: { gpu: [], api: [] }, peer: { gpu: [], api: [] } }
 		let takesDone = 0
 		const worker = (async () => {
@@ -237,7 +281,7 @@ async function soak(report, ctx) {
 		const load = {}
 		for (const n of ['main', 'peer']) {
 			const g = samples[n].gpu.filter(Boolean)
-			load[n] = { gpuUtilMax: Math.max(0, ...g.map((x) => x.util)), gpuMemMax: Math.max(0, ...g.map((x) => x.mem)), apiP50: Math.round(P.pct(samples[n].api, 50)), apiMax: Math.round(Math.max(0, ...samples[n].api)) }
+			load[n] = { gpuIdle: idle[n], gpuUtilAvg: Math.round(g.reduce((a, x) => a + x.util, 0) / (g.length || 1)), gpuUtilMax: Math.max(0, ...g.map((x) => x.util)), gpuMemMax: Math.max(0, ...g.map((x) => x.mem)), apiP50: Math.round(P.pct(samples[n].api, 50)), apiMax: Math.round(Math.max(0, ...samples[n].api)) }
 		}
 		const bad = []
 		const recRes = judgeRecording(rec, secs)
@@ -261,7 +305,10 @@ async function aftermath(report, ctx) {
 		if (s.rtmp?.active) bad.push('stream still active')
 		if (s.record?.active) bad.push('record still active')
 		for (const n of ['main', 'peer']) if (!after[n].state.configComparison?.aligned) bad.push(`${n}: layout no longer aligned`)
-		if (!after.main.cluster.show?.in_sync) bad.push('show out of sync')
+		// the master holds no copy, so its own show.in_sync is always false: its followers' acks + the follower's own flag
+		const acks = Object.values(after.main.cluster.show?.peers || {})
+		if (!acks.length || !acks.every((p) => p.in_sync)) bad.push(`master: follower not acked ${j(after.main.cluster.show?.peers).slice(0, 160)}`)
+		if (!after.peer.cluster.show?.in_sync) bad.push(`second server out of sync (held ${after.peer.cluster.show?.held})`)
 		const f = Object.values(after.main.cluster.fanout?.peers || {})[0] || {}
 		if (f.error || (f.held || []).length) bad.push(`fan-out: ${f.error} held ${j(f.held)}`)
 		if (j(after.main.duties) !== j(ctx.snap.main.duties) || j(after.peer.duties) !== j(ctx.snap.peer.duties)) bad.push('duties changed during the run')

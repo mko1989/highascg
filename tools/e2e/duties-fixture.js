@@ -121,6 +121,8 @@ function sandboxOptions(role, root) {
 	fs.chmodSync(SIDECAR, 0o755)
 	return {
 		tracking: true,
+		// WO-1026: detection only runs where a camera is local — the tracking server has the camera's DeckLink input (in1)
+		config: { casparServer: { configPath: path.join(root, 'casparcg.config'), decklink_input_count: 1 } },
 		env: { HIGHASCG_TRACKING_PYTHON: SIDECAR, HIGHASCG_TRACKING_MODELS: models, FAKE_DETECT_PERSONS: '1' },
 	}
 }

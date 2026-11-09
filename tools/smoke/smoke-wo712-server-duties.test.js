@@ -196,6 +196,7 @@ describe('WO-712 R1 gates', () => {
 				{ log: () => {} },
 				{
 					spawn: fakeSpawn,
+					hasSurface: () => true,
 					exists: () => true,
 					python: '/fake/python',
 					modelsDir: '/fake/models',

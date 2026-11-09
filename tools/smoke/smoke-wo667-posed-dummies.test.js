@@ -77,7 +77,7 @@ describe('WO-667 posed dummies', () => {
 			proc.kill = () => {}
 			return proc
 		}
-		const svc = createDetectService({ log: () => {} }, {
+		const svc = createDetectService({ log: () => {} }, { hasSurface: () => true,
 			spawn, exists: () => true, python: '/fake/python', modelsDir: '/fake/models', lease: () => Promise.resolve([]), autostart: false,
 			project: { previs: { tracking: { cameras: [{ id: 'a', role: 'ch1', raster: RASTER, cam: CAM_A }],
 				detection: { enabled: true, pose_model: 'yolo26n-pose.onnx' } } } },

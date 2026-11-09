@@ -4,7 +4,8 @@
 
 const { sleep } = require('./lib')
 
-const NOISE = /Failed to enable external keyer/i // standard on DeckLink outputs, not an error of the run
+// standard on DeckLink outputs, and Caspar's own log line for every BEGIN…COMMIT (WO-281 #8: benign, logged at warning)
+const NOISE = /Failed to enable external keyer|Executing batch: BATCH\(\d+ commands\)/i
 
 /**
  * `INFO <channel>` (this build answers the whole channel) → what stage layer `n` shows:
@@ -20,11 +21,32 @@ function layerOf(infoXml, n) {
 	return { empty: !producer || producer === 'empty', producer, text: fg.trim().slice(0, 700) }
 }
 
-/** Does that layer show DeckLink input `slot`, which this server hosts on `channel`? (a route to it, or the device itself) */
-function showsInput(layer, slot, channel) {
-	if (layer.empty) return false
-	if (/decklink/i.test(layer.producer)) return new RegExp(`<path>${slot}</path>`).test(layer.text)
-	return new RegExp(`route://${channel}\\b|<channel>${channel}</channel>|\\b${channel}-${slot}\\b`).test(layer.text)
+/**
+ * A look's logical layer `n` plays on bank A (n) or bank B (n + 100) and the banks alternate per take
+ * (src/engine/look-layer-ranges.js) → the bank that has a producer, else the empty one: { …layerOf, bank }.
+ */
+function lookLayer(infoXml, n) {
+	const a = { ...layerOf(infoXml, n), bank: 'A' }
+	const b = { ...layerOf(infoXml, n + 100), bank: 'B' }
+	if (!a.empty && !b.empty) return { ...a, both: true, other: b.text }
+	return a.empty ? b : a
+}
+
+/**
+ * Does that layer show DeckLink input `slot`, which this server hosts on `channel` layer `hostLayer`? A route producer
+ * names both (`<route><channel>11</channel><layer>3</layer></route>` on this build); a DeckLink producer its device.
+ */
+function showsInput(layer, slot, channel, hostLayer = slot) {
+	if (layer.empty || !channel) return false
+	if (/decklink/i.test(layer.producer)) return new RegExp(`<device>${slot}</device>|<path>${slot}</path>`).test(layer.text)
+	return new RegExp(`<channel>${channel}</channel>\\s*<layer>${hostLayer}</layer>`).test(layer.text)
+}
+
+/** `INFO <channel>` → the output ports Caspar runs on it: [{ port, consumer }] (ADD ch-97 STREAM → port 97). */
+function consumersOf(infoXml) {
+	const flat = String(infoXml).replace(/\s+/g, ' ')
+	const out = /<output>(.*?)<\/output>/.exec(flat)?.[1] || ''
+	return [...out.matchAll(/<port_(\d+)>\s*<consumer>([^<]*)<\/consumer>/g)].map((m) => ({ port: Number(m[1]), consumer: m[2] }))
 }
 
 const CASPAR_LOG = '$HOME/highascg/log/caspar_$(date +%F).log'
@@ -83,19 +105,26 @@ async function apiMs(box) {
 async function rtmpReceiver(box, url, seconds, dir) {
 	const file = `${dir}/rx-${Date.now()}.flv`
 	const listen = url.replace(/^rtmp:\/\/[^/:]+/, 'rtmp://0.0.0.0')
-	await box.sh(`mkdir -p '${dir}'; nohup ffmpeg -y -loglevel error -listen 1 -timeout ${seconds + 30} -i '${listen}' -t ${seconds} -c copy '${file}' > '${file}.log' 2>&1 &`)
+	// -nostdin + </dev/null: a background ffmpeg must not read the shell's stdin; the pid is ours to stop, nobody else's
+	const r = await box.sh(
+		`mkdir -p '${dir}'; nohup ffmpeg -nostdin -y -loglevel error -listen 1 -timeout ${seconds + 30} -i '${listen}' -t ${seconds} -c copy '${file}' </dev/null > '${file}.log' 2>&1 & echo $!`,
+	)
+	const pid = parseInt(r.out, 10) || 0
 	await sleep(1200)
+	const alive = async () => pid > 1 && (await box.sh(`kill -0 ${pid} 2>/dev/null && echo run || echo gone`)).out.includes('run')
 	return {
 		file,
+		pid,
+		alive,
 		async done(maxMs) {
 			const end = Date.now() + maxMs
-			while (Date.now() < end) {
-				const r = await box.sh(`pgrep -f 'rx-[0-9]+\\.flv' > /dev/null && echo run || echo gone`)
-				if (r.out.includes('gone')) break
-				await sleep(1000)
-			}
-			await box.sh(`pkill -TERM -f '[f]fmpeg -y -loglevel error -listen 1' || true`)
+			while (Date.now() < end && (await alive())) await sleep(1000)
+			if (await alive()) await box.sh(`kill -TERM ${pid} 2>/dev/null; sleep 1; kill -0 ${pid} 2>/dev/null && kill -KILL ${pid} || true`)
 			return file
+		},
+		/** Stop it now (a failed start leaves it listening until -timeout). */
+		async stop() {
+			if (await alive()) await box.sh(`kill -TERM ${pid} 2>/dev/null || true`)
 		},
 	}
 }
@@ -105,4 +134,4 @@ const pct = (xs, p) => {
 	return s.length ? s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))] : 0
 }
 
-module.exports = { layerOf, showsInput, logMark, logsSince, probeMedia, gpu, apiMs, rtmpReceiver, pct }
+module.exports = { layerOf, lookLayer, showsInput, consumersOf, logMark, logsSince, probeMedia, gpu, apiMs, rtmpReceiver, pct }

@@ -1,6 +1,6 @@
 # WO-1026 — Two-server workflow on the real boxes: tracking + stream/record on the second server, LED wall on main (test harness + runs)
 **Area:** testing-ci, network, video-io, tracking-vr
-**Status: IN PROGRESS (09.11 — harness written, 5867 on release 2026-11-09T194123Z and linked; phase 1 and phase 2 runs pending)**
+**Status: IN PROGRESS (09.11 — phase 1 set up and run: 31 pass / 11 fail of 45; four product bugs found and fixed; re-run on the fixed build and phase 2 pending)**
 
 Owner, 09.11: update the second server, then test it "as doing part of the workflow":
 
@@ -36,6 +36,67 @@ Owner, 09.11: update the second server, then test it "as doing part of the workf
      pair, "to zoom" and the 7680x2160 pair on an 8 GB GPU. Kept as is; the soak measures the cost. (T8.1)
   4. Whether stream credentials posted on the master (project-scoped, WO-261) reach the follower. (T6.1)
 
+## Phase 1, first run (09.11, release 2026-11-09T194123Z on both) — what it found
+
+Set up and run by an Opus agent from the runbook below. Result: **31 passed, 11 failed, 1 warning, 2 skipped** of 45.
+The DeckLink inputs carry no SDI signal on either box, so every source is black: the take checks prove routing (which
+channel-layer plays which input), not picture content.
+
+| Checks | Result | Cause |
+|---|---|---|
+| T0.1–T0.7, T1.1–T1.4, T2.1–T2.3, T2.5, T3.1 (both), T4.1, T4.5, T4.6, T5.0–T5.4, T5.5b, T6.1b, T6.4, T9.1 | PASS | |
+| T3.2.peer | WARN | no SDI signal on the second server's inputs (hardware) |
+| T2.4, T3.2.main | SKIP | phase 2 only / main has no inputs in phase 1 |
+| T6.2, T6.3, T7.1, T8.1 | FAIL | **bug A** — the follower dropped its own stream / record consumers |
+| T5.5 | FAIL | **bug B** — a program take pressed on the follower went nowhere |
+| T4.2, T4.4 | FAIL | **bug C** (gap 1) — both servers held the tracking duty |
+| T4.3, T9.2 | FAIL | setup: the second server had no tracking venv |
+| T5.6, part of T8.1 | FAIL | gap 2 — the master answers `403 LOADBG FAILED` for its own copy of the look (open) |
+| T6.1 | FAIL | by design: stream credentials are per server (the check was wrong) |
+
+- **Bug A — a follower never starts its own stream or recording.**
+  - `src/caspar/amcp-client-transport.js:61-62` asks `shouldBlockLocalPgmAmcpCommand` (`src/replication/amcp-fanout.js`)
+    for every line. On a follower it blocks everything addressed to a program channel — also `ADD 7-97 STREAM …` and
+    `ADD 7-96 FILE …`, which are that server's own consumers, not air content.
+  - The API still answered "started", `rtmp.active: true`, link "connected". Caspar's `INFO 7` had no such port.
+  - 5867's journal: 12 lines `skip local PGM AMCP … ADD 7-9[67]` during the run.
+- **Bug B — a program take on the follower is lost.**
+  - `POST /api/scene/take-look` on a follower answers ok; `src/api/routes-scene-take.js:224-232` then skips every line
+    ("follower amcp-fanout: skip local PGM AMCP"). The follower's Godot GUI takes exactly this way
+    (`godot/client/features/live/deck_view.gd:273`).
+  - The cluster-call path (`look.take` relayed to the master) works (T5.5b).
+- **Bug C — tracking on both servers (gap 1 confirmed).** Main ran the detector and logged
+  `no surface at /dev/shm/highascg-in1` / `in2`; both servers listed the `tracking` duty.
+- **Bug D — the master's air journal outlives its own Caspar.**
+  - The catch-up replayed `PLAY 7-23 SHM NAME zoom-gallery` and `MIXER 7-23 OPACITY 0` into the second server's
+    workflow PGM. Main's channel 7 had hosted DeckLink 1 before the phase 1 apply; after it, 7 is the destination's PGM.
+  - `src/cluster/cluster-air-journal.js` had no way to forget; `src/api/routes-cluster.js:145` keeps one journal per
+    node process.
+- **Gap 2 — an input only the other server has.**
+  - The master lists no Live source for the second server's DeckLink 3 / 4. The looks use the route the second server
+    itself lists (`route://11-3`, `route://12-4`); the fan-out sends it unchanged, so the second server plays it.
+  - The master also plays its own copy of the destination (previs, thumbnails) and has no channel 11 / 12:
+    `403 LOADBG FAILED` for `LOADBG 7-10 route://11-3`, 22 lines in the take block, 44 in the soak.
+  - Gap 4 (credentials): `streaming` is volatile in `src/cluster/show-merge.js` (:8, :22) — a target or key posted on the
+    master stays there. Posted on the second server, the stream starts (T6.1b). By design; the harness now sets them on
+    the output's owner (T6.1).
+- **Other findings (not fixed, see Open):**
+  - `casparServer.screen_N_decklink_device` is not cleared when a DeckLink port goes from `out` to `in`
+    (`conflict_output_device`). It needed `POST /api/settings {"casparServer":{"screen_1_decklink_device":0}}` and
+    `POST /api/caspar-config/apply {"force":true}`; a plain apply was a no-op.
+  - After the show was shared the two servers rewrote it in turn: the follower GUI's `multiview.canvasWidth` 6144 vs
+    3072 (`mv_doc.gd` canvas_size, `multiview_tab.gd` `_sync_canvas_size`), until the second server's Caspar apply. The
+    first added destination vanished in that window (`shared-show-ctx.js:27-29`).
+  - A new destination reached the second server only after a project autosave wrote `hardwareConfig`.
+    `addDestination` defaults `mainScreenIndex` to 0 (the LED wall's); it had to be passed.
+  - The second server's apply put the Caspar screen off screen while the operator GUI was still cabled to disconnected
+    GPU ports, and that apply restarted nodm there.
+  - The master's own `show.in_sync` is false by design (`shared-show.js:318-320`): sync is the master's
+    `show.peers.<id>.in_sync` plus the follower's own flag.
+- **Measurements (second server, RTX 2080 SUPER):** idle ~96–98 % GPU, ~1013–1055 MiB (Godot ~49 %, Caspar ~48 %);
+  in the soak 95–100 %, memory unchanged. Main 44–47 %, ~3070 MiB. API p50 4–5 ms, max 8–14 ms. The stream and record
+  consumers never ran (bug A), so their cost was not in these numbers.
+
 ## What was done
 
 - **Harness `tools/e2e/two-box/`** (run on main; reads both servers' APIs, the second one's shell over ssh):
@@ -66,6 +127,29 @@ Owner, 09.11: update the second server, then test it "as doing part of the workf
   - T8 soak: stream + record + takes for 60 s; recording complete, stream unbroken, no log errors, API < 1 s; GPU load.
   - T9 aftermath: nothing running, layouts aligned, show in sync, duties unchanged, detector still fresh.
 
+- **Fixes for what phase 1 found:**
+  - **A — `src/replication/amcp-fanout.js` `shouldBlockLocalPgmAmcpCommand`:** `ADD` / `REMOVE` lines pass on a
+    follower. They are this server's own consumers (stream, record, shm, a screen); the leader never sends them
+    (`shouldFanOutCommand`). `CG … ADD` starts with `CG`, so it stays blocked.
+  - **B — `src/api/routes-scene-take-look.js` `relayToMaster`:** a program take on a follower is handed to the master
+    as the cluster call `look.take`, with its options (`mainIdx`, `forceCut`, `transitionOverride`,
+    `timersVisibility`), and the answer carries `viaMaster: true` (502 when the master does not answer). Preview takes
+    stay local. `src/cluster/cluster-call-actions.js` passes the same options on and marks the hand-on `relayed`, so
+    the master runs it locally. Chosen over "allow the follower to play": air stays the master's (one journal, one
+    take order).
+  - **C — `src/tracking/detect-service.js`:** the detector runs, and the `tracking` duty is held, only where a camera
+    role resolves to a channel of this server (the surface manager's new `has(role)`, `src/system/video-surfaces.js`:
+    DeckLink input, PGM / PRV or Caspar channel; `simulate` counts as local).
+    Checked again on every lease tick, so a layout change starts or stops it without a project change. No per-server
+    switch to set: the inputs decide.
+  - **D — `src/cluster/cluster-air-journal.js` `reset` + `forgetOnCasparRestart`,** called first in
+    `setupAllRouting` (`src/config/routing-setup.js`, boot and every Caspar reconnect) with the Caspar pid: a new pid
+    empties the journal, the same pid (a TCP blip, Caspar kept its layers) keeps it.
+- **Harness changes after the first run:** sync judged by `show.peers.<id>.in_sync`; the record source read from the
+  `record_out` connector; look checks accept both layer banks; T5.3 requires PRV to change with PGM untouched; T5.5b
+  (cluster-call relay) added; T6.1 sets the credentials on the output's owner; T6.2 cross-checks Caspar's `INFO`
+  consumer port against the API's "active"; the RTMP receiver runs with `-nostdin`; the soak samples the idle GPU first.
+
 ## Setup runbook
 
 Every device-view edit is `POST /api/device-view <op>` on the server it concerns; nothing restarts Caspar until
@@ -75,24 +159,29 @@ call; an op that answers an error has changed nothing.
 ### Phase 1
 
 1. **Share the show on the second server:** `POST http://192.168.0.10:4200/api/cluster/show {"on":true}`. Wait for
-   `GET /api/cluster` → `show.in_sync` on both. Its own project goes to `projects/_cluster/`.
+   `GET /api/cluster` → the master's `show.peers.<id>.in_sync` and the follower's `show.in_sync`. Its own project goes
+   to `projects/_cluster/`.
 2. **Second server, free the SDI ports:** remove the edges into `dlsdi_3` / `dlsdi_4` (`{"removeEdge":{"id":…}}`, ids
    from `GET /api/device-view` → `graph.edges`), then DeckLink 1–4 to `in`:
    `{"updateConnector":{"id":"dlsdi_N","patch":{"caspar":{"ioDirection":"in"}}}}`. Inputs must end up enabled
    (`casparServer.decklink_inputs_disabled` off — check `live.decklink.inputs`).
 3. **Main, release DeckLink 1 + 2:** `ioDirection: "unassigned"` for `dlsdi_1`, `dlsdi_2`.
 4. **The workflow destination, on the master:**
-   `{"addDestination":{"type":"pgm_prv","label":"Stream PGM","videoMode":"1080p5000"}}`. It is show data; wait until the
-   second server lists it. Leave it uncabled on main.
+   `{"addDestination":{"type":"pgm_prv","label":"Stream PGM","videoMode":"1080p5000","mainScreenIndex":<next free>}}`
+   (without `mainScreenIndex` it gets 0, the LED wall's). It is show data, but it reaches the second server only after a
+   project autosave on the master wrote `hardwareConfig` — do step 7 before waiting for it. Leave it uncabled on main.
 5. **Second server, cable it to the monitor:** find the `gpu_out` connector whose `externalRef` is the connected output
    (HDMI-0). If the operator GUI is cabled there, move the operator GUI off it first (one feed per sink). Then
-   `{"addEdge":{"sourceId":"dst_in_<id>","sinkId":"gpu_pN"}}`. PRV on the same output is an edge with note
-   `{"outputLayer":2}` — only if the sink takes a second feed; otherwise PRV stays a channel without an output (T2.3
-   reports which).
+   `{"addEdge":{"sourceId":"dst_in_<id>","sinkId":"gpu_pN"}}`. `addEdge` takes no note and a sink takes one feed, so
+   PRV stays a channel without an output (T2.3 reports it). Remove the operator GUI's edges to disconnected GPU ports
+   too, or the apply places the Caspar screen off screen.
 6. **Second server, stream + record outputs** (device-local): `POST /api/settings` with ONLY the keys to change (the
    GET is redacted — never post it back):
    `{"streamingChannel":{"enabled":true}, "streamOutputs":[{"id":"str_1","label":"Stream PGM","enabled":true,"type":"rtmp","name":"Str1","quality":"medium"}], "recordOutputs":[{"id":"rec_1","label":"Rec PGM","enabled":true,"name":"Rec1","source":"program_1","crf":26}]}`
-   (check `src/api/settings-post.js` for the exact wrapper). Then cable `dst_in_<id>` → `str_1` and → `rec_1`.
+   — the record `source` is `program_<mainScreenIndex + 1>` of the workflow destination (`program_4` here), and
+   `streamingChannel` must name its PGM channel. Then cable `dst_in_<id>` → `str_1` and → `rec_1`. A port that was an
+   output keeps `casparServer.screen_N_decklink_device`: set it to 0 and apply with `{"force":true}`.
+   The inputs become Live sources with `{"addExtraLiveSource":…}` (`route://<channel>-<slot>`).
 7. **Tracking cameras, on the master:** `GET /api/project`, set
    `previs.tracking.cameras` to `cam_1` role `in1` + `cam_2` role `in2` (copy cam_1's shape) and
    `previs.tracking.detection.enabled = true`, post back with `POST /api/project/autosave {"project": doc}` (stored
@@ -100,9 +189,8 @@ call; an op that answers an error has changed nothing.
 8. **Test looks, on the master, same autosave:** three scenes in `scenes.scenes` (shape: any look in
    `projects/mplaner.json`): `2box Mixer` (layer 10 source = the second server's DeckLink 3), `2box PPT` (DeckLink 4),
    both with `mainScope` = the workflow destination's `mainScreenIndex`; `2box LED` (any media or colour source the box
-   has) scoped to the LED wall's screen. How a look names an input that only the other server has is gap 2 — try the
-   Live source the master lists for it; if there is none, record that and use the route the second server itself
-   lists (`extraLiveSources`).
+   has) scoped to the LED wall's screen. The master lists no Live source for the other server's inputs (gap 2): the
+   looks use the route the second server itself lists (`route://11-3`, `route://12-4`).
 9. **Apply on both** (`POST /api/caspar-config/apply`), wait for Caspar to answer `VERSION` again, check
    `GET /api/state` → `configComparison.aligned`.
 10. `node tools/e2e/two-box/run.js --phase=1 --static`, fix the setup until T0–T3 hold, then the full run with
@@ -115,6 +203,9 @@ call; an op that answers an error has changed nothing.
 2. **Main:** DeckLink 1 + 2 → `in`.
 3. Cameras stay `in1` + `in2` in the show; the tracking server is now main. Apply on both; run `--phase=2`.
 
+Phase 2 needs the tracking venv + models on the tracking server; phase 1 needed them on the second server
+(`tools/tracking-detect/setup-venv.sh`, models rsynced from main to `~/.local/share/highascg/models`, done 09.11).
+
 ### Restore
 
 `~/backups/twobox-before-20261109-205021/` on each box (config/ + project JSONs). The second server's own project is
@@ -122,6 +213,28 @@ also in its `projects/_cluster/`. `POST /api/cluster/show {"on":false}` there re
 
 ## What was verified
 
-- Harness: `node --check`, eslint (0 errors), max-lines, unwired exports. Not yet run against the boxes.
-- **Phase 1 run:** pending.
+- **Harness:** `node --check`, eslint (0 errors), max-lines, unwired exports. The phase 1 agent calibrated the probes:
+  the look probes separate Mixer / PPT / cleared / wrong-channel states; the RTMP receiver was checked with a lavfi
+  1080p50 sender and with no sender.
+- **Phase 1, first run:** the table above (`phase1.json` / `phase1.log` kept in the session scratchpad).
+- **The fixes, offline:** `tools/smoke/smoke-wo1026-two-box-follower.test.js` (new, curated, 13 tests): follower
+  ADD / REMOVE pass while PLAY and `CG … ADD` stay blocked; the take relay (options carried, preview / relayed / master
+  stay local, unreachable master → 502); the tracking gate (no local input → no detector and no duty, one input is
+  enough, a layout change starts / stops it); the journal (reset, new pid empties, same pid keeps, called first in
+  `setupAllRouting`). The detector smokes (WO-616 / 665 / 667 / 675 / 979 / 712) got the `hasSurface` seam; the WO-712
+  cluster-call expectation now carries `relayed: true`. The WO-979 role-split sandbox (`tools/e2e/duties-fixture.js`)
+  had a tracking server with a camera on `in1` and no input at all — it now has one DeckLink input in its config, as a
+  real tracking server does (the first gate run failed 8 of its steps on exactly this).
+- **Phase 1 re-run on the fixed build:** pending.
 - **Phase 2 run:** pending.
+
+## Open
+
+- **Gap 2 — inputs of another server in a look.** A look can only name them by the other server's route, and the master
+  logs a 403 per take for its own copy. Idea: a source "DeckLink N of server X" in the show, resolved by slot on the
+  server that renders it; the master skips a layer whose input it lacks.
+- `screen_N_decklink_device` not cleared when a port goes `out` → `in`.
+- The show rewrite loop from `multiview.canvasWidth` after sharing, and the destination lost in it.
+- A new destination needs a project save to reach the other server; `addDestination` defaults to screen 0.
+- The second server's GPU sits at ~97 % idle (it renders every shared destination, gap 3).
+- A preset recalled on a follower loses take-group sync.
