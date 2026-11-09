@@ -48,8 +48,11 @@ func fill(names: Array, cols: Dictionary, labels := {}, hidden := [], off := [])
 	highlight(_lit)
 
 
-## WO-647: mark these rows (the layers of the objects selected in 3D); the first is scrolled into view.
+## WO-647: mark these rows (the layers of the objects selected in 3D); the first is scrolled into view — WO-1004 only
+## when the marks changed and the rows are already on screen: since WO-948 the nearest ScrollContainer is the whole
+## Inspector, so picking a head yanked it from the Programmer up to MVR scene → Layers.
 func highlight(names: Array) -> void:
+	var moved := names != _lit
 	_lit = names.duplicate()
 	var first: Control = null
 	for n in _rows:
@@ -59,7 +62,8 @@ func highlight(names: Array) -> void:
 		if on and first == null:
 			first = p
 	var scroll := _scroll()
-	if first != null and scroll != null and first.is_visible_in_tree():
+	if moved and first != null and scroll != null and first.is_visible_in_tree() \
+			and scroll.get_global_rect().intersects(get_global_rect()):
 		scroll.ensure_control_visible.call_deferred(first)
 
 

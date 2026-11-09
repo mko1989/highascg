@@ -188,3 +188,48 @@ func test_pick_hits_triangles_not_boxes() -> void:
 	t.eq(cache.size(), 2, "one triangle mesh per mesh, built once")
 	shell.free()
 	deck.free()
+
+
+## WO-1004 — the Layers rows sit in the Inspector's own scroll (WO-948): a head picked while the Programmer is on screen
+## must not pull the column up to MVR scene → Layers. Only marks that changed, on rows already in view, scroll.
+func test_highlight_leaves_the_inspector_where_it_is() -> void:
+	var sc := ScrollContainer.new()
+	sc.size = Vector2(300, 200)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var pad := func(h: float) -> Control:
+		var c := Control.new()
+		c.custom_minimum_size.y = h
+		return c
+	var rows := ColorRows.new()
+	var names := range(30).map(func(i: int) -> String: return "L%d" % i)
+	rows.fill(names, {})
+	v.add_child(pad.call(1000.0))
+	v.add_child(rows)
+	v.add_child(pad.call(2000.0))  # the Programmer, further down
+	sc.add_child(v)
+	t.root.add_child(sc)
+	await t.process_frame
+	await t.process_frame
+	var bottom := int(v.size.y - sc.size.y)
+	sc.scroll_vertical = bottom
+	await t.process_frame
+	rows.highlight(["L25"])
+	await t.process_frame
+	await t.process_frame
+	t.eq(sc.scroll_vertical, bottom, "rows off screen: the Programmer stays in view")
+	sc.scroll_vertical = int(rows.position.y)
+	await t.process_frame
+	rows.highlight(["L26"])
+	await t.process_frame
+	await t.process_frame
+	t.ok(sc.scroll_vertical > int(rows.position.y), "rows on screen: the marked row is scrolled into view (WO-647)")
+	var at := sc.scroll_vertical
+	sc.scroll_vertical = int(rows.position.y)
+	await t.process_frame
+	rows.highlight(["L26"])
+	await t.process_frame
+	await t.process_frame
+	t.eq(sc.scroll_vertical, int(rows.position.y), "the same marks again (a project reload) do not scroll (was %d)" % at)
+	sc.queue_free()
