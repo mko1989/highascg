@@ -186,7 +186,7 @@ func _build(o: Dictionary) -> void:
 		"led_wall":
 			mat.set_shader_parameter("panels", Vector2(o.panels[0], o.panels[1]))
 			mat.set_shader_parameter("panel_px", Vector2(o.panel_px[0], o.panel_px[1]))
-			mat.set_shader_parameter("seam_px", 1.5)
+			mat.set_shader_parameter("seam_px", 0.0)  # WO-1007: no dark panel seams on the wall (owner 09.11)
 			mat.set_shader_parameter("pixel_grid", 0.6)
 			var edges := S.column_edges(o)
 			root.add_child(_mesh(_strip(edges, size.y, 0.0), mat))

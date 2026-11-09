@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-914 live WOs (29 open, 121 in progress, 764 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+916 live WOs (29 open, 121 in progress, 766 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -357,7 +357,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 916 DONE [mapping+lighting] Pixel map: always on, cheap sampling, its own output to the lighting console → 916_WO_pixel_map_always_on_console_output.md
 - 917 DONE [mapping+lighting] Pixel map: an intensity override switch for playing with it in the previs → 917_WO_pixel_map_intensity_override.md
 
-## lighting — DMX, Art-Net, sACN, fixtures, consoles (34)
+## lighting — DMX, Art-Net, sACN, fixtures, consoles (35)
 
 - 09 OPEN [lighting+engine] Global per-screen border effects and Art-Net control → 09_WO_Global_Per_Screen_Border_Effects.md
 - 179 DONE [lighting+mapping] Lighting I/O: Art-Net listener off by default, sACN input option, region-averag… → 179_WO_ARTNET_SACN_DEFAULTS_AND_PIXELMAP_SAMPLING.md
@@ -393,8 +393,9 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 - 1005 DONE [lighting+godot-client] Previs: Pixel Strobe cells lit all the time in 15 Ch (a non-light channel count… → 1005_WO_pixel_strobe_15ch_cells_lit.md
+- 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 
-## godot-client — Godot client (146)
+## godot-client — Godot client (147)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -542,6 +543,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1002 DONE [godot-client+tracking-vr] Previs: a "Tracking stage" fold that puts the tracking grid on the MVR's stage;… → 1002_WO_previs_tracking_stage_fit_to_mvr.md
 - 1003 OPEN [godot-client] Previs: MVR for patch and lights + a Capture .glb for everything else, without… → 1003_WO_previs_mvr_plus_glb_without_duplicates.md
 - 1004 DONE [godot-client] Previs: picking a head no longer scrolls the Inspector away from the Programmer → 1004_WO_previs_head_pick_keeps_inspector_scroll.md
+- 1007 DONE [godot-client] Previs: LED walls without the dark panel-seam grid → 1007_WO_previs_led_wall_no_panel_seams.md
 
 ## web-client — Web client (82)
 
