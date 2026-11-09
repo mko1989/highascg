@@ -15,7 +15,8 @@
  * × the bar master), 0 while a Shutter channel sits on a "Closed" set or
  * function; strobes read as open. Colour = additive emitters summed (ColorAdd_*, normalised so the brightest
  * component is 1, its level folded into intensity), else white, then filtered by subtractive CMY and colour-wheel
- * slots (CIE xyY → sRGB chromaticity). A beam with no channel in scope stays dark. Zoom = the Zoom function's physical angle, else the beam's BeamAngle. Pure.
+ * slots (CIE xyY → sRGB chromaticity). A beam with no light channel in scope (dimmer, shutter, emitter, filter, colour
+ * wheel — WO-1005) stays dark. Zoom = the Zoom function's physical angle, else the beam's BeamAngle. Pure.
  *
  * WO-784: a virtual channel (Offset="", no DMX slot) is left out of every scope. It is the console's own value, folded
  * into the real channels before they are sent; the wire never carries it. Reading its default kept the MAC Aura PXL,
@@ -48,6 +49,12 @@ function cieToRgb([x, y]) {
 	})
 }
 
+/** WO-1005: a channel that makes or shapes the light (dimmer, shutter, emitter, filter, colour wheel). A beam whose scope
+ * holds none of these is not driven by the mode — the Pixel Strobe's 15 Ch reaches its 70 cells only through
+ * Head_DimmerMode, which read as "no dimmer = full white" and kept them lit whatever the programmer sent. */
+const emits = (c) => c.functions.some((f) => f.attribute === 'Dimmer' || /^Shutter\d*/.test(f.attribute) || ADD[f.attribute]
+	|| SUB[f.attribute] || /^Color\d+$/.test(f.attribute))
+
 /** @param {object} type gdtf-parse.js result @param {object} mode @param {{ nodes }} rig gdtf-rig.js */
 function compileVisual(type, mode, rig) {
 	const byGeom = new Map()
@@ -62,7 +69,7 @@ function compileVisual(type, mode, rig) {
 		if (n.kind !== 'Beam') return
 		const scope = []
 		for (let at = i; at >= 0; at = rig.nodes[at].parent) scope.push(...(byGeom.get(rig.nodes[at].id) || []))
-		beams.push({ id: n.id, angle: n.beam?.beamAngle ?? 25, scope })
+		beams.push({ id: n.id, angle: n.beam?.beamAngle ?? 25, scope, lit: scope.some(emits) })
 	})
 	return { channels: mode.channels, axes, beams, wheels: type.wheels || {} }
 }
@@ -153,8 +160,9 @@ function decodeVisual(plan, buf, address = 1, offset = null) {
 			level = Math.min(1, max)
 			c = max > 0 ? add.map((x, i) => (x / max) * filter[i]) : [0, 0, 0]
 		}
-		// A beam no channel of the mode reaches is not lit by it (Pulse Panel 3CH: only the CW cells are patched).
-		const out = { i: r3(open && b.scope.length ? dim * level : 0), c: c.map(r3), zoom: r3(zoom ?? b.angle) }
+		// A beam no light channel of the mode reaches is not lit by it (Pulse Panel 3CH: only the CW cells are patched;
+		// WO-1005 Pixel Strobe 15 Ch: only Head_DimmerMode reaches the cells).
+		const out = { i: r3(open && b.lit ? dim * level : 0), c: c.map(r3), zoom: r3(zoom ?? b.angle) }
 		if (gobo) out.gobo = gobo
 		beams[b.id] = out
 	}
