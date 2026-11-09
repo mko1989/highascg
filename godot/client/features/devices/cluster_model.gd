@@ -184,6 +184,26 @@ static func is_master(m: Dictionary, peer_id: String) -> bool:
 	return int(m.get("epoch", 0)) > 0 and str(m.get("master_id", "")) == peer_id
 
 
+## WO-1018 — the badge on a server's rear panel / card: "MASTER", "FOLLOWER" (a master exists and it is another), or ""
+## while no master was ever chosen. `id` = "self" (the server this view is of) or a peer id.
+static func role_badge(m: Dictionary, id: String) -> String:
+	if int(m.get("epoch", 0)) <= 0:
+		return ""
+	return "MASTER" if str(m.get("master_id", "")) == id else "FOLLOWER"
+
+
+## WO-1018 — the make-master button names the server it acts on.
+static func make_text(server_name: String) -> String:
+	return "Make %s master" % (server_name if server_name != "" else "this server")
+
+
+## WO-1018 — the button sits on a server that is not master already (a peer must also be online and identified).
+static func can_make(m: Dictionary, id: String, p: Dictionary = {}) -> bool:
+	if is_master(m, id):
+		return false
+	return id == "self" or (p.get("online") == true and p.get("identity") == true)
+
+
 ## P4a/b — the line on a server's card while this server is master (server cluster-fanout.js status: fanout.peers[id] =
 ## {caspar, connected, sent, error, destinations [{label, pgm: [mine, theirs], prv}], caught_up {lines}}).
 static func fanout_line(snap: Dictionary, peer_id: String) -> String:

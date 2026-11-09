@@ -1,24 +1,19 @@
 extends MarginContainer
-## WO-605 slice 1 — the Devices tab, read-only (web device-view.js): screen-destination cards on the left, the Caspar
-## host's rear panel on the right, the cables list under it, and the hanging cables drawn over all of it. Data is
-## GET /api/device-view, fetched whenever the tab is shown, on Refresh, and on WS `gpu_topology_changed` (DRM
-## hotplug — the web's only device-view push). The inspector arrives in later slices.
-## Slice 2c: cabling — click an output dot to arm (targets tint valid/invalid, a ghost follows the pointer), click a
-## target to connect; click a cable (or its row) to select it, then Delete/Backspace removes it or clicking one of its
-## ends lifts that end to move it; Esc / empty space cancels; Ctrl+Z undoes. cable_gesture.gd does the writes.
-## Slice 3: the left column is destinations_panel.gd — add / edit / remove destinations through the Inspector, plus
-## the input & host channel cards. A selected cable and a selected destination exclude each other.
-## Slice 4-6: a GPU port (gpu_output_controls.gd), DeckLink port or Stream / Record / Virtual cam / Audio output opens
-## its page in the Inspector (a destination page excludes them); the rear panel's "+" adds an output (output_port_controls.gd).
-## Slice 7: a click on the rear panel's background (not a port, cable or "+") opens the Caspar server page
-## (server_controls.gd — frame rate, CEF, network, hot backup), like the web's casparBand → selectDevice(CASPAR_HOST).
-## Slice 7c: the "Mapping nodes" column (mapping_panel.gd); a card or a mapping connector opens the node page
-## (mapping_controls.gd), whose "Edit mapping" (WO-869 / WO-944) shows slice_editor.gd in place of the body.
-## Slice 8: the header's download arrow saves a device snapshot (snapshot_dialogs.gd). Slice 10: the toolbar toggles
-## the Matrix view (matrix_view.gd) and the Node view (node_panel.gd, Bézier cables). Cables list: cables_list.gd.
+## WO-605 — the Devices tab (web device-view.js): screen-destination cards on the left (destinations_panel.gd, slice 3),
+## the Caspar host's rear panel on the right, the cables list under it, and the hanging cables drawn over all of it.
+## Data is GET /api/device-view, fetched when the tab is shown, on Refresh and on WS `gpu_topology_changed`.
+## Slice 2c cabling: click an output dot to arm (targets tint valid/invalid, a ghost follows the pointer), click a target
+## to connect; click a cable (or its row) to select it, Delete/Backspace removes it, clicking one of its ends lifts that
+## end; Esc / empty space cancels; Ctrl+Z undoes (cable_gesture.gd does the writes). A selected cable and a selected
+## destination exclude each other. Slice 4-6: a GPU port, DeckLink port or Stream / Record / Virtual cam / Audio output
+## opens its page in the Inspector; the rear panel's "+" adds an output (output_port_controls.gd). Slice 7: a click on the
+## rear panel's background opens the Caspar server page (server_controls.gd); 7c: the "Mapping nodes" column
+## (mapping_panel.gd, mapping_controls.gd, "Edit mapping" = slice_editor.gd). Slice 8: the download arrow saves a device
+## snapshot. Slice 10: the toolbar toggles the Matrix view and the Node view (node_panel.gd). Cables list: cables_list.gd.
+## WO-1018: the destinations column, the mapping nodes and the rear panels + Servers each scroll on their own
+## (devices_scroll.gd); a cable end scrolled out of its area hides the cable.
 
 const Model := preload("res://features/devices/devices_model.gd")
-const PortIcon := preload("res://features/devices/port_icon.gd")
 const RearPanel := preload("res://features/devices/rear_panel.gd")
 const CableLayer := preload("res://features/devices/cable_layer.gd")
 const CableGesture := preload("res://features/devices/cable_gesture.gd")
@@ -42,6 +37,7 @@ const CablesList := preload("res://features/devices/cables_list.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const SliceEditor := preload("res://features/devices/slice_editor.gd")
 const Follow := preload("res://features/devices/devices_follow.gd")  # WO-918: project changes / apply layout warnings
+const Scrolls := preload("res://features/devices/devices_scroll.gd")  # WO-1018: destinations / nodes / rear panels scroll apart
 
 var _dests: DestinationsPanel
 var _rear: RearPanel
@@ -67,6 +63,7 @@ var _slices: SliceEditor
 var snapshots: SnapshotDialogs
 var live_inputs: LiveInputDialog
 var _payload := {}  # the merged device-view payload the page was built from
+var _scrolls: Array = []  # WO-1018: the three scroll areas (the wheel goes to the one under the pointer)
 
 
 func _ready() -> void:
@@ -77,9 +74,7 @@ func _ready() -> void:
 	add_child(v)
 	_gesture = CableGesture.new()
 	add_child(_gesture)
-	_gesture.changed.connect(_sync)
-	_gesture.status.connect(_set_status)
-	_gesture.reload_requested.connect(refresh)
+	_gesture.changed.connect(_sync); _gesture.status.connect(_set_status); _gesture.reload_requested.connect(refresh)
 	Ws.on("log_line", _gesture.on_log_line)
 	_confirm = ConfirmationDialog.new()
 	_confirm.dialog_text = "Are you sure you want to remove ALL cable connections?"
@@ -87,8 +82,7 @@ func _ready() -> void:
 	add_child(_confirm)
 	snapshots = SnapshotDialogs.new()
 	add_child(snapshots)
-	snapshots.status.connect(_set_status)
-	snapshots.applied.connect(refresh)
+	snapshots.status.connect(_set_status); snapshots.applied.connect(refresh)
 	live_inputs = LiveInputDialog.new()
 	add_child(live_inputs)
 	live_inputs.dirty.connect(func() -> void: _gesture.set_dirty(true))
@@ -114,6 +108,7 @@ func _ready() -> void:
 	_matrix.header.connect(_open_header)
 	_matrix.add.connect(_matrix_add)
 	var left := ScrollContainer.new()
+	_scrolls.append(left)
 	left.custom_minimum_size.x = 280
 	left.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	body.add_child(left)
@@ -121,12 +116,9 @@ func _ready() -> void:
 	_dests.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_child(_dests)
 	_dests.status.connect(_set_status)
-	_dests.refresh_requested.connect(refresh)
-	_dests.add_live_input.connect(live_inputs.open)
+	_dests.refresh_requested.connect(refresh); _dests.add_live_input.connect(live_inputs.open)
 	_dests.changed.connect(func() -> void:  # WO-685: previs reads destinations from Settings, not this payload
-		_gesture.set_dirty(true)
-		await DevicesTarget.settings.load_from_server()
-		refresh())
+		_gesture.set_dirty(true); await DevicesTarget.settings.load_from_server(); refresh())
 	_dests.selected.connect(func(id: String) -> void:
 		if id != "":
 			_close_port()
@@ -152,6 +144,7 @@ func _ready() -> void:
 		_slices.set_meta("open", true)
 		_show_mode())
 	var mid := ScrollContainer.new()
+	_scrolls.append(mid)
 	mid.custom_minimum_size.x = 190
 	mid.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	body.add_child(mid)
@@ -170,10 +163,15 @@ func _ready() -> void:
 				_gesture.select_edge(CableRules.s(e.get("id")))
 				return
 		_set_status("%s has no cable." % id, false))
+	var right_scroll := ScrollContainer.new()  # WO-1018: this server's rear panel + every linked server's scroll on their own
+	right_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.add_child(right_scroll)
+	_scrolls.append(right_scroll)
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_theme_constant_override("separation", 12)
-	body.add_child(right)
+	right_scroll.add_child(right)
 	_rear = RearPanel.new()
 	_rear.add_requested.connect(_outp.add_output)
 	_rear.order_changed.connect(refresh)
@@ -196,17 +194,16 @@ func _ready() -> void:
 	_list.remove.connect(func(id: String) -> void: _gesture.remove_edge(id))
 	right.add_child(_list)
 	right.add_child(preload("res://features/devices/lighting_consoles_panel.gd").new())  # WO-837: lighting consoles for timeline light cues
-	right.add_child(ClusterPanel.new())
+	var cluster := ClusterPanel.new()
+	cluster.self_role.connect(func(server_name: String, badge: String) -> void: _rear.set_identity(server_name, badge))
+	right.add_child(cluster)
 	_cables = CableLayer.new()
 	add_child(_cables)
-	_cables.unplug.connect(_gesture.pull)  # owner 30.10: a plug pulled out by its boot
-	_cables.unplug_drop.connect(_gesture.unplug_drop)
+	_cables.unplug.connect(_gesture.pull); _cables.unplug_drop.connect(_gesture.unplug_drop)  # owner 30.10: a plug pulled out by its boot
 	_cables.port_clicked.connect(_open_port)
 	_cables.loops = Toolbar.saved_loops()  # WO-674: remembered per client
 	_bar.loops_changed.connect(func(n: int) -> void: _cables.loops = n)
-	_bar.view_changed.connect(func(_m: String) -> void:
-		_show_mode()
-		refresh())
+	_bar.view_changed.connect(func(_m: String) -> void: _show_mode(); refresh())
 	_show_mode()
 	visibility_changed.connect(func() -> void: if is_visible_in_tree(): refresh())
 	DevicesTarget.target_changed.connect(func() -> void: _gesture.forget(); refresh())  # WO-732 P3b: Edit / Back
@@ -255,8 +252,6 @@ func _matrix_add(what: String) -> void:
 			await _outp.add_output(what)
 
 
-## GET /api/device-view (+ settings once — the cable writes seed from them). A reload asked for while one is in
-## flight runs again after it, so a mutation is never answered by a read that started before it.
 ## WO-604: a live-audio strip clicked in the Audio tab → that slot's host-channel page (web live-audio-input-select).
 func inspect_destination(id: String) -> void:
 	if not _dests.has(id):
@@ -269,6 +264,7 @@ func mark_restart_dirty() -> void:  # something outside the tab changed Caspar's
 	_gesture.set_dirty(true)
 
 
+## GET /api/device-view (+ settings once). A reload asked for while one is in flight runs again after it.
 func refresh() -> void:
 	if _loading:
 		_reload_again = true
@@ -429,11 +425,13 @@ func _set_status(text: String, ok: bool) -> void:
 	_bar.set_status(text, ok)
 
 
-## Clicks are taken here, before the GUI: a connector dot (rect grown 3 px) drives the gesture, a rear-panel port's
-## row label or socket opens its page, then a cable selects;
-## anything else cancels an armed gesture (web: empty space restores) and lets the click through.
+## Clicks are taken here, before the GUI: a connector dot drives the gesture, a rear-panel port's label or socket opens
+## its page, then a cable selects; anything else cancels an armed gesture and lets the click through.
 func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or _confirm.visible or snapshots.is_open() or live_inputs.is_open() or _matrix.visible or _slices.visible:
+		return
+	if event is InputEventMouseButton and _over_tab(event.global_position) and Scrolls.wheel(_scrolls, event):  # WO-1018
+		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventMouseMotion:
 		var lp: Vector2 = _cables.get_global_transform().affine_inverse() * event.global_position
@@ -457,10 +455,11 @@ func _input(event: InputEvent) -> void:
 	if _gesture.armed():
 		_gesture.cancel()
 		return
-	if _rear.visible and _rear.begin_drag(pos):  # a DeckLink label press drags (release without a drop opens the page)
+	var in_right: bool = _scrolls[2].get_global_rect().has_point(pos)  # WO-1018: the rear panel's part scrolled out of view takes no click
+	if _rear.visible and in_right and _rear.begin_drag(pos):  # a DeckLink label press drags (release without a drop opens the page)
 		get_viewport().set_input_as_handled()
 		return
-	var port := _rear.label_at(pos) if _rear.visible else ""
+	var port := _rear.label_at(pos) if _rear.visible and in_right else ""
 	var pick: Dictionary = _cables.press(pos, port)  # a plug pulls, a body drags (cable_grab.gd); else a port opens its page
 	if port != "" and pick.is_empty():
 		get_viewport().set_input_as_handled()
@@ -470,7 +469,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		if port == "":  # a plug in a socket: its click (no pull) still opens the port (cable_layer port_clicked)
 			_gesture.select_edge(pick.id)
-	elif (_rear if _rear.visible else _nodes).get_global_rect().has_point(pos) and not get_viewport().gui_get_hovered_control() is BaseButton:
+	elif in_right and (_rear if _rear.visible else _nodes).get_global_rect().has_point(pos) and not get_viewport().gui_get_hovered_control() is BaseButton:
 		_gesture.deselect()
 		_open_server()
 	elif not (_list.get_global_rect().has_point(pos) or _bar.get_global_rect().has_point(pos)):

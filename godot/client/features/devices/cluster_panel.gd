@@ -6,17 +6,17 @@ extends VBoxContainer
 ## cables, read-only: each server keeps its own wiring (owner, WO-670 answer 2). Nothing here drives a peer yet (P3/P4).
 ## P2b: "Send media" pushes this project's media to it (server cluster-media.js; both servers must have linked each
 ## other); the progress / result line comes from the peer's `media_send` in the snapshot.
-## P3a: the master line (who runs the show, epoch, auto failover — server cluster-master.js, snapshot `master`), a
-## MASTER tag on its card, "Make master" on this server and on every linked one. (P3b's "This client follows the
-## master" is gone, WO-802: a client stays on its own server.) P4: on each card while this server is master, which
-## destinations its takes are forwarded to there (channel translation, sent count, catch-up), or why not; on a server
-## that is not master, a note that its PGM follows the master.
+## P3a: the master line (who runs the show, epoch, auto failover — server cluster-master.js, snapshot `master`). WO-1018:
+## every server (this one's row and rear panel header, each linked card and its rear panel) carries a MASTER / FOLLOWER
+## badge, and "Make <name> master" sits on the server it acts on, never on the one that already is master. P4: on each
+## card while this server is master, which destinations its takes are forwarded to there, or why not.
 ## WO-739: a server asking to link with this one shows on top as an invite (Accept / Decline). A server this one linked
 ## that has not accepted yet says so on its card. Auto-accept is on the Devices server page.
 ## WO-732 P3b: "Edit" on a card points the whole Devices tab at that server (core/devices_target.gd edit_peer): its
 ## rear panel, cables, destinations and Apply. WO-802: sent through this server's relay, never straight to it. "Back to
 ## this machine" returns; an unlink returns by itself and says so.
 
+const Badge := preload("res://features/devices/server_badge.gd")  # WO-1018
 const M := preload("res://features/devices/cluster_model.gd")
 const Model := preload("res://features/devices/devices_model.gd")
 const RearPanel := preload("res://features/devices/rear_panel.gd")
@@ -36,7 +36,9 @@ var _auto: CheckBox
 var _accept: CheckBox  # WO-712 D3 / WO-723: the one setting left of the R1 ticks
 var _share: CheckBox  # WO-746: this server takes / gives the shared show
 var _show_l: Label
-var _take: Button
+var _take: Button  # WO-1018: "Make <this server> master", on this server's own row (not in the shared controls)
+var _self_row: HBoxContainer
+var _self_badge: HBoxContainer
 var _make: ConfirmationDialog
 var _make_id := ""
 var _add: ConfirmationDialog
@@ -50,6 +52,8 @@ var _inv_err := {}  # WO-739: invite id → why Accept / Decline failed
 var _back: Button  # WO-732 P3b
 var _edit_err := ""
 var _sig := ""
+
+signal self_role(server_name: String, badge: String)  # WO-1018: this server's name + MASTER / FOLLOWER, for its rear panel
 
 
 func _ready() -> void:
@@ -67,21 +71,17 @@ func _ready() -> void:
 	_self_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	head.add_child(_self_l)
 	add_child(head)
+	_build_self_row()
 	_back = Button.new()  # WO-732 P3b: only while the tab edits a linked server
 	_back.visible = false
 	_back.pressed.connect(func() -> void: DevicesTarget.stop_editing())
 	add_child(_back)
 	DevicesTarget.target_changed.connect(reload)
 	_build_master_row()
-	size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var scroll := ScrollContainer.new()  # the rest of the column's height: more servers scroll, the window never grows
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
-	_list = VBoxContainer.new()
+	_list = VBoxContainer.new()  # WO-1018: no inner scroll — each server's rear panel at full size; the Devices tab's right column scrolls
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_theme_constant_override("separation", 12)
-	scroll.add_child(_list)
+	add_child(_list)
 	_build_add()
 	_remove = ConfirmationDialog.new()
 	_remove.confirmed.connect(func() -> void:
@@ -100,9 +100,7 @@ func _ready() -> void:
 			DevicesTarget.ended = "")  # WO-802: the "no longer linked" note is shown once
 	var poll := Timer.new()  # WO-732 P3a: an edited linked server pushes nothing to this client (its WS is not ours)
 	poll.wait_time = DevicesTarget.POLL_S
-	poll.timeout.connect(func() -> void:
-		if DevicesTarget.polled() and is_visible_in_tree():
-			_poll())
+	poll.timeout.connect(func() -> void: if DevicesTarget.polled() and is_visible_in_tree(): _poll())
 	add_child(poll)
 	poll.start()
 
@@ -142,7 +140,7 @@ func _render() -> void:
 	_follow_l.visible = _follow_l.text != ""
 	_auto.set_pressed_no_signal(ms.get("auto", true) == true)
 	_auto.disabled = int(ms.get("epoch", 0)) <= 0
-	_take.visible = ms.get("is_master") != true
+	_show_self(me, ms)
 	var own_duties: Variant = me.get("duties")
 	_accept.set_pressed_no_signal(not (own_duties is Dictionary) or own_duties.get("accept_remote", true) == true)
 	var sh: Variant = _snap.get("show")
@@ -180,8 +178,9 @@ func _card(p: Dictionary) -> Control:
 	var name_l := Label.new()
 	name_l.text = str(p.get("name", id))
 	top.add_child(name_l)
-	if M.is_master(_master(), id):
-		top.add_child(_small("MASTER", ThemeBuilder.ACCENT))
+	var role := M.role_badge(_master(), id)
+	if role != "":
+		top.add_child(Badge.make(role))
 	var facts := _small(M.facts(p), ThemeBuilder.WARN if p.get("media_parity") == "differs" else ThemeBuilder.TEXT_MUTED)
 	facts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	facts.clip_text = true
@@ -203,9 +202,9 @@ func _card(p: Dictionary) -> Control:
 				_sig = ""
 				_render())
 		top.add_child(ed)
-	if not M.is_master(_master(), id) and p.get("online") == true and p.get("identity") == true:
+	if M.can_make(_master(), id, p):
 		var mk := Button.new()
-		mk.text = "Make master"
+		mk.text = M.make_text(str(p.get("name", id)))
 		mk.tooltip_text = "%s runs the show from now on (every linked server is told)." % str(p.get("name", id))
 		mk.pressed.connect(func() -> void: _confirm_make(id, str(p.get("name", id))))
 		top.add_child(mk)
@@ -298,6 +297,8 @@ func _fill(id: String, body: VBoxContainer) -> void:
 	body.add_child(_small("Roles (from its cables): " + M.roles_text(M.roles(_own, view)), ThemeBuilder.TEXT))
 	var rear := RearPanel.new()
 	body.add_child(rear)
+	var pn := str(_peer(id).get("name", id))
+	rear.set_identity(pn, M.role_badge(_master(), id))
 	rear.show_slots(m.slots)
 	rear.set_process_input(false)
 	_freeze(rear)
@@ -312,6 +313,13 @@ func _send(id: String) -> void:
 		_send_err[id] = str(r.get("error", "")) if str(r.get("error", "")) != "" else "Send failed (HTTP %d)" % int(r.get("status", 0))
 	_sig = ""
 	_render()
+
+
+func _peer(id: String) -> Dictionary:
+	for p in _snap.get("peers", []):
+		if p is Dictionary and str(p.get("id", "")) == id:
+			return p
+	return {}
 
 
 func _master() -> Dictionary:
@@ -348,14 +356,38 @@ func _build_master_row() -> void:
 	_share.tooltip_text = "One show on every linked server that has this on: the master's. Edits made here go to the master."
 	_share.toggled.connect(_set_share)
 	controls.add_child(_share)
-	_take = Button.new()
-	_take.text = "Make this server master"
-	_take.pressed.connect(func() -> void: _confirm_make("self", "This server"))
-	controls.add_child(_take)
 	add_child(_master_row)
 	_make = ConfirmationDialog.new()
 	_make.confirmed.connect(func() -> void: _set_master({"master": _make_id}))
 	add_child(_make)
+
+
+## WO-1018: this server's own line: its name, the MASTER / FOLLOWER badge, and the button that makes IT master.
+func _build_self_row() -> void:
+	_self_row = HBoxContainer.new()
+	_self_row.add_theme_constant_override("separation", 8)
+	_self_badge = HBoxContainer.new()
+	_self_row.add_child(_self_badge)
+	_take = Button.new()
+	_take.pressed.connect(func() -> void: _confirm_make("self", _take.get_meta("server_name", "this server")))
+	_self_row.add_child(_take)
+	add_child(_self_row)
+
+
+func _show_self(me: Dictionary, ms: Dictionary) -> void:
+	var nm := str(me.get("hostname", ""))
+	var badge := M.role_badge(ms, "self") if not _snap.get("peers", []).is_empty() else ""
+	for c in _self_badge.get_children():
+		c.queue_free()
+	_self_badge.add_child(_small(nm if nm != "" else "This server", ThemeBuilder.TEXT))
+	if badge != "":
+		_self_badge.add_child(Badge.make(badge))
+	_take.visible = M.can_make(ms, "self") and badge != ""
+	_take.text = M.make_text(nm)
+	_take.set_meta("server_name", nm if nm != "" else "This server")
+	_take.tooltip_text = "%s runs the show from now on (every linked server is told)." % _take.get_meta("server_name")
+	_self_row.visible = badge != ""
+	self_role.emit(nm, badge)
 
 
 ## WO-746: switching on replaces this server's show with the master's, so it asks first; the poll shows the result.

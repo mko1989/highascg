@@ -19,6 +19,7 @@ extends Control
 const CableModel := preload("res://features/devices/cable_model.gd")
 const CableRope := preload("res://features/devices/cable_rope.gd")
 const CableGrab := preload("res://features/devices/cable_grab.gd")
+const Scrolls := preload("res://features/devices/devices_scroll.gd")  # WO-1018: a port scrolled out of its area has no cable
 const GHOST := Color("#58a6ff")
 const HIT_PX := 6.0
 const UNPLUG_PX := 8.0  # a press on a plug becomes a pull after this much travel
@@ -95,7 +96,7 @@ func _find(key: String) -> Control:
 		c = anchors.get(key.get_slice("#", 0))
 	elif c == null:
 		c = anchors.get(key + "#pgm")
-	return c if c is Control and is_instance_valid(c) and c.is_visible_in_tree() else null
+	return c if c is Control and is_instance_valid(c) and c.is_visible_in_tree() and not Scrolls.control_clipped(c) else null
 
 
 func _process(_delta: float) -> void:
@@ -250,7 +251,7 @@ func press(global: Vector2, port := "") -> Dictionary:
 func anchor_at(global: Vector2) -> String:
 	for key in anchors:
 		var p: Control = anchors[key]
-		if is_instance_valid(p) and p.is_visible_in_tree() and p.get_global_rect().grow(3).has_point(global):
+		if is_instance_valid(p) and p.is_visible_in_tree() and p.get_global_rect().grow(3).has_point(global) and not Scrolls.clipped(global, Scrolls.scroll_rects(p)):
 			return key
 	return ""
 

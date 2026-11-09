@@ -25,6 +25,7 @@ signal open_requested(id: String)
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
+const Badge := preload("res://features/devices/server_badge.gd")  # WO-1018
 const DO := preload("res://features/devices/decklink_order.gd")
 const GL := preload("res://features/devices/gpu_layout.gd")
 const H := preload("res://features/devices/host_channels.gd")
@@ -48,6 +49,25 @@ var _drag := ""  # the DeckLink / GPU port being dragged (edit mode)
 var _io_ids: Array = []  # the decklink_io ports (they drag out as connectors outside edit mode)
 var _press := {}  # {id, at}: a decklink_io press waiting to become a drag or a click
 var _over := ""
+var _server_name := ""  # WO-1018: whose rear panel this is, and whether that server is the master / a follower
+var _role := ""
+var _head: HBoxContainer
+
+
+## WO-1018: the header names the server and carries its MASTER / FOLLOWER badge (cluster_model.gd role_badge).
+func set_identity(server_name: String, role: String) -> void:
+	_server_name = server_name
+	_role = role
+	if _head != null:
+		_fill_head()
+
+
+func _fill_head() -> void:
+	for c in _head.get_children():
+		c.queue_free()
+	_head.add_child(_small("REAR PANEL" + (" · " + _server_name if _server_name != "" else ""), ThemeBuilder.TEXT_MUTED))
+	if _role != "":
+		_head.add_child(Badge.make(_role))
 
 
 func _ready() -> void:
@@ -69,7 +89,10 @@ func show_slots(slots: Array) -> void:
 	_gpu_slots = {}
 	var v := VBoxContainer.new()
 	add_child(v)
-	v.add_child(_small("REAR PANEL", ThemeBuilder.TEXT_MUTED))
+	_head = HBoxContainer.new()
+	_head.add_theme_constant_override("separation", 8)
+	v.add_child(_head)
+	_fill_head()
 	var inner := PanelContainer.new()
 	inner.add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_DARK, ThemeBuilder.BORDER, 1))
 	v.add_child(inner)

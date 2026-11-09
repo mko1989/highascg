@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-926 live WOs (30 open, 125 in progress, 771 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+927 live WOs (30 open, 126 in progress, 771 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -397,7 +397,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1005 DONE [lighting+godot-client] Previs: Pixel Strobe cells lit all the time in 15 Ch (a non-light channel count… → 1005_WO_pixel_strobe_15ch_cells_lit.md
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 
-## godot-client — Godot client (153)
+## godot-client — Godot client (154)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -552,6 +552,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1011 DONE [godot-client+audio] Visuals Flow builder: ~40 node types and a preset library, the op logic based o… → 1011_WO_visuals_flow_node_library_and_presets_from_cables.md
 - 1014 IN PROGRESS [godot-client] Header "Test card" tick button shows an extra blue border inside the button → 1014_WO_test_card_tick_button_inner_blue_border.md
 - 1015 IN PROGRESS [godot-client+os-iso] Operator dock: the eyedropper opens a real colour picker app (Gpick) → 1015_WO_dock_eyedropper_opens_gpick.md
+- 1018 IN PROGRESS [godot-client+network] Devices tab: the destinations and the rear panels scroll apart, and the master… → 1018_WO_devices_split_scroll_and_master_marker.md
 
 ## web-client — Web client (82)
 
