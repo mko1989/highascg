@@ -187,3 +187,29 @@ merged from the glb."
 - **The owner's hidden layers:** the owner had hidden 14 of 21 layers while checking. On "make sure my gui ends up with
   the mvr and glb loaded and everything matched", `hidden_layers` was set back to the earlier `["Sufit"]` (ceiling only)
   via autosave. The GUI was left on the Front view.
+
+### Follow-up 09.11 ~16:30 — "positions only from the glb file … match positions of the objects from glb to mvr"
+
+- **Investigation (every MVR object vs its .glb node by uuid, in the MVR frame `(x, −z, y)`):**
+  - 5582 of 5614 objects agree within 2 cm.
+  - The rest is one group that was moved in Capture after the MVR export. It sits on Default Layer: 5 Truss (the stage
+    towers), 5 SceneObjects, and the 15 fixtures on them. That is MAC Quantum Profile 6–10, Pixel Line IP 1041–1045 and
+    Pixel Strobe 708–712.
+  - All of it is shifted by exactly **(0, −0.151, +0.61) m** in the .glb. The venue already drew the towers from the
+    .glb, but the fixtures came from the patch (MVR), so they hung 0.61 m low, beside their towers.
+- **The fixture node vs the GDTF origin differs by a constant per type** (Capture's model pivot, in fixture-local
+  metres). This is not a position difference:
+  - Pixel Strobe (0, 0, −0.098);
+  - Robin 600 (0, 0, −0.01), and Capture's node is also yawed 180°;
+  - MAC Quantum, Pixel Line, X-Dot ≈ 0.
+  - The .glb also flips Pixel Line roll ±90 and hang truss↔floor. That is a Capture model convention, so the
+    **orientation stays from the MVR**.
+- **What was done (data, Narvil only):**
+  - The 15 patch poses got +(0, −0.151, +0.61) on x/y/z via `POST /api/project/autosave` (rev 65).
+  - Yaw/pitch/roll/hang are unchanged.
+  - Backup: scratchpad `narvil.before-glb-positions.json`.
+- **Verified:**
+  - 90 of 90 patched fixtures match their .glb node after the per-type pivot, with 0 off by more than 1 cm.
+  - The owner's GUI (Front view) shows the MAC Quantums on top of the .glb towers, with the Pixel Lines on the tower legs.
+- **Not done:** an automatic "take positions from the venue .glb" action. Narvil was corrected as data. A tool would
+  have to tell a moved group from the per-type pivots, which is what the per-type median does here.
