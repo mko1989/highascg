@@ -243,3 +243,12 @@ paragraph is updated, and the hold file is documented.
   - The source tarball is `git archive` of 5c3373ec5.
 - **Public source:** https://github.com/mko1989/casparcg-server, a GitHub fork of CasparCG/server created by the lead
   on 09.11 with the owner's choice "Fork as casparcg-server". Default branch `highascg-main`, tag `highascg-5c3373ec5`.
+
+### 5867 never swapped (09.11, ~15:00) → WO-1023
+
+- 5867 updated to release 133601 but kept f04acf2f. Every web-UI update there exits 1 at the unguarded `.applied-stamp`
+  write: there is no drop-update volume, `~/exfat` is empty and root-owned.
+- So the root helpers never refreshed and the swap step never ran. "A second update swaps" was also wrong, because a
+  re-apply of the same release skipped the swap.
+- Both are fixed in [WO-1023](1023_WO_update_apply_fails_without_drop_volume.md). The live swap on 5867 waits on its
+  one-time sudo bootstrap.

@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-931 live WOs (31 open, 127 in progress, 773 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+932 live WOs (30 open, 128 in progress, 774 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -545,7 +545,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1000 DONE [godot-client+engine] FragCoord custom uniforms as controls in Visuals ▸ Shader (sliders/colours, sav… → 1000_WO_fragcoord_custom_uniform_controls.md
 - 1001 DONE [godot-client] Previs Layers: clicking a layer row selects the objects on that layer → 1001_WO_previs_layer_row_selects_objects.md
 - 1002 DONE [godot-client+tracking-vr] Previs: a "Tracking stage" fold that puts the tracking grid on the MVR's stage;… → 1002_WO_previs_tracking_stage_fit_to_mvr.md
-- 1003 OPEN [godot-client] Previs: MVR for patch and lights + a Capture .glb for everything else, without… → 1003_WO_previs_mvr_plus_glb_without_duplicates.md
+- 1003 DONE [godot-client+tracking-vr] Previs: MVR for patch and lights + a Capture .glb for everything else, without… → 1003_WO_previs_mvr_plus_glb_without_duplicates.md
 - 1004 DONE [godot-client] Previs: picking a head no longer scrolls the Inspector away from the Programmer → 1004_WO_previs_head_pick_keeps_inspector_scroll.md
 - 1007 DONE [godot-client] Previs: LED walls without the dark panel-seam grid → 1007_WO_previs_led_wall_no_panel_seams.md
 - 1008 DONE [godot-client] Previs: full screen view with a floating, hideable Inspector; middle-drag pans… → 1008_WO_previs_full_screen_floating_inspector_and_middle_pan.md
@@ -727,7 +727,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1019 OPEN [devices-config+video-io] A second NDI sender (or RTMP/ffmpeg output) on one channel silently replaces th… → 1019_WO_second_ndi_or_rtmp_output_on_a_channel_replaces_the_first.md
 - 1021 OPEN [devices-config+video-io] Route-heal points live sources at channels of a config that has not been applie… → 1021_WO_route_heal_points_live_sources_at_unapplied_channels.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (86)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (87)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -815,6 +815,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 939 DONE [os-iso+caspar-build] Calamares installs keep a locale the image does not carry (en_US.UTF-8) and Cas… → 939_WO_calamares_install_locale_not_installed_caspar_cannot_start.md
 - 975 DONE [os-iso+godot-client] NVIDIA "sync to display" auto-on for the first GPU port feeding a PGM → 975_WO_nvidia_sync_auto_first_pgm_port.md
 - 996 DONE [os-iso+process] Retire the dd-flash / scripted-partition stick tools (sticks are Ventoy-only) → 996_WO_retire_dd_flash_stick_tools.md
+- 1023 IN PROGRESS [os-iso+caspar-build] Web-UI update "FAILED" on boxes without the drop-update volume (and no Caspar s… → 1023_WO_update_apply_fails_without_drop_volume.md
 
 ## network — Cluster, replication, Tailscale, auth (43)
 

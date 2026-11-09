@@ -154,3 +154,60 @@ test('WO-925: a newer drop still applies; ALLOW_DOWNGRADE rolls back on purpose'
 	const back = applyOver('2026-11-01_170159', (drop) => fs.writeFileSync(path.join(drop, 'ALLOW_DOWNGRADE'), ''))
 	assert.deepEqual([back.stamp, back.index], ['2026-06-28T120000Z', '// smoke\n'])
 })
+
+// An installed box without the stick: the drop root is an empty, read-only mount point (5867's ~/exfat, no
+// drop-update/). The applied-stamp bookkeeping used to fail the whole apply AFTER the merge (set -e), so every web UI
+// update reported FAILED and the steps after it (helper refresh, WO-1022 Caspar swap) never ran.
+test('retain mode survives an unwritable drop-update root (no stick)', { skip: process.getuid?.() === 0 }, () => {
+	const root = fs.mkdtempSync(path.join(require('os').tmpdir(), 'ha-drop-'))
+	const drop = seedDrop(root)
+	const dest = path.join(root, 'highascg')
+	fs.mkdirSync(dest, { recursive: true })
+	const mount = path.join(root, 'exfat')
+	fs.mkdirSync(mount)
+	fs.chmodSync(mount, 0o555)
+	let r
+	try {
+		r = require('child_process').spawnSync(
+			APPLY,
+			['--source', drop, '--dest', dest, '--drop-update-root', path.join(mount, 'drop-update'), '--retain-drop',
+				'--user', process.env.USER || 'nobody', '--excludes', EXCLUDES],
+			{ cwd: REPO, encoding: 'utf8',
+				env: { ...process.env, HIGHASCG_SERVER_UPDATE_NPM_CI: '0', HIGHASCG_UPDATE_STAGING: path.join(root, '.staging') } },
+		)
+	} finally {
+		fs.chmodSync(mount, 0o755)
+	}
+	assert.equal(r.status, 0, `the apply succeeds:\n${r.stderr}`)
+	assert.equal(fs.readFileSync(path.join(dest, 'BUILD_STAMP'), 'utf8').trim(), '2026-06-28T120000Z', 'the merge landed')
+	assert.match(r.stderr, /could not record the applied stamp/, 'the missing bookkeeping is a warning, not a failure')
+})
+
+// WO-1022: the Caspar swap step runs on the "stamp unchanged" path too — re-applying the installed release is how a
+// box whose earlier apply stopped short (5867, 09.11: the applied-stamp failure above) gets the pinned Caspar.
+test('a re-apply of the installed release still runs the Caspar swap step', { skip: process.getuid?.() === 0 }, () => {
+	const root = fs.mkdtempSync(path.join(require('os').tmpdir(), 'ha-drop-'))
+	const drop = seedDrop(root)
+	const dest = path.join(root, 'highascg')
+	fs.mkdirSync(path.join(dest, 'dist-web'), { recursive: true })
+	fs.mkdirSync(path.join(dest, 'bin'), { recursive: true })
+	fs.mkdirSync(path.join(dest, 'caspar'), { recursive: true })
+	fs.writeFileSync(path.join(dest, 'BUILD_STAMP'), '2026-06-28T120000Z\n')
+	fs.writeFileSync(path.join(dest, 'dist-web/index.html'), '<!doctype html>\n')
+	fs.writeFileSync(path.join(dest, 'bin/casparcg'), '#!/bin/sh\n', { mode: 0o755 })
+	fs.writeFileSync(path.join(dest, 'caspar/PINNED.json'), '{}\n')
+	const marker = path.join(root, 'swap-args')
+	const stub = path.join(root, 'swap-stub.sh')
+	fs.writeFileSync(stub, `#!/bin/bash\necho "$@" > ${JSON.stringify(marker)}\n`, { mode: 0o755 })
+	const r = require('child_process').spawnSync(
+		APPLY,
+		['--source', drop, '--dest', dest, '--drop-update-root', drop, '--retain-drop', '--user', process.env.USER || 'nobody',
+			'--excludes', EXCLUDES],
+		{ cwd: REPO, encoding: 'utf8',
+			env: { ...process.env, HIGHASCG_SERVER_UPDATE_NPM_CI: '0', HIGHASCG_UPDATE_STAGING: path.join(root, '.staging'),
+				HIGHASCG_CASPAR_SWAP_SH: stub } },
+	)
+	assert.equal(r.status, 0, r.stderr)
+	assert.match(r.stderr, /stamp unchanged/, 'the unchanged-stamp path')
+	assert.equal(fs.readFileSync(marker, 'utf8').trim(), `apply --root ${dest} --user ${process.env.USER || 'nobody'} --verify detach`)
+})

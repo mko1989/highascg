@@ -173,6 +173,35 @@ stamp_older_skip() {
 	[[ -n "$s" && -n "$d" && "$s" < "$d" ]]
 }
 
+# WO-1022: a release carries the pinned Caspar (caspar/bin/casparcg). The swap helper installs it when it differs
+# (ldd + CEF check against this box's lib/, backup + .prev in bin/, Caspar restarted only if it runs) and detaches a
+# check that rolls back when Caspar never reports the pinned VERSION; the same binary is a no-op. The copy in the
+# applied tree runs, not /usr/local/lib/highascg/ (refreshed only after this apply); it never fails the update. Also
+# run when the stamp is unchanged: re-applying the installed release is how a box whose earlier apply stopped short
+# (the applied-stamp failure, 5867 09.11) gets its Caspar.
+caspar_swap_step() {
+	local dest="$1" user_name="$2"
+	local caspar_swap="${HIGHASCG_CASPAR_SWAP_SH:-${dest}/scripts/exfat/highascg-caspar-swap.sh}"
+	if [[ -f "$caspar_swap" && -f "${dest}/caspar/PINNED.json" ]]; then
+		bash "$caspar_swap" apply --root "$dest" --user "$user_name" --verify detach ||
+			log "WARN: Caspar swap step failed (continuing; see ${dest}/bin/caspar-swap.state)"
+	fi
+}
+
+# The drop-update bookkeeping (.applied-stamp / .applied-at) — best effort. On an installed box without the stick the
+# drop root is an empty, root-owned mount point (~/exfat, no drop-update/): the unguarded write failed the whole apply
+# under set -e AFTER the merge, so the web UI reported "update FAILED" on every update (5867 since 07.11 at least) and
+# the steps after it never ran — the helper refresh into /usr/local/lib/highascg, and WO-1022's Caspar swap.
+record_applied() {
+	local root="$1" stamp="$2" user_name="$3" grp="$4"
+	if mkdir -p "$root" 2>/dev/null && echo "$stamp" >"${root}/.applied-stamp" 2>/dev/null; then
+		date -u +%Y-%m-%dT%H:%M:%SZ >"${root}/.applied-at" 2>/dev/null || true
+		chown "${user_name}:${grp}" "${root}/.applied-stamp" "${root}/.applied-at" 2>/dev/null || true
+	else
+		log "WARN: could not record the applied stamp in ${root}/ (no drop-update volume?) — continuing"
+	fi
+}
+
 apply_server_drop() {
 	local src="$1" dest="$2" drop_root="$3" retain="$4" legacy="$5" user_name="$6" excludes="$7" dry_run="$8" archive_copy="$9"
 
@@ -195,9 +224,8 @@ apply_server_drop() {
 	if [[ "$retain" -eq 1 ]] && stamp_unchanged_skip "$src" "$dest"; then
 		log "stamp unchanged (${src_stamp}) — skip rsync (retain mode)"
 		if [[ "$dry_run" -eq 0 ]]; then
-			echo "${src_stamp}" >"${drop_root}/.applied-stamp"
-			date -u +%Y-%m-%dT%H:%M:%SZ >"${drop_root}/.applied-at" 2>/dev/null || true
-			chown "${user_name}:${grp}" "${drop_root}/.applied-stamp" "${drop_root}/.applied-at" 2>/dev/null || true
+			record_applied "$drop_root" "$src_stamp" "$user_name" "$grp"
+			caspar_swap_step "$dest" "$user_name"  # a re-apply of the installed release still brings its Caspar in
 		fi
 		return 0
 	fi
@@ -243,15 +271,7 @@ apply_server_drop() {
 			log "refreshed ${wrapper_dst}" || log "WARN: ${wrapper_dst} refresh failed"
 	fi
 
-	# WO-1022: a release carries the pinned Caspar (caspar/bin/casparcg). The swap helper installs it when it differs
-	# (ldd + CEF check against this box's lib/, backup + .prev in bin/, Caspar restarted only if it runs) and detaches a
-	# check that rolls back when Caspar never reports the pinned VERSION. The copy that just arrived with the drop runs,
-	# not /usr/local/lib/highascg/ (refreshed only after this apply); it never fails the update.
-	local caspar_swap="${HIGHASCG_CASPAR_SWAP_SH:-${dest}/scripts/exfat/highascg-caspar-swap.sh}"
-	if [[ -f "$caspar_swap" && -f "${dest}/caspar/PINNED.json" ]]; then
-		bash "$caspar_swap" apply --root "$dest" --user "$user_name" --verify detach ||
-			log "WARN: Caspar swap step failed (continuing; see ${dest}/bin/caspar-swap.state)"
-	fi
+	caspar_swap_step "$dest" "$user_name"
 	if [[ ! -x "${dest}/bin/casparcg" ]]; then
 		log "WARN: ${dest}/bin/casparcg missing — restore from ISO/install (this drop carries no Caspar)"
 	fi
@@ -280,17 +300,14 @@ apply_server_drop() {
 	fi
 
 	if [[ "$retain" -eq 1 ]]; then
-		echo "${src_stamp}" >"${drop_root}/.applied-stamp"
-		date -u +%Y-%m-%dT%H:%M:%SZ >"${drop_root}/.applied-at" 2>/dev/null || true
-		chown "${user_name}:${grp}" "${drop_root}/.applied-stamp" "${drop_root}/.applied-at" 2>/dev/null || true
-		if [[ "$archive_copy" -eq 1 ]]; then
-			mkdir -p "${drop_root}/applied"
+		record_applied "$drop_root" "$src_stamp" "$user_name" "$grp"
+		if [[ "$archive_copy" -eq 1 ]] && mkdir -p "${drop_root}/applied" 2>/dev/null; then
 			local audit="${drop_root}/applied/${utc_stamp}"
 			log "audit copy → ${audit}"
 			cp -a "$src" "$audit"
 			chown -R "${user_name}:${grp}" "$audit" 2>/dev/null || true
 		fi
-		write_drop_readme "$drop_root" 1
+		write_drop_readme "$drop_root" 1 2>/dev/null || true
 		chown "${user_name}:${grp}" "${drop_root}/README.txt" 2>/dev/null || true
 		log "retain mode: drop left at ${src}/ (stamp ${src_stamp})"
 	else
