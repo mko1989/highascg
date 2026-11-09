@@ -274,7 +274,7 @@ var _press_at := Vector2.INF
 ## 3D: orbit as before; a click without drag picks a fixture (WO-615 T6 programmer), else the object under it.
 ## Right-drag on a head points the selection at the floor (WO-679); left-drag on the selection moves it (WO-682).
 func _on_3d_input(e: InputEvent) -> void:
-	if aim_drag.input(e, stage.camera(), fixtures3d):
+	if not stage.dolly_event(e) and aim_drag.input(e, stage.camera(), fixtures3d):  # WO-1025: left + right = dolly
 		return
 	var mb := e as InputEventMouseButton
 	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:

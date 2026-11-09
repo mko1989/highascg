@@ -8,6 +8,7 @@ signal model_loaded(meshes: Array)
 
 const FLOOR_LAYER := 1 << 19  # WO-616 T12: the camera overlay culls the floor plane (the real floor is in the picture)
 const Quality := preload("res://features/previs/previs_quality.gd")  # WO-892
+const MIN_DIST := 2.0  # the wheel's closest orbit distance (WO-1025: then it dollies on)
 const PRESETS := {"Front": Vector3(0.0, 0.12, 12.0), "Top": Vector3(0.0, 1.45, 14.0), "ISO": Vector3(-0.75, 0.45, 13.0)}
 
 var live_texture: Texture2D
@@ -21,6 +22,7 @@ var _dist := 12.0
 var _target := Vector3(0, 2.2, 0)
 var _orbiting := false
 var _panning := false  # WO-1008: middle button held
+var _buttons := 0  # WO-1025: left (1) + right (2) held together = dolly
 var _fly_tween: Tween
 var sun: DirectionalLight3D
 var floor_mat: StandardMaterial3D
@@ -153,17 +155,23 @@ func handle_input(event: InputEvent) -> void:
 		return
 	var mb := event as InputEventMouseButton
 	if mb != null:
-		if mb.button_index == MOUSE_BUTTON_LEFT:
-			_orbiting = mb.pressed
+		if mb.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+			var bit := 1 if mb.button_index == MOUSE_BUTTON_LEFT else 2
+			_buttons = (_buttons | bit) if mb.pressed else (_buttons & ~bit)
+			_orbiting = _buttons == 1
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_panning = mb.pressed
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
-			_dist = maxf(2.0, _dist * 0.9)
+			if _dist * 0.9 < MIN_DIST:
+				dolly(maxf(0.5, _dist * 0.1))  # WO-1025: at the orbit point the wheel walks on through the scene
+			_dist = maxf(MIN_DIST, _dist * 0.9)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
 			_dist = minf(80.0, _dist * 1.1)
 		_update_camera()
 	var mm := event as InputEventMouseMotion
-	if mm != null and _panning:
+	if mm != null and _buttons == 3:
+		dolly(-mm.relative.y * maxf(_dist, 4.0) * 0.004)  # WO-1025: drag up = forward
+	elif mm != null and _panning:
 		pan(mm.relative)
 	elif mm != null and _orbiting:
 		_yaw -= mm.relative.x * 0.005
@@ -181,6 +189,24 @@ func pan(px: Vector2) -> void:
 	var per_px := 2.0 * _dist * tan(deg_to_rad(_cam.fov) * 0.5) / vh
 	var b := _cam.global_transform.basis
 	_target += (-b.x * px.x + b.y * px.y) * per_px
+	_update_camera()
+
+
+## WO-1025: a right-button event while the left is held belongs to the dolly, not to a fixture aim (WO-679 right-drag).
+func dolly_event(e: InputEvent) -> bool:
+	var mb := e as InputEventMouseButton
+	if mb == null or mb.button_index != MOUSE_BUTTON_RIGHT:
+		return false
+	return (_buttons & 1) != 0 if mb.pressed else _buttons == 3
+
+
+## WO-1025 (owner 09.11: "i cant zoom in anymore … i cant seem to move the camer forward (left-right hold maybe)"): the
+## orbit point moves `m` metres along the view, the camera with it — the wheel stopped at 2 m from a Fit's point in the
+## middle of a venue, and nothing else moved forward.
+func dolly(m: float) -> void:
+	if _cam == null:
+		return
+	_target += -_cam.global_transform.basis.z * m
 	_update_camera()
 
 

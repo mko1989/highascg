@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-933 live WOs (30 open, 128 in progress, 775 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+934 live WOs (30 open, 128 in progress, 776 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -400,7 +400,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 - 1024 IN PROGRESS [lighting+godot-client] GDTF fixture models missing in the previs (built-in primitives drawn as boxes;… → 1024_WO_gdtf_models_missing_primitives_and_share_swap.md
 
-## godot-client — Godot client (154)
+## godot-client — Godot client (155)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -556,6 +556,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1014 DONE [godot-client] Header "Test card" tick button shows an extra blue border inside the button → 1014_WO_test_card_tick_button_inner_blue_border.md
 - 1015 DONE [godot-client+os-iso] Operator dock: the eyedropper opens a real colour picker app (Gpick) → 1015_WO_dock_eyedropper_opens_gpick.md
 - 1018 IN PROGRESS [godot-client+network] Devices tab: the destinations and the rear panels scroll apart, and the master… → 1018_WO_devices_split_scroll_and_master_marker.md
+- 1025 DONE [godot-client+tracking-vr] Previs camera: zoom stops at the orbit point and nothing moves forward → 1025_WO_previs_camera_dolly_forward.md
 
 ## web-client — Web client (82)
 
