@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-919 live WOs (29 open, 121 in progress, 769 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+921 live WOs (30 open, 121 in progress, 770 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -277,7 +277,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 974 DONE [audio+engine,godot-client] LTC timecode in (reader + timeline chase) and out (generator) → 974_WO_ltc_timecode_in_out.md
 - 976 DONE [audio+engine,godot-client] A Caspar channel / screen destination (e.g. Dioda PGM) as the audio-reactive FF… → 976_WO_caspar_channel_as_fft_source.md
 
-## video-io — DeckLink, NDI, v4l2, virtual camera, recording (32)
+## video-io — DeckLink, NDI, v4l2, virtual camera, recording (33)
 
 - 27 IN PROGRESS [video-io] Streaming Channel and UI Tab → 27_WO_STREAMING_CHANNEL.md
 - 28 DONE [video-io] DeckLink input / output routing → 28_WO_DECKLINK_INPUT_OUTPUT_ROUTING.md
@@ -311,6 +311,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 941 DONE [video-io+godot-client] DeckLink driver install reports "no response from the server" although the inst… → 941_WO_decklink_install_blocks_server_client_times_out.md
 - 942 DONE [video-io+mapping,caspar-build] DeckLink outputs fed by a mapping node show solid green on yuv (v210 ignores su… → 942_WO_decklink_yuv_subregion_solid_green.md
 - 947 DONE [video-io+godot-client] Record and stream outputs checked end to end; a stream that cannot reach its re… → 947_WO_record_stream_output_checks.md
+- 1012 OPEN [video-io+audio,devices-config,godot-client] Zoom integration via the Zoom desktop client: its windows on hidden virtual des… → 1012_WO_zoom_desktop_client_windows_as_live_inputs_and_return_feed.md
 
 ## mapping — Pixel map, screens, multiview, destinations (42)
 
@@ -395,7 +396,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1005 DONE [lighting+godot-client] Previs: Pixel Strobe cells lit all the time in 15 Ch (a non-light channel count… → 1005_WO_pixel_strobe_15ch_cells_lit.md
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 
-## godot-client — Godot client (150)
+## godot-client — Godot client (151)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -547,6 +548,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1008 DONE [godot-client] Previs: full screen view with a floating, hideable Inspector; middle-drag pans… → 1008_WO_previs_full_screen_floating_inspector_and_middle_pan.md
 - 1009 DONE [godot-client+media,tracking-vr] Project documents: upload MVR / GLB / PDF / Excel to the project folder; browse… → 1009_WO_project_documents_mvr_glb_pdf_xls_upload_and_sources_browsing.md
 - 1010 DONE [godot-client+tracking-vr] Previs: projector-beams toggle moves into the projection Inspector; Haze moves… → 1010_WO_previs_beams_toggle_to_projection_inspector_haze_into_quality_menu.md
+- 1011 DONE [godot-client+audio] Visuals Flow builder: ~40 node types and a preset library, the op logic based o… → 1011_WO_visuals_flow_node_library_and_presets_from_cables.md
 
 ## web-client — Web client (82)
 

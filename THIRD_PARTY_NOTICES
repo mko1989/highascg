@@ -41,6 +41,44 @@ outside the tree by tools/tracking-detect/setup-venv.sh and export-models.sh:
   NumPy — https://numpy.org — Copyright NumPy Developers. License: BSD-3-Clause.
 
 ================================================================================
+cables.gl — https://github.com/cables-gl/cables
+Copyright (c) 2019-present undefined development
+License: MIT (package.json "license": "MIT"; full text below)
+
+HighAsCG's Visuals Flow node library (WO-1011) follows the logic of cables.gl ops (src/ops/base/Ops.*). The ops
+were re-implemented in GDScript, per frame with a time step; no cables.gl source file is copied verbatim:
+
+  godot/client/features/visuals/flow_eval.gd    ← Ops.Anim.LFO_v4, Ops.Anim.Smooth, Ops.Anim.Spring,
+                                                   Ops.Math.MapRange, Ops.Math.SchlickBias, Ops.Math.Ease,
+                                                   Ops.Trigger.Threshold, Ops.Trigger.TriggerCounterLoop,
+                                                   Ops.Trigger.NthTrigger, Ops.Trigger.ProbabilityTrigger,
+                                                   Ops.Math.TriggerRandomNumber, Ops.Boolean.MonoFlop,
+                                                   Ops.Boolean.ToggleBool, Ops.Boolean.And / Or,
+                                                   Ops.Number.SwitchNumber, Ops.Number.GateNumber,
+                                                   Ops.Number.FreezeNumber, Ops.Number.DelayNumberSimple,
+                                                   Ops.Math.SimpleMovingAverage, Ops.Math.Speed,
+                                                   Ops.Math.MaxSinceReset
+  godot/client/features/visuals/flow_nodes.gd   ← the op set, port and parameter naming of the ops above
+  godot/client/features/visuals/flow_presets.gd ← HighAsCG's own patches, built from the nodes above
+  godot/client/features/visuals/visuals_flow.gd ← the categorised op browser idea
+
+cables.gl's Ops.Math.PerlinNoise_v3 derives from p5.js (LGPL) and was NOT ported; the Flow "Noise" node is HighAsCG's
+own value noise on the LFO hash. The cables.gl name and logo are not used for the feature.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
+Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+================================================================================
 music-reactive-lighting — https://github.com/CanYuzbey/music-reactive-lighting
 Copyright (c) 2026 CanYuzbey
 License: MIT (text below).

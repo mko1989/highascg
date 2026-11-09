@@ -5,6 +5,9 @@ extends RefCounted
 const Auto := preload("res://features/visuals/visuals_autopilot.gd")
 const Layers := preload("res://features/visuals/visuals_layers.gd")
 const Cam := preload("res://features/visuals/visuals_camera.gd")
+const Nodes := preload("res://features/visuals/flow_nodes.gd")  # WO-1011: the Flow node library (cables.gl ops)
+const Eval := preload("res://features/visuals/flow_eval.gd")
+const Presets := preload("res://features/visuals/flow_presets.gd")
 const PARAMS := ["pulse", "spin", "hue", "glow", "flash", "speed", "amount", "burst",
 	"cam_yaw", "cam_pitch", "cam_zoom"]  # WO-896: the last three orbit the output camera (0.5 = no offset, visuals_camera.gd)
 const PARAM_DEFAULTS := {"pulse": 0.2, "spin": 0.15, "hue": 0.55, "glow": 0.3, "flash": 0.0, "speed": 0.3, "amount": 0.5, "burst": 0.0,
@@ -50,89 +53,42 @@ static func buses_of(frame: Variant) -> Dictionary:
 		# WO-872: only while locked — the tempo is held through silence, where the dropped grid reads phase 0 (a stuck 1)
 		var on := _num(beat.get("bpm")) > 0.0 and bool(beat.get("locked", true))
 		out["beat"] = clampf(1.0 - ph * 4.0, 0.0, 1.0) if on else 0.0
+		if on:
+			out["_bpm"] = _num(beat.get("bpm"))  # WO-1011: the LFO's beat clock (not a bus in the menu)
 	return out
 
 
-## The starter graph: kick pumps the rings and bursts (WO-873), energy spins them, valence tints, loudness glows, snare flashes.
+## The starter graph (WO-863): kick pumps the rings and bursts (WO-873), energy spins them, valence tints, loudness glows,
+## snare flashes. WO-1011: one of the Flow presets (flow_presets.gd).
 static func default_graph() -> Dictionary:
-	return {"nodes": [
-		_node("b1", "bus", 20, 20, {"bus": "kick"}), _node("s1", "shape", 240, 20, {"gain": 1.0, "attack": 5, "release": 180}),
-		_node("p1", "param", 470, 20, {"param": "pulse"}),
-		_node("b2", "bus", 20, 160, {"bus": "energy"}), _node("p2", "param", 470, 160, {"param": "spin"}),
-		_node("b3", "bus", 20, 260, {"bus": "valence"}), _node("s3", "shape", 240, 260, {"gain": 0.4, "attack": 400, "release": 1500}),
-		_node("p3", "param", 470, 260, {"param": "hue"}),
-		_node("b4", "bus", 20, 400, {"bus": "loudness"}), _node("p4", "param", 470, 400, {"param": "glow"}),
-		_node("b5", "bus", 20, 500, {"bus": "snare"}), _node("s5", "shape", 240, 500, {"gain": 0.8, "attack": 0, "release": 120}),
-		_node("p5", "param", 470, 500, {"param": "flash"}),
-		_node("p6", "param", 470, 90, {"param": "burst"}),
-	], "links": [["b1", "s1"], ["s1", "p1"], ["s1", "p6"], ["b2", "p2"], ["b3", "s3"], ["s3", "p3"], ["b4", "p4"], ["b5", "s5"],
-		["s5", "p5"]]}
+	return Presets.starter()
 
 
-static func _node(id: String, type: String, x: float, y: float, props: Dictionary) -> Dictionary:
-	var n := {"id": id, "type": type, "x": x, "y": y}
-	n.merge(props)
-	return n
-
-
-## A stored or hand-edited graph made safe: known types only, unique ids, links between existing nodes in the
-## bus/shape → shape/param direction, one link per target input pair.
+## A stored or hand-edited graph made safe (WO-1011: the node library flow_nodes.gd — known types, clamped properties,
+## links `[a, b]` / `[a, b, port]` from an output to an existing input port, no duplicates); not a graph → the starter.
 static func normalize_graph(g: Variant) -> Dictionary:
-	if not g is Dictionary or not g.get("nodes") is Array:
-		return default_graph()
-	var nodes := []
-	var types := {}
-	for n in g.nodes:
-		if not n is Dictionary or str(n.get("id", "")) == "" or types.has(str(n.id)):
-			continue
-		var t := str(n.get("type", ""))
-		var c := {"id": str(n.id), "type": t, "x": _num(n.get("x")), "y": _num(n.get("y"))}
-		match t:
-			"bus":
-				c.bus = str(n.get("bus", "")) if str(n.get("bus", "")) in BUSES else "loudness"
-			"shape":
-				c.gain = clampf(_num(n.get("gain", 1.0)), -4.0, 4.0)
-				c.attack = clampf(_num(n.get("attack")), 0.0, 5000.0)
-				c.release = clampf(_num(n.get("release")), 0.0, 10000.0)
-			"param":
-				c.param = str(n.get("param", "")) if str(n.get("param", "")) in PARAMS else "pulse"
-			_:
-				continue
-		types[c.id] = t
-		nodes.append(c)
-	var links := []
-	var seen := {}
-	for l in (g.get("links") if g.get("links") is Array else []):
-		if not l is Array or l.size() != 2:
-			continue
-		var a := str(l[0])
-		var b := str(l[1])
-		if not types.has(a) or not types.has(b) or types[a] == "param" or types[b] == "bus" or seen.has(a + ">" + b):
-			continue
-		seen[a + ">" + b] = true
-		links.append([a, b])
-	return {"nodes": nodes, "links": links}
+	var out: Variant = Nodes.normalize(g, BUSES, PARAMS)
+	return out if out is Dictionary else default_graph()
 
 
-## One frame: {param: base + Σ bound audio}, clamped 0..1 (hue wraps). `env` carries each Shape's follower between frames;
-## `trace` (optional) receives every node's value this frame — the Flow view's meters.
+## One frame: {param: base + Σ bound values}, clamped 0..1 (hue wraps). `env` carries each node's state between frames
+## (plain data: {id: {…}}); `trace` (optional) receives every evaluated node's value — the Flow view's meters. A loop
+## reads the node's previous-frame output (a one-frame feedback), never recursing forever.
 static func evaluate(graph: Dictionary, buses: Dictionary, base: Dictionary, env: Dictionary, dt: float, trace := {}) -> Dictionary:
 	var by_id := {}
 	for n in graph.nodes:
 		by_id[n.id] = n
-	var inputs := {}
+	var inputs := {}  # id → {port: [source id…]}
 	for l in graph.links:
-		if not inputs.has(l[1]):
-			inputs[l[1]] = []
-		inputs[l[1]].append(l[0])
+		(inputs.get_or_add(l[1], {}) as Dictionary).get_or_add(Nodes.port_of(l), []).append(l[0])
 	var memo := {}
 	var out := params_of(base)
 	for n in graph.nodes:
 		if n.type != "param":
 			continue
 		var add := 0.0
-		for src in inputs.get(n.id, []):
-			add += _value(src, by_id, inputs, buses, env, dt, memo, 0)
+		for src in (inputs.get(n.id, {}) as Dictionary).get(0, []):
+			add += _value(src, by_id, inputs, buses, env, dt, memo)
 		out[n.param] = out[n.param] + add
 		trace[n.id] = clampf(add, 0.0, 1.0)
 	for p in PARAMS:
@@ -143,32 +99,38 @@ static func evaluate(graph: Dictionary, buses: Dictionary, base: Dictionary, env
 
 
 static func _value(id: String, by_id: Dictionary, inputs: Dictionary, buses: Dictionary, env: Dictionary, dt: float,
-		memo: Dictionary, depth: int) -> float:
+		memo: Dictionary) -> float:
 	if memo.has(id):
 		return memo[id]
 	var n: Dictionary = by_id.get(id, {})
-	var v := 0.0
-	if depth > 16:  # a shape loop: cut it, never recurse forever
+	if n.is_empty() or n.type == "param":
 		return 0.0
-	if n.get("type") == "bus":
-		v = float(buses.get(n.bus, 0.0))
-	elif n.get("type") == "shape":
-		var x := 0.0
-		for src in inputs.get(id, []):
-			x += _value(src, by_id, inputs, buses, env, dt, memo, depth + 1)
-		v = follow(float(env.get(id, 0.0)), x, n.attack, n.release, dt)
-		env[id] = v
-		v *= n.gain
+	var st: Dictionary = env[id] if env.get(id) is Dictionary else {}
+	memo[id] = float(st.get("o", 0.0))  # while its inputs evaluate: a loop back here reads last frame's output
+	var ports: Dictionary = inputs.get(id, {})
+	var x := []
+	var spec: Array = Nodes.ins(n.type)
+	for i in spec.size():
+		if ports.has(i):
+			var sum := 0.0
+			for src in ports[i]:
+				sum += _value(src, by_id, inputs, buses, env, dt, memo)
+			x.append(sum)
+		else:
+			var fb: Variant = spec[i][1]
+			x.append(float(n.get(fb, 0.0)) if fb is String else float(fb))
+	var v := Eval.step(n, x, st, buses, dt)
+	if is_nan(v) or is_inf(v):
+		v = 0.0
+	st.o = v
+	env[id] = st
 	memo[id] = v
 	return v
 
 
 ## Envelope follower: rises with `attack_ms`, falls with `release_ms` (0 = jump).
 static func follow(prev: float, x: float, attack_ms: float, release_ms: float, dt: float) -> float:
-	var ms := attack_ms if x > prev else release_ms
-	if ms <= 0.0:
-		return x
-	return prev + (x - prev) * (1.0 - exp(-dt * 1000.0 / ms))
+	return Eval.follow(prev, x, attack_ms, release_ms, dt)
 
 
 static func params_of(v: Variant) -> Dictionary:
