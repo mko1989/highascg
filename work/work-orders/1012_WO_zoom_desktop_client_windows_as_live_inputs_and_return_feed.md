@@ -46,13 +46,13 @@ The two WOs can coexist; this one is the pragmatic first route.
    the main window is mirrored or moved to `:0` with the WO-258 "Interact" mechanism. To decide in a spike: Zoom is one
    process per X display, so a single client cannot span `:0` and `:98`. The likely answer is **Zoom on `:0`**, with the
    extra windows (pop-out share, a second video window) moved **off the visible desktop** or onto a hidden area, then
-   x11grab'd by window id / region. A hidden window that is unmapped stops rendering, so "hidden" has to mean
+   grabbed by window id (shm ring, see "Transport" below). A hidden window that is unmapped stops rendering, so "hidden" has to mean
    off-screen-but-mapped or behind the operator GUI, not minimised. **This is the first spike.**
 2. **Sources** = window plus mode, one host channel each, chosen per input:
    - **Presenter / active speaker**: a Zoom video window in Speaker view.
    - **Share**: the screen-share window ("dual monitors" mode in Zoom settings separates share from video).
    - **Gallery**: a window in Gallery view.
-   Each one becomes an x11grab bridge (browser-capture-bridge shape) into a dedicated host channel. Windows are found
+   Each one becomes a window → shm ring grab (see "Transport") into a dedicated host channel. Windows are found
    by WM_CLASS / title (`xdotool search --class zoom`), and the bridge re-finds the window after Zoom recreates it.
 3. **Audio, both ways** (PipeWire):
    - **Zoom → HighAsCG**: Zoom's output device = a PipeWire null sink ("HighAsCG Zoom In"). Its monitor feeds the
@@ -69,6 +69,26 @@ The two WOs can coexist; this one is the pragmatic first route.
    Options belong in the inspector, not a new tab (rule: minimalism, inspector right).
 6. **Opt-in.** Like WO-521 §4: nothing in core depends on Zoom. Off by default; a missing `/usr/bin/zoom` reads as
    "not installed".
+
+## Transport: shared-memory rings, not x11grab → ffmpeg (owner 09.11)
+
+Owner, 09.11: *"we have a shared memory input output now so maybe its better to use this as grab?"* Yes, and it was
+the stated reason for building the rings. WO-742, owner 24.10: *"definitly shared memory … i think it will be useful for
+future window grabbing from virtual screens"*.
+
+- **In (Zoom window → Caspar).** A small native **window grabber** writes each chosen Zoom window into its own ring
+  `/dev/shm/highascg-zoom-<source>` (hshm v1 header, `hshm_abi.h`; WO-743 / WO-745 writers are the models). The grab
+  uses XComposite (the window's own pixmap, so it renders even when covered or off-screen) plus XShm. That is no
+  encode, no ffmpeg, and one copy per frame. Caspar plays it as `PLAY <ch>-<layer> SHM NAME highascg-zoom-<source>` (the
+  WO-742 producer, live on the box since 25.10). It appears automatically in `/api/shm/sources`, so it is also a Live-tab
+  look source (WO-744) and a host-channel input. XComposite may also solve the "hidden windows" problem in design §1:
+  the window can stay off-screen and mapped, and the grab reads its backing pixmap, not the screen.
+- **Out (channel → Zoom camera).** The WO-594 shm **consumer** already writes a Caspar channel (a screen destination or
+  input channel) into a ring. A ring → v4l2loopback writer replaces the Caspar STREAM → ffmpeg encode path of WO-399
+  for this use, with lower latency and no encoder. Zoom selects that `/dev/videoN` as its camera.
+- **Audio** stays on PipeWire (design §3). The rings carry video only. Lip sync: measure ring latency against the
+  PipeWire path once both run.
+- x11grab (WO-258) stays the fallback if XComposite capture of Zoom's GL windows misbehaves.
 
 ## Open questions
 
