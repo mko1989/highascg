@@ -3,6 +3,7 @@
 const { getChannelMap, getRouteString } = require('./routing-map')
 const { normalizeNdiSourceName, ndiDisplayLabel, buildNdiHostPlayCommands } = require('./ndi-playback')
 const { browserCapturePlayClip } = require('../capture/browser-capture-args')
+const { isZoomHostCandidate, normalizeZoomHostSource, zoomHostPlayCommands } = require('./host-live-sources-zoom')
 
 /** Default layer for webpage / NDI host producers (WO-88). */
 const HOST_LAYER = 1
@@ -66,7 +67,20 @@ function isBrowserDisplayCandidate(item) {
  * @returns {boolean}
  */
 function isHostLiveSource(item) {
-	return isWebpageHostCandidate(item) || isNdiHostCandidate(item) || isBrowserDisplayCandidate(item)
+	return isWebpageHostCandidate(item) || isNdiHostCandidate(item) || isBrowserDisplayCandidate(item) || isZoomHostCandidate(item)
+}
+
+/**
+ * The host-live kind of an extraLiveSources item (also its `hostRole` and the map entry's `kind`).
+ * @param {object} item
+ * @returns {'browser_display'|'webpage_host'|'ndi_host'|'zoom_host'|''}
+ */
+function hostLiveKindOf(item) {
+	if (isBrowserDisplayCandidate(item)) return 'browser_display'
+	if (isZoomHostCandidate(item)) return 'zoom_host' // WO-1012 stage B (host-live-sources-zoom.js)
+	if (isWebpageHostCandidate(item)) return 'webpage_host'
+	if (isNdiHostCandidate(item)) return 'ndi_host'
+	return ''
 }
 
 /**
@@ -282,6 +296,7 @@ function normalizeBrowserDisplaySource(item, ctx) {
 function normalizeToHostLiveSource(item, ctx) {
 	if (!item || typeof item !== 'object') return item
 	if (isBrowserDisplayCandidate(item)) return normalizeBrowserDisplaySource(item, ctx)
+	if (isZoomHostCandidate(item)) return normalizeZoomHostSource(item, ctx)
 	if (isWebpageHostCandidate(item)) return normalizeWebpageHostSource(item, ctx)
 	if (isNdiHostCandidate(item)) return normalizeNdiHostSource(item, ctx)
 	return item
@@ -299,7 +314,7 @@ function listHostLiveChannelEntries(config) {
 		const hostChannel = parseInt(String(item.hostChannel ?? ''), 10)
 		if (!Number.isFinite(hostChannel) || hostChannel < 1) continue
 		const hostLayer = parseInt(String(item.hostLayer ?? HOST_LAYER), 10) || HOST_LAYER
-		const kind = isBrowserDisplayCandidate(item) ? 'browser_display' : isWebpageHostCandidate(item) ? 'webpage_host' : 'ndi_host'
+		const kind = hostLiveKindOf(item)
 		out.push({
 			kind,
 			sourceId: item.sourceId,
@@ -307,8 +322,8 @@ function listHostLiveChannelEntries(config) {
 			layer: hostLayer,
 			// browser_display's udp/mpegts producer resamples like NDI does — DEFAULT_HOST_MODE for both,
 			// same conservative choice as ndi_host (arbitrary browser width/height/fps isn't guaranteed
-			// to be a valid Caspar channel video-mode string).
-			mode: kind === 'ndi_host' || kind === 'browser_display' ? DEFAULT_HOST_MODE : mode,
+			// to be a valid Caspar channel video-mode string). WO-1012: the Zoom ring is fixed-size — same.
+			mode: kind === 'webpage_host' ? mode : DEFAULT_HOST_MODE,
 			route: getRouteString(hostChannel, hostLayer),
 			label: item.label || item.sourceId || kind,
 			item,
@@ -348,6 +363,7 @@ function amcpCommandsForHostLiveSource(item) {
 		const clip = browserCapturePlayClip(ch)
 		return [`PLAY ${ch}-${layer} ${clip}`, `MIXER ${ch}-${layer} FILL 0 0 1 1`, `MIXER ${ch} COMMIT`]
 	}
+	if (isZoomHostCandidate(item)) return zoomHostPlayCommands(ch, layer, item) // PLAY <ch>-<layer> SHM NAME zoom-<source>
 	if (isWebpageHostCandidate(item)) {
 		const playArg = item.playArg || item.templateOrUrl || item.cefNeedle
 		if (!playArg) return []
@@ -398,6 +414,10 @@ function hostChannelDestinationId(role, ch, slotOrSourceId) {
 	if (r === 'browser_display') {
 		const sid = String(slotOrSourceId ?? ch ?? '').trim()
 		return sid ? `host_browser_${sid}` : `host_browser_ch_${ch}`
+	}
+	if (r === 'zoom_host') {
+		const sid = String(slotOrSourceId ?? ch ?? '').trim()
+		return sid ? `host_zoom_${sid}` : `host_zoom_ch_${ch}`
 	}
 	return `host_${r}_${ch}`
 }

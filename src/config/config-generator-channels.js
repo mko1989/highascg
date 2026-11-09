@@ -154,7 +154,7 @@ function buildChannelsSection(config, routeMap) {
 
 	// WO-53: one dedicated channel per live input (DeckLink/ALSA play here over AMCP).
 	for (const entry of plan.inputChannels) {
-		if (entry.kind === 'webpage_host' || entry.kind === 'ndi_host' || entry.kind === 'browser_display') {
+		if (entry.kind === 'webpage_host' || entry.kind === 'ndi_host' || entry.kind === 'browser_display' || entry.kind === 'zoom_host') {
 			setChannelXml(entry.channel, buildHostLiveChannel(config, entry))
 		} else if (entry.kind === 'live_audio') {
 			// WO-898: audio-only — the tiny custom mode at the PGM rate, registered in <video-modes>.

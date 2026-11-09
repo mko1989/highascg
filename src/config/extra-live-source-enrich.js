@@ -132,7 +132,7 @@ function enrichExtraLiveSource(item, ctx) {
 		}
 		out.thumbnailChannel = parsed.channel
 		out.thumbnailLayer = parsed.layer
-	} else if (routeType === 'webpage_host' || routeType === 'ndi_host' || routeType === 'browser_display') {
+	} else if (routeType === 'webpage_host' || routeType === 'ndi_host' || routeType === 'browser_display' || routeType === 'zoom_host') {
 		const hostCh = parseInt(String(out.hostChannel ?? parsed.channel), 10)
 		const hostLayer = parseInt(String(out.hostLayer ?? parsed.layer ?? 1), 10) || 1
 		if (Number.isFinite(hostCh) && hostCh >= 1) {

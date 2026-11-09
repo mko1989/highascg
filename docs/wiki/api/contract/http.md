@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-550 routes.
+554 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -558,6 +558,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/vr/stop` | registry | `src/api/routes-vr.js` |
 | * | `/api/ws` | handler | `src/server/ws-server.js` |
 | GET | `/api/zoom` | registry | `src/api/routes-zoom.js` |
+| GET | `/api/zoom/audio` | registry | `src/api/routes-zoom-audio.js` |
+| POST | `/api/zoom/audio` | registry | `src/api/routes-zoom-audio.js` |
+| GET | `/api/zoom/host` | registry | `src/api/routes-zoom-host.js` |
+| POST | `/api/zoom/host` | registry | `src/api/routes-zoom-host.js` |
 | POST | `/api/zoom/launch` | registry | `src/api/routes-zoom.js` |
 | POST | `/api/zoom/quit` | registry | `src/api/routes-zoom.js` |
 | POST | `/api/zoom/source` | registry | `src/api/routes-zoom.js` |
@@ -624,6 +628,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-v4l2-input.js` |  |
 | `src/api/routes-virtual-camera.js` |  |
 | `src/api/routes-vr.js` | WO-770 — explicit VR session from the operator GUI (see src/vr/vr-session.js): GET  /api/vr/status → { installed, serverRunning, headsetConnected, sessionRunnin |
+| `src/api/routes-zoom-audio.js` | WO-1012 stage C — two-way Zoom audio (src/zoom/zoom-audio.js). |
+| `src/api/routes-zoom-host.js` | WO-1012 stage B — Zoom sources (presenter / share / gallery) as HOST CHANNELS (src/config/host-live-sources-zoom.js): a dedicated Caspar channel that plays the  |
 | `src/api/routes-zoom.js` | WO-1012 — the Zoom device (src/zoom/zoom-session.js): the Zoom desktop client's windows as live inputs. |
 | `src/api/system-network-wifi.js` | WO-692 — Wi-Fi from the GUI: status (radio, adapters, last scan), rescan, connect (WPA passphrase), disconnect, radio on / off. |
 | `src/autofollow/register.js` | Stage auto-follow module registration (WO-31 / WO-30). |

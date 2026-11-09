@@ -170,7 +170,9 @@ function buildHostLiveChannel(config, entry) {
 			? `NDI host ${entry?.label || entry?.sourceId || ''} (PLAY ${ch}-${entry?.layer} NDI …; route:// for on-air)`
 			: entry?.kind === 'browser_display'
 				? `Browser display host ${entry?.label || entry?.sourceId || ''} (WO-258: real Firefox on an off-screen :0 region, x11grab -> PLAY ${ch}-${entry?.layer} udp://127.0.0.1:…; route:// for on-air)`
-				: `Webpage host ${entry?.label || entry?.sourceId || ''} (PLAY ${ch}-${entry?.layer} [HTML] … LOOP; route:// for on-air)`
+				: entry?.kind === 'zoom_host'
+					? `Zoom host ${entry?.label || entry?.sourceId || ''} (WO-1012: PLAY ${ch}-${entry?.layer} SHM NAME zoom-…; route:// for on-air)`
+					: `Webpage host ${entry?.label || entry?.sourceId || ''} (PLAY ${ch}-${entry?.layer} [HTML] … LOOP; route:// for on-air)`
 	return `${channelXmlComment(`Caspar channel ${ch}: ${role}`)}        <channel>
             <video-mode>${escapeXml(modeId)}</video-mode>${channelLayoutElementXml('stereo')}
             <consumers>${composeXml}

@@ -224,7 +224,9 @@ function buildGeneratedChannelOrder(ctx) {
 							? 'ndi_host'
 							: entry.kind === 'browser_display'
 								? 'browser_display'
-								: 'decklink_input'
+								: entry.kind === 'zoom_host'
+									? 'zoom_host'
+									: 'decklink_input'
 		const row = { ch: entry.channel, role, slot: entry.slot }
 		if (entry.sourceId) row.sourceId = entry.sourceId
 		if (entry.label) row.label = entry.label

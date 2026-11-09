@@ -51,7 +51,7 @@ function authoritativeEntryForSource(item, map) {
 	if (rt === 'v4l2' && item.v4l2Slot != null) {
 		return inputs.find((e) => e.kind === 'v4l2' && e.slot === Number(item.v4l2Slot)) || null
 	}
-	if (rt === 'ndi_host' || rt === 'webpage_host' || rt === 'browser_display') {
+	if (rt === 'ndi_host' || rt === 'webpage_host' || rt === 'browser_display' || rt === 'zoom_host') {
 		const sid = String(item.sourceId || item.hostSourceId || '').trim()
 		if (sid) return inputs.find((e) => e.kind === rt && String(e.sourceId || '') === sid) || null
 		const label = String(item.label || '').trim().toLowerCase()
