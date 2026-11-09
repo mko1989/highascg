@@ -185,6 +185,12 @@ function applyCard(ctx, enabled, opts = {}) {
 			}
 		}
 		const ok = targets.length > 0 && (enabled ? failures.length < targets.length : failures.length === 0)
+		/* WO-1013: the card that is up is now the operator's (restore-on-screens re-plans it from these settings, not the
+		 * boot splash), and layer 999 is painted again — WO-492's "provably empty" cache is stale. */
+		if (ctx && enabled && ok) {
+			ctx._ledTestCardSource = 'control'
+			require('../bootstrap/led-test-layer-999').markLedTestLayerPainted(ctx)
+		} else if (ctx && !enabled && masterOff) ctx._ledTestCardSource = null
 		return { ok, enabled: !!enabled, targets, failures }
 	}
 	const p = chain.then(run, run)

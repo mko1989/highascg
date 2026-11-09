@@ -11,10 +11,16 @@
  */
 function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCasparConnected, setupAllRouting, reconcileAfterInfoGather }) {
 	return () => {
+		/* WO-1013: the first connect of this node process is a boot (nothing of ours was on that Caspar); every later
+		 * one is a reconnect — after Devices ▸ Apply & restart node still knows what was on the screens. */
+		appCtx._casparInfoReadyCount = (appCtx._casparInfoReadyCount || 0) + 1
+		const reconnect = appCtx._casparInfoReadyCount > 1
 		handleCasparConnected()
-		void setupAllRouting(appCtx).catch((e) => {
-			appCtx.log('warn', 'Routing setup: ' + (e?.message || e))
-		})
+		const routingDone = Promise.resolve()
+			.then(() => setupAllRouting(appCtx))
+			.catch((e) => {
+				appCtx.log('warn', 'Routing setup: ' + (e?.message || e))
+			})
 		// WO-209 T209.4: normalize preview channel pointers to 'a' (bank-less mode).
 		// A stale 'b' pointer from previous session must not survive into the playlist path.
 		try {
@@ -37,9 +43,29 @@ function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCas
 			})
 			.then(async () => {
 				const Setup = require('../config/routing-setup')
+				/* WO-1013: put back what was on the screens — program looks (after routing, so route:// sources and
+				 * audio buses exist), then the preview re-stage, then the test card LAST so layer 999 sits on top of
+				 * everything restored. Capped wait: a hung routing setup must not hold the restore forever. */
+				const restore = require('../engine/restore-on-screens')
+				await Promise.race([
+					routingDone,
+					new Promise((r) => {
+						const t = setTimeout(r, 20000)
+						if (t.unref) t.unref()
+					}),
+				])
+				await restore.restoreProgramLooks(appCtx, { reconnect }).catch((e) => {
+					appCtx.log('warn', '[restore-on-screens] program looks: ' + (e?.message || e))
+				})
 				await Setup.restagePersistedPreviewLooks(appCtx).catch((e) => {
 					appCtx.log('warn', 'Preview re-stage: ' + (e?.message || e))
 				})
+				/* The first connect's card is the boot splash startup-led-test-pattern.js has just painted. */
+				if (reconnect) {
+					await restore.restoreLedTestCard(appCtx).catch((e) => {
+						appCtx.log('warn', '[restore-on-screens] test card: ' + (e?.message || e))
+					})
+				}
 				await Setup.warmLookDeckThumbnails(appCtx).catch((e) => {
 					appCtx.log('warn', 'Look thumb warm: ' + (e?.message || e))
 				})

@@ -10,6 +10,7 @@ const { getChannelMap } = require('../config/routing')
 const liveSceneState = require('./live-scene-state')
 const { normalizeProgramLayerBank } = require('../engine/program-layer-bank')
 const { isTimelineOnlyScene, physicalProgramLayer } = require('../engine/scene-transition')
+const { LOOK_LAYER_MIN, LOOK_LAYER_MAX, PGM_BANK_B_OFFSET } = require('../engine/look-layer-ranges')
 
 const parseXml = util.promisify(parseString)
 
@@ -146,6 +147,23 @@ async function parseLayerFgProducerTypesFromChannelXml(xmlStr) {
 	return out
 }
 
+/**
+ * WO-1013: does Caspar show NOTHING in either look bank (10–99 bank A, 110–199 bank B)?
+ * A freshly (re)started Caspar answers like this; layers outside the bands (audio buses, timers,
+ * the 999 test card) do not count — routing setup or the card may already sit there.
+ * @param {Record<string, string>} typesByLayer - {@link parseLayerFgProducerTypesFromChannelXml}
+ * @returns {boolean}
+ */
+function lookBandsEmpty(typesByLayer) {
+	for (const [k, type] of Object.entries(typesByLayer || {})) {
+		const n = parseInt(k, 10)
+		const inA = n >= LOOK_LAYER_MIN && n <= LOOK_LAYER_MAX
+		const inB = n >= LOOK_LAYER_MIN + PGM_BANK_B_OFFSET && n <= LOOK_LAYER_MAX + PGM_BANK_B_OFFSET
+		if ((inA || inB) && type && type !== 'empty') return false
+	}
+	return true
+}
+
 function shouldSkipSceneReconcile(scene) {
 	if (isTimelineOnlyScene(scene)) return true
 	for (const l of scene?.layers || []) {
@@ -159,8 +177,11 @@ function shouldSkipSceneReconcile(scene) {
 /**
  * Compare persisted scene.live to INFO XML in gatheredInfo.channelXml.
  * @param {object} self - app ctx (config, gatheredInfo, log, programLayerBankByChannel, _wsBroadcast)
+ * @param {{ deferEmpty?: boolean }} [opts] WO-1013: on connect, a program channel whose look bands are EMPTY is
+ *   not a mismatch to clear — a restarted Caspar is empty. `restore-on-screens.js` decides it (re-take on a
+ *   reconnect, clear on the first connect of this node process). Different content still clears, as before.
  */
-async function reconcileLiveSceneFromGatheredXml(self) {
+async function reconcileLiveSceneFromGatheredXml(self, opts = {}) {
 	if (!self) return
 	const liveAll = liveSceneState.getAll()
 	if (!liveAll || Object.keys(liveAll).length === 0) return
@@ -189,6 +210,19 @@ async function reconcileLiveSceneFromGatheredXml(self) {
 		} catch (e) {
 			self.log('debug', `Live scene reconcile: parse INFO XML ch ${ch}: ${e?.message || e}`)
 			continue
+		}
+
+		if (opts.deferEmpty === true) {
+			let types = null
+			try {
+				types = await parseLayerFgProducerTypesFromChannelXml(xml)
+			} catch {
+				/* unparseable: fall through to the clip compare, as before */
+			}
+			if (types && lookBandsEmpty(types)) {
+				self.log('debug', `Live scene reconcile: channel ${ch} look bands empty on Caspar — left to restore-on-screens (WO-1013).`)
+				continue
+			}
 		}
 
 		const persistedWithContent = (scene.layers || []).filter(layerHasContent)
@@ -240,7 +274,7 @@ async function reconcileLiveSceneFromGatheredXml(self) {
  */
 async function reconcileAfterInfoGather(self) {
 	if (!self || self.config?.reconcile_live_on_connect === false) return
-	await reconcileLiveSceneFromGatheredXml(self)
+	await reconcileLiveSceneFromGatheredXml(self, { deferEmpty: true })
 }
 
 module.exports = {
@@ -248,6 +282,8 @@ module.exports = {
 	normPath,
 	parseLayerFgClipsFromChannelXml,
 	parseLayerFgProducerTypesFromChannelXml,
+	lookBandsEmpty,
+	shouldSkipSceneReconcile,
 	reconcileLiveSceneFromGatheredXml,
 	reconcileAfterInfoGather,
 }

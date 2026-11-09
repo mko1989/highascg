@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-924 live WOs (29 open, 125 in progress, 770 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+924 live WOs (29 open, 124 in progress, 771 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -182,7 +182,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 983 DONE [engine+amcp,testing-ci] Test-coverage + correctness sweep of AMCP planning and timecode/scene math → 983_WO_amcp_timecode_scene_math_sweep.md
 - 984 DONE [engine+testing-ci,network,process] Code-health sweep of src/ and tools/ → 984_WO_src_tools_code_health_sweep.md
 - 989 DONE [engine] FTB blacks PRV in Caspar but kept its look in the server state, so the next pre… → 989_WO_ftb_forgets_preview_state.md
-- 1013 IN PROGRESS [engine+mapping] After Devices ▸ Apply & restart, put back what was on the screens: the test car… → 1013_WO_restore_screens_after_caspar_restart.md
+- 1013 DONE [engine+mapping] After Devices ▸ Apply & restart, put back what was on the screens: the test car… → 1013_WO_restore_screens_after_caspar_restart.md
 
 ## amcp — AMCP client and protocol (20)
 
