@@ -6,12 +6,12 @@ extends RefCounted
 
 const R := preload("res://features/devices/cable_rules.gd")
 const ROLES := ["inputs_host", "streaming_channel", "extra_audio", "decklink_input", "live_audio_input", "v4l2_input",
-	"webpage_host", "ndi_host", "browser_display"]
+	"webpage_host", "ndi_host", "browser_display", "zoom_host"]  # WO-1012 B: zoom_host
 const ROLE_LABEL := {"multiview": "Multiview", "inputs_host": "Inputs host", "decklink_input": "DeckLink input",
 	"live_audio_input": "Live audio input", "v4l2_input": "USB video input", "extra_audio": "Extra audio",
 	"streaming_channel": "Streaming channel", "webpage_host": "Webpage host", "ndi_host": "NDI host",
-	"browser_display": "Browser display"}
-const LIVE_HOST_KINDS := ["webpage_host", "ndi_host", "browser_display"]
+	"browser_display": "Browser display", "zoom_host": "Zoom host"}
+const LIVE_HOST_KINDS := ["webpage_host", "ndi_host", "browser_display", "zoom_host"]
 
 
 ## JS parseInt(String(v), 10): leading-digit prefix of the text, null for NaN. JSON floats truncate like "3.5" → 3.
@@ -66,9 +66,9 @@ static func destination_id(role: String, ch: Variant, slot: Variant = null) -> S
 			var s: Variant = js_int(coalesce([slot, ""]))
 			var tag: String = {"decklink_input": "decklink", "live_audio_input": "live_audio", "v4l2_input": "v4l2"}[role]
 			return "host_%s_input_%d" % [tag, s] if s != null and s >= 1 else "host_%s_ch_%s" % [tag, c]
-		"webpage_host", "ndi_host", "browser_display":
+		"webpage_host", "ndi_host", "browser_display", "zoom_host":
 			var sid := R.s(coalesce([slot, ch, ""])).strip_edges()
-			var tag: String = {"webpage_host": "webpage", "ndi_host": "ndi", "browser_display": "browser"}[role]
+			var tag: String = {"webpage_host": "webpage", "ndi_host": "ndi", "browser_display": "browser", "zoom_host": "zoom"}[role]
 			return "host_%s_%s" % [tag, sid] if sid != "" else "host_%s_ch_%s" % [tag, c]
 	return "host_%s_%s" % [role, c]
 
@@ -82,7 +82,7 @@ static func default_label(role: String, ch: Variant, slot: Variant = null, label
 		return "Live audio input %s%s" % [R.s(slot), tail]
 	if role == "v4l2_input" and slot != null:
 		return "USB: %s%s" % [R.s(label) if truthy(label) else "USB video", tail]
-	var named := {"webpage_host": ["Webpage: ", "Webpage"], "ndi_host": ["NDI: ", "NDI"], "browser_display": ["Browser: ", "Browser"]}
+	var named := {"webpage_host": ["Webpage: ", "Webpage"], "ndi_host": ["NDI: ", "NDI"], "browser_display": ["Browser: ", "Browser"], "zoom_host": ["Zoom: ", "Zoom"]}
 	if named.has(role):
 		var name: String = R.s(label) if truthy(label) else (R.s(source_id) if truthy(source_id) else named[role][1])
 		return named[role][0] + name + tail
@@ -391,7 +391,7 @@ static func reconcile(dest: Dictionary, cm: Dictionary) -> Dictionary:
 		entry = live_audio_entry(cm, slot)
 	elif role == "v4l2_input" and has_slot:
 		entry = v4l2_entry(cm, slot)
-	elif role == "webpage_host" or role == "ndi_host":
+	elif role == "webpage_host" or role == "ndi_host" or role == "zoom_host":
 		var sid := R.s(dest.get("sourceId")).strip_edges()
 		for e in _entries(cm):
 			if R.s(e.get("kind")) == role and (sid == "" or R.s(e.get("sourceId")) == sid):

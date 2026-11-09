@@ -84,3 +84,11 @@ func test_merge_settings_and_live_map_override() -> void:
 	var live := {"decklinkCount": 1, "inputsCh": 9, "liveAudioCount": 0}
 	t.eq(H.channel_map(p, live).inputsCh, 9, "store channelMap wins")
 	t.eq(H.channel_map(p, null).inputsCh, 4, "snapshot map without a store map")
+
+
+## WO-1012 B: the server's hostChannelDestinationId('zoom_host', ch, sourceId) → host_zoom_<sourceId> (else _ch_<ch>).
+func test_zoom_host_matches_the_server() -> void:
+	_eq(H.destination_id("zoom_host", 8, "zoom_share"), "host_zoom_zoom_share", "id by sourceId")
+	_eq(H.destination_id("zoom_host", 8, null), "host_zoom_8", "no sourceId: the channel, like the other hosts")
+	_eq(H.default_label("zoom_host", 8, null, "Zoom share"), "Zoom: Zoom share (ch 8)", "label")
+	_eq(H.role_label("zoom_host"), "Zoom host", "role label")

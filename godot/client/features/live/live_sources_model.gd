@@ -8,7 +8,7 @@ extends RefCounted
 const H := preload("res://features/devices/host_channels.gd")
 const R := preload("res://features/devices/cable_rules.gd")
 const TIMERS := "/templates/playback_timers.html"
-const HOST_KINDS := ["webpage_host", "ndi_host", "browser_display"]
+const HOST_KINDS := ["webpage_host", "ndi_host", "browser_display", "zoom_host"]  # WO-1012 B
 const HINTS := [
 	["decklink", "DeckLink tiles match Settings. Use Stop to clear layer."],
 	["live_audio", "Live audio: configure in Settings → live audio, then drag onto looks."],
@@ -17,6 +17,7 @@ const HINTS := [
 	["webpage_host", "Webpage hosts: click a tile to edit the page URL in the Inspector; ⛶ routes video to the operator monitor."],
 	["ndi_host", "NDI hosts: click a tile to inspect and remove in the Inspector panel."],
 	["browser_display", "Browser sources: click a tile to edit URL/dimensions and toggle operator screen in the Inspector."],
+	["zoom_host", "Zoom hosts: a Zoom source on its own channel — pick its window under Devices ▸ Zoom; drag route:// onto looks."],
 ]
 const PAYLOAD_KEYS := ["resolution", "fps", "routeType", "screenIdx"]
 
