@@ -6,7 +6,7 @@
 # - tmux: Terminal multiplexer (eggs build monitoring)
 # - mc: Midnight Commander (file browser for exFAT)
 # - magic-wormhole: Secure file transfer (air-gapped media ingest)
-# - v4l2loopback-utils + v4l2loopback-dkms: virtual camera (the module is out-of-tree; DKMS builds it per kernel)
+# - v4l2loopback-utils (+ v4l2loopback-dkms only on kernels that do not ship the module): virtual camera
 # - gpick: Colour picker (github.com/thezbyg/gpick) — the operator dock's eyedropper opens it (WO-1015)
 #
 # Usage:
@@ -35,8 +35,13 @@ apt-get install -y \
 	mc \
 	magic-wormhole \
 	v4l2loopback-utils \
-	v4l2loopback-dkms \
 	gpick
+
+# v4l2loopback: Ubuntu kernels from 7.0.0-43 ship the module (ubuntu/dkms/v4l2loopback); with it present,
+# v4l2loopback-dkms fails its postinst ("already installed", dpkg exit 1 — box 09.11). DKMS only when missing.
+if ! modinfo v4l2loopback >/dev/null 2>&1; then
+	apt-get install -y v4l2loopback-dkms
+fi
 
 echo "==> Verifying installations"
 command -v gh >/dev/null && echo "  ✓ gh $(gh --version | head -1)"
