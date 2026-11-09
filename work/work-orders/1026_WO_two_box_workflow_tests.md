@@ -1,6 +1,6 @@
 # WO-1026 — Two-server workflow on the real boxes: tracking + stream/record on the second server, LED wall on main (test harness + runs)
 **Area:** testing-ci, network, video-io, tracking-vr
-**Status: IN PROGRESS (09.11 — phase 1 set up and run: 31 pass / 11 fail of 45; four product bugs found and fixed; re-run on the fixed build and phase 2 pending)**
+**Status: IN PROGRESS (09.11 — phase 1: first run 31 pass / 11 fail, four product bugs fixed, re-run on release 2026-11-09T204447Z 39 pass / 2 fail of 44; phase 2 pending)**
 
 Owner, 09.11: update the second server, then test it "as doing part of the workflow":
 
@@ -96,6 +96,44 @@ channel-layer plays which input), not picture content.
 - **Measurements (second server, RTX 2080 SUPER):** idle ~96–98 % GPU, ~1013–1055 MiB (Godot ~49 %, Caspar ~48 %);
   in the soak 95–100 %, memory unchanged. Main 44–47 %, ~3070 MiB. API p50 4–5 ms, max 8–14 ms. The stream and record
   consumers never ran (bug A), so their cost was not in these numbers.
+
+## Phase 1, re-run on the fixed build (09.11, release 2026-11-09T204447Z / acf2246a on both)
+
+Run by an Opus agent. Result: **39 passed, 2 failed, 1 warning, 2 skipped** of 44 (T6.1b was merged into T6.1).
+
+- **Now PASS:** T4.2, T4.3, T4.4 (bug C + the venv), T5.5 (bug B), T6.1–T6.4 and T7.1 (bug A), T9.2.
+  - The second server tracks with fresh frames on both cameras; main has `tracking: false`, no detector, no surfaces.
+  - Caspar on the second server really runs the consumers: `INFO 7` showed port 97 (stream) and port 96 (record)
+    whenever the API said active, and neither afterwards. 0 `skip local PGM` lines in its journal for the whole run.
+  - A 10 s recording alone: 1920x1080, 50 fps, 462 frames in 9.2 s, audio.
+- **T5.6 FAIL — gap 2, unchanged:** 26 lines, all on main: 13 × `AMCP batch: command failed inside BEGIN…COMMIT —
+  cmd="LOADBG 7-110 route://11-3 …" reply="403 LOADBG FAILED"` and Caspar's 13 matching `Check syntax.`.
+- **T8.1 FAIL — new: the second server loses frames when it streams and records.**
+
+  | Second server | Delivered |
+  |---|---|
+  | record alone (T7.1) | 50 fps |
+  | stream alone | ~43 fps (470–511 of 600 frames in 12 s) |
+  | stream + record (soak) | recording 1698 of 2903 frames (58 %); stream ~27 fps, back to ~43 when recording stops |
+
+  - The channel keeps its rate: the screen consumer of channel 7 presented 483 frames in 10 s, 0 dropped.
+  - The encoder is not the limit: on black input libx264 reports skip 100 %; 671 frames encoded in 15.5 s, so the
+    missing frames never reached it. libx264 only — no NVENC session (`src/streaming/streaming-channel-ffmpeg.js`).
+  - Load: GPU 100 % idle and 93–100 % in the soak, memory 1219 → 1862 MiB. CPU with both consumers 78 % user (Caspar
+    ~267 % → ~1081 %); the tracking python alone takes ~420–440 %, the four signal-less DeckLink inputs 30–66 % each.
+  - Caspar on the second server logged 82 DeckLink lines (`in-sync changed`, `Excessive A/V sync drift detected …
+    recreating filters to resync`) only while the consumers ran.
+  - Not isolated further (inference: the loss is in Caspar's ffmpeg consumer before the encoder — frame download or
+    its queue — on a GPU pinned at 100 %). Phase 2 takes the tracking load off this server: the same checks there
+    tell whether the loss follows it.
+- **Bug D on the boxes:** no fresh replay; neither main's journal nor its Caspar has a layer 7-23. The stale
+  `zoom-gallery` layer from the first run was still on the second server's PGM (its Caspar had not restarted) — cleared
+  with `STOP 7-23` + `MIXER 7-23 CLEAR` on the master.
+- **Harness, after the re-run:** T6.3 and the soak count the received stream frames against the duration (the 50p
+  timebase alone passed 470 of 600); T9.0 clears the throwaway stream target and key.
+- Also seen: `scenes.liveSceneIdByMain` on the master stays `[null, null, null, null]` after a take; the stream ADD
+  carries `-format mpegts -i -` and Caspar logs `Unused option i=-` (`streaming-channel-ffmpeg.js:104`); main's
+  `/api/system/version` shows the dev checkout's old `BUILD_STAMP` (2026-11-03_093850), not the commit it runs.
 
 ## What was done
 
@@ -225,11 +263,14 @@ also in its `projects/_cluster/`. `POST /api/cluster/show {"on":false}` there re
   cluster-call expectation now carries `relayed: true`. The WO-979 role-split sandbox (`tools/e2e/duties-fixture.js`)
   had a tracking server with a camera on `in1` and no input at all — it now has one DeckLink input in its config, as a
   real tracking server does (the first gate run failed 8 of its steps on exactly this).
-- **Phase 1 re-run on the fixed build:** pending.
+- **Phase 1 re-run on the fixed build:** the section above (`phase1-rerun.json` / `.log` in the session scratchpad).
+  All four fixes hold on the boxes.
 - **Phase 2 run:** pending.
 
 ## Open
 
+- **Frame loss in stream / record on the second server** (re-run T8.1, T6.3): where the frames are lost, and whether
+  an NVENC path or fewer rendered destinations on that server removes it.
 - **Gap 2 — inputs of another server in a look.** A look can only name them by the other server's route, and the master
   logs a 403 per take for its own copy. Idea: a source "DeckLink N of server X" in the show, resolved by slot on the
   server that renders it; the master skips a layer whose input it lacks.

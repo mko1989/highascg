@@ -135,13 +135,20 @@ async function takes(report, ctx) {
 	})
 }
 
+/** A received stream (probeMedia) with fewer frames than its duration at 50 fps → why, else ''. */
+function streamFramesShort(m) {
+	const want = m.duration * 50
+	if (!m.video || m.video.frames >= want - Math.max(10, want * 0.02)) return ''
+	return `${m.video.frames} frames for ${m.duration.toFixed(1)} s (${want.toFixed(0)} at 50 fps, ${(m.video.frames / m.duration).toFixed(1)} fps delivered)`
+}
+
 /** The second server's first stream / record output ids. */
 const outputIds = (stream) => ({ str: stream.outputs?.stream?.[0]?.id || '', rec: stream.outputs?.record?.[0]?.id || '' })
 
-/** POST the throwaway stream target + key to `box` (/api/project/streaming-credentials: the active project) → status. */
+/** POST the throwaway stream target + key to `box` (/api/project/streaming-credentials: the active project) → { status, data }. */
 async function setStreamTarget(ctx, box, id, clear = false) {
 	const body = clear ? { outputId: id, rtmpServerUrl: '', clearKey: true } : { outputId: id, rtmpServerUrl: ctx.rtmp, streamKey: ctx.key, clearKey: false }
-	return (await box.try('/api/project/streaming-credentials', body)).status
+	return box.try('/api/project/streaming-credentials', body)
 }
 
 /** Receiver on main + start on the second server → { rx, r } (the receiver is stopped again when the start is refused). */
@@ -160,7 +167,7 @@ async function stream(report, ctx) {
 	// are set on the server that owns the output. Phase 1 (09.11) confirmed a target posted on the master does not travel.
 	await report.check('T6.1', 'stream target + key set on the second server (the output\'s owner) → its stream starts', async () => {
 		if (!str) return skip('no stream output on the second server')
-		const set = await setStreamTarget(ctx, peer, str)
+		const set = (await setStreamTarget(ctx, peer, str)).status
 		const s = await startStream(ctx, str, 12)
 		rx = s.rx
 		if (!rx) return fail(`credentials on the second server (→ ${set}); start refused: ${s.r.status} ${j(s.r.data).slice(0, 300)}`, s.r.data)
@@ -185,7 +192,11 @@ async function stream(report, ctx) {
 		if (m.error) return fail(m.error, (await main.sh(`cat '${file}.log' | tail -5`)).out)
 		const v = m.video
 		const good = v.codec === 'h264' && v.width === 1920 && v.height === 1080 && Math.round(v.fps) === 50 && m.audio >= 1 && m.duration >= 6
-		return good ? ok(`${v.codec} ${v.width}x${v.height} ${v.fps} fps, ${m.audio} audio, ${m.duration.toFixed(1)} s, ${v.frames} frames`, m) : fail(j(m))
+		const line = `${v.codec} ${v.width}x${v.height} ${v.fps} fps, ${m.audio} audio, ${m.duration.toFixed(1)} s, ${v.frames} frames`
+		if (!good) return fail(j(m))
+		// a 50p timebase says nothing about delivery: the frames received must fill the duration (rerun 09.11: 470 of 600)
+		const short = streamFramesShort(m)
+		return short ? fail(`${short} (${line})`, m) : ok(line, m)
 	})
 	await report.check('T6.4', 'stop: the stream ends and is reported off', async () => {
 		if (!str) return skip('no stream output')
@@ -288,6 +299,7 @@ async function soak(report, ctx) {
 		if (recRes.status !== 'pass') bad.push('recording: ' + recRes.detail)
 		if (st.status > 299) bad.push(`stream start ${st.status}`)
 		if (rxMedia.error || rxMedia.duration < secs * 0.9) bad.push(`stream received ${rxMedia.error || rxMedia.duration.toFixed(1) + ' s'}`)
+		else if (streamFramesShort(rxMedia)) bad.push(`stream: ${streamFramesShort(rxMedia)}`)
 		const errs = logs.main.caspar.length + logs.peer.caspar.length + logs.main.node.length + logs.peer.node.length
 		if (errs) bad.push(`${errs} error / warning lines`)
 		if (load.main.apiMax > 1000 || load.peer.apiMax > 1000) bad.push('an API call took > 1 s')
@@ -297,6 +309,15 @@ async function soak(report, ctx) {
 }
 
 async function aftermath(report, ctx) {
+	// T6.1 / the soak leave the throwaway target + key in the second server's project: take them out again
+	await report.check('T9.0', 'the throwaway stream target + key are cleared on the second server', async () => {
+		const { str } = outputIds(ctx.snap.peer.stream)
+		if (!str) return skip('no stream output')
+		if (ctx.keep) return skip('--keep')
+		const r = await setStreamTarget(ctx, ctx.peer, str, true)
+		const left = r.data?.rtmpServerUrl || r.data?.hasStreamKey
+		return r.status < 300 && !left ? ok(`${str}: no target, no key`) : fail(`clear → ${r.status} ${j(r.data).slice(0, 200)}`)
+	})
 	await sleep(3000)
 	const after = { main: await snapshot(ctx.main), peer: await snapshot(ctx.peer) }
 	await report.check('T9.1', 'afterwards: nothing left running, layouts and the shared show as before', () => {
