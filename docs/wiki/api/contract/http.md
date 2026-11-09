@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-537 routes.
+546 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -207,6 +207,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/ltc` | registry | `src/timecode/routes-ltc.js` |
 | POST | `/api/ltc/config` | registry | `src/timecode/routes-ltc.js` |
 | GET | `/api/media` | registry | `src/api/router.js` |
+| GET | `/api/media-docs` | registry | `src/api/routes-project-files.js` |
+| DELETE | `/api/media-docs/file` | registry | `src/api/routes-project-files.js` |
+| GET | `/api/media-docs/file` | registry | `src/api/routes-project-files.js` |
+| GET | `/api/media-docs/sheet` | registry | `src/api/routes-project-files.js` |
 | POST | `/api/media/*` | registry | `src/api/router.js` |
 | POST | `/api/media/cinf` | registry | `src/api/router.js`, `src/api/routes-media.js` |
 | POST | `/api/media/copy` | registry | `src/api/router.js`, `src/api/routes-media.js` |
@@ -282,6 +286,11 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/private-sync/*` | registry | `src/api/router.js` |
 | POST | `/api/private-sync/*` | registry | `src/api/router.js` |
 | GET | `/api/project` | registry | `src/api/router.js` |
+| GET | `/api/project-files` | registry | `src/api/routes-project-files.js` |
+| POST | `/api/project-files` | registry | `src/api/routes-project-files.js` |
+| DELETE | `/api/project-files/*` | registry | `src/api/routes-project-files.js` |
+| GET | `/api/project-files/*` | registry | `src/api/routes-project-files.js` |
+| POST | `/api/project-files/*` | registry | `src/api/routes-project-files.js` |
 | DELETE | `/api/project/*` | registry | `src/api/router.js` |
 | GET | `/api/project/*` | registry | `src/api/router.js` |
 | POST | `/api/project/*` | registry | `src/api/router.js` |
@@ -590,6 +599,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-pixel-map.js` | WO-807 — region-to-fixture-pixel mapping (src/fixtures/pixel-map-service.js, via ctx.fixtureService.pixelMap): GET  /api/fixtures/pixelmap         → { ok, mappi |
 | `src/api/routes-playlist.js` | routes-playlist.js — Manual playlist advance API (WO-224). |
 | `src/api/routes-plugins.js` |  |
+| `src/api/routes-project-files.js` | WO-1009 — the open project's documents (src/media/project-files.js): GET    /api/project-files                 → { slug, files: [{ name, kind: mvr\|model\|pdf\| |
 | `src/api/routes-project-hardware.js` | WO-608 — project hardware reconcile on the node (web lib/project-import-flow.js + project-hardware-apply.js). |
 | `src/api/routes-replication-get.js` | optional |
 | `src/api/routes-replication-post.js` | optional |

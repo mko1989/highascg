@@ -43,7 +43,9 @@ describe('WO-706 MVR wall layers', () => {
 
 	it('Import tells the section whether the scene is new to the project', () => {
 		const imp = GD('features/previs/mvr_import.gd')
-		assert.match(imp, /PaneKit\.confirm\(host, check\[1\], func\(\) -> void: _upload\(path, cur, status, done, false\)\)/)
-		assert.match(imp, /\t\t_upload\(path, cur, status, done, true\)/)
+		// WO-1009: the check is shared by the disk and the project-folder import (_after_check → go(fresh))
+		assert.match(imp, /PaneKit\.confirm\(host, check\[1\], func\(\) -> void: go\.call\(false\)\)/)
+		assert.match(imp, /\telse:\n\t\tgo\.call\(true\)/)
+		assert.match(imp, /_after_check\(host, check, func\(fresh: bool\) -> void: _upload\(path, cur, status, done, fresh\)\)/)
 	})
 })
