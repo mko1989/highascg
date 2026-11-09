@@ -21,3 +21,14 @@ test('RTMP ignores hevc request — YouTube ingest requires H.264', () => {
 	assert.match(args, /-codec:v libx264/)
 	assert.doesNotMatch(args, /libx265/)
 })
+
+test('WO-1026: one -format (the container) and no input option — Caspar warned "Unused option i=-" on every start', () => {
+	const args = buildStreamingRtmpFfmpegArgs('medium', { fps: 50 })
+	assert.equal(args.match(/-format /g).length, 1, 'Caspar keeps the last -format; a leading one was dead')
+	assert.ok(args.endsWith('-format flv'))
+	assert.doesNotMatch(args, /(^| )-i( |$)/, 'the consumer has no input option')
+	assert.ok(args.startsWith('-filter:v format=yuv420p'))
+	const ts = buildStreamingRtmpFfmpegArgs('medium', { fps: 50, containerFormat: 'mpegts' })
+	assert.equal(ts.match(/-format /g).length, 1)
+	assert.ok(ts.endsWith('-format mpegts'))
+})

@@ -266,7 +266,9 @@ async function soak(report, ctx) {
 		const led = looks[LOOKS.led.name]
 		const idle = { main: await P.gpu(main), peer: await P.gpu(peer) } // before stream + record start
 		const marks = { main: await P.logMark(main), peer: await P.logMark(peer) }
-		const rx = await P.rtmpReceiver(main, `${ctx.rtmp}/${ctx.key}`, secs + 4, ctx.dir)
+		// headroom: the receiver must outlive the sender, or its exit shows up as the sender's "Connection lost" errors
+		// (phase 2, 09.11: a secs + 4 receiver quit while the stream still ran through the recording's stop + probe)
+		const rx = await P.rtmpReceiver(main, `${ctx.rtmp}/${ctx.key}`, secs + 30, ctx.dir)
 		const st = await peer.try('/api/streaming-channel/rtmp', { action: 'start', outputId: ids.str })
 		if (st.status > 299) await rx.stop()
 		const samples = { main: { gpu: [], api: [] }, peer: { gpu: [], api: [] } }
@@ -283,9 +285,10 @@ async function soak(report, ctx) {
 				await sleep(Math.max(0, Math.min(5000, end - Date.now())))
 			}
 		})()
-		const rec = await recordFor(ctx, ids.rec, secs)
+		const recP = recordFor(ctx, ids.rec, secs) // stops at `secs`, then waits for the MP4 and probes it
 		await worker
-		await peer.try('/api/streaming-channel/rtmp', { action: 'stop', outputId: ids.str })
+		await peer.try('/api/streaming-channel/rtmp', { action: 'stop', outputId: ids.str }) // with the recording, not after its probe
+		const rec = await recP
 		const rxMedia = await P.probeMedia(main, await rx.done(15000))
 		const logs = { main: await P.logsSince(main, marks.main), peer: await P.logsSince(peer, marks.peer) }
 		if (rec.path && !ctx.keep) await peer.sh(`rm -f '${rec.path}'`)

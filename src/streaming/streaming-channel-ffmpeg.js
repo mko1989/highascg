@@ -100,8 +100,9 @@ function buildStreamingRtmpFfmpegArgs(quality, opts = {}) {
 	if (audioCodec === 'copy') audioPart = '-codec:a copy'
 	if (audioCodec === 'none') audioPart = '-an'
 
+	// WO-1026: no leading `-format mpegts -i -` — Caspar keeps the LAST -format (options map) and has no input option,
+	// so that prefix only produced a `Unused option i=-` warning on every stream start.
 	return [
-		`-format mpegts -i -`,
 		`-filter:v format=yuv420p`,
 		`-codec:v libx264 -preset:v ${preset} -b:v ${vbr}k -tune:v zerolatency -profile:v high`,
 		`-g:v ${keyint}`,

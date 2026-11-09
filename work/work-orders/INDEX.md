@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-935 live WOs (30 open, 129 in progress, 776 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+937 live WOs (32 open, 129 in progress, 776 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (176)
+## engine — Looks, takes, timeline, playback (177)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -183,6 +183,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 984 DONE [engine+testing-ci,network,process] Code-health sweep of src/ and tools/ → 984_WO_src_tools_code_health_sweep.md
 - 989 DONE [engine] FTB blacks PRV in Caspar but kept its look in the server state, so the next pre… → 989_WO_ftb_forgets_preview_state.md
 - 1013 DONE [engine+mapping] After Devices ▸ Apply & restart, put back what was on the screens: the test car… → 1013_WO_restore_screens_after_caspar_restart.md
+- 1027 OPEN [engine+network,video-io] A look cannot name another server's input: raw route://N-L gives a 403, an empt… → 1027_WO_looks_cannot_name_another_servers_inputs.md
 
 ## amcp — AMCP client and protocol (20)
 
@@ -819,7 +820,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 996 DONE [os-iso+process] Retire the dd-flash / scripted-partition stick tools (sticks are Ventoy-only) → 996_WO_retire_dd_flash_stick_tools.md
 - 1023 DONE [os-iso+caspar-build] Web-UI update "FAILED" on boxes without the drop-update volume (and no Caspar s… → 1023_WO_update_apply_fails_without_drop_volume.md
 
-## network — Cluster, replication, Tailscale, auth (43)
+## network — Cluster, replication, Tailscale, auth (44)
 
 - 13 DONE [network+companion] Final Polish & Security Hardening → 13_WO_FINAL_POLISH_AND_HARDENING.md
 - 15 DONE [network+web-client] Client-Server Preshow Sync & Split Architecture → 15_WO_CLIENT_SERVER_SYNC.md
@@ -864,6 +865,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 933 DONE [network+engine] The cluster fan-out replays its air journal to a follower whose Caspar never st… → 933_WO_fanout_replays_to_follower_that_kept_playing.md
 - 986 DONE [network+media,testing-ci] Security sweep of the node server and tools → 986_WO_security_sweep.md
 - 1017 IN PROGRESS [network+mapping] A screen destination rendered on the linked server (mapping node → the peer's D… → 1017_WO_screen_destination_rendered_on_peer_server.md
+- 1028 OPEN [network+video-io,tracking-vr,devices-config] Two-server workflow: the small findings of the WO-1026 runs → 1028_WO_two_server_workflow_small_findings.md
 
 ## media — Media library, thumbnails, ingest, transcode (25)
 

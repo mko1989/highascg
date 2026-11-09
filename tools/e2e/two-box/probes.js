@@ -5,7 +5,8 @@
 const { sleep } = require('./lib')
 
 // standard on DeckLink outputs, and Caspar's own log line for every BEGIN…COMMIT (WO-281 #8: benign, logged at warning)
-const NOISE = /Failed to enable external keyer|Executing batch: BATCH\(\d+ commands\)/i
+// the flv line: ffmpeg cannot seek back into a live RTMP output to patch the header on a clean stop (every stream stop)
+const NOISE = /Failed to enable external keyer|Executing batch: BATCH\(\d+ commands\)|\[flv @ [^\]]+\] Failed to update header with correct (duration|filesize)/i
 
 /**
  * `INFO <channel>` (this build answers the whole channel) → what stage layer `n` shows:
@@ -61,7 +62,7 @@ async function logMark(box) {
 async function logsSince(box, mark) {
 	const c = await box.sh(`tail -n +${mark.line + 1} ${CASPAR_LOG} 2>/dev/null | grep -E "\\[(error|warning)\\]" | tail -200 || true`)
 	const n = await box.sh(`journalctl -u highascg --since @${mark.at} --no-pager -o cat 2>&1 | grep -E "\\[error\\]|\\[warn\\]" | tail -200 || true`)
-	const lines = (t) => t.split('\n').map((l) => l.trim()).filter((l) => l && !NOISE.test(l))
+	const lines = (t) => t.split('\n').map((l) => l.trim()).filter((l) => l && !NOISE.test(l) && !/\[(error|warning)\]$/.test(l)) // a level tag alone: ffmpeg's trailing newline
 	return { caspar: lines(c.out), node: lines(n.out) }
 }
 
