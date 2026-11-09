@@ -160,6 +160,61 @@ future window grabbing from virtual screens"*.
 - Each source ring is a Live-tab source at once (`/api/shm/sources` → `shm://zoom-<source>`, WO-744). Caspar plays it
   with `PLAY <ch>-<layer> SHM NAME zoom-<source>` (WO-742).
 
+### Stage B (09.11): Zoom sources as host channels (`zoom_host`)
+
+- `src/config/host-live-sources-zoom.js` adds a fourth host-live kind. The `extraLiveSources` entry is
+  `{type:'zoom', routeType:'zoom_host', source, ring:'zoom-<source>', hostChannel, hostLayer, sourceId:'zoom_<source>',
+  label:'Zoom <source>', value:'route://<ch>-<layer>', hostRole:'zoom_host'}`.
+  - The channel defaults to the next free one. The mode is DEFAULT_HOST_MODE (1080p5000), because the ring has a fixed
+    size, like NDI and browser.
+  - The AMCP plan is `PLAY <ch>-<layer> SHM NAME zoom-<source>`, then `MIXER … FILL 0 0 1 1` and COMMIT. There is no
+    ready-check: the WO-742 producer waits for a writer.
+- `host-live-sources.js` routes the kind through the shared paths (destination id `host_zoom_<sourceId>`). So do the
+  generator ("Caspar channel N: Zoom host"), the Device View role, live-source enrich and route heal. Allocation,
+  pinning and the replay on reconnect are already generic.
+- `src/api/routes-zoom-host.js`:
+  - `GET /api/zoom/host` → `{ok, entries:[{source, hostChannel, hostLayer, route, configured, live}], needsRestart}`.
+  - `POST {source, enabled}` saves through the Devices live-source path. It plays at once only onto an existing Zoom
+    host channel, and STOPs on disable.
+  - `needsRestart` is true when the applied config has no "Zoom host" comment for the channel, or the running Caspar
+    lacks the channel.
+- Godot: `host_channels.gd` and `live_sources_model.gd` know `zoom_host`, with the same destination id as the server.
+- **Caution.** With a Zoom entry saved and the channel not yet in Caspar, a node restart makes the host-live setup
+  rewrite the config and restart Caspar by itself (existing NDI and webpage behaviour). So save, then Apply & restart.
+
+### Stage C (09.11): two-way audio on a private PipeWire daemon
+
+- **No sound server by design.** The box runs none (WO-773 and WO-282: Caspar owns ALSA, and the DM3 is single-open),
+  and `pipewire-bin` is installed but idle. So `src/zoom/zoom-audio.js` starts its own `pipewire` from a generated
+  config (`zoom-audio-conf.js`):
+  - sockets only under `$XDG_RUNTIME_DIR/highascg-zoom-audio`, with no `pipewire-0` and no `pulse/native`;
+  - no ALSA and no device monitor; no defaults changed;
+  - a Dummy-Driver clock;
+  - nodes "HighAsCG Zoom In" (Zoom's speaker) and "HighAsCG Zoom Out" (its mic, a loopback fed by
+    `highascg_zoom_out_feed`).
+- **Zoom → HighAsCG.** A `pw-cat` record of the Zoom In monitor goes through ffmpeg into mpegts mp2 on
+  `udp://127.0.0.1:52233`, which Caspar can PLAY.
+- **HighAsCG → Zoom.** The feed (`pgm:<screen>` / `prv:<screen>`) gets a Caspar `ADD <ch>-9277 STREAM udp://…:52232`
+  (pcm s16le, like the FFT tee). A node socket passes it to `pw-cat --playback` into the virtual mic.
+- **No session manager.** A 2 s tick sets PortConfig and links only our nodes and streams whose app name matches
+  /zoom/i (`zoom-audio-links.js`).
+- **Mix-minus.** A feed whose INFO, followed through 2 `route://` hops, contains the Zoom In URL is refused, with a
+  note.
+- Off by default. The state is kept in `~/.highascg/zoom-audio.json` and restored on the first GET.
+- `GET`/`POST /api/zoom/audio {enabled?, feed?}`. `POST /api/zoom/launch` adds only the `PULSE_SERVER/SINK/SOURCE`
+  lines to Zoom's env while audio is on, and never takes them from the request.
+
+### Stage E (09.11): the Zoom page in Devices
+
+- A "Zoom" card at the end of the Devices rear panel (`node_panel.gd`) opens the Zoom page in the Inspector
+  (`zoom_controls.gd`, logic in `zoom_model.gd`). The page has:
+  - status;
+  - a meeting link with Start and Quit (with a confirm);
+  - per source: a window picker, Hidden, size, a live indicator and the host-channel toggle;
+  - audio enable and feed.
+- It polls `/api/zoom` (+ `/host`, `/audio`) about once a second, and only while visible. A section whose API is
+  missing reads "not available yet".
+
 ## What was verified
 
 - **Offline.** `tools/smoke/smoke-wo1012-zoom.test.js`, 5/5, in the curated list. It covers:
@@ -180,3 +235,23 @@ future window grabbing from virtual screens"*.
     `frames 60`, `lapped 0`. The layer was then stopped and cleared.
   - Before any of that, `/usr/bin/zoom` existed, v4l2loopback was not loaded (no `/dev/video*`), and the X screen was
     5120×1080.
+- **Stage B, offline.** `smoke-wo1012-zoom-host` 12/12, plus related host-live and generator smokes 139/139. They
+  cover normalize, ids, the AMCP plan, the generated "Zoom host" channel at 1080p5000 (not a DeckLink input), the
+  Device View role, a single graph connector, the setup replay, and the routes (round trip, idempotent enable,
+  `needsRestart` before and after an apply, `live` via OSC and INFO, the 400s). Godot
+  `test_zoom_host_matches_the_server`.
+- **Stage C, offline.** `smoke-wo1012-zoom-audio` 6/6: link policy, config (no ALSA, no defaults), enable, re-enable,
+  feed change, disable, mix-minus, raw-body route. The launch-env test proves only the PULSE_* lines from zoom-audio
+  reach Zoom.
+- **Stage C, live with a stand-in (agent D).** A pulse client named "zoom" (ffmpeg, 440 Hz) was auto-linked into Zoom
+  In, and the UDP tap received it (about −23 dB mean). 1 kHz sent to UDP 52232 was read back from the virtual mic.
+  Everything was cleaned up afterwards, and the feature is left OFF.
+- **Stage E.** Godot suite 26521/0 (`test_zoom_model.gd`), and the `--check` boot is OK.
+- **Not yet:**
+  - the live Apply & restart of a Zoom host channel;
+  - real Zoom audio, and whether Zoom honours `PULSE_SINK`/`PULSE_SOURCE` or needs a one-time pick of "HighAsCG Zoom
+    In/Out" in its Settings ▸ Audio;
+  - Caspar playing `udp://127.0.0.1:52233`;
+  - the grabs coming back after a node restart (window bindings are not persisted);
+  - the 30 fps ring on a 50p channel;
+  - the return camera (v4l2loopback needs `sudo modprobe`).
