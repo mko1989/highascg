@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-933 live WOs (30 open, 129 in progress, 774 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+933 live WOs (30 open, 128 in progress, 775 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -816,7 +816,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 939 DONE [os-iso+caspar-build] Calamares installs keep a locale the image does not carry (en_US.UTF-8) and Cas… → 939_WO_calamares_install_locale_not_installed_caspar_cannot_start.md
 - 975 DONE [os-iso+godot-client] NVIDIA "sync to display" auto-on for the first GPU port feeding a PGM → 975_WO_nvidia_sync_auto_first_pgm_port.md
 - 996 DONE [os-iso+process] Retire the dd-flash / scripted-partition stick tools (sticks are Ventoy-only) → 996_WO_retire_dd_flash_stick_tools.md
-- 1023 IN PROGRESS [os-iso+caspar-build] Web-UI update "FAILED" on boxes without the drop-update volume (and no Caspar s… → 1023_WO_update_apply_fails_without_drop_volume.md
+- 1023 DONE [os-iso+caspar-build] Web-UI update "FAILED" on boxes without the drop-update volume (and no Caspar s… → 1023_WO_update_apply_fails_without_drop_volume.md
 
 ## network — Cluster, replication, Tailscale, auth (43)
 

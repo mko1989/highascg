@@ -1,6 +1,6 @@
 # WO-1023 — Web-UI update "FAILED" on boxes without the drop-update volume (and no Caspar swap on a re-apply)
 **Area:** os-iso, caspar-build
-**Status: IN PROGRESS (09.11, fix + 2 smokes offline green; the installed root helper on 5867 is still the old one — needs the owner's one-time sudo, then two updates)**
+**Status: DONE (09.11 — owner ran the one-time mkdir on 5867; release 2026-11-09_142521 applied twice: helpers refreshed, then the re-apply swapped Caspar to 5c3373ec5, verified)**
 
 Found 09.11 while checking why 5867 (192.168.0.10) never swapped to the WO-1022 Caspar after updating to release
 2026-11-09_133601.
@@ -57,3 +57,20 @@ Found 09.11 while checking why 5867 (192.168.0.10) never swapped to the WO-1022 
   2. Update 5867. The helpers refresh to the fixed copies.
   3. Update again. The re-apply runs the swap: f04acf2f → 40115da4 (5c3373ec5).
   4. Check VERSION, `bin/caspar-swap.state` and the sweep's `caspar.pinned`.
+
+## Verified live on 5867 (09.11, ~15:30)
+
+1. The owner ran the `sudo mkdir … && sudo chown …` bootstrap.
+2. The push 8b8a3f3e went out, CI was green, and release **2026-11-09_142521** was published.
+3. **First apply** (`POST /api/system/update/apply`, still the old 03.11 helper):
+   - `retain mode: drop left at …`;
+   - `refreshed /usr/local/lib/highascg/highascg-apply-server-drop.sh`, and the installed copy now has `caspar_swap_step`;
+   - `web UI update complete`.
+4. **Second apply** (same release, new helper):
+   - `stamp unchanged (2026-11-09T142521Z) — skip rsync`;
+   - `[highascg-caspar-swap] swapped bin/casparcg → 2.5.1 5c3373ec5 Stable (backup …casparcg.pre-20261109T143135Z)`;
+   - restart, then the detached verify;
+   - `bin/caspar-swap.state`: `result=verified`, `reason=VERSION 2.5.1 5c3373ec5 Stable`, candidate sha 40115da4…,
+     previous f04acf2f….
+5. **AMCP `VERSION` on 5867** (via `/api/amcp/raw`): `2.5.1 5c3373ec5 Stable`. The service's casparcg process runs from
+   `~/highascg/bin/casparcg`.
