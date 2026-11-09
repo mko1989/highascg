@@ -41,13 +41,12 @@ var _models: ItemList
 var _meshes: VBoxContainer
 var _source: OptionButton
 var _status: Label
-var _model_ids: Array = []
 var mode := "3d"
 var _sv: SubViewport
 var _svc: SubViewportContainer
 var _mode_btns := {}
 var _glb_role := ""
-var _glb_id := ""  # WO-607 T1: server model id whose screen tags live in project.previs.modelScreens
+var models := preload("res://features/previs/previs_models.gd").new()  # WO-1009: project .glb files + the library
 var track_view: TrackingView
 var track_page: TrackingPage
 var markers: MarkerDriver
@@ -157,6 +156,7 @@ func _ready() -> void:
 	track_view.picked.connect(track_page.pick)
 	track_view.source_size.connect(track_page.adopt_size)
 	_side = _build_panel()
+	models.bind(_models, _status, stage)
 	_side.visible = false
 	add_child(_side)  # in the tree before stage_panel.bind (its _ready builds the list)
 	stage.model_loaded.connect(_on_model_loaded)
@@ -187,7 +187,7 @@ func _ready() -> void:
 	track_view.set_ghost(track_page.ghost_on, track_page.ghost_opacity)
 	set_mode(str(Config.args.get("previs-mode", cfg.get_value("previs", "mode", "3d"))))
 	visibility_changed.connect(_apply_mode)
-	refresh_models()
+	models.refresh()
 
 
 func _on_tracking_changed() -> void:
@@ -397,38 +397,9 @@ func _build_toolbar() -> Control:
 	bar.add_child(_coverage_cb)
 	bar.add_child(cards.picker)
 	var fit := UI.button("Fit", func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))
-	for c in [fit, preload("res://features/previs/haze.gd").picker(), preload("res://features/previs/previs_quality.gd").picker(), preload("res://features/previs/projector_beams.gd").checkbox(), preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button()]:
-		bar.add_child(c)  # WO-786 haze, WO-892 quality, projector beams, WO-770 VR
+	for c in [fit, preload("res://features/previs/previs_quality.gd").picker(), preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button()]:
+		bar.add_child(c)  # WO-892 quality (WO-1010: with Haze in it; projector beams → the projection's Stage inspector), WO-770 VR
 	return bar
-
-
-func refresh_models() -> void:
-	var res: Dictionary = await Api.get_json("/api/previs/models")
-	_models.clear()
-	_model_ids.clear()
-	if not res.ok:
-		_status.text = "no GLB model library (server previs module off) — the stage above works without it"
-		return
-	for m in (res.data as Dictionary).get("models", []):
-		_models.add_item(str(m.get("name", m.get("id"))))
-		_model_ids.append(str(m.get("id")))
-	_status.text = "%d model(s) on the server" % _model_ids.size()
-	if not _model_ids.is_empty() and Config.args.has("previs-autoload"):
-		load_model(0)
-
-
-func load_model(idx: int) -> void:
-	if idx < 0 or idx >= _model_ids.size():
-		return
-	_status.text = "loading…"
-	_glb_id = str(_model_ids[idx])
-	var res: Dictionary = await Api.get_bytes("/api/previs/models/%s" % _model_ids[idx])
-	if not res.ok:
-		_status.text = "download failed: %s" % res.error
-		return
-	if not stage.load_glb_bytes(res.bytes):
-		_status.text = "not a glTF/GLB the runtime can read"
-	# on success _on_model_loaded() has already written "N meshes, M screens"
 
 
 func _set_source(role: String) -> void:
@@ -442,7 +413,7 @@ func _on_model_loaded(meshes: Array) -> void:
 	_apply_mode.call_deferred()  # (re)hold the GLB source now that screen meshes exist
 	for c in _meshes.get_children():
 		c.queue_free()
-	var tagged: Variant = GlbScreens.saved(Store.project, _glb_id)
+	var tagged: Variant = GlbScreens.saved(Store.project, models.glb_id)
 	for mi in meshes:
 		stage.set_screen(mi, GlbScreens.is_screen(str(mi.name), tagged))
 		var cb := CheckBox.new()
@@ -450,7 +421,7 @@ func _on_model_loaded(meshes: Array) -> void:
 		cb.button_pressed = stage.screens.has(mi)
 		cb.toggled.connect(func(on: bool) -> void:
 			stage.set_screen(mi, on)
-			GlbScreens.store(Store.project, _glb_id, stage.screens.keys().map(func(m: Variant) -> String: return str(m.name)))
+			GlbScreens.store(Store.project, models.glb_id, stage.screens.keys().map(func(m: Variant) -> String: return str(m.name)))
 			ProjectSync.mark_dirty())
 		_meshes.add_child(cb)
 	_status.text = "%d meshes, %d screens" % [meshes.size(), stage.screens.size()]
@@ -477,17 +448,15 @@ func _build_panel() -> Control:
 	v.add_child(Fold.new("Stage", [stage_panel]))
 	_models = ItemList.new()
 	UI.fit_list(_models, 6)
-	_models.item_activated.connect(load_model)
-	_models.item_selected.connect(load_model)
-	v.add_child(Fold.new("Models", [_models]))
+	_status = Label.new()  # WO-1009: under the list it speaks for (an empty list says where models come from)
+	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
+	v.add_child(Fold.new("Models", [_models, _status]))
 	var scroll := ScrollContainer.new()
 	_meshes = VBoxContainer.new()
 	scroll.add_child(_meshes)
 	UI.fit_scroll(scroll, _meshes, 160.0)
-	_status = Label.new()
-	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
-	v.add_child(Fold.new("Screens (live texture)", [scroll, _status]))
+	v.add_child(Fold.new("Screens (live texture)", [scroll]))
 	mvr_section = MvrSection.new()
 	v.add_child(Fold.new("MVR scene", [mvr_section]))
 	v.add_child(preload("res://features/previs/tracking/tracking_stage.gd").fold(mvr_section))  # WO-1002

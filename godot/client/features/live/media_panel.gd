@@ -60,6 +60,7 @@ var _ingest_label: Label
 var _bar: SelectionBar
 var _select_queued := false
 var project_bar: ProjectBar
+var docs := preload("res://features/live/media_docs.gd").new()  # WO-1009: documents in the tree ("media only" off)
 var _dl: Download
 var _fit: RefCounted  # WO-899: every sub-tab always visible (shrink the font, then trim the titles)
 
@@ -151,6 +152,7 @@ func _ready() -> void:
 	_tree.set_drag_forwarding(_drag_data, _can_drop, _drop)
 	_tree.gui_input.connect(_tree_input)
 	media.add_child(_tree)
+	docs.bind(_tree, self)
 	_bar = SelectionBar.new()
 	_bar.changed.connect(load_media)
 	_bar.clear_requested.connect(func() -> void:
@@ -253,8 +255,8 @@ func _tree_input(event: InputEvent) -> void:
 		return
 	if mb.button_index != MOUSE_BUTTON_RIGHT:
 		return
-	var file := _file_at(mb.position)
-	var f: Variant = _folder_at(mb.position)
+	var file := Ops.file_at(_tree, mb.position)
+	var f: Variant = Ops.folder_at(_tree, mb.position)
 	if (f == null or str(f) == "") and file == "":
 		return
 	_tree.accept_event()
@@ -278,28 +280,14 @@ func _tree_input(event: InputEvent) -> void:
 	menu.popup(Rect2i(at, Vector2i.ZERO))
 
 
-## A media file row under the pointer → its id, or "".
-func _file_at(at: Vector2) -> String:
-	var it := _tree.get_item_at_position(at)
-	var m: Variant = it.get_metadata(0) if it != null else null
-	return str(m.value) if m is Dictionary and (m as Dictionary).has("row") else ""
-
-
 func _delete_one(id: String) -> void:
 	_bar.set_selection([id], id.get_base_dir())
 	_bar.confirm_delete()
 
 
-## A folder row under the pointer (web: folders are the move targets), or null.
-func _folder_at(at: Vector2) -> Variant:
-	var it := _tree.get_item_at_position(at)
-	var m: Variant = it.get_metadata(0) if it != null else null
-	return m.folder if m is Dictionary and (m as Dictionary).has("folder") else null
-
-
 ## Desktop DeckLink connectors (live sources) or media files onto a folder (move; Alt = copy, like the web).
 func _can_drop(at: Vector2, data: Variant) -> bool:
-	var f: Variant = _folder_at(at)
+	var f: Variant = Ops.folder_at(_tree, at)
 	var files := f != null and not Ops.folder_drop_ids(data, str(f)).is_empty()
 	_tree.drop_mode_flags = Tree.DROP_MODE_ON_ITEM if files else Tree.DROP_MODE_DISABLED
 	return files or live.can_drop_connector(at, data)
@@ -307,7 +295,7 @@ func _can_drop(at: Vector2, data: Variant) -> bool:
 
 func _drop(at: Vector2, data: Variant) -> void:
 	_tree.drop_mode_flags = Tree.DROP_MODE_DISABLED
-	var f: Variant = _folder_at(at)
+	var f: Variant = Ops.folder_at(_tree, at)
 	var ids: Array = Ops.folder_drop_ids(data, str(f)) if f != null else []
 	if not ids.is_empty():
 		_bar.transfer("copy" if Input.is_key_pressed(KEY_ALT) else "move", ids, str(f))
@@ -335,6 +323,7 @@ func load_templates() -> void:
 func load_media() -> void:
 	var res: Dictionary = await Api.get_json("/api/media")
 	_rows = res.data if res.ok and res.data is Array else []
+	await docs.fetch_rows()
 	_bar.rows = _rows
 	project_bar.refresh()
 	if _fx.is_empty():
@@ -350,13 +339,15 @@ func _build() -> void:
 	var f := _filter.text.strip_edges().to_lower()
 	_bar.set_selection([], "")
 	_info_w = 0.0
-	for e in Ops.tree_entries(Ops.in_folder(_rows, project_bar.folder) if project_bar.project_only() else _rows, f):
+	for e in Ops.tree_entries(Ops.in_folder(docs.merged(_rows), project_bar.folder) if project_bar.project_only() else docs.merged(_rows), f):
 		var it := _tree.create_item(dirs[e.parent])
 		it.set_text(0, e.label)
 		if e.kind == "dir":
 			it.collapsed = f == "" and not project_bar.project_only()
 			it.set_metadata(0, {"folder": e.folder})
 			dirs[e.key] = it
+			continue
+		if docs.decorate(it, e.row):
 			continue
 		var r: Dictionary = e.row
 		var id := str(r.get("id", ""))

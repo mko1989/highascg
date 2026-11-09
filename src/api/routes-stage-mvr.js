@@ -48,14 +48,26 @@ function readUpload(req) {
 	})
 }
 
-async function handleUpload(req) {
+/** Parse + store an .mvr → the import summary (also POST /api/project-files/<name>/mvr, WO-1009). */
+async function importReply(buf, name) {
+	const rec = await store.importMvr(buf, name)
+	const s = rec.scene
+	return { id: rec.id, name: rec.name, version: s.version, provider: s.provider, layers: s.layers.length,
+		objects: s.objects.length, meshes: s.meshes.length, report: s.report }
+}
+
+async function handleUpload(req, ctx) {
 	const up = await readUpload(req)
 	if (up.error) return reply(400, { error: up.error })
 	try {
-		const rec = await store.importMvr(up.file.buf, up.file.name)
-		const s = rec.scene
-		return reply(200, { id: rec.id, name: rec.name, version: s.version, provider: s.provider, layers: s.layers.length,
-			objects: s.objects.length, meshes: s.meshes.length, report: s.report })
+		const out = await importReply(up.file.buf, up.file.name)
+		try { // WO-1009: the file stays with the show (its project folder), next to its PDFs and sheets
+			const kept = ctx ? require('../media/project-files').saveBuffer(ctx, up.file.name, up.file.buf) : null
+			if (kept && !kept.existed && typeof ctx._wsBroadcast === 'function') ctx._wsBroadcast('change', { path: 'projectFiles' })
+		} catch (e) {
+			ctx?.log?.('warn', `[stage-mvr] could not keep ${up.file.name} in the project folder: ${e.message}`)
+		}
+		return reply(200, out)
 	} catch (e) {
 		return reply(400, { error: `MVR import failed: ${e.message}` })
 	}
@@ -179,7 +191,7 @@ function register(routes) {
 	const opt = { requireCaspar: false }
 	routes.get('/api/stage/mvr', () => reply(200, { scenes: store.list() }), opt)
 	routes.get('/api/stage/mvr-export', ({ ctx }) => handleExport(ctx), opt)
-	routes.post('/api/stage/mvr', ({ req }) => handleUpload(req), opt)
+	routes.post('/api/stage/mvr', ({ req, ctx }) => handleUpload(req, ctx), opt)
 	routes.get('/api/stage/mvr/*', ({ path, query }) => handleGet(path, query), opt)
 	routes.post('/api/stage/mvr/*', ({ ctx, path, body }) => {
 		const m = /^\/api\/stage\/mvr\/([0-9a-f]{12})\/(patch|types)$/.exec(path)
@@ -192,4 +204,4 @@ function register(routes) {
 	}, opt)
 }
 
-module.exports = { register, handleExport, handlePatch, handleTypes, readUpload }
+module.exports = { register, handleExport, handlePatch, handleTypes, readUpload, importReply }

@@ -74,6 +74,14 @@ func _ready() -> void:
 	new_btn.tooltip_text = "Start a fresh project with empty looks and only the Operator GUI screen destination"
 	new_btn.pressed.connect(func() -> void: _new_confirm.popup_centered())
 	add_child(new_btn)
+	var files_btn := Button.new()  # WO-1009: the show's MVR / GLB / PDF / Excel files
+	files_btn.text = "Files"
+	files_btn.focus_mode = Control.FOCUS_NONE
+	files_btn.tooltip_text = "Project files: MVR, GLB, PDF and Excel files kept with this show"
+	var files_dlg := preload("res://app/project_files_dialog.gd").new()
+	add_child(files_dlg)
+	files_btn.pressed.connect(files_dlg.open)
+	add_child(files_btn)
 	notice_label = Label.new()
 	notice_label.add_theme_font_size_override("font_size", 12)
 	notice_label.clip_text = true

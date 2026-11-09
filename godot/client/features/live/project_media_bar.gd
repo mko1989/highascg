@@ -5,16 +5,19 @@ extends HBoxContainer
 ## project_sync re-imports the project); this bar only shows the plan and asks before moving.
 
 signal filter_toggled
+signal media_toggled(only: bool)  # WO-1009: off = the tree also lists the MVR / GLB / PDF / Excel files
 signal gathered(text: String)
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Ops := preload("res://features/live/media_ops.gd")
-const UiFit := preload("res://core/ui_fit.gd")  # WO-899: shrink the font, then trim, instead of pinning the column wide
+const UiFit := preload("res://core/ui_fit.gd")
+const UiCfg := preload("res://core/ui_cfg.gd")  # WO-899: shrink the font, then trim, instead of pinning the column wide
 
 var folder := ""
 var pending: Array = []
 var _path: Label
 var _only: CheckBox
+var _media: CheckBox
 var _gather: Button
 var _again: Timer
 var _full := {}  # control → [full text, its own tooltip] (the fit may show a trimmed text)
@@ -36,6 +39,16 @@ func _ready() -> void:
 	add_child(_only)
 	_only.clip_text = true  # WO-899: the minimum is the chrome; _fit() sets the width of the text it chose
 	_only.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_media = CheckBox.new()  # WO-1009 (owner 09.11): browse the project's other files here too
+	_media.text = "media only"
+	_media.tooltip_text = "Show only clips and stills; off also lists MVR, GLB, PDF and Excel files (double-click opens one)"
+	_media.button_pressed = _saved_media_only()
+	_media.toggled.connect(func(on: bool) -> void:
+		UiCfg.save_value("sources", "media_only", on)
+		media_toggled.emit(on))
+	add_child(_media)
+	_media.clip_text = true
+	_media.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_gather = Button.new()
 	_gather.visible = false
 	_gather.pressed.connect(confirm_gather)
@@ -50,6 +63,17 @@ func _ready() -> void:
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _again.start())
 	resized.connect(fit)
 	fit()
+
+
+## WO-1009: only media in the tree (the default). The choice is kept in ui.cfg; it also holds while this bar is hidden.
+func media_only() -> bool:
+	return _media.button_pressed if _media != null else _saved_media_only()
+
+
+static func _saved_media_only() -> bool:
+	var cfg := ConfigFile.new()
+	cfg.load(UiCfg.PATH)
+	return cfg.get_value("sources", "media_only", true) != false
 
 
 ## True while the filter is on and there is a project folder to filter by.
@@ -105,7 +129,7 @@ func confirm_gather() -> void:
 func fit() -> void:
 	if _only == null or size.x < 8.0:
 		return
-	var ctl: Array = [_only]
+	var ctl: Array = [_only, _media]
 	if _gather.visible:
 		ctl.append(_gather)
 	var texts: Array = []

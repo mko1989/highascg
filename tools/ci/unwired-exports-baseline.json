@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 618,
+	"count": 617,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -514,7 +514,6 @@
 		"src/server/security-headers.js: isCspReportOnly",
 		"src/server/ws-amcp-dispatch.js: STRUCTURED_TYPES",
 		"src/shaderfx/shader-store.js: CHANNEL_VALUES",
-		"src/shaderfx/shader-store.js: isValidShaderId",
 		"src/shaderfx/shader-store.js: slugFromName",
 		"src/stage/glb-units.js: FIXTURE_MAX_M",
 		"src/stage/glb-units.js: MM_RATIO",

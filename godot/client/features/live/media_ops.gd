@@ -201,3 +201,17 @@ static func is_notchlc(row: Dictionary) -> bool:
 static func hms(ms: float) -> String:
 	var s := int(floor(ms / 1000.0))
 	return "%02d:%02d:%02d" % [s / 3600, (s / 60) % 60, s % 60]
+
+
+## A media file row of `tree` under the pointer → its id, or "".
+static func file_at(tree: Tree, at: Vector2) -> String:
+	var it := tree.get_item_at_position(at)
+	var m: Variant = it.get_metadata(0) if it != null else null
+	return str(m.value) if m is Dictionary and (m as Dictionary).has("row") else ""
+
+
+## A folder row of `tree` under the pointer (web: folders are the move targets), or null.
+static func folder_at(tree: Tree, at: Vector2) -> Variant:
+	var it := tree.get_item_at_position(at)
+	var m: Variant = it.get_metadata(0) if it != null else null
+	return m.folder if m is Dictionary and (m as Dictionary).has("folder") else null

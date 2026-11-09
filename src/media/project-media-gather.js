@@ -81,4 +81,4 @@ async function gatherProjectMedia(ctx) {
 	return { status: 200, body: { ok: failed.length === 0, folder: info.folder, moved, failed, refs: follow.refs } }
 }
 
-module.exports = { planGather, projectMediaInfo, gatherProjectMedia, _setActiveProjectForTests }
+module.exports = { planGather, projectMediaInfo, gatherProjectMedia, activeProject, _setActiveProjectForTests }
