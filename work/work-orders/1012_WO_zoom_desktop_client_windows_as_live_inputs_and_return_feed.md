@@ -215,6 +215,27 @@ future window grabbing from virtual screens"*.
 - It polls `/api/zoom` (+ `/host`, `/audio`) about once a second, and only while visible. A section whose API is
   missing reads "not available yet".
 
+### Stage B2 (09.11): Zoom sources as layers on an existing channel (replaces B's channel-per-source)
+
+Owner: "also for zoom, how about using specific layers on the same channels and use route with specific layer as the
+live input."
+
+- **How it works.** Caspar's layer route (`video_channel.cpp` routesCb) sends `draw_frame::pop(layer foreground)`,
+  which drops the layer transform. So a layer at `MIXER OPACITY 0` is invisible in its host channel's own picture,
+  while `route://<ch>-<layer>` still carries the full frame. Layer routes fire in the same stage tick as channel routes.
+- **Placement.** Presenter/share/gallery play on layers 21/22/23 of the first DeckLink input channel (OPACITY 0).
+  The live input is `route://<ch>-<layer>`. With no DeckLink input, the sources share ONE generated "Zoom host" channel
+  (one Apply & restart, once). Caspar 2.5 cannot add channels at runtime (WO-1016).
+- **Placement follows the channel map** at PLAY, at the reconnect replay (`replayZoomLayers` in
+  `host-live-sources-setup.js`) and at the route heal (`healZoomEntry`), so the saved value follows a renumber.
+- **Guards.**
+  - A PLAY happens only when the APPLIED casparcg.config gives the channel that role AND the running Caspar has it.
+  - Borrowed channels are not pinned in the routing map.
+  - Zoom PLAY failures never trigger the host-live auto-apply.
+- **API.** `/api/zoom/host` keeps its shape: enable = save + PLAY, disable = STOP + save, and `needsRestart` is true
+  only without a ready host channel. Stage-B entries are migrated by any POST and by the reconnect heal.
+- **Godot.** The Zoom controls read "Live input", with no restart.
+
 ## What was verified
 
 - **Offline.** `tools/smoke/smoke-wo1012-zoom.test.js`, 5/5, in the curated list. It covers:
@@ -255,3 +276,16 @@ future window grabbing from virtual screens"*.
   - the grabs coming back after a node restart (window bindings are not persisted);
   - the 30 fps ring on a 50p channel;
   - the return camera (v4l2loopback needs `sudo modprobe`).
+- **Stage B2, offline.** `smoke-wo1012-zoom-host` 15/15. It covers:
+  - placement without renumbering, and the AMCP plan;
+  - the shared channel listed once (generator, device view, graph);
+  - migration, the heal on a renumber, and the replay ready/pending without auto-apply;
+  - idempotent enable, the disable order, and the 400s.
+  Godot 26562/0.
+- **Stage B2, live (AMCP, agent G).** `PLAY 5-23 SHM NAME zoom-gallery` + OPACITY 0, then `PLAY 8-10 route://5-23`:
+  - the ch 8 print showed mean luma 248.7 (the Zoom frame), while ch 5's own print stayed black with alpha 0;
+  - `route://2-999` carried only the test-card layer;
+  - two shm readers of one ring ran with lapped 0;
+  - the 30 fps ring plays on a 50p channel.
+  The new route, replay and heal code is not yet live: that needs a node restart plus the Apply, which is held until
+  WO-1017 settles Screen 3.

@@ -99,7 +99,7 @@ func _source_box(key: String, label: String) -> Control:
 	box.add_child(row)
 	r.live = _text("", ThemeBuilder.TEXT_MUTED, 11)
 	box.add_child(r.live)
-	r.host = _check("Host channel", false, "Make this source a Caspar host channel (route://) — needs Apply & restart")
+	r.host = _check("Live input", false, "Play this source on a layer of an input channel (route://<ch>-<layer>) — no restart")
 	r.host.toggled.connect(func(on: bool) -> void: _host(key, on))
 	box.add_child(r.host)
 	r.host_note = _text("", ThemeBuilder.TEXT_MUTED, 11)
@@ -164,7 +164,7 @@ func _apply(rz: Dictionary, rh: Dictionary, ra: Dictionary) -> void:
 		r.host.set_pressed_no_signal(bool(e.get("configured", false)))
 		r.host_note.text = M.host_text(host, key) if host_ok else M.UNAVAILABLE
 		r.host_note.visible = r.host_note.text != ""
-	_host_note.text = "Host-channel changes need Apply & restart (Devices ▸ Apply)." if M.host_needs_restart(host) else ""
+	_host_note.text = "Zoom inputs need Apply & restart once (Devices ▸ Apply): no input channel for them yet." if M.host_needs_restart(host) else ""
 	_host_note.visible = _host_note.text != ""
 	var av: Dictionary = M.audio_view(M.body(ra))
 	var ok: bool = M.available(ra) and bool(av.available)

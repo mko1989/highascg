@@ -3,7 +3,7 @@
 const { getChannelMap, getRouteString } = require('./routing-map')
 const { normalizeNdiSourceName, ndiDisplayLabel, buildNdiHostPlayCommands } = require('./ndi-playback')
 const { browserCapturePlayClip } = require('../capture/browser-capture-args')
-const { isZoomHostCandidate, normalizeZoomHostSource, zoomHostPlayCommands } = require('./host-live-sources-zoom')
+const { isZoomHostCandidate, ownsZoomChannel, normalizeZoomHostSource, zoomHostPlayCommands } = require('./host-live-sources-zoom')
 
 /** Default layer for webpage / NDI host producers (WO-88). */
 const HOST_LAYER = 1
@@ -315,9 +315,13 @@ function listHostLiveChannelEntries(config) {
 		if (!Number.isFinite(hostChannel) || hostChannel < 1) continue
 		const hostLayer = parseInt(String(item.hostLayer ?? HOST_LAYER), 10) || HOST_LAYER
 		const kind = hostLiveKindOf(item)
+		// WO-1012 B2: Zoom sources are LAYERS (host-live-sources-zoom.js). Only the shared Zoom host channel is a
+		// channel of its own (one entry for all three sources); a DeckLink-hosted or legacy stage-B entry owns none.
+		const zoomChannel = kind === 'zoom_host'
+		if (zoomChannel && (!ownsZoomChannel(item) || out.some((e) => e.kind === 'zoom_host' && e.channel === hostChannel))) continue
 		out.push({
 			kind,
-			sourceId: item.sourceId,
+			sourceId: zoomChannel ? 'zoom' : item.sourceId,
 			channel: hostChannel,
 			layer: hostLayer,
 			// browser_display's udp/mpegts producer resamples like NDI does — DEFAULT_HOST_MODE for both,
@@ -325,7 +329,7 @@ function listHostLiveChannelEntries(config) {
 			// to be a valid Caspar channel video-mode string). WO-1012: the Zoom ring is fixed-size — same.
 			mode: kind === 'webpage_host' ? mode : DEFAULT_HOST_MODE,
 			route: getRouteString(hostChannel, hostLayer),
-			label: item.label || item.sourceId || kind,
+			label: zoomChannel ? 'Zoom' : item.label || item.sourceId || kind,
 			item,
 		})
 	}
@@ -363,7 +367,7 @@ function amcpCommandsForHostLiveSource(item) {
 		const clip = browserCapturePlayClip(ch)
 		return [`PLAY ${ch}-${layer} ${clip}`, `MIXER ${ch}-${layer} FILL 0 0 1 1`, `MIXER ${ch} COMMIT`]
 	}
-	if (isZoomHostCandidate(item)) return zoomHostPlayCommands(ch, layer, item) // PLAY <ch>-<layer> SHM NAME zoom-<source>
+	if (isZoomHostCandidate(item)) return zoomHostPlayCommands(ch, layer, item) // PLAY … SHM NAME zoom-<source>, OPACITY 0
 	if (isWebpageHostCandidate(item)) {
 		const playArg = item.playArg || item.templateOrUrl || item.cefNeedle
 		if (!playArg) return []

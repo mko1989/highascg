@@ -69,6 +69,14 @@ func test_host() -> void:
 	t.eq(M.host_text(h, "gallery"), "route://7-11")
 	t.eq(M.host_text(h, "presenter"), "")
 	t.ok(M.host_needs_restart(h))
+	# WO-1012 B2: layers on an existing channel — not live without a pending restart is just "not playing".
+	var b2 := {"needsRestart": false, "entries": [{"source": "share", "route": "route://5-22", "configured": true, "live": false},
+		{"source": "gallery", "route": "route://5-23", "configured": true, "live": true},
+		{"source": "presenter", "route": null, "configured": true, "live": false}]}
+	t.eq(M.host_text(b2, "share"), "route://5-22 · not playing")
+	t.eq(M.host_text(b2, "gallery"), "route://5-23")
+	t.eq(M.host_text(b2, "presenter"), "no input channel yet · not playing")
+	t.ok(not M.host_needs_restart(b2))
 
 
 func test_audio_view() -> void:
@@ -77,3 +85,11 @@ func test_audio_view() -> void:
 	t.eq(v.feed, "pgm")
 	t.eq(v.note, "n")
 	t.eq(M.audio_view({"error": "boom"}).note, "boom")
+
+
+## WO-1012 B2: a Zoom input is a hidden layer (OPACITY 0) on an input channel, so that channel's print shows the input
+## under it — the Live tab shows no thumbnail for it rather than the wrong picture.
+func test_zoom_input_has_no_channel_thumbnail() -> void:
+	var L := preload("res://features/live/live_sources_model.gd")
+	t.eq(L.thumb_channel({"routeType": "zoom_host", "value": "route://5-23", "thumbnailChannel": 5}), null)
+	t.eq(L.thumb_channel({"routeType": "decklink", "value": "route://5-1"}), 5, "the DeckLink input keeps its thumbnail")

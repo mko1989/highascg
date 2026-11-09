@@ -51,7 +51,7 @@ function authoritativeEntryForSource(item, map) {
 	if (rt === 'v4l2' && item.v4l2Slot != null) {
 		return inputs.find((e) => e.kind === 'v4l2' && e.slot === Number(item.v4l2Slot)) || null
 	}
-	if (rt === 'ndi_host' || rt === 'webpage_host' || rt === 'browser_display' || rt === 'zoom_host') {
+	if (rt === 'ndi_host' || rt === 'webpage_host' || rt === 'browser_display') {
 		const sid = String(item.sourceId || item.hostSourceId || '').trim()
 		if (sid) return inputs.find((e) => e.kind === rt && String(e.sourceId || '') === sid) || null
 		const label = String(item.label || '').trim().toLowerCase()
@@ -71,7 +71,15 @@ function healExtraLiveSourceChannels(config, log = () => {}) {
 	const list = Array.isArray(config?.extraLiveSources) ? config.extraLiveSources : []
 	if (!list.length) return { changed: false, notes }
 	const map = routingMap.getChannelMap(config)
+	const zoom = require('./host-live-sources-zoom')
 	for (const item of list) {
+		// WO-1012 B2: a Zoom layer follows its host (the DeckLink input channel through a renumber; a legacy stage-B
+		// entry moves onto it). Its placement comes from the zoom module, not from an inputChannels row.
+		if (zoom.isZoomHostCandidate(item)) {
+			const note = zoom.healZoomEntry(item, config, map)
+			if (note) notes.push(note)
+			continue
+		}
 		const entry = authoritativeEntryForSource(item, map)
 		if (!entry || !entry.route) continue
 		if (String(item.value || '') === String(entry.route)) continue

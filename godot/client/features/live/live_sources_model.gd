@@ -17,7 +17,7 @@ const HINTS := [
 	["webpage_host", "Webpage hosts: click a tile to edit the page URL in the Inspector; ⛶ routes video to the operator monitor."],
 	["ndi_host", "NDI hosts: click a tile to inspect and remove in the Inspector panel."],
 	["browser_display", "Browser sources: click a tile to edit URL/dimensions and toggle operator screen in the Inspector."],
-	["zoom_host", "Zoom hosts: a Zoom source on its own channel — pick its window under Devices ▸ Zoom; drag route:// onto looks."],
+	["zoom_host", "Zoom: a Zoom source on a layer of an input channel — pick its window under Devices ▸ Zoom; drag route:// onto looks."],
 ]
 const PAYLOAD_KEYS := ["resolution", "fps", "routeType", "screenIdx"]
 
@@ -307,6 +307,8 @@ static func slot_message(s: Dictionary, status: Dictionary) -> String:
 static func thumb_channel(s: Dictionary) -> Variant:
 	var v: Variant = s.get("value")
 	if s.get("useDirect") == true and v is String and v.strip_edges().to_lower().begins_with("ndi://"):
+		return null
+	if s.get("routeType") == "zoom_host":  # WO-1012 B2: a hidden layer — its channel's print shows the host input
 		return null
 	if v is String:
 		var m := RegEx.create_from_string("(?i)^route://(\\d+)").search(v)

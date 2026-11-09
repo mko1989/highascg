@@ -152,7 +152,8 @@ function buildChannelsSection(config, routeMap) {
 		}
 	}
 
-	// WO-53: one dedicated channel per live input (DeckLink/ALSA play here over AMCP).
+	// WO-53: one dedicated channel per live input (DeckLink/ALSA play here over AMCP). WO-1012 B2: a zoom_host entry
+	// is the ONE shared Zoom channel (only when no DeckLink input hosts the Zoom layers); routing-map lists it once.
 	for (const entry of plan.inputChannels) {
 		if (entry.kind === 'webpage_host' || entry.kind === 'ndi_host' || entry.kind === 'browser_display' || entry.kind === 'zoom_host') {
 			setChannelXml(entry.channel, buildHostLiveChannel(config, entry))

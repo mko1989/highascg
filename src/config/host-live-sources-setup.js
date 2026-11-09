@@ -7,13 +7,16 @@ const {
 	isBrowserDisplayCandidate,
 } = require('./host-live-sources')
 const { ensureBrowserDisplaySourceReady } = require('./host-live-sources-browser-runtime')
+const { listZoomLayerEntries, replayZoomLayers } = require('./host-live-sources-zoom')
 
 /**
  * @param {object} self — app context (amcp, config, log)
  */
 async function setupHostLiveSources(self) {
-	const entries = listHostLiveChannelEntries(self.config)
-	if (!self.amcp || entries.length === 0) {
+	// WO-1012 B2: Zoom sources are layers, replayed by replayZoomLayers below (never through the auto-apply).
+	const entries = listHostLiveChannelEntries(self.config).filter((e) => e.kind !== 'zoom_host')
+	const zoomEntries = listZoomLayerEntries(self.config)
+	if (!self.amcp || entries.length + zoomEntries.length === 0) {
 		self._hostLiveSourcesStatus = {
 			updatedAt: Date.now(),
 			enabled: false,
@@ -66,6 +69,9 @@ async function setupHostLiveSources(self) {
 		}
 	}
 
+	const zoom = zoomEntries.length ? await replayZoomLayers(self, zoomEntries) : { played: [], failed: [] }
+	played.push(...zoom.played)
+
 	if (played.length > 0) {
 		self.log(
 			'info',
@@ -96,12 +102,15 @@ async function setupHostLiveSources(self) {
 		}
 	}
 
+	if (zoom.failed.length > 0) {
+		self.log?.('info', `Host live sources: Zoom layer(s) not played — ${zoom.failed.map((f) => `ch${f.channel}: ${f.message}`).join(', ')}`)
+	}
 	self._hostLiveSourcesStatus = {
 		updatedAt: Date.now(),
 		enabled: true,
-		count: entries.length,
+		count: entries.length + zoomEntries.length,
 		played,
-		failed,
+		failed: [...failed, ...zoom.failed],
 	}
 }
 

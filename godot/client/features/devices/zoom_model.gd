@@ -92,13 +92,16 @@ static func host_entry(h: Dictionary, key: String) -> Dictionary:
 	return {}
 
 
+## WO-1012 B2: a source is a LAYER on a channel Caspar already runs, so enabling it plays at once. "needs Apply &
+## restart" only while the server says so (no host channel yet, or a channel renumber not applied).
 static func host_text(h: Dictionary, key: String) -> String:
 	var e := host_entry(h, key)
 	if e.is_empty() or not bool(e.get("configured", false)):
 		return ""
-	var s := str(e.get("route", ""))
+	var r: Variant = e.get("route")
+	var s := str(r) if r != null and str(r) != "" else "no input channel yet"
 	if not bool(e.get("live", false)):
-		s += " · needs Apply & restart"
+		s += " · needs Apply & restart" if host_needs_restart(h) else " · not playing"
 	return s
 
 

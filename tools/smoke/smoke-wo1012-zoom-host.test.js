@@ -1,9 +1,11 @@
 'use strict'
 
 /**
- * WO-1012 stage B — Zoom sources as host channels: the zoom_host kind (src/config/host-live-sources-zoom.js), its
- * place at every host-live kind switch (generator, device view, device graph), and GET/POST /api/zoom/host
- * (src/api/routes-zoom-host.js) with raw JSON-string bodies and an injected config.
+ * WO-1012 stage B2 — Zoom sources as LAYERS on a channel Caspar already runs (src/config/host-live-sources-zoom.js):
+ * the first DeckLink input channel, else ONE shared Zoom host channel; layers 21/22/23 at OPACITY 0; the live input is
+ * route://<ch>-<layer>. Covers placement, the AMCP plan, which entries own a channel (pinning, generator, device view,
+ * device graph), the legacy stage-B migration, the route heal through a renumber, the reconnect replay (never an
+ * auto-apply), and GET/POST /api/zoom/host with raw JSON-string bodies and an injected config.
  */
 
 const { describe, it, before, after } = require('node:test')
@@ -20,8 +22,7 @@ const { buildCasparGeneratorFlatConfig } = require('../../src/config/build-caspa
 const { buildConfigXml } = require('../../src/config/config-generator')
 const { buildGeneratedChannelOrder } = require('../../src/api/device-view-snapshot')
 const { suggestConnectorsAndDevicesFromLive } = require('../../src/config/device-graph')
-const { enrichExtraLiveSource } = require('../../src/config/extra-live-source-enrich')
-const { authoritativeEntryForSource } = require('../../src/config/live-source-route-heal')
+const { healExtraLiveSourceChannels } = require('../../src/config/live-source-route-heal')
 
 let tmp
 before(() => {
@@ -29,207 +30,272 @@ before(() => {
 })
 after(() => fs.rmSync(tmp, { recursive: true, force: true }))
 
-/** A factory config (fixture ConfigManager, never the box's own config/) plus extra keys. */
-function factoryConfig(extra = {}) {
+/** A factory config (fixture ConfigManager, never the box's own config/), `decklink` DeckLink inputs, plus keys. */
+function factoryConfig(decklink, extra = {}) {
 	const dir = fs.mkdtempSync(path.join(tmp, 'cfg-'))
 	const cm = new ConfigManager(dir, { info() {}, warn() {}, error() {} })
 	cm.load()
-	return { ...cm.get(), ...extra }
+	const base = cm.get()
+	return { ...base, casparServer: { ...base.casparServer, decklink_input_count: decklink }, ...extra }
 }
+const dlChannel = (config, slot = 1) => getChannelMap(config).inputChannels.find((e) => e.kind === 'decklink' && e.slot === slot).channel
+const legacy = (ch) => ({ type: 'zoom', routeType: 'zoom_host', source: 'gallery', ring: 'zoom-gallery', value: `route://${ch}-1`,
+	label: 'Zoom gallery', hostChannel: ch, hostLayer: 1, sourceId: 'zoom_gallery', interactiveCapable: false, hostRole: 'zoom_host' })
 
-describe('WO-1012 B: the zoom_host kind', () => {
-	it('normalizes an entry: route, kind, role, ring, sourceId; picks the next free channel', () => {
-		const config = factoryConfig({ extraLiveSources: [] })
-		const free = hostLive.suggestNextHostChannel(config)
+describe('WO-1012 B2: placement and the AMCP plan', () => {
+	it('with a DeckLink input: a layer on its channel (21/22/23), no channel of its own, nothing renumbered', () => {
+		const config = factoryConfig(2, { extraLiveSources: [] })
+		const before = JSON.stringify(getChannelMap(config).inputChannels)
+		const ch = dlChannel(config)
 		const n = hostLive.normalizeToHostLiveSource({ type: 'zoom', source: 'share' }, { config })
 		assert.equal(n.routeType, 'zoom_host')
-		assert.equal(n.hostRole, 'zoom_host')
-		assert.equal(n.type, 'zoom')
-		assert.equal(n.source, 'share')
+		assert.equal(n.hostOn, 'decklink_input')
+		assert.equal(n.hostSlot, 1)
+		assert.equal(n.hostChannel, ch)
+		assert.equal(n.hostLayer, 22)
+		assert.equal(n.value, `route://${ch}-22`)
 		assert.equal(n.ring, 'zoom-share')
 		assert.equal(n.sourceId, 'zoom_share')
-		assert.equal(n.label, 'Zoom share')
-		assert.equal(n.hostChannel, free)
-		assert.equal(n.hostLayer, 1)
-		assert.equal(n.value, `route://${free}-1`)
 		assert.ok(hostLive.isHostLiveSource(n))
-		assert.equal(hostLive.isWebpageHostCandidate(n), false)
-		assert.equal(hostLive.isNdiHostCandidate(n), false)
-		assert.equal(hostLive.isBrowserDisplayCandidate(n), false)
+		const p = zoom.normalizeZoomHostSource({ source: 'presenter' }, { config: { ...config, extraLiveSources: [n] } })
+		assert.equal(p.value, `route://${ch}-21`, 'every source on the same channel, its own layer')
+		const g = zoom.normalizeZoomHostSource({ source: 'gallery' }, { config })
+		assert.equal(g.hostLayer, 23)
+
+		const withZoom = { ...config, extraLiveSources: [n, p] }
+		assert.deepEqual(hostLive.listHostLiveChannelEntries(withZoom), [], 'a DeckLink-hosted Zoom layer owns no channel')
+		assert.equal(JSON.stringify(getChannelMap(withZoom).inputChannels), before, 'no pin: the DeckLink channels stay put')
+		const xml = buildConfigXml(buildCasparGeneratorFlatConfig(withZoom))
+		assert.doesNotMatch(xml, /Caspar channel \d+: Zoom host/, 'the generator makes no Zoom channel')
+		assert.ok(!buildGeneratedChannelOrder({ config: withZoom }).some((r) => r.role === 'zoom_host'))
 	})
 
-	it('keeps a given hostChannel/hostLayer, reads the source from sourceId, refuses an unknown source', () => {
-		const n = zoom.normalizeZoomHostSource({ routeType: 'zoom_host', sourceId: 'zoom_gallery', hostChannel: 12, hostLayer: 3 }, { config: {} })
-		assert.equal(n.source, 'gallery')
-		assert.equal(n.value, 'route://12-3')
-		assert.equal(zoom.zoomSourceOf({ value: 'shm://zoom-presenter' }), 'presenter')
-		assert.throws(() => zoom.normalizeZoomHostSource({ type: 'zoom', source: 'webcam' }, { config: {} }), /presenter, share, gallery/)
-	})
-
-	it('AMCP plan: PLAY SHM NAME zoom-<source>, full fill, commit', () => {
-		const item = zoom.normalizeZoomHostSource({ type: 'zoom', source: 'presenter', hostChannel: 9 }, { config: {} })
-		assert.deepEqual(hostLive.amcpCommandsForHostLiveSource(item), [
-			'PLAY 9-1 SHM NAME zoom-presenter',
-			'MIXER 9-1 FILL 0 0 1 1',
-			'MIXER 9 COMMIT',
-		])
-	})
-
-	it('host channel entry: kind zoom_host, DEFAULT_HOST_MODE, stable destination id', () => {
-		const item = zoom.normalizeZoomHostSource({ type: 'zoom', source: 'share', hostChannel: 9 }, { config: {} })
-		const config = { webpage_host_channel_mode: '720p5000', extraLiveSources: [item] }
-		const [e] = hostLive.listHostLiveChannelEntries(config)
-		assert.equal(e.kind, 'zoom_host')
-		assert.equal(e.mode, hostLive.DEFAULT_HOST_MODE, 'the ring is fixed-size: not the webpage mode')
-		assert.equal(e.route, 'route://9-1')
-		assert.equal(hostLive.hostChannelDestinationId('zoom_host', 9, 'zoom_share'), 'host_zoom_zoom_share')
-		assert.equal(hostLive.hostChannelDestinationId('zoom_host', 9, ''), 'host_zoom_ch_9')
-	})
-
-	it('channel map, generator, device view, device graph, enrich and heal all carry the zoom channel', () => {
-		const base = factoryConfig({ extraLiveSources: [] })
-		const item = zoom.normalizeZoomHostSource({ type: 'zoom', source: 'share' }, { config: base })
-		const config = { ...base, extraLiveSources: [item] }
+	it('PLAY the ring hidden from the host channel (OPACITY 0: the layer route carries it); STOP + CLEAR', () => {
+		const item = zoom.normalizeZoomHostSource({ type: 'zoom', source: 'presenter' }, { config: factoryConfig(1) })
 		const ch = item.hostChannel
-		const map = getChannelMap(config)
-		const input = (map.inputChannels || []).find((x) => x.kind === 'zoom_host')
-		assert.ok(input && input.channel === ch && input.route === item.value, 'routing map input entry')
-		assert.notEqual(hostLive.suggestNextHostChannel(config), ch, 'the next source gets another channel')
+		assert.deepEqual(hostLive.amcpCommandsForHostLiveSource(item), [
+			`PLAY ${ch}-21 SHM NAME zoom-presenter`,
+			`MIXER ${ch}-21 OPACITY 0`,
+			`MIXER ${ch} COMMIT`,
+		])
+		assert.deepEqual(zoom.zoomHostStopCommands(9, 23), ['STOP 9-23', 'MIXER 9-23 CLEAR', 'MIXER 9 COMMIT'])
+	})
+
+	it('no DeckLink input: ONE shared Zoom channel for all three — generated, pinned and listed once', () => {
+		const base = factoryConfig(0, { extraLiveSources: [] })
+		const free = hostLive.suggestNextHostChannel(base)
+		const a = zoom.normalizeZoomHostSource({ source: 'share' }, { config: base })
+		assert.equal(a.hostOn, 'zoom_channel')
+		assert.equal(a.hostChannel, free)
+		assert.equal(a.value, `route://${free}-22`)
+		const b = zoom.normalizeZoomHostSource({ source: 'gallery' }, { config: { ...base, extraLiveSources: [a] } })
+		assert.equal(b.hostChannel, free, 'the second source joins the same channel')
+		const config = { ...base, extraLiveSources: [a, b] }
+		const entries = hostLive.listHostLiveChannelEntries(config)
+		assert.equal(entries.length, 1)
+		assert.equal(entries[0].kind, 'zoom_host')
+		assert.equal(entries[0].sourceId, 'zoom')
+		assert.equal(entries[0].mode, hostLive.DEFAULT_HOST_MODE)
+		assert.notEqual(hostLive.suggestNextHostChannel(config), free)
 
 		const xml = buildConfigXml(buildCasparGeneratorFlatConfig(config))
-		const block = xml.match(new RegExp(`<!-- HighAsCG: Caspar channel ${ch}: Zoom host[\\s\\S]*?</channel>`))
-		assert.ok(block, 'the generated config declares the channel as a Zoom host')
-		assert.match(block[0], /SHM NAME zoom-/)
-		assert.match(block[0], /<video-mode>1080p5000<\/video-mode>/)
-		assert.doesNotMatch(block[0], /DeckLink/i, 'not built as a DeckLink input channel')
-
+		assert.equal((xml.match(/Caspar channel \d+: Zoom host/g) || []).length, 1)
+		assert.match(xml, new RegExp(`Caspar channel ${free}: Zoom host[\\s\\S]*?<video-mode>1080p5000</video-mode>`))
 		const order = buildGeneratedChannelOrder({ config })
-		const row = order.find((r) => r.ch === ch)
-		assert.equal(row?.role, 'zoom_host')
-		assert.equal(row?.sourceId, 'zoom_share')
-
+		assert.deepEqual(order.filter((r) => r.role === 'zoom_host').map((r) => r.ch), [free])
 		const graph = suggestConnectorsAndDevicesFromLive({ caspar: { generatedChannelOrder: order } }, config)
-		const dst = graph.connectors.filter((c) => c.externalRef === 'host_zoom_zoom_share')
-		assert.equal(dst.length, 1, 'one destination connector')
-		assert.equal(dst[0].caspar?.hostRole, 'zoom_host')
-
-		const enriched = enrichExtraLiveSource(item, { config })
-		assert.equal(enriched.thumbnailChannel, ch)
-		assert.equal(enriched.thumbnailLayer, 1)
-		assert.equal(authoritativeEntryForSource(item, map)?.channel, ch)
+		assert.equal(graph.connectors.filter((c) => c.externalRef === 'host_zoom_zoom').length, 1)
+		assert.deepEqual(zoom.listZoomLayerEntries(config).map((e) => e.route), [`route://${free}-22`, `route://${free}-23`])
 	})
 
-	it('setup replays a configured zoom entry on reconnect', async () => {
-		const item = zoom.normalizeZoomHostSource({ type: 'zoom', source: 'gallery', hostChannel: 9 }, { config: {} })
-		const sent = []
-		const self = { config: { extraLiveSources: [item] }, amcp: { raw: async (c) => sent.push(c) }, log() {} }
-		await require('../../src/config/host-live-sources-setup').setupHostLiveSources(self)
-		assert.ok(sent.includes('PLAY 9-1 SHM NAME zoom-gallery'), sent.join(' | '))
-		assert.equal(self._hostLiveSourcesStatus.played[0]?.kind, 'zoom_host')
+	it('a shared Zoom channel stays even when a DeckLink input appears later (no second restart)', () => {
+		const a = zoom.normalizeZoomHostSource({ source: 'share' }, { config: factoryConfig(0) })
+		const n = zoom.normalizeZoomHostSource({ source: 'presenter' }, { config: factoryConfig(1, { extraLiveSources: [a] }) })
+		assert.equal(n.hostOn, 'zoom_channel')
+		assert.equal(n.hostChannel, a.hostChannel)
+	})
+
+	it('refuses an unknown source; reads the source from sourceId or the shm value', () => {
+		assert.throws(() => zoom.normalizeZoomHostSource({ type: 'zoom', source: 'webcam' }, { config: {} }), /presenter, share, gallery/)
+		assert.equal(zoom.zoomSourceOf({ value: 'shm://zoom-presenter' }), 'presenter')
+		assert.equal(zoom.zoomSourceOf({ sourceId: 'zoom_gallery' }), 'gallery')
 	})
 })
 
-describe('WO-1012 B: GET/POST /api/zoom/host', () => {
-	function harness(over = {}) {
+describe('WO-1012 B2: stage-B migration and the route heal', () => {
+	it('a stage-B entry owns nothing (its channel drops at the next apply) and moves onto the DeckLink channel', () => {
+		const config = factoryConfig(2, { extraLiveSources: [legacy(8)] })
+		assert.deepEqual(hostLive.listHostLiveChannelEntries(config), [])
+		assert.doesNotMatch(buildConfigXml(buildCasparGeneratorFlatConfig(config)), /Zoom host/)
+		const ch = dlChannel(config)
+		const n = zoom.normalizeZoomHostSource(config.extraLiveSources[0], { config })
+		assert.equal(n.value, `route://${ch}-23`)
+		assert.equal(n.hostOn, 'decklink_input')
+		assert.equal(zoom.listZoomLayerEntries(config)[0].route, `route://${ch}-23`, 'replayed at its new place already')
+	})
+
+	it('the heal re-points a stage-B entry and follows a DeckLink renumber', () => {
+		const config = factoryConfig(2, { extraLiveSources: [legacy(8)] })
+		const ch = dlChannel(config)
+		const notes = []
+		assert.equal(healExtraLiveSourceChannels(config, (l, m) => notes.push(m)).changed, true)
+		const item = config.extraLiveSources[0]
+		assert.equal(item.value, `route://${ch}-23`)
+		assert.equal(item.hostOn, 'decklink_input')
+		assert.equal(item.hostChannel, ch)
+		assert.equal(healExtraLiveSourceChannels(config).changed, false, 'stable once healed')
+
+		// A pinned NDI host on the DeckLink's channel pushes the DeckLink inputs up one channel.
+		const ndi = hostLive.normalizeNdiHostSource({ ndiName: 'HOST (cam)', hostChannel: ch }, { config })
+		config.extraLiveSources.push(ndi)
+		const moved = dlChannel(config)
+		assert.notEqual(moved, ch)
+		assert.equal(zoom.listZoomLayerEntries(config)[0].channel, moved, 'the replay follows at once')
+		assert.equal(healExtraLiveSourceChannels(config).changed, true)
+		assert.equal(item.value, `route://${moved}-23`)
+	})
+
+	it('a DeckLink-hosted entry on a box with no DeckLink input has no placement until a save', () => {
+		const config = factoryConfig(0, { extraLiveSources: [legacy(8)] })
+		assert.deepEqual(zoom.listZoomLayerEntries(config), [])
+		assert.equal(healExtraLiveSourceChannels(config).changed, false)
+		assert.equal(zoom.normalizeZoomHostSource(config.extraLiveSources[0], { config }).hostOn, 'zoom_channel')
+	})
+})
+
+/** An applied casparcg.config with given channel role comments; returns its path. */
+function appliedFile(roles) {
+	const p = path.join(fs.mkdtempSync(path.join(tmp, 'caspar-')), 'casparcg.config')
+	fs.writeFileSync(p, Object.entries(roles).map(([ch, r]) => `<!-- HighAsCG: Caspar channel ${ch}: ${r} -->\n`).join(''))
+	return p
+}
+
+describe('WO-1012 B2: reconnect replay', () => {
+	it('re-PLAYs every Zoom layer whose host channel is applied in that role; a pending one is skipped, never auto-applied', async () => {
+		const base = factoryConfig(1)
+		const ch = dlChannel(base)
+		const share = zoom.normalizeZoomHostSource({ source: 'share' }, { config: base })
+		const gallery = zoom.normalizeZoomHostSource({ source: 'gallery' }, { config: base })
+		const sent = []
+		const mk = (roles) => ({
+			config: { ...base, casparServer: { ...base.casparServer, configPath: appliedFile(roles) }, extraLiveSources: [share, gallery] },
+			gatheredInfo: { channelIds: [ch] },
+			amcp: { raw: async (c) => sent.push(c) },
+			log() {},
+		})
+		const setup = require('../../src/config/host-live-sources-setup')
+		const self = mk({ [ch]: 'DeckLink input 1 (PLAY …)' })
+		await setup.setupHostLiveSources(self)
+		assert.deepEqual(sent.filter((c) => c.startsWith('PLAY')), [`PLAY ${ch}-22 SHM NAME zoom-share`, `PLAY ${ch}-23 SHM NAME zoom-gallery`])
+		assert.ok(sent.includes(`MIXER ${ch}-23 OPACITY 0`))
+		assert.deepEqual(self._hostLiveSourcesStatus.played.map((p) => p.kind), ['zoom_host', 'zoom_host'])
+
+		sent.length = 0
+		const pending = mk({ [ch]: 'Monitor / headphone mix (system-audio consumer)' })
+		await setup.setupHostLiveSources(pending)
+		assert.deepEqual(sent, [], 'no PLAY onto a channel Caspar runs in another role')
+		assert.equal(pending._hostLiveSourcesStatus.failed[0].message, 'zoom_host_channel_not_applied')
+		assert.equal(pending._hostLiveCasparAutoApplyAttempted, undefined, 'a Zoom skip never reaches the auto-apply')
+	})
+})
+
+describe('WO-1012 B2: GET/POST /api/zoom/host', () => {
+	function harness({ decklink = 1, roles = null, extraLiveSources = [] } = {}) {
 		const handlers = {}
 		const routes = {
 			get: (p, fn, opt) => (handlers[`GET ${p}`] = { fn, opt }),
 			post: (p, fn, opt) => (handlers[`POST ${p}`] = { fn, opt }),
 		}
 		require('../../src/api/routes-zoom-host').register(routes)
-		const casparPath = path.join(fs.mkdtempSync(path.join(tmp, 'caspar-')), 'casparcg.config')
-		fs.writeFileSync(casparPath, '<configuration><channels></channels></configuration>')
-		const saved = []
-		const sent = []
-		const broadcasts = []
-		let disk = factoryConfig({ casparServer: { configPath: casparPath }, extraLiveSources: [] })
+		const events = []
+		let disk = factoryConfig(decklink, { extraLiveSources })
+		const ch = decklink ? dlChannel(disk) : null
+		const casparPath = appliedFile(roles || (ch ? { [ch]: 'DeckLink input 1 (PLAY …)' } : {}))
+		disk = { ...disk, casparServer: { ...disk.casparServer, configPath: casparPath } }
 		const ctx = {
-			configManager: { get: () => disk, save: (c) => (saved.push(c), (disk = c), true) },
-			gatheredInfo: { channelIds: [1, 2, 3, 4, 5, 6, 7], channelXml: {} },
+			configManager: { get: () => disk, save: (c) => (events.push('save'), (disk = c), true) },
+			gatheredInfo: { channelIds: [1, 2, 3, 4, 5, 6, 7, 8], channelXml: {} },
 			state: { getStateShared: () => ({ channels: [] }) },
-			amcp: { raw: async (c) => sent.push(c) },
-			_wsBroadcast: (ev, v) => broadcasts.push(v),
+			amcp: { raw: async (c) => events.push(c) },
+			_wsBroadcast() {},
 			log() {},
-			...over,
 		}
 		// Like the live ctx: `config` cannot be assigned (the 09.11 box run threw on ctx.config = …).
-		if (!('config' in over)) Object.defineProperty(ctx, 'config', { get: () => disk, enumerable: true })
+		Object.defineProperty(ctx, 'config', { get: () => disk, enumerable: true })
 		const get = async () => JSON.parse((await handlers['GET /api/zoom/host'].fn({ ctx })).body)
 		const post = async (b) => {
 			const res = await handlers['POST /api/zoom/host'].fn({ ctx, body: JSON.stringify(b) })
 			return { status: res.status, json: JSON.parse(res.body) }
 		}
-		return { handlers, ctx, get, post, saved, sent, broadcasts, casparPath }
+		return { handlers, ctx, get, post, events, ch, casparPath }
 	}
+	const shm = (ch, layer) => ({ getStateShared: () => ({ channels: [{ id: ch, oscLayers: { [layer]: { type: 'shm' } } }] }) })
 
-	it('registers both routes without requiring Caspar', () => {
+	it('registers both routes without requiring Caspar; GET lists the three sources, none configured', async () => {
 		const h = harness()
 		assert.equal(h.handlers['GET /api/zoom/host'].opt.requireCaspar, false)
 		assert.equal(h.handlers['POST /api/zoom/host'].opt.requireCaspar, false)
-	})
-
-	it('GET lists the three sources, none configured', async () => {
-		const j = await harness().get()
+		const j = await h.get()
 		assert.equal(j.ok, true)
 		assert.equal(j.needsRestart, false)
 		assert.deepEqual(j.entries.map((e) => e.source), ['presenter', 'share', 'gallery'])
 		assert.ok(j.entries.every((e) => e.configured === false && e.live === false && e.route === null))
 	})
 
-	it('add → saved entry, needsRestart; apply → not; live from OSC or INFO; remove → STOP + gone', async () => {
+	it('enable = save + PLAY at once, no restart; live from OSC; idempotent; disable = STOP, then save', async () => {
 		const h = harness()
+		const ch = h.ch
 		const add = await h.post({ source: 'share', enabled: true })
 		assert.equal(add.status, 200)
 		const e = add.json.entries.find((x) => x.source === 'share')
-		assert.equal(e.configured, true)
-		assert.equal(e.route, `route://${e.hostChannel}-1`)
-		assert.equal(add.json.needsRestart, true, 'the applied config has no Zoom host channel yet')
-		assert.equal(h.saved.length, 1)
-		const stored = h.saved[0].extraLiveSources.find((x) => x.routeType === 'zoom_host')
-		assert.equal(stored.source, 'share')
-		assert.equal(stored.value, e.route)
-		assert.equal(h.broadcasts.at(-1)?.path, 'extraLiveSources')
-		assert.deepEqual(h.sent, [], 'no PLAY onto a channel the running Caspar does not have as a Zoom host')
+		assert.deepEqual([e.configured, e.hostChannel, e.hostLayer, e.route], [true, ch, 22, `route://${ch}-22`])
+		assert.equal(add.json.needsRestart, false, 'the DeckLink input channel exists: no restart')
+		assert.deepEqual(h.events, ['save', `PLAY ${ch}-22 SHM NAME zoom-share`, `MIXER ${ch}-22 OPACITY 0`, `MIXER ${ch} COMMIT`])
+		const stored = h.ctx.config.extraLiveSources.find((x) => x.routeType === 'zoom_host')
+		assert.equal(stored.value, `route://${ch}-22`, 'the Live-tab source value')
 
-		assert.equal((await h.post({ source: 'share', enabled: true })).json.entries.filter((x) => x.configured).length, 1)
-		assert.equal(h.saved.length, 1, 'enabling twice does not add a second entry')
-
-		// The operator's Apply & restart: the file declares the channel, the running Caspar has it.
-		const ch = e.hostChannel
-		fs.writeFileSync(h.casparPath, buildConfigXml(buildCasparGeneratorFlatConfig(h.ctx.config)))
-		h.ctx.gatheredInfo.channelIds = Array.from({ length: ch }, (_, i) => i + 1)
-		let j = await h.get()
-		assert.equal(j.needsRestart, false)
-		assert.equal(j.entries.find((x) => x.source === 'share').live, false, 'nothing plays yet')
-
-		h.ctx.gatheredInfo.channelXml[String(ch)] =
-			'<channel><stage><layer><layer_1><background><producer>empty</producer></background><foreground><producer>shm</producer></foreground></layer_1></layer></stage></channel>'
-		assert.equal((await h.get()).entries.find((x) => x.source === 'share').live, true, 'INFO fallback')
-		h.ctx.gatheredInfo.channelXml = {}
-		h.ctx.state = { getStateShared: () => ({ channels: [{ id: ch, oscLayers: { 1: { type: 'shm' } } }] }) }
-		assert.equal((await h.get()).entries.find((x) => x.source === 'share').live, true, 'OSC mirror')
-
-		// A second source after the apply: no channel for it yet → needsRestart again.
-		j = (await h.post({ source: 'gallery', enabled: true })).json
-		const g = j.entries.find((x) => x.source === 'gallery')
-		assert.notEqual(g.hostChannel, ch)
-		assert.equal(j.needsRestart, true)
+		h.ctx.state = shm(ch, 22)
+		assert.equal((await h.get()).entries.find((x) => x.source === 'share').live, true)
+		h.events.length = 0
+		await h.post({ source: 'share', enabled: true })
+		assert.deepEqual(h.events, [], 'enabling a live source again saves and sends nothing')
 
 		const off = await h.post({ source: 'share', enabled: false })
 		assert.equal(off.json.entries.find((x) => x.source === 'share').configured, false)
-		assert.ok(h.ctx.config.extraLiveSources.every((x) => x.source !== 'share'))
-		assert.deepEqual(h.sent, [`STOP ${ch}-1`], 'the ring stops on its old channel')
+		assert.deepEqual(h.events, [`STOP ${ch}-22`, `MIXER ${ch}-22 CLEAR`, `MIXER ${ch} COMMIT`, 'save'])
+		assert.ok(!h.ctx.config.extraLiveSources.some((x) => x.routeType === 'zoom_host'))
 	})
 
-	it('enabling onto a channel the running Caspar already has as a Zoom host plays it at once', async () => {
-		const h = harness()
-		const config = { ...h.ctx.config, extraLiveSources: [zoom.normalizeZoomHostSource({ source: 'presenter' }, h.ctx)] }
-		fs.writeFileSync(h.casparPath, buildConfigXml(buildCasparGeneratorFlatConfig(config)))
-		const ch = config.extraLiveSources[0].hostChannel
-		h.ctx.gatheredInfo.channelIds = Array.from({ length: ch }, (_, i) => i + 1)
-		const j = (await h.post({ source: 'presenter', enabled: true })).json
+	it('a renumbered channel the running Caspar has in another role (pending Apply): saved, no PLAY, needsRestart', async () => {
+		const h = harness({ roles: { 1: 'Monitor / headphone mix' } })
+		const j = (await h.post({ source: 'gallery', enabled: true })).json
+		assert.equal(j.needsRestart, true)
+		assert.deepEqual(h.events, ['save'])
+		assert.equal((await h.post({ source: 'gallery', enabled: false })).status, 200)
+		assert.deepEqual(h.events, ['save', 'save'], 'disable sends no STOP to a channel that is not ours')
+	})
+
+	it('any POST moves a stage-B entry onto its layer (one save) and plays it', async () => {
+		const h = harness({ extraLiveSources: [legacy(8)] })
+		assert.equal((await h.get()).entries.find((x) => x.source === 'gallery').route, `route://${h.ch}-23`)
+		const j = (await h.post({ source: 'gallery', enabled: true })).json
+		const g = h.ctx.config.extraLiveSources.find((x) => x.source === 'gallery')
+		assert.deepEqual([g.value, g.hostOn, g.hostChannel], [`route://${h.ch}-23`, 'decklink_input', h.ch])
 		assert.equal(j.needsRestart, false)
-		assert.deepEqual(h.sent, [`PLAY ${ch}-1 SHM NAME zoom-presenter`, `MIXER ${ch}-1 FILL 0 0 1 1`, `MIXER ${ch} COMMIT`])
+		assert.deepEqual(h.events.slice(0, 2), ['save', `PLAY ${h.ch}-23 SHM NAME zoom-gallery`])
+	})
+
+	it('no DeckLink input: the shared Zoom channel needs one apply, later sources play at once', async () => {
+		const h = harness({ decklink: 0 })
+		const j = (await h.post({ source: 'share', enabled: true })).json
+		const ch = j.entries.find((x) => x.source === 'share').hostChannel
+		assert.equal(j.needsRestart, true)
+		assert.deepEqual(h.events, ['save'])
+		fs.writeFileSync(h.casparPath, buildConfigXml(buildCasparGeneratorFlatConfig(h.ctx.config)))
+		h.ctx.gatheredInfo.channelIds = Array.from({ length: ch }, (_, i) => i + 1)
+		const k = (await h.post({ source: 'presenter', enabled: true })).json
+		assert.equal(k.needsRestart, false)
+		assert.ok(h.events.includes(`PLAY ${ch}-21 SHM NAME zoom-presenter`))
 	})
 
 	it('refuses an unknown source and a non-boolean enabled; disabling an absent source saves nothing', async () => {
@@ -237,17 +303,7 @@ describe('WO-1012 B: GET/POST /api/zoom/host', () => {
 		assert.equal((await h.post({ source: 'webcam', enabled: true })).status, 400)
 		assert.equal((await h.post({ source: 'share', enabled: 'yes' })).status, 400)
 		assert.equal((await h.post({ source: 'share' })).status, 400)
-		const r = await h.post({ source: 'share', enabled: false })
-		assert.equal(r.status, 200)
-		assert.equal(h.saved.length, 0)
-	})
-
-	it('needsRestart when the channel number exists but the applied config gives it another role', async () => {
-		const h = harness()
-		const add = (await h.post({ source: 'share', enabled: true })).json
-		const ch = add.entries.find((x) => x.source === 'share').hostChannel
-		h.ctx.gatheredInfo.channelIds = Array.from({ length: ch + 2 }, (_, i) => i + 1)
-		fs.writeFileSync(h.casparPath, `<!-- HighAsCG: Caspar channel ${ch}: Monitor / headphone mix -->`)
-		assert.equal((await h.get()).needsRestart, true)
+		assert.equal((await h.post({ source: 'share', enabled: false })).status, 200)
+		assert.deepEqual(h.events, [])
 	})
 })

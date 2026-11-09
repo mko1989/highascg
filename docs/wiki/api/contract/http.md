@@ -629,7 +629,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-virtual-camera.js` |  |
 | `src/api/routes-vr.js` | WO-770 — explicit VR session from the operator GUI (see src/vr/vr-session.js): GET  /api/vr/status → { installed, serverRunning, headsetConnected, sessionRunnin |
 | `src/api/routes-zoom-audio.js` | WO-1012 stage C — two-way Zoom audio (src/zoom/zoom-audio.js). |
-| `src/api/routes-zoom-host.js` | WO-1012 stage B — Zoom sources (presenter / share / gallery) as HOST CHANNELS (src/config/host-live-sources-zoom.js): a dedicated Caspar channel that plays the  |
+| `src/api/routes-zoom-host.js` | WO-1012 stage B2 — Zoom sources (presenter / share / gallery) as LAYERS on a channel Caspar already runs (src/config/host-live-sources-zoom.js): the first DeckL |
 | `src/api/routes-zoom.js` | WO-1012 — the Zoom device (src/zoom/zoom-session.js): the Zoom desktop client's windows as live inputs. |
 | `src/api/system-network-wifi.js` | WO-692 — Wi-Fi from the GUI: status (radio, adapters, last scan), rescan, connect (WPA passphrase), disconnect, radio on / off. |
 | `src/autofollow/register.js` | Stage auto-follow module registration (WO-31 / WO-30). |
