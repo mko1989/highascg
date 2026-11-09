@@ -357,6 +357,12 @@ function startHttpServer(options) {
 			const headers = mergeCors(result.headers, req)
 			// Streamed responses have no buffered body — nothing to compress here.
 			const outBody = result.stream ? result.body : maybeGzip(req, headers, result.body)
+			// WO-1003: a buffered body gets its length, not chunked framing — Node sent it as ONE chunk, and Godot's
+			// HTTPClient refuses chunks over 16 MB ("HTTP Chunk too big!! >16mb"), so a 61 MB project .glb never loaded.
+			if (!result.stream && headers['Content-Length'] == null && ![204, 304].includes(result.status ?? 200)) {
+				if (Buffer.isBuffer(outBody)) headers['Content-Length'] = String(outBody.length)
+				else if (typeof outBody === 'string' || outBody == null) headers['Content-Length'] = String(Buffer.byteLength(outBody ?? ''))
+			}
 			res.writeHead(result.status ?? 200, headers)
 			if (result.stream && typeof result.stream.pipe === 'function') {
 				result.stream.on('error', (err) => {

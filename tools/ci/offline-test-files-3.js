@@ -284,4 +284,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1017-fanout-holds-stale-layout.test.js',
 	'tools/smoke/smoke-wo1022-caspar-swap.test.js',
 	'tools/smoke/smoke-wo1022-release-carries-caspar.test.js',
+	'tools/smoke/smoke-wo1003-buffered-body-content-length.test.js',
 ]
