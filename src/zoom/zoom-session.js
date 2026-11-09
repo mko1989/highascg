@@ -177,6 +177,13 @@ function createZoomSession(deps = {}) {
 		return { ok: true, installed: exists(ZOOM_BIN), running: pids.length > 0, windows, sources, error: lastError }
 	}
 
+	/** WO-1012 C: only the PULSE_* lines of zoom-audio's zoomEnv() reach Zoom's env. */
+	function audioEnv(env) {
+		const out = {}
+		for (const k of ['PULSE_SERVER', 'PULSE_SINK', 'PULSE_SOURCE']) if (env && typeof env[k] === 'string' && env[k]) out[k] = env[k]
+		return out
+	}
+
 	/** Start the Zoom client (and join `url` — a meeting link or number — when given). */
 	async function launch(opts = {}) {
 		if (!exists(ZOOM_BIN)) throw new Error('Zoom is not installed (/usr/bin/zoom)')
@@ -185,7 +192,7 @@ function createZoomSession(deps = {}) {
 		if (raw && !url) throw new Error('not a Zoom meeting link or number')
 		const uid = typeof process.getuid === 'function' ? process.getuid() : 1000
 		// WO-780: a system-unit child has no user-session env — Zoom needs it for PipeWire audio and D-Bus
-		const env = { ...displaySessionEnv(), XDG_RUNTIME_DIR: `/run/user/${uid}`, DBUS_SESSION_BUS_ADDRESS: `unix:path=/run/user/${uid}/bus` }
+		const env = { ...displaySessionEnv(), XDG_RUNTIME_DIR: `/run/user/${uid}`, DBUS_SESSION_BUS_ADDRESS: `unix:path=/run/user/${uid}/bus`, ...audioEnv(opts.env) }
 		const child = spawn(ZOOM_BIN, url ? [`--url=${url}`] : [], { env, detached: true, stdio: 'ignore' })
 		child.unref?.()
 		log('info', `[zoom] started the client${url ? ' (joining a meeting)' : ''}`)

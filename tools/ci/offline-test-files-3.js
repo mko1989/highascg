@@ -279,4 +279,6 @@ module.exports = [
 	'tools/smoke/smoke-wo1009-project-files.test.js',
 	'tools/smoke/smoke-wo1012-zoom.test.js',
 	'tools/smoke/smoke-wo1012-zoom-host.test.js',
+	'tools/smoke/smoke-wo1012-zoom-audio.test.js',
+	'tools/smoke/smoke-wo1013-restore-on-screens.test.js',
 ]

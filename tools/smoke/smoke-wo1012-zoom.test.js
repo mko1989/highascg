@@ -133,3 +133,19 @@ test('routes: GET /api/zoom and POST bodies arrive as raw JSON strings', async (
 	const badUrl = await h['POST /api/zoom/launch']({ ctx: {}, body: JSON.stringify({ url: 'hello' }) })
 	assert.match(String(badUrl.body), /not a Zoom meeting link|not installed/)
 })
+
+test('launch: Zoom audio env (PULSE_* only) joins the user-session env; nothing else from the caller', async () => {
+	const seen = []
+	const s = createZoomSession({
+		exists: () => true,
+		spawn: (bin, args, o) => (seen.push({ bin, args, env: o.env }), { unref() {} }),
+		timers: { setInterval: () => ({ unref() {} }), clearInterval: () => {} },
+	})
+	await s.launch({ url: '81234567890', env: { PULSE_SERVER: 'unix:/run/user/1000/highascg-zoom-audio/native', PULSE_SINK: 'highascg_zoom_in', LD_PRELOAD: '/evil.so' } })
+	assert.strictEqual(seen[0].env.PULSE_SERVER, 'unix:/run/user/1000/highascg-zoom-audio/native')
+	assert.strictEqual(seen[0].env.PULSE_SINK, 'highascg_zoom_in')
+	assert.notStrictEqual(seen[0].env.LD_PRELOAD, '/evil.so')
+	assert.deepStrictEqual(seen[0].args, ['--url=zoommtg://zoom.us/join?action=join&confno=81234567890'])
+	await s.launch({})
+	assert.strictEqual(seen[1].env.PULSE_SERVER, process.env.PULSE_SERVER, 'audio off: no PULSE_* added')
+})

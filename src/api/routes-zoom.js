@@ -13,6 +13,7 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { getZoomSession } = require('../zoom/zoom-session')
+const { getZoomAudio } = require('../zoom/zoom-audio')
 
 const reply = (status, body) => ({ status, headers: JSON_HEADERS, body: jsonBody(body) })
 
@@ -31,7 +32,8 @@ async function guarded(fn) {
 function register(routes) {
 	const opt = { requireCaspar: false }
 	routes.get('/api/zoom', ({ ctx }) => guarded(() => session(ctx).status()), opt)
-	routes.post('/api/zoom/launch', ({ ctx, body }) => guarded(() => session(ctx).launch(parseBody(body) || {})), opt)
+	// WO-1012 C: Zoom joins the private audio daemon when Zoom audio is on (env from zoom-audio, never from the body)
+	routes.post('/api/zoom/launch', ({ ctx, body }) => guarded(() => session(ctx).launch({ url: (parseBody(body) || {}).url, env: getZoomAudio(ctx).zoomEnv() })), opt)
 	routes.post('/api/zoom/quit', ({ ctx }) => guarded(() => session(ctx).quit()), opt)
 	routes.post('/api/zoom/source', ({ ctx, body }) =>
 		guarded(() => {

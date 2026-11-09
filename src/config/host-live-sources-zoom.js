@@ -93,7 +93,6 @@ function zoomHostPlayCommands(ch, layer, item) {
 
 module.exports = {
 	ZOOM_SOURCES,
-	ZOOM_HOST_ROLE,
 	isZoomHostCandidate,
 	zoomSourceOf,
 	normalizeZoomHostSource,
