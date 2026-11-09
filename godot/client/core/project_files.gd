@@ -4,6 +4,7 @@ extends RefCounted
 ## Files dialog (app/project_files_dialog.gd), the previs MVR Import… and the previs Models list share.
 
 const Upload := preload("res://core/stream_upload.gd")
+const SheetView := preload("res://app/sheet_view.gd")
 
 const EXTS := ["mvr", "glb", "pdf", "xls", "xlsx"]
 const KIND_TEXT := {"mvr": "MVR scene", "model": "3D model", "pdf": "PDF", "sheet": "Spreadsheet"}
@@ -13,6 +14,15 @@ const EVENT_PATH := "projectFiles"  # WS change path after an upload / delete
 ## A Sources document (GET /api/media-docs id) on the server.
 static func doc_url(id: String) -> String:
 	return "/api/media-docs/file?id=" + id.uri_encode()
+
+
+## Where the server reads a spreadsheet for the built-in table (the lower-thirds reader) — beside the file's own path.
+static func sheet_url(path: String) -> String:
+	return path.replace("/api/media-docs/file?", "/api/media-docs/sheet?") if path.begins_with("/api/media-docs/file?") else path + "/sheet"
+
+
+static func is_sheet(name: String) -> bool:
+	return name.get_extension().to_lower() in ["xls", "xlsx"]
 
 
 static func filters() -> PackedStringArray:
@@ -78,8 +88,15 @@ static func open(name: String) -> String:
 	return await open_from(url(name), name)
 
 
-## The same for any server path (a Sources document: /api/media-docs/file?id=…).
+## The same for any server path (a Sources document: /api/media-docs/file?id=…). A spreadsheet opens in the client's
+## own table (app/sheet_view.gd), read by the server's lower-thirds reader — no desktop program needed.
 static func open_from(path: String, name: String) -> String:
+	if is_sheet(name):
+		var sh: Dictionary = await Api.get_json(sheet_url(path))
+		if not (sh.ok and sh.data is Dictionary and sh.data.get("ok") == true):
+			return "Could not read %s: %s" % [name, sh.data.get("error", "") if sh.data is Dictionary else sh.error]
+		SheetView.show_sheet((Engine.get_main_loop() as SceneTree).root, sh.data)
+		return ""
 	var res: Dictionary = await Api.get_bytes(path)
 	if not res.ok:
 		return "Could not fetch %s: %s" % [name, res.error]

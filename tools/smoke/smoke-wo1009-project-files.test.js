@@ -121,3 +121,32 @@ test('media docs: every folder under the media root, by media-style id; never ou
 		fs.rmSync(media, { recursive: true, force: true })
 	}
 })
+
+test('spreadsheets open in the built-in reader (the lower-thirds exceljs reader), not a desktop program', async () => {
+	const { media, ctx, dir } = setup()
+	try {
+		const ExcelJS = require('exceljs')
+		const wb = new ExcelJS.Workbook()
+		const ws = wb.addWorksheet('Crew')
+		ws.addRow(['Name', 'Role'])
+		ws.addRow(['Ana', 'Host'])
+		ws.addRow(['Ben', 'Guest'])
+		fs.mkdirSync(dir, { recursive: true })
+		await wb.xlsx.writeFile(path.join(dir, 'crew.xlsx'))
+		fs.writeFileSync(path.join(dir, 'old.xls'), 'legacy')
+		fs.writeFileSync(path.join(dir, 'rider.pdf'), 'P')
+		const got = []
+		routes.register({ get: (p, f) => got.push([p, f]), post: () => {}, delete: () => {} })
+		const get = (p) => got.find((g) => g[0] === p)[1]
+		let j = JSON.parse((await get('/api/media-docs/sheet')({ ctx, query: { id: 'projects/narvil/crew.xlsx' } })).body)
+		assert.deepStrictEqual([j.ok, j.fileName, j.headers, j.rows, j.total], [true, 'crew.xlsx', ['Name', 'Role'], [{ Name: 'Ana', Role: 'Host' }, { Name: 'Ben', Role: 'Guest' }], 2])
+		j = JSON.parse((await get('/api/project-files/*')({ ctx, path: '/api/project-files/crew.xlsx/sheet' })).body)
+		assert.strictEqual(j.total, 2, 'a project file by name')
+		j = JSON.parse((await get('/api/media-docs/sheet')({ ctx, query: { id: 'projects/narvil/old.xls' } })).body)
+		assert.deepStrictEqual([j.ok, /Legacy \.xls/.test(j.error)], [false, true], 'legacy .xls: the reader says why')
+		assert.strictEqual((await get('/api/media-docs/sheet')({ ctx, query: { id: 'projects/narvil/rider.pdf' } })).status, 404, 'only spreadsheets')
+	} finally {
+		gather._setActiveProjectForTests(null)
+		fs.rmSync(media, { recursive: true, force: true })
+	}
+})

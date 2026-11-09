@@ -11,17 +11,24 @@
  *   GET    /api/media-docs                    → [{ id, kind, size, mtime }] every document under the media root (Sources
  *                                               "media only" off; ids like media ids: "projects/narvil/rider.pdf")
  *   GET    /api/media-docs/file?id=<id>       → that file;  DELETE the same → removed
+ *   GET    /api/media-docs/sheet?id=<id>      → a spreadsheet read by the lower-thirds reader (WO-601 exceljs, client/lib/
+ *   GET    /api/project-files/<name>/sheet      lower-third-roster-import.js): { ok, fileName, headers, rows, total }
+ *                                               — the Godot client shows it in its own table (no desktop program needed)
  * Changes are broadcast as WS `change` { path: 'projectFiles' }.
  * Not under /api/project/: its GET / DELETE / POST wildcards (router.js) would take these paths.
  */
 
 const fs = require('fs')
+const path = require('path')
 const crypto = require('crypto')
+const { pathToFileURL } = require('url')
 const busboy = require('busboy')
 const pf = require('../media/project-files')
 const { JSON_HEADERS, jsonBody } = require('./response')
+const { REPO_ROOT } = require('../repo-paths')
 
 const MAX_BYTES = 2 * 1024 * 1024 * 1024
+const SHEET_ROWS = 5000 // rows sent to the viewer (`total` says how many the sheet has)
 const reply = (status, o) => ({ status, headers: JSON_HEADERS, body: jsonBody(o) })
 
 function changed(ctx) {
@@ -86,6 +93,19 @@ function handleUpload(req, ctx) {
 	})
 }
 
+/** WO-1009 (owner 09.11: "we have a built in reader"): `file` read by the lower-thirds spreadsheet reader. */
+async function sheetReply(file) {
+	if (!file || pf.kindOf(file) !== 'sheet') return reply(404, { ok: false, error: 'no such spreadsheet' })
+	const fileName = path.basename(file)
+	try {
+		const lib = await import(pathToFileURL(path.join(REPO_ROOT, 'client', 'lib', 'lower-third-roster-import.js')).href)
+		const { headers, rows } = await lib.parseSpreadsheetFile(new File([fs.readFileSync(file)], fileName))
+		return reply(200, { ok: true, fileName, headers, rows: rows.slice(0, SHEET_ROWS), total: rows.length })
+	} catch (e) {
+		return reply(200, { ok: false, fileName, error: String(e?.message || e) })
+	}
+}
+
 function nameOf(path, suffix = '') {
 	const rest = String(path).slice('/api/project-files/'.length)
 	const raw = suffix && rest.endsWith(suffix) ? rest.slice(0, -suffix.length) : rest
@@ -97,6 +117,7 @@ function nameOf(path, suffix = '') {
 }
 
 function handleGet(ctx, path) {
+	if (String(path).endsWith('/sheet')) return sheetReply(pf.resolve(ctx, nameOf(path, '/sheet')))
 	const name = nameOf(path)
 	const p = pf.resolve(ctx, name)
 	if (!p) return reply(404, { error: `no such project file: ${name}` })
@@ -127,6 +148,7 @@ function register(routes) {
 		if (!p) return reply(404, { error: `no such document: ${query?.id || ''}` })
 		return { status: 200, headers: { 'Content-Type': pf.mimeOf(p) }, body: fs.readFileSync(p) }
 	}, opt)
+	routes.get('/api/media-docs/sheet', ({ ctx, query }) => sheetReply(pf.resolveMediaDoc(ctx.config, query?.id)), opt)
 	routes.delete('/api/media-docs/file', ({ ctx, query }) => {
 		const p = pf.resolveMediaDoc(ctx.config, query?.id)
 		if (!p) return reply(404, { error: `no such document: ${query?.id || ''}` })

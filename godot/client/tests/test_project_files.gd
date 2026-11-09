@@ -38,3 +38,19 @@ func test_media_docs_rows() -> void:
 	t.eq(PF.doc_url("projects/narvil/rider (2).pdf"), "/api/media-docs/file?id=projects%2Fnarvil%2Frider%20%282%29.pdf")
 	tree.free()
 	d.free()
+
+
+## Spreadsheets open in the client's own table (the server's lower-thirds reader), not a desktop program.
+func test_sheet_view() -> void:
+	t.eq(PF.sheet_url(PF.doc_url("a/crew.xlsx")), "/api/media-docs/sheet?id=a%2Fcrew.xlsx")
+	t.eq(PF.sheet_url(PF.url("crew.xlsx")), "/api/project-files/crew.xlsx/sheet")
+	t.eq(["a.XLSX", "b.xls", "c.pdf", "d.mvr"].map(func(n: String) -> bool: return PF.is_sheet(n)), [true, true, false, false])
+	var V := preload("res://app/sheet_view.gd")
+	var v: AcceptDialog = V.new()
+	v.data = {"fileName": "crew.xlsx", "headers": ["Name", "Role"], "rows": [{"Name": "Ana", "Role": "Host"}, {"Name": "Ben", "Role": "Guest"}], "total": 2}
+	t.root.add_child(v)
+	t.eq(v.render(""), 2)
+	t.eq(v.render("guest"), 1, "the filter matches any cell")
+	t.eq(v._meta.text, "1 of 2 rows")
+	t.eq(v.title, "crew.xlsx")
+	v.free()
