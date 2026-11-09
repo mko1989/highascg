@@ -282,4 +282,6 @@ module.exports = [
 	'tools/smoke/smoke-wo1012-zoom-audio.test.js',
 	'tools/smoke/smoke-wo1013-restore-on-screens.test.js',
 	'tools/smoke/smoke-wo1017-fanout-holds-stale-layout.test.js',
+	'tools/smoke/smoke-wo1022-caspar-swap.test.js',
+	'tools/smoke/smoke-wo1022-release-carries-caspar.test.js',
 ]

@@ -159,8 +159,15 @@ jobs:
       - name: Client build
         run: npm run build:client
 
+      # WO-1022: the hand-built Caspar pinned in caspar/PINNED.json goes into the tarball (caspar/bin/). A missing or
+      # mismatched asset fails this job only; verify / godot / build-client stay green.
+      - name: Pinned Caspar build
+        run: |
+          command -v zstd >/dev/null || sudo apt-get install -y zstd
+          bash tools/release/fetch-pinned-caspar.sh
+
       - name: Server prerelease
-        run: bash tools/release/make-github-release-server.sh --no-godot-clients
+        run: bash tools/release/make-github-release-server.sh --no-godot-clients --require-caspar
 
       - name: Keep the newest 10 automatic prereleases
         run: bash tools/release/prune-auto-releases.sh 10

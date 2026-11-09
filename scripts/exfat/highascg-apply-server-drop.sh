@@ -243,8 +243,17 @@ apply_server_drop() {
 			log "refreshed ${wrapper_dst}" || log "WARN: ${wrapper_dst} refresh failed"
 	fi
 
+	# WO-1022: a release carries the pinned Caspar (caspar/bin/casparcg). The swap helper installs it when it differs
+	# (ldd + CEF check against this box's lib/, backup + .prev in bin/, Caspar restarted only if it runs) and detaches a
+	# check that rolls back when Caspar never reports the pinned VERSION. The copy that just arrived with the drop runs,
+	# not /usr/local/lib/highascg/ (refreshed only after this apply); it never fails the update.
+	local caspar_swap="${HIGHASCG_CASPAR_SWAP_SH:-${dest}/scripts/exfat/highascg-caspar-swap.sh}"
+	if [[ -f "$caspar_swap" && -f "${dest}/caspar/PINNED.json" ]]; then
+		bash "$caspar_swap" apply --root "$dest" --user "$user_name" --verify detach ||
+			log "WARN: Caspar swap step failed (continuing; see ${dest}/bin/caspar-swap.state)"
+	fi
 	if [[ ! -x "${dest}/bin/casparcg" ]]; then
-		log "WARN: ${dest}/bin/casparcg missing — restore from ISO/install (not in server drops)"
+		log "WARN: ${dest}/bin/casparcg missing — restore from ISO/install (this drop carries no Caspar)"
 	fi
 
 	echo "${src_stamp}" >"${dest}/BUILD_STAMP"

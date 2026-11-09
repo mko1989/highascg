@@ -248,3 +248,27 @@ without prior written authorization from the Gnome Foundation or Bitstream
 Inc., respectively. For further information, contact: fonts at gnome dot
 org.
 
+
+================================================================================
+CasparCG Server (HighAsCG build) — https://github.com/mko1989/casparcg-server (fork of https://github.com/CasparCG/server)
+Copyright (c) Sveriges Television AB and the CasparCG contributors; HighAsCG changes by the HighAsCG authors.
+License: GNU General Public License v3.0 or later (the LICENSE file of that tree; it ships next to the binary).
+
+Server releases (WO-1022) carry a CasparCG Server binary at caspar/bin/casparcg, pinned by caspar/PINNED.json. It is
+upstream v2.5.1-stable plus the commits listed in caspar/README.md (community pull requests, the CasparCG Enhanced
+fork, HighAsCG's own work). The complete corresponding source of each shipped binary:
+
+  - the tag highascg-<sha9> in https://github.com/mko1989/casparcg-server (source.treeUrl in caspar/PINNED.json), and
+  - casparcg-source-<sha9>.tar.gz in the GitHub release caspar-<sha9> of this repository: `git archive` of that exact
+    commit plus the build script (HIGHASCG-BUILD.sh).
+
+caspar/patches/ (git format-patch exports, GPL-3.0-or-later like the tree they patch) and caspar/modules/shm/ are a
+human-readable copy in this repository; the tag and the source tarball are authoritative.
+
+Libraries the binary uses, not part of this repository:
+  Chromium Embedded Framework (CEF) 142.0.17 — https://bitbucket.org/chromiumembedded/cef — Copyright The Chromium
+    Embedded Framework Authors. License: BSD-3-Clause (LICENSE-CEF.txt next to the binary). libcef_dll_wrapper is
+    linked statically; libcef.so (the owner's no-root build, WO-234) is loaded from the box's lib/ and is not in the
+    release tarball. Chromium inside libcef.so carries its own third-party notices (about:credits).
+  FFmpeg — https://ffmpeg.org — linked dynamically against the Ubuntu 26.04 system packages (libavcodec62 …), which
+    are built with --enable-gpl (libx264, libx265), so that combination is GPL; installed by apt, not shipped by us.

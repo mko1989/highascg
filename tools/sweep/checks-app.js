@@ -268,6 +268,7 @@ module.exports = [
 				: { status: 'pass', summary: `${r.n} projects` }
 		},
 	},
+	require('./check-caspar-pinned'), // WO-1022
 ]
 
 module.exports.CASPAR_NOISE = CASPAR_NOISE

@@ -1,5 +1,16 @@
 # HighAsCG's CasparCG build
 
+## Source
+
+- **Public fork:** https://github.com/mko1989/casparcg-server (a fork of CasparCG/server). Branch `highascg-main` is the
+  local `highascg-main` of `~/caspar-build/src-v2`; the remote is named `highascg` there.
+- **One tag per shipped build:** every binary that leaves this box (release, ISO, another box) has an annotated tag
+  `highascg-<sha9>` on its exact commit in the fork, e.g. `highascg-5c3373ec5`. The GPL requires the corresponding
+  source of everything we distribute; the tag plus the `casparcg-source-<sha9>.tar.gz` asset (`git archive` of that
+  commit + the build script) next to the binary in release `caspar-<sha9>` is that source.
+- **Pinned build:** `caspar/PINNED.json` names the build every server release carries (WO-1022). CI puts it at
+  `caspar/bin/casparcg` in the tarball; the update installs it (`scripts/exfat/highascg-caspar-swap.sh`).
+
 HighAsCG runs its own CasparCG Server build: upstream **v2.5.1-stable**, plus community PRs, the Enhanced fork's audio and
 LED work, and HighAsCG's own additions. **Every Caspar binary that ships (box, ISO, release) must be built from the
 `highascg-main` branch.** That branch is where everything below is committed. Add new work there as new commits. Don't
@@ -15,8 +26,19 @@ start a fresh branch off upstream: the binary would silently lose these features
   3. Run `sudo -n systemctl restart casparcg-server.service`.
   4. Restart node, because the OSC receiver latches per process.
   5. Check `VERSION`, which reports the commit (for example `2.5.1 cd177d369`).
+- **Publish (WO-1022), once the build is proven on this box:**
+  1. Push the source: `git -C ~/caspar-build/src-v2 push highascg highascg-main`, then
+     `git -C ~/caspar-build/src-v2 tag -a highascg-<sha9> -m "HighAsCG Caspar build <VERSION>" <sha>` and
+     `git -C ~/caspar-build/src-v2 push highascg refs/tags/highascg-<sha9>`.
+  2. `bash tools/release/publish-caspar-build.sh ~/caspar-build/build-26/shell/casparcg --dry-run`, then the same
+     without `--dry-run`. It checks the binary's embedded VERSION against the source HEAD, ldd against `~/highascg/lib`,
+     and the fork branch + tag (`git ls-remote`; it prints the missing push commands and stops, it never pushes). It
+     uploads the binary and the source tarball to release `caspar-<sha9>` and rewrites `caspar/PINNED.json`.
+  3. Commit `caspar/PINNED.json`. From the next push to main on, every server release carries this build.
+  - A box that must keep a hand-tested Caspar: `touch ~/.highascg/caspar-hold` (the update then leaves `bin/` alone).
 - **Distribution:** `bin/` is git-ignored and stignored. ISOs are clones of a box, so a box carries whatever is in
-  its `bin/`. Other boxes (for example highascg5867) need a copy with the same swap steps.
+  its `bin/`. Since WO-1022 server releases carry the pinned build and the update swaps it in (backup
+  `bin/casparcg.pre-<stamp>` + `.prev`, automatic rollback when Caspar never reports the pinned VERSION).
 - **Patches:** `patches/` holds `git format-patch` exports of HighAsCG's own commits, so the repo records them even
   without the build tree. These exports are documentation. The branch is the source of truth.
 

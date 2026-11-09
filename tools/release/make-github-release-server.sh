@@ -18,6 +18,8 @@
 #                     rebuilt from the repo so the release never ships a stale snapshot)
 # --no-godot-clients  skip the Godot operator GUI builds (default: export Linux / Windows / macOS with
 #                     godot/export-client.sh and attach them, WO-686; needs the export templates)
+# --require-caspar    fail unless caspar/bin/casparcg is the build caspar/PINNED.json pins (WO-1022; CI fetches it
+#                     first with tools/release/fetch-pinned-caspar.sh). Without the flag it is packed when present.
 #
 set -euo pipefail
 
@@ -35,6 +37,7 @@ BUMP_PACKAGE=1
 STARTER_ZIPS=1
 GODOT_CLIENTS=1
 ALLOW_DIRTY=0
+REQUIRE_CASPAR=0
 BUILD_STAMP_FILE=""
 NOTES=""
 
@@ -68,6 +71,7 @@ while [[ $# -gt 0 ]]; do
 	--no-starter-zips) STARTER_ZIPS=0 ;;
 	--no-godot-clients) GODOT_CLIENTS=0 ;;
 	--allow-dirty) ALLOW_DIRTY=1 ;;
+	--require-caspar) REQUIRE_CASPAR=1 ;;
 	*)
 		echo "Unknown option: $1" >&2
 		usage 1
@@ -113,6 +117,33 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
 	release_lib_check_gh
 fi
 
+# WO-1022: the hand-built Caspar the release carries — caspar/bin/ (casparcg + its GPL/CEF licences + SOURCE.txt), the
+# pin, and the human-readable patch series. The box installs it with scripts/exfat/highascg-caspar-swap.sh.
+CASPAR_NOTE="**Caspar:** none packed (caspar/bin/casparcg missing) — boxes keep their own \`bin/casparcg\`."
+add_pinned_caspar() {
+	local -n _p=$1
+	local pin="${REPO_ROOT}/caspar/PINNED.json" bin="${REPO_ROOT}/caspar/bin/casparcg" want got
+	if [[ ! -f "$pin" || ! -f "$bin" ]]; then
+		[[ "$REQUIRE_CASPAR" -eq 1 ]] && {
+			echo "ERROR: --require-caspar: ${pin} or ${bin} missing (run tools/release/fetch-pinned-caspar.sh)" >&2
+			exit 1
+		}
+		return 0
+	fi
+	want="$(node -e 'process.stdout.write(require(process.argv[1]).binarySha256||"")' "$pin")"
+	got="$(sha256sum "$bin" | cut -d' ' -f1)"
+	if [[ "$got" != "$want" ]]; then
+		echo "ERROR: caspar/bin/casparcg sha256 ${got} is not the pinned ${want}" >&2
+		exit 1
+	fi
+	_p+=(caspar/PINNED.json caspar/README.md caspar/patches caspar/bin)
+	CASPAR_NOTE="$(node -e '
+const p = require(process.argv[1]), s = p.source || {}
+process.stdout.write(`**Caspar:** carries CasparCG \`${p.version}\` (\`caspar/bin/casparcg\`, sha256 \`${p.binarySha256}\`); `
+	+ `the update installs it when it differs from the box (backup in \`bin/\`, automatic rollback; hold: \`~/.highascg/caspar-hold\`). `
+	+ `License GPL-3.0-or-later. **Source:** [${s.treeUrl}](${s.treeUrl}) and \`${s.sourceAsset}\` in [${p.releaseTag}](${p.releaseUrl}).`)' "$pin")"
+}
+
 build_server_archive() {
 	local -a paths=()
 	archive_common_server_tar_members paths
@@ -128,6 +159,7 @@ build_server_archive() {
 
 	echo "$STAMP" >"${REPO_ROOT}/BUILD_STAMP"
 	paths+=(BUILD_STAMP)
+	add_pinned_caspar paths
 	if [[ "$ZIP_EXCLUDE_NODE_MODULES" -eq 0 ]] && [[ -d "${REPO_ROOT}/node_modules" ]]; then
 		paths+=(node_modules)
 	fi
@@ -200,6 +232,8 @@ Unified playout stack for sticks (**\`drop-update/\`** on \`HIGHASCGEXF\`): API 
 | \`HIGHASCGDAT-starter-layout.zip\` | Unzip at the **root of the \`HIGHASCGDAT\`** bridge volume |
 
 ${CLIENTS_NOTE}
+${CASPAR_NOTE}
+
 Stick prep (Ventoy + a reserved exFAT partition at the end): [\`docs/STICK_QUICK_START.md\`](docs/STICK_QUICK_START.md)
 
 ${NM_NOTE}
