@@ -1,8 +1,8 @@
 extends RefCounted
 ## WO-605 slice 10b — the Devices tab's Node view, pure (web device-view-caspar-render-simple.js
 ## renderCasparBandSimple): the rear panel as sections of node cards — GPU, DeckLink, USB video, Virtual cam, Stream,
-## Record, Audio. Each card has a label, a status line and one cable dot: on the left for inputs, on the right for
-## everything else. The last four sections always show, with a "+" and "None yet — click + to add." when empty.
+## Record, Audio. Each card has a label, a status line and one cable dot: on the right for input jacks, on the
+## left for everything else (an output jack takes its cable from the destinations on the left). The last four sections always show, with a "+" and "None yet — click + to add." when empty.
 ## `slots` is devices_model.gd build().slots (GPU = gpu_layout.gd column, DeckLink in the rear order); USB video
 ## comes from the payload's suggested v4l2_in connectors (the classic rear panel does not list them yet).
 ## The web's per-card status class is left out: the node card's own border and background override it in its CSS.

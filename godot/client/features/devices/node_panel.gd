@@ -2,7 +2,7 @@ extends VBoxContainer
 ## WO-605 slice 10b — the Node view's rear panel (web renderCasparBandSimple, 09d-device-view-simple-wiring.css):
 ## node_view_model.gd's sections in a grid of ≥ 200 px columns, each a head (title, "+" for the output kinds) over
 ## its node cards. A card is a button (opens the connector's page, `open_requested`); its dot — on the left for
-## inputs, the right otherwise — is a port_icon.gd registered in `anchors` under the cable id, so the cable layer and
+## output jacks (the cable comes in from the destinations on the left; owner 10.11), the right for input jacks — is a port_icon.gd registered in `anchors` under the cable id, so the cable layer and
 ## the tab's gesture treat it like a rear-panel socket. `highlight` rings the open page's card (blue) and the armed
 ## cable source's (amber), like --selected / --armed.
 ## Slice 12: a decklink_io card drags out as a connector (web node.draggable) onto a destination card or Sources.
@@ -151,7 +151,7 @@ func _card(n: Dictionary) -> Button:
 		text.add_child(l)
 	var dot := PortIcon.make("", Vector2(12, 12), "Start or complete cable at this connector")
 	b.add_child(dot)
-	var place := func() -> void: dot.position = Vector2(-6.0 if n.input else b.size.x - 6.0, (b.size.y - 12.0) / 2.0)
+	var place := func() -> void: dot.position = Vector2(b.size.x - 6.0 if n.input else -6.0, (b.size.y - 12.0) / 2.0)
 	b.resized.connect(place)
 	anchors[str(n.id)] = dot
 	_cards[str(n.id)] = b
