@@ -11,6 +11,8 @@ const liveSceneState = require('../state/live-scene-state')
 const { runFadeToBlackAllLayers } = require('../engine/ftb-pgm-prv')
 const { airHeldBy } = require('../replication/amcp-fanout')
 const { isAirHeld, airHeldReply } = require('../replication/air-held') // WO-1029 B2
+const { notHereFor, notHereList } = require('./screen-not-here') // WO-1029 plan 07 C1c
+const { localScreens } = require('../config/screen-channels')
 
 /**
  * @param {object} map
@@ -20,7 +22,9 @@ const { isAirHeld, airHeldReply } = require('../replication/air-held') // WO-102
 function resolveFtbChannels(map, screenIdx) {
 	if (screenIdx == null) {
 		const channels = []
-		for (let i = 0; i < map.screenCount; i++) {
+		// WO-1029 C1c: only the screens this server outputs (a hole has no channel; flag off = every screen)
+		const idxs = map.channelsWhereCabled === true ? localScreens(map) : [...Array(map.screenCount).keys()]
+		for (const i of idxs) {
 			channels.push(map.programCh(i + 1))
 			const prv = map.previewCh(i + 1)
 			if (prv != null) channels.push(prv)
@@ -74,6 +78,10 @@ async function handlePost(path, body, ctx) {
 		}
 	}
 	const asked = resolveFtbChannels(map, screenIdx)
+	if (asked && screenIdx != null) {
+		const nh = await notHereFor(ctx, { screenIdx })
+		if (nh) return nh
+	}
 	if (!asked) {
 		return {
 			status: 400,
@@ -85,6 +93,7 @@ async function handlePost(path, body, ctx) {
 	// live store would claim black while the master's look stays up). One such screen → 409; "all screens" blacks the
 	// screens this server drives and lists the others in `refused`.
 	const { channels, refused } = splitHeldScreens(ctx, map, screenIdx, asked)
+	const notHere = screenIdx == null ? notHereList(ctx) : []
 	if (!channels.length && refused.length) return airHeldReply(refused[0], { refused })
 
 	try {
@@ -117,7 +126,7 @@ async function handlePost(path, body, ctx) {
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
-			body: jsonBody({ ok: true, screenIdx, ...result, ...(refused.length ? { refused } : {}) }),
+			body: jsonBody({ ok: true, screenIdx, ...result, ...(refused.length ? { refused } : {}), ...(notHere.length ? { notHere } : {}) }),
 		}
 	} catch (e) {
 		if (isAirHeld(e)) return airHeldReply(e)
@@ -131,7 +140,7 @@ async function handlePost(path, body, ctx) {
  * `{ channels, refused: [{ channel, screen, drivenBy }] }`.
  */
 function splitHeldScreens(ctx, map, screenIdx, asked) {
-	const screens = screenIdx == null ? [...Array(map.screenCount).keys()] : [screenIdx]
+	const screens = screenIdx == null ? (map.channelsWhereCabled === true ? localScreens(map) : [...Array(map.screenCount).keys()]) : [screenIdx]
 	const drop = new Set()
 	const refused = []
 	for (const i of screens) {

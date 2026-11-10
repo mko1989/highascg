@@ -10,6 +10,13 @@ const { runTimelineDirectTake } = require('../engine/timeline-take')
 const { notifyTimelineReplication } = require('../replication/replication-hooks')
 const { airHeldBy } = require('../replication/amcp-fanout')
 const { isAirHeld, airHeldReply } = require('../replication/air-held')
+const { notHereFor, notHereReply, isNotHere } = require('./screen-not-here') // WO-1029 plan 07 C1c
+
+/** WO-1029 C1c: 409 NOT_HERE when the routing pins the timeline to a screen that is on another server. */
+async function sendToNotHere(ctx, eng, id, b) {
+	const st = b.sendTo && typeof b.sendTo === 'object' ? b.sendTo : eng._sendToFor?.(id)
+	return st?.screenIdx != null ? notHereFor(ctx, { screenIdx: st.screenIdx }) : null
+}
 
 /** WO-1029: the first channel of this routing that another server drives right now, or null. */
 function timelineHeld(ctx, eng, sendTo) {
@@ -88,6 +95,8 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 				if (!tl) {
 					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
 				}
+				const nh = await sendToNotHere(ctx, eng, id, b)
+				if (nh) return nh
 				// WO-1029 B2: a timeline routed onto a screen another server drives would run with every PGM line refused
 				const held = timelineHeld(ctx, eng, b.sendTo && typeof b.sendTo === 'object' ? b.sendTo : eng._sendToFor?.(id))
 				if (held) return airHeldReply(held)
@@ -102,11 +111,14 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 				if (!eng.get(id)) {
 					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
 				}
+				const nh = await sendToNotHere(ctx, eng, id, b)
+				if (nh) return nh
 				try {
 					const result = await runTimelineDirectTake(ctx, eng, id, b)
 					return { status: 200, headers: JSON_HEADERS, body: jsonBody(result) }
 				} catch (err) {
 					if (isAirHeld(err)) return airHeldReply(err)
+					if (isNotHere(err)) return notHereReply(ctx, err)
 					return {
 						status: 500,
 						headers: JSON_HEADERS,

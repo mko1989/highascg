@@ -259,7 +259,13 @@ function resolveRecordSourceChannel(ctx, outputId) {
 	 * copies of these regexes are gone; only the per-caller fallback differs, and this one keeps
 	 * recording SOMETHING rather than refusing. */
 	const resolved = resolveOutputSourceToChannel(map, picked?.source || 'program_1')
-	return resolved != null ? resolved : map.programCh(1)
+	if (resolved != null) return resolved
+	// WO-1029 C1c: `program_N` / `preview_N` of a screen on another server is NOT_HERE — never screen 1's channel
+	const hole = /^(?:program|preview)_(\d+)$/.exec(String(picked?.source || ''))
+	if (hole && map.channelsWhereCabled === true && !require('../config/screen-channels').isScreenHere(map, Number(hole[1]) - 1)) {
+		throw Object.assign(new Error(`Screen ${hole[1]} is not on this server`), { code: 'NOT_HERE', screenIdx: Number(hole[1]) - 1 })
+	}
+	return map.programCh(1)
 }
 
 module.exports = {

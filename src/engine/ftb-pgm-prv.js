@@ -7,6 +7,7 @@
 
 const { param } = require('../caspar/amcp-utils')
 const { getChannelMap } = require('../config/routing')
+const { loopScreens } = require('../config/screen-channels')
 const playbackTracker = require('../state/playback-tracker')
 const { resolveChannelFramerateForMixerTween } = require('./scene-transition')
 const { TIMELINE_LAYER_BASE, TIMELINE_LAYER_MAX_COUNT } = require('./timeline-playback-helpers')
@@ -28,7 +29,6 @@ function timelineSendToIncludesChannel(self, sendTo, ch) {
 	const st = sendTo || {}
 	const previewOn = st.preview !== false
 	const programOn = st.program !== false
-	const screenCount = map.screenCount || 1
 	const screenIdx = st.screenIdx != null ? st.screenIdx : null
 	const hit = (i) => {
 		let ok = false
@@ -37,10 +37,8 @@ function timelineSendToIncludesChannel(self, sendTo, ch) {
 		return ok
 	}
 	if (screenIdx !== null) return hit(screenIdx)
-	for (let i = 0; i < screenCount; i++) {
-		if (hit(i)) return true
-	}
-	return false
+	// WO-1029 C1b: the screens here only (a hole has no channel to match; same set as the timeline's _channelsFor)
+	return loopScreens(map, 1).some(hit)
 }
 
 /**

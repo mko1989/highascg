@@ -9,6 +9,7 @@
 
 const liveSceneState = require('../state/live-scene-state')
 const { getChannelMap } = require('../config/routing')
+const { localProgramChannels } = require('../config/screen-channels')
 
 /**
  * → [{ channel, sceneId, name }]: every channel in the live store except a preview bus (preview takes share the store).
@@ -17,7 +18,7 @@ const { getChannelMap } = require('../config/routing')
  */
 function programLooks(ctx) {
 	const map = getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel)
-	const programs = new Set((map.programChannels || []).map(Number))
+	const programs = new Set(localProgramChannels(map)) // WO-1029 C1b: holes (screens elsewhere) are no program here
 	const previews = new Set([...(map.previewChannels || []), ...(map.switcherBus1Channels || [])].map(Number))
 	const all = liveSceneState.getAll()
 	return Object.keys(all)

@@ -119,7 +119,19 @@ function makeBusAccessors(lists, activeBuses, holey) {
 	return { programCh, previewCh }
 }
 
+/**
+ * WO-1029 C1b: the screens a consumer's "for each screen" loop visits. Rule on → `localScreens(map)` (a hole is not
+ * part of "all screens" here). Rule off → 0 … screenCount-1 exactly as the legacy loops counted (`screenCount`, or
+ * `fallbackCount` when the map has none), so flag-off callers stay byte-identical.
+ */
+function loopScreens(map, fallbackCount = 0) {
+	if (map?.channelsWhereCabled === true) return localScreens(map)
+	const n = Number(map?.screenCount) || Number(fallbackCount) || 0
+	return Array.from({ length: Math.max(0, n) }, (_, i) => i)
+}
+
 module.exports = {
+	loopScreens,
 	channelsWhereCabledEnabled,
 	screenChannels,
 	isScreenHere,

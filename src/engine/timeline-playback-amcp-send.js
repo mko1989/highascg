@@ -1,6 +1,7 @@
 'use strict'
 
 const { getChannelMap } = require('../config/routing')
+const { loopScreens } = require('../config/screen-channels')
 const {
 	clipAudioRoute,
 	playAfSuffix,
@@ -437,21 +438,26 @@ module.exports = {
 		if (!previewOn && !programOn) return []
 		let map = null
 		try {
-			map = this.self?.config ? getChannelMap(this.self.config) : null
+			map = getChannelMap(this.self?.config || {})
 		} catch (_) {}
-		const screenCount = map?.screenCount || 1
 		const screenIdx = st.screenIdx != null ? st.screenIdx : null
+		/* WO-1029 C1b: holes (screens on another server) get nothing — "every screen" means the screens here, one screen
+		 * that is not here routes nowhere, and the last-resort program fallback below is skipped while holes can exist. */
+		const holey = map?.channelsWhereCabled === true
 		const ch = []
 		const addScreen = (i) => {
 			if (previewOn) {
-				const prv = map?.previewCh ? map.previewCh(i + 1) : (i + 1) * 2
+				const prv = map?.previewCh ? map.previewCh(i + 1) : null
 				if (prv != null) ch.push(prv)
 			}
-			if (programOn) ch.push(map?.programCh ? map.programCh(i + 1) : (i + 1) * 2 - 1)
+			if (programOn) {
+				const pgm = map?.programCh ? map.programCh(i + 1) : null
+				if (pgm != null || !holey) ch.push(pgm) // flag off: pushed as-is, as it always was
+			}
 		}
 		if (screenIdx !== null) addScreen(screenIdx)
-		else for (let i = 0; i < screenCount; i++) addScreen(i)
-		if (ch.length === 0) {
+		else for (const i of loopScreens(map, 1)) addScreen(i)
+		if (ch.length === 0 && !holey) {
 			/* PRV requested but the screen has no PRV bus (pgm_only/pixelmap): route NOWHERE.
 			 * The old fallback crossed to programCh(1) here, which is exactly how scrubbing a
 			 * "preview-only" timeline painted over the live look on PGM-only rigs (todos06.08).

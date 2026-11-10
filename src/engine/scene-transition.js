@@ -4,6 +4,7 @@
  */
 
 const { getChannelMap } = require('../config/routing')
+const { localScreens } = require('../config/screen-channels')
 const { toCasparTween } = require('../caspar/caspar-tween')
 const { normalizeSpeed } = require('../caspar/clip-speed') // WO-973
 const { normalizeProgramLayerBank } = require('./program-layer-bank')
@@ -47,7 +48,9 @@ function programChannelToScreenIdx(config, channel) {
 	 * to 0 sent ch4 (Proj PRV) to screen 0, so the PGM→PRV exchange on ch4 routed the Proj timeline onto
 	 * Dioda ch1/ch2 and STOPped ch3 mid-fade. */
 	const prvIdx = Array.isArray(map.previewChannels) ? map.previewChannels.indexOf(n) : -1
-	return prvIdx >= 0 ? prvIdx : 0
+	/* WO-1029 C1b: a channel that is no screen bus → the first screen ON THIS SERVER (0 while no hole can exist), never
+	 * a screen that is not here. */
+	return prvIdx >= 0 ? prvIdx : (localScreens(map)[0] ?? 0)
 }
 
 function sourceEqual(a, b) {

@@ -157,7 +157,7 @@ const FALLBACK_PATTERNS = [
 /** Hole-safe by construction: programCh returns null for a hole while the rule is on. */
 const HOLE_SAFE = new Set(['src/config/routing-map.js', 'src/config/screen-channels.js'])
 /** Today's count (10.11.2026, after C1a). Converting a consumer lowers it: update the pin, never raise it. */
-const FALLBACK_PIN = 13
+const FALLBACK_PIN = 1
 
 function walk(dir, out = []) {
 	for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

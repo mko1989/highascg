@@ -119,8 +119,11 @@ function globalBorderSlotFromScenes(scenes, screenIdx) {
 function resolveProgramChannel(appCtx, screenIdx) {
 	try {
 		const { getChannelMap } = require('../config/routing')
+		const { screenChannels } = require('../config/screen-channels')
 		const cm = getChannelMap(appCtx.config || {}, appCtx.switcherOutputBusByChannel)
-		const ch = cm?.programChannels?.[screenIdx] ?? cm?.programChannels?.[0]
+		/* WO-1029 C1b: the border's screen is not on this server (a hole) → null, never screen 1's channel or 1. */
+		if (cm?.channelsWhereCabled === true) return screenChannels(cm, screenIdx).pgm
+		const ch = cm.programCh(screenIdx + 1) // flag off: the legacy "past the screens → screen 1" (programCh's own)
 		if (Number.isFinite(ch) && ch >= 1) return ch
 	} catch (_) {}
 	return 1

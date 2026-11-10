@@ -7,6 +7,7 @@ const fs = require('fs')
 const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
 const routingMap = require('./routing-map')
+const { localScreens, loopScreens } = require('./screen-channels')
 const {
 	normalizeAudioPreview,
 	resolveAudioPreviewChannel,
@@ -52,9 +53,12 @@ async function setupPreviewChannel(self, screenIdx) {
 async function setupMultiview(self, layout) {
 	const map = routingMap.getChannelMap(self.config); if (!map.multiviewEnabled || map.multiviewCh == null || !self.amcp) return
 	const ch = map.multiviewCh
-	const finalLayout = (layout && layout.length > 0) ? layout : [
-		{ layer: 11, x: 0, y: 0, w: 0.5, h: 0.5, route: routingMap.getRouteString(map.programCh(1)) },
-		{ layer: 12, x: 0.5, y: 0, w: 0.5, h: 0.5, route: routingMap.getRouteString(map.previewCh(1) || map.programCh(1)) }
+	// WO-1029 C1b: the default cells show the FIRST SCREEN ON THIS SERVER (screen 1 while no hole can exist); none here → no cells
+	const n = (localScreens(map)[0] ?? 0) + 1
+	const pgm = map.programCh(n)
+	const finalLayout = (layout && layout.length > 0) ? layout : (map.channelsWhereCabled === true && pgm == null) ? [] : [
+		{ layer: 11, x: 0, y: 0, w: 0.5, h: 0.5, route: routingMap.getRouteString(pgm) },
+		{ layer: 12, x: 0.5, y: 0, w: 0.5, h: 0.5, route: routingMap.getRouteString(map.previewCh(n) || pgm) }
 	]
 	for (const cell of finalLayout) {
 		await self.amcp.play(ch, cell.layer, cell.route || cell.source)
@@ -153,7 +157,7 @@ async function setupAllRouting(self) {
 		await setupLiveAudioPgmRoutes(self)
 	}
 	await setupAudioPreviewBus(self)
-	for (let n = 1; n <= map.screenCount; n++) await setupPreviewChannel(self, n)
+	for (const i of loopScreens(map)) await setupPreviewChannel(self, i + 1) // WO-1029 C1b: holes have no channels here
 	if (map.switcherBusMode && self.amcp) {
 		if (!self.switcherOutputBusByChannel) self.switcherOutputBusByChannel = {}
 		for (let i = 0; i < map.screenCount; i++) {

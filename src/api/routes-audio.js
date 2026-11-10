@@ -25,6 +25,7 @@ const { startInputCapture } = require('../audio/live-input-start')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const mixerState = require('../audio/mixer-state')
 const inputRouting = require('../audio/input-audio-routing')
+const { notHereFor } = require('./screen-not-here')
 const { handleMonitorPair } = require('./routes-audio-monitor-pair')
 
 /**
@@ -278,6 +279,10 @@ async function handlePost(path, body, ctx) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid body' }) }
 		}
 		const source = String(b.source || 'pgm_1').toLowerCase()
+		if (/^(pgm|prv|preview)_/.test(source)) {
+			const nh = await notHereFor(ctx, { screenIdx: (parseInt(source.split('_')[1], 10) || 1) - 1 }) // WO-1029 C1c: a screen of another server
+			if (nh) return nh
+		}
 		const map = getChannelMap(ctx.config)
 		const previewCh = resolveAudioPreviewChannel(ctx.config, map)
 		const monitorCh = previewCh ?? map.monitorCh

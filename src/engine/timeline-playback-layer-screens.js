@@ -20,12 +20,14 @@ module.exports = {
 	_screenChannelSet(screenIdx) {
 		let map = null
 		try {
-			map = this.self?.config ? getChannelMap(this.self.config) : null
+			map = getChannelMap(this.self?.config || {})
 		} catch (_) {}
 		const screenCount = map?.screenCount || 1
 		if (screenIdx >= screenCount) return null
-		const prv = map?.previewCh ? map.previewCh(screenIdx + 1) : (screenIdx + 1) * 2
-		const pgm = map?.programCh ? map.programCh(screenIdx + 1) : (screenIdx + 1) * 2 - 1
+		/* WO-1029 C1b: a screen that is not on this server (a hole) has NO channels here — its pinned layers go silent,
+		 * never onto a fixed (idx + 1) * 2 number or screen 1 (programCh returns null for a hole). */
+		const prv = map?.previewCh ? map.previewCh(screenIdx + 1) : null
+		const pgm = map?.programCh ? map.programCh(screenIdx + 1) : null
 		return new Set([prv, pgm].filter((c) => c != null))
 	},
 

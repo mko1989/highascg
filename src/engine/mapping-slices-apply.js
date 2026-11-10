@@ -30,7 +30,7 @@ function applyLineFor(ctx, w) {
 	} catch {
 		ch = null
 	}
-	if (!Number.isFinite(Number(ch))) return null
+	if (ch == null || !Number.isFinite(Number(ch))) return null // WO-1029 C1b: a hole (screen elsewhere) has no channel
 	return `APPLY ${ch}-${w.consumerIndex} ${slicesSetParams(w.window)}`
 }
 

@@ -14,6 +14,9 @@
  * src/engine/project-channel-scheme.js converts between the two.
  */
 
+const { channelsWhereCabledEnabled, localScreens, screenChannels } = require('./screen-channels')
+const { notHereError } = require('./not-here')
+
 const CHANNEL_SCHEME_FIRST = 'operator-first-v1'
 const CHANNEL_SCHEME_LEGACY = 'legacy'
 const FLAG_KEY = 'operator_gui_first'
@@ -62,13 +65,22 @@ function channelSchemeFor(config) {
  */
 function defaultProgramChannel(configOrCtx) {
 	const config = configOrCtx && typeof configOrCtx === 'object' && configOrCtx.config && typeof configOrCtx.config === 'object' ? configOrCtx.config : configOrCtx
-	if (!isOperatorGuiFirst(config)) return 1
+	let map
 	try {
-		const ch = parseInt(String(require('./routing').getChannelMap(config).programChannels?.[0] ?? ''), 10)
-		return Number.isFinite(ch) && ch >= 1 ? ch : 1
+		map = isOperatorGuiFirst(config) || channelsWhereCabledEnabled(config) ? require('./routing').getChannelMap(config) : null
 	} catch {
-		return 1
+		map = null
 	}
+	/* WO-1029 C1b: while holes can exist, "PGM of Screen 1" is the FIRST SCREEN ON THIS SERVER (said explicitly);
+	 * none here → NOT_HERE (never 1: that is the operator GUI, nor another box's screen). */
+	if (map?.channelsWhereCabled === true) {
+		const first = localScreens(map)[0]
+		if (first == null) throw notHereError(0)
+		return screenChannels(map, first).pgm
+	}
+	if (!isOperatorGuiFirst(config) || !map) return 1
+	const ch = parseInt(String(screenChannels(map, 0).pgm ?? ''), 10)
+	return Number.isFinite(ch) && ch >= 1 ? ch : 1
 }
 
 module.exports = {

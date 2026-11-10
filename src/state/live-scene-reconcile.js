@@ -7,6 +7,7 @@
 const util = require('util')
 const { parseString } = require('xml2js')
 const { getChannelMap } = require('../config/routing')
+const { localProgramChannels } = require('../config/screen-channels')
 const liveSceneState = require('./live-scene-state')
 const { normalizeProgramLayerBank } = require('../engine/program-layer-bank')
 const { isTimelineOnlyScene, physicalProgramLayer } = require('../engine/scene-transition')
@@ -187,7 +188,7 @@ async function reconcileLiveSceneFromGatheredXml(self, opts = {}) {
 	if (!liveAll || Object.keys(liveAll).length === 0) return
 
 	const map = getChannelMap(self.config || {})
-	const programSet = new Set(map.programChannels || [])
+	const programSet = new Set(localProgramChannels(map)) // WO-1029 C1b: the screens here (holes have no channel)
 	let anyCleared = false
 
 	for (const chStr of Object.keys(liveAll)) {

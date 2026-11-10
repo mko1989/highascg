@@ -7,6 +7,7 @@
 
 const persistence = require('../utils/persistence')
 const { getChannelMap } = require('../config/routing')
+const { loopScreens } = require('../config/screen-channels')
 const { buildChannelMap } = require('../config/channel-map-from-ctx')
 const { runSerialized } = require('../utils/async-serial-queue')
 const { renumberLookLayersConsecutive } = require('../engine/look-layer-ranges')
@@ -132,7 +133,7 @@ function invalidateIfProgramChannel(config, channel) {
 	if (!Number.isFinite(n) || n < 1) return false
 	const map = getChannelMap(config || {})
 	const programs = []
-	for (let i = 0; i < map.screenCount; i++) programs.push(map.programCh(i + 1))
+	for (const i of loopScreens(map)) programs.push(map.programCh(i + 1)) // WO-1029 C1b: holes have no channel here
 	if (!programs.includes(n)) return false
 	if (!getChannel(n)) return false
 	void clearChannel(n)

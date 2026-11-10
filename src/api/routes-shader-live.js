@@ -19,6 +19,7 @@
  */
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const S = require('../shaderfx/shader-live-session')
 const Ops = require('../shaderfx/shader-live-ops')
 const { liveShaderInstances } = require('../shaderfx/shader-live-instances')
@@ -119,6 +120,8 @@ async function handleAudition(body, ctx) {
 	const sid = (value.toLowerCase().match(/sh-[a-z0-9-]+$/) || [])[0]
 	if (!sid) return reply(400, { ok: false, error: 'value must be a shader template (…/sh-<id>)' })
 	const main = Math.max(0, parseInt(b.mainIndex, 10) || 0)
+	const nh = await notHereFor(ctx, { screenIdx: main }) // WO-1029 C1c
+	if (nh) return nh
 	const rm = getRouteMap(ctx)
 	const programCh = rm.programChannels?.[main]
 	const prvCh = rm.previewChannels?.[main]

@@ -303,6 +303,8 @@ module.exports = [
 	'tools/smoke/smoke-cwc-holey-map.test.js',
 	'tools/smoke/smoke-cwc-cabled-predicate.test.js',
 	'tools/smoke/smoke-cwc-channel-rule.test.js',
+	'tools/smoke/smoke-cwc-engine-holes.test.js',
+	'tools/smoke/smoke-cwc-api-holes.test.js',
 	'tools/smoke/smoke-wo1029-virtual-remote-client.test.js',
 	'tools/smoke/smoke-wo1029-virtual-takeover.test.js',
 	'tools/smoke/smoke-wo1029-virtual-handover.test.js',

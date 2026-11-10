@@ -14,6 +14,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const ctl = require('../engine/led-test-card-control')
 const { airHeldBy } = require('../replication/amcp-fanout')
 const { airHeldReply } = require('../replication/air-held') // WO-1029 B2
+const { notHereFor, notHereList, screenTarget } = require('./screen-not-here') // WO-1029 plan 07 C1c
 
 const reply = (status, body) => ({ status, headers: JSON_HEADERS, body: jsonBody(body) })
 
@@ -64,7 +65,14 @@ async function handlePost(op, body, ctx) {
 		const held = new Set(refused.map((h) => h.channel))
 		const opts = refused.length ? { channels: targets.filter((c) => !held.has(c)), masterOff: !enabled } : {}
 		const r = await ctl.applyCard(ctx, enabled, opts)
-		return reply(r.ok ? 200 : 502, refused.length ? { ...r, refused } : r)
+		const notHere = notHereList(ctx) // the screens on other servers get no card from here
+		return reply(r.ok ? 200 : 502, refused.length || notHere.length ? { ...r, ...(refused.length ? { refused } : {}), ...(notHere.length ? { notHere } : {}) } : r)
+	}
+	// WO-1029 C1c: `screenIdx` addresses a screen; one on another server is a typed 409 (a raw `channel` stays as is)
+	if (b.channel == null && b.screenIdx != null) {
+		const nh = await notHereFor(ctx, { screenIdx: b.screenIdx })
+		if (nh) return nh
+		b.channel = screenTarget(ctx, { screenIdx: b.screenIdx }).pgm
 	}
 	const ch = parseInt(String(b.channel), 10)
 	if (!Number.isFinite(ch) || ch < 1) return reply(400, { error: 'channel must be a positive channel number' })

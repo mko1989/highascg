@@ -19,6 +19,7 @@
  */
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const liveSceneState = require('../state/live-scene-state')
 const { physicalProgramLayer } = require('../engine/scene-transition')
 const { getRouteMap, stripEphemeralTakeFields, chainSceneTakeWork } = require('./routes-scene-shared')
@@ -43,6 +44,8 @@ async function handlePost(body, ctx) {
 	if (!clear && !value) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'value required (or clear: true)' }) }
 	}
+	const nh = await notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c
+	if (nh) return nh
 	const routeMap = getRouteMap(ctx)
 	const channel = routeMap.programChannels?.[mainIdx]
 	if (!Number.isFinite(channel)) {

@@ -25,6 +25,7 @@ const path = require('path')
 const { pathToFileURL } = require('url')
 const { normalizeSpeed } = require('../caspar/clip-speed') // WO-973
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const { REPO_ROOT } = require('../repo-paths')
 
 const NUDGE_MAX_LAYERS = 12
@@ -101,6 +102,8 @@ async function handlePreviewPush(body, ctx, deps = {}) {
 	const map = require('../engine/scene-take-payload').withProgramResolutions(getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
 	const scope = parseInt(String(scene.mainScope ?? ''), 10)
 	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+	const nh = await notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c: a look of a screen on another server
+	if (nh) return nh
 	const pgmCh = Number(map.programChannels?.[mainIdx] ?? map.playbackChannels?.[mainIdx])
 	const prvCh = Number(map.previewChannels?.[mainIdx])
 	if (!(Number.isFinite(prvCh) && prvCh > 0 && prvCh !== pgmCh)) {

@@ -1,6 +1,7 @@
 'use strict'
 
 const { removeStalePreviewStreamConsumers } = require('../streaming/caspar-ffmpeg-setup')
+const { screenChannels } = require('../config/screen-channels')
 
 /**
  * On Caspar connect/restart, strip stale preview STREAM/NDI consumers from older configs.
@@ -9,8 +10,11 @@ function createStreamingLifecycle({ appCtx, config, getChannelMap }) {
 	function buildStalePreviewTargets(basePort) {
 		const cm = getChannelMap(config)
 		const targets = []
-		const pgmCh = cm.programChannels?.[0] ?? 1
-		targets.push({ name: 'pgm_1', channel: pgmCh, port: basePort + 1 })
+		/* Screen 1's PGM. WO-1029 C1b: while holes can exist, only when screen 1 is on this server (a hole has no channel
+		 * here; channel 1 is not it). Flag off: the legacy default 1. */
+		const s1 = screenChannels(cm, 0)
+		if (cm.channelsWhereCabled !== true) targets.push({ name: 'pgm_1', channel: s1.pgm ?? 1, port: basePort + 1 })
+		else if (s1.here) targets.push({ name: 'pgm_1', channel: s1.pgm, port: basePort + 1 })
 		if (cm.multiviewCh != null) {
 			targets.push({ name: 'multiview', channel: cm.multiviewCh, port: basePort + 5 })
 		}

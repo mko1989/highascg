@@ -1,5 +1,7 @@
 'use strict'
 
+const { loopScreens } = require('../config/screen-channels')
+
 /**
  * @param {object} opts
  * @param {object} opts.appCtx
@@ -105,9 +107,8 @@ function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCas
 				const liveSceneState = require('../state/live-scene-state')
 				const map = getChannelMap(config || {})
 				const programChannels = []
-				for (let i = 0; i < map.screenCount; i++) {
-					programChannels.push(map.programCh(i + 1))
-				}
+				// WO-1029 C1b: the screens on this server only (a hole has no channel — never `CG null-…`)
+				for (const i of loopScreens(map)) programChannels.push(map.programCh(i + 1))
 				await sweepTemplateCgOrphansOnCasparConnected({
 					amcp: appCtx.amcp,
 					liveState: liveSceneState.getAll(),

@@ -64,12 +64,18 @@ async function rekeyLiveLooks(ctx, snap, { deps: injected, newRoles } = {}) {
 		if (!entry) continue
 		const to = map(look.channel)
 		if (to === look.channel) continue
-		if (to == null) dropped.push({ what: `look ${look.name || look.scene_id} (ch ${look.channel})`, why: 'its destination no longer exists' })
+		if (to == null) dropped.push({ what: `look ${look.name || look.scene_id} (ch ${look.channel})`, why: goneWhy(snap, roles, look.channel, 'its destination no longer exists') })
 		moves.push({ from: look.channel, to, entry })
 	}
 	for (const m of moves) await deps.liveSceneState.clearChannel(m.from)
 	for (const m of moves) if (m.to != null) await deps.liveSceneState.setChannel(m.to, m.entry)
 	return { moved: moves.filter((m) => m.to != null).map((m) => ({ from: m.from, to: m.to })), dropped }
+}
+
+/** WO-1029 C1b: a role with no channel here because its screen is on another server says so (NOT_HERE), not "gone". */
+function goneWhy(snap, roles, oldCh, gone) {
+	const role = snap.roles?.[String(oldCh)]
+	return role && roles.notHere?.has(role) ? 'its screen is not on this server (NOT_HERE) — content dropped here' : gone
 }
 
 const otherBank = (b) => (b === 'b' ? 'a' : 'b')
@@ -140,7 +146,7 @@ async function restoreChannels(ctx, snap, { deps: injected, newRoles } = {}) {
 		const ch = mapChannel(sc.channel)
 		const name = `${sc.label || sc.role} (was ch ${sc.channel})`
 		if (ch == null) {
-			out.skipped.push({ what: name, why: 'destination no longer exists — its content dropped' })
+			out.skipped.push({ what: name, why: goneWhy(snap, roles, sc.channel, 'destination no longer exists — its content dropped') })
 			continue
 		}
 		const held = deps.airHeld(ch)

@@ -2,6 +2,8 @@
 
 const { getChannelMap } = require('../config/routing')
 const { defaultProgramChannel } = require('../config/operator-gui-first')
+const { isScreenHere } = require('../config/screen-channels')
+const { notHereError } = require('../config/not-here')
 const { LOOK_LAYER_MIN } = require('./look-layer-ranges')
 
 /** Caspar host layers for HTML/CG overlays above the look stack (10–199). */
@@ -78,7 +80,7 @@ function channelMapFromCtx(ctx) {
  * @param {object} [ctx]
  * @param {number} [fallbackChannel] default PGM Screen 1 (1 unless Operator GUI first — WO-868)
  */
-function resolveCgRequestChannel(body, ctx, fallbackChannel = defaultProgramChannel(ctx)) {
+function resolveCgRequestChannel(body, ctx, fallbackChannel) {
 	const b = body && typeof body === 'object' ? body : {}
 	if (b.channel != null) {
 		const ch = parseInt(b.channel, 10)
@@ -89,6 +91,8 @@ function resolveCgRequestChannel(body, ctx, fallbackChannel = defaultProgramChan
 		const idx = parseInt(idxRaw, 10)
 		if (Number.isFinite(idx) && idx >= 0) {
 			const map = channelMapFromCtx(ctx)
+			/* WO-1029 C1b: an explicit screen that is not on this server is NOT_HERE — never the default's channel. */
+			if (map.channelsWhereCabled === true && !isScreenHere(map, idx)) throw notHereError(idx)
 			const programs = map.programChannels || []
 			if (programs[idx] != null) {
 				const ch = parseInt(programs[idx], 10)
@@ -96,7 +100,8 @@ function resolveCgRequestChannel(body, ctx, fallbackChannel = defaultProgramChan
 			}
 		}
 	}
-	const fb = parseInt(fallbackChannel, 10)
+	// lazy (WO-1029 C1b): the default may be NOT_HERE, which must not fire when an explicit channel answered
+	const fb = parseInt(fallbackChannel === undefined ? defaultProgramChannel(ctx) : fallbackChannel, 10)
 	return Number.isFinite(fb) && fb > 0 ? fb : 1
 }
 

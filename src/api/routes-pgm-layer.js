@@ -31,6 +31,8 @@ function pgmLayers(snapshot, channelMap, banks, now = Date.now()) {
 		const label = String(channelMap.screenLabels?.[i] || `Screen ${i + 1}`)
 		const v = videos.find((x) => x.channel === ch)
 		if (!v) {
+			// WO-1029 C1c: a screen that is on another server has no channel here (`channel: null`)
+			if (ch == null) return { screen: i, label, channel: null, here: false, active: false, layer: null, clip: '', remainingSec: null, durationSec: null, elapsedSec: null, progress: 0, paused: false }
 			return { screen: i, label, channel: ch, active: false, layer: null, clip: '', remainingSec: null, durationSec: null, elapsedSec: null, progress: 0, paused: false }
 		}
 		const remaining = Math.max(0, Math.min(v.duration_s, v.remaining_s))

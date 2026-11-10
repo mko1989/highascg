@@ -4,6 +4,8 @@
 
 'use strict'
 
+const { localScreens } = require('../config/screen-channels')
+
 const MV_STAGE_W = 1920
 const MV_STAGE_H = 1080
 const MV_TIMER_TITLE_PX = 28
@@ -24,7 +26,16 @@ function normalizePrvRouteSource(src, previewChannels) {
 }
 
 /**
- * Determine the route string for a given cell.
+ * WO-1029 C1b: a PGM/PRV cell of a screen that is not on this server (a hole while the rule is on) gets NO route
+ * (null — the cell stays empty; a placeholder is a later step), never `route://null` or another screen's channel.
+ * Flag off: the legacy string, whatever the channel.
+ */
+function screenRoute(map, ch) {
+	return ch == null && map?.channelsWhereCabled === true ? null : `route://${ch}`
+}
+
+/**
+ * Determine the route string for a given cell (null: a hole — see screenRoute).
  */
 function routeForCell(cell, map, inputsCh, previewChannels) {
 	// WO-271: a persisted cell.source route string can carry a channel number from an OLD map
@@ -43,13 +54,13 @@ function routeForCell(cell, map, inputsCh, previewChannels) {
 	const pgmM = cell.id?.match(/^pgm(?:_(\d+))?$/)
 	if (pgmM || cell.type === 'pgm') {
 		const n = pgmM?.[1] != null ? parseInt(pgmM[1], 10) + 1 : 1
-		return `route://${map.programCh(n)}`
+		return screenRoute(map, map.programCh(n))
 	}
 	// Support prv / prv_0 (screen 1) ... prv_N (screen N+1)
 	const prvM = cell.id?.match(/^prv(?:_(\d+))?$/)
 	if (prvM || cell.type === 'prv') {
 		const n = prvM?.[1] != null ? parseInt(prvM[1], 10) + 1 : 1
-		return `route://${map.previewCh(n) || map.programCh(n)}`
+		return screenRoute(map, map.previewCh(n) || map.programCh(n))
 	}
 	if (cell.type === 'decklink') {
 		// WO-53: each DeckLink input has its own dedicated channel; route the channel layer = slot.
@@ -72,7 +83,8 @@ function routeForCell(cell, map, inputsCh, previewChannels) {
 		if (ch != null) return `route://${ch}-${i}`
 		if (inputsCh) return `route://${inputsCh}-${i}`
 	}
-	return `route://${map.programCh(1)}`
+	// unknown cell → the first screen's PGM; WO-1029 C1b: the first screen ON THIS SERVER (screen 1 while no hole exists)
+	return screenRoute(map, map.programCh((localScreens(map)[0] ?? 0) + 1))
 }
 
 /**

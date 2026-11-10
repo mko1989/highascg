@@ -8,6 +8,7 @@
  */
 
 const { channelRoles } = require('../config/channel-remap')
+const { isScreenHere } = require('../config/screen-channels')
 const { routingDestinationsFromConfig, isMainBusDestinationMode } = require('../config/screen-destinations')
 
 /** main screen index → destination id ('' when none owns it). */
@@ -48,7 +49,13 @@ function rolesOf(config, getChannelMap = (c) => require('../config/routing').get
 	}
 	const byChannel = new Map()
 	for (const [r, ch] of byRole) if (!byChannel.has(ch)) byChannel.set(ch, r)
-	return { byRole, byChannel, label, kind: roleKind }
+	/* WO-1029 C1b: the roles of screens that EXIST but are output by another server (holes) — their content is dropped
+	 * with "not on this server", never moved onto a screen that is here. Empty while the rule is off. */
+	const notHere = new Set()
+	if (map.channelsWhereCabled === true) {
+		for (let i = 0; i < n; i++) if (ids[i] && !isScreenHere(map, i)) notHere.add(`pgm:${ids[i]}`).add(`prv:${ids[i]}`)
+	}
+	return { byRole, byChannel, label, kind: roleKind, notHere }
 }
 
 /** 'program' | 'preview' | 'other' — the restore order (program first). */

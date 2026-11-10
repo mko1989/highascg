@@ -17,6 +17,7 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const screenTimers = require('../engine/screen-timers')
 const { getChannelMap } = require('../config/routing')
+const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 
 /** CG sub-layer index for consistency with scene take. */
 const CG_SUBLAYER = 0
@@ -91,6 +92,10 @@ async function handlePost(p, body, ctx) {
 	const cmd = m[1]
 	let result
 
+	if (cmd !== 'cmd' && Number.isFinite(b.screenIdx)) {
+		const nh = await notHereFor(ctx, { screenIdx: b.screenIdx }) // WO-1029 C1c: a screen of another server has no channel here
+		if (nh) return nh
+	}
 	if (cmd === 'assign') {
 		result = await handleAssign(b, ctx)
 	} else if (cmd === 'unassign') {

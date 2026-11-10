@@ -13,6 +13,7 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const { getRouteMap } = require('./routes-scene-shared')
 const { parsePrintFilenameFromAmcpData } = require('../media/live-thumbnail-cache-capture')
 
@@ -51,6 +52,10 @@ async function handlePgmCapture(body, ctx) {
 		return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 	}
 	const b = parseBody(body)
+	if (b.mainIndex != null) {
+		const nh = await notHereFor(ctx, { screenIdx: b.mainIndex }) // WO-1029 C1c
+		if (nh) return nh
+	}
 	const channel = resolvePgmCaptureChannel(ctx, b)
 	if (!channel) {
 		return {

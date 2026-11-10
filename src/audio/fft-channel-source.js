@@ -15,6 +15,7 @@
  */
 
 const { getChannelMap, readCasparSetting } = require('../config/routing-map')
+const { loopScreens } = require('../config/screen-channels')
 const { resolveAudioFftSourceSlot, listConfiguredLiveAudioSlots } = require('../config/live-audio-input')
 const { amcpInfoText } = require('../streaming/caspar-ffmpeg-setup')
 
@@ -76,7 +77,8 @@ function describeFftSource(cfg) {
 	const map = getChannelMap(cfg)
 	const options = [{ id: 'none', label: 'None (OSC levels only)' }]
 	for (const s of listConfiguredLiveAudioSlots(cfg).slots) options.push({ id: `slot:${s.slot}`, label: `Input slot ${s.slot}` })
-	for (let d = 1; d <= map.screenCount; d++) {
+	for (const d of loopScreens(map).map((i) => i + 1)) {
+		// WO-1029 C1b: a screen on another server has no channel to tap here — not offered
 		options.push({ id: `channel:${d}:pgm`, label: `Screen ${d} program (ch ${map.programCh(d)})` })
 		if (map.previewCh(d) != null) options.push({ id: `channel:${d}:prv`, label: `Screen ${d} preview (ch ${map.previewCh(d)})` })
 	}

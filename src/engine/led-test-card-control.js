@@ -12,6 +12,7 @@
  */
 
 const persistence = require('../utils/persistence')
+const { localProgramChannels } = require('../config/screen-channels')
 
 const KEY = 'ledTestCard'
 
@@ -148,7 +149,9 @@ function chans(list) {
  */
 function planTargets(settings, channelMap, enabled, channels) {
 	const cm = channelMap || {}
-	const program = chans(cm.programChannels?.length ? cm.programChannels : [1])
+	/* WO-1029 C1b: "all program channels" = the screens on THIS server; with holes and no local screen it is none (never
+	 * the [1] default — channel 1 is the operator GUI there). */
+	const program = cm.channelsWhereCabled === true ? localProgramChannels(cm) : chans(cm.programChannels?.length ? cm.programChannels : [1])
 	const mv = chans([cm.multiviewCh, ...(Array.isArray(cm.multiviewChannels) ? cm.multiviewChannels : [])])
 	const picked = chans([...Object.keys(settings.channelsEnabled || {}), ...Object.keys(settings.gridByChannel || {})])
 	if (Array.isArray(channels) && channels.length) return chans(channels)

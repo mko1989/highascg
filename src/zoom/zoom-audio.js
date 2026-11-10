@@ -25,6 +25,7 @@ const path = require('path')
 const dgram = require('dgram')
 const { spawn: nodeSpawn, execFile } = require('child_process')
 const { promisify } = require('util')
+const { loopScreens } = require('../config/screen-channels')
 const { getChannelMap } = require('../config/routing-map')
 const { amcpInfoText } = require('../streaming/caspar-ffmpeg-setup')
 const { buildConf, SINK_IN, SRC_OUT, TAP, FEEDER } = require('./zoom-audio-conf')
@@ -44,7 +45,8 @@ function defaultFeeds(config) {
 	const out = []
 	try {
 		const map = getChannelMap(config || {})
-		for (let d = 1; d <= map.screenCount; d++) {
+		for (const d of loopScreens(map).map((i) => i + 1)) {
+			// WO-1029 C1b: only the screens on this server feed the return (a hole has no channel here)
 			const pg = map.programCh(d)
 			if (Number.isInteger(pg) && pg >= 1) out.push({ id: `pgm:${d}`, label: `Screen ${d} program (ch ${pg})`, channel: pg })
 			const pv = map.previewCh(d)

@@ -8,6 +8,7 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const liveSceneState = require('../state/live-scene-state')
 const { takeOverlayLook } = require('../engine/overlay-look')
 const { stopOverlayLook, getAll: getOverlayLive } = require('../engine/overlay-look-live')
@@ -79,6 +80,8 @@ async function handleOverlayLookStop(body, ctx) {
 	const routeMap = getRouteMap(ctx)
 	let channel = parseInt(String(b.channel ?? ''), 10)
 	if (!Number.isFinite(channel) && Number.isFinite(Number(b.mainIdx))) {
+		const nh = await notHereFor(ctx, { screenIdx: b.mainIdx }) // WO-1029 C1c
+		if (nh) return nh
 		channel = Number(routeMap.programChannels?.[Number(b.mainIdx)])
 	}
 	if (!Number.isFinite(channel) || channel < 1) {

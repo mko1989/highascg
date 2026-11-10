@@ -12,6 +12,7 @@ const { resolveCasparCinfMediaId } = require('../media/caspar-cls-id')
 const { MEDIA_FILE_EXT } = require('../utils/media-browser-dedupe')
 const { isTemplateClip } = require('../state/playback-tracker-media')
 const { getChannelMap } = require('../config/routing')
+const { localScreens } = require('../config/screen-channels')
 const { getModeDimensions } = require('../config/config-modes')
 const { buildChannelMap } = require('../config/channel-map-from-ctx')
 
@@ -109,7 +110,7 @@ function getScreenIndexForChannel(config, channel) {
 		const prvCh = map.previewCh(i + 1)
 		if (map.programCh(i + 1) === n || (prvCh != null && prvCh === n)) return i
 	}
-	return 0
+	return localScreens(map)[0] ?? 0 // WO-1029 C1b: the first screen here (0 while no hole can exist)
 }
 
 /**

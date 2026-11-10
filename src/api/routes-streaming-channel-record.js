@@ -31,7 +31,13 @@ async function handlePostRecord(body, ctx) {
 	const action = b.action === 'stop' ? 'stop' : 'start'
 	const outputId = String(b.outputId || '').trim()
 	const outCfg = resolveRecordOutputConfig(ctx.config || {}, outputId)
-	const ch = outputId ? resolveRecordSourceChannel(ctx, outputId) : map.streamingCh
+	let ch
+	try {
+		ch = outputId ? resolveRecordSourceChannel(ctx, outputId) : map.streamingCh
+	} catch (e) {
+		if (e?.code === 'NOT_HERE') return require('./screen-not-here').notHereReply(ctx, e) // WO-1029 C1c
+		throw e
+	}
 	if (ch == null) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'No recording source channel available' }) }
 	}

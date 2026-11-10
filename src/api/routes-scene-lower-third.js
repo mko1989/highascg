@@ -16,6 +16,7 @@
  */
 
 const path = require('path')
+const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const { pathToFileURL } = require('url')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { REPO_ROOT } = require('../repo-paths')
@@ -74,6 +75,8 @@ async function handleSceneLowerThird(body, ctx, deps = {}) {
 	const map = getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}
 	const scope = parseInt(String(scene.mainScope ?? ''), 10)
 	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+	const nh = await notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c
+	if (nh) return nh
 	const channel = editBusChannel(map, mainIdx)
 	if (!channel) return out(200, { ok: false, reason: 'no_channel', mainIdx })
 	const routing = { channel, layer: ln, templateHostLayer: 1 }

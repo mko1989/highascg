@@ -14,6 +14,7 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const { getRouteMap } = require('./routes-scene-shared')
 const { computeBorderLines, cancelPendingBorderClear } = require('./routes-scene-border')
 const { scheduleProjectSyncBroadcast } = require('./routes-data-project-sync')
@@ -114,6 +115,8 @@ async function handleGlobalBorderControl(body, ctx) {
 	if (!Number.isFinite(screenIdx) || screenIdx < 0 || screenIdx >= screenCount) {
 		return bad(400, `screen out of range (0..${Math.max(0, screenCount - 1)})`)
 	}
+	const nh = await notHereFor(ctx, { screenIdx }) // WO-1029 C1c
+	if (nh) return nh
 	if (!ctx.amcp) return bad(503, 'Caspar not connected')
 
 	const { loadFullProject, persistProject } = require('../engine/project-scenes')

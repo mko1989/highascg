@@ -1,6 +1,8 @@
 'use strict'
 
 const { getChannelMap } = require('../config/routing')
+const { loopScreens, isScreenHere } = require('../config/screen-channels')
+const { notHereError } = require('../config/not-here')
 const { param } = require('../caspar/amcp-utils')
 const liveSceneState = require('../state/live-scene-state')
 const {
@@ -85,11 +87,11 @@ function collectClipOpacityFadeLayers(eng, tl, pos) {
  */
 async function runTimelineDirectTake(ctx, eng, tlId, body) {
 	const map = getChannelMap(ctx?.config || {})
-	const screenCount = map?.screenCount || 1
+	/* WO-1029 C1b: "all" = the screens on this server; one screen that is not here → NOT_HERE (its programCh is null,
+	 * and the `?? 1` defaults below would have landed it on channel 1). */
 	const targetIdxs =
-		body.screenIdx === null || body.screenIdx === 'all'
-			? Array.from({ length: screenCount }, (_, i) => i)
-			: [Math.max(0, parseInt(body.screenIdx, 10) || 0)]
+		body.screenIdx === null || body.screenIdx === 'all' ? loopScreens(map, 1) : [Math.max(0, parseInt(body.screenIdx, 10) || 0)]
+	if (map?.channelsWhereCabled === true) for (const i of targetIdxs) if (!isScreenHere(map, i)) throw notHereError(i)
 
 	const tl = eng.get(tlId)
 	if (!tl) throw new Error('Timeline not found')
@@ -183,11 +185,12 @@ async function runTimelineDirectTake(ctx, eng, tlId, body) {
 
 	for (const sIdx of targetIdxs) {
 		const programCh = map?.programCh?.(sIdx + 1) ?? 1
-		const previewCh = map?.previewCh?.(sIdx + 1) ?? 2
+		// WO-1029 C1b: with holes a PGM-only screen has no PRV here — the legacy `2` may be another screen's PGM
+		const previewCh = map?.previewCh?.(sIdx + 1) ?? (map?.channelsWhereCabled === true ? null : 2)
 		await clearSceneProgramLookStackLayers(amcp, programCh, ctx)
-		await clearSceneProgramLookStackLayers(amcp, previewCh, ctx)
+		if (previewCh != null) await clearSceneProgramLookStackLayers(amcp, previewCh, ctx)
 		await amcp.mixerCommit(programCh).catch(() => {})
-		await amcp.mixerCommit(previewCh).catch(() => {})
+		if (previewCh != null) await amcp.mixerCommit(previewCh).catch(() => {})
 		liveSceneState.clearChannel(programCh)
 	}
 

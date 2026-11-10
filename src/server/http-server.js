@@ -380,6 +380,12 @@ function startHttpServer(options) {
 			const msg = e instanceof Error ? e.message : String(e)
 			// WO-1029: a screen held by the cluster master is the operator's to read (409 + who), not a gateway fault
 			const held = e && e.code === 'AIR_HELD'
+			if (e && e.code === 'NOT_HERE') {
+				// WO-1029 plan 07 C1c: a screen with no channel on this server — typed 409, same body as the routes' own
+				const reply = require('../api/screen-not-here').notHereFromError(e)
+				res.writeHead(409, mergeCors({ 'Content-Type': 'application/json; charset=utf-8' }, req))
+				return res.end(reply.body)
+			}
 			res.writeHead(held ? 409 : 502, mergeCors({ 'Content-Type': 'application/json; charset=utf-8' }, req))
 			res.end(JSON.stringify(held ? { error: msg, code: 'AIR_HELD', drivenBy: e.drivenBy || '', channel: e.channel } : { error: msg }))
 		}

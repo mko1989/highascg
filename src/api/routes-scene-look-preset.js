@@ -133,6 +133,8 @@ async function clearDestination(ctx, mainIdx, target, cut, takeGroup) {
 
 async function fadeProgramToBlack(ctx, mainIdx, cut, sync) {
 	const map = require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}) || {}, ctx)
+	const nh = await require('./screen-not-here').notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c
+	if (nh) return nh
 	const ch = Number(map?.programChannels?.[mainIdx])
 	if (!Number.isFinite(ch) || ch <= 0 || !ctx?.amcp) return out(400, { ok: false, error: `no program channel for main ${mainIdx}` })
 	const fps = map?.programResolutions?.[mainIdx]?.fps ?? 50

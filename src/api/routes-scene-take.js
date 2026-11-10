@@ -30,6 +30,8 @@ const {
 	getRouteMap,
 } = require('./routes-scene-shared')
 
+const { channelForScreen } = require('./screen-not-here')
+
 const TAKE_TIMEOUT_MS = 120000
 
 function liveEntryFromTake(inc, takeUpdatedAt) {
@@ -66,7 +68,9 @@ function handleSceneTake(body, ctx) {
 
 async function handleSceneTakeInner(body, ctx, sync) {
 	const b = parseBody(body)
-	const channel = parseInt(b.channel, 10)
+	const sel = await channelForScreen(ctx, b) // WO-1029 C1c: `screenIdx` on a screen of another server → 409 NOT_HERE
+	if (sel.reply) return sel.reply
+	const channel = sel.channel
 	if (!channel || channel < 1) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'channel required' }) }
 	}

@@ -117,7 +117,7 @@ function programFps(ctx, sceneId) {
 	let ch = liveProgramChannel(ctx, sceneId)
 	if (ch == null) {
 		try {
-			ch = ctx.state?.getState?.()?.channelMap?.programChannels?.[0] ?? 1
+			ch = require('../config/screen-channels').localProgramChannels(ctx.state?.getState?.()?.channelMap)[0] ?? 1 // WO-1029 C1c: first screen HERE
 		} catch {
 			ch = 1
 		}

@@ -287,6 +287,7 @@ class DmxBorderReceiverBase {
 		const applyKey = overlayApplyKey(type, payloadParams)
 
 		const channel = this._resolveProgramChannel()
+		if (channel == null) return // WO-1029 C1b: the border's screen is not on this server — nothing to drive here
 		const prevType = this._addedTypeByChannel.get(channel)
 		const typeChanged = prevType != null && String(type) !== String(prevType)
 		const needsAdd = prevType == null || typeChanged

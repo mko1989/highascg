@@ -274,6 +274,12 @@ async function _doApplyMultiviewLayout(b, ctx, ch, map, opts = {}) {
 	const failed = []
 	for (const cell of layout) {
 		const route = routeForCell(cell, map, inputsCh, previewChannels)
+		if (route == null) {
+			// WO-1029 C1b: the cell's screen is not on this server — leave the cell empty (no PLAY, no route://null)
+			ctx.log('debug', `Multiview: cell "${cell.label || cell.id || `L${layer}`}" left empty — its screen is not on this server`)
+			layer++
+			continue
+		}
 		// WO-156: a cell routing the multiview channel into itself starves/wedges the channel —
 		// skip the cell (with a warning) instead of failing the whole apply.
 		const selfRoute = findSelfRouteViolation(route, ch)

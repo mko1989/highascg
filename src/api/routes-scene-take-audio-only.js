@@ -11,6 +11,7 @@ const liveAudioOnlyLookState = require('../state/live-audio-only-look-state')
 const { takeAudioOnlyLook, stopAudioOnlyLook } = require('../engine/audio-only-look')
 const { airHeldBy } = require('../replication/amcp-fanout')
 const { airHeldReply, isAirHeld } = require('../replication/air-held')
+const { channelForScreen } = require('./screen-not-here')
 const { resolvePreviewChannel, isPreviewTakeTarget, getRouteMap } = require('./routes-scene-shared')
 
 function resolveMainIdxForChannel(routeMap, channel) {
@@ -76,7 +77,9 @@ async function handleAudioOnlyLookTake(b, ctx, channel, inc) {
  */
 async function handleAudioOnlyLookStop(body, ctx) {
 	const b = parseBody(body)
-	const channel = parseInt(b.channel, 10)
+	const sel = await channelForScreen(ctx, b) // WO-1029 C1c
+	if (sel.reply) return sel.reply
+	const channel = sel.channel
 	if (!channel || channel < 1) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'channel required' }) }
 	}

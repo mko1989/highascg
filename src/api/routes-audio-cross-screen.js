@@ -26,6 +26,8 @@ async function lib() {
 	return _lib
 }
 
+const { notHereList } = require('./screen-not-here')
+
 function reply(status, payload) {
 	return { status, headers: JSON_HEADERS, body: jsonBody(payload) }
 }
@@ -51,7 +53,9 @@ async function handlePlan(body, ctx) {
 	const b = parseBody(body) || {}
 	const sources = (Array.isArray(b.sources) ? b.sources : []).slice(0, 200)
 	return reply(200, {
-		screens: programChannels(map).map((channel, index) => ({ channel, index })),
+		// WO-1029 C1c: `index` is the screen index (a hole keeps its slot); screens on other servers are listed apart
+		screens: (map.programChannels || []).map((c, index) => ({ channel: Number(c), index })).filter((s) => Number.isInteger(s.channel) && s.channel >= 1),
+		...(notHereList(ctx).length ? { notHere: notHereList(ctx) } : {}),
 		sources: sources.map((s) => planSource(L, map, s)),
 	})
 }

@@ -1,6 +1,7 @@
 'use strict'
 
 const { readCasparSetting } = require('./routing-map')
+const { isScreenHere } = require('./screen-channels')
 
 /**
  * @param {object} config
@@ -48,7 +49,10 @@ function resolveAudioPreviewChannel(config, map) {
 	if (!ap.enabled) return map.monitorCh ?? null
 	if (ap.bus === 'multiview') return map.multiviewCh ?? null
 	const ch = map.previewCh(ap.screenIndex)
-	return ch != null ? ch : map.previewCh(1)
+	if (ch != null) return ch
+	// WO-1029 C1b: the preview screen is not on this server → no preview bus here (screen 1's PRV is not it)
+	if (map.channelsWhereCabled === true && !isScreenHere(map, ap.screenIndex - 1)) return null
+	return map.previewCh(1)
 }
 
 /**
@@ -68,11 +72,17 @@ function resolveAudioPreviewDefaultRoute(config, map) {
 	if (pm) {
 		const { getRouteString } = require('./routing-map')
 		const i = parseInt(pm[1], 10)
-		if (i >= 1 && i <= map.screenCount) return getRouteString(map.programCh(i))
+		if (i >= 1 && i <= map.screenCount) {
+			const pgm = map.programCh(i)
+			// WO-1029 C1b: program_N of a screen on another server has no channel here — no route://null
+			if (pgm == null && map.channelsWhereCabled === true) return null
+			return getRouteString(pgm)
+		}
 	}
 	const pr = src.match(/^preview[_-]?(\d+)$/) || src === 'preview_1' || src === 'prv'
 	const i = pr && pr[1] != null ? parseInt(pr[1], 10) : ap.screenIndex
-	const p = map.previewCh(i) || map.previewCh(1)
+	// WO-1029 C1b: no "screen 1" stand-in while holes can exist (it may be another server's screen, or a different one)
+	const p = map.previewCh(i) || (map.channelsWhereCabled === true ? null : map.previewCh(1))
 	if (p != null) {
 		const { getRouteString } = require('./routing-map')
 		return getRouteString(p)

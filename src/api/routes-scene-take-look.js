@@ -128,6 +128,10 @@ async function takeLook(b, ctx, deps) {
 	const getMap = deps.getChannelMap || require('../config/routing').getChannelMap
 	const map = require('../engine/scene-take-payload').withProgramResolutions(getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
 	const mainIdx = lookMainIdx(b, scene)
+	// WO-1029 C1c: a look of a screen that is on another server is a typed refusal, not "no program channel"
+	if (map.channelsWhereCabled === true && !require('../config/screen-channels').isScreenHere(map, mainIdx) && mainIdx < Number(map.screenCount)) {
+		return require('./screen-not-here').notHereReply(ctx, { screenIdx: mainIdx })
+	}
 	const programCh = Number(map.programChannels?.[mainIdx])
 	if (!Number.isFinite(programCh) || programCh <= 0) return bad(400, `no program channel for main ${mainIdx}`)
 	const prvCh = Number(map.previewChannels?.[mainIdx])

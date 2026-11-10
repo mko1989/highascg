@@ -4,6 +4,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
 const { resolveSceneById } = require('../engine/project-scenes')
+const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const {
 	stripEphemeralTakeFields,
 	resolvePreviewChannel,
@@ -28,6 +29,10 @@ async function handlePreviewLiveRegister(body, ctx) {
 		mainIdx = parseInt(b.mainScreenIndex, 10) - 1
 	}
 
+	if (mainIdx >= 0) {
+		const nh = await notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c
+		if (nh) return nh
+	}
 	let previewCh = null
 	if (mainIdx >= 0) {
 		previewCh = resolvePreviewChannel(routeMap, mainIdx, null)
@@ -78,6 +83,10 @@ async function handlePreviewLiveClear(body, ctx) {
 		mainIdx = parseInt(b.mainScreenIndex, 10) - 1
 	}
 
+	if (mainIdx >= 0) {
+		const nh = await notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c
+		if (nh) return nh
+	}
 	let previewCh = null
 	if (mainIdx >= 0) {
 		previewCh = resolvePreviewChannel(routeMap, mainIdx, null)
