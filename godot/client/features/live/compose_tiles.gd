@@ -25,6 +25,7 @@ const Clock := preload("res://features/live/timeline_clock.gd")
 const P := preload("res://features/live/pgm_timer_model.gd")
 const DeckModel := preload("res://features/live/deck_model.gd")
 const AL := preload("res://features/live/compose_auto_layout.gd")
+const RC := preload("res://features/live/compose_reconcile.gd")  # WO-1029
 const OUTLINE := {"pgm": Color("#e63946"), "prv": Color("#2a9d8f")}
 const STRIP := {"pgm": Color("#c92a2a"), "prv": Color("#0d9488")}
 const OTHER := Color("#457b9d")
@@ -54,6 +55,7 @@ var times := false  # WO-652: per-layer media / playlist times over each window 
 var osc: Node  # the live tab's OscMirror; its `updated` redraws while `times` is on
 var auto := false  # WO-658: PGM / PRV windows tiled per screen into the visible canvas (live_tab's Auto toggle)
 var _retile_timer: Timer
+var _sig := ""  # WO-1029: the screen list the cells were last reconciled against (compose_reconcile.gd)
 var _over: Control  # WO-652: the times paint here, above the atlas crops (children paint over the parent's _draw)
 var _x_line: TextLine  # WO-798: the label strip's ✕, shaped once — the glyph is not in the UI font, so every shape
 var _x_font: Font  # walked the system-font fallback (~1.3 ms each, 4 windows × 25 Hz ≈ 11 % of a core with Times on)
@@ -82,6 +84,7 @@ func _ready() -> void:
 		_retile_soon())
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
 		if path == "*" or path.begins_with("channelMap"):
+			_reconcile(true)  # WO-1029: a destination was deleted / added / moved to another server
 			queue_redraw()
 			_retile_soon())
 	refresh()
@@ -111,9 +114,26 @@ func _take(list: Array, with_media: bool) -> void:
 				_media.append(c)
 		elif c.get("rect") is Dictionary:
 			cells.append(c.duplicate(true))
+	_reconcile(with_media)  # WO-1029
 	queue_redraw()
 	if with_media:  # WO-902: our own fetch only — re-tiling another client's broadcast posts OUR panel's tiling over theirs
 		_retile_soon()
+
+
+## WO-1029: match the windows to the screens of NOW (compose_reconcile.gd); a screen without any window gets one only
+## when the screen list changed (or on load), so a closed window stays closed. Posts for our own fetch / map changes.
+func _reconcile(post: bool) -> void:
+	var cm: Variant = Store.get_value("channelMap", {})
+	if not _drag.is_empty() or _posting or cells.is_empty() or not (cm is Dictionary) or (cm as Dictionary).is_empty():
+		return
+	var sig := RC.signature(cm)
+	var r: Dictionary = RC.reconcile(cells, cm, sig != _sig)
+	_sig = sig
+	if r.changed:
+		cells = r.cells
+		queue_redraw()
+		if post:
+			_post()
 
 
 func _on_ws(type: String, data: Variant) -> void:
@@ -196,16 +216,12 @@ func _screen(i: int) -> Rect2:
 	var k := ir.size.x / canvas().x
 	return Rect2(ir.position + p.position * k, p.size * k)
 
-
-
-
 func label_text(c: Dictionary) -> String:
 	var r := str(c.get("role", ""))
 	if r in ["pgm", "prv"]:
 		var mi := int(c.get("mainIndex", 0))
 		var cm: Variant = Store.get_value("channelMap", {})
-		var labels: Variant = (cm as Dictionary).get("screenLabels") if cm is Dictionary else null
-		var sl := str(labels[mi]) if labels is Array and mi >= 0 and mi < labels.size() and str(labels[mi]) != "" else "S%d" % (mi + 1)
+		var sl := RC.screen_label(c, cm)  # WO-1029: by destination id first
 		var cue := SC.cue(cm, mi, Store.cluster)  # WO-1029 C15
 		return "%s %d / %s%s" % [r.to_upper(), mi + 1, sl, " · " + cue if cue != "" else ""]
 	return str(c.get("label", c.get("id", r)))

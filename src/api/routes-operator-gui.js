@@ -69,7 +69,7 @@ async function handlePost(path, body, ctx) {
  */
 function handleGet(path, ctx) {
 	if (path !== '/api/operator-gui/layout') return null
-	const { cells, channel, atlas } = getPersistedOperatorGuiLayout(ctx)
+	const { cells, channel, atlas } = getPersistedOperatorGuiLayout(ctx, { addMissing: true })
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, channel, cells, atlas }) }
 }
 

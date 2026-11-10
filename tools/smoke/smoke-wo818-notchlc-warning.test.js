@@ -31,7 +31,10 @@ describe('WO-818 NotchLC warning mark in the media list', () => {
 		assert.ok(NOTCHLC_WARNING.includes('GPU') && NOTCHLC_WARNING.includes('CPU'), 'WO-820: GPU on the HighAsCG build, CPU on stock')
 		assert.ok(!NOTCHLC_WARNING.includes('ffmpeg'), 'no command line: HighAsCG transcodes to HAP itself')
 		const gd = fs.readFileSync(path.join(__dirname, '../../godot/client/features/live/media_ops.gd'), 'utf8')
-		assert.ok(gd.includes(JSON.stringify(NOTCHLC_WARNING)), 'Godot NOTCHLC_TIP is the same text')
+		// WO-1029 (owner 10.11): in the Godot client NotchLC is a neutral codec tag — the HighAsCG Caspar build decodes it
+		// on the GPU (WO-820) — and the CPU wording is kept only for a server that reports a stock Caspar
+		assert.ok(gd.includes('const NOTCHLC_TIP := "NotchLC — decoded on the GPU by the HighAsCG Caspar build"'), 'Godot: neutral tag text')
+		assert.ok(gd.includes('const NOTCHLC_TIP_STOCK := ') && gd.includes('Transcode it to HAP in HighAsCG'), 'Godot: the stock-Caspar wording still points at the HAP transcode')
 	})
 
 	it('the media row renders the mark next to the label', () => {

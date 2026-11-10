@@ -39,7 +39,7 @@ describe('WO-862 (a) screen labels in the audio mixer', () => {
 		const rows = src('godot/client/features/audio/audio_rows.gd')
 		assert.match(rows, /"label": bus_label\(cm, i\)/)
 		assert.match(rows, /"label": bus_label\(cm, i, true\)/)
-		assert.match(src('godot/client/features/audio/audio_tab.gd'), /AR\.inputs_title\(cm, i, progs\[i\]\)/)
+		assert.match(src('godot/client/features/audio/audio_tab.gd'), /AR\.inputs_title\(cm, AR\.screen_idx\(cm, progs\[i\]\), progs\[i\]\)/)
 		assert.match(src('godot/client/features/audio/audio_dock.gd'), /DM\.groups\(rows, progs, cm\)/)
 	})
 })

@@ -36,6 +36,7 @@ const {
 const { splitMediaPreviewEntries, persistableCells, applyMediaPreviewLayer } = require('./operator-gui-media-layer')
 const { scheduleComposeLayoutProjectPersist } = require('./operator-gui-compose-persist')
 const atlasMode = require('./operator-gui-atlas')
+const { reconcileLayoutCells } = require('./operator-gui-reconcile')
 
 // WO-338: 150 → 50 ms — the per-channel chain already serializes applies; the client throttles at 150 ms.
 const APPLY_DEBOUNCE_MS = 50
@@ -172,6 +173,8 @@ function shouldIgnoreBootShrink(ch, cells, log) {
  * @param {Array} cells
  */
 async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
+	// WO-1029: the cells are keyed by screen index — match them to the screens of NOW before routing/persisting/broadcasting.
+	cells = reconcileLayoutCells(cells, ctx.config, { addMissing: opts.addMissing === true })
 	const map = getChannelMap(ctx.config)
 	// WO-597 §D: in atlas mode the cells' rects are rewritten to packed slots; an unchanged plan sends no AMCP.
 	const atlas = atlasMode.atlasLayout(ctx, ch, cells, opts.atlas)
@@ -265,7 +268,7 @@ function finishOperatorGuiApply(ctx, ch, cells, plan, atlas, opts) {
 	} catch (_) {
 		/* broadcast optional */
 	}
-	return { ch, plan, atlas: atlas ? atlas.descriptor : null }
+	return { ch, plan, atlas: atlas ? atlas.descriptor : null, cells: persistableCells(cells) }
 }
 
 /**
@@ -279,7 +282,7 @@ function applyProjectComposeLayout(ctx, project) {
 	if (!Array.isArray(cells) || !cells.length) {
 		return Promise.resolve({ skipped: true, reason: 'no compose layout in project' })
 	}
-	return applyOperatorGuiLayout(ctx, cells, { source: 'project_load' })
+	return applyOperatorGuiLayout(ctx, cells, { source: 'project_load', addMissing: true })
 }
 
 /**
@@ -326,13 +329,13 @@ function applyOperatorGuiLayout(ctx, cells, opts = {}) {
  * channel } or { cells: [] } when nothing is persisted / no operator_gui destination.
  * @param {{ config: object, persistence?: object }} ctx
  */
-function getPersistedOperatorGuiLayout(ctx) {
+function getPersistedOperatorGuiLayout(ctx, opts = {}) {
 	const resolved = resolveOperatorGuiChannel(ctx.config)
 	let cells = []
 	try {
 		const persistence = ctx.persistence || require('../utils/persistence')
 		const saved = persistence.get('operatorGuiLayout')
-		if (saved && Array.isArray(saved.cells)) cells = saved.cells
+		if (saved && Array.isArray(saved.cells)) cells = reconcileLayoutCells(saved.cells, ctx.config, { addMissing: opts.addMissing === true })
 	} catch {
 		/* no persistence — empty */
 	}
@@ -411,6 +414,7 @@ async function ensureOperatorGuiChannel(ctx) {
 			saved = persistence.get('operatorGuiLayout')
 		}
 		if (saved && Array.isArray(saved.cells)) {
+			saved = { ...saved, cells: reconcileLayoutCells(saved.cells, ctx.config, { addMissing: true }) } // WO-1029
 			// 2026-07-20: never re-assert holes over a tab that shows no preview — see
 			// {@link lastClientIntentByChannel}. The saved record itself is left intact, so
 			// returning to Looks restores it via the client's own report.
@@ -423,7 +427,8 @@ async function ensureOperatorGuiChannel(ctx) {
 				// Not awaited: a client POST inside the apply debounce window supersedes this call's
 				// promise (its timer is cleared, so it never settles) — and boot must not block on it.
 				applyOperatorGuiLayout(ctx, saved.cells, { source: savedSource }).then(
-					() => ctx.log?.('info', `Operator GUI re-apply: ${saved.cells.length} cell(s) applied (ch ${ch})`),
+					// WO-1029: the number routed, not the number saved (cells of dead / remote screens get no route)
+					(r) => ctx.log?.('info', `Operator GUI re-apply: ${Array.isArray(r?.plan) ? r.plan.filter((e) => !e.media).length : saved.cells.length} cell(s) applied (ch ${ch})`),
 					(e) => ctx.log?.('warn', `operator-gui: layout re-apply failed: ${e?.message || e}`),
 				)
 			}

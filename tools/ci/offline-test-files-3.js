@@ -314,6 +314,7 @@ module.exports = [
 	'tools/smoke/smoke-cwc-dest-route.test.js',
 	'tools/smoke/smoke-cwc-dest-air.test.js',
 	'tools/smoke/smoke-wo1029-virtual-dest.test.js',
+	'tools/smoke/smoke-wo1029-live-layout-reconcile.test.js',
 	'tools/smoke/smoke-wo1029-virtual-remote-client.test.js',
 	'tools/smoke/smoke-wo1029-virtual-takeover.test.js',
 	'tools/smoke/smoke-wo1029-virtual-handover.test.js',
