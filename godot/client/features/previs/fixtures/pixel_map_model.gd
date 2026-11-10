@@ -5,6 +5,7 @@ extends RefCounted
 ## the stored list plus rectangles drawn and not yet used; a pixel row picks one. Regions: {id "R<n>", channelNo, x, y,
 ## w, h} (ints). Rows: {pixel, geometry, order, id (mapping id or ""), enabled, region ("" = unmapped), mode,
 ## colourOrder}. Godot's JSON numbers are floats: everything from the API is cast with int().
+const SC := preload("res://core/screen_channels.gd")
 
 const MODES := ["average", "point"]
 const LABEL_CELL := 8.0  # view px grid for the region-label collision check (pixel_map_view.gd)
@@ -35,8 +36,9 @@ static func channels(cm: Variant) -> Array:
 ## the sampler share one Caspar consumer: pgmN / prvN when the channel is that bus, else chN.
 static func role_for(ch: int, cm: Variant) -> String:
 	var m: Dictionary = cm if cm is Dictionary else {}
-	var pgm: Array = (m.get("programChannels", []) as Array).map(func(v: Variant) -> int: return int(v)) if m.get("programChannels") is Array else []
-	var prv: Array = (m.get("previewChannels", []) as Array).map(func(v: Variant) -> int: return int(v)) if m.get("previewChannels") is Array else []
+	# WO-1029: a screen on another server has no channel here → -1 (never int(null), never matches a real channel)
+	var pgm: Array = range((m.get("programChannels") as Array).size()).map(func(i: int) -> int: return SC.pgm(m, i)) if m.get("programChannels") is Array else []
+	var prv: Array = range((m.get("previewChannels") as Array).size()).map(func(i: int) -> int: return SC.prv(m, i)) if m.get("previewChannels") is Array else []
 	var i := pgm.find(ch)
 	if i >= 0 and i < 4:
 		return "pgm%d" % (i + 1)

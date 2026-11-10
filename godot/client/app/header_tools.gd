@@ -148,8 +148,9 @@ func ftb() -> void:
 	ftb_btn.disabled = true
 	var res: Dictionary = await Api.post_json("/api/ftb", {})
 	ftb_btn.disabled = false
-	if not res.ok:
-		notice.emit({"text": "FTB: " + str(res.error), "tone": "error"})
+	var n := Store.notice_for("FTB", res)  # WO-1029 C15: the screens on other servers are named, not silently skipped
+	if n.tone != "ok":
+		notice.emit({"text": n.text, "tone": "error" if n.tone == "error" else "warn"})
 
 
 ## The master switch: node picks the channels and answers which took it; the checkbox then follows the WS
@@ -158,7 +159,7 @@ func set_test_card(on: bool) -> void:
 	test_card.set_busy(true)
 	var res: Dictionary = await Api.post_json("/api/led-test-card/master", {"enabled": on})
 	test_card.set_busy(false)
-	var n := LedTest.switch_notice(res, on)
+	var n := LedTest.switch_notice(res, on, Store.get_value("channelMap", {}), Store.cluster)
 	if not n.is_empty():
 		notice.emit(n)
 	if not res.ok:

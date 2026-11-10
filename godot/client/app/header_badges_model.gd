@@ -3,6 +3,9 @@ extends RefCounted
 ## header-bar-streaming.js, header-bar-replication.js, app-pgm-header-timer.js, header-bar-audio.js,
 ## header-bar-config-strip.js). Testable without autoloads.
 
+const SC := preload("res://core/screen_channels.gd")
+const RA := preload("res://features/live/remote_air_model.gd")
+
 ## Badge colours (web 01a2-header-bar.css): {bg, border, text}.
 const TONES := {
 	"idle": [Color("#484f58"), Color("#5a626d"), Color("#aeb5bd")],
@@ -88,17 +91,30 @@ static func replication_badge(status: Variant) -> Dictionary:
 
 
 ## Screen chips for the PGM timer: one per playback / program channel, 3-letter screen label (WO-506).
-static func timer_chips(cm: Dictionary) -> Array:
+## WO-1029 C15: a screen on another linked server (null channel) gets a `remote` chip — no channel, a tip "on <box>"
+## (and what the owner reports on air); the header leaves it disabled, the timer cannot show a channel that is not here.
+static func timer_chips(cm: Dictionary, cluster: Variant = null, scene: Variant = null) -> Array:
 	var list: Array = cm.get("playbackChannels") if cm.get("playbackChannels") is Array and not (cm.playbackChannels as Array).is_empty() else (cm.get("programChannels", [1]) if cm.get("programChannels") is Array else [1])
 	var labels: Array = cm.get("screenLabels", []) if cm.get("screenLabels") is Array else []
 	var out: Array = []
 	for i in list.size():
-		if list[i] == null:
-			continue  # WO-1029: a screen that is not on this server has no channel here — no timer chip
 		var full := str(labels[i]) if i < labels.size() and str(labels[i]) != "" else "S%d" % (i + 1)
 		var short := full.strip_edges().substr(0, 3)
-		out.append({"main": i, "channel": int(list[i]), "label": short if short != "" else "P%d" % (i + 1), "tip": "Show playback timer for %s (channel %d)" % [full, int(list[i])]})
+		var label := short if short != "" else "P%d" % (i + 1)
+		if not (list[i] is int or list[i] is float):
+			var cue := SC.cue(cm, i, cluster, RA.server_name(RA.entry(scene, i)))
+			var air := RA.summary(RA.entry(scene, i))
+			var ms := RA.timer_ms(RA.entry(scene, i))
+			out.append({"main": i, "channel": -1, "remote": true, "label": label,
+				"tip": "%s — %s%s%s" % [full, cue if cue != "" else "on another server", (" · " + air) if air != "" else "", (" · " + _mmss(ms)) if ms >= 0.0 else ""]})
+			continue
+		out.append({"main": i, "channel": int(list[i]), "remote": false, "label": label, "tip": "Show playback timer for %s (channel %d)" % [full, int(list[i])]})
 	return out
+
+
+static func _mmss(ms: float) -> String:
+	var sec := int(ms / 1000.0)
+	return "%d:%02d" % [sec / 60, sec % 60]
 
 
 ## Server hardware-monitor sources (POST /api/audio/monitor-source {source}); [] = no monitor bus, no menu.
@@ -107,19 +123,13 @@ static func monitor_options(cm: Dictionary) -> Dictionary:
 	var preview_on := active_flag(ap.get("enabled")) and cm.get("audioPreviewCh") != null
 	if not preview_on and cm.get("monitorCh") == null:
 		return {"title": "", "note": "", "options": []}
-	var pgm: Array = cm.get("programChannels", [1]) if cm.get("programChannels") is Array else [1]
-	var prv: Array = cm.get("previewChannels", [2]) if cm.get("previewChannels") is Array else [2]
 	# WO-1029: the first screen that IS on this server (a null entry = a screen cabled on another server)
-	var first := 0
-	for i in pgm.size():
-		if pgm[i] != null:
-			first = i
-			break
+	var first := SC.first_local(cm)
 	var opts := []
-	if first < pgm.size() and pgm[first] != null:
-		opts.append({"id": "pgm_%d" % (first + 1), "label": "PGM · ch %d" % int(pgm[first])})
-	if first < prv.size() and prv[first] != null:
-		opts.append({"id": "prv_%d" % (first + 1), "label": "PRV · ch %d" % int(prv[first])})
+	if first >= 0 and SC.pgm(cm, first) >= 0:
+		opts.append({"id": "pgm_%d" % (first + 1), "label": "PGM · ch %d" % SC.pgm(cm, first)})
+	if first >= 0 and SC.prv(cm, first) >= 0:
+		opts.append({"id": "prv_%d" % (first + 1), "label": "PRV · ch %d" % SC.prv(cm, first)})
 	if cm.get("multiviewCh") != null:
 		opts.append({"id": "multiview", "label": "Multiview · ch %d" % int(cm.multiviewCh)})
 	if preview_on:

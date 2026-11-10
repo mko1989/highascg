@@ -17,6 +17,8 @@ extends Control
 signal atlas_changed(on: bool)
 signal auto_changed(on: bool)  # WO-658: a manual move / resize / remove turns Auto off
 
+const SC := preload("res://core/screen_channels.gd")
+const CR := preload("res://features/live/compose_remote.gd")
 const TM := preload("res://features/live/compose_tile_math.gd")
 const CT := preload("res://features/live/compose_times_model.gd")
 const Clock := preload("res://features/live/timeline_clock.gd")
@@ -204,7 +206,8 @@ func label_text(c: Dictionary) -> String:
 		var cm: Variant = Store.get_value("channelMap", {})
 		var labels: Variant = (cm as Dictionary).get("screenLabels") if cm is Dictionary else null
 		var sl := str(labels[mi]) if labels is Array and mi >= 0 and mi < labels.size() and str(labels[mi]) != "" else "S%d" % (mi + 1)
-		return "%s %d / %s" % [r.to_upper(), mi + 1, sl]
+		var cue := SC.cue(cm, mi, Store.cluster)  # WO-1029 C15
+		return "%s %d / %s%s" % [r.to_upper(), mi + 1, sl, " · " + cue if cue != "" else ""]
 	return str(c.get("label", c.get("id", r)))
 
 
@@ -219,6 +222,8 @@ func _draw() -> void:
 		var c: Dictionary = cells[i]
 		var r := _screen(i)
 		var k := str(c.get("role", ""))
+		if CR.is_remote(c):  # WO-1029 C15: a screen on another server — labelled placeholder, no picture
+			CR.draw(self, r, c, font)
 		draw_rect(r.grow(1.0), OUTLINE.get(k, OTHER), false, 2.0)  # 2 px ring whose inner edge is the picture edge
 		var strip := Rect2(r.position.x - 2.0, r.end.y + 2.0, r.size.x + 4.0, LABEL_H)
 		draw_rect(strip, STRIP.get(k, OTHER_STRIP))
@@ -293,13 +298,15 @@ func _time_rows(c: Dictionary) -> Array:
 	var mi := int(c.get("mainIndex", 0))
 	var pgm := str(c.get("role", "")) == "pgm"
 	var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
+	if not SC.is_here(cm, mi):
+		return []  # WO-1029 C15: no OSC channel here; the tile shows the owner's report (compose_remote.gd)
 	var live: Dictionary = Store.get_value("scene.live", {}) if Store.get_value("scene.live") is Dictionary else {}
 	var ps: Dictionary = Store.project.get("scenes", {}) if Store.project.get("scenes") is Dictionary else {}
 	var looks := {}
 	for s in ps.get("scenes", []):
 		if s is Dictionary:
 			looks[str(s.get("id", ""))] = s
-	var id := str(DeckModel.resolve_bus_look_ids(mi, live, cm, looks, ps).get("pgm" if pgm else "prv", ""))
+	var id := str(DeckModel.resolve_bus_look_ids(mi, live, cm, looks, ps, Store.get_value("scene.remoteLive")).get("pgm" if pgm else "prv", ""))
 	var ch: Variant
 	var bank: Variant = null
 	if pgm:
@@ -307,8 +314,7 @@ func _time_rows(c: Dictionary) -> Array:
 		ch = res.channel
 		bank = res.bank
 	else:
-		var prv: Array = cm.get("previewChannels", []) if cm.get("previewChannels") is Array else []
-		ch = prv[mi] if mi < prv.size() else null
+		ch = SC.prv(cm, mi) if SC.prv(cm, mi) >= 0 else null  # WO-1029: -1 = no PRV channel here
 		var staged := DeckModel._live_scene_id(live, int(ch)) if ch != null else ""
 		if looks.has(staged):
 			id = staged  # the deck blanks a PRV that holds the PGM look; its times still show

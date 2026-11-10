@@ -88,6 +88,8 @@ static func build(cm: Variant, connectors: Array, audio_cfg: Variant, v4l2_cfg: 
 	var names := R.a(cm.get("virtualMainChannels"))
 	var pgm := R.a(cm.get("programChannels"))
 	for i in pgm.size():
+		if pgm[i] == null:
+			continue  # WO-1029: a screen on another linked server has no route here
 		var res: Variant = _at(cm.get("programResolutions"), i)
 		var nm: Variant = R.d(_at(names, i)).get("name")
 		out.append({"type": "route", "routeType": "pgm", "value": "route://" + _js(pgm[i]),

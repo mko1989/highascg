@@ -25,6 +25,6 @@ static func wire(col: Control, main: int, cm: Dictionary, report: Callable) -> v
 
 static func clear(main: int, report: Callable) -> Dictionary:
 	var res: Dictionary = await Api.post_json("/api/scene/live/preview/clear", {"mainIndex": main})
-	report.call("PRV cleared" if res.ok else "PRV clear refused: %s" % res.error, res.ok)
+	report.call("PRV cleared" if res.ok else "PRV clear refused: %s" % Store.fail_text(res), res.ok)  # WO-1029 C15
 	print("[client] prv clear main %d → %s %s" % [main, res.status, res.error])
 	return res

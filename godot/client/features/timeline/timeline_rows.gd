@@ -184,7 +184,7 @@ static func available_screens(tl: Dictionary, count: int) -> Array:
 ## screen → label: the destination's name from the channel map (the Dest list's), "Screen N" when it has none.
 static func screen_names(cm: Dictionary, count: int) -> Dictionary:
 	var out := {}
-	for o in S.screen_options(cm):
+	for o in S.screen_options(cm, Store.cluster):
 		if o[1] != null:
 			out[int(o[1])] = str(o[0])
 	for i in count:

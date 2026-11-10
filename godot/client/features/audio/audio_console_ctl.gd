@@ -70,7 +70,11 @@ static func _d(v: Variant) -> Dictionary:
 
 
 static func programs(cm: Dictionary) -> Array:
-	return cm.get("programChannels", []) if cm.get("programChannels") is Array and not cm.programChannels.is_empty() else [1]
+	if not (cm.get("programChannels") is Array) or (cm.programChannels as Array).is_empty():
+		return [1]
+	# WO-1029 C15: only the program channels of screens ON this server (a null = a screen on another linked server).
+	# Consumers that need the screen index of a channel use AudioRows.screen_idx.
+	return (cm.programChannels as Array).filter(func(c: Variant) -> bool: return c != null)
 
 
 func solos() -> Array:

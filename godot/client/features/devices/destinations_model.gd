@@ -6,6 +6,7 @@ extends RefCounted
 
 const R := preload("res://features/devices/cable_rules.gd")
 const S := preload("res://features/devices/cable_seed.gd")
+const SC := preload("res://core/screen_channels.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const TYPE_OPTIONS := [["pgm_prv", "PGM/PRV"], ["pgm_only", "PGM only"], ["multiview", "Multiview"],
 	["pixelmap", "Pixel Map"], ["operator_gui", "Operator GUI"]]
@@ -124,6 +125,15 @@ static func shows_audio(mode: String) -> bool:
 
 static func shows_prv(mode: String) -> bool:
 	return not mode in ["pgm_only", "multiview", "pixelmap", "operator_gui"]
+
+
+## WO-1029 C15: "on highascg5867" for a PGM/PRV destination whose screen is output by another linked server ("" else).
+## `cm` = the channelMap of the server whose Devices view is shown; `cluster` = its linked servers (null → generic wording).
+static func remote_cue(dest: Dictionary, cm: Variant, cluster: Variant = null) -> String:
+	if not is_main_bus(dest.get("mode")) or not (cm is Dictionary):
+		return ""
+	var idx := SC.screen_of_dest(cm, R.s(dest.get("id")), int(dest.get("mainScreenIndex", 0)))
+	return SC.cue(cm, idx, cluster)
 
 
 ## The summary table, [[label, value]…] in the web's order.

@@ -44,7 +44,7 @@ static func groups(rows: Array, programs: Array, cm := {}) -> Array:
 		var list := rows.filter(func(r: Dictionary) -> bool:
 			return r.get("isMaster", false) != true and r.get("isLiveInput", false) != true and float(r.ch) == float(programs[i]))
 		if not list.is_empty():
-			out.append({"title": AR.inputs_title(cm, i, programs[i], ""), "rows": list, "dense": list.size() > DENSE_ROWS})
+			out.append({"title": AR.inputs_title(cm, AR.screen_idx(cm, programs[i]), programs[i], ""), "rows": list, "dense": list.size() > DENSE_ROWS})
 	return out
 
 

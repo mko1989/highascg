@@ -264,7 +264,13 @@ func _open_logs() -> void:
 ## Connection eye: WS + Caspar link (state.caspar.connection, like client/components/connection-eye.js).
 ## WO-739: a server asking to link with this machine's server shows on the Devices tab, so it is seen from every tab.
 func _watch_invites(devices: Control) -> void:
-	var title := func(snap: Variant) -> void: undock.set_title(devices, ClusterModel.devices_title(snap))
+	var title := func(snap: Variant) -> void:
+		if snap is Dictionary:
+			Store.set_cluster(snap)  # WO-1029 C15: names of the linked servers (remote-screen cue)
+		undock.set_title(devices, ClusterModel.devices_title(snap))
+	Ws.on("cluster:dest-air", func(d: Variant) -> void:  # WO-1029 C15: what the other servers' screens show (scene.remoteLive)
+		if d is Dictionary and (d as Dictionary).get("remoteLive") is Array:
+			Store.apply_change("scene.remoteLive", d.remoteLive))
 	Ws.on("cluster:peers", func(d: Variant) -> void: title.call(d))  # WO-802: the WS is always this machine's server
 	Ws.connected.connect(func() -> void:
 		var r: Dictionary = await DevicesTarget.box_api.get_json("/api/cluster")

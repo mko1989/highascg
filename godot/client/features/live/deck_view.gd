@@ -18,6 +18,7 @@ const Destinations := preload("res://features/live/destinations.gd")
 const DeckOverlay := preload("res://features/live/deck_overlay.gd")
 const DeckHidden := preload("res://features/live/deck_hidden.gd")
 const DeckScroll := preload("res://features/live/deck_scroll.gd")
+const RemoteCue := preload("res://features/live/remote_cue.gd")
 const NeedsFlow := preload("res://features/live/media_needs_flow.gd")  # WO-1029
 const NeedsDot := preload("res://features/live/media_needs_dot.gd")
 const CARD_W := 200
@@ -72,7 +73,7 @@ func rebuild() -> void:
 	var mains := DeckHidden.visible_mains(DeckModel.screen_count(cm))  # WO-953: this client's hidden screens drop out
 	for main in mains:
 		_main_for_card = main
-		var bus := DeckModel.resolve_bus_look_ids(main, live, cm, known, ps)
+		var bus := DeckModel.resolve_bus_look_ids(main, live, cm, known, ps, Store.get_value("scene.remoteLive"))
 		if main != mains[0]:  # a line between screens: their cards would otherwise run together
 			_columns.add_child(ThemeBuilder.vline())
 		_columns.add_child(_column(DeckModel.screen_label(cm, main), DeckModel.scenes_for_main(scenes, main), bus, main, cm))
@@ -88,9 +89,13 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	col.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))  # WO-623 B: blank deck space
 	var head_row := DeckHead.build(self, title, looks.size(), bus, main, cm)  # WO-781: title = destination toggle
 	col.add_child(head_row)
-	var timer := TimerView.new()
-	timer.setup(osc_mirror, main)
-	col.add_child(timer)
+	var cue := RemoteCue.build(main)  # WO-1029 C15: a screen on another server shows "on <box>" instead of a timer
+	if cue != null:
+		col.add_child(cue)
+	else:
+		var timer := TimerView.new()
+		timer.setup(osc_mirror, main)
+		col.add_child(timer)
 	var grid := HFlowContainer.new()  # web .scenes-deck: auto-fill grid of thumbnail cards, 12 px gap
 	grid.add_theme_constant_override("h_separation", 12)
 	grid.add_theme_constant_override("v_separation", 12)
@@ -149,7 +154,7 @@ func create_look(main: int, src: Variant) -> String:
 		body["source"] = src
 	var res: Dictionary = await Api.post_json("/api/scene/new-look", body)
 	if not res.ok or not (res.data is Dictionary) or not ((res.data as Dictionary).get("look") is Dictionary):
-		action_result.emit("New look refused: %s" % res.error, false)
+		action_result.emit("New look refused: %s" % Store.fail_text(res), false)
 		return ""
 	var lk: Dictionary = res.data.look
 	var root := _scenes_root()
@@ -244,7 +249,7 @@ func take_main(main := 0) -> Dictionary:
 	for s in ps.get("scenes", []):
 		if s is Dictionary:
 			known[str((s as Dictionary).get("id", ""))] = true
-	var bus := DeckModel.resolve_bus_look_ids(main, live, cm, known, ps)
+	var bus := DeckModel.resolve_bus_look_ids(main, live, cm, known, ps, Store.get_value("scene.remoteLive"))
 	if str(bus.get("prv", "")) == "":
 		return {"ok": false, "error": "no look on PRV"}
 	return await request_take(str(bus.prv), main, "program")
@@ -276,12 +281,8 @@ func request_take(scene_id: String, main: int, target: String) -> Dictionary:
 	var res: Dictionary = await Api.post_json("/api/scene/take-look", {"sceneId": scene_id, "mainIdx": main, "target": target})
 	var what := "TAKE" if target == "program" else "PRV"
 	var warn := NeedsFlow.take_line(res.data, DeckModel.take_warning(res.data)) if res.ok else ""  # WO-1029
-	if warn != "":
-		action_result.emit("%s %s" % [what, warn], false)
-	elif res.ok:
-		action_result.emit("%s ok" % what, true)
-	else:
-		action_result.emit("%s refused: %s" % [what, res.error], false)
+	var n := Store.notice_for(what, res)  # WO-1029 C15: NOT_HERE / via worded in one place
+	action_result.emit("%s %s" % [what, warn] if warn != "" else n.text, warn == "" and n.ok)
 	print("[client] take-look %s %s → %s %s" % [target, scene_id, res.status, res.error])
 	return res
 
@@ -289,18 +290,17 @@ func request_take(scene_id: String, main: int, target: String) -> Dictionary:
 ## WO-860: the card's ■ — the on-air overlay look plays out; ▶ returns with the scene.liveOverlay broadcast.
 func stop_overlay(scene_id: String, main: int) -> Dictionary:
 	var res: Dictionary = await Api.post_json("/api/scene/overlay/stop", DeckOverlay.stop_body(main, scene_id))
-	action_result.emit("Play out ok" if res.ok else "Play out refused: %s" % res.error, res.ok)
+	var n := Store.notice_for("Play out", res)
+	action_result.emit(n.text, n.ok)
 	return res
 
 
 ## Same body as the web deck (client/components/scene-list-column.js:108-110): 0.5 s at the main's fps.
 func request_ftb(main: int, cm: Dictionary) -> Dictionary:
-	var res_list: Array = cm.get("programResolutions", [])
-	var fps := 50.0
-	if main < res_list.size() and res_list[main] is Dictionary:
-		fps = float((res_list[main] as Dictionary).get("fps", 50))
+	var fps := _fps(main)
 	var res: Dictionary = await Api.post_json("/api/ftb", {"screenIdx": main, "durationFrames": int(round(0.5 * fps)), "framerate": fps})
-	action_result.emit("FTB %s" % ("ok" if res.ok else "refused: " + str(res.error)), res.ok)
+	var n := Store.notice_for("FTB", res)  # WO-1029 C15: NOT_HERE / via worded in one place
+	action_result.emit(n.text, n.ok)
 	print("[client] ftb main %d → %s %s" % [main, res.status, res.error])
 	return res
 

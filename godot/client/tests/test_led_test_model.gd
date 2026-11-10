@@ -30,3 +30,11 @@ func test_switch_notice() -> void:
 	var all := M.switch_notice({"ok": false, "data": {"targets": [1], "failures": [{"channel": 1, "error": "no"}]}}, true)
 	t.eq(all, {"text": "Test card on failed — ch 1: no", "tone": "error"}, "all failed")
 	t.eq(M.switch_notice({"ok": false, "error": "HTTP 503", "data": {"error": "Caspar not connected"}}, false).text, "Test card off failed — Caspar not connected", "server error")
+
+
+func test_wo1029_not_here_notice() -> void:
+	var res := {"ok": false, "status": 409, "error": "Screen 3 is not on this server: it is on highascg5867", "data": {"code": "NOT_HERE", "screen": 2, "owners": ["highascg5867"], "error": "Screen 3 is not on this server: it is on highascg5867"}}
+	var n := M.switch_notice(res, true, {"screenCount": 4, "channelsWhereCabled": true, "programChannels": [2, null, null, null]}, {"peers": [{"id": "highascg5867", "name": "highascg5867"}]})
+	t.eq(n.text, "Test card on failed — Screen 3 is on highascg5867 — not reachable from here", "typed refusal")
+	var all := M.switch_notice({"ok": true, "data": {"notHere": [{"screen": 1}]}}, true)
+	t.eq(all.tone, "warn", "all-screens switch names the rest")

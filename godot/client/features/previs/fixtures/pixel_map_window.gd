@@ -9,6 +9,7 @@ extends AcceptDialog
 ## (pixel_map_console.gd) set the server's own output of the colours to the lighting console and the sampling rate.
 ## Save POSTs the whole list to /api/fixtures/pixelmap (phase 1; the server checks
 ## it and keeps it in the project); a 400's errors land on their rows. Never sends DMX itself.
+const SC := preload("res://core/screen_channels.gd")
 
 const P := preload("res://features/previs/fixtures/pixel_map_model.gd")
 const View := preload("res://features/previs/fixtures/pixel_map_view.gd")
@@ -249,8 +250,8 @@ func _fill_channels() -> void:
 	var cm := _cm()
 	var keep := _ch()
 	if keep == 0:
-		var pgm: Variant = cm.get("programChannels")
-		keep = int(regions[0].channelNo) if not regions.is_empty() else (int(pgm[0]) if pgm is Array and not pgm.is_empty() else 0)
+		# WO-1029: the first screen that is on THIS server (a null entry = another server's screen)
+		keep = int(regions[0].channelNo) if not regions.is_empty() else maxi(0, SC.pgm(cm, maxi(0, SC.first_local(cm))))
 	_channel.clear()
 	for ch in P.channels(cm):
 		_channel.add_item(P.channel_label(ch, cm))

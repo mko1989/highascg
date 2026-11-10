@@ -169,7 +169,7 @@ func _flush() -> void:
 		if rebuild:
 			_render()
 	else:
-		_status.text = "Border update failed: %s" % res.error
+		_status.text = "Border update failed: %s" % Store.fail_text(res)
 	if not _pending.is_empty():
 		_timer.start()
 

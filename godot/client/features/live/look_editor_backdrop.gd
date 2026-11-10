@@ -3,6 +3,7 @@ extends RefCounted
 ## or, on a main without a PRV bus, the look composited from HQ source thumbnails (look_thumb.gd, the deck card's
 ## renderer) — owner 30.10: "this space should always show the prv channel directly (unless there is no, then use
 ## thumbnails hq)".
+const SC := preload("res://core/screen_channels.gd")
 
 const DeckModel := preload("res://features/live/deck_model.gd")
 const LOOK_THUMB := "res://features/live/look_thumb.gd"  # loaded on use: it calls the Api autoload
@@ -29,7 +30,7 @@ static func open_with(ed: Control, cm: Dictionary, make_thumb := Callable()) -> 
 	if ed._thumb != null:
 		ed._thumb.queue_free()
 		ed._thumb = null
-	var prv := DeckModel.preview_bus_available(cm, ed.main)
+	var prv := DeckModel.preview_bus_available(cm, ed.main) and SC.is_here(cm, ed.main)  # WO-1029: no PRV picture of a remote screen
 	ed._video.visible = prv
 	if prv:
 		var role := "prv%d" % (ed.main + 1)

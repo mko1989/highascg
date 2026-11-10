@@ -3,6 +3,7 @@ extends RefCounted
 ## previewBusAvailableForSendTo / coerceTimelineSendTo / defaultTimelineSendTo, timeline-transport.js Dest screen list,
 ## projectFps and the Take body, editor-defaults.js getDefaultTransitionFromEditor).
 
+const SC := preload("res://core/screen_channels.gd")
 const DeckModel := preload("res://features/live/deck_model.gd")
 const T := preload("res://features/live/transitions.gd")
 
@@ -50,7 +51,7 @@ static func coerce(cm: Dictionary, st: Dictionary) -> Dictionary:
 
 
 ## The Dest list: [[label, screenIdx]], "All screens" (null) first when there are 2+ screens.
-static func screen_options(cm: Dictionary) -> Array:
+static func screen_options(cm: Dictionary, cluster: Variant = null) -> Array:
 	var n := DeckModel.screen_count(cm)
 	var out := []
 	if n > 1:
@@ -59,7 +60,8 @@ static func screen_options(cm: Dictionary) -> Array:
 	for i in n:
 		var vm: Variant = v[i] if v is Array and i < (v as Array).size() else null
 		var name := str(vm.get("name", "")) if vm is Dictionary and vm.get("name") != null else ""
-		out.append([name if name != "" else _screen_label(cm, i), i])
+		var cue := SC.cue(cm, i, cluster)  # WO-1029 C15: a screen on another server is still a valid target (the server relays)
+		out.append([(name if name != "" else _screen_label(cm, i)) + (" · " + cue if cue != "" else ""), i])
 	return out
 
 

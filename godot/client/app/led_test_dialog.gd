@@ -194,7 +194,7 @@ func _switch_channel(on: bool, ch: int) -> void:
 	if _filling:
 		return
 	var res: Dictionary = await Api.post_json("/api/led-test-card/channel", {"channel": ch, "enabled": on})
-	var n := M.switch_notice(res, on)
+	var n := M.switch_notice(res, on, Store.get_value("channelMap", {}), Store.cluster)
 	if not n.is_empty():
 		notice.emit(n)
 	if not res.ok and _show.has(str(ch)):

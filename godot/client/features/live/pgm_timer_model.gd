@@ -2,6 +2,7 @@ extends RefCounted
 ## WO-600 O — pure port of the PGM top-layer timer rules (client/components/playback-timer.js +
 ## playback-timer-format.js): which layer counts, labels, formats, traffic-light tiers. The server's
 ## `osc` WS snapshots already carry file.elapsed/remaining/duration/progress (endian-correct since WO-613).
+const SC := preload("res://core/screen_channels.gd")
 
 const TIMER_BAND := [980, 989]
 const BORDER_LAYER := 998
@@ -138,10 +139,10 @@ static func apply_osc(channels: Dictionary, d: Variant) -> Dictionary:
 
 ## PGM channel actually playing for main `i` (web refresh(): switcher_bus remap) + its layer bank.
 static func resolve_pgm(cm: Dictionary, scene_state: Variant, main: int) -> Dictionary:
-	var progs: Array = cm.get("programChannels", []) if cm.get("programChannels") is Array else []
-	# WO-1029: a screen that is not on this server has no channel here (null in programChannels) → 0 = none
-	var raw: Variant = progs[main] if main < progs.size() else main + 1
-	var ch := int(raw) if raw != null else 0
+	# WO-1029: a screen that is not on this server has no channel here (null in programChannels) → 0 = none. No
+	# programChannels at all (older server / simulator) keeps the legacy main + 1.
+	var progs: Array = cm.get("programChannels") if cm.get("programChannels") is Array else []
+	var ch := main + 1 if main >= progs.size() else maxi(SC.pgm(cm, main), 0)
 	var banks: Dictionary = (scene_state as Dictionary).get("programLayerBankByChannel", {}) if scene_state is Dictionary and (scene_state as Dictionary).get("programLayerBankByChannel") is Dictionary else {}
 	var bank: Variant = null
 	if str(cm.get("transitionModel", "")) == "switcher_bus":

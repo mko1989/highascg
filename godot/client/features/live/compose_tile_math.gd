@@ -3,6 +3,7 @@ extends RefCounted
 ## server's cell rects): a cell `rect` is {x, y, w, h} as fractions of the operator canvas — the picture area
 ## itself (the web's "hole"); chrome is drawn outside it. Moves and resizes work in canvas px: snapped to an
 ## 8 px grid, kept inside the canvas, never below MIN (160×90, web MIN_BODY), resizes keep the window's aspect.
+const SC := preload("res://core/screen_channels.gd")
 
 const GRID := 8.0
 const MIN := Vector2(160, 90)
@@ -85,10 +86,10 @@ static func source_aspect(c: Dictionary, cm: Variant) -> float:
 		return float(c.srcW) / float(c.srcH)
 	var m: Dictionary = cm if cm is Dictionary else {}
 	var mi := int(c.get("mainIndex", -1))
-	var chans: Variant = m.get("programChannels" if str(c.get("role", "")) == "pgm" else "previewChannels")
-	if chans is Array and mi >= 0 and mi < chans.size() and chans[mi] != null:  # WO-1029: null = screen not on this server
+	var ch := SC.pgm(m, mi) if str(c.get("role", "")) == "pgm" else SC.prv(m, mi)  # WO-1029: -1 = screen not on this server
+	if ch >= 0:
 		var by: Variant = m.get("channelResolutionsByChannel")
-		var res: Variant = (by as Dictionary).get(str(int(chans[mi]))) if by is Dictionary else null
+		var res: Variant = (by as Dictionary).get(str(ch)) if by is Dictionary else null
 		if res is Dictionary and float(res.get("w", 0)) > 0 and float(res.get("h", 0)) > 0:
 			return float(res.w) / float(res.h)
 	var pr: Variant = m.get("programResolutions")

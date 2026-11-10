@@ -62,7 +62,7 @@ func refresh() -> void:
 	var st := S.coerce(cm, S.normalize(tl.get("sendTo")))
 	_screens.clear()
 	_screen.clear()
-	for o in S.screen_options(cm):
+	for o in S.screen_options(cm, Store.cluster):
 		_screen.add_item(o[0])
 		_screens.append(o[1])
 	_screen.select(maxi(0, _screens.find(st.screenIdx)))
@@ -129,7 +129,7 @@ func take_to_program() -> void:
 	st["preview"] = false
 	var r: Dictionary = await Api.post_json("/api/timelines/%s/take" % str(tl.id).uri_encode(),
 		S.take_body(_take, S.project_fps(tl, _cm()), st.screenIdx))
-	status("" if r.ok else "Take failed: %s" % r.error)
+	status("" if r.ok else "Take failed: %s" % Store.fail_text(r))  # WO-1029 C15
 	await update_send_to(st)
 
 

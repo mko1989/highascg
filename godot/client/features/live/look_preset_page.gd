@@ -8,6 +8,7 @@ extends VBoxContainer
 
 signal said(text: String, ok: bool)  # WO-781: the deck's action line shows it
 
+const SC := preload("res://core/screen_channels.gd")
 const M := preload("res://features/live/look_preset_model.gd")
 const DeckModel := preload("res://features/live/deck_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -95,7 +96,7 @@ func buses() -> Dictionary:
 	var known := _looks()
 	var out := {}
 	for m in DeckModel.screen_count(_cm()):
-		out[m] = DeckModel.resolve_bus_look_ids(m, live, _cm(), known, _scenes_root())
+		out[m] = DeckModel.resolve_bus_look_ids(m, live, _cm(), known, _scenes_root(), Store.get_value("scene.remoteLive"))
 	return out
 
 
@@ -103,10 +104,9 @@ func buses() -> Dictionary:
 ## save captures and what a card's PRV / PGM mark compares against.
 func true_buses() -> Dictionary:
 	var live: Dictionary = Store.get_value("scene.live", {}) if Store.get_value("scene.live") is Dictionary else {}
-	var prv_chs: Array = _cm().get("previewChannels", [])
 	var raw := {}
 	for m in DeckModel.screen_count(_cm()):
-		var ch: int = int(prv_chs[m]) if m < prv_chs.size() and prv_chs[m] != null else 0
+		var ch: int = maxi(0, SC.prv(_cm(), m))  # WO-1029: -1 (screen on another server) → 0 = none
 		var sid := DeckModel._live_scene_id(live, ch) if ch > 0 else ""
 		if _looks().has(sid):
 			raw[m] = sid
@@ -214,11 +214,11 @@ func recall(id: String, target: String, cut := false, global_transition := false
 	if res.data is Dictionary:
 		for it in (res.data as Dictionary).get("items", []):
 			if it is Dictionary and it.get("error") != null:
-				bad.append("screen %d: %s" % [int(it.get("mainIdx", 0)) + 1, it.error])
+				bad.append("screen %d: %s" % [int(it.get("mainIdx", 0)) + 1, Store.fail_text({"ok": false, "status": 0, "data": it, "error": str(it.error)})])  # WO-1029 C15
 	if res.ok and bad.is_empty():
 		_say("Preset %s ok" % what, true)
 	else:
-		_say("Preset %s: %s" % [what, "; ".join(bad) if not bad.is_empty() else str(res.error)], false)
+		_say("Preset %s: %s" % [what, "; ".join(bad) if not bad.is_empty() else Store.fail_text(res)], false)
 	return res
 
 

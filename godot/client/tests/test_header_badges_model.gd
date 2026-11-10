@@ -46,7 +46,7 @@ func test_replication_badge() -> void:
 
 func test_timer_chips() -> void:
 	var one := M.timer_chips({"programChannels": [1], "screenLabels": ["Main LED (DP-7)"]})
-	t.eq(one, [{"main": 0, "channel": 1, "label": "Mai", "tip": "Show playback timer for Main LED (DP-7) (channel 1)"}], "3-letter shorthand (WO-506)")
+	t.eq(one, [{"main": 0, "channel": 1, "remote": false, "label": "Mai", "tip": "Show playback timer for Main LED (DP-7) (channel 1)"}], "3-letter shorthand (WO-506)")
 	var two := M.timer_chips({"programChannels": [1, 3], "playbackChannels": [], "screenLabels": ["", "Side"]})
 	t.eq(two.map(func(c: Dictionary) -> Array: return [c.channel, c.label]), [[1, "S1"], [3, "Sid"]], "unnamed → S<n>; empty playbackChannels → program")
 	t.eq(M.timer_chips({"playbackChannels": [5]})[0].channel, 5, "playbackChannels win")
@@ -71,3 +71,17 @@ func test_config_strip() -> void:
 	t.eq(bad.summary, "Mismatch: server has 3 channel(s), module expects 4. Caspar screen outputs: 1 (ch 1). App screens: 2. Screen count differs from app — check multiview or extra screen consumers.", "mismatch")
 	t.eq([bad.ok, bad.issues, bad.hint], [false, ["x"], "Apply"], "issues + hint")
 	t.eq(M.config_strip({"serverChannelCount": 0}).summary, "Connect to CasparCG or wait for INFO CONFIG to compare channel layout.", "no INFO CONFIG yet")
+
+
+func test_wo1029_hole_maps() -> void:
+	var a := {"screenCount": 4, "channelsWhereCabled": true, "programChannels": [2, null, null, null], "previewChannels": [3, null, null, null],
+		"screenLabels": ["PGM/PRV 1", "to zoom", "PGM/PRV 3", "Stream PGM"], "monitorCh": 6}
+	var cl := {"peers": [{"id": "highascg5867", "name": "highascg5867"}]}
+	var chips := M.timer_chips(a, cl, {"remoteLive": [null, null, {"pgm": {"name": "Bumper"}, "prv": null, "timeline": {"state": "playing", "position": 61000, "age": 2000}}]})
+	t.eq(chips.map(func(c: Dictionary) -> Array: return [c.main, c.channel, c.remote]), [[0, 2, false], [1, -1, true], [2, -1, true], [3, -1, true]], "A: one local chip, the rest remote")
+	t.eq(chips[2].tip, "PGM/PRV 3 — on highascg5867 · PGM Bumper · PRV — · 1:03", "remote tip: box, look, extrapolated time")
+	t.eq(chips[1].tip, "to zoom — on highascg5867", "unknown air: only the cue")
+	t.eq(M.monitor_options(a).options.map(func(o: Dictionary) -> String: return o.id), ["pgm_1", "prv_1"], "A monitor")
+	var b := {"screenCount": 4, "channelsWhereCabled": true, "programChannels": [null, null, 2, 4], "previewChannels": [null, null, 3, 5], "monitorCh": 7}
+	t.eq(M.monitor_options(b).options.map(func(o: Dictionary) -> String: return o.id), ["pgm_3", "prv_3"], "B monitor follows the first local screen")
+	t.eq(M.timer_chips(b)[0].remote, true, "B screen 1 is remote")

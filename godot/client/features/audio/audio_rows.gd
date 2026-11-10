@@ -4,6 +4,7 @@ extends RefCounted
 ## live-audio-inputs.js enumerateLiveAudioMixerSlots and program-audio-layouts.js (bus width per program channel).
 ## Gains / mutes come from the server's GET /api/audio/mixer (the web read them from localStorage). Golden-tested.
 
+const SC := preload("res://core/screen_channels.gd")
 const HC := preload("res://features/devices/host_channels.gd")
 const R := preload("res://features/devices/cable_rules.gd")
 const MM := preload("res://features/live/mixer_math.gd")
@@ -106,6 +107,8 @@ static func program_rows(st: Dictionary, label_max := 14, tail := 0) -> Array:
 	var rows := []
 	for i in progs.size():
 		var ch: Variant = progs[i]
+		if ch == null:
+			continue  # WO-1029: a screen on another linked server has no mixer strip here
 		var key := "pgm:" + R.s(ch)
 		rows.append({"key": key, "ch": ch, "label": bus_label(cm, i), "v": gain(mixer, key), "isMaster": true})
 		var prvs := R.a(cm.get("previewChannels"))
@@ -132,6 +135,8 @@ static func program_rows(st: Dictionary, label_max := 14, tail := 0) -> Array:
 			"liveAudioSlot": slot_row.slot, "hostChannel": slot_row.channel})
 	var audio_only := R.d(st.get("liveAudioOnly"))
 	for ch in progs:
+		if ch == null:
+			continue  # WO-1029
 		var scene: Variant = R.d(audio_only.get(R.s(ch))).get("scene")
 		if not HC.truthy(scene):
 			continue
@@ -333,6 +338,12 @@ static func bus_channel_count(settings: Dictionary, cm: Dictionary, program_ch: 
 	return _channels(layout)
 
 
+## WO-1029: the screen index of program channel `ch` (its position in programChannels, holes included); `fallback` when none.
+static func screen_idx(cm: Dictionary, ch: Variant, fallback := 0) -> int:
+	var i := SC.screen_of_channel(cm, int(ch)) if ch != null else -1
+	return i if i >= 0 else fallback
+
+
 ## The screen label a PGM channel's route / Screens button shows (web client/lib/screen-label.js; mv_layout.gd
 ## screen_label): idx = the channel's position in programChannels; screenLabels[idx] when set, else "S<idx+1>".
 ## A channel that is not in programChannels shows its number.
@@ -377,7 +388,8 @@ static func screen_labels(cm: Dictionary) -> Dictionary:
 	var progs: Variant = cm.get("programChannels")
 	if progs is Array:
 		for p in progs:
-			out[int(p)] = screen_label(cm, int(p))
+			if p != null:  # WO-1029: a screen on another server has no strip here
+				out[int(p)] = screen_label(cm, int(p))
 	return out
 
 

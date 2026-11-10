@@ -235,7 +235,7 @@ func _scrub(ms: float) -> void:
 	var layer_no := int(_layer.get("layerNumber", 0))
 	var res: Dictionary = await Api.post_json("/api/scene/layer-scrub", {"sceneId": _scene_id, "mainIdx": _main, "layerNumber": layer_no, "ms": int(round(ms))})
 	_busy = false
-	var note := T.scrub_note(res.data) if res.ok and res.data is Dictionary else "Scrub failed: %s" % res.error
+	var note := T.scrub_note(res.data) if res.ok and res.data is Dictionary else "Scrub failed: %s" % Store.fail_text(res)
 	_slider.tooltip_text = note
 	if note != _note:
 		_note = note

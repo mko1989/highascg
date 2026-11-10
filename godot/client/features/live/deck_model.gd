@@ -3,6 +3,8 @@ extends RefCounted
 ##   screen count       client/components/scenes-editor.js:45  max(1, channelMap.screenCount)
 ##   looks per main     client/lib/scene-state.js:266-272      mainScope === 'all' || == mainIdx
 ##   PGM/PRV per main   client/lib/scene-live-main-sync.js:62  resolveBusLookIdsForMain()
+const SC := preload("res://core/screen_channels.gd")
+const RA := preload("res://features/live/remote_air_model.gd")
 ## Godot JSON numbers are floats → channel numbers are compared via int(), ids via str().
 
 
@@ -23,8 +25,15 @@ static func scenes_for_main(scenes: Array, main_idx: int) -> Array:
 ## `project_scenes` = project.scenes (liveSceneIdByMain / previewSceneIdByMain are the fallback the
 ## web client reads through sceneState when scene.live has no entry for the main's channels).
 static func resolve_bus_look_ids(main_idx: int, scene_live: Dictionary, channel_map: Dictionary,
-		known_ids: Dictionary, project_scenes: Dictionary) -> Dictionary:
+		known_ids: Dictionary, project_scenes: Dictionary, remote_live: Variant = null) -> Dictionary:
 	var idx: int = max(0, main_idx)
+	if not SC.is_here(channel_map, idx):
+		# WO-1029 C15: a screen on another linked server — only what its owner reports (scene.remoteLive) counts. Never
+		# the saved liveSceneIdByMain (a stale cache of this show) and never a channel of this server. Unknown = "".
+		var e := RA.entry({"remoteLive": remote_live}, idx)
+		var rp := _known(str(RA.look(e, "pgm").id), known_ids)
+		var rv := _known(str(RA.look(e, "prv").id), known_ids)
+		return {"pgm": rp, "prv": "" if rv == rp else rv}
 	var programs: Array = channel_map.get("programChannels", [])
 	var previews: Array = channel_map.get("previewChannels", [])
 	var pgm_ch: int = int(programs[idx]) if idx < programs.size() and programs[idx] != null else 0
@@ -80,6 +89,8 @@ static func preview_bus_available(cm: Dictionary, main_idx: int) -> bool:
 	var pe: Variant = cm.get("previewEnabledByMain")
 	if pe is Array and main_idx < (pe as Array).size() and pe[main_idx] == false:
 		return false
+	if not SC.is_here(cm, main_idx):
+		return true  # WO-1029 C15: a remote screen has no preview channel here; its owner's setting (above) decides
 	var pgm := _num_at(cm.get("programChannels"), main_idx)
 	if is_nan(pgm):
 		pgm = _num_at(cm.get("playbackChannels"), main_idx)

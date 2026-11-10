@@ -7,11 +7,15 @@ extends Node
 signal changed(path: String, value: Variant)
 signal project_changed(project: Dictionary)
 
+const ScreenNotice := preload("res://core/screen_notice.gd")
 var state: Dictionary = {}
 ## The show document (scenes, timelines, multiview, programOutput…) — WO-598: the server copy is
 ## authoritative for this client until the editing protocol lands; `project_sync` replaces it.
 var project: Dictionary = {}
 var _scene_live_seq := -1
+## WO-1029 C15: this server's GET /api/cluster snapshot / WS cluster:peers (self, peers[], destinations[]) — the names
+## of the linked servers a screen on another box is "on". {} until the first answer.
+var cluster: Dictionary = {}
 
 
 func set_project(p: Variant) -> void:
@@ -122,3 +126,18 @@ static func write_path(root: Dictionary, path: String, value: Variant) -> void:
 			cur[k] = {}
 		cur = cur[k]
 	cur[keys[keys.size() - 1]] = value
+
+
+## WO-1029 C15: why a by-screen request failed / what a relayed one did (core/screen_notice.gd, with this client's maps).
+func fail_text(res: Dictionary) -> String:
+	return ScreenNotice.reason(res, get_value("channelMap", {}), cluster)
+
+
+func notice_for(what: String, res: Dictionary) -> Dictionary:
+	return ScreenNotice.summary(what, res, get_value("channelMap", {}), cluster)
+
+
+## Listeners on path "cluster" redraw the "on <box>" cues.
+func set_cluster(snap: Dictionary) -> void:
+	cluster = snap
+	_emit("cluster", snap)

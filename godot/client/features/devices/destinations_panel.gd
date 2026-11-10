@@ -287,6 +287,9 @@ func _card(d: Dictionary, anchors: Dictionary) -> Control:
 			func(_at: Vector2, data: Variant) -> void: _drop(Drop.parse(data), d))
 	wrap.add_child(card)
 	card.add_child(CardBody.build(d, anchors))
+	var cue := DM.remote_cue(d.dest, DevicesTarget.value("channelMap"), Store.cluster if DevicesTarget.editing_id == "" else null)
+	if cue != "":  # WO-1029 C15: this destination's screen is output by another linked server
+		wrap.add_child(_label("  " + cue, ThemeBuilder.TEXT_MUTED, 11))
 	for l in d.links:
 		wrap.add_child(_label("  • " + str(l), ThemeBuilder.TEXT_MUTED, 11))
 	return wrap

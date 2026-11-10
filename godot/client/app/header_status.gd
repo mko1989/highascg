@@ -55,7 +55,7 @@ func _ready() -> void:
 	if cfg.load(UI_CFG) == OK:
 		_main = int(cfg.get_value("header", "timer_main", 0))
 	Store.changed.connect(func(p: String, _v: Variant) -> void:
-		if p == "channelMap" or p == "*" or p == "":
+		if p == "channelMap" or p == "cluster" or p == "scene.remoteLive" or p == "*" or p == "":
 			_render_chips())
 	_render_chips()
 
@@ -71,9 +71,11 @@ func _cm() -> Dictionary:
 
 
 func _render_chips() -> void:
-	var list := M.timer_chips(_cm())
-	if _main >= list.size():
-		_main = 0
+	var list := M.timer_chips(_cm(), Store.cluster, Store.get_value("scene", {}))
+	# WO-1029 C15: _main is a screen index; it must be one of the screens HERE (the timer reads a local channel)
+	var local_mains := list.filter(func(c: Dictionary) -> bool: return not c.remote).map(func(c: Dictionary) -> int: return int(c.main))
+	if not local_mains.has(_main):
+		_main = int(local_mains[0]) if not local_mains.is_empty() else 0
 	for c in chips.get_children():
 		c.queue_free()
 	if list.size() > 1:  # one screen: nothing to choose
@@ -85,6 +87,7 @@ func _render_chips() -> void:
 			b.button_pressed = int(chip.main) == _main
 			b.focus_mode = Control.FOCUS_NONE
 			b.add_theme_font_size_override("font_size", 11)
+			b.disabled = chip.remote  # WO-1029 C15: a screen on another box — the tip says where and what is on air
 			b.pressed.connect(_choose.bind(int(chip.main)))
 			chips.add_child(b)
 	timer.main = _main

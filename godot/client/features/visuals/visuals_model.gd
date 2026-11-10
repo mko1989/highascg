@@ -1,6 +1,7 @@
 extends RefCounted
 ## WO-863 — the Visuals tab's pure half: the WO-861 audio parts as flat 0..1 buses, the Flow graph (WO-858 §6.2 binding table
 ## as nodes: Audio bus → Shape → Parameter), its per-frame evaluation, the scene parameters and the `project.visuals` slice.
+const SC := preload("res://core/screen_channels.gd")
 
 const Auto := preload("res://features/visuals/visuals_autopilot.gd")
 const Layers := preload("res://features/visuals/visuals_layers.gd")
@@ -183,6 +184,8 @@ static func screens(cm: Variant) -> Array:
 	var progs: Array = c.get("programChannels") if c.get("programChannels") is Array else []
 	var labels: Array = c.get("screenLabels") if c.get("screenLabels") is Array else []
 	for i in progs.size():
+		if SC.pgm(c, i) < 0:
+			continue  # WO-1029: a screen on another linked server cannot be sent to from here
 		var own := str(labels[i]) if i < labels.size() and labels[i] != null and str(labels[i]) != "" else "Screen %d" % (i + 1)
 		out.append({"label": "%s PGM (ch %d)" % [own, int(_num(progs[i]))], "channel": int(_num(progs[i]))})
 	return out

@@ -227,7 +227,7 @@ static func local_rows(local: Variant, st: Dictionary) -> Array:
 		return []
 	var l: Dictionary = local
 	var map := R.d(l.get("channelMap"))
-	var pgm := ", ".join(R.a(map.get("programChannels")).map(func(ch: Variant) -> String: return "ch" + t(ch)))
+	var pgm := ", ".join(R.a(map.get("programChannels")).map(func(ch: Variant) -> String: return "ch" + t(ch) if ch != null else "other server"))  # WO-1029
 	var prv_list := R.a(map.get("previewChannels"))
 	var prv_parts := []
 	for i in prv_list.size():

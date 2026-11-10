@@ -3,6 +3,7 @@ extends RefCounted
 ## The settings, target channels and the switch itself live in node (GET/POST /api/led-test-card/settings, …/master,
 ## …/channel); this only shapes what the client shows.
 
+const SN := preload("res://core/screen_notice.gd")
 const BUILDER := "led-builder"
 
 
@@ -44,14 +45,19 @@ static func extras(pattern: String) -> Dictionary:
 
 
 ## A …/master or …/channel reply → a header notice, or {} when every channel took it.
-static func switch_notice(res: Dictionary, enabled: bool) -> Dictionary:
+static func switch_notice(res: Dictionary, enabled: bool, cm: Variant = null, cluster: Variant = null) -> Dictionary:
 	var d: Dictionary = res.get("data") if res.get("data") is Dictionary else {}
 	var failures: Array = d.get("failures", []) if d.get("failures") is Array else []
 	var why := ", ".join(failures.map(func(f: Variant) -> String: return "ch %d: %s" % [int(f.channel), str(f.error)]))
 	if not res.get("ok", false):
 		var err := why if why != "" else str(d.get("error", res.get("error", "")))
+		if SN.is_not_here(res) or not SN.via_failures(res).is_empty():  # WO-1029 C15: a screen on another server
+			err = SN.reason(res, cm, cluster)
 		return {"text": "Test card %s failed — %s" % ["on" if enabled else "off", err], "tone": "error"}
 	if not failures.is_empty():
 		var n: int = (d.get("targets", []) as Array).size() if d.get("targets") is Array else 0
 		return {"text": "Test card on %d of %d channels — %s" % [n - failures.size(), n, why], "tone": "warn"}
+	var nd := SN.not_done(res, cm, cluster)  # WO-1029 C15: "all screens" acted on this server only
+	if nd != "":
+		return {"text": "Test card %s here — %s" % ["on" if enabled else "off", nd], "tone": "warn"}
 	return {}

@@ -78,7 +78,7 @@ static func exchange(ed: Variant, api: Variant, i: int, src: Dictionary) -> bool
 	var n := int(layer.get("layerNumber", 0))
 	var res: Dictionary = await api.post_json("/api/scene/new-layer", {"sceneId": ed.scene_id, "mainIdx": ed.main, "source": src, "layerNumber": n})
 	if not res.ok or not (res.data is Dictionary) or not ((res.data as Dictionary).get("layer") is Dictionary):
-		ed.show_status("Exchange refused: %s" % res.error)
+		ed.show_status("Exchange refused: %s" % Store.fail_text(res))
 		return false
 	i = (ed._layers() as Array).find(layer)  # a project reload while the server answered → the layer is gone
 	if i < 0:
@@ -98,7 +98,7 @@ static func exchange(ed: Variant, api: Variant, i: int, src: Dictionary) -> bool
 static func add(ed: Variant, api: Variant, src: Dictionary) -> bool:
 	var res: Dictionary = await api.post_json("/api/scene/new-layer", {"sceneId": ed.scene_id, "mainIdx": ed.main, "source": src})
 	if not res.ok or not (res.data is Dictionary) or not ((res.data as Dictionary).get("layer") is Dictionary):
-		ed.show_status("Add layer refused: %s" % res.error)
+		ed.show_status("Add layer refused: %s" % Store.fail_text(res))
 		return false
 	var lk: Dictionary = ed.look()
 	if not (lk.get("layers") is Array):

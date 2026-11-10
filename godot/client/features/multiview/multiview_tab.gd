@@ -7,6 +7,7 @@ extends VBoxContainer
 ## settings (timers under labels, timer size, highlight, BG) always apply, like the web. Click a cell = audio focus
 ## (POST /api/multiview/audio-focus). Without a multiview destination the canvas says so and nothing is sent.
 
+const SC := preload("res://core/screen_channels.gd")
 const L := preload("res://features/multiview/mv_layout.gd")
 const D := preload("res://features/multiview/mv_doc.gd")
 const MvCanvas := preload("res://features/multiview/mv_canvas.gd")
@@ -25,6 +26,7 @@ var _scale: SpinBox
 var _bg: ColorPickerButton
 var _presets: Array = []
 var _say: Label
+var _remote: Label
 var _timer: Timer
 var _applying := false
 var _apply_again := false
@@ -70,6 +72,10 @@ func _ready() -> void:
 	_say.clip_text = true
 	_say.add_theme_color_override("font_color", Color("#f0b429"))
 	_bar.add_child(_say)
+	_remote = Label.new()  # WO-1029 C15: screens that are on another linked server are not in this multiview
+	_remote.add_theme_color_override("font_color", Color("#8b949e"))
+	_remote.add_theme_font_size_override("font_size", 12)
+	add_child(_remote)
 	canvas = MvCanvas.new()
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas.st = st
@@ -84,7 +90,7 @@ func _ready() -> void:
 	add_child(_timer)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: reload())
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
-		if path == "*" or path.begins_with("channelMap"):
+		if path == "*" or path == "cluster" or path.begins_with("channelMap"):
 			_on_channel_map())
 	Ws.on("client_prefs", _on_client_prefs)
 	Ws.connected.connect(_load_prefs)
@@ -134,6 +140,8 @@ func _on_channel_map() -> void:
 	_pick.visible = chs.size() > 1
 	if chs.size() > 1:
 		_pick.select(clampi(index - 1, 0, chs.size() - 1))
+	_remote.text = SC.remote_note(_cm, Store.cluster)
+	_remote.visible = _remote.text != ""
 	canvas.cm = _cm
 	canvas.mv_ch = mv_channel() if _cm.get("multiviewEnabled") != false else null
 	canvas.hold_video()
