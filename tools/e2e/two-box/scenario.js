@@ -18,7 +18,8 @@ const LED_ID = 'dst_mw7t9epz_1'
 const MODE = { videoMode: '1080p5000', width: 1920, height: 1080, fps: 50 }
 
 /** The test looks (project scenes, by name) the take checks use; `slot` = the DeckLink input of the SECOND server. */
-const LOOKS = { mixer: { name: '2box Mixer', slot: 3 }, ppt: { name: '2box PPT', slot: 4 }, led: { name: '2box LED' } }
+// TWOBOX_LED_LOOK=<look name>: any look scoped to the LED wall stands in when the show has no '2box LED' (WO-1029 run)
+const LOOKS = { mixer: { name: '2box Mixer', slot: 3 }, ppt: { name: '2box PPT', slot: 4 }, led: { name: process.env.TWOBOX_LED_LOOK || '2box LED' } }
 
 const PHASES = {
 	1: {

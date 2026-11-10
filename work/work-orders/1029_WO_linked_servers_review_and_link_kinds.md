@@ -1,6 +1,6 @@
 # WO-1029 — Linked servers: full review, link kinds (one operator / peers), identity that survives an IP change
 **Area:** network, engine, testing-ci, devices-config
-**Status: IN PROGRESS (10.11 — review done, reports in `1029_review/`; phase 1 fixed offline (gates green), two-box run pending; phase 2 = link kinds, owner's answers recorded)**
+**Status: IN PROGRESS (10.11 — review done, reports in `1029_review/`; phase 1 DONE and verified on the two boxes; phase 2 = link kinds + destination ownership, owner's answers recorded, not started)**
 
 Owner, 10.11 (after the incident below):
 - *"it seemed like it didnt let me drive local screens. which is my main idea with 2box/multibox setup. have connected
@@ -116,7 +116,7 @@ From report 02 section 3 and report 03 section 3:
 - [x] P1d hardware id — one rule for the boot unit and the node; a hostname one of the box's NICs derives wins over a
       flipped file (this box: file said 7580, name 7579 → stays 7579, file repaired on the next start)
 - [x] P1e harness + incident replay (df2372ee) — loopback aliases, `move()`, one-way cut; 4/4
-- [ ] Phase 1 on both boxes (update 5867, change an address under a live link, reboot each box)
+- [x] Phase 1 on both boxes (10.11, release 2026-11-10T095041Z on 5867, main on 4d68638e) — see "Verified on the two boxes"
 - [ ] Phase 2 after the owner's answers
 
 ## Phase 1 — left open (found while fixing)
@@ -132,3 +132,35 @@ From report 02 section 3 and report 03 section 3:
 - The replay's one-way-cut case no longer requires B to see A offline; tighten it.
 - Engine paths that swallow send errors (stop audio-only look, clear channel, FTB retries) are covered only where a
   route pre-checks; the library-typed AMCP path skips the gate (B14).
+
+## Verified on the two boxes (10.11, main 4d68638e from the tree, highascg5867 on release 2026-11-10T095041Z)
+
+- **Gates:** local gate loop green (offline suite included), CI green on 4d68638e, Godot unit suite 26608 / 0.
+- **5867 post-update sweep:** 26 pass, 4 warn (client not restarted, one root helper, DeckLink keyer lines, build
+  stamps differ because main runs from the tree), 0 fail.
+- **WO-1026 harness, phase 2:** static 26 pass / 0 fail / 2 warn (no SDI signal). Full run 41 pass / 1 fail / 2 warn /
+  1 skip of 45: the fail is T5.0 "missing look 2box LED" — the look is no longer in the show (the owner's
+  BIG_BUCK_BUNNY look took its place), T5.4 skipped with it. Re-run of T5 with `TWOBOX_LED_LOOK=BIG_BUCK_BUNNY_1080P24`:
+  7 pass / 1 fail — T5.6 counted one Caspar line, `ffmpeg[…BIG_BUCK_BUNNY_1080P24.Y4M] Latency: 0` (the stand-in clip).
+  Stream 591 frames / 12.1 s, record 501 / 10 s, soak 3001 / 60 s with 11 takes: no frame lost.
+- **Drive gate (P1c):** the master reports `forwarded_here: [7]` to 5867. On 5867: test card on its own PGM ch 2 →
+  200 and on its Caspar; test card / `PLAY` on ch 7 → 409 `AIR_HELD … driven by highascg7579`; a MIXER query on ch 7 is
+  answered by Caspar.
+- **Mastership (P1b):** master node frozen 22 s → 5867 takes over (epoch 10); thawed → main steps down and STAYS
+  follower (no failback); Make master on main → epoch 11, `push: accepted`, held 30 s on both. Master node restart
+  (back in < 12 s) and follower node restart: no takeover, epoch stays 11, show in sync, report resumes.
+- **Identity (P1a), live:** a second address made primary on main's eno1 (.37, route source changed) → 5867 logs
+  `highascg7579: now at 192.168.0.37:4200 (was 192.168.0.36:4200)` within one poll; address removed (.37 dead, the
+  incident's state) → `now at 192.168.0.36:4200 (was 192.168.0.37:4200)`; master and epoch unchanged throughout.
+- **Hardware id (P1d):** after the node restart the box is still highascg7579 and `config/hardware-identity.json` is
+  repaired to 7579 / eno2. Not verified through a real boot.
+
+### Found in this run (both are phase 2, not regressions)
+
+1. **A follower still cannot drive a screen that is cabled only on it when the master forwards to it.** With 5867 as
+   master it reported `forwarded_here: [2, 5]` to main, and the test card on main's own LED wall (ch 2) answered 409.
+   Honest now, but against the owner's rule 2. Cure = destination ownership: a destination cabled only here is never
+   held here; only a backup destination (cabled on the master too) hands the press to the master.
+2. **A new master's catch-up replays its own copy channel onto the other box's screen** (B5): a probe layer put on
+   5867's ch 2 (`PLAY 2-99 EMPTY`) appeared on main's LED channel after 5867 took over. Cure = the same ownership
+   rule: catch-up only for destinations the master holds.
