@@ -290,3 +290,35 @@ the plan showed it dirty, Apply restarted only its Caspar: window now at x=2048,
 checked).
 - Seen on that screen: the Servers card of 5867's client still says "PGM here is driven by the master: local PGM
   takes are skipped" — no longer true for its own screens; wording to fix with the unified view.
+
+## Channels only where cabled — live on both boxes (10.11 14:15, owner: "run the fix directly on the boxes")
+
+Built and pushed (plan 07 wave A): C0 caps (0a2b39f0), C4 clock-free signed calls (a2fc6eed), C1a/C2/C3 the rule
+behind `cluster.channelsWhereCabled` (957c598a), C1b/C1c engine + API hole-safe, `NOT_HERE` 409 (e82bd3a4). Flag set
+by hand in each box's `config/general.json` (the switch UI, C12, is not built), then Apply.
+
+| Box | Before | Now |
+|---|---|---|
+| highascg5867 (release 2026-11-10T130244Z) | 10 channels | 7: GUI, PGM/PRV 3 on 2/3, Stream PGM on 4/5, DeckLink 3/4 on 6/7 |
+| highascg7579 (tree e82bd3a4) | 11 channels | 6: GUI, PGM/PRV 1 (LED) on 2/3, DeckLink 1/2 on 4/5, monitor mix on 6 |
+
+- Each box refuses the other's screens with a clear answer: FTB / test card for screen 3 on 7579 →
+  409 `NOT_HERE … it is on highascg5867`; FTB for screen 1 on 5867 → `… it is on highascg7579`. Each drives its own
+  (5867: test card by `screenIdx: 2` → its channel 2).
+- 7579's Apply (new engine): LED look re-taken and resumed (23 s → 34 s), `restored in 722 ms`; the "2box Mixer" look
+  that sat on the old Stream copy channels reported `its destination no longer exists` and was not put anywhere.
+- 5867's first switch ran on the core-only release and put content back by channel number (see WO-1030); it is on
+  the converted build now.
+
+**Open, expected at this stage (plan 07 waves B–D):**
+- No box can drive the other's screens (the master included): `dest.*` node-to-node calls are not built. The old
+  fan-out has nothing to mirror (no copy channels).
+- "to zoom" has no channel anywhere (cabled nowhere; the Local use connector is not built).
+- `GET /api/cluster` `destinations` lists only the screens a box has channels for.
+- The "2box" looks' `route://9-3` / `10-4` point at channels that are now 6 / 7 on 5867 (input identity, plan 06
+  S13–S16).
+- No picture of a remote screen; no media needs / spread (in progress); the Godot client does not know `NOT_HERE`.
+- The channel switch has no UI and no dry run; the flag was written into general.json by hand
+  (backups: `/tmp/general.before-cwc.json` on 5867, the session scratchpad on 7579).
+- `smoke-wo746-shared-show-e2e` step G7 failed once in a full local suite run ("save refused twice") and passed on
+  rerun and in CI: a load-dependent flake to harden.
