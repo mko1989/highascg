@@ -6,6 +6,7 @@
  * server WO-739's invites (cluster-invites.js) on its own store, so a link-back waits there unless it auto-accepts.
  * WO-1029: servers sign hellos with a fake device key (`sign`/`verify` below: a hash, enough to tell keys apart).
  * `move(name, host)` re-addresses a server; `block(from, to)` / `unblock(from, to)` cut one direction only.
+ * WO-1029 C0: `caps` = the capability list that server advertises (default: this build's; null = a build before caps).
  * `noHello` = a server before WO-1029 (no hello route, no ping fingerprint). Hellos are counted in `hellos`, not `calls`.
  */
 
@@ -35,10 +36,10 @@ function lan() {
 		const m = new Map()
 		const store = { get: (k) => m.get(k), set: (k, v) => m.set(k, v), m }
 		const key = o.key || `-----KEY ${name}-----`
-		const n = { name, host, port: 4200, key, store, up: true, auth: !!o.auth, old: !!o.old, noHello: !!(o.old || o.noHello), calls: [], hellos: [] }
+		const n = { name, host, port: 4200, key, store, up: true, auth: !!o.auth, old: !!o.old, noHello: !!(o.old || o.noHello), calls: [], hellos: [], caps: o.caps === undefined ? require('../../../src/cluster/cluster-caps').supported() : o.caps }
 		const reach = reachFrom(n)
 		n.ping = () => ({ appId: 'highascg', selfId: name, hostname: name, instanceId: `i-${name}`, appVersion: 'x',
-			...(n.old ? {} : { clusterLinked: linkedFingerprints(store) }), ...(n.noHello ? {} : { fingerprint: fingerprint(n.key) }) })
+			...(n.old ? {} : { clusterLinked: linkedFingerprints(store) }), ...(n.noHello ? {} : { fingerprint: fingerprint(n.key) }), ...(n.old || n.caps === null ? {} : { caps: n.caps }) })
 		n.c = createCluster({
 			persistence: store,
 			invites: o.invites ? createInvites({ persistence: store, now: clock.now }) : null,

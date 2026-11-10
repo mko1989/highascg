@@ -111,6 +111,7 @@ async function handleGet(path, ctx, req) {
 				projectMedia,
 				duties: require('../cluster/server-duties').get(), // WO-712 R1: what this server does (linked servers show it)
 				clusterLinked: require('../cluster/cluster-peers').linkedFingerprints(ctx.persistence || require('../utils/persistence')), // WO-732
+				caps: require('../cluster/cluster-caps').supported(), // WO-1029 C0: what this build supports (older builds: absent)
 				fingerprint: devicePingFingerprint(), // WO-1029: a linker sees whether the box at its saved address is that server
 				activeShowSlug,
 				activeShowRevision,

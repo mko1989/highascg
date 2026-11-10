@@ -21,6 +21,7 @@
  */
 
 const { fingerprint } = require('./cluster-media')
+const { normalize: normalizeCaps } = require('./cluster-caps')
 
 const FRESH_MS = 12000 // a hello this recent keeps the peer online when our poll to it fails (2 polls + slack)
 const UNSUPPORTED_MS = 60000
@@ -72,12 +73,13 @@ function createHello(deps) {
 		const local = advertised(route, deps.selfHost?.())
 		lastSent = Math.max(deps.now(), lastSent + 1)
 		const req = { id: deps.selfId(), fp: me, to: fingerprint(p.saved.device_key), address: `${local}:${Number(deps.selfPort?.()) || 4200}`, ts: lastSent }
-		let r = await deps.request('POST', host, port, '/api/cluster/hello', { ...req, sig: deps.sign(helloText(req)) })
+		const caps = deps.selfCaps?.() || [] // WO-1029 C0: unsigned, advisory (an older receiver verifies the old text and ignores it)
+		let r = await deps.request('POST', host, port, '/api/cluster/hello', { ...req, caps, sig: deps.sign(helloText(req)) })
 		const floor = Number(r.json?.last)
 		if (r.status === 409 && Number.isSafeInteger(floor) && floor >= req.ts) {
 			lastSent = floor + 1 // our clock is behind what it took from us before (clock reset): count on from there
 			req.ts = lastSent
-			r = await deps.request('POST', host, port, '/api/cluster/hello', { ...req, sig: deps.sign(helloText(req)) })
+			r = await deps.request('POST', host, port, '/api/cluster/hello', { ...req, caps, sig: deps.sign(helloText(req)) })
 		}
 		const error = r.ok ? '' : r.json?.error || r.error || `HTTP ${r.status}`
 		if (!r.ok && r.status && r.status !== 404 && p.hello?.error !== error) deps.log('warn', `${p.saved.name}: hello refused (${error})`)
@@ -98,7 +100,8 @@ function createHello(deps) {
 		if (Number(b.ts) <= (lastTs.get(fp) || 0)) return { status: 409, body: { error: 'replayed hello', last: lastTs.get(fp) } }
 		lastTs.set(fp, Number(b.ts))
 		p.heardAt = t
-		p.live = { ...p.live, online: true, last_seen: t, error: '', via: p.live.via === 'poll' && p.live.online === true ? 'poll' : 'hello' }
+		const caps = normalizeCaps(b.caps) // WO-1029 C0: [] from an older build
+		p.live = { ...p.live, online: true, last_seen: t, error: '', via: p.live.via === 'poll' && p.live.online === true ? 'poll' : 'hello', caps }
 		const addr = deps.parseAddress(b.address)
 		const was = `${p.saved.host}:${p.saved.port}`
 		let moved = false

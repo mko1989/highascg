@@ -48,7 +48,9 @@ function createClusterApply(deps) {
 	/** One linked server's dirty state, as it decides it. */
 	async function peerDirty(p) {
 		const base = { reachable: true, build: 'current' }
-		const r = await deps.relay('GET', p.id, '/api/caspar-config/dirty')
+		// WO-1029 C0: a peer that advertises caps without `apply` is an older build: no probe. No caps = probe the route as before.
+		const known = deps.peerCaps ? deps.peerCaps(p.id) : []
+		const r = known.length && !known.includes('apply') ? { status: 404 } : await deps.relay('GET', p.id, '/api/caspar-config/dirty')
 		const j = parse(r)
 		if (r.status === 200 && j && typeof j.dirty === 'boolean') {
 			const reasons = Array.isArray(j.reasons) ? j.reasons : []

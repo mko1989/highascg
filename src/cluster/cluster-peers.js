@@ -32,6 +32,7 @@ const net = require('net')
 const os = require('os')
 const { outboundAuthHeaders } = require('../server/auth')
 const { createHello, advertised } = require('./cluster-hello')
+const caps = require('./cluster-caps')
 
 const STORE_KEY = 'clusterPeers'
 const TOMBSTONE_KEY = 'clusterUnlinked'
@@ -194,6 +195,7 @@ function createCluster(opts) {
 			media: ping.projectMedia ? { slug: ping.projectMedia.slug, files: ping.projectMedia.fileCount, signature: ping.projectMedia.signature } : null,
 			duties: ping.duties && typeof ping.duties === 'object' ? ping.duties : null, // WO-712 R1: what that server does (null = older server)
 			linked: Array.isArray(ping.clusterLinked) ? ping.clusterLinked.map(String) : null, // WO-732 (null = older server)
+			caps: caps.normalize(ping.caps), // WO-1029 C0: [] = older build
 			error: '',
 			via: 'poll', // WO-1029: 'hello' = seen only by its signed hello (our poll does not reach it)
 		}
@@ -228,6 +230,7 @@ function createCluster(opts) {
 			linked_back: linkedBack(p),
 			link_back_error: linkedBack(p) === true ? '' : p.back?.error || '',
 			link_pending: linkedBack(p) !== true && p.back?.pending === true, // WO-739: waiting for that server's accept
+			caps: p.live.online === false ? [] : caps.normalize(p.live.caps),
 			reached_by: p.live.online === true ? p.live.via || 'poll' : null, // WO-1029: 'hello' = only it reaches this server
 		}
 	}
@@ -236,7 +239,7 @@ function createCluster(opts) {
 		const s = self || {}
 		return {
 			self: { id: s.selfId || '', hostname: s.hostname || '', version: versionOf(s), role: s.role || '', epoch: s.leaderEpoch ?? null,
-				media: s.projectMedia ? { slug: s.projectMedia.slug, files: s.projectMedia.fileCount } : null, duties: s.duties ?? null,
+				media: s.projectMedia ? { slug: s.projectMedia.slug, files: s.projectMedia.fileCount } : null, duties: s.duties ?? null, caps: self ? caps.normalize(s.caps) : caps.supported(),
 				auto_accept: invites ? invites.autoAccept() : true },
 			peers: [...peers.values()].map(view),
 			invites: invites ? invites.list() : [],
@@ -269,6 +272,7 @@ function createCluster(opts) {
 		else if (r.ok && r.json?.appId === 'highascg') p.live = liveFrom(r.json)
 		else if (hello?.fresh(p)) p.live = { ...p.live, online: true, via: 'hello', error: '' } // WO-1029: one-way reachable
 		else p.live = { ...p.live, online: false, error: r.error || (r.status ? `HTTP ${r.status}` : 'no answer') }
+		if (p.live.online !== true) p.live.caps = [] // WO-1029 C0: an offline server's caps are unknown (it may come back on another build)
 	}
 
 	/** WO-732: ask that server to link this one back → { ok, status, error, unlinked, pending } (recorded in p.back). */
@@ -308,7 +312,7 @@ function createCluster(opts) {
 	// WO-1029 P1a: signed hellos (only with a device key to sign with: routes-cluster.js, the LAN smokes)
 	const hello = opts.sign && opts.verify && selfFp
 		? createHello({ peers, selfKey: opts.selfKey, sign: opts.sign, verify: opts.verify, request, localAddress, selfPort: opts.selfPort, selfHost: opts.selfHost,
-			selfId: () => idFromPing(self, ''), parseAddress, now, save, changed, log })
+			selfId: () => idFromPing(self, ''), selfCaps: () => (self ? caps.normalize(self.caps) : caps.supported()), parseAddress, now, save, changed, log })
 		: null
 
 	const pollHooks = []
@@ -481,7 +485,7 @@ function createCluster(opts) {
 	}
 
 	return { snapshot, poll, add, accept, decline, setAutoAccept, remove, unlink, deviceView, scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
-		saved, list, byDeviceKey, mediaSend, setMediaSend, afterPoll: (fn) => pollHooks.push(fn),
+		...caps.createCapsApi(peers), saved, list, byDeviceKey, mediaSend, setMediaSend, afterPoll: (fn) => pollHooks.push(fn),
 		hello: (body) => (hello ? hello.handle(body) : { status: 404, body: { error: 'not found' } }) } // WO-1029
 }
 

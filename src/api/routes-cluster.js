@@ -463,6 +463,7 @@ function applyOf(ctx) {
 		selfId,
 		selfName: () => clusterOf(ctx).snapshot().self?.hostname || '',
 		peers: () => clusterOf(ctx).snapshot().peers,
+		peerCaps: (id) => clusterOf(ctx).peerCaps(id), // WO-1029 C0
 		masterId: () => (masterOf(ctx).view().is_master ? selfId() : masterOf(ctx).view().master_id || ''),
 		localDirty: () => require('../config/caspar-config-dirty').casparConfigDirty(ctx),
 		localApply: (b) => require('./routes-caspar-config').handlePost('/api/caspar-config/apply', JSON.stringify(b), ctx),
