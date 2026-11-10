@@ -31,6 +31,7 @@ var _timer: Timer
 var _quiet := 0.0
 var _done: Dictionary = {}
 var _run_id := ""
+var _t0 := 0
 
 
 func _ready() -> void:
@@ -157,16 +158,66 @@ func _say(text: String, tip := "") -> void:
 
 
 func _go() -> void:
-	var ids: Array = M.plan(needs).map(func(i: Dictionary) -> String: return i.id)
+	await _run({"files": M.plan(needs).map(func(i: Dictionary) -> String: return i.id)})
+
+
+## Explicit send (selection bar "Send…"): these local files to the chosen servers, needed there or not.
+func send(ids: Array, rows: Array) -> void:
+	ids = M.sendable(ids)
+	if running or ids.is_empty():
+		return
+	await refresh(true)
+	var targets := M.send_targets(needs)
+	if targets.is_empty():
+		_say("✗ No linked server to send to (offline or its media is not known)")
+		return
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "Send media"
+	dlg.ok_button_text = "Copy"
+	var box := VBoxContainer.new()
+	var label := Label.new()
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	label.custom_minimum_size.x = 440
+	box.add_child(label)
+	var checks: Array = []
+	if targets.size() > 1:
+		for tg in targets:
+			var c := CheckBox.new()
+			c.text = str(tg.get("name", tg.id))
+			c.button_pressed = true
+			c.set_meta("sid", str(tg.id))
+			checks.append(c)
+			box.add_child(c)
+	var chosen := func() -> Array:
+		return checks.filter(func(c: CheckBox) -> bool: return c.button_pressed).map(func(c: CheckBox) -> String: return str(c.get_meta("sid"))) if not checks.is_empty() else [str(targets[0].id)]
+	var upd := func() -> void:
+		var to: Array = chosen.call()
+		label.text = M.send_confirm(needs, ids, to, rows) if not to.is_empty() else "Pick at least one server."
+		dlg.get_ok_button().disabled = to.is_empty()
+	for c in checks:
+		c.toggled.connect(func(_on: bool) -> void: upd.call())
+	dlg.add_child(box)
+	dlg.confirmed.connect(func() -> void:
+		var to: Array = chosen.call()
+		dlg.queue_free()
+		_run(M.send_body(ids, to)))
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	upd.call()
+	dlg.popup_centered()
+
+
+func _run(body: Dictionary) -> void:
+	_t0 = Time.get_ticks_msec()
 	running = true
 	_apply()
 	_say("Spreading media…")
-	var r: Dictionary = await Api.post_json("/api/cluster/media-spread", {"files": ids})
+	var r: Dictionary = await Api.post_json("/api/cluster/media-spread", body)
 	var o := M.start_outcome(int(r.get("status", 0)), r.get("data"))
 	if o.how == "refused":
 		running = false
 		_apply()
-		_say("✗ Spread refused: %s" % str(r.get("error", o.get("error", ""))))
+		_say("✗ Spread refused: %s" % str(o.get("error", r.get("error", ""))))
 		return
 	if o.how == "attached":
 		_say("A spread is already running — following it…")
@@ -188,7 +239,7 @@ func _follow(run_id: String) -> void:
 			var st: Dictionary = await Api.get_json("/api/cluster/media-spread/status")
 			if st.get("ok") == true:
 				if M.is_running(st.data):
-					_say(M.progress_line(st.data, needs))
+					_say(M.progress_line(st.data, needs, (Time.get_ticks_msec() - _t0) / 1000.0))
 				else:
 					_done = st.data if st.data is Dictionary else {"run": {}}
 	running = false

@@ -14,6 +14,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const RenameDialog := preload("res://features/live/media_rename_dialog.gd")
 const HapDialog := preload("res://features/live/media_hap_dialog.gd")
 const Hap := preload("res://features/live/hap_status.gd")
+const NeedsFlow := preload("res://features/live/media_needs_flow.gd")
 
 var ids: Array = []  # selected media ids (files)
 var add_menu: AddMenu  # the media panel ingests what it picks
@@ -24,6 +25,7 @@ var _bar: HFlowContainer
 var _count: Label
 var status: Label
 var _hap_cancel: Button
+var _send: Button
 var bottom_row: HBoxContainer  # WO-1029: the Spread (N) button sits here, left of the "+"
 var _jobs := {}  # jobId → the server's job snapshot (media:hap-encode / GET /api/media/hap-encode)
 var _announced := {}
@@ -39,6 +41,10 @@ func _ready() -> void:
 	_bar.add_child(_button("Copy to…", func() -> void: _pick("copy")))
 	_bar.add_child(_button("Move to…", func() -> void: _pick("move")))
 	_bar.add_child(_button("HAP…", _hap, "Encode the selected clips to HAP (light-CPU playback codec), saved next to the original as _HAP.mov"))
+	_send = _button("Send…", _send_selected, "Copy the selected files to a linked server (the originals stay here)")
+	_send.visible = false
+	_bar.add_child(_send)
+	NeedsFlow.bus.changed.connect(_sync_send)
 	_bar.add_child(_button("Delete", confirm_delete))
 	_bar.add_child(_button("✕", clear_requested.emit, "Clear the selection"))
 	add_child(_bar)
@@ -62,6 +68,17 @@ func _ready() -> void:
 		if type == "media:hap-encode" and data is Dictionary:
 			_on_job(data))
 	_attach_hap()
+	_sync_send()
+
+
+## WO-1029: "Send…" only when servers are linked (the needs answer says so).
+func _send_selected() -> void:
+	if NeedsFlow.current != null:
+		NeedsFlow.current.send(ids.duplicate(), rows)
+
+
+func _sync_send() -> void:
+	_send.visible = NeedsFlow.current != null and NeedsFlow.current.M.linked(NeedsFlow.current.needs) and not NeedsFlow.current.M.send_targets(NeedsFlow.current.needs).is_empty()
 
 
 func set_selection(sel: Array, at_folder: String) -> void:

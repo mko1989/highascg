@@ -128,6 +128,26 @@ func test_progress_and_result() -> void:
 	t.eq(M.event_line({"phase": "start"}), "Spreading media…", "start event")
 
 
+func test_explicit_send() -> void:
+	var n := _needs()
+	t.eq(M.send_targets(n).map(func(s: Dictionary) -> String: return s.id), ["b"], "C unknown: not offered")
+	t.eq(M.sendable(["A/x", "", "A/x", "B"]), ["A/x", "B"], "once each, no blanks")
+	var one := {"servers": [{"id": "a", "name": "A", "self": true}, {"id": "b", "name": "highascg5867", "online": true, "known": true}],
+		"files": [{"id": "TESTOWE/BIG", "size": 36720000000, "on": ["a"]}]}
+	t.eq(M.send_confirm(one, ["TESTOWE/BIG"], ["b"]), "Copy 1 file (34.2 GB) to highascg5867, same folder: TESTOWE/. The originals stay here.", "confirm")
+	one.files[0].on = ["a", "b"]
+	t.ok(M.send_confirm(one, ["TESTOWE/BIG"], ["b"]).contains("Already there, skipped: BIG on highascg5867"), "already there")
+	t.eq(M.send_body(["x"], ["b"]), {"files": ["x"], "to": ["b"]}, "body")
+	t.eq(M.space_text(one, {"server": "b", "needed": 36720000000, "available": 8589934592}), "Not enough space on highascg5867: needs 34.2 GB, 8.0 GB free", "space")
+	t.eq(M.start_outcome(400, {"error": "x", "needed": 1073741824, "available": 1048576}).error, "Not enough space on the target: needs 1.0 GB, 1 MB free", "refusal text")
+	var st := {"running": true, "run": {"bytes": 36720000000, "done_bytes": 13314398617, "files": [{"id": "T/BIG", "to": "b", "state": "copying", "bytes": 36720000000, "done_bytes": 13314398617}]}}
+	t.eq(M.progress_line(st, one), "Spreading 1 of 1 · BIG → highascg5867 (12.4 GB / 34.2 GB)", "bytes of one big file")
+	t.ok(M.progress_line(st, one, 600.0).ends_with("~18 min left"), "eta")
+	t.eq(M.eta_text(10, 100, 2), "", "too early")
+	var skip := {"run": {"files": [{"id": "T/BIG", "to": "b", "state": "skipped", "error": "already there"}]}}
+	t.eq(M.result(skip, one).text, "Nothing copied — BIG → highascg5867: already there", "all skipped")
+
+
 func test_start_outcome() -> void:
 	t.eq(M.start_outcome(202, {"run_id": "r1"}), {"how": "started", "run_id": "r1"}, "202")
 	t.eq(M.start_outcome(409, {"run": {"run_id": "r0", "files": []}}).how, "attached", "409 attaches")
