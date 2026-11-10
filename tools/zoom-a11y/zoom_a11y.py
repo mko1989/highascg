@@ -33,10 +33,14 @@ def load():
 def zoom_frames(Atspi):
     desk = Atspi.get_desktop(0)
     for i in range(desk.get_child_count()):
-        app = desk.get_child_at_index(i)
+        # Other applications on the bus may not answer at all (10.11, live: ibus and the desktop portal hung and every
+        # name lookup waited seconds for them, so each call here timed out). Ask them briefly; Zoom gets real time.
+        Atspi.set_timeout(250, 250)
         try:
+            app = desk.get_child_at_index(i)
             if (app.get_name() or "") != "zoom":
                 continue
+            Atspi.set_timeout(4000, 4000)
             for j in range(app.get_child_count()):
                 f = app.get_child_at_index(j)
                 if f is not None:

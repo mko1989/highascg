@@ -116,6 +116,8 @@ static func source_body(key: String, field: String, value: Variant) -> Dictionar
 			b["window"] = null if str(value) == "" else str(value)
 		"hidden":
 			b["hidden"] = bool(value)
+		"fit":
+			b["fit"] = bool(value)
 		"size":
 			b["size"] = str(value)
 	return b
@@ -148,3 +150,136 @@ static func audio_view(a: Dictionary) -> Dictionary:
 
 static func audio_body(field: String, value: Variant) -> Dictionary:
 	return {"enabled": bool(value)} if field == "enabled" else {"feed": str(value)}
+
+
+# ---------------------------------------------------------------- Meeting section (GET/POST /api/zoom/ui)
+
+const SHARE_TAB_SUFFIX := "'s screen"
+
+
+static func ui_status(u: Dictionary) -> String:
+	var s := "Not in a meeting"
+	if bool(u.get("waiting", false)):
+		s = "In the waiting room"
+	elif bool(u.get("inMeeting", false)):
+		s = "In the meeting"
+	elif str(u.get("preview", "")) != "":
+		s = "Join preview open"
+	var sh: Variant = u.get("sharing")
+	if sh is Array and not sh.is_empty():
+		s += " · %s is sharing" % ", ".join(sh.map(func(x: Variant) -> String: return str(x)))
+	return s
+
+
+static func join_visible(u: Dictionary) -> bool:
+	return str(u.get("preview", "")) != ""
+
+
+## Microphone / Camera: {enabled, pressed}. pressed = the device is ON (mic live, camera sending); disabled when Zoom
+## reports null (not in a meeting).
+static func toggle_view(u: Dictionary, kind: String) -> Dictionary:
+	var v: Variant = u.get("muted" if kind == "mic" else "video")
+	if v == null:
+		return {"enabled": false, "pressed": false}
+	return {"enabled": true, "pressed": (not bool(v)) if kind == "mic" else bool(v)}
+
+
+static func toggle_body(kind: String, on: bool) -> Dictionary:
+	if kind == "mic":
+		return {"action": "unmute" if on else "mute"}
+	return {"action": "video_on" if on else "video_off"}
+
+
+static func _tabs(u: Dictionary) -> Array:
+	var t: Variant = u.get("tabs")
+	return t if t is Array else []
+
+
+static func share_tab_exists(u: Dictionary) -> bool:
+	for x in _tabs(u):
+		if x is Dictionary and str(x.get("name", "")).ends_with(SHARE_TAB_SUFFIX):
+			return true
+	return false
+
+
+## "speaker" | "share" | "" — which tab the main window shows.
+static func main_window(u: Dictionary) -> String:
+	for x in _tabs(u):
+		if x is Dictionary and bool(x.get("checked", false)):
+			var n := str(x.get("name", ""))
+			if n == "Meeting":
+				return "speaker"
+			if n.ends_with(SHARE_TAB_SUFFIX):
+				return "share"
+	return ""
+
+
+static func main_window_body(which: String) -> Dictionary:
+	return {"action": "share_tab" if which == "share" else "meeting_tab"}
+
+
+static func join_body() -> Dictionary:
+	return {"action": "join"}
+
+
+static func participants_body() -> Dictionary:
+	return {"action": "participants"}
+
+
+static func settings_body() -> Dictionary:
+	return {"action": "settings"}
+
+
+## name "" removes the pin.
+static func pin_body(name: String) -> Dictionary:
+	return {"action": "pin", "name": name}
+
+
+## "3 changed, 14 already right" (+ " · not found: a, b, c, +N" for failed and missing settings).
+## `r` = the `settings` field of GET /api/zoom/ui: {} (never run), {running: true}, {error}, or the result.
+static func settings_line(r: Dictionary) -> String:
+	if r.is_empty():
+		return ""
+	if bool(r.get("running", false)):
+		return "Applying… Zoom's Settings window is open for about half a minute"
+	if str(r.get("error", "")) != "":
+		return "Not applied: " + str(r.get("error"))
+	var ch: Variant = r.get("changed")
+	var s := "%d changed, %d already right" % [ch.size() if ch is Array else 0, int(r.get("alreadyRight", 0))]
+	var names := []
+	for key in ["failed", "missing"]:
+		var l: Variant = r.get(key)
+		if l is Array:
+			for x in l:
+				if x is Dictionary:
+					names.append(str(x.get("setting", "")))
+	if not names.is_empty():
+		var shown := names.slice(0, 3)
+		var txt := ", ".join(shown)
+		if names.size() > 3:
+			txt += ", +%d" % (names.size() - 3)
+		s += " · not found: " + txt
+	return s
+
+
+## Participants reply → [{name, label, pin}] — only others get a Pin button; flags in the label.
+static func pin_rows(r: Dictionary) -> Array:
+	var out := []
+	var p: Variant = r.get("participants")
+	if p is Array:
+		for x in p:
+			if not x is Dictionary:
+				continue
+			var name := str(x.get("name", ""))
+			var label := name
+			var flags := []
+			if bool(x.get("me", false)):
+				flags.append("me")
+			if bool(x.get("host", false)):
+				flags.append("host")
+			if bool(x.get("sharing", false)):
+				flags.append("sharing")
+			if not flags.is_empty():
+				label += " (%s)" % ", ".join(flags)
+			out.append({"name": name, "label": label, "pin": not bool(x.get("me", false)) and name != ""})
+	return out

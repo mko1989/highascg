@@ -25,6 +25,15 @@ var _audio_box: VBoxContainer
 var _audio_note: Label
 var _audio_on: CheckBox
 var _audio_feed: OptionButton
+var _meeting_box: VBoxContainer
+var _meeting_status: Label
+var _join: Button
+var _mic: CheckBox
+var _cam: CheckBox
+var _win := {}  # "speaker" | "share" → Button
+var _people_box: VBoxContainer
+var _settings_note: Label
+var _ui_pending := 0  # Meeting POSTs in flight: the poll leaves the toggles alone until they answer
 
 
 func _init() -> void:
@@ -32,6 +41,7 @@ func _init() -> void:
 	page.add_child(_title("Zoom"))
 	_status = _note("")
 	page.add_child(_status)
+	page.add_child(_meeting_section())
 	_url = _line("", "Meeting link or number", "A zoom.us link or a meeting number")
 	_url.select_all_on_focus = true
 	_url.text_submitted.connect(func(_t: String) -> void: _start())
@@ -96,6 +106,9 @@ func _source_box(key: String, label: String) -> Control:
 	r.size = _select(M.SIZES, "", "Grab size")
 	r.size.item_selected.connect(func(i: int) -> void: _edit(key, "size", r.size.get_item_metadata(i)))
 	row.add_child(r.size)
+	r.fit = _check("Fill frame", false, "Only the picture inside the Zoom window, scaled to fill the frame (no Zoom bars)")
+	r.fit.toggled.connect(func(on: bool) -> void: _edit(key, "fit", on))
+	row.add_child(r.fit)
 	box.add_child(row)
 	r.live = _text("", ThemeBuilder.TEXT_MUTED, 11)
 	box.add_child(r.live)
@@ -106,6 +119,49 @@ func _source_box(key: String, label: String) -> Control:
 	box.add_child(r.host_note)
 	_rows[key] = r
 	return box
+
+
+func _meeting_section() -> Control:
+	_meeting_box = _section()
+	_meeting_box.add_child(_title("Meeting"))
+	_meeting_status = _note("")
+	_meeting_box.add_child(_meeting_status)
+	_join = _button("Join", func() -> void: _ui(M.join_body()), "Join from the open preview")
+	_join.visible = false  # only while Zoom shows its join preview
+	_meeting_box.add_child(_join)
+	var tg := _row()
+	_mic = _check("Microphone", false, "Zoom's real microphone state")
+	_mic.toggled.connect(func(on: bool) -> void: _toggle("mic", on))
+	tg.add_child(_mic)
+	_cam = _check("Camera", false, "Zoom's real camera state")
+	_cam.toggled.connect(func(on: bool) -> void: _toggle("cam", on))
+	tg.add_child(_cam)
+	_meeting_box.add_child(tg)
+	_meeting_box.add_child(_caption("Main window shows"))
+	var wr := _row()
+	var grp := ButtonGroup.new()
+	for w in [["speaker", "Speaker"], ["share", "Share"]]:
+		var b := Button.new()
+		b.text = w[1]
+		b.toggle_mode = true
+		b.button_group = grp
+		b.focus_mode = Control.FOCUS_NONE
+		var which: String = w[0]
+		b.toggled.connect(func(on: bool) -> void: if on and not _syncing: _ui(M.main_window_body(which)))
+		wr.add_child(b)
+		_win[which] = b
+	_meeting_box.add_child(wr)
+	var pr := _row()
+	pr.add_child(_button("Refresh", _participants, "List the participants (briefly drives the Zoom window)"))
+	pr.add_child(_button("Unpin", func() -> void: _ui(M.pin_body("")), "Remove the pin"))
+	_meeting_box.add_child(_caption("Participants"))
+	_meeting_box.add_child(pr)
+	_people_box = VBoxContainer.new()
+	_meeting_box.add_child(_people_box)
+	_meeting_box.add_child(_button("Apply Zoom settings", _apply_settings, "Set Zoom's options for playout (briefly drives the Zoom window)"))
+	_settings_note = _note("")
+	_meeting_box.add_child(_settings_note)
+	return _meeting_box
 
 
 func _audio_section() -> Control:
@@ -131,10 +187,12 @@ func poll() -> void:
 	var rz: Dictionary = await DevicesTarget.api.get_json("/api/zoom")
 	var rh: Dictionary = await DevicesTarget.api.get_json("/api/zoom/host")
 	var ra: Dictionary = await DevicesTarget.api.get_json("/api/zoom/audio")
+	var ru: Dictionary = await DevicesTarget.api.get_json("/api/zoom/ui")
 	_polling = false
 	if not is_inside_tree():
 		return
 	_apply(rz, rh, ra)
+	_apply_ui(ru)
 
 
 func _apply(rz: Dictionary, rh: Dictionary, ra: Dictionary) -> void:
@@ -150,6 +208,7 @@ func _apply(rz: Dictionary, rh: Dictionary, ra: Dictionary) -> void:
 		var src := M.source_of(_z, key)
 		_set_options(r.window, M.window_options_for(_z, key), str(src.get("window", "")) if src.get("window") != null else "")
 		r.hidden.set_pressed_no_signal(bool(src.get("hidden", false)))
+		r.fit.set_pressed_no_signal(bool(src.get("fit", false)))
 		var size := str(src.get("size", "1920x1080"))
 		var sizes: Array = M.SIZES.duplicate()
 		if not M.SIZES.any(func(o: Array) -> bool: return o[0] == size):
@@ -173,6 +232,28 @@ func _apply(rz: Dictionary, rh: Dictionary, ra: Dictionary) -> void:
 	_audio_on.set_pressed_no_signal(av.enabled)
 	_set_options(_audio_feed, av.feeds, av.feed)
 	_audio_note.text = av.note if M.available(ra) else M.UNAVAILABLE
+	_syncing = false
+
+
+func _apply_ui(ru: Dictionary) -> void:
+	var ok := M.available(ru)
+	var u := M.body(ru)
+	_meeting_status.text = M.ui_status(u) if ok else M.UNAVAILABLE
+	_join.visible = ok and M.join_visible(u)
+	var sr: Variant = u.get("settings")
+	_settings_note.text = M.settings_line(sr if sr is Dictionary else {})
+	if _ui_pending > 0:  # an operator click is still being answered: keep what they set
+		return
+	_syncing = true
+	for k in ["mic", "cam"]:
+		var v := M.toggle_view(u, k)
+		var cb: CheckBox = _mic if k == "mic" else _cam
+		cb.disabled = not ok or not v.enabled
+		cb.set_pressed_no_signal(v.pressed)
+	var cur := M.main_window(u)
+	for k in _win:
+		_win[k].disabled = not ok or (k == "share" and not M.share_tab_exists(u))
+		_win[k].set_pressed_no_signal(ok and k == cur)
 	_syncing = false
 
 
@@ -225,3 +306,40 @@ func _start() -> void:
 func _quit_zoom() -> void:
 	if await _confirm("Quit Zoom? This leaves the meeting.", "Quit Zoom"):
 		_post("/api/zoom/quit", {})
+
+
+## A Meeting action: held (_ui_pending) so the poll cannot flip a toggle back before Zoom answers.
+func _ui(body: Dictionary) -> Dictionary:
+	_err.text = ""
+	_ui_pending += 1
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/zoom/ui", body)
+	_ui_pending -= 1
+	var e := _reply_error(r)
+	if e != "":
+		_err.text = e
+	poll()
+	return r if e == "" else {}
+
+
+func _toggle(kind: String, on: bool) -> void:
+	if not _syncing:
+		_ui(M.toggle_body(kind, on))
+
+
+func _participants() -> void:
+	var r := await _ui(M.participants_body())
+	for c in _people_box.get_children():
+		c.queue_free()
+	for p in M.pin_rows(M.body(r)):
+		var row := _row()
+		var l := _text(p.label, ThemeBuilder.TEXT_MUTED, 11)
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(l)
+		if p.pin:
+			var name: String = p.name
+			row.add_child(_button("Pin", func() -> void: _ui(M.pin_body(name)), "Pin %s in the main window" % name))
+		_people_box.add_child(row)
+
+
+func _apply_settings() -> void:
+	_ui(M.settings_body())  # answers at once; the progress and the result arrive with the poll (state.settings)

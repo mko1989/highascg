@@ -132,14 +132,24 @@ function createZoomUi(deps = {}) {
 			}
 		}
 	}
+	// One read serves every caller within 700 ms (the GUI polls each second, the join watcher too); any press drops it.
+	let cached = { at: 0, value: null }
 	const dump = async (frame) => (await a11y(frame ? ['dump', '--frame', frame] : ['dump'])).frames || []
-	const press = (frame, name, extra = []) => a11y(['press', '--frame', frame, '--name', name, ...extra])
+	const press = (frame, name, extra = []) => {
+		cached = { at: 0, value: null }
+		return a11y(['press', '--frame', frame, '--name', name, ...extra])
+	}
 	const need = (r, what) => {
 		if (!r || !r.ok) throw new Error(`Zoom control not found or not pressed: ${what}${r && r.error ? ` (${r.error})` : ''}`)
 		return r
 	}
 
-	const state = async () => ({ ok: true, ...readState(await dump()) })
+	/** The last settings run: null (never), { running: true }, { error }, or applySettings' result. */
+	let settingsRun = null
+	const state = async () => {
+		if (!cached.value || Date.now() - cached.at > 700) cached = { at: Date.now(), value: readState(await dump()) }
+		return { ok: true, ...cached.value, settings: settingsRun }
+	}
 
 	/** Press a two-state toolbar button until Zoom shows the wanted state. */
 	async function setToolbar(key, want, onName, offName) {
@@ -175,12 +185,35 @@ function createZoomUi(deps = {}) {
 	async function autoJoin(timeoutMs = 45000) {
 		const until = Date.now() + timeoutMs
 		while (Date.now() < until) {
-			const s = await state()
-			if (s.inMeeting || s.waiting) return s
-			if (s.preview) return join()
+			let s = await state()
+			if (s.preview) s = await join()
+			if (s.inMeeting || s.waiting) {
+				cameraOnceInside().catch((e) => log('warn', `[zoom-ui] camera after joining: ${e.message}`))
+				return s
+			}
 			await sleep(1500)
 		}
 		throw new Error('Zoom showed neither a join preview nor a meeting')
+	}
+
+	/**
+	 * A join without the preview comes in with the camera off (10.11, live), and the waiting room has no camera
+	 * button. So: wait until the box is inside (the host may take a while to admit it), then turn the camera on.
+	 */
+	async function cameraOnceInside(maxMs = 15 * 60 * 1000) {
+		const until = Date.now() + maxMs
+		while (Date.now() < until) {
+			const s = await state()
+			if (s.inMeeting) {
+				if (s.video === false) {
+					await setVideo(true)
+					log('info', '[zoom-ui] inside the meeting: camera turned on')
+				}
+				return
+			}
+			if (!s.running) return
+			await sleep(3000)
+		}
 	}
 
 	/**
@@ -285,7 +318,23 @@ function createZoomUi(deps = {}) {
 		return { ok: failed.length === 0 && missing.length === 0, changed, alreadyRight, failed, missing }
 	}
 
-	return { state, setMute, setVideo, join, autoJoin, selectTab, participants, pin, applySettings, a11y }
+	/**
+	 * Start applySettings in the background and answer at once: a run takes about half a minute (five pages, each
+	 * shown before it is read), longer than a client waits for a POST. The result is `settings` in state().
+	 */
+	function startSettings() {
+		if (settingsRun && settingsRun.running) return { ok: true, running: true }
+		settingsRun = { running: true }
+		applySettings()
+			.then((r) => (settingsRun = { running: false, ...r }))
+			.catch((e) => {
+				settingsRun = { running: false, ok: false, error: String(e.message || e) }
+				log('warn', `[zoom-ui] settings: ${settingsRun.error}`)
+			})
+		return { ok: true, running: true }
+	}
+
+	return { startSettings, state, setMute, setVideo, join, autoJoin, selectTab, participants, pin, applySettings, a11y }
 }
 
 let instance = null

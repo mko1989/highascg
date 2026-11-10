@@ -219,3 +219,17 @@ test('routes: actions map to the UI, unknown actions and failures are 400s, raw 
 	const helper = fs.readFileSync(path.join(__dirname, '..', '..', 'tools', 'zoom-a11y', 'zoom_a11y.py'), 'utf8')
 	for (const cmd of ['"dump"', '"press"', '"close"', '"key"']) assert.ok(helper.includes(`sub.add_parser(${cmd})`), cmd)
 })
+
+test('settings from the API answer at once; the run and its result are in the state', async () => {
+	const frames = () => [{ name: 'Zoom Workplace - Free account', states: S, controls: [c('button', 'Settings')] }, { name: 'Settings', states: S, controls: [c('check box', 'HD', ['checked'])] }]
+	const r = rig(frames)
+	assert.strictEqual((await r.ui.state()).settings, null)
+	assert.deepStrictEqual(r.ui.startSettings(), { ok: true, running: true })
+	assert.deepStrictEqual(r.ui.startSettings(), { ok: true, running: true }, 'a second press while it runs starts nothing')
+	for (let i = 0; i < 50 && (await r.ui.state()).settings.running; i++) await new Promise((res) => setImmediate(res))
+	const done = (await r.ui.state()).settings
+	assert.strictEqual(done.running, false)
+	assert.strictEqual(done.alreadyRight, 1)
+	assert.ok(done.missing.length > 5)
+	assert.strictEqual(r.calls.filter((a) => a[0] === 'press' && a.includes('^Settings$') && a.includes('button')).length, 0, 'the Settings window was already open: not opened twice')
+})

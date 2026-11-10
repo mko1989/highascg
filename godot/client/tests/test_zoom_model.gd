@@ -87,6 +87,67 @@ func test_audio_view() -> void:
 	t.eq(M.audio_view({"error": "boom"}).note, "boom")
 
 
+func test_ui_status() -> void:
+	t.eq(M.ui_status({"inMeeting": true, "sharing": []}), "In the meeting")
+	t.eq(M.ui_status({"waiting": true}), "In the waiting room")
+	t.eq(M.ui_status({"preview": "Join"}), "Join preview open")
+	t.eq(M.ui_status({}), "Not in a meeting")
+	t.eq(M.ui_status({"inMeeting": true, "sharing": ["ZOOM"]}), "In the meeting · ZOOM is sharing")
+	t.ok(M.join_visible({"preview": "Join"}))
+	t.ok(not M.join_visible({"preview": ""}))
+
+
+func test_toggles() -> void:
+	t.eq(M.toggle_view({"muted": false, "video": true}, "mic"), {"enabled": true, "pressed": true})
+	t.eq(M.toggle_view({"muted": true, "video": false}, "mic"), {"enabled": true, "pressed": false})
+	t.eq(M.toggle_view({"muted": true, "video": false}, "cam"), {"enabled": true, "pressed": false})
+	t.eq(M.toggle_view({"muted": null, "video": null}, "cam"), {"enabled": false, "pressed": false})
+	t.eq(M.toggle_view({}, "mic").enabled, false)
+	t.eq(M.toggle_body("mic", true), {"action": "unmute"})
+	t.eq(M.toggle_body("mic", false), {"action": "mute"})
+	t.eq(M.toggle_body("cam", true), {"action": "video_on"})
+	t.eq(M.toggle_body("cam", false), {"action": "video_off"})
+
+
+func test_main_window() -> void:
+	var sp := {"tabs": [{"name": "Meeting", "checked": true}, {"name": "ZOOM's screen", "checked": false}]}
+	var sh := {"tabs": [{"name": "Meeting", "checked": false}, {"name": "ZOOM's screen", "checked": true}]}
+	t.eq(M.main_window(sp), "speaker")
+	t.eq(M.main_window(sh), "share")
+	t.eq(M.main_window({}), "")
+	t.ok(M.share_tab_exists(sp))
+	t.ok(not M.share_tab_exists({"tabs": [{"name": "Meeting", "checked": true}]}))
+	t.eq(M.main_window_body("share"), {"action": "share_tab"})
+	t.eq(M.main_window_body("speaker"), {"action": "meeting_tab"})
+
+
+func test_meeting_bodies() -> void:
+	t.eq(M.join_body(), {"action": "join"})
+	t.eq(M.participants_body(), {"action": "participants"})
+	t.eq(M.settings_body(), {"action": "settings"})
+	t.eq(M.pin_body("Ann"), {"action": "pin", "name": "Ann"})
+	t.eq(M.pin_body(""), {"action": "pin", "name": ""})
+	t.eq(M.source_body("share", "fit", true), {"source": "share", "fit": true})
+
+
+func test_settings_line() -> void:
+	t.eq(M.settings_line({}), "")
+	t.eq(M.settings_line({"running": true}), "Applying… Zoom's Settings window is open for about half a minute")
+	t.eq(M.settings_line({"error": "x"}), "Not applied: x")
+	t.eq(M.settings_line({"changed": [{}, {}, {}], "alreadyRight": 14, "failed": [], "missing": []}), "3 changed, 14 already right")
+	t.eq(M.settings_line({"changed": [], "alreadyRight": 2, "failed": [{"setting": "a"}], "missing": [{"setting": "b"}]}), "0 changed, 2 already right · not found: a, b")
+	t.eq(M.settings_line({"changed": [], "alreadyRight": 0, "failed": [{"setting": "a"}, {"setting": "b"}], "missing": [{"setting": "c"}, {"setting": "d"}, {"setting": "e"}]}), "0 changed, 0 already right · not found: a, b, c, +2")
+
+
+func test_pin_rows() -> void:
+	var rows := M.pin_rows({"participants": [{"name": "Me", "me": true, "host": false}, {"name": "Ann", "host": true}, {"name": "Bo"}]})
+	t.eq(rows.size(), 3)
+	t.eq(rows[0], {"name": "Me", "label": "Me (me)", "pin": false})
+	t.eq(rows[1], {"name": "Ann", "label": "Ann (host)", "pin": true})
+	t.eq(rows[2], {"name": "Bo", "label": "Bo", "pin": true})
+	t.eq(M.pin_rows({}), [])
+
+
 ## WO-1012 B2: a Zoom input is a hidden layer (OPACITY 0) on an input channel, so that channel's print shows the input
 ## under it — the Live tab shows no thumbnail for it rather than the wrong picture.
 func test_zoom_input_has_no_channel_thumbnail() -> void:

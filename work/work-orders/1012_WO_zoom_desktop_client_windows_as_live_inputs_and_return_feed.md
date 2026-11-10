@@ -375,6 +375,27 @@ Not verified:
   understood yet. Today the reliable way is the main window: `share_tab` for the share, `meeting_tab` for the speaker.
 - English control names only (Zoom 7.1.0.3715).
 
+### The Zoom page gets Zoom's controls (10.11)
+
+- Godot (`zoom_model.gd`, `zoom_controls.gd`, a Sonnet agent; reviewed, tests re-run, looked at on the glass): a
+  "Meeting" section (status, Join, Microphone, Camera, "Main window shows" Speaker / Share, Participants with Pin and
+  Unpin, "Apply Zoom settings" with its progress and result line) and "Fill frame" per source.
+- Found while looking at it on the box, and fixed:
+  - **The Inspector slid off the right edge of the screen in Node view.** `node_panel.gd` counted its grid columns
+    from its own width, which includes the grid's minimum width, so the count could only go up. It now drops to one
+    column, lets the layout settle and counts again.
+  - **"server did not answer in time" on Apply Zoom settings.** A run takes about half a minute. The POST now
+    answers at once and the run and its result are `settings` in `GET /api/zoom/ui`.
+  - **The API said "not in a meeting" while Zoom was in one.** Two other applications on the accessibility bus
+    (ibus, the desktop portal) had stopped answering and every lookup waited seconds for them. They get 250 ms now.
+  - **A join without the preview comes in with the camera off.** After a launch with a link the server waits until
+    the box is inside (up to 15 min for the host to admit it) and turns the camera on.
+  - The state read is shared for 700 ms, so the page's poll does not start a Python process per client per second.
+- Verified on the glass: the page in the Inspector; Camera switched on from the page (`video: true` from Zoom);
+  Apply Zoom settings showed "Applying…" then "0 changed, 17 already right"; the Inspector stayed in place.
+  Godot 27175/0, `--check` boot OK. `smoke-wo1012-zoom-ui` 9/9.
+- The Zoom card only exists in the Devices **Node view**; the default rear-panel view has no way to the page.
+
 Not tested, and why:
 
 - **In-meeting pictures: a participant's video, a participant's share, the far end seeing and hearing this box.**

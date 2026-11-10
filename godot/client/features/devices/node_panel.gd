@@ -26,6 +26,7 @@ const ARMED := Color(0.98, 0.8, 0.08, 0.7)
 var anchors := {}
 var _grid: GridContainer
 var _cards := {}  # cable id → card Button
+var _fitting := false
 var _zoom := ZoomControls.new()  # WO-1012 E: the Zoom device (its page opens in the Inspector)
 
 
@@ -45,8 +46,20 @@ func _init() -> void:
 
 
 ## Columns as CSS grid auto-fit minmax(200px, 1fr) would give.
+## The grid's own minimum width (columns × COL_W) is part of this panel's size, so counting columns from `size.x`
+## alone could only ever go up: one wide moment left three columns in room for two and pushed the Inspector off the
+## right edge of the screen (WO-1012, 10.11, live). So: one column first, let the layout give the real width, then count.
 func _fit() -> void:
+	if _fitting:
+		return
+	_fitting = true
+	_grid.columns = 1
+	if is_inside_tree():
+		await get_tree().process_frame
 	_grid.columns = maxi(1, int((size.x + GAP.x) / (COL_W + GAP.x)))
+	if is_inside_tree():
+		await get_tree().process_frame  # the resize our own column change causes must not start another pass
+	_fitting = false
 
 
 func show_sections(sections: Array) -> void:
