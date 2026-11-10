@@ -40,6 +40,13 @@ function fakeCaspar(state = {}, { fps = 50, failOn = null } = {}) {
 			raw: async (line) => {
 				if (failOn && failOn.test(line)) throw new Error(`refused: ${line}`)
 				lines.push(line)
+				/* PLAY / LOAD put a producer on the layer, so a test can count the copies of a clip on the channel. */
+				const m = /^(PLAY|LOAD) (\d+)-(\d+) (?:"([^"]+)"|(\S+))/.exec(line)
+				if (m) {
+					const [ch, layer, clip] = [m[2], m[3], m[4] || m[5]]
+					state[ch] = state[ch] || {}
+					state[ch][layer] = /^route:/.test(clip) ? { producer: 'route', route: { channel: parseInt(clip.slice(8), 10) } } : clip === '[HTML]' ? { producer: 'html', url: '?' } : { clip, time: 0, len: 100 }
+				}
 				return { ok: true }
 			},
 		},
@@ -73,4 +80,7 @@ const dests = (ids) => ({
 	screenDestinations: { destinations: ids.map((id, i) => ({ id, label: id.toUpperCase(), mode: 'pgm_prv', mainScreenIndex: i })) },
 })
 
-module.exports = { channelXml, fakeCaspar, memPersistence, memLive, dests }
+/** Layers of a channel that show `clip`. */
+const copiesOf = (state, ch, clip) => Object.entries(state[ch] || {}).filter(([, L]) => L.clip === clip).map(([n]) => Number(n))
+
+module.exports = { copiesOf, channelXml, fakeCaspar, memPersistence, memLive, dests }

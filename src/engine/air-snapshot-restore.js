@@ -32,6 +32,7 @@ function defaultDeps(ctx) {
 			}
 		},
 		timelineEngine: () => ctx.timelineEngine || null,
+		persistBanks: () => require('./scene-transition').persistProgramLayerBanks(ctx),
 		startStream: (outputId) =>
 			require('../api/routes-streaming-channel-rtmp').handlePostRtmp(JSON.stringify({ action: 'start', ...(outputId ? { outputId } : {}) }), ctx),
 	}
@@ -71,6 +72,57 @@ async function rekeyLiveLooks(ctx, snap, { deps: injected, newRoles } = {}) {
 	return { moved: moves.filter((m) => m.to != null).map((m) => ({ from: m.from, to: m.to })), dropped }
 }
 
+const otherBank = (b) => (b === 'b' ? 'a' : 'b')
+
+function bankTable(ctx) {
+	if (!ctx.programLayerBankByChannel) ctx.programLayerBankByChannel = {} // the real ctx has it (live-deck getter)
+	return ctx.programLayerBankByChannel
+}
+
+/**
+ * WO-1029 — a program look sits on bank A or B and every take lands on the OTHER bank (scene-take-lbg.js). The
+ * WO-1013 re-take after a restart would therefore put the look on the other bank than the snapshot saw it on. Before
+ * the re-take the pointer of each mapped program channel is set to the opposite of the snapshot's bank, so the cut
+ * lands on the SAME bank and flips the pointer back to it; a channel without a live look keeps its old bank.
+ * @returns {Array<{ channel: number, bank: 'a'|'b', retake: boolean }>}
+ */
+function alignBanksForRetake(ctx, snap, { deps: injected, newRoles } = {}) {
+	const deps = { ...defaultDeps(ctx), ...(injected || {}) }
+	const roles = newRoles || rolesOf(ctx.config || {}, deps.getChannelMap)
+	const map = channelMapper(snap, roles)
+	const live = deps.liveSceneState.getAll() || {}
+	const banks = bankTable(ctx)
+	const out = []
+	for (const sc of snap.channels || []) {
+		if (sc.kind !== 'program' || !sc.bank) continue
+		const ch = map(sc.channel)
+		if (ch == null) continue
+		const retake = !!live[String(ch)]?.scene?.layers?.some((l) => l?.source?.value)
+		banks[String(ch)] = retake ? otherBank(sc.bank) : sc.bank
+		out.push({ channel: ch, bank: sc.bank, retake })
+	}
+	return out
+}
+
+/**
+ * After the looks: a channel whose look was not re-taken (kept, skipped, failed) goes back to the snapshot's bank;
+ * a re-taken one keeps what the take set (it flipped onto the snapshot's bank). Persisted, so the next take's
+ * outgoing / incoming banks match what is on Caspar.
+ */
+function settleBanks(ctx, aligned, looks, { deps: injected } = {}) {
+	const deps = { ...defaultDeps(ctx), ...(injected || {}) }
+	const banks = bankTable(ctx)
+	for (const a of aligned || []) {
+		const retaken = (looks || []).some((l) => l.channel === a.channel && l.action === 'retaken')
+		if (!retaken) banks[String(a.channel)] = a.bank
+	}
+	try {
+		deps.persistBanks()
+	} catch {
+		/* advisory */
+	}
+}
+
 /**
  * The INFO pass: every snapshot channel, mapped by role, planned against what Caspar shows there now.
  * @returns {Promise<{ clips: object[], layers: object[], skipped: object[] }>}
@@ -107,7 +159,13 @@ async function restoreChannels(ctx, snap, { deps: injected, newRoles } = {}) {
 			continue
 		}
 		const elapsedS = Math.max(0, deps.now() - snap.taken_at) / 1000
-		const plan = planChannelRestore(sc, current, { channel: ch, elapsedS, mapChannel, cardActive, timelineOwned })
+		/* A program channel: its old bank's layers go to the bank the node's pointer holds now (the re-take's), the other
+		 * bank's are leftovers of the previous look (air-snapshot-plan.js bandOf). */
+		const bands =
+			sc.kind === 'program' && sc.bank
+				? { oldBank: sc.bank, newBank: bankTable(ctx)[String(ch)] === 'b' ? 'b' : 'a', lookLayers: sc.look_layers || [] }
+				: null
+		const plan = planChannelRestore(sc, current, { channel: ch, elapsedS, mapChannel, cardActive, timelineOwned, bands })
 		const failed = new Set()
 		for (const line of plan.lines) {
 			try {
@@ -180,4 +238,4 @@ function errorOf(r) {
 	}
 }
 
-module.exports = { rekeyLiveLooks, restoreChannels, resumeTimeline, restoreConsumers }
+module.exports = { rekeyLiveLooks, alignBanksForRetake, settleBanks, restoreChannels, resumeTimeline, restoreConsumers }

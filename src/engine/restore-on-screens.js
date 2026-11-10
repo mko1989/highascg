@@ -343,7 +343,11 @@ async function restoreOnConnect(ctx, { reconnect, answeredAt, routingDone, setup
 		const rk = await step('live looks re-key', () => AirRestore.rekeyLiveLooks(ctx, snap, { deps: injected }))
 		if (rk) report.skipped.push(...rk.dropped)
 	}
+	/* WO-1029: the re-take lands on the bank the look was on (a take always lands on the other one), then the pointer
+	 * is settled to what Caspar shows — one copy of each look layer, on a known bank. */
+	const aligned = snap ? (await step('look banks', () => AirRestore.alignBanksForRetake(ctx, snap, { deps: injected }))) || [] : []
 	report.looks = (await step('program looks', () => module.exports.restoreProgramLooks(ctx, { reconnect: reconnect || !!snap, deps: injected }))) || []
+	if (snap) await step('look banks', () => AirRestore.settleBanks(ctx, aligned, report.looks, { deps: injected }))
 	await step('preview re-stage', () => Setup.restagePersistedPreviewLooks(ctx))
 	if (snap) {
 		const ch = await step('layers', () => AirRestore.restoreChannels(ctx, snap, { deps: injected }))

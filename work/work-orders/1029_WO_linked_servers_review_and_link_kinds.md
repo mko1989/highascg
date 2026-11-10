@@ -249,3 +249,10 @@ Caspar.
 - **Bug:** the PGM look came back twice — its old bank layer (10) resumed at the right position AND the re-take on
   the other bank (110) from 0. The plan did not know look banks. Being fixed (engine).
 - 5867 is not on this build yet (the owner is working on it): the two-box apply is verified only in the virtual bed.
+- **Bank fix, second run (12:34):** the snapshot records each program channel's look bank and look layers; the re-take
+  lands on the same bank, the node's bank pointer agrees. Live: one copy on layer 110, 348.08 s → 352.14 s over
+  4.13 s (expected 352.21), `via: look`, card back, a stale route on ch 7's other bank reported as a leftover and not
+  put back. `restored in 1149 ms`.
+- Open: the virtual bed's fake looks do not alternate banks (the scenario could not have caught this); a program
+  channel in bus mode was not considered; CG templates played by hand outside a look come back without their data;
+  mixer state set outside a look is not captured.

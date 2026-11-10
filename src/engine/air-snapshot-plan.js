@@ -31,6 +31,25 @@ function ownedElsewhere(layer, { cardActive = false, timelineOwned = false } = {
 	return ''
 }
 
+/**
+ * WO-1029 — program look banks: a PGM look lives on bank A (10–99) or bank B (110–199) and every take moves it to the
+ * other one. `bands = { oldBank, newBank, lookLayers }` (old bank = where the live look was at the snapshot; new bank
+ * = where the node's pointer is after the re-take): a layer on the old bank moves to the same logical layer of the
+ * new bank — `look` when the live look owns it, `extra` when it was played there by hand; anything on the OTHER bank
+ * is a leftover of the previous look (fading / transition) and is never put back. No `bands` (PRV, other channels):
+ * every layer stays where it was.
+ * @returns {{ role: 'outside'|'look'|'extra'|'leftover', target: number, bank?: 'a'|'b' }}
+ */
+function bandOf(layer, bands) {
+	const n = Number(layer)
+	const bank = n >= 10 && n <= 99 ? 'a' : n >= 110 && n <= 199 ? 'b' : null
+	if (!bands || !bank) return { role: 'outside', target: n }
+	if (bank !== bands.oldBank) return { role: 'leftover', target: n, bank }
+	const target = bands.newBank === bands.oldBank ? n : bands.newBank === 'b' ? n + 100 : n - 100
+	const look = bands.lookLayers instanceof Set ? bands.lookLayers.has(n) : (bands.lookLayers || []).includes(n)
+	return { role: look ? 'look' : 'extra', target, bank }
+}
+
 const isFileProducer = (L) => !!L.clip && !['route', 'html', 'decklink', 'color'].includes(L.producer)
 const round3 = (n) => Math.round(n * 1000) / 1000
 
@@ -54,7 +73,7 @@ function clipPosition(L, elapsedS) {
  * @param {{ channel: number, layers: object[], fps: number|null, label?: string }} snapCh the snapshot's channel
  * @param {{ fps: number|null, layers: object[] }} current parsed INFO of the mapped channel now
  * @param {{ channel: number, elapsedS: number, mapChannel: (old: number) => number|null, cardActive?: boolean,
- *   timelineOwned?: boolean }} o
+ *   timelineOwned?: boolean, bands?: { oldBank: 'a'|'b', newBank: 'a'|'b', lookLayers: number[] } }} o
  * @returns {{ lines: string[], clips: object[], layers: object[], skipped: object[] }}
  */
 function planChannelRestore(snapCh, current, o) {
@@ -65,9 +84,15 @@ function planChannelRestore(snapCh, current, o) {
 	const frames = (s) => Math.max(0, Math.round(s * fps))
 	for (const L of snapCh.layers || []) {
 		if (ownedElsewhere(L.layer, o)) continue
-		const cl = `${ch}-${L.layer}`
+		const band = bandOf(L.layer, o.bands)
 		const what = `ch ${ch} layer ${L.layer}${L.clip ? ` ${L.clip}` : ` (${L.producer})`}`
-		const cur = now.get(L.layer)
+		if (band.role === 'leftover') {
+			out.skipped.push({ what, why: `leftover on the ${band.bank === 'b' ? 'B' : 'A'} bank, not part of the live look — not put back` })
+			continue
+		}
+		const T = band.target
+		const cl = `${ch}-${T}`
+		const cur = now.get(T)
 		const file = isFileProducer(L)
 		const pos = file ? clipPosition(L, o.elapsedS) : null
 		const seekable = pos && fps && Number(L.length_s) > 0
@@ -77,10 +102,10 @@ function planChannelRestore(snapCh, current, o) {
 					const f = pos.state === 'ended' ? Math.max(0, Math.floor(Number(L.length_s) * fps) - 1) : frames(pos.target_s)
 					out.lines.push(`CALL ${cl} SEEK ${f}`)
 					if (pos.state !== 'playing') out.lines.push(`PAUSE ${cl}`)
-					out.clips.push({ channel: ch, layer: L.layer, clip: L.clip, at_s: round3(pos.at_s), resumed_s: round3(pos.target_s), paused: pos.state !== 'playing', loop: !!L.loop, via: 'look' })
-				} else out.layers.push({ channel: ch, layer: L.layer, producer: L.producer, action: 'kept' })
+					out.clips.push({ channel: ch, layer: T, clip: L.clip, at_s: round3(pos.at_s), resumed_s: round3(pos.target_s), paused: pos.state !== 'playing', loop: !!L.loop, ...(band.role !== 'extra' ? { via: 'look' } : {}) })
+				} else out.layers.push({ channel: ch, layer: T, producer: L.producer, action: 'kept' })
 			} else if (cur.producer === L.producer && !file) {
-				out.layers.push({ channel: ch, layer: L.layer, producer: L.producer, action: 'kept' })
+				out.layers.push({ channel: ch, layer: T, producer: L.producer, action: 'kept' })
 			} else {
 				out.skipped.push({ what, why: `layer now shows ${cur.clip || cur.producer} (look / routing put it there)` })
 			}
@@ -94,7 +119,7 @@ function planChannelRestore(snapCh, current, o) {
 			}
 			if (!seekable) {
 				out.lines.push(`${L.paused ? 'LOAD' : 'PLAY'} ${cl} ${c}${L.loop ? ' LOOP' : ''}`)
-				out.layers.push({ channel: ch, layer: L.layer, producer: L.producer, action: 'played' })
+				out.layers.push({ channel: ch, layer: T, producer: L.producer, action: 'played' })
 				continue
 			}
 			const f = frames(pos.target_s)
@@ -103,7 +128,7 @@ function planChannelRestore(snapCh, current, o) {
 				out.lines.push(`${verb} ${cl} ${c} LOOP`)
 				if (f > 0) out.lines.push(`CALL ${cl} SEEK ${f}`)
 			} else out.lines.push(`${verb} ${cl} ${c}${f > 0 ? ` SEEK ${f}` : ''}`)
-			out.clips.push({ channel: ch, layer: L.layer, clip: L.clip, at_s: round3(pos.at_s), resumed_s: round3(pos.target_s), paused: pos.state === 'paused', loop: !!L.loop })
+			out.clips.push({ channel: ch, layer: T, clip: L.clip, at_s: round3(pos.at_s), resumed_s: round3(pos.target_s), paused: pos.state === 'paused', loop: !!L.loop })
 			continue
 		}
 		if (L.producer === 'route') {
@@ -120,7 +145,7 @@ function planChannelRestore(snapCh, current, o) {
 			out.skipped.push({ what, why: `${L.producer} layer: nothing to put it back from` })
 			continue
 		}
-		out.layers.push({ channel: ch, layer: L.layer, producer: L.producer, action: 'played' })
+		out.layers.push({ channel: ch, layer: T, producer: L.producer, action: 'played' })
 	}
 	return out
 }

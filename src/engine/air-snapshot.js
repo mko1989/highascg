@@ -94,6 +94,7 @@ async function captureAirSnapshot(ctx, { reason = 'apply', deps: injected } = {}
 		channels.push({ channel, role, kind: roleKind(role), label: labels.get(role) || role, fps: parsed.fps, layers: parsed.layers })
 	}
 	const live = deps.liveLooks() || {}
+	for (const c of channels) if (c.kind === 'program') Object.assign(c, programBank(ctx, live[String(c.channel)]?.scene, c.channel))
 	const looks = []
 	for (const [chKey, entry] of Object.entries(live)) {
 		const scene = entry?.scene
@@ -123,6 +124,21 @@ async function captureAirSnapshot(ctx, { reason = 'apply', deps: injected } = {}
 		consumers: consumersOf(ctx),
 		errors,
 	}
+}
+
+/**
+ * WO-1029: which look bank the live look of a program channel is on (`programLayerBankByChannel`, the pointer every
+ * take flips) and the Caspar layers it owns there — the restore must find THAT look on its layers, never take the
+ * other bank's leftovers (a fading previous look) for hand-played extras.
+ */
+function programBank(ctx, scene, channel) {
+	const { normalizeProgramLayerBank } = require('./program-layer-bank')
+	const bank = normalizeProgramLayerBank(ctx?.programLayerBankByChannel?.[String(channel)])
+	const layers = Array.isArray(scene?.layers) ? scene.layers : []
+	const look_layers = layers
+		.filter((l) => l?.source?.value && Number.isFinite(parseInt(l.layerNumber, 10)))
+		.map((l) => parseInt(l.layerNumber, 10) + (bank === 'b' ? 100 : 0))
+	return { bank, look_layers: [...new Set(look_layers)].sort((a, b) => a - b) }
 }
 
 /* ── store: persisted, armed for the next (re)connect, one at a time ── */

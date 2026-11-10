@@ -9,7 +9,7 @@
 
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
-const { fakeCaspar, memPersistence, memLive, dests } = require('./lib/wo1029-apply-fixtures')
+const { fakeCaspar, memPersistence, memLive, dests, copiesOf } = require('./lib/wo1029-apply-fixtures')
 const Air = require('../../src/engine/air-snapshot')
 const { planChannelRestore, clipPosition } = require('../../src/engine/air-snapshot-plan')
 const { parseChannelInfo } = require('../../src/engine/air-snapshot-parse')
@@ -19,7 +19,8 @@ const T0 = 1_000_000_000
 const OLD_MAP = () => ({ programChannels: [1, 3], previewChannels: [2, 4], screenLabels: ['A', 'B'] })
 /* The apply put the operator GUI on channel 1 (WO-868): every main moved up one. */
 const NEW_MAP = () => ({ programChannels: [2, 4], previewChannels: [3, 5], operatorGuiChannels: [1], screenLabels: ['A', 'B'] })
-const look = (id, name) => ({ sceneId: id, scene: { id, name, layers: [{ source: { type: 'file', value: 'CLIP_A' } }] } })
+const look = (id, name, layers = [{ layerNumber: 10, source: { type: 'file', value: 'CLIP_A' } }]) => ({ sceneId: id, scene: { id, name, layers } })
+const htmlLook = (id, name) => look(id, name, [{ layerNumber: 10, source: { type: 'html', value: 'http://h/b.html' } }])
 
 /** What was on air before the apply. */
 function onAir() {
@@ -51,8 +52,8 @@ function captureCtx(caspar, extra = {}) {
 	}
 }
 
-async function snapshotNow(caspar, live) {
-	const ctx = captureCtx(caspar)
+async function snapshotNow(caspar, live, extra = {}) {
+	const ctx = captureCtx(caspar, extra)
 	Air.rememberConnectRoles(ctx, OLD_MAP) // the roles of the Caspar that is running
 	return Air.captureAirSnapshot(ctx, {
 		deps: {
@@ -80,7 +81,7 @@ describe('WO-1029 air snapshot — capture', () => {
 	})
 
 	it('captures every channel with its role, the looks, card, timeline, stream and recording — and survives JSON', async () => {
-		const live = memLive({ 1: look('L1', 'Look one'), 3: look('L2', 'Look two') })
+		const live = memLive({ 1: look('L1', 'Look one'), 3: htmlLook('L2', 'Look two') })
 		const snap = JSON.parse(JSON.stringify(await snapshotNow(fakeCaspar(onAir()), live)))
 		assert.equal(snap.taken_at, T0)
 		assert.deepEqual(snap.roles, { 1: 'pgm:da', 2: 'prv:da', 3: 'pgm:db', 4: 'prv:db' })
@@ -133,7 +134,7 @@ function restoreRig(snap, { newMap = NEW_MAP, config = dests(['da', 'db']), live
 	const takes = []
 	const calls = []
 	const tl = { playing: true, position: 12000, played: [], paused: [] }
-	const ctx = { config, amcp: caspar.amcp, log: () => {}, _ledTestPatternActive: true, _ledTestCardSource: 'control', streamingChannelRtmp: { active: true }, streamingChannelRecords: { rec1: { active: true } } }
+	const ctx = { config, amcp: caspar.amcp, log: () => {}, programLayerBankByChannel: {}, _ledTestPatternActive: true, _ledTestCardSource: 'control', streamingChannelRtmp: { active: true }, streamingChannelRecords: { rec1: { active: true } } }
 	const deps = {
 		persistence,
 		now: () => T0 + 7000,
@@ -144,12 +145,20 @@ function restoreRig(snap, { newMap = NEW_MAP, config = dests(['da', 'db']), live
 		send: (line) => caspar.amcp.raw(line),
 		airHeld: () => null,
 		clearBorderType: () => {},
+		/* Like scene-take-lbg.js: the incoming look plays on the bank OPPOSITE the pointer, then the pointer flips to it. */
 		take: async (body) => {
 			takes.push([body.channel, body.incomingScene.id, body.forceCut, body.previewExchange])
-			if (body.incomingScene.id === 'L1') caspar.state[body.channel] = { 10: { clip: 'CLIP_A', time: 0, len: 60 } }
-			if (body.incomingScene.id === 'L2') caspar.state[body.channel] = { 10: { producer: 'html', url: 'http://h/b.html' } }
+			const key = String(body.channel)
+			const onto = ctx.programLayerBankByChannel[key] === 'b' ? 'a' : 'b'
+			const st = (caspar.state[body.channel] = caspar.state[body.channel] || {})
+			for (const l of body.incomingScene.layers) {
+				const phys = l.layerNumber + (onto === 'b' ? 100 : 0)
+				st[phys] = l.source.type === 'html' ? { producer: 'html', url: l.source.value } : { clip: l.source.value, time: 0, len: 60 }
+			}
+			ctx.programLayerBankByChannel[key] = onto
 			return { status: 200, body: '{}' }
 		},
+		persistBanks: () => calls.push('banks persisted'),
 		applyCard: async () => (calls.push('card'), { targets: [2, 4], failures: [] }),
 		timelineEngine: () => ({
 			getPlayback: () => ({ timelineId: 'TL1', playing: tl.playing, position: tl.position }),
@@ -163,7 +172,7 @@ function restoreRig(snap, { newMap = NEW_MAP, config = dests(['da', 'db']), live
 
 describe('WO-1029 air snapshot — restore after 7 s on a renumbered Caspar', () => {
 	it('looks re-taken on their destination’s NEW channel, then every layer at position + 7 s, timeline, card, stream', async () => {
-		const live = memLive({ 1: look('L1', 'Look one'), 3: look('L2', 'Look two') })
+		const live = memLive({ 1: look('L1', 'Look one'), 3: htmlLook('L2', 'Look two') })
 		const snap = await snapshotNow(fakeCaspar(onAir()), live)
 		const rig = restoreRig(snap, { live })
 		const report = await restoreOnConnect(rig.ctx, { reconnect: true, answeredAt: T0 + 6000, setup: { restagePersistedPreviewLooks: async () => {} }, deps: rig.deps })
@@ -181,7 +190,7 @@ describe('WO-1029 air snapshot — restore after 7 s on a renumbered Caspar', ()
 		])
 		assert.ok(!rig.caspar.lines.some((l) => /ENDING|-999 |-1 /.test(l)), 'ended clip, card layer and audio bus are not replayed from INFO')
 		assert.deepEqual(rig.tl.played, [['TL1', 12000, true]], 'timeline resumed where its engine is (snapshot + elapsed)')
-		assert.deepEqual(rig.calls, ['card', 'stream:yt'], 'card after the layers, stream restarted')
+		assert.deepEqual(rig.calls, ['banks persisted', 'card', 'stream:yt'], 'card after the layers, stream restarted')
 		assert.deepEqual(report.clips.map((c) => [c.channel, c.layer, c.at_s, c.resumed_s, c.paused]), [[2, 10, 10, 17, false], [2, 20, 50, 2, false], [2, 30, 12.5, 12.5, true], [3, 10, 3, 10, false]])
 		assert.ok(report.skipped.some((s) => /ENDING/.test(s.what) && /ended/.test(s.why)))
 		assert.ok(report.skipped.some((s) => /recording rec1/.test(s.what)), 'a recording is reported, not silently restarted')
@@ -191,7 +200,7 @@ describe('WO-1029 air snapshot — restore after 7 s on a renumbered Caspar', ()
 	})
 
 	it('a destination that no longer exists: its look and content are dropped and reported', async () => {
-		const live = memLive({ 1: look('L1', 'Look one'), 3: look('L2', 'Look two') })
+		const live = memLive({ 1: look('L1', 'Look one'), 3: htmlLook('L2', 'Look two') })
 		const snap = await snapshotNow(fakeCaspar(onAir()), live)
 		const rig = restoreRig(snap, { live, config: dests(['da']), newMap: () => ({ programChannels: [1], previewChannels: [2], screenLabels: ['A'] }) })
 		const report = await restoreOnConnect(rig.ctx, { reconnect: true, setup: { restagePersistedPreviewLooks: async () => {} }, deps: rig.deps })
@@ -244,5 +253,78 @@ describe('WO-1029 air snapshot — restore after 7 s on a renumbered Caspar', ()
 		assert.equal(Air.armedSnapshot({ reconnect: false, persistence: p, now: T0 + 30_000, uptimeMs: 20_000 }).snap, null, 'rebooted: boot rules')
 		assert.equal(Air.armedSnapshot({ reconnect: false, persistence: p, now: T0 + 30_000, uptimeMs: 600_000 }).snap.id, 'x')
 		assert.equal(Air.armedSnapshot({ reconnect: true, persistence: p, now: T0 + 30_000, uptimeMs: 1 }).snap.id, 'x')
+	})
+})
+
+describe('WO-1029 air snapshot — program look banks (A 10–99 / B 110–199)', () => {
+	const prvRestage = (rig) => ({ restagePersistedPreviewLooks: async () => void (rig.caspar.state[3] = { 10: { clip: 'CLIP_P', time: 0, len: 30 } }) })
+	const twoLayers = (bank) => {
+		const o = bank === 'b' ? 100 : 0
+		const stale = bank === 'b' ? 10 : 110
+		return {
+			1: {
+				[10 + o]: { clip: 'CLIP_A', time: 10, len: 60 }, // the live look, layer 1 of 2
+				[11 + o]: { clip: 'CLIP_B', time: 20, len: 90, loop: true }, // the live look, layer 2 of 2
+				[stale]: { clip: 'STALE_PREV', time: 30, len: 60 }, // the previous look, still fading on the other bank
+				[20 + o]: { clip: 'HAND', time: 4, len: 40 }, // played by hand on the look's bank
+				201: { clip: 'AUDIO_BED', time: 1, len: 300 }, // played by hand outside the bands
+				999: { producer: 'html', url: 'http://127.0.0.1:4200/templates/led-test-card.html' },
+			},
+			2: { 10: { clip: 'CLIP_P', time: 3, len: 30 } },
+		}
+	}
+	const multi = () =>
+		look('L1', 'Look one', [
+			{ layerNumber: 10, source: { type: 'file', value: 'CLIP_A' } },
+			{ layerNumber: 11, source: { type: 'file', value: 'CLIP_B' } },
+		])
+
+	for (const bank of ['a', 'b']) {
+		it(`look on bank ${bank.toUpperCase()}: re-taken onto the same bank, seeked (via look), ONE copy; leftover dropped; extras back`, async () => {
+			const live = memLive({ 1: multi() })
+			const snap = await snapshotNow(fakeCaspar(twoLayers(bank)), live, { programLayerBankByChannel: { 1: bank } })
+			const pgm = snap.channels.find((c) => c.channel === 1)
+			assert.equal(pgm.bank, bank)
+			assert.deepEqual(pgm.look_layers, bank === 'b' ? [110, 111] : [10, 11])
+			const rig = restoreRig(snap, { live })
+			const report = await restoreOnConnect(rig.ctx, { reconnect: true, setup: prvRestage(rig), deps: rig.deps })
+			const o = bank === 'b' ? 100 : 0
+			const st = rig.caspar.state
+			assert.deepEqual(copiesOf(st, 2, 'CLIP_A'), [10 + o], 'exactly one copy of each look layer')
+			assert.deepEqual(copiesOf(st, 2, 'CLIP_B'), [11 + o])
+			assert.deepEqual(copiesOf(st, 2, 'STALE_PREV'), [], 'the previous look is not resurrected')
+			assert.deepEqual(copiesOf(st, 2, 'HAND'), [20 + o])
+			assert.deepEqual(copiesOf(st, 2, 'AUDIO_BED'), [201])
+			assert.equal(rig.ctx.programLayerBankByChannel[2], bank, 'the node’s pointer agrees with Caspar')
+			assert.deepEqual(rig.caspar.lines.filter((l) => / 2-1[01]\b| 2-11[01]\b/.test(l)), [`CALL 2-${10 + o} SEEK 850`, `CALL 2-${11 + o} SEEK 1350`])
+			const lookClips = report.clips.filter((c) => c.via === 'look').map((c) => [c.channel, c.layer, c.resumed_s])
+			assert.deepEqual(lookClips, [[2, 10 + o, 17], [2, 11 + o, 27], [3, 10, 10]], 'PGM look layers and the PRV look, seeked')
+			assert.ok(report.skipped.some((s) => /STALE_PREV/.test(s.what) && /leftover/.test(s.why)))
+			assert.deepEqual(copiesOf(st, 3, 'CLIP_P'), [10], 'PRV: one copy')
+			assert.ok(rig.caspar.lines.includes('CALL 3-10 SEEK 500'))
+			assert.ok(!rig.caspar.lines.some((l) => / 2-999 /.test(l)), 'the card is the card restore’s')
+		})
+	}
+
+	it('even when the re-take lands on the other bank, the old bank’s look layer maps to it (no second copy)', () => {
+		const plan = planChannelRestore(
+			{ channel: 1, fps: 50, layers: [{ layer: 10, producer: 'ffmpeg', clip: 'CLIP_A', time_s: 63.1, length_s: 600 }, { layer: 20, producer: 'ffmpeg', clip: 'HAND', time_s: 1, length_s: 9 }] },
+			{ fps: 50, layers: [{ layer: 110, producer: 'ffmpeg', clip: 'CLIP_A', time_s: 0.56 }] },
+			{ channel: 2, elapsedS: 4, mapChannel: (c) => c + 1, bands: { oldBank: 'a', newBank: 'b', lookLayers: [10] } },
+		)
+		assert.deepEqual(plan.lines, ['CALL 2-110 SEEK 3355', 'PLAY 2-120 "HAND" SEEK 250'])
+		assert.equal(plan.clips[0].via, 'look')
+	})
+
+	it('a re-take that fails: pointer back on the snapshot’s bank, the look layer put back once from INFO there', async () => {
+		const live = memLive({ 1: multi() })
+		const snap = await snapshotNow(fakeCaspar(twoLayers('b')), live, { programLayerBankByChannel: { 1: 'b' } })
+		const rig = restoreRig(snap, { live })
+		rig.deps.take = async () => ({ status: 500, body: JSON.stringify({ error: 'media missing' }) })
+		await restoreOnConnect(rig.ctx, { reconnect: true, setup: prvRestage(rig), deps: rig.deps })
+		assert.equal(rig.ctx.programLayerBankByChannel[2], 'b')
+		assert.deepEqual(copiesOf(rig.caspar.state, 2, 'CLIP_A'), [110])
+		assert.ok(rig.caspar.lines.includes('PLAY 2-110 "CLIP_A" SEEK 850'))
+		assert.deepEqual(copiesOf(rig.caspar.state, 2, 'STALE_PREV'), [])
 	})
 })
