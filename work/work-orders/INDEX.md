@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-940 live WOs (34 open, 129 in progress, 777 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+940 live WOs (33 open, 130 in progress, 777 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -730,7 +730,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1016 IN PROGRESS [devices-config+caspar-build] Which Devices settings can the running Caspar take live, and which really need… → 1016_WO_devices_settings_live_vs_restart_audit.md
 - 1019 OPEN [devices-config+video-io] A second NDI sender (or RTMP/ffmpeg output) on one channel silently replaces th… → 1019_WO_second_ndi_or_rtmp_output_on_a_channel_replaces_the_first.md
 - 1021 OPEN [devices-config+video-io] Route-heal points live sources at channels of a config that has not been applie… → 1021_WO_route_heal_points_live_sources_at_unapplied_channels.md
-- 1031 OPEN [devices-config+tracking-vr,video-io,network] Narvil show on the real setup: LED walls + tracking cameras on this box, camera… → 1031_WO_narvil_show_real_setup_two_boxes_and_custom_ptz.md
+- 1031 IN PROGRESS [devices-config+tracking-vr,video-io,network] Narvil show on the real setup: LED walls + tracking cameras on this box, camera… → 1031_WO_narvil_show_real_setup_two_boxes_and_custom_ptz.md
 
 ## os-iso — ISO, sticks, kernel, NVIDIA, boot (87)
 
