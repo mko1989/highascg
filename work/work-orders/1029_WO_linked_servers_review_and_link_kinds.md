@@ -338,3 +338,25 @@ by hand in each box's `config/general.json` (the switch UI, C12, is not built), 
 - Root-installed `/usr/local/bin/highascg-replication-ssh` on both boxes is the old wrapper: a spread runs without
   rate limit and resume until it is reinstalled (sudo):
   `sudo install -m 755 ~/highascg/tools/runtime/highascg-replication-ssh.sh /usr/local/bin/highascg-replication-ssh`
+
+### 10.11 15:45 — drive calls live on both boxes (main 1974c860, 5867 on 2026-11-10T142816Z + dock hot-patch)
+
+Pushed: wave B + C8 (1e770113), C15 Godot audit (020962e8), Live layout reconcile (67d40b30), air restore leaves the
+operator GUI / multiview channels alone (18a29c05), strobe (eeca7d75), dock on its own monitor (1974c860, not in a
+release yet). 5867: 2 channels (GUI + the wall, PGM only); DeckLink 2/3/4 unassigned and the stale live sources
+removed (leftovers of the WO-1026 setup).
+
+- `GET /api/cluster` on both: every destination with owners (`own` / `remote`); `scene.remoteLive` present on both.
+- **From 7579 (master): FTB on the wall** → 200 `via: [highascg5867 ok]`, the wall's channel emptied.
+- **From 7579: take "OKKKK (LOOP)" on the wall** (`mainIdx: 1`) → 200 via 5867 in 126 ms; the wall plays it; 7579's
+  `remoteLive[1]` shows `pgm: OKKKK (LOOP)`, `holder: highascg7579`.
+- **From 5867 (follower): test card on 7579's LED** (`screenIdx: 0`) → 200 `via: [highascg7579 ok]`, `html` on the
+  LED's layer 999; off again.
+- Found: the same take WITHOUT `mainIdx` answers 400 `no program channel for main 2` — the looks' `mainScope` is a
+  screen INDEX and still says 2 after two destinations were deleted (the wall is index 1 now). Looks need their scope
+  re-keyed by destination id, like the Live layout cells (67d40b30).
+- Found and fixed: the operator dock sat on the wall (the screen's usable rect was the whole desktop once the wall
+  was one tiled RandR monitor).
+- The wall's two heads carry the RandR `TILE` property (group 473, 2×1, 3840×2160 each) and X exposes one
+  7680×2160 monitor: the GPU driver registers the DisplayID tile topology. Scan-out phase between the two heads was
+  not measured.
