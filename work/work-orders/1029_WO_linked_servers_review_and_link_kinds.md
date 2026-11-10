@@ -360,3 +360,28 @@ removed (leftovers of the WO-1026 setup).
 - The wall's two heads carry the RandR `TILE` property (group 473, 2×1, 3840×2160 each) and X exposes one
   7680×2160 monitor: the GPU driver registers the DisplayID tile topology. Scan-out phase between the two heads was
   not measured.
+
+### 10.11 16:16 — both boxes on 6fdee493 / 2026-11-10T150805Z (GUIs relaunched, 0 script errors)
+
+In this build: looks keyed by destination (`destScope`), picture relay (C9), Local use + the channel switch (C2 /
+C12), plan 06 server side (S1 operator GUI per server, S3 / S4 combined device view, S5 destinations shared on link,
+S6 delete clears cables everywhere, live-input keys).
+
+Checked on the boxes, screenshots of both operator screens:
+- **7579's Live tab shows the wall's real picture** in the tile "PGM 2 / PGM/PRV 3 · on highascg5867" (relay state
+  `live`); its deck column reads "PGM/PRV 3 · 8 looks · on highascg5867 · PGM clip OKKKK (LOOP) 0:20".
+- **5867's Live tab shows its own wall** again (tile "PGM 2 / PGM/PRV 3"), and 7579's LED as remote tiles; the dock
+  is on its operator monitor.
+- **Looks:** on load 3 looks at index 1 were stamped onto the wall, 7 became unscoped. The 5 at index 2 are the
+  wall's (it was index 2 until two destinations were deleted today): attached with
+  `POST /api/project/rescope-looks {from:'2', to:'dst_mw989wyz_1'}` → 8 looks on the wall on both boxes; the two
+  "2box" looks (their destination was deleted) are in the "No screen" column.
+- **Take without a screen named** from 7579: 200 via highascg5867 (was 400 `no program channel for main 2`).
+- Shared destination list active, writer = the master, no conflicts; both boxes advertise 14 capabilities.
+- `sync_tile_test.mp4` (1920×540, 50p, sweeping bar + frame counters each side of the seam) is in both media
+  folders for the tiled-wall check.
+
+Open: the Godot side of the single Devices view (plan 06 S7–S10, S17), prepare/go barrier (C7), Art-Net sender
+connector, NDI return / SDI loop cable (S18), look references to inputs by `{server, input}` (S14–S16), link kinds,
+the cost of the relay's read-back on an 8K channel (not measured), media-needs id case mismatch seen on 7579
+("ZZ_TL_RAMP needed on highascg5867" while 5867 has `zz_tl_ramp.mp4`).
