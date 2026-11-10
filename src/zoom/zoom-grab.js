@@ -94,6 +94,9 @@ function createGrab(o) {
 			}, 1000).unref?.()
 		},
 	}
+	// resolves when the process is gone: it unlinks its ring on exit, so a replacement must not start before that
+	let gone = () => {}
+	grab.exited = new Promise((r) => (gone = r))
 	let buf = ''
 	child.stdout?.on('data', (d) => {
 		buf += d
@@ -116,6 +119,7 @@ function createGrab(o) {
 	})
 	child.on('exit', (code) => {
 		grab.alive = false
+		gone()
 		o.onExit?.(code)
 	})
 	child.on('error', (e) => {

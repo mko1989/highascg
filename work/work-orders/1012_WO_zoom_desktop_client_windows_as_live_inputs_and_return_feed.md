@@ -319,6 +319,62 @@ Proven live with the real client (Zoom 7.1.0.3715, meeting 679 1592 7344, this b
 - **Still open from this round:** audio from the far end (two captures were digital silence, the far end was muted
   or quiet) and whether the far end heard the speech loop.
 
+### Zoom's own controls from HighAsCG (10.11): the accessibility route
+
+Owner, 10.11: "Can't we automate some of the zoom settings via API?" then, to the five proposals, "I'd like all of them".
+
+Investigation:
+
+- Zoom's cloud REST API covers account and meeting settings, not what the desktop client shows. `zoomus.conf` holds a
+  few startup flags; the real settings sit in encrypted databases. The `zoommtg://` link carries no layout.
+- **The client is on the accessibility bus** (AT-SPI; `at-spi-bus-launcher` runs on the box, python3-gi + Atspi are
+  installed). Every control has a name and a "Press" / "Toggle" action. A full dump takes about 150 ms.
+- What Press does NOT do (found live): menu items, page tabs and the Settings navigation labels answer `ok` and do
+  nothing. Controls that are not showing do nothing either. Those are clicked at the position Zoom itself reports for
+  them (pointer there and back, the window raised first).
+- The Settings window: a page's controls exist once the page was shown, and stay — except the Video page, whose
+  controls only exist while it is up. Toggles work while scrolled out of view, and read back.
+- `_NET_WM_STATE_FULLSCREEN` and the View menu's "Fullscreen" both open Zoom's "annotate_toolbar" window on the
+  operator screen. Not used.
+
+Done:
+
+- `tools/zoom-a11y/zoom_a11y.py`: the only AT-SPI code — `dump`, `press` (action, or `--click [--raise]
+  [--button 3] [--at fx,fy]`), `close` (a window by title), `key`.
+- `src/zoom/zoom-ui.js`: `state`, `setMute`, `setVideo`, `join` / `autoJoin`, `selectTab`, `participants`, `pin`,
+  `applySettings` (`SETTINGS_PROFILE`, 17 settings, each with its reason). `readState` and `settingsPlan` are pure.
+- `src/api/routes-zoom-ui.js`: `GET /api/zoom/ui`, `POST /api/zoom/ui {action}`.
+- `POST /api/zoom/launch` with a link joins by itself in the background; binding the presenter source puts the
+  main window on its Meeting tab.
+- A replaced grabber waits for the old one's exit: the old process unlinks the ring when it ends, and a fit change
+  had left `/dev/shm` without `highascg-zoom-gallery`.
+
+Verified live in the meeting:
+
+- `GET /api/zoom/ui`: in the meeting, mic, camera, both tabs, who shares, the tile of each window.
+- `mute` / `unmute` read back from Zoom; `participants` gave both names with mic, video and sharing (and showed the
+  far end was muted, which explains the silent captures).
+- `meeting_tab` → `share_tab` → `meeting_tab`, each verified from the tab state.
+- `settings`: first run changed 3 (video preview first off, non-video participants off, automatic microphone volume
+  off); with the page-by-page fix the second run found all 17 right. "Original sound for musicians" had been set by
+  the same route during the investigation, and the second window then carries "Original sound for musicians: On".
+- Quit + `POST /api/zoom/launch {url}`: with "Show video preview first" off there is no preview; Zoom was in the
+  waiting room 8 s later with no click, and the saved bindings came back by themselves.
+- Offline: `smoke-wo1012-zoom-ui` 8/8 (state, mute/video, join, tabs, settings plan and page-by-page apply,
+  participants, pin without a Pin item, routes).
+
+Not verified:
+
+- **Pin.** With two participants Zoom's tile menu has no "Pin" (Chat, Show self view, Report…). The path is built
+  (tile menu ▸ Pin) and answers "Zoom offers no Pin … (it needs three or more participants)". It needs a third
+  participant to prove.
+- **`join` on a preview.** The preview path is covered offline only: the profile turns the preview off.
+- **Which window gets the share.** Right after the box was admitted the second window showed the share. Later it
+  showed the box's own video while the share ran, and its "Switch to shared content" control is not showing, so it
+  cannot be pressed (it is hidden under the GUI). What moves the share in and out of the second window is not
+  understood yet. Today the reliable way is the main window: `share_tab` for the share, `meeting_tab` for the speaker.
+- English control names only (Zoom 7.1.0.3715).
+
 Not tested, and why:
 
 - **In-meeting pictures: a participant's video, a participant's share, the far end seeing and hearing this box.**

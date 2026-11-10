@@ -164,11 +164,15 @@ function createZoomSession(deps = {}) {
 		e.grab = null
 	}
 
-	function ensureGrab(s) {
+	async function ensureGrab(s) {
 		const e = src[s]
 		const fit = e.fit ? ZOOM_CHROME : ''
 		if (e.grab && e.grab.alive && e.grab.size === e.size && e.grab.fps === e.fps && (e.grab.fit || '') === fit) return true
+		// The old grabber unlinks the ring when it exits. Started before that, the new one lost its ring (10.11, live:
+		// a fit change left /dev/shm without highascg-zoom-gallery). Wait for the exit, 2 s at most.
+		const old = e.grab
 		stopGrab(s)
+		if (old && old.exited) await Promise.race([old.exited, new Promise((r) => setTimeout(r, 2000))])
 		const bin = ensureBinary()
 		if (!bin.ok) {
 			lastError = bin.error || 'window grabber unavailable'
@@ -321,7 +325,7 @@ function createZoomSession(deps = {}) {
 		}
 		if (!e.window) throw new Error(`pick a Zoom window for "${s}" first`)
 		lastError = ''
-		if (!ensureGrab(s)) throw new Error(lastError)
+		if (!(await ensureGrab(s))) throw new Error(lastError)
 		e.grab.setWindow(e.window)
 		const hide = o.hidden !== undefined ? !!o.hidden : e.hidden
 		if (hide) await placeHidden(s)
