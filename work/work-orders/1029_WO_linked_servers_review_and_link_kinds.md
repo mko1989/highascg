@@ -322,3 +322,19 @@ by hand in each box's `config/general.json` (the switch UI, C12, is not built), 
   (backups: `/tmp/general.before-cwc.json` on 5867, the session scratchpad on 7579).
 - `smoke-wo746-shared-show-e2e` step G7 failed once in a full local suite run ("save refused twice") and passed on
   rerun and in CI: a load-dependent flake to harden.
+
+### 10.11 14:35 — both boxes on c5cf3a00 / 2026-11-10T133002Z, GUIs and Caspar restarted
+
+- Mastership had moved to 5867 at 14:23 (failover: 7579 unseen 15 s on the 192.168.0.x path while a 44.5 GB rsync
+  ran over 7579's 100 Mbit `eno1`; cause not proven — upstream gap or the copy starving the polls). Made master again
+  on 7579: epoch 15, accepted.
+- **Godot was not hole-safe:** after the first relaunch the client threw `int(null)` thousands of times per second
+  (PGM timer, compose tiles, header chips / monitor options, audio rows). Fixed (c5cf3a00); 0 script errors on both
+  GUIs after the relaunch. The full Godot audit (plan 07 C15) is still to do.
+- Both Caspars restarted through `POST /api/cluster/apply {servers:[highascg5867, self]}` in 7.1 s: 5867 first
+  (test card back on the wall, 114 ms), then 7579 (LED look re-taken, clips resumed, 725 ms).
+- Screens checked by screenshot: 7579 shows "Spread (0)", 5867 "Spread (1)" with an amber dot on the BUMPER look;
+  remote screens are empty tiles on each box (no picture relay yet).
+- Root-installed `/usr/local/bin/highascg-replication-ssh` on both boxes is the old wrapper: a spread runs without
+  rate limit and resume until it is reinstalled (sudo):
+  `sudo install -m 755 ~/highascg/tools/runtime/highascg-replication-ssh.sh /usr/local/bin/highascg-replication-ssh`
