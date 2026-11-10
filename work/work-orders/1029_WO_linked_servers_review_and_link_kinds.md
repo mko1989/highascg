@@ -277,3 +277,16 @@ Caspar.
 only where this server's own graph cables the destination to a physical sink; the screen index stays the shared key,
 with holes), node-to-node `dest.*` calls replacing the copy-channel AMCP mirror, the picture relay, media per
 destination, migration of the two boxes, rollout R0–R6 and steps C0–C15, owner decisions O1–O11. Not started.
+
+### Operator GUI invisible on 5867 (owner, 10.11 13:00) — fixed
+
+Owner: *"im trying to run operator gui on the second box and it doesnt show there. the dock is on this screen, but
+mouse isnt and no gui"*. 5867: operator GUI first (HDMI-0 at 0,0), PGM/PRV 3 → Pixel Mapping 1 → DP-0 / DP-4. The OS
+layout put the mapping canvas at x=2048, but the generated Caspar window of the mapping-fed screen (7680x2160, always
+on top, no slice windows, no DeckLink tiles) kept the default 0,0 and covered the operator monitor. The bbox-origin
+rule only ran for screens with DeckLink tiles. Fixed in `build-caspar-generator-layout-sync.js` (453edf26, test in
+smoke-wo869-operator-first-slices; fails on the old code). Hot-patched on 5867 (that one file), its node restarted,
+the plan showed it dirty, Apply restarted only its Caspar: window now at x=2048, the GUI is on HDMI-0 (screenshot
+checked).
+- Seen on that screen: the Servers card of 5867's client still says "PGM here is driven by the master: local PGM
+  takes are skipped" — no longer true for its own screens; wording to fix with the unified view.
