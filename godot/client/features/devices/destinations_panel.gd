@@ -21,14 +21,12 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const Model := preload("res://features/devices/devices_model.gd")
 const DM := preload("res://features/devices/destinations_model.gd")
-const PortIcon := preload("res://features/devices/port_icon.gd")
+const CardBody := preload("res://features/devices/destination_card_body.gd")
 const Inspector := preload("res://features/devices/destination_inspector.gd")
 const HostControls := preload("res://features/devices/host_channel_controls.gd")
 const LI := preload("res://features/devices/live_input_model.gd")
 const Drop := preload("res://features/devices/decklink_drop_flow.gd")
 const DropIo := preload("res://features/devices/decklink_drop_io.gd")
-const PGM := Color("#e74c3c")
-const PRV := Color("#2ecc71")
 
 var selected_id := ""
 var _cards: VBoxContainer
@@ -288,36 +286,7 @@ func _card(d: Dictionary, anchors: Dictionary) -> Control:
 		card.set_drag_forwarding(Callable(), func(_at: Vector2, data: Variant) -> bool: return Drop.parse(data) != "",
 			func(_at: Vector2, data: Variant) -> void: _drop(Drop.parse(data), d))
 	wrap.add_child(card)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 2)
-	v.mouse_filter = Control.MOUSE_FILTER_PASS
-	card.add_child(v)
-	var title := HBoxContainer.new()
-	title.mouse_filter = Control.MOUSE_FILTER_PASS
-	v.add_child(title)
-	var t := _label(str(d.label), ThemeBuilder.TEXT, 15)
-	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_child(t)
-	if d.halves.is_empty():
-		title.add_child(_dot(anchors, d.connector, "%s output" % d.label))
-	v.add_child(_label(str(d.sub), ThemeBuilder.TEXT_MUTED, 12))
-	for i in d.halves.size():
-		var half: String = d.halves[i]
-		var tag_text: String = d.half_tags[i]
-		var row := HBoxContainer.new()
-		row.mouse_filter = Control.MOUSE_FILTER_PASS
-		row.custom_minimum_size.y = 26
-		var gui: bool = d.mode == "operator_gui"
-		var tag := _label(tag_text, ThemeBuilder.TEXT if gui else (PGM if half == "pgm" else PRV), 11)
-		tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT  # next to its dot, not at the card's left edge
-		row.add_child(tag)
-		if half == "pgm" or d.get("prv_dot", true):
-			var tip := "%s %s output" % [d.label, tag_text]
-			if gui:
-				tip = "%s — monitor %s (%s window)" % [d.label, tag_text, "second operator" if half == "prv" else "main"]
-			row.add_child(_dot(anchors, Model.anchor_key(d.connector, half), tip))
-		v.add_child(row)
+	card.add_child(CardBody.build(d, anchors))
 	for l in d.links:
 		wrap.add_child(_label("  • " + str(l), ThemeBuilder.TEXT_MUTED, 11))
 	return wrap
@@ -329,13 +298,6 @@ func _drop(cid: String, d: Dictionary) -> void:
 	io.on_status = func(text: String, ok: bool) -> void: status.emit(text, ok)
 	io.on_reload = func() -> void: changed.emit()
 	await Drop.new(io).to_destination(cid, d.dest, d.intent)
-
-
-func _dot(anchors: Dictionary, key: String, tip: String) -> Control:
-	var p := PortIcon.make("", Vector2(14, 14), tip)
-	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	anchors[key] = p
-	return p
 
 
 func _note(text: String) -> Label:
