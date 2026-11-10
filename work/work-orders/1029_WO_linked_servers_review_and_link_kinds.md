@@ -270,3 +270,10 @@ Caspar.
   it goes away with node-to-node `dest.*` calls (plan 07).
 - After its restore 5867 holds PGM/PRV 3 and Stream PGM (`it holds it now`): the master replays nothing there until
   its operator presses.
+
+## Channels only where a destination is cabled (owner's go, 10.11) — plan
+
+[`1029_review/07-channels-where-cabled-plan.md`](./1029_review/07-channels-where-cabled-plan.md): the rule (channels
+only where this server's own graph cables the destination to a physical sink; the screen index stays the shared key,
+with holes), node-to-node `dest.*` calls replacing the copy-channel AMCP mirror, the picture relay, media per
+destination, migration of the two boxes, rollout R0–R6 and steps C0–C15, owner decisions O1–O11. Not started.
