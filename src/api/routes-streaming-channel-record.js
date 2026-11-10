@@ -22,6 +22,24 @@ const {
 } = require('./routes-streaming-channel-shared')
 const { pushRecordLog, broadcastRecordStopped } = require('./routes-streaming-channel-log')
 
+/** The record file's name under Caspar's media folder: in the active show's folder for a `folder: 'project'` row. */
+function recordRelativeName(ctx, outCfg, mediaDir, fileName, deps = {}) {
+	if (String(outCfg?.folder || '') !== 'project') return fileName
+	const path = require('path')
+	let projectDir
+	try {
+		projectDir = (deps.ensureProjectMediaDir || require('../media/project-media-root').ensureProjectMediaDir)(ctx.config, '', ctx.persistence || require('../utils/persistence'))
+	} catch {
+		projectDir = null
+	}
+	const rel = projectDir ? path.relative(path.resolve(mediaDir), path.resolve(projectDir)) : ''
+	if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+		ctx.log?.('warn', '[Streaming channel] Record: no project folder under the media folder, recording into the media root')
+		return fileName
+	}
+	return `${rel.split(path.sep).join('/')}/${fileName}`
+}
+
 async function handlePostRecord(body, ctx) {
 	if (!ctx.amcp) {
 		return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
@@ -80,7 +98,11 @@ async function handlePostRecord(body, ctx) {
 		}
 		const recLabel = safeFileStem(outCfg?.name || outCfg?.label || outputId || 'record')
 		const fileName = `${recLabel}_${localDateTimeStampForFilename()}.mp4`
-		const absPath = joinCasparMediaFile(dir, fileName)
+		// WO-1031 (owner: "H.264 to the project folder"): a row with folder 'project' records into the active show's
+		// media folder (media/projects/<slug>/), so the recording travels with the show's media. Caspar's FILE consumer
+		// takes a path under its media folder; a project folder outside it (or none) falls back to the media root.
+		const relName = recordRelativeName(ctx, outCfg, dir, fileName)
+		const absPath = joinCasparMediaFile(dir, relName)
 		// WO-172 T172.5: layout-aware downmix — resolve the cabled source's program-bus audio layout
 		// (screenDestinations[].audioLayout) so non-stereo buses (e.g. this rig's discrete-8ch) get an
 		// explicit pan= downmix instead of a blind stereo remix.
@@ -95,7 +117,7 @@ async function handlePostRecord(body, ctx) {
 			audioBitrateKbps: b.audioBitrateKbps ?? outCfg?.audioBitrateKbps,
 			programLayout,
 		})
-		const paramsAfterPath = `${param(fileName)} ${args}`
+		const paramsAfterPath = `${param(relName)} ${args}`
 		const addCmd = `ADD ${ch}-${consumerIndex} FILE ${paramsAfterPath}`
 		// WO-172 T172.7: full ADD line + resolved source channel + layout, at error level visibility
 		// (info) so an ffprobe-style audio complaint can be cross-checked against exactly what was sent.
@@ -223,4 +245,5 @@ async function handlePostRecord(body, ctx) {
 
 module.exports = {
 	handlePostRecord,
+	recordRelativeName,
 }

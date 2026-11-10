@@ -341,6 +341,8 @@ async function handlePost(path, body, ctx) {
 					encoderPreset,
 					audioCodec,
 					audioBitrateKbps: Math.max(32, parseInt(String(x.audioBitrateKbps ?? 128), 10) || 128),
+					// WO-1031: 'project' = the file goes into the active show's media folder; 'media' = the media root
+					folder: String(x.folder || '').trim().toLowerCase() === 'project' ? 'project' : 'media',
 				}
 			})
 			.filter(Boolean)
