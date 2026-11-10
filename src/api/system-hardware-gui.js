@@ -131,12 +131,21 @@ function spawnGuiDetached(action, opts = {}) {
 		XAUTHORITY: getXAuthority(),
 		MOZ_ENABLE_WAYLAND: '0',
 		GDK_BACKEND: 'x11',
+		// WO-1012: a Zoom started here gets its session + audio lines (zoom-launch-env.js prepareZoomAppLaunch)
+		...(opts.extraEnv && typeof opts.extraEnv === 'object' ? opts.extraEnv : {}),
 	}
 
 	if (action === 'nvidia-settings') {
 		void applyNvidiaDisplayPolicy(env, { log: opts.log })
 	}
 
+	// WO-1012: Zoom runs in its own user scope, so a node restart does not end the meeting (the unit is KillMode=mixed)
+	const launched = bin
+	if (opts.extraEnv && require('../zoom/zoom-launch-env').isZoomBin(bin)) {
+		const cmd = require('../zoom/zoom-launch-env').userScopeArgv(bin, args)
+		bin = cmd.bin
+		args = cmd.args
+	}
 	const proc = spawn(bin, args, {
 		env,
 		cwd,
@@ -158,7 +167,7 @@ function spawnGuiDetached(action, opts = {}) {
 		const { scheduleGuiWindowPosition } = require('../utils/x-display-session')
 		scheduleGuiWindowPosition(action, opts.config, { log: opts.log })
 	}
-	return bin
+	return launched
 }
 
 /**
@@ -254,6 +263,9 @@ async function handleGuiLaunchPost(body, ctx, req, deps = {}) {
 				}
 			}
 		}
+		// WO-1012: Zoom from the launcher joins Zoom audio like Zoom from the Zoom page
+		const zoomEnv = await (deps.prepareZoomAppLaunch || require('../zoom/zoom-launch-env').prepareZoomAppLaunch)(action, ctx)
+		if (zoomEnv) guiOpts.extraEnv = zoomEnv
 		const exe = spawnGui(action, guiOpts)
 		const note = action === 'os-password' ? 'Terminal opened on the box screen — finish there.' : undefined
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action, exe, card: guiOpts.card, note }) }

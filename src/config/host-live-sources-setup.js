@@ -13,6 +13,8 @@ const { listZoomLayerEntries, replayZoomLayers } = require('./host-live-sources-
  * @param {object} self — app context (amcp, config, log)
  */
 async function setupHostLiveSources(self) {
+	// WO-1012: saved Zoom window bindings + Zoom audio return with the node (a restart used to drop both until a GET)
+	require('../zoom/zoom-session').restoreZoomOnBoot(self)
 	// WO-1012 B2: Zoom sources are layers, replayed by replayZoomLayers below (never through the auto-apply).
 	const entries = listHostLiveChannelEntries(self.config).filter((e) => e.kind !== 'zoom_host')
 	const zoomEntries = listZoomLayerEntries(self.config)

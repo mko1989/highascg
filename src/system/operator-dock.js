@@ -153,7 +153,10 @@ async function launchOrFocus(action, ctx, deps = {}) {
 	}
 	try {
 		const spawn = deps.spawnGuiDetached || require('../api/system-hardware-gui').spawnGuiDetached
-		const exe = spawn(a, { config: ctx?.config || {}, log })
+		// WO-1012: Zoom from the dock joins Zoom audio like Zoom from the Zoom page
+		const prepare = deps.prepareZoomAppLaunch || require('../zoom/zoom-launch-env').prepareZoomAppLaunch
+		const extraEnv = await prepare(a, ctx)
+		const exe = spawn(a, { config: ctx?.config || {}, log, ...(extraEnv ? { extraEnv } : {}) })
 		log('info', `[dock] ${a}: launched ${exe}`)
 		return { status: 200, body: { ok: true, action: a, launched: true, exe } }
 	} catch (e) {

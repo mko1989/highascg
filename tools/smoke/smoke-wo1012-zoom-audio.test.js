@@ -85,7 +85,8 @@ function rig({ amcpInfo = () => '' } = {}) {
 		p.stdin.write = () => true
 		p.stdout = { pipe: () => {} }
 		spawns.push(p)
-		if (bin === 'pipewire') up = true
+		// the daemon starts in its own user scope (a node restart must not kill it under Zoom)
+		if (bin === '/usr/bin/systemd-run' && args.includes('pipewire')) up = true
 		return p
 	}
 	const sock = new EventEmitter()
@@ -122,7 +123,8 @@ test('enable: daemon, bridges, links and the AMCP consumer; idempotent; disable 
 	assert.strictEqual(s.env.PULSE_SOURCE, 'highascg_zoom_out')
 	assert.match(s.env.PULSE_SERVER, /^unix:\/x\/zdir\/native$/)
 	assert.match(r.files['/x/zdir/pipewire.conf'], /highascg_zoom_in/)
-	assert.deepStrictEqual(r.spawns.map((p) => p.bin), ['pipewire', 'pw-cat', 'ffmpeg', 'pw-cat'])
+	assert.deepStrictEqual(r.spawns.map((p) => p.bin), ['/usr/bin/systemd-run', 'pw-cat', 'ffmpeg', 'pw-cat'])
+	assert.deepStrictEqual(r.spawns[0].args.slice(0, 6), ['--user', '--scope', '--collect', '--quiet', '--', 'pipewire'])
 	assert.ok(r.calls.some((c) => c[0] === 'pw-cli' && c[1] === 's' && c[3] === 'PortConfig' && c[2] === '10'))
 	assert.ok(r.calls.some((c) => c[0] === 'pw-link' && c[1] === '200' && c[2] === '100'))
 	assert.strictEqual(r.raw.length, 1)
@@ -137,7 +139,7 @@ test('enable: daemon, bridges, links and the AMCP consumer; idempotent; disable 
 	assert.deepStrictEqual(r.raw.map((c) => c.split(' ').slice(0, 2).join(' ')), ['ADD 2-9277', 'REMOVE 2-9277', 'ADD 3-9277'])
 	await r.za.apply({ enabled: false })
 	assert.strictEqual(r.raw.pop(), 'REMOVE 3-9277')
-	assert.ok(r.spawns.filter((p) => p.bin !== 'pipewire').every((p) => p.killed.includes('SIGTERM')))
+	assert.ok(r.spawns.filter((p) => p.bin !== '/usr/bin/systemd-run').every((p) => p.killed.includes('SIGTERM')))
 	assert.ok(r.sock.closed)
 	assert.strictEqual(JSON.parse(r.files['/x/state.json']).enabled, false)
 	s = await r.za.status()

@@ -30,6 +30,7 @@ const { getChannelMap } = require('../config/routing-map')
 const { amcpInfoText } = require('../streaming/caspar-ffmpeg-setup')
 const { buildConf, SINK_IN, SRC_OUT, TAP, FEEDER } = require('./zoom-audio-conf')
 const { wantedLinks, portConfigs, portConfigPod } = require('./zoom-audio-links')
+const { userScopeArgv } = require('./zoom-launch-env')
 
 const IN_UDP_PORT = 52233
 const OUT_UDP_PORT = 52232
@@ -118,7 +119,12 @@ function createZoomAudio(deps = {}) {
 		fsx.mkdirSync(dir, { recursive: true, mode: 0o700 })
 		const conf = path.join(dir, 'pipewire.conf')
 		fsx.writeFileSync(conf, buildConf())
-		daemonChild = spawn('pipewire', ['-c', conf], { env, detached: true, stdio: 'ignore' })
+		// In its own user scope, like Zoom itself: the unit is KillMode=mixed, so a node restart SIGKILLed this daemon
+		// under a Zoom that had streams on it, and Zoom's audio layer then deadlocked its GUI thread for good (10.11,
+		// live, gdb: main thread waiting on play_webrtc → pa_threaded_mainloop_wait). The next node adopts it (dump()).
+		const cmd = userScopeArgv('pipewire', ['-c', conf], { exists: fsx.existsSync, uid })
+		const denv = cmd.scoped ? { ...env, DBUS_SESSION_BUS_ADDRESS: `unix:path=/run/user/${uid}/bus` } : env
+		daemonChild = spawn(cmd.bin, cmd.args, { env: denv, detached: true, stdio: 'ignore' })
 		daemonChild.unref?.()
 		daemonChild.on?.('error', (e) => (lastError = `pipewire: ${e.message}`))
 		for (let i = 0; i < 20; i++) {
@@ -196,7 +202,14 @@ function createZoomAudio(deps = {}) {
 	/** The no-session-manager policy: add the links wantedLinks() says are missing (pw-link by port id). */
 	async function linkTick() {
 		let g = await dump()
-		if (!g) return
+		if (!g) {
+			// the daemon is gone (killed, crashed): bring it back, it was never restarted before (10.11, live)
+			if (!persisted.enabled || !(await startDaemon())) return
+			log('warn', '[zoom-audio] private PipeWire daemon was gone, started again')
+			spawnTap()
+			g = await dump()
+			if (!g) return
+		}
 		const cfgs = portConfigs(g)
 		for (const c of cfgs) await pw('pw-cli', ['s', String(c.id), 'PortConfig', portConfigPod(c)]).catch((e) => log('warn', `[zoom-audio] PortConfig ${c.id}: ${e.message}`))
 		if (cfgs.length) g = (await dump()) || g

@@ -30,8 +30,22 @@ function guessRole(title) {
 	const t = String(title || '')
 	if (/^zoom workplace/i.test(t) || /^zoom\s*-\s*(free|pro|licensed)/i.test(t)) return 'home'
 	if (/share|screen|whiteboard/i.test(t)) return 'share'
-	if (/^zoom meeting/i.test(t) || /^zoom$/i.test(t)) return 'meeting'
+	// Zoom 7.1 titles the meeting window just "Meeting"
+	if (/^(zoom )?meeting$/i.test(t) || /^zoom$/i.test(t)) return 'meeting'
 	return 'other'
+}
+
+/**
+ * The windows a source may be bound to WITHOUT the operator (re-bind after Zoom recreated a window, restore after a
+ * node restart). Zoom 7.1 reuses the title "Zoom Workplace" for the dual-monitor meeting window, for dialogs and,
+ * while it starts, for the home window. 10.11, live: a re-bind took the home window, put it BELOW the GUI and resized
+ * it; another took the join preview. So: only while a meeting window is up, only large windows, never the home one.
+ * @param {Array<{ title: string, width?: number, height?: number }>} wins
+ */
+function autoBindable(wins) {
+	const list = Array.isArray(wins) ? wins : []
+	if (!list.some((w) => guessRole(w.title) === 'meeting')) return []
+	return list.filter((w) => (w.width ?? 9999) >= 800 && (w.height ?? 9999) >= 500 && !/^zoom workplace\s+-/i.test(String(w.title || '')))
 }
 
 /**
@@ -99,4 +113,4 @@ async function operatorGuiRect(deps = {}) {
 	return null
 }
 
-module.exports = { listZoomWindows, parseWindowDump, guessRole, operatorGuiRect }
+module.exports = { listZoomWindows, parseWindowDump, guessRole, operatorGuiRect, autoBindable }

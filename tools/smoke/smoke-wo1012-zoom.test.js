@@ -97,7 +97,7 @@ test('a hidden source grabs its window into zoom-<source>, BELOW the operator GU
 	const r = await s.assign('presenter', { window: '0x200001c', hidden: true, size: '1280x720' })
 	assert.strictEqual(grabs.length, 1)
 	assert.deepStrictEqual([grabs[0].ring, grabs[0].size, grabs[0].fps], ['zoom-presenter', '1280x720', 30])
-	assert.deepStrictEqual(grabs[0].sent, ['window 0x200001c', 'below', 'move 0 0 1280 720'])
+	assert.deepStrictEqual(grabs[0].sent, ['window 0x200001c', 'below', 'move 1 1 1278 718'])
 	assert.strictEqual(r.sources.presenter.value, 'shm://zoom-presenter')
 	assert.strictEqual(r.sources.presenter.hidden, true)
 	await assert.rejects(s.assign('share', { window: '0x200001c' }), /already feeds "presenter"/)
@@ -115,7 +115,7 @@ test('a window Zoom recreates is re-bound by its title and hidden again; quit st
 	grabs[0].status.window = null // the grabber said "window gone"
 	st.windows = [WINS[0], { id: '0x2000099', title: 'Zoom Meeting', role: 'meeting' }]
 	await s.rebind()
-	assert.deepStrictEqual(grabs[0].sent.slice(-3), ['window 0x2000099', 'below', 'move 0 0 1920 1080'])
+	assert.deepStrictEqual(grabs[0].sent.slice(-3), ['window 0x2000099', 'below', 'move 1 1 1918 1078'])
 	assert.strictEqual((await s.status()).sources.gallery.window, '0x2000099')
 	const q = await s.quit()
 	assert.strictEqual(grabs[0].alive, false)
@@ -145,7 +145,126 @@ test('launch: Zoom audio env (PULSE_* only) joins the user-session env; nothing 
 	assert.strictEqual(seen[0].env.PULSE_SERVER, 'unix:/run/user/1000/highascg-zoom-audio/native')
 	assert.strictEqual(seen[0].env.PULSE_SINK, 'highascg_zoom_in')
 	assert.notStrictEqual(seen[0].env.LD_PRELOAD, '/evil.so')
-	assert.deepStrictEqual(seen[0].args, ['--url=zoommtg://zoom.us/join?action=join&confno=81234567890'])
+	// in its own user scope (a node restart must not end the meeting)
+	assert.strictEqual(seen[0].bin, '/usr/bin/systemd-run')
+	assert.deepStrictEqual(seen[0].args, ['--user', '--scope', '--collect', '--quiet', '--', '/usr/bin/zoom', '--url=zoommtg://zoom.us/join?action=join&confno=81234567890'])
+	assert.ok(seen[0].env.DBUS_SESSION_BUS_ADDRESS, 'systemd-run --user needs the session bus')
 	await s.launch({})
 	assert.strictEqual(seen[1].env.PULSE_SERVER, process.env.PULSE_SERVER, 'audio off: no PULSE_* added')
+})
+
+test('a Zoom started from the dock or the app launcher gets the same session + audio env (10.11: it had none)', async () => {
+	const { zoomClientEnv, isZoomBin, prepareZoomAppLaunch } = require('../../src/zoom/zoom-launch-env')
+	assert.ok(isZoomBin('/usr/bin/zoom'))
+	assert.ok(!isZoomBin('/usr/bin/zoomies') && !isZoomBin('/usr/bin/firefox'))
+	assert.deepStrictEqual(zoomClientEnv({ PULSE_SERVER: 'unix:/x/native', LD_PRELOAD: '/evil.so' }, 1000), {
+		XDG_RUNTIME_DIR: '/run/user/1000',
+		DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus',
+		PULSE_SERVER: 'unix:/x/native',
+	})
+	let restored = 0
+	const audio = { restore: async () => void restored++, zoomEnv: () => ({ PULSE_SERVER: 'unix:/x/native', PULSE_SINK: 'highascg_zoom_in', PULSE_SOURCE: 'highascg_zoom_out' }) }
+	const deps = { resolveAppLaunch: (a) => (a === 'app:Zoom' ? { bin: '/usr/bin/zoom', args: [] } : a === 'app:vlc' ? { bin: '/usr/bin/vlc', args: [] } : null), getZoomAudio: () => audio }
+	const env = await prepareZoomAppLaunch('app:Zoom', {}, deps)
+	assert.strictEqual(restored, 1, 'the private daemon is brought back before Zoom looks for a sound server')
+	assert.strictEqual(env.PULSE_SINK, 'highascg_zoom_in')
+	assert.strictEqual(env.PULSE_SOURCE, 'highascg_zoom_out')
+	assert.ok(env.XDG_RUNTIME_DIR)
+	assert.strictEqual(await prepareZoomAppLaunch('app:vlc', {}, deps), null)
+	assert.strictEqual(await prepareZoomAppLaunch('app:gone', {}, deps), null)
+	assert.strictEqual(await prepareZoomAppLaunch('firefox', {}, deps), null)
+	assert.strictEqual(restored, 1)
+
+	// the dock passes it on to the spawn
+	const { launchOrFocus } = require('../../src/system/operator-dock')
+	const spawned = []
+	const r = await launchOrFocus('app:Zoom', { config: {} }, {
+		isHelperAction: () => true,
+		findGuiWindowIds: async () => [],
+		spawnGuiDetached: (a, o) => (spawned.push(o), '/usr/bin/zoom'),
+		prepareZoomAppLaunch: async () => env,
+	})
+	assert.strictEqual(r.status, 200)
+	assert.strictEqual(spawned[0].extraEnv.PULSE_SERVER, 'unix:/x/native')
+})
+
+test('user scope: plain argv when there is no systemd-run or no user manager', () => {
+	const { userScopeArgv } = require('../../src/zoom/zoom-launch-env')
+	assert.deepStrictEqual(userScopeArgv('/usr/bin/zoom', ['x'], { exists: () => false }), { bin: '/usr/bin/zoom', args: ['x'], scoped: false })
+	assert.deepStrictEqual(userScopeArgv('/usr/bin/zoom', [], { exists: (p) => p === '/usr/bin/systemd-run', uid: 1000 }).scoped, false)
+	assert.strictEqual(userScopeArgv('/usr/bin/zoom', [], { exists: () => true, uid: 1000 }).scoped, true)
+})
+
+test('bindings survive a node restart and a Quit: saved by title, restored when the window is back', async () => {
+	const os = require('os')
+	const fs = require('fs')
+	const path = require('path')
+	const stateFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'zoom-src-')), 'zoom-sources.json')
+	let wins = [
+		{ id: '0x1', title: 'Meeting', width: 1188, height: 800, role: 'meeting' },
+		{ id: '0x2', title: 'Zoom Workplace', width: 560, height: 244, role: 'home' },
+		{ id: '0x3', title: 'Zoom Workplace', width: 1188, height: 800, role: 'home' },
+	]
+	const mk = () => {
+		const grabs = []
+		const s = createZoomSession({
+			stateFile,
+			exists: () => true,
+			exec: async () => ({ stdout: '' }),
+			listWindows: async () => wins,
+			guiRect: async () => ({ x: 0, y: 0, width: 1920, height: 1080 }),
+			ensureBinary: () => ({ ok: true, bin: '/x' }),
+			createGrab: (o) => {
+				const g = { ...o, alive: true, sent: [], status: { window: o.window }, setWindow: (w) => g.sent.push(`window ${w}`), below: () => g.sent.push('below'), normal: () => g.sent.push('normal'), move: (...a) => g.sent.push(`move ${a.join(' ')}`), stop: () => (g.alive = false) }
+				grabs.push(g)
+				return g
+			},
+			timers: { setInterval: () => ({ unref() {} }), clearInterval: () => {} },
+		})
+		return { s, grabs }
+	}
+	const a = mk()
+	await a.s.assign('presenter', { window: '0x1' })
+	await a.s.assign('gallery', { window: '0x3', hidden: true })
+	assert.deepStrictEqual(Object.keys(JSON.parse(fs.readFileSync(stateFile, 'utf8'))).sort(), ['gallery', 'presenter'])
+
+	// "node restart": a new session, Zoom recreated nothing but the ids differ; the dialog shares the title
+	wins = [
+		{ id: '0xa', title: 'Zoom Workplace', width: 560, height: 244, role: 'home' },
+		{ id: '0xb', title: 'Zoom Workplace', width: 1188, height: 800, role: 'home' },
+	]
+	const b = mk()
+	await b.s.restore()
+	let st = await b.s.status()
+	assert.strictEqual(st.sources.gallery.window, null, 'no meeting window yet: nothing is bound by itself (a starting Zoom titles its home window "Zoom Workplace")')
+	assert.strictEqual(st.sources.presenter.window, null)
+	wins.push({ id: '0xc', title: 'Meeting', width: 1188, height: 800, role: 'meeting' })
+	wins.push({ id: '0xh', title: 'Zoom Workplace - Free account', width: 1280, height: 960, role: 'home' })
+	await b.s.restore()
+	st = await b.s.status()
+	assert.strictEqual(st.sources.gallery.window, '0xb', 'the large window of that title, not the dialog, never the home window')
+	assert.strictEqual(st.sources.gallery.hidden, true)
+	assert.ok(b.grabs.some((g) => g.sent.includes('below')))
+	assert.strictEqual(st.sources.presenter.window, '0xc')
+
+	// Quit keeps them for the next Zoom start; an explicit unbind forgets
+	await b.s.quit()
+	wins = [{ id: '0xd', title: 'Meeting', width: 1188, height: 800, role: 'meeting' }]
+	await b.s.restore()
+	assert.strictEqual((await b.s.status()).sources.presenter.window, '0xd')
+	await b.s.assign('presenter', { window: null })
+	assert.ok(!('presenter' in JSON.parse(fs.readFileSync(stateFile, 'utf8'))))
+})
+
+test('automatic binding: only in a meeting, only large windows, never the home window or a dialog', () => {
+	const { autoBindable, guessRole } = require('../../src/zoom/zoom-windows')
+	assert.strictEqual(guessRole('Meeting'), 'meeting')
+	const home = { id: '0x1', title: 'Zoom Workplace', width: 1280, height: 960 } // the home window while Zoom starts
+	const preview = { id: '0x2', title: "host's Zoom Meeting", width: 638, height: 510 }
+	assert.deepStrictEqual(autoBindable([home, preview]), [], 'no meeting window: nothing')
+	const meeting = { id: '0x3', title: 'Meeting', width: 1188, height: 800 }
+	const second = { id: '0x4', title: 'Zoom Workplace', width: 1188, height: 800 }
+	const dialog = { id: '0x5', title: 'Zoom Workplace', width: 560, height: 244 }
+	const realHome = { id: '0x6', title: 'Zoom Workplace - Free account', width: 1280, height: 960 }
+	assert.deepStrictEqual(autoBindable([meeting, second, dialog, realHome]).map((w) => w.id), ['0x3', '0x4'])
 })

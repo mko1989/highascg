@@ -49,7 +49,8 @@ function buildV4l2BridgeRelayArgs(config, channel) {
 
 	const outputArgs = [
 		'-vf',
-		`format=yuv420p,scale=${width}:${height}`,
+		// Fit, never stretch: a 3072×1024 program reached Zoom squashed into 16:9 (WO-1012, 10.11). Bars fill the rest.
+		`format=yuv420p,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`,
 		'-pix_fmt',
 		'yuv420p',
 		'-an',
