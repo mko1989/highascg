@@ -10,9 +10,9 @@ const Nodes := preload("res://features/visuals/flow_nodes.gd")  # WO-1011: the F
 const Eval := preload("res://features/visuals/flow_eval.gd")
 const Presets := preload("res://features/visuals/flow_presets.gd")
 const PARAMS := ["pulse", "spin", "hue", "glow", "flash", "speed", "amount", "burst",
-	"cam_yaw", "cam_pitch", "cam_zoom"]  # WO-896: the last three orbit the output camera (0.5 = no offset, visuals_camera.gd)
+	"cam_yaw", "cam_pitch", "cam_zoom", "strobe"]  # WO-896: cam_* orbit the output camera (0.5 = no offset, visuals_camera.gd)
 const PARAM_DEFAULTS := {"pulse": 0.2, "spin": 0.15, "hue": 0.55, "glow": 0.3, "flash": 0.0, "speed": 0.3, "amount": 0.5, "burst": 0.0,
-	"cam_yaw": 0.5, "cam_pitch": 0.5, "cam_zoom": 0.5}
+	"cam_yaw": 0.5, "cam_pitch": 0.5, "cam_zoom": 0.5, "strobe": 0.0}
 ## WO-873 scene library (visuals_stage.gd SCENES): [id, label]. `burst` is the event parameter — its rising edge fires the scenes.
 const SCENES := [["rings", "Rings"], ["particles", "Particles"], ["starfield", "Starfield"], ["tunnel", "Tunnel"],
 	["shader", "Shader"], ["spectrum", "Spectrum"], ["game", "Game"]]  # WO-874: a library shader (`shader` in the slice);

@@ -14,8 +14,11 @@ uniform sampler2D a : filter_nearest;
 uniform sampler2D b : filter_nearest;
 uniform float x = 0.0;
 uniform float master = 1.0;
+uniform float strobe = 0.0;
 void fragment() {
-	COLOR = vec4(mix(texture(a, UV).rgb, texture(b, UV).rgb, x) * master, 1.0);
+	// strobe: the whole mixed picture towards white, above every layer of both decks; the master (blackout) still wins
+	vec3 c = mix(texture(a, UV).rgb, texture(b, UV).rgb, x);
+	COLOR = vec4(mix(c, vec3(1.0), strobe) * master, 1.0);
 }
 """
 const BLACKOUT_S := 0.4
@@ -29,6 +32,7 @@ var x := 0.0  # deck 1's weight in the mix; reaches `live` when a fade ends
 var fade_s := 1.0
 var level := 1.0  # the master fader
 var blackout := false
+var strobe := 0.0  # the strobe parameter on the canvas (set_strobe)
 var master := 1.0  # what is on the canvas: level, or 0 in a blackout, moving towards it
 var running := true
 var dj := false
@@ -168,10 +172,17 @@ func step(delta: float) -> void:
 	master = move_toward(master, 0.0 if blackout else level, delta / BLACKOUT_S)
 	_mat.set_shader_parameter("x", x)
 	_mat.set_shader_parameter("master", master)
+	set_strobe(float(deck().params.get("strobe", 0.0)))
 	for d in decks:
 		d.step(delta)
 	if was and not fading():
 		_apply()
+
+
+## WO-1011 strobe: 0..1 white over the whole canvas (the final composite, so the output ring gets it too).
+func set_strobe(v: float) -> void:
+	strobe = clampf(v, 0.0, 1.0)
+	_mat.set_shader_parameter("strobe", strobe)
 
 
 func _apply() -> void:

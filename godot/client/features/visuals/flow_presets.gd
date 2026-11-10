@@ -1,7 +1,7 @@
 extends RefCounted
 ## WO-1011 — ready-made Flow patches (the Flow view's Presets menu: replace the graph, or add one beside it). Built from
 ## the flow_nodes.gd library (op logic after cables.gl, see THIRD_PARTY_NOTICES). The parameters they drive are
-## visuals_model.gd PARAMS: pulse · spin · hue · glow · flash · speed · amount · burst (a rising edge fires the scenes) ·
+## visuals_model.gd PARAMS: pulse · spin · hue · glow · flash (a glow behind the base) · strobe (the whole picture towards white) · speed · amount · burst (a rising edge fires the scenes) ·
 ## cam_yaw / cam_pitch / cam_zoom (0.5 = no offset).
 ## A node spec is [id, type, column, row, {props}]; a link is [from, to] or [from, to, input port].
 
@@ -54,8 +54,8 @@ const LIST := [
 		["n2", "noise", 0, 1, {"rate": 0.1, "lo": 0.42, "hi": 0.58, "seed": 9.0}], ["p2", "param", 1, 1, {"param": "cam_pitch"}],
 		["n3", "noise", 0, 2, {"rate": 0.3, "lo": 0.1, "hi": 0.5, "seed": 4.0}], ["p3", "param", 1, 2, {"param": "spin"}]],
 		[["n1", "p"], ["n2", "p2"], ["n3", "p3"]]],
-	["Four on the floor strobe", "Rhythm", "A short white hit on every beat.",
-		[["b", "bus", 0, 0, {"bus": "beat"}], ["h", "hold", 1, 0, {"ms": 50.0}], ["m", "mul", 2, 0, {"b": 0.8}], ["p", "param", 3, 0, {"param": "flash"}]],
+	["Four on the floor strobe", "Rhythm", "A short white hit of the whole picture on every beat.",
+		[["b", "bus", 0, 0, {"bus": "beat"}], ["h", "hold", 1, 0, {"ms": 50.0}], ["m", "mul", 2, 0, {"b": 0.8}], ["p", "param", 3, 0, {"param": "strobe"}]],
 		[["b", "h"], ["h", "m"], ["m", "p"]]],
 	["Every 4th beat burst", "Rhythm", "A particle burst on the one of every bar.",
 		[["b", "bus", 0, 0, {"bus": "beat"}], ["n", "nth", 1, 0, {"n": 4.0}], ["p", "param", 2, 0, {"param": "burst"}],
@@ -80,7 +80,7 @@ const LIST := [
 	["Build-up tension", "Song", "During a build the speed and spin climb and a 1/8 strobe creeps in.",
 		[["b", "bus", 0, 0, {"bus": "section.build"}], ["sl", "slew", 1, 0, {"up": 0.08, "down": 1.0}], ["p", "param", 2, 0, {"param": "speed"}],
 		["p2", "param", 2, 1, {"param": "spin"}], ["l", "lfo", 0, 2, {"wave": "square", "clock": "beat", "beats": 0.5, "width": 0.25}],
-		["m", "mul", 1, 2, {}], ["m2", "mul", 2, 2, {"b": 0.6}], ["p3", "param", 3, 2, {"param": "flash"}]],
+		["m", "mul", 1, 2, {}], ["m2", "mul", 2, 2, {"b": 0.6}], ["p3", "param", 3, 2, {"param": "strobe"}]],
 		[["b", "sl"], ["sl", "p"], ["sl", "p2"], ["l", "m"], ["sl", "m", 1], ["m", "m2"], ["m2", "p3"]]],
 	["Drop explosion", "Song", "The drop: a burst, a two-second flash-out and a speed kick.",
 		[["d", "bus", 0, 0, {"bus": "drop"}], ["c", "compare", 1, 0, {"at": 0.9}], ["p", "param", 2, 0, {"param": "burst"}],
@@ -88,7 +88,7 @@ const LIST := [
 		["p3", "param", 3, 2, {"param": "speed"}]], [["d", "c"], ["c", "p"], ["c", "u"], ["u", "p2"], ["d", "s"], ["s", "p3"]]],
 	["Peak strobe", "Song", "In the loudest section: a 1/16 strobe; elsewhere nothing.",
 		[["l", "lfo", 0, 0, {"wave": "square", "clock": "beat", "beats": 0.25, "width": 0.3}], ["pk", "bus", 0, 1, {"bus": "section.peak"}],
-		["g", "gate", 1, 0, {}], ["m", "mul", 2, 0, {"b": 0.7}], ["p", "param", 3, 0, {"param": "flash"}]],
+		["g", "gate", 1, 0, {}], ["m", "mul", 2, 0, {"b": 0.7}], ["p", "param", 3, 0, {"param": "strobe"}]],
 		[["l", "g"], ["pk", "g", 1], ["g", "m"], ["m", "p"]]],
 	["Quiet drift", "Song", "In quiet passages the picture slows, dims and drifts on noise.",
 		[["q", "bus", 0, 0, {"bus": "section.quiet"}], ["sl", "slew", 1, 0, {"up": 0.3, "down": 0.3}], ["n", "noise", 0, 1, {"rate": 0.08, "lo": 0.05, "hi": 0.25}],
@@ -109,6 +109,18 @@ const LIST := [
 		["v2", "value", 2, 2, {"value": 0.25}], ["v3", "value", 2, 3, {"value": 0.5}], ["v4", "value", 2, 4, {"value": 0.75}], ["sw", "switch", 3, 0, {}],
 		["p", "param", 4, 0, {"param": "hue"}]],
 		[["b", "n"], ["n", "c"], ["c", "sw"], ["v1", "sw", 1], ["v2", "sw", 2], ["v3", "sw", 3], ["v4", "sw", 4], ["sw", "p"]]],
+	["Strobe", "Strobe", "Free-running white strobe over the whole picture, ~15 % on. Set the rate in Hz on the LFO (default 4; keep it low).",
+		[["l", "lfo", 0, 0, {"wave": "square", "clock": "free", "rate": 4.0, "width": 0.15}], ["p", "param", 1, 0, {"param": "strobe"}]], [["l", "p"]]],
+	["Beat strobe 1/4", "Strobe", "A white strobe once per beat, locked to the tempo.",
+		[["l", "lfo", 0, 0, {"wave": "square", "clock": "beat", "beats": 1.0, "width": 0.15}], ["p", "param", 1, 0, {"param": "strobe"}]], [["l", "p"]]],
+	["Beat strobe 1/8", "Strobe", "A white strobe twice per beat, locked to the tempo.",
+		[["l", "lfo", 0, 0, {"wave": "square", "clock": "beat", "beats": 0.5, "width": 0.15}], ["p", "param", 1, 0, {"param": "strobe"}]], [["l", "p"]]],
+	["Beat strobe 1/16", "Strobe", "A white strobe four times per beat, locked to the tempo.",
+		[["l", "lfo", 0, 0, {"wave": "square", "clock": "beat", "beats": 0.25, "width": 0.15}], ["p", "param", 1, 0, {"param": "strobe"}]], [["l", "p"]]],
+	["Kick strobe", "Strobe", "A short white hit on every kick.",
+		[["b", "bus", 0, 0, {"bus": "kick"}], ["h", "hold", 1, 0, {"ms": 40.0}], ["p", "param", 2, 0, {"param": "strobe"}]], [["b", "h"], ["h", "p"]]],
+	["Snare strobe", "Strobe", "A short white hit on every snare.",
+		[["b", "bus", 0, 0, {"bus": "snare"}], ["h", "hold", 1, 0, {"ms": 40.0}], ["p", "param", 2, 0, {"param": "strobe"}]], [["b", "h"], ["h", "p"]]],
 ]
 
 

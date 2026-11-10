@@ -99,3 +99,7 @@ math, and its ops are small enough to read and re-derive. The alternatives were 
   - "Scene shuffle" shows the 5-port Switch fed by four Values, with no overlaps and live meters.
   - Right-click shows the five categories with submenus. Animate ▸ Spring added a Spring node at the click point.
   - The graph was then put back with Load preset ▸ Basics ▸ Starter.
+
+## Note 10.11 — real strobe
+
+Owner: the presets were missing strobe. `flash` only lifts the base layer's background tint (a glow), so the three "strobe" presets did nothing visible. New look parameter `strobe` (0..1, default 0, in `visuals_model.gd` PARAMS): the whole canvas goes towards white in the mixer's final composite (`visuals_mixer.gd` MIX shader, above both decks, before the master/blackout), so the output ring gets it too. Colour is white (the param system has no colour-typed params). The three old strobe presets (Four on the floor strobe, Build-up tension, Peak strobe) now drive `strobe`; a new "Strobe" group adds Strobe (free, 4 Hz, 15 %), Beat strobe 1/4, 1/8, 1/16, Kick strobe, Snare strobe: 35 presets in all. "Blackout chop" skipped: no parameter cuts the picture to black. `flash` is unchanged (Starter, Snare flash). Photosensitivity: strobing above ~3 flashes per second can trigger seizures in photosensitive people; warn the audience and keep rates low.
