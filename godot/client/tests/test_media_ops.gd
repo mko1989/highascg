@@ -100,6 +100,9 @@ func test_gather_text() -> void:
 	t.eq(O.gather_text({"ok": true, "data": {"ok": true, "folder": "p", "moved": [], "failed": []}}), "✓ Every referenced clip is already in the project folder")
 	t.eq(O.gather_text({"ok": true, "data": {"ok": false, "folder": "p", "moved": [{}], "failed": [{"id": "x", "error": "Destination file already exists"}]}}), "✗ Gathered 1 file into p/, 1 failed — first: Destination file already exists")
 	t.eq(O.gather_text({"ok": false, "status": 409, "data": {"ok": false, "error": "No project is open."}}), "✗ Gather failed: No project is open.")
+	t.eq(O.gather_text({"ok": true, "data": {"ok": true, "mode": "copy", "folder": "projects/demo", "moved": [], "copied": [{}, {}], "failed": [], "refs": 3}}), "✓ Copied 2 files into projects/demo/ — 3 reference(s) follow")
+	t.eq(O.gather_text({"ok": true, "data": {"ok": false, "mode": "copy", "folder": "p", "moved": [], "copied": [{}], "failed": [{"id": "x", "error": "Destination file already exists"}]}}), "✗ Copied 1 file into p/, 1 failed — first: Destination file already exists")
+	t.eq(O.gather_text({"ok": false, "status": 507, "data": {"ok": false, "mode": "copy", "error": "Not enough free space to copy: need 2.00 GB, 1.00 GB available."}}), "✗ Copy failed: Not enough free space to copy: need 2.00 GB, 1.00 GB available.")
 
 
 func test_download_url_and_progress() -> void:

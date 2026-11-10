@@ -64,19 +64,21 @@ static func in_folder(rows: Array, folder: String) -> Array:
 	return out
 
 
-## POST /api/media/gather reply → the status line.
+## POST /api/media/gather reply → the status line ("Copied" for mode copy, "Gathered" for a move).
 static func gather_text(res: Dictionary) -> String:
-	if not res.get("ok", false) and not (res.get("data") is Dictionary and res.data.has("moved")):
-		var err: Variant = res.data.get("error") if res.get("data") is Dictionary else null
-		return "✗ Gather failed: %s" % (err if err != null else res.get("error", "HTTP %s" % res.get("status", "?")))
-	var d: Dictionary = res.data
-	var moved: int = (d.get("moved", []) as Array).size()
-	var failed: Array = d.get("failed", [])
+	var d0: Dictionary = res.data if res.get("data") is Dictionary else {}
+	var copy: bool = d0.get("mode", "move") == "copy"
+	if not res.get("ok", false) and not (d0.has("moved") or d0.has("copied")):
+		var err: Variant = d0.get("error")
+		return "✗ %s failed: %s" % ["Copy" if copy else "Gather", err if err != null else res.get("error", "HTTP %s" % res.get("status", "?"))]
+	var done: int = ((d0.get("copied", []) if copy else d0.get("moved", [])) as Array).size()
+	var verb := "Copied" if copy else "Gathered"
+	var failed: Array = d0.get("failed", [])
 	if failed.size() > 0:
-		return "✗ Gathered %s into %s/, %d failed — first: %s" % [plural(moved), d.get("folder", ""), failed.size(), failed[0].get("error", "")]
-	if moved == 0:
+		return "✗ %s %s into %s/, %d failed — first: %s" % [verb, plural(done), d0.get("folder", ""), failed.size(), failed[0].get("error", "")]
+	if done == 0:
 		return "✓ Every referenced clip is already in the project folder"
-	return "✓ Gathered %s into %s/ — %d reference(s) follow" % [plural(moved), d.get("folder", ""), int(d.get("refs", 0))]
+	return "✓ %s %s into %s/ — %d reference(s) follow" % [verb, plural(done), d0.get("folder", ""), int(d0.get("refs", 0))]
 
 
 static func plural(n: int) -> String:

@@ -89,10 +89,10 @@ func refresh() -> void:
 	pending = d.get("pending", []) if d.get("pending") is Array else []
 	visible = d.get("enabled", false) == true and str(d.get("slug", "")) != "" and folder != ""
 	_path.text = folder.get_file() + "/"  # the column is narrow — the project's own folder name, full path on hover
-	_path.tooltip_text = "Project media folder: %s/ — Gather moves clips here" % folder
+	_path.tooltip_text = "Project media folder: %s/ — Gather moves or copies clips here" % folder
 	_gather.visible = visible and not pending.is_empty()
 	_gather.text = "Gather (%d)" % pending.size()
-	_gather.tooltip_text = "%d referenced clip(s) live outside the project folder — move them in" % pending.size()
+	_gather.tooltip_text = "%d referenced clip(s) live outside the project folder — move or copy them in" % pending.size()
 	_full.erase(_gather)  # a new text: the fit re-learns it
 	fit()
 	if was_only != project_only():
@@ -105,20 +105,17 @@ func confirm_gather() -> void:
 	var dlg := ConfirmationDialog.new()
 	dlg.title = "Gather project media?"
 	dlg.ok_button_text = "Move"
+	dlg.add_button("Copy", false, "copy")
 	var names := PackedStringArray()
 	for id in pending.slice(0, 8):
 		names.append("  " + str(id))
 	if pending.size() > 8:
 		names.append("  … and %d more" % (pending.size() - 8))
-	dlg.dialog_text = "Move %s into %s/?\n\n%s\n\nLooks, playlists and timelines follow the move." % [Ops.plural(pending.size()), folder, "\n".join(names)]
-	dlg.confirmed.connect(func() -> void:
-		dlg.queue_free()
-		_gather.disabled = true
-		gathered.emit("Gathering %s…" % Ops.plural(pending.size()))
-		var res: Dictionary = await Api.post_json("/api/media/gather", {})
-		_gather.disabled = false
-		gathered.emit(Ops.gather_text(res))
-		refresh())
+	dlg.dialog_text = "Gather %s into %s/?\n\n%s\n\nMove: the clips leave their current folders. Copy: the originals stay where they are; the project uses the copies.\nLooks, playlists and timelines follow either way." % [Ops.plural(pending.size()), folder, "\n".join(names)]
+	dlg.confirmed.connect(_run_gather.bind(dlg, "move"))
+	dlg.custom_action.connect(func(action: StringName) -> void:
+		if action == &"copy":
+			_run_gather(dlg, "copy"))
 	dlg.canceled.connect(dlg.queue_free)
 	add_child(dlg)
 	dlg.popup_centered()
@@ -161,3 +158,13 @@ func fit() -> void:
 		if plan.size != UiFit.NATURAL_SIZE:
 			c.add_theme_font_size_override("font_size", plan.size)
 		c.custom_minimum_size.x = ceilf(measure.call(c.text, plan.size) + ov[i])
+
+
+func _run_gather(dlg: Node, mode: String) -> void:
+	dlg.queue_free()
+	_gather.disabled = true
+	gathered.emit("%s %s…" % ["Copying" if mode == "copy" else "Gathering", Ops.plural(pending.size())])
+	var res: Dictionary = await Api.post_json("/api/media/gather", {"mode": mode})
+	_gather.disabled = false
+	gathered.emit(Ops.gather_text(res))
+	refresh()

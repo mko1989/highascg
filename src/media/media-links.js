@@ -62,15 +62,17 @@ function writeJsonAtomic(p, obj) {
 /**
  * @param {object} ctx
  * @param {Array<{ from: string, to: string }>} renames - media-root relative, with extension
+ * @param {{ onlySlug?: string }} [opts]
  * @returns {Promise<{ projects: number, refs: number }>}
  */
-async function applyRenamesToProjects(ctx, renames) {
+async function applyRenamesToProjects(ctx, renames, { onlySlug = '' } = {}) {
 	const ps = projectStore()
 	const persistence = ctx.persistence || require('../utils/persistence')
 	const active = ps.getActiveSlug(persistence)
 	let projects = 0
 	let refs = 0
 	for (const slug of listProjectSlugs()) {
+		if (onlySlug && slug !== onlySlug) continue // copies: other projects keep pointing at the originals
 		if (slug === active) {
 			const { loadFullProject, persistProject } = require('../engine/project-scenes')
 			const cur = loadFullProject()

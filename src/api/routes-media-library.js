@@ -108,10 +108,11 @@ function handleProjectGet(ctx) {
 	return reply(200, require('../media/project-media-gather').projectMediaInfo(ctx))
 }
 
-/** POST /api/media/gather — move the project's referenced clips into its folder; references follow. */
-async function handleGather(ctx) {
-	const r = await require('../media/project-media-gather').gatherProjectMedia(ctx)
-	if (r.body.moved?.length) require('./routes-media').triggerMediaRescanSettled(ctx)
+/** POST /api/media/gather { mode: 'move'|'copy' } — bring the project's referenced clips into its folder; references follow. */
+async function handleGather(ctx, body) {
+	const mode = parseBody(body)?.mode
+	const r = await require('../media/project-media-gather').gatherProjectMedia(ctx, { mode })
+	if (r.body.moved?.length || r.body.copied?.length) require('./routes-media').triggerMediaRescanSettled(ctx)
 	return reply(r.status, r.body)
 }
 
