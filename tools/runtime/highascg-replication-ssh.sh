@@ -64,6 +64,8 @@ validate_option() {
 	case "$tok" in
 		--server | --sender | --mkpath) return 0 ;;
 	esac
+	# WO-1029 media spread: a rate limit (digits only) so a copy never starves a show link.
+	[[ "$tok" =~ ^--bwlimit=[0-9]{1,9}$ ]] && return 0
 	[[ "$tok" =~ ^-[vnlogDtprRz]+e\.[A-Za-z]*$ ]] && return 0
 	die "disallowed rsync option: $tok"
 }
@@ -132,6 +134,16 @@ for ((i = 2; i < ${#argv[@]}; i++)); do
 	fi
 	# again on the real text: "\.\." is no ".." on the command line, but it is one in the word
 	[[ "${argv[i]}" == *..* ]] && die "path traversal not allowed"
+	# WO-1029 media spread: resume a huge file from ONE fixed hidden folder next to it (rsync sends the folder as
+	# its own word); no other value is accepted, so it can never name a path outside the destination folder.
+	if [[ "${argv[i]}" == "--partial-dir" ]]; then
+		[[ "${argv[i + 1]:-}" == ".highascg-partial" && "${escaped[i + 1]:-0}" == 0 ]] || die "disallowed --partial-dir value"
+		i=$((i + 1))
+		continue
+	fi
+	if [[ "${argv[i]}" == "--partial-dir=.highascg-partial" ]]; then
+		continue
+	fi
 	if [[ "${argv[i]}" == -* ]]; then
 		validate_option "${argv[i]}"
 	else

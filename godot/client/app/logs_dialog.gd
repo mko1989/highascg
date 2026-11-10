@@ -5,10 +5,14 @@ extends AcceptDialog
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const L := preload("res://app/logs_model.gd")
+const ConfigPane := preload("res://app/config_pane.gd")
 
 const POLL_S := 2.0
 
 var _high_on := true
+var _config_on := false  # the casparcg.config pane (owner 10.11); off until asked for, it is the widest pane
+var _config: ConfigPane
+var _discard: ConfirmationDialog
 var _caspar_on := true
 var _categories: Array = L.default_categories()
 var _levels: Array = L.DEFAULT_LEVELS.duplicate()
@@ -50,6 +54,17 @@ func _init() -> void:
 	_caspar_pane = _pane("CasparCG", _caspar, _amcp)
 	_caspar_pane.add_child(_reply)
 	split.add_child(_caspar_pane)
+	_config = ConfigPane.new()
+	_config.visible = false
+	split.add_child(_config)
+	_discard = ConfirmationDialog.new()
+	_discard.title = "Unsaved config edits"
+	_discard.dialog_text = "The casparcg.config editor has changes that were not applied. Discard them and close?"
+	_discard.ok_button_text = "Discard"
+	_discard.cancel_button_text = "Keep editing"
+	_discard.confirmed.connect(func() -> void: _config.discard())
+	_discard.canceled.connect(func() -> void: popup_centered())
+	add_child(_discard)
 	_poll = Timer.new()
 	_poll.wait_time = POLL_S
 	_poll.timeout.connect(_load_caspar)
@@ -57,7 +72,9 @@ func _init() -> void:
 	Ws.message.connect(_on_ws)
 	visibility_changed.connect(func() -> void:
 		if not visible:
-			_poll.stop())
+			_poll.stop()
+			if _config.has_unsaved():
+				_discard.popup_centered())
 
 
 func open() -> void:
@@ -68,6 +85,8 @@ func open() -> void:
 	_load_high()
 	_last_caspar = ""
 	_load_caspar()
+	if _config_on:
+		_config.load_all()
 	_poll.start()
 
 
@@ -75,10 +94,11 @@ func _toolbar() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	for spec in [["HighAsCG", func(on: bool) -> void: _high_on = on; _sync_panes(); _load_high()],
-			["CasparCG", func(on: bool) -> void: _caspar_on = on; _sync_panes(); _load_caspar()]]:
+			["CasparCG", func(on: bool) -> void: _caspar_on = on; _sync_panes(); _load_caspar()],
+			["casparcg.config", func(on: bool) -> void: _config_on = on; _sync_panes(); if on: _config.load_all()]]:
 		var b := CheckButton.new()
 		b.text = spec[0]
-		b.button_pressed = true
+		b.button_pressed = spec[0] != "casparcg.config"
 		b.toggled.connect(spec[1])
 		row.add_child(b)
 	row.add_child(VSeparator.new())
@@ -136,6 +156,7 @@ func _pane(heading: String, te: TextEdit, extra: Control = null) -> Control:
 func _sync_panes() -> void:
 	_high_pane.visible = _high_on
 	_caspar_pane.visible = _caspar_on
+	_config.visible = _config_on
 
 
 func _fill_categories() -> void:

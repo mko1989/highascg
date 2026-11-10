@@ -119,7 +119,7 @@ async function startVirtualBoxes(root, spec) {
 			extra: (id) => ({
 				caspar: { host: casparOf[id].host, port: casparOf[id].port },
 				// the graph is the virtual box's, not this machine's GPU (the boot hardware sync would swap in its DP ports)
-				env: { HIGHASCG_SANDBOX_FANOUT: '1', HIGHASCG_BOOT_DEVICE_GRAPH_SYNC: '0', HIGHASCG_SANDBOX_CASPAR_RESTART_URL: casparOf[id].control.url }, // WO-1029: the apply's "restart Caspar" calls this box's fake
+				env: { HIGHASCG_SANDBOX_FANOUT: '1', HIGHASCG_BOOT_DEVICE_GRAPH_SYNC: '0', HIGHASCG_SANDBOX_CASPAR_RESTART_URL: casparOf[id].control.url, HIGHASCG_SANDBOX_MEDIA_LOOPBACK: '1' }, // WO-1029: the apply's "restart Caspar" calls this box's fake; C10: the media Spread copies between the boxes' temp media folders, never ssh
 				config: {
 					screenDestinations: { version: 1, destinations: destList },
 					deviceGraph: graphFor(dests, spec.boxes[id].cabled),

@@ -141,4 +141,4 @@ async function postSshKey(id, peer, sshKey, deps) {
 	return r
 }
 
-module.exports = { acceptSshKey, sendMedia, fingerprint, canonical, canonical2, MAX_SKEW_MS }
+module.exports = { acceptSshKey, sendMedia, postSshKey, fingerprint, canonical, canonical2, MAX_SKEW_MS } // WO-1029 C10: postSshKey for the Spread

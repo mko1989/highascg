@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-560 routes.
+568 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -50,6 +50,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/auth/status` | registry | `src/api/router.js` |
 | * | `/api/autofollow/devices` | handler | `src/autofollow/register.js` |
 | POST | `/api/caspar-config/apply` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
+| GET | `/api/caspar-config/current` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
 | GET | `/api/caspar-config/dirty` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
 | GET | `/api/caspar-config/generate` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
 | GET | `/api/caspar-config/mode-choices` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
@@ -80,6 +81,13 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/cluster/master` | registry | `src/api/routes-cluster.js` |
 | POST | `/api/cluster/master` | registry | `src/api/routes-cluster.js` |
 | POST | `/api/cluster/master/set` | registry | `src/api/routes-cluster.js` |
+| * | `/api/cluster/media-call` | handler | `src/server/auth.js` |
+| POST | `/api/cluster/media-call` | registry | `src/api/routes-cluster-media.js` |
+| GET | `/api/cluster/media-library` | registry | `src/api/routes-cluster-media.js` |
+| GET | `/api/cluster/media-needs` | registry | `src/api/routes-cluster-media.js` |
+| POST | `/api/cluster/media-spread` | registry | `src/api/routes-cluster-media.js` |
+| POST | `/api/cluster/media-spread/cancel` | registry | `src/api/routes-cluster-media.js` |
+| GET | `/api/cluster/media-spread/status` | registry | `src/api/routes-cluster-media.js` |
 | POST | `/api/cluster/peers` | registry | `src/api/routes-cluster.js` |
 | DELETE | `/api/cluster/peers/:id` | registry | `src/api/routes-cluster.js` |
 | GET | `/api/cluster/peers/:id/device-view` | registry | `src/api/routes-cluster.js` |
@@ -584,6 +592,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-auth.js` |  |
 | `src/api/routes-caspar-config.js` | Generated CasparCG configuration: preview XML, download, apply on same host (write + RESTART). |
 | `src/api/routes-client-prefs.js` | WO-598 D — operator setup that used to live in ONE client's storage (web localStorage, Godot ui.cfg), kept on the node so every client sees the same thing: GET  |
+| `src/api/routes-cluster-media.js` | WO-1029 plan 07 C10 — the shared media library of the linked servers (cluster-media-service.js): GET  /api/cluster/media-needs[?refresh=1]         → { generated |
 | `src/api/routes-cluster.js` | WO-670 P2 — the linked servers (src/cluster/cluster-peers.js), shown in the Devices view: GET    /api/cluster                        → { self, peers: [{ id, hos |
 | `src/api/routes-companion-preview.js` | WO-450 round 3: the passive client is disconnected whenever idle (or when its one reconnect attempt raced a Companion restart), so its "cannot reach" hint lied  |
 | `src/api/routes-companion.js` | Companion integration routes (hot-backup control plane + WO-75 preview). |

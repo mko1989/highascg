@@ -96,6 +96,7 @@ routes.get('/api/caspar-config/generate', ({ path, query, ctx }) => routesCaspar
 routes.get('/api/caspar-config/mode-choices', ({ path, query, ctx }) => routesCasparConfig.handleGet(path, query, ctx), { requireCaspar: false })
 routes.get('/api/caspar-config/override', ({ path, query, ctx }) => routesCasparConfig.handleGet(path, query, ctx), { requireCaspar: false })
 routes.get('/api/caspar-config/dirty', ({ path, query, ctx }) => routesCasparConfig.handleGet(path, query, ctx), { requireCaspar: false }) // WO-1029
+routes.get('/api/caspar-config/current', ({ path, query, ctx }) => routesCasparConfig.handleGet(path, query, ctx), { requireCaspar: false }) // the file on disk (Godot logs view)
 routes.post('/api/caspar-config/apply', ({ path, body, ctx }) => routesCasparConfig.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/caspar-config/override', ({ path, body, ctx }) => routesCasparConfig.handlePost(path, body, ctx), { requireCaspar: false })
 
@@ -475,7 +476,7 @@ routes.post('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.h
 routes.delete('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.handle(method, path, body, ctx), { requireCaspar: true })
 
 require('./routes-stage-mvr').register(routes); require('./routes-project-files').register(routes); require('./routes-operator-screen').register(routes); require('./routes-fixture-types').register(routes); require('./routes-fixture-dmx').register(routes) // WO-612 MVR import, WO-599 T4 operator-screen picker, WO-615 GDTF types + DMX engine
-require('./routes-gdtf-share').register(routes); require('./routes-cluster').register(routes) // WO-637 GDTF Share: placeholders → real GDTFs; WO-670 P2 linked servers
+require('./routes-gdtf-share').register(routes); require('./routes-cluster').register(routes); require('./routes-cluster-media').register(routes) // WO-1029 C10 shared media library; WO-637 GDTF Share: placeholders → real GDTFs; WO-670 P2 linked servers
 require('./routes-dmx-monitor').register(routes); require('./routes-pixel-map').register(routes) // WO-693 DMX viewer: Art-Net nodes / sACN sources, live universe; WO-807 screen regions → fixture pixels
 require('./routes-shader-live').register(routes); require('./routes-zoom').register(routes); require('./routes-zoom-host').register(routes); require('./routes-zoom-audio').register(routes); require('./routes-audio-cross-screen').register(routes); require('./routes-contract').register(routes); require('./routes-client-prefs').register(routes); require('./routes-vr').register(routes); require('./routes-lighting').register(routes); require('./routes-console-selection').register(routes); require('../timecode/routes-ltc').register(routes) // WO-1012 Zoom (+ B host channels, C audio); WO-974 LTC; WO-857 console selection mirror; WO-606 Shader Live, WO-604 cross-screen audio, WO-598 C4 + D, WO-770 VR session, WO-837 lighting consoles
 const routeRequest = require('./router-dispatch').makeRouteRequest(routes)

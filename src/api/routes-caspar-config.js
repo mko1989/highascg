@@ -309,6 +309,18 @@ function pendingAfterApply(ctx, fullApply, opts) {
 	}
 }
 
+/** @param {object} ctx */
+function readCurrentConfig(ctx) {
+	const filePath = resolveCasparConfigWritePath(ctx)
+	try {
+		const st = require('fs').statSync(filePath)
+		const xml = require('fs').readFileSync(filePath, 'utf8')
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ path: filePath, exists: true, xml, mtimeMs: st.mtimeMs, size: st.size }) }
+	} catch {
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ path: filePath, exists: false, xml: '', mtimeMs: null, size: 0 }) }
+	}
+}
+
 /**
  * @param {string} p
  * @param {Record<string, string>} query - from {@link parseQueryString}
@@ -340,6 +352,12 @@ function handleGet(p, query, ctx) {
 	if (p === '/api/caspar-config/dirty') {
 		// WO-1029: decided here, the same for every client and for a linked server's apply plan
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(require('../config/caspar-config-dirty').casparConfigDirty(ctx)) }
+	}
+
+	if (p === '/api/caspar-config/current') {
+		// Read-only: the file Apply wrote and Caspar was started with (the Godot logs view's "On disk"). Nothing in the
+		// config is a credential (the generator writes no stream keys; the lock-clear phrase is already in /generate).
+		return readCurrentConfig(ctx)
 	}
 
 	if (p === '/api/caspar-config/override') {

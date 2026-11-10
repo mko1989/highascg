@@ -167,7 +167,9 @@ async function takeLook(b, ctx, deps) {
 		...(b.takeGroup ? { takeGroup: b.takeGroup } : {}),
 	}
 	const take = deps.take || require('./routes-scene-take').handleSceneTake
-	return { ...(await take(takeBody, ctx)), handedToTake: true }
+	// WO-1029 C10: `media_missing` when the last media-needs knows this look's media is missing on the box of its screen
+	const res = require('../cluster/cluster-media-service').withMediaMissing(ctx, await take(takeBody, ctx), sceneId, mainIdx)
+	return { ...res, handedToTake: true }
 }
 
 module.exports = { handleTakeLook, relayArgs, airHeldForLook, lookProgramChannel }

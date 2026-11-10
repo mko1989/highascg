@@ -18,6 +18,7 @@ const SUPPORTED = [
 	'apply', // cluster apply: GET /api/caspar-config/dirty + the apply plan answer for this server
 	'orphan-edges', // the cabling view lists orphan edges (cabled outputs with no destination)
 	'call-signed', // clock-free signed node-to-node call transport (cluster-call.js)
+	'media-needs', // WO-1029 C10: shared media library (GET /api/cluster/media-needs, POST /api/cluster/media-call, Spread)
 ]
 
 /** Names reserved for the coming plan 07 steps. NOT advertised until the step lands: move a name into SUPPORTED. */

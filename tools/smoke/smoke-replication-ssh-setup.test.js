@@ -128,3 +128,29 @@ test('highascg-replication-ssh wrapper accepts media paths', () => {
 	})
 	assert.doesNotMatch(allowed.stderr || '', /forbidden command|path not under|disallowed path/)
 })
+
+test('WO-1029: the wrapper accepts a numeric --bwlimit and the one fixed --partial-dir, nothing else', () => {
+	const { spawnSync } = require('child_process')
+	const wrapper = path.join(__dirname, '../../tools/runtime/highascg-replication-ssh.sh')
+	const src = fs.readFileSync(wrapper, 'utf8')
+	// the final exec is rsync itself: run the validation only, with a stub rsync first on PATH
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wo1029-ssh-'))
+	fs.writeFileSync(path.join(dir, 'rsync'), '#!/bin/sh\necho RSYNC "$@"\n', { mode: 0o755 })
+	const media = path.join(dir, 'repo', 'media')
+	fs.mkdirSync(media, { recursive: true })
+	const run = (cmd) => spawnSync('bash', [wrapper], { encoding: 'utf8', env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, HIGHASCG_REPO_ROOT: path.join(dir, 'repo'), SSH_ORIGINAL_COMMAND: cmd } })
+	const base = `rsync --server -vlogDtprRze.iLsfxCIvu --mkpath`
+	try {
+		assert.equal(run(`${base} --bwlimit=10240 . ${media}/`).status, 0)
+		assert.match(run(`${base} --bwlimit=10240 --partial-dir .highascg-partial . ${media}/`).stdout, /RSYNC --server .* --partial-dir \.highascg-partial \. /)
+		assert.equal(run(`${base} --partial-dir=.highascg-partial . ${media}/`).status, 0)
+		for (const bad of ['--bwlimit=1;id', '--bwlimit=abc', '--bwlimit=', '--partial-dir /etc', '--partial-dir ../x', '--partial-dir=/tmp/x', '--partial-dir', '--temp-dir=/tmp', '--log-file=/tmp/x']) {
+			const r = run(`${base} ${bad} . ${media}/`)
+			assert.notEqual(r.status, 0, `${bad} must be refused`)
+			assert.doesNotMatch(r.stdout, /RSYNC/, `${bad} must not reach rsync`)
+		}
+		assert.match(src, /disallowed --partial-dir value/)
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true })
+	}
+})

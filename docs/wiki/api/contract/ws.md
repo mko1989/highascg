@@ -5,7 +5,7 @@
 Message types on the node's WebSocket (`/` on the HTTP port; envelope `{ type, data }`). **server → clients** =
 broadcasts and direct sends; **client → server** = types the node acts on. Payloads: the sending / handling module.
 
-90 types.
+91 types.
 
 | Direction | Type | Module | Note |
 |---|---|---|---|
@@ -55,6 +55,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `change` | `index.js`, `src/api/host-live-browser.js`, `src/api/host-live-decklink.js`, `src/api/host-live-ndi.js`, `src/api/host-live-webpage.js`, `src/api/host-operator-fullscreen.js`, `src/api/routes-caspar-config.js`, `src/api/routes-data-project-handlers.js`, `src/api/routes-data-project-new.js`, `src/api/routes-device-snapshot.js`, `src/api/routes-device-view.js`, `src/api/routes-led-test-card.js`, `src/api/routes-project-files.js`, `src/api/routes-screens.js`, `src/api/routes-sources.js`, `src/api/routes-stage-mvr.js`, `src/api/routes-zoom-host.js`, `src/api/settings-post.js`, `src/audio/input-audio-routing.js`, `src/audio/mixer-state.js`, `src/bootstrap/os-layout-issue.js`, `src/bootstrap/startup-led-test-pattern.js`, `src/config/config-compare.js`, `src/engine/project-activate.js`, `src/server/ws-server.js`, `src/state/live-audio-only-look-state.js`, `src/state/live-scene-state.js`, `src/system/caspar-cef-health.js`, `src/system/operator-first-switch.js`, `src/utils/media-catalog-broadcast.js`, `src/utils/periodic-sync.js` |  |
 | server → clients | `client_prefs` | `src/api/routes-client-prefs.js` |  |
 | server → clients | `cluster:apply` | `src/api/routes-cluster.js` |  |
+| server → clients | `cluster:media` | `src/cluster/cluster-media-service.js` |  |
 | server → clients | `cluster:peers` | `src/api/routes-cluster.js` |  |
 | server → clients | `companion.buttonPreview` | `src/api/routes-companion-preview.js` |  |
 | server → clients | `companion.hello_ack` | `src/server/ws-server.js` |  |
