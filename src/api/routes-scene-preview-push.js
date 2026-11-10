@@ -100,8 +100,9 @@ async function handlePreviewPush(body, ctx, deps = {}) {
 
 	const getMap = deps.getChannelMap || require('../config/routing').getChannelMap
 	const map = require('../engine/scene-take-payload').withProgramResolutions(getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
-	const scope = parseInt(String(scene.mainScope ?? ''), 10)
-	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+	// WO-1029: the look's destination when no mainIdx is given; a look with no screen is not staged anywhere
+	const mainIdx = require('../engine/project-dest-scope').lookMainIdx(ctx, scene, b.mainIdx)
+	if (mainIdx === null) return require('../engine/project-dest-scope').noScreenReply(scene)
 	// WO-1029 C1c → Wave B: a look of a screen on another server is pushed there (dest.preview), else 409 NOT_HERE
 	const nh = await relayIfNotHere(ctx, { screenIdx: mainIdx }, 'dest.preview', { body: { ...b, mainIdx } })
 	if (nh) return nh

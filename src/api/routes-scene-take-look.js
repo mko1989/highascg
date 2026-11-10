@@ -56,7 +56,8 @@ async function destTake(b, ctx, deps) {
 	const { resolveLiveSceneById } = require('../engine/project-scenes-transform')
 	const scene = deps.resolveSceneById ? deps.resolveSceneById(sceneId) : resolveLiveSceneById(ctx, sceneId)
 	if (!scene) return null // the take's own 404
-	const mainIdx = lookMainIdx(b, scene)
+	const mainIdx = lookMainIdx(b, scene, ctx)
+	if (mainIdx === null) return null // WO-1029: no screen — the take's own 409
 	const target = b.target === 'preview' ? 'preview' : 'program'
 	const { relayed: _r, target: _t, mainIdx: _m, ...opts } = relayArgs(b)
 	const args = { ...opts, bus: target }
@@ -113,10 +114,12 @@ async function relayToMaster(b, ctx, deps) {
 	return { status: r.status, headers: JSON_HEADERS, body: jsonBody(r.body) }
 }
 
-/** The look's screen: `mainIdx`, else the look's own `mainScope`, else 0 (same rule as takeLook). */
-function lookMainIdx(b, scene) {
-	const scope = parseInt(String(scene?.mainScope ?? ''), 10)
-	return Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+/**
+ * The look's screen: `mainIdx`, else the look's DESTINATION (WO-1029: `destScope`, its index of today; old data: its
+ * `mainScope` when a screen has that index), else 0 ('all' / no scope). null = its destination no longer exists.
+ */
+function lookMainIdx(b, scene, ctx) {
+	return require('../engine/project-dest-scope').lookMainIdx(ctx, scene, b?.mainIdx)
 }
 
 /**
@@ -142,7 +145,9 @@ function lookProgramChannel(b, ctx, deps = {}) {
 	const scene = deps.resolveSceneById ? deps.resolveSceneById(sceneId) : resolveLiveSceneById(ctx, sceneId)
 	const getMap = deps.getChannelMap || require('../config/routing').getChannelMap
 	const map = getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}
-	const ch = Number(map.programChannels?.[lookMainIdx(b, scene)])
+	const idx = lookMainIdx(b, scene, ctx)
+	if (idx === null) return 0
+	const ch = Number(map.programChannels?.[idx])
 	return Number.isFinite(ch) && ch > 0 ? ch : 0
 }
 
@@ -155,7 +160,8 @@ async function takeLook(b, ctx, deps) {
 
 	const getMap = deps.getChannelMap || require('../config/routing').getChannelMap
 	const map = require('../engine/scene-take-payload').withProgramResolutions(getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
-	const mainIdx = lookMainIdx(b, scene)
+	const mainIdx = lookMainIdx(b, scene, ctx)
+	if (mainIdx === null) return require('../engine/project-dest-scope').noScreenReply(scene) // WO-1029: needs an explicit screen
 	// WO-1029 C1c: a look of a screen that is on another server is a typed refusal, not "no program channel"
 	if (map.channelsWhereCabled === true && !require('../config/screen-channels').isScreenHere(map, mainIdx) && mainIdx < Number(map.screenCount)) {
 		return require('./screen-not-here').notHereReply(ctx, { screenIdx: mainIdx })

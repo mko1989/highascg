@@ -24,13 +24,29 @@ function commitShow(ctx, project) {
 	// WO-919 N2: taking ANOTHER show replaces the live destinations — the open show keeps its own first
 	require('../engine/project-switch-stamp').stampOutgoingShowRig(ctx, require('../engine/project-store').projectSlugFromName(project?.name))
 	const r = persistProject(ctx, project, { writeAutosave: true, pushVolumes: false })
-	const dst = project?.hardwareConfig?.screenDestinations
+	const dst = liveDestinationsFor(ctx, project?.hardwareConfig?.screenDestinations)
 	if (dst && stableJson(normalizeScreenDestinations(dst)) !== stableJson(normalizeScreenDestinations(ctx.config?.screenDestinations))) {
 		require('../engine/project-hardware-config').applyHardwareConfigToCtx(ctx, { screenDestinations: dst })
 	}
 	ctx.artnetReceiver?.reconfigureFromProject?.(r.project)
 	if (!r.unchanged) require('../api/routes-data-project-sync').scheduleProjectSyncBroadcast(ctx, r.project)
 	return r
+}
+
+/**
+ * WO-1029 plan 06: the live destination list a taken show may set here, or null for "leave it".
+ *   - S5: while the destination list is shared on its own (shared-show-dests.js), it alone sets the live list — a
+ *     show (a follower's New project / Load merged on the master, report 03 F1.3) never does;
+ *   - S1: the operator GUI entries of the live config stay as they are (never a peer's port / headless / shm / size);
+ *   - a destination cabled here and missing from the show is kept (shared-show-dests-ctx.js guardIncoming).
+ */
+function liveDestinationsFor(ctx, dst) {
+	if (!dst || ctx._clusterDests?.owns()) return null
+	const incoming = Array.isArray(dst) ? dst : dst.destinations
+	if (!Array.isArray(incoming)) return dst
+	const g = require('./shared-show-dests-ctx').guardIncoming(ctx.config, incoming, [])
+	for (const c of g.conflicts) ctx.log?.('warn', `[cluster] show: kept destination ${c.destId || ''} here (${c.conflict})`)
+	return g.changed ? { ...(Array.isArray(dst) ? {} : dst), destinations: g.list } : null
 }
 
 /** projects/_cluster/<slug>.<tag>-<time>.json (box-local: .stignore) → the path shown to the operator. */
@@ -77,9 +93,10 @@ function sharedShowDeps(ctx, of) {
 		backup: backupProject,
 		pairEnabled: () => !!require('../config/replication-config').getReplicationConfig(ctx.config).enabled,
 		casparApply: () => casparLayoutDiffers(ctx),
+		destsShared: () => !!require('./shared-show-dests-ctx').destsOf(ctx)?.owns(), // WO-1029 S5: the list travels on its own
 		broadcast: (type, data) => typeof ctx._wsBroadcast === 'function' && ctx._wsBroadcast(type, data),
 		log: ctx.log,
 	}
 }
 
-module.exports = { sharedShowDeps, commitShow, backupProject, casparLayoutDiffers, channelModes }
+module.exports = { sharedShowDeps, commitShow, liveDestinationsFor, backupProject, casparLayoutDiffers, channelModes }

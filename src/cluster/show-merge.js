@@ -32,12 +32,64 @@ function keyed(a) {
 const keyedPair = (a, b) => keyed(a) && keyed(b) && (a.length > 0 || b.length > 0)
 const same = (a, b) => a === b || stableJson(a) === stableJson(b)
 
-/** The shared slice of a project (a new object; the project is untouched). */
-function showOf(project) {
+/**
+ * WO-1029 plan 06 S1 (owner D2): the operator GUI destination belongs to ONE server — its monitor port, headless, shm
+ * output and size are that box's. It leaves the shared show here and `intoProject` puts this box's own back.
+ * `screenDestinations` is `{ destinations: [] }` in a real project (an array in older test projects): both handled.
+ */
+const isOpGui = (d) => isObj(d) && d.mode === 'operator_gui'
+const destListOf = (sd) => (Array.isArray(sd) ? sd : isObj(sd) && Array.isArray(sd.destinations) ? sd.destinations : null)
+function withDestList(sd, list) {
+	return Array.isArray(sd) ? list : { ...sd, destinations: list }
+}
+/** The operator GUI destinations of a project (with their index in its list). */
+function opGuiOf(project) {
+	const list = destListOf(project?.hardwareConfig?.screenDestinations) || []
+	return list.map((d, i) => ({ d, i })).filter((x) => isOpGui(x.d))
+}
+
+/**
+ * The shared slice of a project (a new object; the project is untouched). Form options (both ends of a link must use
+ * the same, shared-show.js decides per peer):
+ *   opGuiLocal: false = the previous build's show, which still carries the operator GUI (WO-1029 S1 version gate: what a
+ *     master sends a peer without `opgui-local`)
+ *   dests: false = no `screenDestinations` at all — the destination list travels on its own (S5, shared-show-dests.js)
+ */
+function showOf(project, form = {}) {
 	if (!isObj(project)) return {}
 	const s = stripDeviceLocalFromProject(project)
 	for (const k of Object.keys(s)) if (VOLATILE.has(k) || k.startsWith('_')) delete s[k]
-	return s
+	return reform(s, form)
+}
+
+/** A show in a given form (see showOf); returns the same object when nothing changes. */
+function reform(show, { opGuiLocal = true, dests = true } = {}) {
+	const hc = show?.hardwareConfig
+	if (!isObj(hc) || !('screenDestinations' in hc)) return show
+	if (!dests) {
+		const { screenDestinations: _gone, ...rest } = hc
+		return { ...show, hardwareConfig: rest }
+	}
+	const list = destListOf(hc.screenDestinations)
+	if (!opGuiLocal || !list?.some(isOpGui)) return show
+	return { ...show, hardwareConfig: { ...hc, screenDestinations: withDestList(hc.screenDestinations, list.filter((d) => !isOpGui(d))) } }
+}
+
+/** WO-1029 S1: a show for a peer on the previous build = the show + this box's operator GUI entries (as before S1). */
+function withOpGui(show, project) {
+	const mine = opGuiOf(project)
+	const list = destListOf(show?.hardwareConfig?.screenDestinations)
+	if (!mine.length || !list) return show
+	const out = structuredClone(show)
+	out.hardwareConfig.screenDestinations = withDestList(out.hardwareConfig.screenDestinations, placeOpGui(list.filter((d) => !isOpGui(d)), mine))
+	return out
+}
+
+/** Insert operator GUI entries back at their own (local) positions. */
+function placeOpGui(list, mine) {
+	const out = [...list]
+	for (const { d, i } of [...mine].sort((a, b) => a.i - b.i)) out.splice(Math.min(i, out.length), 0, structuredClone(d))
+	return out
 }
 
 const hashShow = (show) => crypto.createHash('sha256').update(stableJson(show)).digest('hex').slice(0, 16)
@@ -152,7 +204,25 @@ function intoProject(local, show) {
 		for (const k of Object.keys(hc)) if (!(k in (own.hardwareConfig || {}))) out.hardwareConfig[k] = hc[k]
 	}
 	for (const k of Object.keys(local)) if ((VOLATILE.has(k) || k.startsWith('_')) && local[k] !== undefined) out[k] = local[k]
+	// S5: a show that does not carry the destination list leaves this box's own as it is
+	if (isObj(out.hardwareConfig) && !('screenDestinations' in out.hardwareConfig) && local.hardwareConfig?.screenDestinations !== undefined)
+		out.hardwareConfig.screenDestinations = structuredClone(local.hardwareConfig.screenDestinations)
+	keepOwnOpGui(out, local)
 	return out
 }
 
-module.exports = { showOf, hashShow, diff, apply, merge3, intoProject, pathText, keyed }
+/**
+ * WO-1029 S1: this box's operator GUI stays its own. A show without one (a new master) gets the local entries back at
+ * their local positions; a show WITH one (an older master still sends it) has it replaced by the local entries, so a
+ * peer's physicalPort / headless / videoOutput / shmName / size never land here. Only a box with none takes the
+ * incoming entry (as before S1: an older master's show is the only source it has).
+ */
+function keepOwnOpGui(out, local) {
+	const mine = opGuiOf(local)
+	const sd = out.hardwareConfig?.screenDestinations
+	const list = destListOf(sd)
+	if (!list || !mine.length) return
+	out.hardwareConfig.screenDestinations = withDestList(sd, placeOpGui(list.filter((d) => !isOpGui(d)), mine))
+}
+
+module.exports = { showOf, hashShow, diff, apply, merge3, intoProject, pathText, keyed, withOpGui, reform, isOpGui, destListOf }

@@ -13,6 +13,7 @@
 'use strict'
 
 const routingMap = require('./routing-map')
+const { inputKeyOfSource, entryForInputKey } = require('./live-input-key')
 
 /** @param {unknown} value @returns {{ channel: number, layer: number|null }|null} */
 function parseRouteValue(value) {
@@ -40,20 +41,12 @@ function knownRouteChannels(map) {
  * @param {object} map
  */
 function authoritativeEntryForSource(item, map) {
+	// WO-1029 S13: identity = the stable input key (live-input-key.js); a label is only a fallback for host channels
+	const byKey = entryForInputKey(inputKeyOfSource(item), map)
+	if (byKey) return byKey
 	const inputs = Array.isArray(map?.inputChannels) ? map.inputChannels : []
 	const rt = String(item?.routeType || '').toLowerCase()
-	if (rt === 'decklink' && item.decklinkSlot != null) {
-		return inputs.find((e) => e.kind === 'decklink' && e.slot === Number(item.decklinkSlot)) || null
-	}
-	if (rt === 'live_audio' && item.liveAudioSlot != null) {
-		return inputs.find((e) => e.kind === 'live_audio' && e.slot === Number(item.liveAudioSlot)) || null
-	}
-	if (rt === 'v4l2' && item.v4l2Slot != null) {
-		return inputs.find((e) => e.kind === 'v4l2' && e.slot === Number(item.v4l2Slot)) || null
-	}
-	if (rt === 'ndi_host' || rt === 'webpage_host' || rt === 'browser_display') {
-		const sid = String(item.sourceId || item.hostSourceId || '').trim()
-		if (sid) return inputs.find((e) => e.kind === rt && String(e.sourceId || '') === sid) || null
+	if ((rt === 'ndi_host' || rt === 'webpage_host' || rt === 'browser_display') && !String(item.sourceId || item.hostSourceId || '').trim()) {
 		const label = String(item.label || '').trim().toLowerCase()
 		if (label) return inputs.find((e) => e.kind === rt && String(e.label || '').trim().toLowerCase() === label) || null
 	}

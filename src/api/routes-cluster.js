@@ -85,6 +85,7 @@ function clusterOf(ctx) {
 		await showOf(ctx).tick() // WO-746: the master catches every server up; a follower's waiting edit goes again
 		await fanoutOf(ctx).refresh()
 		await ownershipOf(ctx).refresh() // WO-1029 2a: which linked server each destination is cabled on
+		await require('../cluster/cluster-device-view').afterPoll(ctx) // WO-1029 S5: the shared destination list; S3: the combined Devices view
 		reportOf(ctx).publish() // WO-1029 B1: each linked server hears what this master forwards to it (nothing if not master)
 		require('../cluster/air-state').airChanged(ctx) // WO-712 R3b: the `air` heartbeat
 		require('../cluster/dest-air').tick(ctx) // WO-1029 C8: `dest.air` heartbeat; offline sources → unknown
@@ -279,7 +280,7 @@ function callOf(ctx) {
 		post: postJson,
 		masterId: () => (masterOf(ctx).view().is_master ? '' : masterOf(ctx).view().master_id),
 		acceptsRemote: () => require('../cluster/server-duties').has('accept_remote'),
-		info: { ...exchangeOf(ctx).info, ...showOf(ctx).info, ...reportOf(ctx).info, ...require('../cluster/dest-actions').destActionsOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
+		info: { ...exchangeOf(ctx).info, ...showOf(ctx).info, ...require('../cluster/cluster-device-view').clusterInfo(ctx), ...reportOf(ctx).info, ...require('../cluster/dest-actions').destActionsOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
 		actions: { ...createCallActions(ctx, { callMaster: (a, args, o) => callOf(ctx).callMaster(a, args, o), call: (id, a, args, o) => callOf(ctx).call(id, a, args, o),
 			owners: (ids) => ownershipOf(ctx).owners(ids), isFollower: () => isClusterFollower(ctx) }), ...showOf(ctx).actions },
 		log: ctx.log,
@@ -484,7 +485,7 @@ function applyOf(ctx) {
 }
 
 function relayOf(ctx) {
-	if (!ctx._clusterRelay) ctx._clusterRelay = createRelay({ cluster: clusterOf(ctx), log: ctx.log })
+	if (!ctx._clusterRelay) ctx._clusterRelay = createRelay({ cluster: clusterOf(ctx), log: ctx.log, onAnswered: (id, m, p, st) => require('../cluster/cluster-device-view').relayWrote(ctx, id, m, p, st) }) // WO-1029 S4
 	return ctx._clusterRelay
 }
 

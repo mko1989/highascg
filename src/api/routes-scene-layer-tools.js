@@ -40,8 +40,7 @@ async function handleLayerFit(body, ctx, deps = {}) {
 	const layer = (scene.layers || []).find((l) => Number(l?.layerNumber) === ln)
 	if (!layer?.source?.value) return out(404, { ok: false, error: `layer ${ln} has no source` })
 	const map = deps.getChannelMap ? deps.getChannelMap() : require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
-	const scope = parseInt(String(scene.mainScope ?? ''), 10)
-	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+	const mainIdx = require('../engine/project-dest-scope').lookMainIdx(ctx, scene, b.mainIdx) ?? 0 // WO-1029: by destination
 	const res = map.programResolutions?.[mainIdx] || map.programResolutions?.[0] || {}
 	const canvas = { width: Number(res.w) > 0 ? Number(res.w) : 1920, height: Number(res.h) > 0 ? Number(res.h) : 1080 }
 	const fit = await fitFillForSource(ctx, layer.source, b.contentFit || layer.contentFit || 'native', canvas, deps.mediaResolution)
@@ -77,8 +76,7 @@ async function handleLayerReload(body, ctx, deps = {}) {
 	const layer = (scene?.layers || []).find((l) => Number(l?.layerNumber) === ln)
 	if (!layer?.source?.value) return out(404, { ok: false, error: `layer ${ln} has no source` })
 	const map = deps.getChannelMap ? deps.getChannelMap() : require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
-	const scope = parseInt(String(scene.mainScope ?? ''), 10)
-	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+	const mainIdx = require('../engine/project-dest-scope').lookMainIdx(ctx, scene, b.mainIdx) ?? 0 // WO-1029: by destination
 	const nh = await require('../cluster/dest-route').relayIfNotHere(ctx, { screenIdx: mainIdx }, 'dest.layer', { op: 'layer-reload', body: { ...b, mainIdx } }) // WO-1029 Wave B
 	if (nh) return nh
 	const getStaged = deps.getStaged || ((ch) => require('../state/live-scene-state').getChannel(ch))

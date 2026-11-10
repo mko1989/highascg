@@ -11,10 +11,8 @@ extends VBoxContainer
 ## badge, and "Make <name> master" sits on the server it acts on, never on the one that already is master. P4: on each
 ## card while this server is master, which destinations its takes are forwarded to there, or why not.
 ## WO-739: a server asking to link with this one shows on top as an invite (Accept / Decline). A server this one linked
-## that has not accepted yet says so on its card. Auto-accept is on the Devices server page.
-## WO-732 P3b: "Edit" on a card points the whole Devices tab at that server (core/devices_target.gd edit_peer): its
-## rear panel, cables, destinations and Apply. WO-802: sent through this server's relay, never straight to it. "Back to
-## this machine" returns; an unlink returns by itself and says so.
+## that has not accepted yet says so on its card. Auto-accept is on the Devices server page. WO-1029 C12: each server row carries the "Channels only for the screens cabled here" switch (channels_cabled_flow.gd). WO-732 P3b: "Edit" on a card points the whole Devices tab at that server (core/devices_target.gd edit_peer): its
+## rear panel, cables, destinations and Apply. WO-802: sent through this server's relay, never straight to it. "Back to this machine" returns; an unlink returns by itself and says so.
 
 const Badge := preload("res://features/devices/server_badge.gd")  # WO-1018
 const M := preload("res://features/devices/cluster_model.gd")
@@ -23,6 +21,7 @@ const RearPanel := preload("res://features/devices/rear_panel.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const DTM := preload("res://core/devices_target_model.gd")
 const Kit := preload("res://features/settings/pane_kit.gd")
+const CCFlow := preload("res://features/devices/channels_cabled_flow.gd")
 
 var _snap := {}
 var _views := {}  # peer id → its device-view payload
@@ -218,6 +217,7 @@ func _card(p: Dictionary) -> Control:
 		_remove.popup_centered())
 	top.add_child(x)
 	v.add_child(top)
+	if p.get("online") == true: CCFlow.attach(v, id, str(p.get("name", id)))  # WO-1029 C12
 	var does := M.does_text(p.get("duties"))  # WO-723: what its config and the links resolve it to
 	if does != "":
 		v.add_child(_small(does, ThemeBuilder.TEXT_MUTED))
@@ -372,6 +372,7 @@ func _build_self_row() -> void:
 	_take.pressed.connect(func() -> void: _confirm_make("self", _take.get_meta("server_name", "this server")))
 	_self_row.add_child(_take)
 	add_child(_self_row)
+	CCFlow.attach(self)
 
 
 func _show_self(me: Dictionary, ms: Dictionary) -> void:

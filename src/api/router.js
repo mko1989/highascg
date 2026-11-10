@@ -38,6 +38,7 @@ const routesV4l2Input = require('./routes-v4l2-input')
 const routesFtb = require('./routes-ftb')
 const routesOperatorDock = require('./routes-operator-dock')
 const routesOperatorFirst = require('./routes-operator-first') // WO-868
+const routesChannelsCabled = require('./routes-channels-cabled') // WO-1029 C12
 const routesLedTestControl = require('./routes-led-test-control')
 const routesIngest = require('./routes-ingest')
 const routesUsbIngest = require('./routes-usb-ingest')
@@ -164,6 +165,8 @@ routes.get('/api/system/dock', () => routesOperatorDock.handleGet(), { requireCa
 routes.post('/api/system/dock/launch', ({ body, ctx }) => routesOperatorDock.handleLaunch(body, ctx), { requireCaspar: false })
 routes.get('/api/system/operator-first', ({ ctx }) => routesOperatorFirst.handleGet(ctx), { requireCaspar: false })
 routes.post('/api/system/operator-first', ({ body, ctx }) => routesOperatorFirst.handlePost(body, ctx), { requireCaspar: false })
+routes.get('/api/cluster/channels-where-cabled', ({ ctx }) => routesChannelsCabled.handleGet(ctx), { requireCaspar: false })
+routes.post('/api/cluster/channels-where-cabled', ({ body, ctx }) => routesChannelsCabled.handlePost(body, ctx), { requireCaspar: false })
 routes.get('/api/led-test-card/settings', ({ ctx }) => routesLedTestControl.handleGet(ctx), { requireCaspar: false }) // WO-629
 routes.post('/api/led-test-card/:op', ({ params, body, ctx }) => routesLedTestControl.handlePost(params.op, body, ctx), { requireCaspar: false })
 routes.post('/api/system/gpu-ports-reset', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
@@ -476,7 +479,7 @@ routes.post('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.h
 routes.delete('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.handle(method, path, body, ctx), { requireCaspar: true })
 
 require('./routes-stage-mvr').register(routes); require('./routes-project-files').register(routes); require('./routes-operator-screen').register(routes); require('./routes-fixture-types').register(routes); require('./routes-fixture-dmx').register(routes) // WO-612 MVR import, WO-599 T4 operator-screen picker, WO-615 GDTF types + DMX engine
-require('./routes-gdtf-share').register(routes); require('./routes-cluster').register(routes); require('./routes-cluster-media').register(routes) // WO-1029 C10 shared media library; WO-637 GDTF Share: placeholders → real GDTFs; WO-670 P2 linked servers
+require('./routes-gdtf-share').register(routes); require('./routes-cluster').register(routes); require('./routes-cluster-media').register(routes); require('./routes-cluster-devices').register(routes) // WO-1029 C10 shared media library, S3 one Devices view; WO-637 GDTF Share: placeholders → real GDTFs; WO-670 P2 linked servers
 require('./routes-dmx-monitor').register(routes); require('./routes-pixel-map').register(routes) // WO-693 DMX viewer: Art-Net nodes / sACN sources, live universe; WO-807 screen regions → fixture pixels
 require('./routes-shader-live').register(routes); require('./routes-zoom').register(routes); require('./routes-zoom-host').register(routes); require('./routes-zoom-audio').register(routes); require('./routes-audio-cross-screen').register(routes); require('./routes-contract').register(routes); require('./routes-client-prefs').register(routes); require('./routes-vr').register(routes); require('./routes-lighting').register(routes); require('./routes-console-selection').register(routes); require('../timecode/routes-ltc').register(routes) // WO-1012 Zoom (+ B host channels, C audio); WO-974 LTC; WO-857 console selection mirror; WO-606 Shader Live, WO-604 cross-screen audio, WO-598 C4 + D, WO-770 VR session, WO-837 lighting consoles
 const routeRequest = require('./router-dispatch').makeRouteRequest(routes)

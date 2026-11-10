@@ -19,6 +19,15 @@ const { clearDecklinkInputSlot, releaseDecklinkOutputsForDestination } = require
 
 const { saveConfig } = require('./device-view-crud-save')
 
+/**
+ * WO-1029 plan 06 S5: a destination edit made here reaches the linked servers at once (shared-show-dests.js), whether
+ * or not the show is shared; the operator GUI stays this server's own (S1). → the report, or null when nothing is shared.
+ */
+function shareDestEdit(ctx, op) {
+	if (op.upsert?.mode === 'operator_gui' || op.upsert?.mode === 'host_channel') return null // per server (S1; a host channel is this Caspar's)
+	return require('../cluster/shared-show-dests-ctx').localDestEdit(ctx, op)
+}
+
 function scheduleDeviceViewCasparSyncIfNeeded(ctx) {
 	try {
 		const { scheduleDeviceViewCasparSync } = require('./device-view-decklink-wiring')
@@ -61,7 +70,8 @@ function handleAddDestination(j, ctx) {
 		const next = normalizeScreenDestinations(top)
 		ctx.config.screenDestinations = next
 		saveConfig(ctx, { screenDestinations: next })
-		return { ok: true, screenDestinations: next, addedId: id }
+		const cluster = shareDestEdit(ctx, { upsert: next.destinations.find((d) => d.id === id), index: next.destinations.findIndex((d) => d.id === id) })
+		return { ok: true, screenDestinations: next, addedId: id, ...(cluster ? { cluster } : {}) }
 	}
 
 	const id = `dst_${now}_${seq}`; const nextMain = Math.max(0, parseInt(j.addDestination.mainScreenIndex, 10) || 0)
@@ -123,7 +133,8 @@ function handleAddDestination(j, ctx) {
 	const next = normalizeScreenDestinations(top)
 	ctx.config.screenDestinations = next
 	saveConfig(ctx, { screenDestinations: next })
-	return { ok: true, screenDestinations: next, addedId: id }
+	const cluster = shareDestEdit(ctx, { upsert: next.destinations.find((d) => d.id === id), index: next.destinations.findIndex((d) => d.id === id) })
+	return { ok: true, screenDestinations: next, addedId: id, ...(cluster ? { cluster } : {}) }
 }
 
 function handleUpdateDestination(j, ctx) {
@@ -204,11 +215,29 @@ function handleUpdateDestination(j, ctx) {
 	const next = normalizeScreenDestinations(top)
 	ctx.config.screenDestinations = next
 	saveConfig(ctx, { screenDestinations: next })
-	return { ok: true, screenDestinations: next, updatedId: id }
+	// WO-1029: a destination that became / stopped being the operator GUI leaves / joins the shared list
+	const after = next.destinations.find((d) => d.id === id)
+	const cluster = after?.mode === 'operator_gui' || after?.mode === 'host_channel' ? (d0.mode !== after.mode ? shareDestEdit(ctx, { remove: id }) : null) : shareDestEdit(ctx, { upsert: after, index: next.destinations.findIndex((d) => d.id === id) })
+	return { ok: true, screenDestinations: next, updatedId: id, ...(cluster ? { cluster } : {}) }
 }
 
+/**
+ * WO-1029 S6: an explicit "remove destination". Here as before (DeckLinks released, its cables pruned); on every linked
+ * server that is online through the shared list (its tombstone → each server deletes the destination and its cables);
+ * `cluster.pending` names the servers that were offline: they clean up when they are back.
+ */
 function handleRemoveDestination(j, ctx) {
 	const id = String(j.removeDestination.id)
+	const mode = normalizeScreenDestinations(ctx.config?.screenDestinations).destinations.find((d) => d.id === id)?.mode
+	const wasGui = mode === 'operator_gui' || mode === 'host_channel' // per server: nothing to share
+	const res = removeDestinationHere(ctx, id)
+	if (res.error || wasGui) return res
+	const cluster = shareDestEdit(ctx, { remove: id })
+	return cluster ? { ...res, cluster } : res
+}
+
+/** Remove a destination from THIS server's list and graph only (the shared list's take calls it too). */
+function removeDestinationHere(ctx, id) {
 	const top = normalizeScreenDestinations(ctx.config?.screenDestinations)
 	const before = top.destinations.length
 	top.destinations = top.destinations.filter(d => d.id !== id)
@@ -230,11 +259,27 @@ function handleRemoveDestination(j, ctx) {
 	return { ok: true, screenDestinations: next, removedId: id, graph, casparRestartNeeded: released.casparServerChanged }
 }
 
+/**
+ * WO-1029 S4: the destination a `dst_in_<id>` end names (its connector's externalRef first), when it is not in this
+ * server's list → its id (the cable would hang on nothing: 409 DEST_UNKNOWN_HERE, not an unknown-connector error).
+ */
+function unknownDestination(ctx, ids, destIds) {
+	const conns = normalizeDeviceGraph(ctx.config?.deviceGraph).connectors || []
+	for (const cid of ids) {
+		if (!cid.startsWith('dst_in_')) continue
+		const ref = String(conns.find((c) => c?.id === cid && c.kind === 'destination_in')?.externalRef || cid.slice('dst_in_'.length))
+		if (ref && !destIds.includes(ref)) return ref
+	}
+	return ''
+}
+
 function handleAddEdge(j, ctx, liveSnapshot) {
 	const suggested = require('../config/device-graph').suggestConnectorsAndDevicesFromLive(liveSnapshot, ctx.config || {})
 	const sid = String(j.addEdge.sourceId), tid = String(j.addEdge.sinkId)
 	// WO-1029: a cable left by a destination that no longer exists here must not keep this input occupied
 	const destIds = normalizeScreenDestinations(ctx.config?.screenDestinations).destinations.map((d) => d.id)
+	const unknown = Array.isArray(ctx.config?.screenDestinations?.destinations) ? unknownDestination(ctx, [sid, tid], destIds) : ''
+	if (unknown) return { status: 409, code: 'DEST_UNKNOWN_HERE', destId: unknown, error: `destination ${unknown} is not in this server's list (yet)` }
 	const freed = require('../config/device-graph-edges').withoutOrphanDestinationEdges(normalizeDeviceGraph(ctx.config?.deviceGraph), destIds, tid)
 	for (const e of freed.orphans) ctx.log?.('info', `[device-view] removed the cable of a deleted destination (${e.sourceId} → ${e.sinkId})`)
 	const merged = ensureConnectorsFromSuggested(freed.graph, [sid, tid], suggested)
@@ -412,4 +457,4 @@ function handleRemoveAllEdges(j, ctx) {
 }
 
 
-module.exports = { handleAddDestination, handleUpdateDestination, handleRemoveDestination, handleAddEdge, handleRemoveEdge, handleUpdateConnector, handleRemoveAllEdges }
+module.exports = { removeDestinationHere, handleAddDestination, handleUpdateDestination, handleRemoveDestination, handleAddEdge, handleRemoveEdge, handleUpdateConnector, handleRemoveAllEdges }

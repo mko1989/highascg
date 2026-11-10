@@ -59,6 +59,7 @@ function createShowCluster(names, opts = {}) {
 			project: sampleProject(opts.sameProject ? 'Show' : `${name} own show`, undefined, name),
 			slug: opts.sameProject ? 'show' : `${name}_own_show`,
 			store: new Map(), backups: [], events: [], log: [],
+			caps: opts.caps?.[name] ?? require('../../src/cluster/cluster-caps').supported(), // WO-1029: [] = a server on the previous build
 		}
 		n.sign = (msg) => crypto.sign(null, Buffer.from(msg, 'utf8'), privateKey).toString('base64')
 		nodes.set(name, n)
@@ -94,7 +95,7 @@ function createShowCluster(names, opts = {}) {
 			isMaster: () => !!n.claim && n.claim.master === n.fp,
 			claim: () => n.claim,
 			fpOf: (peer) => fingerprint(peer.device_key),
-			peers: () => others().map((o) => ({ id: o.id, name: o.name, online: reachable(n.name, o.name) })),
+			peers: () => others().map((o) => ({ id: o.id, name: o.name, online: reachable(n.name, o.name), caps: o.caps })), // WO-1029 S1: caps per server
 			call: (id, action, args, o) => n.call.call(id, action, args, o),
 			callMaster: (action, args, o) => n.call.callMaster(action, args, o),
 			current: () => ({ slug: n.slug, project: n.project }),

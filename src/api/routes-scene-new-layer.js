@@ -98,8 +98,7 @@ async function buildLayerForSource(ctx, scene, src, mainIdxIn, deps = {}, layerN
 	// the config-only map has no programResolutions: without them every fit assumed a 1920×1080 canvas
 	const getMap = deps.getChannelMap || (() => require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx))
 	const map = getMap()
-	const scope = parseInt(String(scene.mainScope ?? ''), 10)
-	const mainIdx = Number.isFinite(Number(mainIdxIn)) ? Math.max(0, Math.floor(Number(mainIdxIn))) : Number.isFinite(scope) ? scope : 0
+	const mainIdx = require('../engine/project-dest-scope').lookMainIdx(ctx, scene, mainIdxIn) ?? 0 // WO-1029: by destination
 	if (type === 'route' || String(src.value).startsWith('route://')) {
 		const active = { activeScreenIndex: mainIdx }
 		const why = inputs.routeDropRejectionMessage(src.value, {

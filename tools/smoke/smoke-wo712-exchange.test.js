@@ -292,7 +292,7 @@ describe('WO-712 R3 routes', () => {
 
 	it("wiring: the call gets the exchange info list; auto-routes offers each look; PTZ setup ignores another server's snapshot", () => {
 		// WO-746 added the shared show's info list beside it
-		assert.match(read('src/api/routes-cluster.js'), /info: \{ \.\.\.exchangeOf\(ctx\)\.info, \.\.\.showOf\(ctx\)\.info, \.\.\.reportOf\(ctx\)\.info, (?:\.\.\.require\('\.\.\/cluster\/dest-actions'\)\.destActionsOf\(ctx\)\.info, )?'cluster\.senders': \(args\) => sendersReceived\(ctx, args\) \},/)
+		assert.match(read('src/api/routes-cluster.js'), /info: \{ \.\.\.exchangeOf\(ctx\)\.info, \.\.\.showOf\(ctx\)\.info, .*\.\.\.reportOf\(ctx\)\.info, .*'cluster\.senders': \(args\) => sendersReceived\(ctx, args\) \},/)
 		assert.match(
 			read('src/tracking/auto-routes.js'),
 			/if \(ctx\._cluster\) require\('\.\.\/api\/routes-cluster'\)\.exchangeOf\(ctx\)\.offer\('tracking\.auto', snap\)/

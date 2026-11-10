@@ -32,6 +32,9 @@ const HEARTBEAT_MS = 5000
 const HISTORY = 48
 const FULL_TIMEOUT_MS = 30000
 const STORE_KEY = 'clusterShow'
+/** WO-1029 S1: this build keeps the operator GUI out of the show (show-merge.js); a peer without it gets the old form. */
+const OPGUI_CAP = 'opgui-local'
+const hasOpGuiCap = (p) => Array.isArray(p?.caps) && p.caps.includes(OPGUI_CAP)
 
 /**
  * @param {{ store: { get: Function, set: Function }, isMaster: () => boolean, claim: () => ({ epoch: number,
@@ -64,16 +67,36 @@ function createSharedShow(deps) {
 		while (history.size > HISTORY) history.delete(history.keys().next().value)
 	}
 
-	/** This server's show now: { slug, rev, show, hash, project } (hash cached per slug + rev + savedAt). */
+	/** WO-1029 S1: the master this follower takes from is on the previous build (its show carries its operator GUI). */
+	function oldMaster() {
+		if (deps.isMaster()) return false
+		const fp = deps.claim()?.master
+		const p = fp ? (deps.peers() || []).find((x) => deps.fpOf(x) === fp) : null
+		return !!p && !hasOpGuiCap(p)
+	}
+
+	/**
+	 * This server's show now: { slug, rev, show, hash, project, legacy: { show, hash } } (cached per slug + rev + savedAt).
+	 * `legacy` = the previous build's form (with this box's operator GUI) for a peer without OPGUI_CAP. Under an older
+	 * master the show is compared in ITS form: the master's operator GUI entry as held, so this box's own (kept by
+	 * intoProject) neither looks like an edit nor travels to the master.
+	 */
 	function mine() {
 		const c = deps.current()
 		if (!c?.project) return null
-		const key = `${c.slug}|${c.project.rev}|${c.project.savedAt}`
+		const old = oldMaster()
+		const form = { dests: old || !deps.destsShared?.() } // S5: while the list is shared on its own it is not in the show
+		const key = `${c.slug}|${c.project.rev}|${c.project.savedAt}|${form.dests}|${old ? `${held?.hash || '-'}${held?.show ? '+' : ''}` : ''}`
 		if (cache.key !== key) {
-			const show = M.showOf(c.project)
-			cache = { key, show, hash: M.hashShow(show) }
+			const full = M.showOf(c.project, { opGuiLocal: false })
+			let show = M.showOf(c.project, form)
+			if (old) show = held?.show ? M.withOpGui(show, held.show) : full
+			const hash = M.hashShow(show)
+			const fullHash = M.hashShow(full)
+			cache = { key, show, hash, legacy: fullHash === hash ? null : { show: full, hash: fullHash } }
 		}
-		return { slug: c.slug, rev: Number(c.project.rev) || 0, show: cache.show, hash: cache.hash, project: c.project }
+		const legacy = cache.legacy || { show: cache.show, hash: cache.hash }
+		return { slug: c.slug, rev: Number(c.project.rev) || 0, show: cache.show, hash: cache.hash, project: c.project, legacy, form }
 	}
 
 	async function commit(show, slug, own) {
@@ -137,11 +160,13 @@ function createSharedShow(deps) {
 		const m = mine()
 		if (!m) return
 		remember(m.hash, m.show)
+		if (m.legacy.hash !== m.hash) remember(m.legacy.hash, m.legacy.show)
 		local = { show: m.show, hash: m.hash }
 		await Promise.all(deps.peers().filter((p) => p.online).map((p) => pushTo(p, m)))
 	}
 
-	async function pushTo(p, m) {
+	async function pushTo(p, m0) {
+		const m = hasOpGuiCap(p) ? m0 : { ...m0, ...m0.legacy } // WO-1029 S1 gate: an older peer keeps getting an operator GUI
 		if (!peerState.has(p.id)) peerState.set(p.id, { acked: '', busy: false, at: 0, failing: '', full: false })
 		const s = peerState.get(p.id)
 		if (s.busy || (s.acked === m.hash && now() - s.at < HEARTBEAT_MS * 6)) return
@@ -182,6 +207,8 @@ function createSharedShow(deps) {
 		const m = mine()
 		if (!m) return refuse(409, 'the master has no project')
 		remember(m.hash, m.show)
+		const old = !hasOpGuiCap((deps.peers() || []).find((x) => x.id === peer.id)) // WO-1029 S1: an older proposer's shows carry an operator GUI
+		if (old && m.legacy.hash !== m.hash) remember(m.legacy.hash, m.legacy.show)
 		const s = peerState.get(peer.id)
 		const base = args.base === m.hash ? m.show : history.get(String(args.base || ''))
 		if (!base || !Array.isArray(args.ops)) {
@@ -194,14 +221,22 @@ function createSharedShow(deps) {
 			return refuse(409, 'the edit did not arrive whole', { base_unknown: true })
 		}
 		remember(args.hash, theirs)
-		const { merged, conflicts } = base === m.show ? { merged: theirs, conflicts: [] } : M.merge3(base, m.show, theirs)
-		const hash = M.hashShow(merged)
-		remember(hash, merged)
-		if (s) s.acked = hash // the proposer holds the merged show once it reads this answer: no echo push
-		else peerState.set(peer.id, { acked: hash, busy: false, at: now(), failing: '', full: false })
+		// WO-1029 S1: merged in this build's form (no operator GUI): an older proposer's operator GUI never lands here
+		const [b, t] = old ? [M.reform(base, m.form), M.reform(theirs, m.form)] : [base, theirs]
+		const { merged, conflicts } = M.hashShow(b) === m.hash ? { merged: t, conflicts: [] } : M.merge3(b, m.show, t)
 		if (conflicts.length) noteConflict(conflicts, peer.name, '')
-		if (hash !== m.hash) await commit(merged, m.slug, true) // an own write: the hook pushes it to the others
-		return { status: 200, body: { ok: true, hash, rev: mine()?.rev || m.rev, conflicts, ops: M.diff(theirs, merged) } }
+		const ack = (show) => {
+			const h = M.hashShow(show)
+			remember(h, show)
+			if (s) s.acked = h // the proposer holds the merged show once it reads this answer: no echo push
+			else peerState.set(peer.id, { acked: h, busy: false, at: now(), failing: '', full: false })
+			return h
+		}
+		if (!old) ack(merged)
+		if (M.hashShow(merged) !== m.hash) await commit(merged, m.slug, true) // an own write: the hook pushes it to the others
+		const answer = old ? (mine() || m).legacy.show : merged // what the proposer will hold (its form: after the commit)
+		const hash = old ? ack(answer) : M.hashShow(merged)
+		return { status: 200, body: { ok: true, hash, rev: mine()?.rev || m.rev, conflicts, ops: M.diff(theirs, answer) } }
 	}
 
 	// ── follower ──────────────────────────────────────────────────────────────────────────────────────────────

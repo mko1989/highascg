@@ -24,6 +24,7 @@ function saveConfig(ctx, patch) {
 	} catch {
 		/* optional */
 	}
+	require('../cluster/cluster-device-view').localChanged(ctx) // WO-1029 S3: linked servers / clients hear the view changed
 	return true
 }
 

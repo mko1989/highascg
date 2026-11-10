@@ -36,20 +36,27 @@ function applyHelpers(bed) {
 	}
 
 	/**
-	 * Make `id` dirty (or clean again): flips the video mode of a destination that is NOT cabled on that box (so no
-	 * content moves) between 1080p5000 and 1080p2500 through the box's own device-view API, or `via`'s relay. A cable
-	 * change alone does not alter the generated casparcg.config of a virtual box (its outputs are not DeckLink / GPU
-	 * heads), so it is not dirty; a channel video mode is.
+	 * Make `id` dirty (or clean again) without moving content: flips the size of THAT box's own headless operator GUI
+	 * destination (added at the first touch) through the box's own device-view API, or `via`'s relay. A cable change
+	 * alone does not alter the generated casparcg.config of a virtual box (its outputs are not DeckLink / GPU heads), so
+	 * it is not dirty; a channel video mode is. WO-1029 plan 06: an ordinary destination is shared by every linked box
+	 * (S5), so its mode would dirty all of them; the operator GUI stays per box (S1).
 	 */
 	async function touch(id, { via } = {}) {
 		const b = box(id)
-		const d = bed.dests.find((x) => !b.cabled.has(x.id))
-		assert.ok(d, `${id}: every destination is cabled — nothing to touch`)
+		const post = (body) => (via ? box(via).node.post(`/api/cluster/peers/${id}/relay/api/device-view`, body) : b.node.post('/api/device-view', body))
 		b.touched = !b.touched
-		const body = { updateDestination: { id: d.id, videoMode: b.touched ? '1080p2500' : '1080p5000' } }
-		const r = via ? await box(via).node.post(`/api/cluster/peers/${id}/relay/api/device-view`, body) : await b.node.post('/api/device-view', body)
-		assert.ok(r.status === 200 && r.data?.ok !== false, `${via ? via + ' → ' : ''}${id}: touch ${d.id}: ${r.status} ${JSON.stringify(r.data)?.slice(0, 200)}`)
-		return d.id
+		const size = b.touched ? { width: 1280, height: 720 } : { width: 1024, height: 576 }
+		const r = b.guiId
+			? await post({ updateDestination: { id: b.guiId, videoMode: 'custom', ...size } })
+			: await post({ addDestination: { type: 'operator_gui', headless: true, videoMode: 'custom', mainScreenIndex: 9, ...size } })
+		assert.ok(r.status === 200 && r.data?.ok !== false, `${via ? via + ' → ' : ''}${id}: touch: ${r.status} ${JSON.stringify(r.data)?.slice(0, 200)}`)
+		if (!b.guiId) {
+			b.guiId = r.data.addedId
+			assert.equal((await post({ updateDestination: { id: b.guiId, headless: true } })).status, 200, `${id}: headless GUI`) // no monitor on a virtual box
+			await refreshChannels(id)
+		}
+		return b.guiId
 	}
 
 	/** Every cabled destination's PGM / PRV channel as the fake Caspar shows it, with clip positions. */

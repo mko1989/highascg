@@ -132,7 +132,7 @@ function adaptProjectOnRead(project) {
 	try {
 		const r = convertProjectChannelScheme(project, cfg, { absent: CHANNEL_SCHEME_LEGACY })
 		logConverted(r, `read of ${project.slug || project.name || 'project'}`)
-		return r.project
+		return require('./project-dest-scope').adaptOnRead(r.project, cfg) // WO-1029: looks keep their destination
 	} catch {
 		return project
 	}
@@ -145,7 +145,7 @@ function adaptProjectOnWrite(project) {
 	try {
 		const r = convertProjectChannelScheme(project, cfg, { absent: channelSchemeFor(cfg) })
 		logConverted(r, `write of ${project.slug || project.name || 'project'}`)
-		return r.project
+		return require('./project-dest-scope').adaptOnWrite(r.project, cfg) // WO-1029
 	} catch {
 		return project
 	}

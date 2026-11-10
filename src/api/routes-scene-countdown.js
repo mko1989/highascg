@@ -29,8 +29,7 @@ async function handleSceneCountdown(body, ctx, deps = {}) {
 	if (!scene) return out(404, { ok: false, error: `look ${sceneId} not found` })
 	const getMap = deps.getChannelMap || require('../config/routing').getChannelMap
 	const map = getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}
-	const scope = parseInt(String(scene.mainScope ?? ''), 10)
-	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+	const mainIdx = require('../engine/project-dest-scope').lookMainIdx(ctx, scene, b.mainIdx) ?? 0 // WO-1029: by destination
 	const nh = await notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c
 	if (nh) return nh
 	const channel = editBusChannel(map, mainIdx)

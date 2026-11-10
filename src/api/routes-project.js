@@ -248,6 +248,7 @@ async function handlePost(requestPath, body, ctx) {
 	if (requestPath === '/api/project/sync') return handleSyncPush(ctx)
 	if (requestPath === '/api/project/diff') return handleManifestDiff(body, ctx)
 	if (requestPath === '/api/project/apply-bundle') return handleApplyBundle(body, ctx)
+	if (requestPath === '/api/project/rescope-looks') return require('./routes-project-rescope').handleRescopeLooks(body, ctx) // WO-1029
 	return require('./routes-project-hardware').handlePost(requestPath, ctx) // WO-608 hardware-apply
 }
 

@@ -484,7 +484,7 @@ function createCluster(opts) {
 		changed()
 	}
 
-	return { snapshot, poll, add, accept, decline, setAutoAccept, remove, unlink, deviceView, scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
+	return { snapshot, poll, add, accept, decline, setAutoAccept, remove, unlink, deviceView, dropView: (id) => void (peers.has(id) && (peers.get(id).view = null)), scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
 		...caps.createCapsApi(peers), saved, list, byDeviceKey, mediaSend, setMediaSend, afterPoll: (fn) => pollHooks.push(fn),
 		hello: (body) => (hello ? hello.handle(body) : { status: 404, body: { error: 'not found' } }) } // WO-1029
 }

@@ -8,7 +8,7 @@ extends RefCounted
 ## Godot client has no layout editor yet), and auto host-channel destinations in labels (destinations slice).
 
 const CASPAR_HOST := "caspar_host"
-const OUT_KINDS := ["gpu_out", "decklink_out", "caspar_mv_out", "stream_out", "record_out", "audio_out", "v4l2_out"]
+const OUT_KINDS := ["gpu_out", "decklink_out", "caspar_mv_out", "stream_out", "record_out", "audio_out", "v4l2_out", "local_use"]
 const REJECTIONS := {
 	"sink_already_connected": "That output already has a cable. Remove the existing cable first, then connect from the mapping output again.",
 	"duplicate": "This cable is already in the graph.",
@@ -210,7 +210,7 @@ static func canonical_id(payload: Dictionary, id: String) -> String:
 ## The edge already on this sink's physical socket, or {}.
 static func sink_conflict(payload: Dictionary, sink_id: String) -> Dictionary:
 	var sid := gpu_port_cable_id(sink_id)
-	if sid == "":
+	if sid == "" or s(connector_by_id(payload, sink_id).get("kind")) == "local_use":  # Local use takes any number of cables
 		return {}
 	for e in a(d(payload.get("graph")).get("edges")):
 		if e is Dictionary and gpu_port_cable_id(s(e.get("sinkId"))) == sid:
@@ -325,12 +325,12 @@ static func dedicated_streaming(settings: Variant) -> bool:
 
 
 ## Cabling this sink needs a Caspar restart (WO-172 T172.3 matrix): stream only in dedicated-channel mode,
-## record / virtual cam never, everything else always.
+## record / virtual cam / Local use never, everything else always.
 static func sink_needs_restart(sink: Dictionary, dedicated: bool) -> bool:
 	match s(sink.get("kind")):
 		"stream_out":
 			return dedicated
-		"record_out", "v4l2_out":
+		"record_out", "v4l2_out", "local_use":  # Local use: the server decides (caspar-config-dirty) once the switch is on
 			return false
 	return true
 
@@ -367,6 +367,8 @@ static func friendly_label(payload: Dictionary, connector_id: String) -> String:
 			return "str" + num.get_string(1) if num else s(conn.get("label")) if s(conn.get("label")) != "" else id
 		"v4l2_out":
 			return s(conn.get("label")) if s(conn.get("label")) != "" else "Virtual cam"
+		"local_use":
+			return "Local use"
 		"record_out":
 			return "rec" + num.get_string(1) if num else s(conn.get("label")) if s(conn.get("label")) != "" else id
 		"gpu_out":

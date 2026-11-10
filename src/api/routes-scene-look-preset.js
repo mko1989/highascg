@@ -30,23 +30,30 @@ function out(status, payload) {
  * @param {object} preset
  * @param {(id: string) => boolean} exists
  */
-function recallItems(preset, exists) {
-	const main = (v) => {
+function recallItems(preset, exists, rows = null) {
+	const clamp = (v) => {
 		const m = Number(v)
 		return Number.isFinite(m) && m >= 0 && m <= 3 ? Math.floor(m) : 0
 	}
+	// WO-1029: an item's screen is its destination (`destId`, its index of today); a gone destination → no screen
+	const DS = require('../config/dest-scope')
+	const main = (holder, keys) => {
+		const r = DS.resolveScope(holder, rows, keys)
+		return r.unscoped ? null : clamp(r.idx ?? holder?.[keys.idx])
+	}
+	const PRESET = { id: 'destId', idx: 'targetMain' }
 	const items = []
 	for (const it of Array.isArray(preset?.items) ? preset.items : []) {
 		const sid = String(it?.sceneId || '').trim()
 		if (sid && exists(sid)) {
 			// WO-840: the item's per-screen timer visibility (absent = timers untouched on recall)
 			const timersVisibility = sanitizeVisibilityMap(it.timersVisibility)
-			items.push({ mainIdx: main(it.mainIdx), sceneId: sid, ...(timersVisibility ? { timersVisibility } : {}) })
-		} else if (!sid && it?.empty === true) items.push({ mainIdx: main(it.mainIdx), sceneId: '', empty: true })
+			items.push({ mainIdx: main(it, DS.ITEM_KEYS), sceneId: sid, ...(timersVisibility ? { timersVisibility } : {}) })
+		} else if (!sid && it?.empty === true) items.push({ mainIdx: main(it, DS.ITEM_KEYS), sceneId: '', empty: true })
 	}
 	if (items.length) return items
 	const sid = String(preset?.sceneId || '').trim()
-	return sid && exists(sid) ? [{ mainIdx: main(preset.targetMain), sceneId: sid }] : []
+	return sid && exists(sid) ? [{ mainIdx: main(preset, PRESET), sceneId: sid }] : []
 }
 
 /** The deck default transition with its duration resolved at screen 1's fps (web getResolvedGlobalDefaultTransition). */
@@ -72,7 +79,7 @@ async function handleLookPresetRecall(body, ctx, deps = {}) {
 	const preset = list.find((p) => p && String(p.id) === id)
 	if (!preset) return out(404, { ok: false, error: `look preset ${id} not found` })
 	const resolve = deps.resolveSceneById || ((sid) => require('../engine/project-scenes-transform').resolveLiveSceneById(ctx, sid))
-	const items = recallItems(preset, (sid) => !!resolve(sid))
+	const items = recallItems(preset, (sid) => !!resolve(sid), require('../config/dest-scope').screenRows(ctx?.config))
 	if (!items.length) return out(409, { ok: false, error: `look preset "${preset.name || id}" has no look left` })
 
 	const target = b.target === 'program' ? 'program' : 'preview'
@@ -87,7 +94,9 @@ async function handleLookPresetRecall(body, ctx, deps = {}) {
 	const takeGroup = items.length > 1 ? { id: `preset-${id}-${Date.now()}`, size: items.length } : null
 	const results = await Promise.all(
 		items.map(async (it) => {
-			const res = it.empty
+			const res = it.mainIdx === null
+				? noScreen(it, takeGroup) // WO-1029: its destination no longer exists
+				: it.empty
 				? await clearDest(it.mainIdx, target, forceCut, takeGroup)
 				: await takeLook({
 						sceneId: it.sceneId,
@@ -112,6 +121,12 @@ async function handleLookPresetRecall(body, ctx, deps = {}) {
 	)
 	const failed = results.filter((r) => r.error)
 	return out(failed.length === results.length ? 502 : 200, { ok: failed.length === 0, target, items: results })
+}
+
+/** WO-1029: an item whose destination is gone is reported, never taken onto the screen now at its old index. */
+function noScreen(it, takeGroup) {
+	require('../engine/take-sync-barrier').joinTakeGroup(takeGroup)?.leave()
+	return out(409, { ok: false, code: 'NO_SCREEN', error: `the screen of look ${it.sceneId || '(empty)'} no longer exists` })
 }
 
 /**

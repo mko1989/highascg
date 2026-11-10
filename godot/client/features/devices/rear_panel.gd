@@ -36,7 +36,7 @@ const DOT_TIP := "Start or complete cable at this connector"
 const PLATE := Color("#2b3038")
 const GPU_EDIT_TIP := "Edit GPU layout — reorder ports, Show all, or Reset Layout (xrandr)"
 const ICON := {"decklink": "bnc_female_axis", "stream_out": "ethernet-port-icon", "v4l2_out": "hdmi-port-icon",
-	"record_out": "record-port-icon", "audio_out": "jack-svg"}
+	"record_out": "record-port-icon", "audio_out": "jack-svg", "local_use": "jack-svg"}
 
 static var folder_open := false  # the GPU "Disconnected" fold (web <details>, closed per page load)
 
@@ -230,14 +230,19 @@ func _plate(rows: Array, kind: String) -> Control:
 func _extra_slot(s: Dictionary) -> Control:
 	var v := VBoxContainer.new()
 	var head := HBoxContainer.new()
-	head.add_child(_small(str(s.title).to_upper(), ThemeBuilder.TEXT_MUTED))
+	var title := _small(str(s.title).to_upper(), ThemeBuilder.TEXT_MUTED)
+	if str(s.get("hint", "")) != "":
+		title.tooltip_text = str(s.hint)
+		title.mouse_filter = Control.MOUSE_FILTER_STOP
+	head.add_child(title)
 	var plus := Button.new()
 	plus.text = "+"
 	plus.flat = true
 	plus.tooltip_text = "Add new %s output" % str(s.title).to_lower()
 	plus.add_theme_font_size_override("font_size", 12)
 	plus.pressed.connect(func() -> void: add_requested.emit(str(s.kind)))
-	head.add_child(plus)
+	if s.kind != "local_use":  # virtual: one per server, nothing to add
+		head.add_child(plus)
 	v.add_child(head)
 	if s.items.is_empty():
 		v.add_child(_small("—", ThemeBuilder.TEXT_MUTED))

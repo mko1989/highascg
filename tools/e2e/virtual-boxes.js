@@ -117,7 +117,8 @@ function cwcBoxes(opts = {}) {
 /**
  * @param {string} root  scratch root (one folder per node under it)
  * @param {{ boxes: Record<string, { host: string, caspar: string, cabled: string[] }>, destinations: string[],
- *   password?: string, log?: Function, cwc?: boolean }} spec  cwc: `cluster.channelsWhereCabled` on every box (cwcBoxes)
+ *   password?: string, log?: Function, cwc?: boolean, feedFrames?: boolean }} spec  cwc: `cluster.channelsWhereCabled` on every box (cwcBoxes);
+ *   feedFrames: every box's video feed sends stamped test JPEGs (feed-frame-provider.js, WO-1029 C9)
  */
 async function startVirtualBoxes(root, spec) {
 	const dests = spec.destinations.map((k) => ({ key: k, ...DEST[k] }))
@@ -140,7 +141,7 @@ async function startVirtualBoxes(root, spec) {
 			extra: (id) => ({
 				caspar: { host: casparOf[id].host, port: casparOf[id].port },
 				// the graph is the virtual box's, not this machine's GPU (the boot hardware sync would swap in its DP ports)
-				env: { HIGHASCG_SANDBOX_FANOUT: '1', HIGHASCG_BOOT_DEVICE_GRAPH_SYNC: '0', HIGHASCG_SANDBOX_CASPAR_RESTART_URL: casparOf[id].control.url, HIGHASCG_SANDBOX_MEDIA_LOOPBACK: '1' }, // WO-1029: the apply's "restart Caspar" calls this box's fake; C10: the media Spread copies between the boxes' temp media folders, never ssh
+				env: { HIGHASCG_SANDBOX_FANOUT: '1', HIGHASCG_BOOT_DEVICE_GRAPH_SYNC: '0', HIGHASCG_SANDBOX_CASPAR_RESTART_URL: casparOf[id].control.url, HIGHASCG_SANDBOX_MEDIA_LOOPBACK: '1', ...(spec.feedFrames ? { HIGHASCG_SANDBOX_FEED_FRAMES: id } : {}) }, // WO-1029: the apply's "restart Caspar" calls this box's fake; C10: the media Spread copies between the boxes' temp media folders, never ssh; C9: feedFrames = stamped JPEGs (feed-frame-provider.js)
 				config: {
 					screenDestinations: { version: 1, destinations: destList },
 					deviceGraph: graphFor(dests, spec.boxes[id].cabled),

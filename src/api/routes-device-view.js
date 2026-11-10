@@ -167,6 +167,8 @@ function announceChannelMap(ctx) {
 async function handlePost(body, ctx) {
 	ctx.augmentGraphWithSources = augmentGraphWithSources
 	const j = parseBody(body) || {}; let res = null
+	// WO-1029: the screen list BEFORE a destination edit — looks are stamped with it, then follow their destination
+	const scopeBefore = j.addDestination || j.updateDestination || j.removeDestination ? require('../config/dest-scope').screenRows(ctx.config) : null
 	if (j.applyPlan) res = await Apply.executeApplyPlan(ctx, typeof j.applyPlan === 'object' ? j.applyPlan : {})
 	else if (j.addDestination) res = CRUD.handleAddDestination(j, ctx)
 	else if (j.addMappingNode) res = CRUD_MAPPING.handleAddMappingNode(j, ctx)
@@ -292,7 +294,10 @@ async function handlePost(body, ctx) {
 		}
 	}
 
-	if (res && !res.error && (j.addDestination || j.updateDestination || j.removeDestination)) announceChannelMap(ctx)
+	if (res && !res.error && (j.addDestination || j.updateDestination || j.removeDestination)) {
+		announceChannelMap(ctx)
+		require('../engine/project-dest-scope').onDestinationsCommitted(ctx, scopeBefore)
+	}
 	if (res) {
 		if (res.error) return { status: Number(res.status) >= 400 && Number(res.status) < 600 ? Number(res.status) : 400, headers: JSON_HEADERS, body: jsonBody(res) }
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(res) }

@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-623 B (WO-598 thin client) — POST /api/scene/new-look { mainIdx, mainScope?, source? }
+ * WO-623 B (WO-598 thin client) — POST /api/scene/new-look { mainIdx, mainScope?, destScope?, source? }
  *
  * Builds (does not store) the look the web creates for the deck "+" tile (client/components/scene-list-column.js →
  * sceneState.addScene) and for a media drop on blank deck space (scenes-editor-deck-drop.js: addScene, then addLayer +
@@ -43,7 +43,13 @@ async function handleNewLook(body, ctx, deps = {}) {
 	if (src && String(src.type || '') === 'timer') return out(400, { ok: false, error: 'timers do not make a look (web deck drop rule)' })
 	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : 0
 	const scopeIn = b.mainScope != null ? String(b.mainScope) : String(mainIdx)
-	const mainScope = scopeIn === 'all' ? 'all' : /^[0-3]$/.test(scopeIn) ? scopeIn : '0'
+	let mainScope = scopeIn === 'all' ? 'all' : /^[0-3]$/.test(scopeIn) ? scopeIn : '0'
+	// WO-1029: the look belongs to the destination of its column (`destScope` from the client, else the one at mainScope)
+	const DS = require('../config/dest-scope')
+	const rows = DS.screenRows(ctx?.config)
+	const destIn = b.destScope != null ? String(b.destScope).trim() : ''
+	const destScope = mainScope === 'all' ? (rows ? 'all' : '') : destIn && DS.indexOfDest(rows, destIn) >= 0 ? destIn : DS.destAt(rows, parseInt(mainScope, 10))
+	if (destScope && destScope !== 'all') mainScope = String(DS.indexOfDest(rows, destScope))
 
 	const env = deps.projectScenes ? deps.projectScenes() : require('../engine/project-scenes-load').loadProjectScenes()
 	const snaps = ctx?.sceneDeck?.sceneSnapshots
@@ -56,6 +62,7 @@ async function handleNewLook(body, ctx, deps = {}) {
 		name: mediaLookName(src) || `Look ${count + 1}`,
 		layers: [],
 		mainScope,
+		...(destScope ? { destScope } : {}),
 		defaultTransition: { ...helpers.defaultTransition(), ...global },
 	})
 	let contentResolution = null

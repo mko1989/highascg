@@ -20,13 +20,16 @@ const SUPPORTED = [
 	'call-signed', // clock-free signed node-to-node call transport (cluster-call.js)
 	'dest-air', // WO-1029 C8: exchange `dest.air` (what is on each destination cabled here) is received (dest-air.js)
 	'media-needs', // WO-1029 C10: shared media library (GET /api/cluster/media-needs, POST /api/cluster/media-call, Spread)
+	'feed-relay', // WO-1029 C9: /api/video-feed takes a linked server's signed relay token (feed-relay.js, feed-relay-auth.js)
 	'dest-actions', // WO-1029 Wave B: node-to-node dest.* calls (dest-actions.js) — a screen elsewhere is driven through its owner
+	'opgui-local', // WO-1029 plan 06 S1: the operator GUI destination stays out of the shared show (show-merge.js)
+	'dests-shared', // WO-1029 S5/S6: the destination list is shared whenever linked (shared-show-dests.js: dests.push / dests.propose)
+	'unified-devices', // WO-1029 S3/S4: GET /api/cluster/device-view + info `devices.changed` (cluster-device-view.js)
+	'channels-cabled', // WO-1029 C12: GET|POST /api/cluster/channels-where-cabled (dry run + switch), the Local use connector
 ]
 
 /** Names reserved for the coming plan 07 steps. NOT advertised until the step lands: move a name into SUPPORTED. */
 const RESERVED = [
-	'channels-cabled', // channels only where cabled
-	'feed-relay', // the picture relay
 ]
 
 /** A wire value → sorted unique short names; anything else (older build: absent) → []. */

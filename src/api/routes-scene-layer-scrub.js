@@ -67,12 +67,7 @@ async function handleLayerScrub(body, ctx, deps = {}) {
 				require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {},
 				ctx
 			)
-	const scope = parseInt(String(scene.mainScope ?? ''), 10)
-	const mainIdx = Number.isFinite(Number(b.mainIdx))
-		? Math.max(0, Math.floor(Number(b.mainIdx)))
-		: Number.isFinite(scope)
-			? scope
-			: 0
+	const mainIdx = require('../engine/project-dest-scope').lookMainIdx(ctx, scene, b.mainIdx) ?? 0 // WO-1029: by destination
 	const nh = await require('../cluster/dest-route').relayIfNotHere(ctx, { screenIdx: mainIdx }, 'dest.layer', { op: 'layer-scrub', body: { ...b, mainIdx } }) // WO-1029 Wave B
 	if (nh) return nh
 	const pgmCh = Number(map.programChannels?.[mainIdx] ?? map.playbackChannels?.[mainIdx])

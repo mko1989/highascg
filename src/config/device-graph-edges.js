@@ -3,6 +3,7 @@
 const { normalizeDeviceGraph, validateDeviceGraph } = require('./device-graph-core')
 const { DEFAULT_DEVICE_ID, DEST_DEVICE_ID, slug } = require('./device-graph-constants')
 const { isDecklinkIoOutputSink, isDecklinkIoIn } = require('./decklink-io-direction')
+const { isLocalUseConnector } = require('./device-graph-local-use')
 
 function isCasparOutputConnector(c) {
 	const ioOut = c && c.deviceId === DEFAULT_DEVICE_ID && c.kind === 'decklink_io' && isDecklinkIoOutputSink(c)
@@ -31,6 +32,9 @@ function edgeConnectAllowed(graph, sourceId, sinkId) {
 	if (isDestinationInputConnector(a) && isPixelMapInputConnector(b)) return { ok: true }
 	if (isPixelMapInputConnector(a) && isDestinationInputConnector(b)) return { ok: true }
 	if (isPixelMapOutputConnector(a) && isCasparOutputConnector(b)) return { ok: true }
+	// WO-1029: Local use takes any number of cables (not a single-input output, see addEdgeToGraph)
+	if ((isDestinationInputConnector(a) || isPixelMapOutputConnector(a)) && isLocalUseConnector(b)) return { ok: true }
+	if (isLocalUseConnector(a) && (isDestinationInputConnector(b) || isPixelMapOutputConnector(b))) return { ok: true }
 	if (isCasparOutputConnector(a) && isPixelMapOutputConnector(b)) return { ok: true }
 	return { ok: false, reason: 'allowed: destination_to_output' }
 }

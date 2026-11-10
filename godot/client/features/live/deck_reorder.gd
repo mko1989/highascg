@@ -12,13 +12,20 @@ static func payload(id: String, main: int) -> Dictionary:
 	return {"type": KIND, "lookId": id, "main": main}
 
 
-## A look card dragged from this screen's deck (a look never moves to another screen's column by drag).
+## A look card dragged from this screen's deck.
 static func is_reorder(data: Variant, main: int) -> bool:
 	return data is Dictionary and str((data as Dictionary).get("type", "")) == KIND and int((data as Dictionary).get("main", -1)) == main
 
 
-## The card as drag source + drop target. `root` returns the scenes root, `commit` saves the deck.
-static func wire(card: Control, id: String, main: int, label: String, root: Callable, commit: Callable) -> void:
+## WO-1029: a look card dragged from ANOTHER column (or from "No screen", main -1) — dropping it re-scopes the look to
+## this screen's destination.
+static func is_rescope(data: Variant, main: int) -> bool:
+	return data is Dictionary and str((data as Dictionary).get("type", "")) == KIND and int((data as Dictionary).get("main", -1)) != main
+
+
+## The card as drag source + drop target. `root` returns the scenes root, `commit` saves the deck. `rescope(look id)`
+## (WO-1029) attaches a look dragged from another column to this one before it is placed.
+static func wire(card: Control, id: String, main: int, label: String, root: Callable, commit: Callable, rescope := Callable()) -> void:
 	card.set_drag_forwarding(func(_at: Vector2) -> Variant:
 		var p := Label.new()
 		p.text = label
@@ -26,9 +33,13 @@ static func wire(card: Control, id: String, main: int, label: String, root: Call
 		card.set_drag_preview(p)
 		return payload(id, main),
 	func(_at: Vector2, data: Variant) -> bool:
-		return is_reorder(data, main) and str(data.lookId) != id,
+		return (is_reorder(data, main) or (rescope.is_valid() and is_rescope(data, main))) and str(data.lookId) != id,
 	func(at: Vector2, data: Variant) -> void:
-		if E.move_look(root.call(), str(data.lookId), id, at.x > card.size.x / 2.0):
+		var moved := false
+		if is_rescope(data, main) and rescope.is_valid():
+			rescope.call(str(data.lookId))
+			moved = true
+		if E.move_look(root.call(), str(data.lookId), id, at.x > card.size.x / 2.0) or moved:
 			commit.call())
 
 

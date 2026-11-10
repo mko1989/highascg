@@ -9,7 +9,6 @@ const E := preload("res://features/live/look_edits.gd")
 const Reorder := preload("res://features/live/deck_reorder.gd")
 const TimerView := preload("res://features/live/pgm_timer_view.gd")
 const Icons := preload("res://app/ui_icons.gd")
-const TransitionRow := preload("res://features/live/transition_row.gd")
 const LookThumb := preload("res://features/live/look_thumb.gd")
 const LFS := preload("res://features/previs/fixtures/look_fixtures_store.gd")
 const BlankClear := preload("res://features/live/deck_blank_clear.gd")
@@ -21,6 +20,9 @@ const DeckScroll := preload("res://features/live/deck_scroll.gd")
 const RemoteCue := preload("res://features/live/remote_cue.gd")
 const NeedsFlow := preload("res://features/live/media_needs_flow.gd")  # WO-1029
 const NeedsDot := preload("res://features/live/media_needs_dot.gd")
+const CardMenu := preload("res://features/live/deck_card_menu.gd")
+const DestScope := preload("res://core/dest_scope.gd")  # WO-1029: looks are grouped by destination
+const NoScreen := preload("res://features/live/deck_no_screen.gd")
 const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
@@ -33,6 +35,7 @@ var _columns: HBoxContainer
 var _dirty := true
 var _main_for_card := 0
 var _press_id := ""  # the card a left press landed on (WO-762: PRV on release, not on a drag)
+var _ids: Array = []  # WO-1029: destination id per screen index (DestScope.ids)
 var osc_mirror: Node  # WO-600 O: set by the live tab before the first rebuild
 
 
@@ -49,7 +52,7 @@ func _ready() -> void:
 
 
 func _on_store_changed(path: String, _v: Variant) -> void:
-	if path == "*" or path.begins_with("scene") or path == "channelMap" or path == Destinations.PATH or path == DeckHidden.PATH:
+	if path == "*" or path.begins_with("scene") or path == "channelMap" or path == Destinations.PATH or path == DeckHidden.PATH or path == "screenDestinations":
 		_dirty = true
 
 
@@ -70,14 +73,23 @@ func rebuild() -> void:
 		if s is Dictionary:
 			known[str((s as Dictionary).get("id", ""))] = true
 	Destinations.prune(DeckModel.screen_count(cm))
-	var mains := DeckHidden.visible_mains(DeckModel.screen_count(cm))  # WO-953: this client's hidden screens drop out
+	var count := DeckModel.screen_count(cm)
+	_ids = DestScope.ids(cm, Store.get_value("screenDestinations"))  # WO-1029: index ↔ destination of today
+	var prev := DestScope.list_changed(_ids)
+	if not prev.is_empty() and DestScope.reconcile(scenes, prev, _ids) > 0:
+		_commit_looks()  # the list changed under the deck: looks follow their destination (the server does the same)
+	var mains := DeckHidden.visible_mains(count)  # WO-953: this client's hidden screens drop out
 	for main in mains:
 		_main_for_card = main
 		var bus := DeckModel.resolve_bus_look_ids(main, live, cm, known, ps, Store.get_value("scene.remoteLive"))
 		if main != mains[0]:  # a line between screens: their cards would otherwise run together
 			_columns.add_child(ThemeBuilder.vline())
-		_columns.add_child(_column(DeckModel.screen_label(cm, main), DeckModel.scenes_for_main(scenes, main), bus, main, cm))
-	if mains.is_empty() and DeckModel.screen_count(cm) > 0: _columns.add_child(DeckHidden.note(DeckModel.screen_count(cm)))
+		_columns.add_child(_column(DeckModel.screen_label(cm, main), DestScope.looks_for_main(scenes, main, _ids, count), bus, main, cm))
+	if mains.is_empty() and count > 0: _columns.add_child(DeckHidden.note(count))
+	var lost := DestScope.no_screen(scenes, _ids, count)
+	if not lost.is_empty():  # WO-1029: looks whose screen is gone — kept, never shown under another screen
+		_columns.add_child(ThemeBuilder.vline())
+		_columns.add_child(NoScreen.build(self, lost, _ids, cm))
 
 
 func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictionary) -> Control:
@@ -132,7 +144,7 @@ func _add_tile(main: int) -> Control:
 
 ## Same sources the look editor takes (web isDraggableLayerSourcePayload: never an effect); timers never make a look.
 func _can_drop_new(_at: Vector2, data: Variant, main: int) -> bool:
-	if Reorder.is_reorder(data, main):  # WO-762: a card dropped on blank space / "+" moves to the end
+	if Reorder.is_reorder(data, main) or Reorder.is_rescope(data, main):  # WO-762 / WO-1029: to the end (of this screen)
 		return true
 	if not (data is Dictionary) or str((data as Dictionary).get("value", "")) == "":
 		return false
@@ -140,6 +152,11 @@ func _can_drop_new(_at: Vector2, data: Variant, main: int) -> bool:
 
 
 func _drop_new(_at: Vector2, data: Variant, main: int) -> void:
+	if Reorder.is_rescope(data, main):  # WO-1029: a look from another column (or "No screen") joins this screen
+		rescope_look(str((data as Dictionary).get("lookId", "")), main)
+		E.move_look(_scenes_root(), str((data as Dictionary).get("lookId", "")), "")
+		_commit_looks()
+		return
 	if Reorder.is_reorder(data, main):
 		Reorder.to_end(data, _scenes_root, _commit_looks)
 		return
@@ -150,6 +167,8 @@ func _drop_new(_at: Vector2, data: Variant, main: int) -> void:
 ## syncs, and opens it in the editor, which stages it on PRV like the web's setEditingScene + preview push.
 func create_look(main: int, src: Variant) -> String:
 	var body := {"mainIdx": main, "mainScope": "0" if DeckModel.screen_count(_cm()) < 2 else str(main)}
+	if main < _ids.size() and str(_ids[main]) != "":
+		body["destScope"] = str(_ids[main])  # WO-1029: the look belongs to this column's destination
 	if src is Dictionary:
 		body["source"] = src
 	var res: Dictionary = await Api.post_json("/api/scene/new-look", body)
@@ -184,7 +203,8 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.tooltip_text = "Click: stage on PRV · Double-click: TAKE to PGM · Right-click: rename / transition"
 	card.gui_input.connect(_on_card_input.bind(id, _main_for_card))
-	Reorder.wire(card, id, _main_for_card, str(scene.get("name", "")), _scenes_root, _commit_looks)  # WO-762
+	var main_c := _main_for_card
+	Reorder.wire(card, id, main_c, str(scene.get("name", "")), _scenes_root, _commit_looks, func(lid: String) -> void: rescope_look(lid, main_c))  # WO-762 / WO-1029
 	var v := VBoxContainer.new()
 	card.add_child(v)
 	var thumb := LookThumb.new()  # WO-608 R5: looks show as thumbnails
@@ -202,7 +222,7 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	dup.pressed.connect(func() -> void: duplicate_look(id))
 	head.add_child(dup)
 	var del := Icons.button("close", "Delete look", 12)
-	del.pressed.connect(func() -> void: _confirm_delete(id))
+	del.pressed.connect(func() -> void: CardMenu.confirm_delete(self, id))
 	head.add_child(del)
 	v.add_child(head)
 	var meta := Label.new()
@@ -320,90 +340,14 @@ func rename_look(scene_id: String, new_name: String) -> bool:
 	return false
 
 
-func _prompt_rename(scene_id: String) -> void:
-	var dlg := AcceptDialog.new()
-	dlg.title = "Rename look"
-	var edit := LineEdit.new()
-	edit.custom_minimum_size.x = 320
-	for s in (Store.project.get("scenes", {}) as Dictionary).get("scenes", []):
-		if str(s.get("id", "")) == scene_id:
-			edit.text = str(s.get("name", ""))
-	dlg.add_child(edit)
-	dlg.confirmed.connect(func() -> void:
-		rename_look(scene_id, edit.text)
-		dlg.queue_free())
-	dlg.canceled.connect(dlg.queue_free)
-	add_child(dlg)
-	dlg.popup_centered()
-	edit.grab_focus()
-	edit.select_all()
-
-
-## Right-click on a look: Rename… · Transition… · Use default transition · Edit · fixtures (WO-615 T8) · Delete.
-func _card_menu(scene_id: String, main: int) -> void:
-	var pm := PopupMenu.new()
-	pm.add_item("Rename…", 0)
-	pm.add_item("Transition…", 1)
-	pm.add_item("Use default transition", 2)
-	pm.add_separator()
-	pm.add_item("Edit look…", 3)
-	pm.add_separator()
-	pm.add_item("Store fixtures from programmer", 5)
-	var n := LFS.count(scene_id)
-	if n > 0:
-		pm.add_item("Recall fixtures (%d)" % n, 6)
-		pm.add_item("Clear fixtures", 7)
-	pm.add_separator()
-	pm.add_item("Delete look…", 4)
-	pm.id_pressed.connect(_on_card_menu.bind(scene_id, main))
-	pm.popup_hide.connect(pm.queue_free)
-	add_child(pm)
-	var at := Vector2i(get_viewport().get_mouse_position())
-	if not get_viewport().gui_embed_subwindows:  # embedded popups are placed in window coordinates (adding the window position pushed it off DP-3's right edge)
-		at += get_window().position
-	pm.popup(Rect2i(at, Vector2i.ZERO))
-
-
-func _on_card_menu(id: int, scene_id: String, main: int) -> void:
-	if id == 0:
-		_prompt_rename(scene_id)
-	elif id == 1:
-		_prompt_transition(scene_id, main)
-	elif id == 3:
-		edit_requested.emit(scene_id, main)
-	elif id == 4:
-		_confirm_delete(scene_id)
-	elif id == 2:
-		set_look_transition(scene_id, _scenes_root().get("globalDefaultTransition", T.default_transition()))
-	elif id == 5:
-		store_fixtures(scene_id)
-	elif id == 6:
-		var r: Dictionary = await LFS.recall(scene_id)
-		action_result.emit(r.msg, r.ok)
-	elif id == 7:
-		var r: Dictionary = LFS.clear(scene_id)
-		action_result.emit(r.msg, r.ok)
+func _card_menu(scene_id: String, main: int) -> void:  # deck_card_menu.gd (timeline_tab / media_panel point here)
+	CardMenu.open(self, scene_id, main)
 
 
 ## WO-615 T8: the programmer → this look's fixture state (a PGM TAKE of the look crossfades the rig to it).
 func store_fixtures(scene_id: String) -> void:
 	var r: Dictionary = await LFS.store(scene_id)
 	action_result.emit(r.msg, r.ok)
-
-
-func _confirm_delete(scene_id: String) -> void:
-	var name := ""
-	for s in _scenes_root().get("scenes", []):
-		if s is Dictionary and str(s.get("id", "")) == scene_id:
-			name = str(s.get("name", ""))
-	var dlg := ConfirmationDialog.new()
-	dlg.dialog_text = "Delete look \"%s\"?" % name  # web confirm(`Delete look "${sc.name}"?`)
-	dlg.confirmed.connect(func() -> void:
-		delete_look(scene_id)
-		dlg.queue_free())
-	dlg.canceled.connect(dlg.queue_free)
-	add_child(dlg)
-	dlg.popup_centered()
 
 
 func duplicate_look(scene_id: String) -> String:
@@ -428,24 +372,6 @@ func delete_look(scene_id: String) -> bool:
 	return true
 
 
-func _prompt_transition(scene_id: String, main: int) -> void:
-	var cur: Variant = null
-	for s in _scenes_root().get("scenes", []):
-		if str(s.get("id", "")) == scene_id:
-			cur = s.get("defaultTransition")
-	var dlg := AcceptDialog.new()
-	dlg.title = "Look transition"
-	var row := TransitionRow.new()
-	var pgm_only := not DeckModel.preview_bus_available(_cm(), main)
-	row.setup(cur if cur is Dictionary else T.default_transition(_fps(main)), pgm_only)
-	row.changed.connect(func(tr: Dictionary) -> void: set_look_transition(scene_id, tr))
-	dlg.add_child(row)
-	dlg.confirmed.connect(dlg.queue_free)
-	dlg.canceled.connect(dlg.queue_free)
-	add_child(dlg)
-	dlg.popup_centered()
-
-
 func set_look_transition(scene_id: String, tr: Dictionary) -> bool:
 	if not E.set_look_transition(_scenes_root(), scene_id, tr):
 		return false
@@ -464,6 +390,32 @@ func apply_default_to_all() -> int:
 	var n := E.apply_default_to_all(_scenes_root(), DeckModel.screen_count(_cm()))
 	_commit_looks()
 	action_result.emit("Default transition applied to %d look(s)" % n, true)
+	return n
+
+
+## WO-1029: a look dragged / attached to screen `main` belongs to that screen's destination (no commit: the caller saves).
+func rescope_look(scene_id: String, main: int) -> bool:
+	for s in _scenes_root().get("scenes", []):
+		if s is Dictionary and str(s.get("id", "")) == scene_id:
+			DestScope.attach(s, main, _ids)
+			return true
+	return false
+
+
+## WO-1029 repair: a "No screen" group → screen `main` (POST /api/project/rescope-looks, then the same edit here so the
+## next deck sync carries it).
+func rescope_group(from: String, main: int) -> int:
+	var to := str(_ids[main]) if main >= 0 and main < _ids.size() else ""
+	if to == "":
+		action_result.emit("Attach refused: screen %d has no destination id" % (main + 1), false)
+		return 0
+	var res: Dictionary = await Api.post_json("/api/project/rescope-looks", {"from": from, "to": to})
+	if not res.ok:
+		action_result.emit("Attach refused: %s" % Store.fail_text(res), false)
+		return 0
+	var n := DestScope.rescope(_scenes_root().get("scenes", []), from, main, _ids, DeckModel.screen_count(_cm()))
+	_commit_looks()
+	action_result.emit("%d look(s) attached to %s" % [n, DeckModel.screen_label(_cm(), main)], true)
 	return n
 
 

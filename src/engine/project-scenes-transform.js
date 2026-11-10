@@ -15,6 +15,7 @@ function extractSceneDeckFromProjectScenes(envelope) {
 			...(s?.mainScope != null && String(s.mainScope).trim()
 				? { mainScope: String(s.mainScope) }
 				: {}),
+			...(s?.destScope ? { destScope: String(s.destScope) } : {}), // WO-1029
 		}))
 		.filter((x) => x.id)
 	let previewSceneId = envelope.previewSceneId
@@ -40,6 +41,7 @@ function extractSceneDeckFromProjectScenes(envelope) {
  */
 function applyLiveSceneDeckToCtx(ctx, data) {
 	if (!ctx || !data || typeof data !== 'object') return
+	require('./project-dest-scope').adaptLiveDeck(data, ctx.config) // WO-1029: stamp / re-index by destination
 	const sceneSnapshots = Array.isArray(data.sceneSnapshots)
 		? data.sceneSnapshots.filter((s) => s && typeof s === 'object' && s.id != null && String(s.id).trim())
 		: []

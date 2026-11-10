@@ -77,7 +77,7 @@ function rawRequest(method, host, port, path, body, timeout = TIMEOUT_MS) {
 
 /**
  * @param {{ cluster: { saved: (id: string) => ({ host: string, port: number, name: string }|null) },
- *   request?: typeof rawRequest, log?: Function }} deps
+ *   request?: typeof rawRequest, log?: Function, onAnswered?: (id, method, path, status) => Promise<void>|void }} deps
  * → relay({ method, id, tail, query, body }) → { status, headers, body }
  */
 function createRelay(deps) {
@@ -97,6 +97,8 @@ function createRelay(deps) {
 			deps.log?.('warn', `[cluster] relay ${m} ${p.path} → ${peer.name}: ${r.error}`)
 			return json(502, { error: `${peer.name}: no answer (${r.error})` })
 		}
+		// WO-1029 S4: a write landed there → the node's copy of that server's Devices view is fresh again before it answers
+		if (deps.onAnswered) await Promise.resolve(deps.onAnswered(String(id), m, p.path, r.status)).catch(() => {})
 		return { status: r.status, headers: { 'Content-Type': r.contentType }, body: r.body }
 	}
 }

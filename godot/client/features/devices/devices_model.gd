@@ -11,7 +11,11 @@ const CASPAR_HOST := "caspar_host"
 const MODE_TAG := {"pgm_only": "PGM", "multiview": "MVR", "stream": "STREAM", "pixelmap": "PXM",
 	"operator_gui": "OPG"}
 ## Rear-panel slots after GPU / DeckLink, in the web's order: [title, connector kinds].
-const EXTRA_SLOTS := [["Stream", ["stream_out"]], ["Virtual cam", ["v4l2_out"]], ["Record", ["record_out"]]]
+const EXTRA_SLOTS := [["Stream", ["stream_out"]], ["Virtual cam", ["v4l2_out"]], ["Record", ["record_out"]],
+	["Local use", ["local_use"]]]
+## WO-1029 (O3): the one virtual jack per server for a screen kept for local purposes; drawn only when the server
+## suggests it, and a cable into it takes any number of destinations.
+const LOCAL_USE_HINT := "Local use (zoom, virtual camera, previews): a destination cabled here keeps its Caspar channels on this server without any output."
 
 
 ## The `{outputLayer}` note WO-364 puts on destination edges: 1 = PGM, 2 = PRV (edgeOutputLayer).
@@ -126,7 +130,10 @@ static func build(payload: Dictionary, live_cm: Variant = null, cc: Variant = nu
 	var deck := DO.current(_of_kinds(conns, ["decklink_io", "decklink_out"]), deck_saved)
 	var slots := [{"title": "GPU", "kind": "gpu", "items": gpu}, {"title": "DeckLink", "kind": "decklink", "items": deck}]
 	for s in EXTRA_SLOTS:
-		slots.append({"title": s[0], "kind": s[1][0], "items": _of_kinds(conns, s[1])})
+		var found := _of_kinds(conns, s[1])
+		if found.is_empty() and s[1][0] == "local_use":
+			continue
+		slots.append({"title": s[0], "kind": s[1][0], "items": found, "hint": LOCAL_USE_HINT if s[1][0] == "local_use" else ""})
 	var audio := []
 	for a in payload.get("audioOutputs", []):
 		if a is Dictionary and str(a.get("id", "")) != "":
