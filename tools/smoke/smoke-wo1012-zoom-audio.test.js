@@ -106,9 +106,10 @@ function rig({ amcpInfo = () => '' } = {}) {
 		},
 	}
 	const feeds = () => [{ id: 'pgm:1', label: 'Screen 1 program (ch 2)', channel: 2 }, { id: 'prv:1', label: 'Screen 1 preview (ch 3)', channel: 3 }]
-	const timers = { setInterval: () => ({ unref() {} }), clearInterval: () => {} }
+	const ticks = []
+	const timers = { setInterval: (fn) => (ticks.push(fn), { unref() {} }), clearInterval: () => {} }
 	const za = createZoomAudio({ exec, spawn, fs, createSocket: () => sock, timers, getAmcp: () => amcp, feeds, dir: '/x/zdir', runtimeBase: '/x', stateFile: '/x/state.json' })
-	return { za, calls, spawns, raw, files, sock, isUp: () => up }
+	return { za, calls, spawns, raw, files, sock, ticks, isUp: () => up }
 }
 
 test('enable: daemon, bridges, links and the AMCP consumer; idempotent; disable cleans up', async () => {
@@ -157,6 +158,25 @@ test('mix-minus: a feed that plays the Zoom input (directly or via route://) is 
 	s = await r.za.apply({ feed: 'prv:1' })
 	assert.ok(/Mix-minus/.test(s.note), 'one route:// hop is followed')
 	assert.ok(!r.raw.some((c) => c.startsWith('ADD')))
+})
+
+test('the 2 s tick keeps the return feed right without a client polling: mix-minus and re-attach', async () => {
+	let playsZoomIn = false
+	let consumerGone = false
+	const r = rig({ amcpInfo: (c) => (c === 2 && playsZoomIn ? 'LAYER udp://127.0.0.1:52233' : '') })
+	await r.za.apply({ enabled: true, feed: 'pgm:1' })
+	assert.strictEqual(r.raw.filter((c) => c.startsWith('ADD 2-9277')).length, 1)
+	assert.strictEqual(r.ticks.length, 1)
+	// the operator puts the Zoom input on program; nobody GETs /api/zoom/audio
+	playsZoomIn = true
+	await r.ticks[0]()
+	assert.ok(r.raw.some((c) => c === 'REMOVE 2-9277'), 'the return is taken off the echoing feed by the tick')
+	// off program again (and a Caspar restart dropped every consumer): the tick puts the return back
+	playsZoomIn = false
+	r.raw.length = 0
+	consumerGone = true
+	await r.ticks[0]()
+	assert.ok(consumerGone && r.raw.some((c) => c.startsWith('ADD 2-9277')), 'the return is attached again by the tick')
 })
 
 test('unknown feed is rejected; defaultFeeds tolerates an empty config', async () => {

@@ -218,6 +218,15 @@ function createZoomAudio(deps = {}) {
 		}
 	}
 
+	/**
+	 * The 2 s tick: links, then the return feed. The feed was only re-checked on a status GET, so with no client on the
+	 * Zoom page the mix-minus guard never ran and the return never came back after a Caspar restart (10.11, live).
+	 */
+	async function tick() {
+		await linkTick()
+		if (persisted.enabled && persisted.feed) await syncFeed().catch((e) => (lastError = String(e.message || e)))
+	}
+
 	/** True when `channel` (or a route:// source of it, two levels) plays the Zoom-in URL — the echo loop. */
 	async function feedHasZoomIn(amcp, channel, depth = 2, seen = new Set()) {
 		if (seen.has(channel)) return false
@@ -318,7 +327,7 @@ function createZoomAudio(deps = {}) {
 			}
 			spawnTap()
 			if (!linkTimer) {
-				linkTimer = timers.setInterval(() => linkTick().catch(() => {}), LINK_MS)
+				linkTimer = timers.setInterval(() => tick().catch(() => {}), LINK_MS)
 				linkTimer.unref?.()
 			}
 			await linkTick()

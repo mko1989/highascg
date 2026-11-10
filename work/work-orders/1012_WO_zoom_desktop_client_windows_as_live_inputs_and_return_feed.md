@@ -1,6 +1,6 @@
 # WO-1012 — Zoom integration via the Zoom desktop client: its windows on hidden virtual desktops as live inputs (presenter / share / gallery), the normal Zoom window on the operator monitor, two-way audio, and a program feed back into Zoom
 **Area:** video-io, audio, devices-config, godot-client
-**Status: IN PROGRESS (09.11, owner: "start work on zoom integration") — stage A done (window grabber, Zoom device API, sources as shm rings / Live sources); next: host channels, audio, return camera, inspector UI**
+**Status: IN PROGRESS (10.11: live test in a real meeting, 8 faults fixed; in-meeting pictures still untested, the box sat in the waiting room) — earlier: (09.11, owner: "start work on zoom integration") — stage A done (window grabber, Zoom device API, sources as shm rings / Live sources); next: host channels, audio, return camera, inspector UI**
 
 Owner, 09.11 (verbatim):
 > write a wo (just this so i wont forget) for zoom plugin/integration.
@@ -235,6 +235,82 @@ live input."
 - **API.** `/api/zoom/host` keeps its shape: enable = save + PLAY, disable = STOP + save, and `needsRestart` is true
   only without a ready host channel. Stage-B entries are migrated by any POST and by the reconnect heal.
 - **Godot.** The Zoom controls read "Live input", with no restart.
+
+### Live test in a real meeting (10.11): what broke, what was fixed
+
+Owner, 10.11: "run full tests with zoom from this machine, connections both ways audio video, grabbing participants
+shares etc. its already connected to a meeting". Zoom had been opened from the dock and was in the meeting.
+
+Fixed (commits 9c4dc418 and the one after it):
+
+- **Zoom from the dock had no sound device.** The dock and the app launcher start Zoom from its .desktop entry and
+  passed neither the session lines nor `PULSE_*`. That Zoom opened the PCH card over ALSA
+  (`/dev/snd/pcmC0D0c` + `pcmC0D0p`) and had no client on the private daemon. `src/zoom/zoom-launch-env.js`: one
+  env for every launch path (`prepareZoomAppLaunch`, used by `operator-dock.js` and `handleGuiLaunchPost`).
+- **A node restart ended the meeting.** The unit is `KillMode=mixed`: systemd SIGKILLs the whole cgroup, so a Zoom
+  started by node died with it (it also kills the dock's Firefox and Thunar; those are unchanged). Zoom now starts
+  through `systemd-run --user --scope` (`userScopeArgv`), outside the unit.
+- **A node restart froze Zoom for good.** The private PipeWire daemon died with the node. A Zoom with streams on
+  it then deadlocked its GUI thread (gdb: main thread waiting on the audio layer, `play_webrtc` in
+  `pa_threaded_mainloop_wait`). The window still showed a stale picture, so it looked alive. The daemon now runs in
+  its own user scope and the next node adopts it. A daemon that is gone is started again by the link tick.
+- **The "hidden" window covered the whole operator GUI.** An undecorated window the exact size of a monitor is
+  fullscreen to Openbox, which lifts it above everything when it takes focus. Hidden placement is now 1 px inside
+  the GUI rect on every side (1918×1078 in a 1920×1080 ring).
+- **Bindings were lost on a node restart.** They are saved by title in `~/.highascg/zoom-sources.json`, restored at
+  node start (`restoreZoomOnBoot`, called from `setupHostLiveSources`) and after a Quit + new start.
+- **Automatic binding took the wrong windows.** Zoom 7.1 titles the meeting window "Meeting", the dual-monitor
+  window "Zoom Workplace", and reuses "Zoom Workplace" for dialogs and for the home window while it starts. A
+  re-bind put the home window BELOW the GUI and resized it; another took the join preview. `autoBindable`: only
+  while a meeting window is up, only windows of 800×500 or more, never the home window, same title only.
+- **The virtual camera stretched the picture.** A 3072×1024 program reached Zoom squashed into 16:9. The relay now
+  fits with bars (`v4l2-bridge-relay.js`).
+- **The return feed was only checked on a status GET.** With no client on the Zoom page, the mix-minus guard never
+  ran and the return did not come back after a Caspar restart. It runs on the 2 s tick now.
+
+Proven live with the real client (Zoom 7.1.0.3715, meeting 679 1592 7344, this box as a participant):
+
+- **Launch + join through the API** with `zoommtg://…confno=`: Zoom in its own scope, `PULSE_*` in its environ.
+  Zoom's Settings ▸ Audio shows Speaker "HighAsCG Zoom In" and Microphone "HighAsCG Zoom Out" by itself:
+  `PULSE_SINK` / `PULSE_SOURCE` are honoured, no one-time pick needed.
+- **Camera.** v4l2loopback loaded through the sudo helper. Zoom lists "Virtual cam" and its self view shows the
+  program (test card, then the Zoom windows themselves once they were on program).
+- **Zoom → HighAsCG audio.** Zoom's own "Test speaker": the tap on `udp://127.0.0.1:52233` measured mean −19.5 dB,
+  max −3.1 dB. Caspar plays that URL: `PLAY 3-991 udp://127.0.0.1:52233` showed about −10 dBFS on both channels.
+- **HighAsCG → Zoom audio.** Speech on program (ch 2) → return consumer 9277 → the virtual mic. Zoom's own
+  "Test microphone" recorded it (level meter green) and played it back into the tap (mean −19 dB): the whole loop
+  through the real client.
+- **Zoom removes tones and music.** A 1 kHz tone and a music loop reached the virtual mic cleanly (probe: tone −38 dB
+  over a −64 dB floor) but Zoom's recording of them was digital silence. Zoom's noise suppression does that. For
+  program sound that is not speech the owner has to turn on "Original sound for musicians" in Zoom Settings ▸ Audio.
+- **Video in.** Both windows grab at 30 fps. With "Use dual monitors" on, the main window is the Meeting window and
+  the second one is the other view. After `POST /api/caspar-config/apply {force:true}` Caspar runs a Zoom host
+  channel (ch 5), `/api/zoom/host` shows presenter `route://5-21` and gallery `route://5-23` live, and both routes
+  played side by side on program (screenshot of DP-2).
+- **Mix-minus.** With `udp://127.0.0.1:52233` playing on program, the return consumer was removed and the note read
+  "Return muted". It came back when the layer was cleared.
+- **Restarts.** Node restarted four times and Caspar once with Zoom in the meeting state: Zoom stayed alive (GUI
+  thread about 200 switches/s throughout), the daemon kept its pid, the grabs, the host layers, the camera relay
+  (now saved as enabled) and the return consumer all came back with no client polling.
+
+Not tested, and why:
+
+- **In-meeting pictures: a participant's video, a participant's share, the far end seeing and hearing this box.**
+  My first node restart killed the dock-started Zoom and took the box out of the meeting. Every rejoin after that
+  landed in the waiting room ("Host has joined. We've let them know you're here") and nobody admitted it. Everything
+  above the waiting room is proven; the share window's title and role are still unseen.
+- **Lip sync** between the ring (video) and the UDP audio.
+
+Open after this test:
+
+- **Zoom's incoming audio is not a live source.** The tap ends at `udp://127.0.0.1:52233`; nothing in the product
+  plays it, so a look with a Zoom picture has no Zoom sound. Proposal: a fourth host layer ("Zoom audio",
+  `route://<ch>-20`) next to presenter / share / gallery. Needs the owner's yes, it changes the source list.
+- **The second meeting window opens on the program monitor.** Zoom places the dual-monitor window at 2990,112, on
+  DP-2. Caspar's screen consumer covers it today. Binding it as a hidden source moves it under the GUI.
+- **Dock apps still die with the node** (Firefox, Thunar). Only Zoom and its audio daemon were moved out.
+- **Zoom freezes if the private daemon dies under it.** That is Zoom's own audio layer; the daemon now outlives the
+  node, which removes the only cause seen.
 
 ## What was verified
 
