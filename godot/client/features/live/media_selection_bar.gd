@@ -24,6 +24,7 @@ var _bar: HFlowContainer
 var _count: Label
 var status: Label
 var _hap_cancel: Button
+var bottom_row: HBoxContainer  # WO-1029: the Spread (N) button sits here, left of the "+"
 var _jobs := {}  # jobId → the server's job snapshot (media:hap-encode / GET /api/media/hap-encode)
 var _announced := {}
 
@@ -46,6 +47,7 @@ func _ready() -> void:
 	status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	add_child(status)
 	var row := HBoxContainer.new()
+	bottom_row = row
 	row.alignment = BoxContainer.ALIGNMENT_END
 	_hap_cancel = _button("Cancel HAP", _cancel_hap, "Cancel the running HAP encode")
 	_hap_cancel.visible = false

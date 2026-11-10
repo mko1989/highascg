@@ -36,6 +36,8 @@ const Upload := preload("res://core/stream_upload.gd")
 const Ingest := preload("res://features/live/media_ingest.gd")
 const SelectionBar := preload("res://features/live/media_selection_bar.gd")
 const Ops := preload("res://features/live/media_ops.gd")
+const EffectRows := preload("res://features/live/media_effects_rows.gd")
+const Needs := preload("res://features/live/media_needs_flow.gd")  # WO-1029: shared library + Spread
 const INFO_FONT := 11
 const FitTabs := preload("res://app/fit_tabs.gd")  # WO-899
 const ProjectBar := preload("res://features/live/project_media_bar.gd")
@@ -60,6 +62,7 @@ var _ingest_label: Label
 var _bar: SelectionBar
 var _select_queued := false
 var project_bar: ProjectBar
+var needs_flow: Needs  # WO-1029: needs / Spread; its button sits left of the "+"
 var docs := preload("res://features/live/media_docs.gd").new()  # WO-1009: documents in the tree ("media only" off)
 var _dl: Download
 var _fit: RefCounted  # WO-899: every sub-tab always visible (shrink the font, then trim the titles)
@@ -190,6 +193,7 @@ func _ready() -> void:
 			_ingest_row.visible = false)
 	_ingest_row.add_child(stop)
 	media.add_child(_ingest_row)
+	needs_flow = Needs.attach(media, _bar.bottom_row, _line)
 	_dl = Download.new()
 	_dl.line.connect(_line)
 	add_child(_dl)
@@ -326,6 +330,7 @@ func load_media() -> void:
 	await docs.fetch_rows()
 	_bar.rows = _rows
 	project_bar.refresh()
+	needs_flow.refresh()  # WO-1029: the media scan changed
 	if _fx.is_empty():
 		var fr: Dictionary = await Api.get_json("/api/scene/effect-registry")
 		_fx = fr.data if fr.ok and fr.data is Dictionary else {}
@@ -339,7 +344,8 @@ func _build() -> void:
 	var f := _filter.text.strip_edges().to_lower()
 	_bar.set_selection([], "")
 	_info_w = 0.0
-	for e in Ops.tree_entries(Ops.in_folder(docs.merged(_rows), project_bar.folder) if project_bar.project_only() else docs.merged(_rows), f):
+	var all := docs.merged(_rows) + needs_flow.remote_rows(_rows)  # WO-1029: + files only a linked server has (greyed)
+	for e in Ops.tree_entries(Ops.in_folder(all, project_bar.folder) if project_bar.project_only() else all, f):
 		var it := _tree.create_item(dirs[e.parent])
 		it.set_text(0, e.label)
 		if e.kind == "dir":
@@ -354,49 +360,30 @@ func _build() -> void:
 		var r: Dictionary = e.row
 		var id := str(r.get("id", ""))
 		var info := Ops.quick_info(r)
+		var mk: Dictionary = needs_flow.mark(id)  # WO-1029: "needed on B (Screen 2)" / "differs on B" / "on B"
+		if str(mk.get("text", "")) != "":
+			info = mk.text
+		if r.get("remote") == true:  # not a local file: draggable, but no selection / inspector / delete
+			it.set_custom_color(0, ThemeBuilder.TEXT_MUTED)
 		it.set_tooltip_text(0, "%s · %s" % [id, info if info != "" else r.get("type", "")])
-		it.set_metadata(0, {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id, "row": r})
+		it.set_metadata(0, {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id} if r.get("remote") == true else {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id, "row": r})
 		var notch := Ops.is_notchlc(r)  # WO-818: ⚠ in amber, the CPU-decode warning as the cell tooltip
 		if notch:
 			info = "⚠ " + info if info != "" else "⚠"
 		if info != "":
 			it.set_text(1, info)
-			it.set_custom_color(1, ThemeBuilder.WARN if notch else ThemeBuilder.TEXT_MUTED)
+			it.set_custom_color(1, ThemeBuilder.WARN if notch or mk.get("amber") == true else ThemeBuilder.TEXT_MUTED)
 			it.set_custom_font_size(1, INFO_FONT)
-			it.set_tooltip_text(1, Ops.NOTCHLC_TIP if notch else id)
+			it.set_tooltip_text(1, Ops.NOTCHLC_TIP if notch else (str(mk.tip) if not mk.is_empty() and str(mk.tip) != "" else id))
 			_info_w = maxf(_info_w, _tree.get_theme_font("font").get_string_size(info, HORIZONTAL_ALIGNMENT_LEFT, -1, INFO_FONT).x)
 	_fit_info()
-	_build_effects(root, f)
+	EffectRows.build(_tree, _fx, root, f)
 
 
 ## The quick-look column as wide as its widest text, but names keep at least 55% of a narrow panel.
 func _fit_info() -> void:
 	_tree.set_column_custom_minimum_width(1, int(minf(_info_w + 12.0, _tree.size.x * 0.45)))
 
-
-func _build_effects(root: TreeItem, f: String) -> void:
-	var fx: Array = _fx.get("effects", []) if _fx.get("effects") is Array else []
-	var cats: Array = _fx.get("categories", []) if _fx.get("categories") is Array else []
-	var group: TreeItem = null
-	for cat in cats:
-		var head: TreeItem = null
-		for e in fx:
-			if not (e is Dictionary) or str(e.get("category", "")) != str(cat.get("id", "")):
-				continue
-			var label := str(e.get("label", e.get("type", "")))
-			if f != "" and not label.to_lower().contains(f) and not str(e.get("category", "")).to_lower().contains(f):
-				continue
-			if group == null:
-				group = _tree.create_item(root)
-				group.set_text(0, "EFFECTS")
-				group.collapsed = f == ""
-			if head == null:
-				head = _tree.create_item(group)
-				head.set_text(0, str(cat.get("label", cat.get("id", ""))))
-			var it := _tree.create_item(head)
-			it.set_text(0, label)
-			it.set_tooltip_text(0, "Mixer effect — drop on a timeline clip")
-			it.set_metadata(0, {"type": "effect", "value": str(e.type), "label": label})
 
 func _drag_data(at: Vector2) -> Variant:
 	_press_row = null  # WO-967: the drop target (layer page, playlist) stays in the Inspector
@@ -476,10 +463,10 @@ func _download(url: String) -> void:
 			return
 
 
-func _line(text: String) -> void:
+func _line(text: String, tip := "") -> void:  # WO-1029: tip = the failures of a spread
 	_ingest_row.visible = text != ""
 	_ingest_label.text = text
-	_ingest_label.tooltip_text = text
+	_ingest_label.tooltip_text = text if tip == "" else text + "\n" + tip
 
 
 func _show_ingest(st: Dictionary) -> void:

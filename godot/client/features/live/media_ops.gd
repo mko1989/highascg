@@ -155,7 +155,7 @@ static func folder_drop_ids(data: Variant, folder: String) -> Array:
 	var items: Array = d.items if d.get("type") == "multi" and d.get("items") is Array else [d]
 	var ids: Array = []
 	for it in items:
-		if it is Dictionary and it.get("type") == "media" and str(it.get("value", "")) != "":
+		if it is Dictionary and it.get("type") == "media" and str(it.get("value", "")) != "" and it.get("remote") != true:  # WO-1029: not on this box
 			ids.append(str(it.value))
 	var movable := ids.any(func(v: String) -> bool: return not v.begins_with(folder + "/") and v != folder)
 	return ids if movable else []

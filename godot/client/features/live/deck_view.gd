@@ -18,6 +18,8 @@ const Destinations := preload("res://features/live/destinations.gd")
 const DeckOverlay := preload("res://features/live/deck_overlay.gd")
 const DeckHidden := preload("res://features/live/deck_hidden.gd")
 const DeckScroll := preload("res://features/live/deck_scroll.gd")
+const NeedsFlow := preload("res://features/live/media_needs_flow.gd")  # WO-1029
+const NeedsDot := preload("res://features/live/media_needs_dot.gd")
 const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
@@ -216,6 +218,7 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var foot := HBoxContainer.new()  # WO-621 N4: web .scenes-card__footer ▶ take · ⚙ edit (CUT left out)
 	foot.add_child(meta)
+	foot.add_child(NeedsDot.make(scene))  # WO-1029: amber when its media is missing on the box that outputs it
 	var main := _main_for_card
 	if DeckOverlay.on_air(Store.get_value(DeckOverlay.PATH), _cm(), main, id):  # WO-860: its lower third is on screen
 		var stop := Icons.button("stop", "Play out — take this lower third off the screen", 12)
@@ -272,7 +275,7 @@ func _notification(what: int) -> void:
 func request_take(scene_id: String, main: int, target: String) -> Dictionary:
 	var res: Dictionary = await Api.post_json("/api/scene/take-look", {"sceneId": scene_id, "mainIdx": main, "target": target})
 	var what := "TAKE" if target == "program" else "PRV"
-	var warn := DeckModel.take_warning(res.data) if res.ok else ""
+	var warn := NeedsFlow.take_line(res.data, DeckModel.take_warning(res.data)) if res.ok else ""  # WO-1029
 	if warn != "":
 		action_result.emit("%s %s" % [what, warn], false)
 	elif res.ok:
