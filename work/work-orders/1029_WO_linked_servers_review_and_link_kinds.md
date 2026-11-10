@@ -1,6 +1,6 @@
 # WO-1029 — Linked servers: full review, link kinds (one operator / peers), identity that survives an IP change
 **Area:** network, engine, testing-ci, devices-config
-**Status: OPEN (10.11 — review done by four reviewers, reports in `1029_review/`; phase 1 fixes in progress; phase 2 design waits for the owner's answers)**
+**Status: IN PROGRESS (10.11 — review done, reports in `1029_review/`; phase 1 fixed offline (gates green), two-box run pending; phase 2 = link kinds, owner's answers recorded)**
 
 Owner, 10.11 (after the incident below):
 - *"it seemed like it didnt let me drive local screens. which is my main idea with 2box/multibox setup. have connected
@@ -110,11 +110,25 @@ From report 02 section 3 and report 03 section 3:
 
 ## Work
 
-- [ ] P1a identity hello + proof
-- [ ] P1b mastership
-- [ ] P1c drive gate
+- [x] P1a identity hello + proof (df2372ee) — `cluster-hello.js`; replay by per-sender counter, never a clock window
+- [x] P1b mastership (04fd38da) — heard-from, stored floor, settled at boot, Make master reports refusals; no failback
+- [x] P1c drive gate (df2372ee) — `cluster-fanout-report.js`, `air-held.js`; 409 AIR_HELD; zone relay (R3) left as it was
 - [x] P1d hardware id — one rule for the boot unit and the node; a hostname one of the box's NICs derives wins over a
       flipped file (this box: file said 7580, name 7579 → stays 7579, file repaired on the next start)
-- [ ] P1e harness + incident replay
+- [x] P1e harness + incident replay (df2372ee) — loopback aliases, `move()`, one-way cut; 4/4
 - [ ] Phase 1 on both boxes (update 5867, change an address under a live link, reboot each box)
 - [ ] Phase 2 after the owner's answers
+
+## Phase 1 — left open (found while fixing)
+
+- Signed node-to-node calls (`cluster-call.js` MAX_SKEW_MS 60 s) still need both clocks within a minute: no NTP on a
+  show LAN breaks take relays. Same cure as the hello: a per-sender counter.
+- Link-back proof compares the public key fetched from the new address; it is not a proof of possession (needs a
+  challenge).
+- Godot does not show the 409 `AIR_HELD` answers yet (test card dialog, FTB, timeline, media play, Draft sync); the
+  Servers card could show `forwarded_here`.
+- For ~10 s after boot `is_master` is false with `master_id: self` (unsettled): check the Devices master line.
+- Up to ~12 s of two writers on one channel after a fan-out report goes stale while the master still forwards.
+- The replay's one-way-cut case no longer requires B to see A offline; tighten it.
+- Engine paths that swallow send errors (stop audio-only look, clear channel, FTB retries) are covered only where a
+  route pre-checks; the library-typed AMCP path skips the gate (B14).
