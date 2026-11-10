@@ -96,7 +96,13 @@ func _find(key: String) -> Control:
 		c = anchors.get(key.get_slice("#", 0))
 	elif c == null:
 		c = anchors.get(key + "#pgm")
-	return c if c is Control and is_instance_valid(c) and c.is_visible_in_tree() and not Scrolls.control_clipped(c) else null
+	return c if c is Control and is_instance_valid(c) and c.is_visible_in_tree() else null
+
+
+## Where a cable end sits: the port's anchor, held at the edge of its scroll area while the port is scrolled out of
+## view (owner 10.11: the cable hangs off the edge instead of disappearing).
+func _end_point(c: Control) -> Vector2:
+	return Scrolls.clamped(c.anchor(), Scrolls.scroll_rects(c))
 
 
 func _process(_delta: float) -> void:
@@ -110,8 +116,8 @@ func _process(_delta: float) -> void:
 		var b := _find(c.to)
 		if a == null or b == null:
 			continue
-		var p1: Vector2 = inv * a.anchor()
-		var p2: Vector2 = inv * b.anchor()
+		var p1: Vector2 = inv * _end_point(a)
+		var p2: Vector2 = inv * _end_point(b)
 		ends[c.id] = [p1, p2]
 		parts.append("%s:%.1f,%.1f,%.1f,%.1f" % [c.id, p1.x, p1.y, p2.x, p2.y])
 	var sig := "|".join(parts)

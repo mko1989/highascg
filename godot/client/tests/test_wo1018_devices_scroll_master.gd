@@ -38,6 +38,14 @@ func test_clipped_point_is_outside_any_holding_scroll_area() -> void:
 	t.ok(not S.clipped(Vector2(50, 50), []), "no scroll area: never clipped")
 
 
+func test_cable_end_is_held_at_the_edge_of_its_scroll_area() -> void:
+	var rects := [Rect2(0, 100, 400, 300), Rect2(0, 0, 400, 1000)]
+	t.eq(S.clamped(Vector2(50, 150), rects), Vector2(50, 150), "in view: unchanged")
+	t.eq(S.clamped(Vector2(50, 50), rects), Vector2(50, 100), "scrolled above: held at the top edge")
+	t.eq(S.clamped(Vector2(50, 450), rects), Vector2(50, 400), "scrolled below: held at the bottom edge")
+	t.eq(S.clamped(Vector2(50, 50), []), Vector2(50, 50), "no scroll area: unchanged")
+
+
 func test_wheel_delta_and_clamp() -> void:
 	t.eq(S.wheel_delta(MOUSE_BUTTON_WHEEL_DOWN, 1.0), S.STEP, "down scrolls forward")
 	t.eq(S.wheel_delta(MOUSE_BUTTON_WHEEL_UP, 1.0), -S.STEP, "up scrolls back")

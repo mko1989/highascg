@@ -6,12 +6,22 @@ const STEP := 64.0  # px per wheel notch
 
 
 ## A point is clipped when it lies outside the visible rect of any scroll area that holds it (a port scrolled out of
-## view: its cable hides and its dot takes no click). `rects` = the scroll areas' global rects that are ancestors.
+## view: its dot takes no click; its cable stays, held at the edge by `clamped`). `rects` = the scroll areas' global rects that are ancestors.
 static func clipped(point: Vector2, rects: Array) -> bool:
 	for r in rects:
 		if r is Rect2 and not (r as Rect2).has_point(point):
 			return true
 	return false
+
+
+## `point` moved onto the nearest edge of every scroll area it lies outside of (unchanged when it is in view).
+static func clamped(point: Vector2, rects: Array) -> Vector2:
+	var p := point
+	for r in rects:
+		if r is Rect2:
+			var q := r as Rect2
+			p = Vector2(clampf(p.x, q.position.x, q.end.x), clampf(p.y, q.position.y, q.end.y))
+	return p
 
 
 ## The global rects of every ScrollContainer above `c` (nearest first).
@@ -23,11 +33,6 @@ static func scroll_rects(c: Control) -> Array:
 			out.append((n as ScrollContainer).get_global_rect())
 		n = n.get_parent()
 	return out
-
-
-## True when the control's centre is scrolled out of any ancestor scroll area.
-static func control_clipped(c: Control) -> bool:
-	return clipped(c.get_global_rect().get_center(), scroll_rects(c))
 
 
 ## Wheel button → scroll delta in px (0 for any other button).
