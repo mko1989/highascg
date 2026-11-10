@@ -18,7 +18,6 @@
  */
 
 const path = require('path')
-const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const { pathToFileURL } = require('url')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { REPO_ROOT } = require('../repo-paths')
@@ -80,7 +79,7 @@ async function handleLayerReload(body, ctx, deps = {}) {
 	const map = deps.getChannelMap ? deps.getChannelMap() : require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
 	const scope = parseInt(String(scene.mainScope ?? ''), 10)
 	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
-	const nh = await notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c
+	const nh = await require('../cluster/dest-route').relayIfNotHere(ctx, { screenIdx: mainIdx }, 'dest.layer', { op: 'layer-reload', body: { ...b, mainIdx } }) // WO-1029 Wave B
 	if (nh) return nh
 	const getStaged = deps.getStaged || ((ch) => require('../state/live-scene-state').getChannel(ch))
 	const { resolveTemplateCgHostLayer } = require('../engine/cg-routing')

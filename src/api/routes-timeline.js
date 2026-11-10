@@ -10,12 +10,38 @@ const { runTimelineDirectTake } = require('../engine/timeline-take')
 const { notifyTimelineReplication } = require('../replication/replication-hooks')
 const { airHeldBy } = require('../replication/amcp-fanout')
 const { isAirHeld, airHeldReply } = require('../replication/air-held')
-const { notHereFor, notHereReply, isNotHere } = require('./screen-not-here') // WO-1029 plan 07 C1c
+const { notHereReply, isNotHere } = require('./screen-not-here') // WO-1029 plan 07 C1c
+const destRoute = require('../cluster/dest-route')
 
-/** WO-1029 C1c: 409 NOT_HERE when the routing pins the timeline to a screen that is on another server. */
-async function sendToNotHere(ctx, eng, id, b) {
+/**
+ * WO-1029 C1c → Wave B (C6c): a timeline routed to ONE screen of another server is played there by its owner
+ * (dest.timeline; 409 NOT_HERE when nobody can). Not synchronised across servers: each owner starts when the call
+ * arrives (the prepare/go barrier is C7).
+ */
+async function sendToNotHere(ctx, eng, id, b, op) {
 	const st = b.sendTo && typeof b.sendTo === 'object' ? b.sendTo : eng._sendToFor?.(id)
-	return st?.screenIdx != null ? notHereFor(ctx, { screenIdx: st.screenIdx }) : null
+	if (st?.screenIdx == null) return null
+	const r = await destRoute.relayIfNotHere(ctx, { screenIdx: st.screenIdx }, 'dest.timeline', { op, timelineId: id, body: b })
+	if (r && r.status < 400) remoteTimelines(ctx).add(id)
+	return r
+}
+
+/** Timelines this server sent to other servers (their pause / stop / seek / loop follow). */
+const remoteTimelines = (ctx) => (ctx._destTimelines = ctx._destTimelines || new Set())
+
+/**
+ * Wave B: "every screen" = the screens here + each other server's screens (one dest.timeline per owner, `all`), and
+ * the transport ops of a timeline sent elsewhere follow it. → the reply with `remote: [{ server, ok, … }]` added.
+ */
+async function withRemote(ctx, eng, id, b, op, res) {
+	const st = b.sendTo && typeof b.sendTo === 'object' ? b.sendTo : eng._sendToFor?.(id)
+	const all = (op === 'play' || op === 'take') && st && st.screenIdx == null
+	if (!all && !remoteTimelines(ctx).has(id)) return res
+	const remote = await destRoute.relayOwners(ctx, 'dest.timeline', { op, timelineId: id, body: b }).catch(() => [])
+	if (!remote.length || res.status >= 400) return res
+	if (all) remoteTimelines(ctx).add(id)
+	const body = JSON.parse(res.body)
+	return { ...res, body: jsonBody({ ...body, remote }) }
 }
 
 /** WO-1029: the first channel of this routing that another server drives right now, or null. */
@@ -95,14 +121,14 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 				if (!tl) {
 					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
 				}
-				const nh = await sendToNotHere(ctx, eng, id, b)
+				const nh = await sendToNotHere(ctx, eng, id, b, 'play')
 				if (nh) return nh
 				// WO-1029 B2: a timeline routed onto a screen another server drives would run with every PGM line refused
 				const held = timelineHeld(ctx, eng, b.sendTo && typeof b.sendTo === 'object' ? b.sendTo : eng._sendToFor?.(id))
 				if (held) return airHeldReply(held)
 				if (b.sendTo && typeof b.sendTo === 'object') eng.setSendTo(b.sendTo, id)
 				eng.play(id, b.from != null ? Number(b.from) : null)
-				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+				return withRemote(ctx, eng, id, b, 'play', { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) })
 			}
 			case 'take': {
 				if (!ctx.amcp) {
@@ -111,11 +137,11 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 				if (!eng.get(id)) {
 					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
 				}
-				const nh = await sendToNotHere(ctx, eng, id, b)
+				const nh = await sendToNotHere(ctx, eng, id, b, 'take')
 				if (nh) return nh
 				try {
 					const result = await runTimelineDirectTake(ctx, eng, id, b)
-					return { status: 200, headers: JSON_HEADERS, body: jsonBody(result) }
+					return withRemote(ctx, eng, id, b, 'take', { status: 200, headers: JSON_HEADERS, body: jsonBody(result) })
 				} catch (err) {
 					if (isAirHeld(err)) return airHeldReply(err)
 					if (isNotHere(err)) return notHereReply(ctx, err)
@@ -128,7 +154,7 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 			}
 			case 'pause':
 				eng.pause(id)
-				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+				return withRemote(ctx, eng, id, b, 'pause', { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) })
 			case 'stop': {
 				/* WO-552: this generic endpoint had two callers — the Timeline Editor's own explicit
 				 * Stop button (a deliberate operator action, always allowed) and
@@ -158,7 +184,7 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 					}
 				}
 				eng.stop(id)
-				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+				return withRemote(ctx, eng, id, b, 'stop', { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) })
 			}
 			case 'seek': {
 				const ms = b.ms != null ? Number(b.ms) : NaN
@@ -169,7 +195,7 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
 				}
 				eng.seek(id, ms)
-				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+				return withRemote(ctx, eng, id, b, 'seek', { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) })
 			}
 			case 'sendto': {
 				if (!eng.get(id)) {
@@ -180,7 +206,7 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 			}
 			case 'loop':
 				eng.setLoop(id, !!b.loop)
-				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+				return withRemote(ctx, eng, id, b, 'loop', { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) })
 			default:
 				break
 		}

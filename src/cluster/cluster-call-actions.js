@@ -17,6 +17,8 @@
  *   tracking.auto.home { after_s?, now? }           → … /home
  *   fixtures.look      { id, fade_ms? }             → POST /api/fixtures/looks/recall (routes-fixture-dmx.js)
  *   companion.press    { page, row, column }        → the zone action's Companion press (zone-actions.js)
+ *   dest.*             WO-1029 plan 07 Wave B: a press on one of THIS server's screens by destination id (dest-actions.js);
+ *                      `look.take` above stays as its alias for one release (an older peer sends it)
  *
  * Every action answers { status, body } with body an object (a route's JSON text is parsed back).
  */
@@ -66,7 +68,8 @@ function createCallActions(ctx, deps) {
 		)
 	}
 	return {
-		'look.take': async (args) => {
+		...(deps.destActions || require('./dest-actions').destActionsOf(ctx)).actions, // WO-1029 Wave B (C5)
+		'look.take': async (args, peer) => {
 			const sceneId = String(args.sceneId || '').trim()
 			if (!sceneId) return { status: 400, body: { error: 'sceneId required' } }
 			const target = args.target === 'preview' ? 'preview' : 'program'
@@ -81,7 +84,12 @@ function createCallActions(ctx, deps) {
 			// `relayed` stays on a relayed take, so the take-look path here never hands it on again. WO-1029 2a: a diverged
 			// backup take (the master did not answer) runs here as `relayed` too (decided once).
 			const { relayed: _r, target: _t, ...opts } = relayArgs({ ...args, sceneId })
-			const out = asObj(await takeLook({ ...opts, target, ...(args.relayed || routed ? { relayed: true } : {}) }))
+			// WO-1029 Wave B: taken HERE, never relayed on by dest-route.js (no loops); on the master a backup screen's other
+			// owners still get it (`fanout`), as for a press the backup box hands over
+			const { runAsRemote } = require('./dest-route')
+			const fanout = ctx?._clusterMaster?.view?.()?.is_master === true
+			const take = () => takeLook({ ...opts, target, ...(args.relayed || routed ? { relayed: true } : {}) })
+			const out = asObj(await runAsRemote({ from: String(peer?.id || ''), fanout }, take))
 			return routed && out.status < 400 ? { ...out, body: { ...out.body, diverged: true } } : out
 		},
 		'tracking.auto.pin': auto('pin'),

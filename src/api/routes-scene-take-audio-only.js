@@ -77,7 +77,7 @@ async function handleAudioOnlyLookTake(b, ctx, channel, inc) {
  */
 async function handleAudioOnlyLookStop(body, ctx) {
 	const b = parseBody(body)
-	const sel = await channelForScreen(ctx, b) // WO-1029 C1c
+	const sel = await channelForScreen(ctx, b, { action: 'dest.media', args: { op: 'audio-only-stop', body: b } }) // WO-1029 Wave B
 	if (sel.reply) return sel.reply
 	const channel = sel.channel
 	if (!channel || channel < 1) {

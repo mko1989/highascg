@@ -31,10 +31,38 @@ async function handleTakeLook(body, ctx, deps = {}) {
 	const b = parseBody(body)
 	const relay = await relayToMaster(b, ctx, deps)
 	if (relay && !relay.diverged) return relay
+	const dest = relay ? null : await destTake(b, ctx, deps) // WO-1029 Wave B: a screen elsewhere / a backup screen
+	if (dest?.reply) {
+		require('../engine/take-sync-barrier').joinTakeGroup(b.takeGroup)?.leave() // the owner's take is not in this barrier
+		return dest.reply
+	}
 	const res = await takeLook(b, ctx, deps)
 	if (res.status >= 400 && !res.handedToTake) require('../engine/take-sync-barrier').joinTakeGroup(b.takeGroup)?.leave()
 	delete res.handedToTake
-	return relay?.diverged ? markDiverged(res) : res
+	const out = relay?.diverged ? markDiverged(res) : res
+	return dest ? require('../cluster/dest-route').finishDest(ctx, out, dest) : out
+}
+
+/**
+ * WO-1029 plan 07 Wave B (C6a, channels only where cabled): the look's screen is not here → `dest.take` to its owner(s)
+ * (an older owner without `dest-actions`: 409 NOT_HERE as before); here and cabled elsewhere too (hot backup) → dest-route.js backupPlan
+ * (PROGRAM only: PRV is each operator's own). → null (take here as before) | { reply } | a backup plan.
+ */
+async function destTake(b, ctx, deps) {
+	const dr = require('../cluster/dest-route')
+	if (deps.cluster === null || !dr.cwcOn(ctx)) return null
+	const sceneId = String(b.sceneId || '').trim()
+	if (!sceneId) return null
+	const { resolveLiveSceneById } = require('../engine/project-scenes-transform')
+	const scene = deps.resolveSceneById ? deps.resolveSceneById(sceneId) : resolveLiveSceneById(ctx, sceneId)
+	if (!scene) return null // the take's own 404
+	const mainIdx = lookMainIdx(b, scene)
+	const target = b.target === 'preview' ? 'preview' : 'program'
+	const { relayed: _r, target: _t, mainIdx: _m, ...opts } = relayArgs(b)
+	const args = { ...opts, bus: target }
+	const reply = await dr.relayIfNotHere(ctx, { screenIdx: mainIdx }, 'dest.take', args)
+	if (reply) return { reply }
+	return target === 'program' ? dr.backupPlan(ctx, { screenIdx: mainIdx }, 'dest.take', args) : null
 }
 
 /** WO-1029 2a: a backup take the master did not answer ran here — the answer says so (`diverged: true`). */

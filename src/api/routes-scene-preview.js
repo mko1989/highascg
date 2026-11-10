@@ -84,7 +84,8 @@ async function handlePreviewLiveClear(body, ctx) {
 	}
 
 	if (mainIdx >= 0) {
-		const nh = await notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c
+		// WO-1029 Wave B: PRV of a screen on another server is cleared there (dest.clear), else 409 NOT_HERE
+		const nh = await require('../cluster/dest-route').relayIfNotHere(ctx, { screenIdx: mainIdx }, 'dest.clear', { bus: 'preview' })
 		if (nh) return nh
 	}
 	let previewCh = null

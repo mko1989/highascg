@@ -10,7 +10,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { getLanIPv4Addresses } = require('../utils/lan-ipv4')
 const { resolveGpuConnectorLabelForChannel } = require('../utils/gpu-connector-label')
 
-const { notHereFor, screenTarget } = require('./screen-not-here') // WO-1029 plan 07 C1c
+const { screenTarget } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const sc = require('../config/screen-channels')
 
 const TEST_LAYER = 999
@@ -55,7 +55,8 @@ async function handlePost(path, body, ctx) {
 	// WO-1029 C1c: `screenIdx` addresses a screen (409 NOT_HERE when it is on another server); no channel and no screen =
 	// the first screen this server outputs (a hole at index 0 is not "screen 1")
 	if (b.channel == null && b.screenIdx != null) {
-		const nh = await notHereFor(ctx, { screenIdx: b.screenIdx })
+		// WO-1029 Wave B: a screen on another server shows the card through its owner (its own card settings)
+		const nh = await require('../cluster/dest-route').relayIfNotHere(ctx, { screenIdx: b.screenIdx }, 'dest.testcard', { on: enabled })
 		if (nh) return nh
 	}
 	const byScreen = b.channel == null && b.screenIdx != null ? screenTarget(ctx, { screenIdx: b.screenIdx }).pgm : null

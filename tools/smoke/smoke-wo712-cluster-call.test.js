@@ -222,10 +222,19 @@ describe('WO-712 R2 allow-list: each action runs the local handler', () => {
 		return { ctx, deps, seen }
 	}
 
-	it('the allow-list is exactly the six R2 actions', () => {
+	it('the allow-list is exactly the six R2 actions + the WO-1029 Wave B dest.* calls', () => {
 		const { ctx, deps } = stubCtx()
 		assert.deepEqual(Object.keys(createCallActions(ctx, deps)).sort(), [
 			'companion.press',
+			'dest.clear',
+			'dest.ftb',
+			'dest.layer',
+			'dest.media',
+			'dest.mixer',
+			'dest.preview',
+			'dest.take',
+			'dest.testcard',
+			'dest.timeline',
 			'fixtures.look',
 			'look.take',
 			'tracking.auto.home',

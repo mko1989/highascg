@@ -26,7 +26,6 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
-const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 const liveSceneState = require('../state/live-scene-state')
 const { getResolvedFillForSceneLayer } = require('../engine/scene-native-fill')
 const {
@@ -198,7 +197,7 @@ async function handlePreviewMixerNudge(body, ctx) {
 	const b = parseBody(body)
 
 	if (b.mainIndex != null) {
-		const nh = await notHereFor(ctx, { screenIdx: b.mainIndex }) // WO-1029 C1c
+		const nh = await require('../cluster/dest-route').relayIfNotHere(ctx, { screenIdx: b.mainIndex }, 'dest.mixer', { op: 'mixer-nudge', body: b }) // WO-1029 Wave B
 		if (nh) return nh
 	}
 	const pgmTarget = isPgmNudgeTarget(b)

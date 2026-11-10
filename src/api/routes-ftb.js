@@ -11,7 +11,8 @@ const liveSceneState = require('../state/live-scene-state')
 const { runFadeToBlackAllLayers } = require('../engine/ftb-pgm-prv')
 const { airHeldBy } = require('../replication/amcp-fanout')
 const { isAirHeld, airHeldReply } = require('../replication/air-held') // WO-1029 B2
-const { notHereFor, notHereList } = require('./screen-not-here') // WO-1029 plan 07 C1c
+const { notHereList } = require('./screen-not-here') // WO-1029 plan 07 C1c
+const destRoute = require('../cluster/dest-route') // WO-1029 Wave B: screens on other servers through their owners
 const { localScreens } = require('../config/screen-channels')
 
 /**
@@ -78,9 +79,13 @@ async function handlePost(path, body, ctx) {
 		}
 	}
 	const asked = resolveFtbChannels(map, screenIdx)
+	const ftbArgs = { body: { durationFrames: b.durationFrames, tween: b.tween, framerate: b.framerate } }
+	let backup = null
 	if (asked && screenIdx != null) {
-		const nh = await notHereFor(ctx, { screenIdx })
+		const nh = await destRoute.relayIfNotHere(ctx, { screenIdx }, 'dest.ftb', ftbArgs) // Wave B: else 409 NOT_HERE
 		if (nh) return nh
+		backup = await destRoute.backupPlan(ctx, { screenIdx }, 'dest.ftb', ftbArgs) // a hot-backup screen: its other owner too
+		if (backup?.reply) return backup.reply
 	}
 	if (!asked) {
 		return {
@@ -93,8 +98,9 @@ async function handlePost(path, body, ctx) {
 	// live store would claim black while the master's look stays up). One such screen → 409; "all screens" blacks the
 	// screens this server drives and lists the others in `refused`.
 	const { channels, refused } = splitHeldScreens(ctx, map, screenIdx, asked)
-	const notHere = screenIdx == null ? notHereList(ctx) : []
 	if (!channels.length && refused.length) return airHeldReply(refused[0], { refused })
+	// Wave B: "all screens" = the local ones here + every other server's screens through their owners (results per screen)
+	const remoteRun = screenIdx == null ? destRoute.relayAll(ctx, 'dest.ftb', ftbArgs).catch(() => []) : Promise.resolve([])
 
 	try {
 		// Stop timeline transport first so the ticker cannot PLAY layers again during the fade.
@@ -122,12 +128,16 @@ async function handlePost(path, body, ctx) {
 		// nudge onto an empty Caspar channel, so PRV stayed black (found 07.11 during the WO-979 two-box run).
 		for (const ch of channels) await liveSceneState.clearChannel(ch)
 		liveSceneState.broadcastSceneLive(ctx)
-
-		return {
-			status: 200,
+		const remote = await remoteRun
+		const driven = new Set(remote.map((r) => r.screen))
+		const notHere = screenIdx == null ? notHereList(ctx).filter((x) => !driven.has(x.screen)) : []
+		const remoteFailed = remote.some((r) => !r.ok)
+		const res = {
+			status: remoteFailed ? 502 : 200,
 			headers: JSON_HEADERS,
-			body: jsonBody({ ok: true, screenIdx, ...result, ...(refused.length ? { refused } : {}), ...(notHere.length ? { notHere } : {}) }),
+			body: jsonBody({ ok: !remoteFailed, screenIdx, ...result, ...(refused.length ? { refused } : {}), ...(notHere.length ? { notHere } : {}), ...(remote.length ? { remote } : {}) }),
 		}
+		return destRoute.finishDest(ctx, res, backup)
 	} catch (e) {
 		if (isAirHeld(e)) return airHeldReply(e)
 		const msg = e?.message || String(e)

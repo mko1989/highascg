@@ -122,6 +122,7 @@ function persistOnState(ctx) {
 	const source = ctx?._ledTestCardSource === 'control' ? 'control' : null
 	try {
 		persistence.set(ON_STATE_KEY, { on: ctx?._ledTestPatternActive === true && source === 'control', source })
+		if (ctx) require('../cluster/dest-air').changed(ctx) // WO-1029 C8: every on/off passes here → `testcard` to linked servers
 	} catch {
 		/* a lost flag only costs the GUI tick after a node restart */
 	}

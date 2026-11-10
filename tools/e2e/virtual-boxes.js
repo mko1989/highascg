@@ -28,6 +28,8 @@ const DEST = {
 	led: { id: LED_ID, label: 'LED wall' },
 	stream: { id: 'dst_stream_pgm', label: STREAM_LABEL },
 	backup: { id: 'dst_backup_pgm', label: 'Backup PGM' },
+	zoom: { id: 'dst_to_zoom', label: 'to zoom' }, // WO-1029 Wave B: the real boxes' screen 2, cabled nowhere
+	pgm3: { id: 'dst_pgm_prv_3', label: 'PGM/PRV 3' },
 }
 
 const destination = (d, idx) => ({ id: d.id, label: d.label, mainScreenIndex: idx, mode: 'pgm_prv', videoMode: MODE.videoMode, width: MODE.width, height: MODE.height, fps: MODE.fps, caspar: { bus: 'pgm' } })
@@ -94,9 +96,28 @@ function twoBoxes(opts = {}) {
 }
 
 /**
+ * WO-1029 plan 07 Wave B: the owner's two boxes with channels only where cabled (`cluster.channelsWhereCabled` on both):
+ * screen 1 LED wall on A (the master), screen 2 "to zoom" cabled nowhere, screens 3 (PGM/PRV 3) and 4 (Stream PGM) on
+ * B; `backup: true` adds screen 5 cabled on both. No copy channels anywhere: other boxes' screens are driven by dest.*.
+ */
+function cwcBoxes(opts = {}) {
+	const b = opts.base ?? 150
+	const both = opts.backup ? ['backup'] : []
+	return {
+		...opts,
+		cwc: true,
+		destinations: ['led', 'zoom', 'pgm3', 'stream', ...both],
+		boxes: {
+			'vb-a': { host: `127.0.1.${b + 1}`, caspar: `127.0.2.${b + 1}`, cabled: ['led', ...both] },
+			'vb-b': { host: `127.0.1.${b + 2}`, caspar: `127.0.2.${b + 2}`, cabled: ['pgm3', 'stream', ...both] },
+		},
+	}
+}
+
+/**
  * @param {string} root  scratch root (one folder per node under it)
  * @param {{ boxes: Record<string, { host: string, caspar: string, cabled: string[] }>, destinations: string[],
- *   password?: string, log?: Function }} spec
+ *   password?: string, log?: Function, cwc?: boolean }} spec  cwc: `cluster.channelsWhereCabled` on every box (cwcBoxes)
  */
 async function startVirtualBoxes(root, spec) {
 	const dests = spec.destinations.map((k) => ({ key: k, ...DEST[k] }))
@@ -124,6 +145,7 @@ async function startVirtualBoxes(root, spec) {
 					screenDestinations: { version: 1, destinations: destList },
 					deviceGraph: graphFor(dests, spec.boxes[id].cabled),
 					security: spec.password ? { enforceAuth: true, exposeToNetwork: true, apiToken: spec.password } : { enforceAuth: false, exposeToNetwork: false },
+					...(spec.cwc ? { cluster: { channelsWhereCabled: true } } : {}), // WO-1029 Wave B
 				},
 			}),
 		})
@@ -290,4 +312,4 @@ async function startVirtualBoxes(root, spec) {
 /** The look whose name is shown for destination `id` in a bed (for messages). */
 const destKey = (id) => Object.keys(DEST).find((k) => DEST[k].id === id)
 
-module.exports = { startVirtualBoxes, oneBox, twoBoxes, threeBoxes, DEST, destKey, graphFor, looksFor, ROOT: path.resolve(__dirname, '../..') }
+module.exports = { startVirtualBoxes, oneBox, twoBoxes, threeBoxes, cwcBoxes, DEST, destKey, graphFor, looksFor, ROOT: path.resolve(__dirname, '../..') }

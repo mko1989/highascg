@@ -133,8 +133,9 @@ async function clearDestination(ctx, mainIdx, target, cut, takeGroup) {
 
 async function fadeProgramToBlack(ctx, mainIdx, cut, sync) {
 	const map = require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}) || {}, ctx)
-	const nh = await require('./screen-not-here').notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c
-	if (nh) return nh
+	// WO-1029 C1c → Wave B: an empty item on a screen of another server is faded there (dest.clear program), not here
+	const nh = await require('../cluster/dest-route').relayIfNotHere(ctx, { screenIdx: mainIdx }, 'dest.clear', { bus: 'program', cut: !!cut })
+	if (nh) return nh // its take-group slot is released by withTakeGroup (the owner's fade is not in this barrier)
 	const ch = Number(map?.programChannels?.[mainIdx])
 	if (!Number.isFinite(ch) || ch <= 0 || !ctx?.amcp) return out(400, { ok: false, error: `no program channel for main ${mainIdx}` })
 	const fps = map?.programResolutions?.[mainIdx]?.fps ?? 50

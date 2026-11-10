@@ -20,7 +20,8 @@
  *       `channel` (a Caspar number) only maps to a screen when it is a PGM/PRV bus HERE; otherwise idx is null and
  *       `here` is true (the ordinary "no such channel" answer of the route stays in charge).
  *   notHereFor(ctx, query)   → Promise<409 reply | null>   — the one-liner for routes: `const nh = await notHereFor(...)`
- *   channelForScreen(ctx, body) → { channel } | { reply }   body.channel, else body.screenIdx → its PGM (409 when a hole)
+ *   channelForScreen(ctx, body, relay?) → { channel } | { reply }   body.channel, else body.screenIdx → its PGM (409 when a
+ *                              hole; with `relay` { action, args } the owner's answer, dest-route.js)
  *   notHereReply(ctx, x)     → Promise<409 reply>   x: a screenTarget, an `e.code === 'NOT_HERE'` error, or the
  *                              `{ notHere: true, screenIdx }` result the engine returns
  *   isNotHere(x)             → x is one of those two engine shapes
@@ -31,40 +32,24 @@ const { JSON_HEADERS, jsonBody } = require('./response')
 const { getChannelMap } = require('../config/routing')
 const sc = require('../config/screen-channels')
 
-const OWNERS_MS = 15 * 1000
-
 const mapOf = (ctx) => getChannelMap(ctx?.config || {})
 const holeRuleOn = (ctx, map) => sc.channelsWhereCabledEnabled(ctx?.config) && map?.channelsWhereCabled === true
 
-/** Linked servers' cables, from the peers' device views (cached by cluster-peers.js); the cache lives on ctx. */
+/** WO-1029 Wave B: the one owner lookup (cluster/dest-owners.js), shared with the ownership gate and dest-route. */
+const ownerIndex = (ctx) => ctx?._clusterOwnership?.ownerIndex || require('../cluster/dest-owners').ownerIndexOf(ctx)
+
+/** Linked servers' cables, refreshed when older than 15 s (never creates the cluster just to answer a refusal). */
 async function warmOwners(ctx) {
-	const cache = (ctx._notHereCables = ctx._notHereCables || { at: 0, byPeer: new Map() })
-	const cluster = ctx?._cluster // never create the cluster just to answer a refusal
-	if (!cluster || Date.now() - cache.at < OWNERS_MS) return cache
-	cache.at = Date.now()
 	try {
-		const { cabledIds } = require('../cluster/cluster-fanout')
-		const peers = cluster.snapshot?.().peers || []
-		for (const p of peers) {
-			if (!p?.id || p.online === false) continue
-			try {
-				const r = await cluster.deviceView?.(p.id)
-				if (r?.status === 200 && r.body?.graph) cache.byPeer.set(p.id, { name: p.name || p.id, cabled: cabledIds(r.body) })
-			} catch {
-				/* a silent peer keeps its last known cables */
-			}
-		}
+		await ownerIndex(ctx)?.warm()
 	} catch {
 		/* no cluster layer: owners stay empty ("not cabled on any server") */
 	}
-	return cache
 }
 
 function ownersOf(ctx, destId) {
-	const out = []
-	if (!destId) return out
-	for (const [id, v] of ctx?._notHereCables?.byPeer || []) if (v.cabled.has(destId)) out.push({ id, name: v.name })
-	return out
+	if (!destId) return []
+	return (ownerIndex(ctx)?.ownersOf(destId) || []).map((o) => ({ id: o.id, name: o.name }))
 }
 
 /** The destination id of a screen index: the map's own `screenHosts`, else the shared list's main entry. */
@@ -130,9 +115,11 @@ async function notHereFor(ctx, q) {
  * The program channel a request addresses: `body.channel` as it is today, else (new) `body.screenIdx` → that screen's PGM
  * here. → `{ channel }` (NaN = nothing addressed: the route's own "channel required") or `{ reply }` (409 NOT_HERE).
  */
-async function channelForScreen(ctx, b) {
+async function channelForScreen(ctx, b, relay = null) {
 	if (b.channel == null && b.screenIdx != null && b.screenIdx !== '') {
 		const t = screenTarget(ctx, { screenIdx: b.screenIdx })
+		// WO-1029 Wave B: `relay` = { action, args } → the screen's owner runs it (dest-route.js), else the 409
+		if (!t.here && relay) return { reply: await require('../cluster/dest-route').relayIfNotHere(ctx, { screenIdx: t.idx }, relay.action, relay.args) }
 		if (!t.here) return { reply: await notHereReply(ctx, t) }
 		if (t.pgm != null) return { channel: t.pgm }
 	}
@@ -162,4 +149,4 @@ function notHereList(ctx) {
 	return out
 }
 
-module.exports = { notHereFromError, channelForScreen, screenTarget, notHereFor, notHereReply, isNotHere, notHereList }
+module.exports = { warmOwners, notHereFromError, channelForScreen, screenTarget, notHereFor, notHereReply, isNotHere, notHereList }

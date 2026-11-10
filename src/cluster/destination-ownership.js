@@ -20,6 +20,11 @@
  *   - the master changes nothing (it drives every screen and forwards).
  * Unknown owners (an old peer, a view not fetched yet) never refuse anything: wire compatibility is "as before".
  *
+ * WO-1029 Wave B, `cluster.channelsWhereCabled` on here: no copy channels, so `verdict` never answers REMOTE_SCREEN (a
+ * screen elsewhere is relayed by dest-route.js) and `destinations()` lists EVERY screen destination of the shared list:
+ * kind 'own' (cabled here only) | 'backup' (here and elsewhere) | 'remote' (elsewhere only) | 'nowhere', `online` per
+ * owner. Owners come from the one owner lookup, dest-owners.js (also behind 409 NOT_HERE and the media needs).
+ *
  * Press notice (`localPress`): a line this server sends itself on an OWN screen the master forwards here tells the master
  * `dest.pressed { destId, seq }` (signed info call, debounced per destination, never awaited by the press), so the
  * master stops catching that screen up (cluster-holders.js). An old-build master answers "unknown action": logged once,
@@ -27,6 +32,7 @@
  */
 
 const { mainChannels, cabledIds } = require('./cluster-fanout')
+const { createOwnerIndex } = require('./dest-owners')
 
 const NOTICE_MS = 1000
 const OLD_PEER_RETRY_MS = 10 * 60 * 1000
@@ -43,7 +49,8 @@ const { PRESSED } = require('./cluster-fanout-report')
 function createOwnership(deps) {
 	const now = deps.now || Date.now
 	const log = (lvl, msg) => deps.log?.(lvl, `[cluster] ${msg}`)
-	const peerCables = new Map() // linked server id → Set<destination id>
+	// WO-1029 Wave B: the one owner lookup (dest-owners.js), shared with screen-not-here / dest-route when wired by ctx
+	const owners0 = deps.ownerIndex || createOwnerIndex({ peers: deps.peers, peerView: deps.peerView, now })
 	const notices = new Map() // destination id → last notice time
 	const oldMasters = new Map() // master id → when it answered "unknown action"
 	let seq = now()
@@ -77,26 +84,20 @@ function createOwnership(deps) {
 
 	/** After every cluster poll: the linked servers' cables (their device views, cached by cluster-peers.js). */
 	async function refresh() {
-		const list = deps.peers() || []
-		for (const id of [...peerCables.keys()]) if (!list.some((p) => p.id === id)) peerCables.delete(id)
-		for (const p of list) {
-			if (!p?.online || !p.id) continue
-			let view
-			try {
-				view = await deps.peerView(p.id)
-			} catch {
-				view = null
-			}
-			if (view?.graph) peerCables.set(p.id, cabledIds(view))
-		}
+		await owners0.refresh()
 		own = null
 	}
 
 	/** Linked servers (not this one) the destination is cabled on → [{ id, name, online }]. */
-	function ownersElsewhere(destId) {
-		const out = []
-		for (const p of deps.peers() || []) if (peerCables.get(p.id)?.has(destId)) out.push({ id: p.id, name: p.name || p.id, online: p.online === true })
-		return out
+	const ownersElsewhere = (destId) => owners0.ownersOf(destId).map(({ id, name, online }) => ({ id, name, online }))
+
+	/** WO-1029 Wave B: channels only where cabled is on HERE (this server's own channel map says so). */
+	function cwc() {
+		try {
+			return deps.ownView()?.live?.caspar?.channelMap?.channelsWhereCabled === true
+		} catch {
+			return false
+		}
 	}
 
 	const isMaster = () => deps.master()?.is_master === true
@@ -105,7 +106,9 @@ function createOwnership(deps) {
 	function verdict(ch) {
 		const held = deps.report.heldBy(ch)
 		if (held) return held
-		if (isMaster() || deps.pairEnabled?.()) return ''
+		// WO-1029 C13a: no copy channels with channels-where-cabled on — a screen elsewhere is relayed (dest-route.js),
+		// never refused here as REMOTE_SCREEN (that 409 would shadow the relay)
+		if (isMaster() || deps.pairEnabled?.() || cwc()) return ''
 		const d = index().byCh.get(Number(ch))
 		if (!d || d.here || d.pgm !== Number(ch)) return '' // PRV stays this operator's
 		const owners = ownersElsewhere(d.id)
@@ -147,6 +150,7 @@ function createOwnership(deps) {
 
 	/** GET /api/cluster `destinations` (rule 6): [{ id, label, main, owners, here, kind, holder }] */
 	function destinations() {
+		if (cwc()) return allDestinations()
 		const self = String(deps.selfId?.() || 'self')
 		const m = deps.master() || {}
 		const fwd = isMaster() ? forwardedIds() : null
@@ -170,13 +174,47 @@ function createOwnership(deps) {
 		})
 	}
 
+	/**
+	 * WO-1029 Wave B (flag on): EVERY screen destination of the shared list, not only those with a channel here —
+	 * [{ id, label, main, owners, here, kind: 'own'|'backup'|'remote'|'nowhere', holder: '', online: { id: bool } }].
+	 * here = cabled in this server's own graph (= has channels here); owners = this server + the linked servers that cable it.
+	 */
+	function allDestinations() {
+		const self = String(deps.selfId?.() || 'self')
+		let view
+		try {
+			view = deps.ownView()
+		} catch {
+			view = null
+		}
+		const here = cabledIds(view)
+		const out = []
+		for (const d of view?.screenDestinations?.destinations || []) {
+			if (!d || typeof d.id !== 'string' || ['multiview', 'stream', 'operator_gui'].includes(String(d.mode || 'pgm_prv'))) continue
+			const others = owners0.ownersOf(d.id)
+			const mine = here.has(d.id)
+			const online = Object.fromEntries(others.map((o) => [o.id, o.online]))
+			if (mine) online[self] = true
+			const kind = mine ? (others.length ? 'backup' : 'own') : others.length ? 'remote' : 'nowhere'
+			const main = Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0)
+			out.push({ id: d.id, label: String(d.label || d.id), main, owners: [...(mine ? [self] : []), ...others.map((o) => o.id)], here: mine, kind, holder: '', online })
+		}
+		return out.sort((a, b) => a.main - b.main)
+	}
+
+	/** WO-1029 Wave B: [{ id, name, online, caps }] for dest-route.js (refreshed when older than 15 s). */
+	async function ownersOf(destId) {
+		await owners0.warm()
+		return owners0.ownersOf(destId)
+	}
+
 	/** What look-relay.js needs about a destination: the linked servers it is cabled on. */
 	const owners = (ids) => (deps.peers() || []).filter((p) => (ids || []).includes(p.id)).map((p) => ({ id: p.id, name: p.name || p.id, online: p.online === true }))
 
 	/** zone-actions.js R3: is this program channel's destination cabled on THIS server? */
 	const cabledHere = (ch) => index().byCh.get(Number(ch))?.here === true
 
-	return { refresh, verdict, localPress, destinations, owners, cabledHere }
+	return { refresh, verdict, localPress, destinations, owners, cabledHere, ownersOf, ownerIndex: owners0, cwc }
 }
 
 module.exports = { createOwnership }

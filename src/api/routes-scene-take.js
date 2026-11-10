@@ -68,7 +68,7 @@ function handleSceneTake(body, ctx) {
 
 async function handleSceneTakeInner(body, ctx, sync) {
 	const b = parseBody(body)
-	const sel = await channelForScreen(ctx, b) // WO-1029 C1c: `screenIdx` on a screen of another server → 409 NOT_HERE
+	const sel = await channelForScreen(ctx, b, { action: 'dest.media', args: { op: 'take', body: { ...b, takeGroup: undefined } } }) // WO-1029 Wave B: its owner
 	if (sel.reply) return sel.reply
 	const channel = sel.channel
 	if (!channel || channel < 1) {

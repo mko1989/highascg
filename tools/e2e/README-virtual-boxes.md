@@ -17,7 +17,10 @@ ephemeral ports), every Caspar is fake.
 
 Layouts: `oneBox()` (LED wall + Stream PGM on one box), `twoBoxes({ backup })` (A: LED wall, B: Stream PGM, optional
 destination cabled on both), `threeBoxes()` (plus C with nothing cabled — a master that owns no screen). Names follow
-`two-box/scenario.js` (`LED_ID`, `STREAM_LABEL`).
+`two-box/scenario.js` (`LED_ID`, `STREAM_LABEL`). WO-1029 Wave B: `cwcBoxes({ backup })` = the owner's two boxes with
+`cluster.channelsWhereCabled` on (A: screen 1 LED wall; screen 2 "to zoom" cabled nowhere; B: screens 3 and 4; optional
+screen 5 on both) — no copy channels and no AMCP fan-out: other boxes' screens are driven by dest.* calls
+(`smoke-wo1029-virtual-dest.test.js`).
 
 ## What it cannot tell you
 

@@ -155,3 +155,42 @@ describe('WO-1029 C10 media needs', () => {
 		assert.equal(withMediaMissing({ _clusterMediaNeeds: n }, err, 'l2', 1), err)
 	})
 })
+
+describe('WO-1029 Wave B: the master knows the owners of screens it has no channel for (one owner lookup)', () => {
+	// found live 10.11: on the MASTER (channels only where cabled) a look on a screen owned by the other box was not
+	// "needed" anywhere — destinations() listed only the screens with a channel on the master
+	const cable = (ids) => ({
+		connectors: [...ids.map((id) => ({ id: `dst_in_${id}`, kind: 'destination_in', externalRef: id })), ...ids.map((id) => ({ id: `out_${id}`, kind: 'gpu_out' }))],
+		edges: ids.map((id) => ({ id: `e_${id}`, sourceId: `dst_in_${id}`, sinkId: `out_${id}` })),
+	})
+	const list = { destinations: [{ id: 'd1', label: 'LED wall', mainScreenIndex: 0, mode: 'pgm_prv' }, { id: 'd2', label: 'Stream PGM', mainScreenIndex: 1, mode: 'pgm_prv' }] }
+	const { createOwnership } = require('../../src/cluster/destination-ownership')
+	const rig = (cwc) =>
+		createOwnership({
+			selfId: () => 'A',
+			ownView: () => ({ graph: cable(['d1']), screenDestinations: list, live: { caspar: { channelMap: cwc ? { programChannels: [2, null], previewChannels: [3, null], channelsWhereCabled: true } : { programChannels: [2, 4], previewChannels: [3, 5] } } } }),
+			peers: () => [{ id: 'B', name: 'boxB', online: true, caps: ['dest-actions'] }],
+			peerView: async () => ({ graph: cable(['d2']), screenDestinations: list }),
+			master: () => ({ is_master: true, epoch: 2 }),
+			report: { heldBy: () => '', forwardedBy: () => null, holderOf: () => '', view: () => null },
+			call: async () => ({ ok: true }),
+		})
+
+	it('destinations() lists every screen with owners / kind / online; the remote screen\'s clip is needed on B', async () => {
+		const o = rig(true)
+		await o.refresh()
+		const d = o.destinations()
+		assert.deepEqual(d.map((x) => [x.id, x.owners, x.here, x.kind]), [['d1', ['A'], true, 'own'], ['d2', ['B'], false, 'remote']])
+		assert.deepEqual(d[1].online, { B: true })
+		assert.equal(o.verdict(4), '', 'no REMOTE_SCREEN 409 shadowing the relay')
+		const n = computeNeeds({ project: { scenes: [look('l2', 1, ['clip2'])] }, destinations: d, servers: SERVERS, inventory: inv({ A: { known: true, files: [F('clip2.mov')] }, B: { known: true, files: [] } }), now: () => 1 })
+		assert.deepEqual(row(n, 'CLIP2').missing_on, ['B'])
+		assert.deepEqual(row(n, 'CLIP2').needed_on.map((x) => x.server), ['B'])
+	})
+
+	it('flag off: unchanged (only the screens with a channel here, the old kinds)', async () => {
+		const o = rig(false)
+		await o.refresh()
+		assert.deepEqual(o.destinations().map((x) => [x.id, x.owners, x.kind]), [['d1', ['A'], 'local'], ['d2', ['B'], 'local']])
+	})
+})

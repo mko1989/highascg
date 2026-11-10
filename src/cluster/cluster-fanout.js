@@ -142,6 +142,7 @@ function createClusterFanout(deps) {
 	const holders = deps.holders || createHolders() // WO-1029 2a
 	let active = false
 	let lastSig = ''
+	let lastDestCalls = false
 	const log = (lvl, msg) => deps.log?.(lvl, `[cluster] ${msg}`)
 
 	function drop(id) {
@@ -163,21 +164,28 @@ function createClusterFanout(deps) {
 	}
 
 	async function plan() {
-		const on = deps.isMaster() && !deps.pairEnabled()
+		const master = deps.isMaster() && !deps.pairEnabled()
+		const own = master ? await deps.ownView() : null
+		// WO-1029 C13a: channels only where cabled — no copy channels to mirror from; every other server's screen (a
+		// backup too) is driven by node-to-node dest.* calls (dest-route.js). Nothing forwarded, no holders, no catch-up.
+		const destCalls = master && own?.live?.caspar?.channelMap?.channelsWhereCabled === true
+		const on = master && !destCalls
 		if (on && !active) holders.clear() // WO-1029 2a: a new mastership holds no other server's screen
-		if (on !== active)
+		if (on !== active || destCalls !== lastDestCalls)
 			log(
 				'info',
 				on
 					? 'master: forwarding takes to the linked servers'
-					: 'not forwarding takes (not the master, or the hot-backup pair is on)'
+					: destCalls
+						? 'master: channels only where cabled — the linked servers\' screens are driven by dest.* calls (no AMCP forwarding)'
+						: 'not forwarding takes (not the master, or the hot-backup pair is on)'
 			)
+		lastDestCalls = destCalls
 		active = on
 		if (!on) {
 			for (const id of [...targets.keys()]) drop(id)
 			return changed()
 		}
-		const own = await deps.ownView()
 		const members = deps.members()
 		for (const id of [...targets.keys()]) if (!members.some((m) => m.id === id)) drop(id)
 		for (const m of members) {

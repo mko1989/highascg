@@ -84,6 +84,7 @@ async function runFadeToBlackAllLayers(amcp, channels, opts, self) {
 	const tween = mapTween(opts?.tween)
 	const uniq = [...new Set((channels || []).map((c) => parseInt(c, 10)).filter((n) => Number.isFinite(n) && n >= 1))]
 	if (uniq.length === 0) return { channels: [], durationFrames }
+	require('../cluster/dest-air').noteFtb(self, uniq) // WO-1029 C8: linked servers show `ftb` for these screens
 
 	let maxFadeMs = 0
 	for (const ch of uniq) {

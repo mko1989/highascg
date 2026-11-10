@@ -35,7 +35,7 @@
  *                                                (cluster-apply.js); progress WS `cluster:apply`
  * GET /api/cluster also carries `master` (the view) and `invites` (WO-739: [{ id, fp, host, port, name, version,
  * first_at, asked_at }]). Changes broadcast WS `cluster:peers` (the GET body).
- * WO-1029 2a: and `destinations: [{ id, label, main, owners: [server ids], here, kind: 'own'|'backup'|'remote'|'local',
+ * WO-1029 2a: and `destinations: [{ id, label, main, owners: [server ids], here, kind: 'own'|'backup'|'remote'|'local'|'nowhere',
  * holder: '' | server id }]` (destination-ownership.js); `forwarded_here` gains `mirror` (the held backup screens).
  * The service starts on the first call, or at boot when servers are linked (P3b `startIfLinked`: failover never waits
  * for a client), and polls only while the list is not empty.
@@ -87,6 +87,7 @@ function clusterOf(ctx) {
 		await ownershipOf(ctx).refresh() // WO-1029 2a: which linked server each destination is cabled on
 		reportOf(ctx).publish() // WO-1029 B1: each linked server hears what this master forwards to it (nothing if not master)
 		require('../cluster/air-state').airChanged(ctx) // WO-712 R3b: the `air` heartbeat
+		require('../cluster/dest-air').tick(ctx) // WO-1029 C8: `dest.air` heartbeat; offline sources → unknown
 		duties.refresh() // WO-723: who does what follows the peers' pings
 		await sendersSyncOf(ctx).tick()
 		ctx._dutiesBroadcast?.() // a server that refused the choices shows it (deduped: nothing new, nothing sent)
@@ -225,7 +226,7 @@ function ownershipOf(ctx) {
 	if (ctx._clusterOwnership) return ctx._clusterOwnership
 	const { createOwnership } = require('../cluster/destination-ownership')
 	const get = { cluster: () => clusterOf(ctx), master: () => masterOf(ctx), report: () => reportOf(ctx), call: () => callOf(ctx) }
-	ctx._clusterOwnership = createOwnership(ownershipDeps(ctx, get))
+	ctx._clusterOwnership = createOwnership({ ...ownershipDeps(ctx, get), ownerIndex: require('../cluster/dest-owners').ownerIndexOf(ctx) }) // WO-1029 Wave B: one owner lookup
 	return ctx._clusterOwnership
 }
 
@@ -278,7 +279,7 @@ function callOf(ctx) {
 		post: postJson,
 		masterId: () => (masterOf(ctx).view().is_master ? '' : masterOf(ctx).view().master_id),
 		acceptsRemote: () => require('../cluster/server-duties').has('accept_remote'),
-		info: { ...exchangeOf(ctx).info, ...showOf(ctx).info, ...reportOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
+		info: { ...exchangeOf(ctx).info, ...showOf(ctx).info, ...reportOf(ctx).info, ...require('../cluster/dest-actions').destActionsOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
 		actions: { ...createCallActions(ctx, { callMaster: (a, args, o) => callOf(ctx).callMaster(a, args, o), call: (id, a, args, o) => callOf(ctx).call(id, a, args, o),
 			owners: (ids) => ownershipOf(ctx).owners(ids), isFollower: () => isClusterFollower(ctx) }), ...showOf(ctx).actions },
 		log: ctx.log,
@@ -317,6 +318,7 @@ function exchangeOf(ctx) {
 		call: (id, action, args, o) => callOf(ctx).call(id, action, args, o),
 		broadcast: (type, data) => typeof ctx._wsBroadcast === 'function' && ctx._wsBroadcast(type, data),
 		onData: (topic, data, source) => topic === 'air' && ctx.zoneService?.onAir(`peer:${source.id}`, data.program),
+		handlers: { 'dest.air': (data, source, why) => require('../cluster/dest-air').received(ctx, data, source, why) }, // WO-1029 C8
 		log: ctx.log,
 	})
 	return ctx._clusterExchange

@@ -45,12 +45,15 @@ async function runAction(action, ctx, deps = {}) {
 		if (action.type === 'invalid') return { ok: false, detail: action.error }
 		if (action.type === 'look') {
 			const cluster = deps.cluster || (ctx?._clusterMaster ? require('../api/routes-cluster') : null)
-			const routed = action.target !== 'preview' && cluster ? await routeLook(action, ctx, cluster, deps) : null
+			// WO-1029 Wave B: channels only where cabled — the take-look path itself sends the look to its screen's owner(s)
+			// (dest.take, dest-route.js); the master / owner hand-over below is the flag-off path
+			const viaDest = require('../cluster/dest-route').cwcOn(ctx)
+			const routed = action.target !== 'preview' && cluster && !viaDest ? await routeLook(action, ctx, cluster, deps) : null
 			if (routed && !routed.diverged) return routed
 			const take = deps.takeLook || require('../api/routes-scene-take-look').handleTakeLook
 			const r = await take({ sceneId: action.sceneId, target: action.target, ...(routed ? { relayed: true } : {}) }, ctx)
 			const ok = !r || !r.status || r.status < 400
-			const how = routed ? ' (the master did not answer: diverged)' : ''
+			const how = routed ? ' (the master did not answer: diverged)' : viaOf(r)
 			return { ok, detail: `look ${action.sceneId} → ${action.target}${how}${ok ? '' : ` (${r.status} ${bodyError(r)})`}` }
 		}
 		if (action.type === 'companion') {
@@ -107,6 +110,16 @@ async function routeLook(action, ctx, cluster, deps) {
 	// WO-712 R2: the master takes it (and forwards it to the screen's owner)
 	const r = await cluster.callOf(ctx).callMaster('look.take', b)
 	return { ok: !!r.ok, detail: `look ${action.sceneId} → master${r.ok ? '' : ` (${r.status} ${r.json?.error || r.error || ''})`}` }
+}
+
+/** Wave B: ' → via highascg5867' when the take ran on other servers (dest-route.js `via`). */
+function viaOf(r) {
+	try {
+		const via = JSON.parse(r.body).via
+		return Array.isArray(via) && via.length ? ` via ${via.map((v) => v.name).join(', ')}` : ''
+	} catch (_) {
+		return ''
+	}
 }
 
 function bodyError(r) {

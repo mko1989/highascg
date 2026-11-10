@@ -123,6 +123,7 @@ function getState(ctx, opts = {}) {
 			programLayerBankByChannel: ctx.programLayerBankByChannel || {},
 			deck: sceneDeck,
 			...(globalBorders ? { globalBorders } : {}),
+			...remoteLiveOf(ctx),
 		},
 		timeline: {
 			list: timelines,
@@ -150,6 +151,16 @@ function getState(ctx, opts = {}) {
 				: ctx.oscState && typeof ctx.oscState.getSnapshot === 'function'
 					? ctx.oscState.getSnapshot()
 					: null,
+	}
+}
+
+/** WO-1029 C8: `scene.remoteLive` (what is on the screens cabled on linked servers) — absent with the flag off. */
+function remoteLiveOf(ctx) {
+	try {
+		const v = require('../cluster/dest-air').remoteLive(ctx)
+		return v ? { remoteLive: v } : {}
+	} catch {
+		return {}
 	}
 }
 

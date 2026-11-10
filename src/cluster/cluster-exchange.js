@@ -12,6 +12,10 @@
  *   air             R3b: what is on program (`{ program: [{ channel, sceneId, name }] }`, src/cluster/air-state.js).
  *                   From a server without the `zones` duty to every online linked server that has it; the receiver
  *                   runs its "on air" rules on it (R4, `onData` → zone-service `onAir`) and broadcasts WS `cluster:air`.
+ *   dest.air        WO-1029 C8: what is on each destination cabled on the sender (src/cluster/dest-air.js), to EVERY online
+ *                   linked server that advertises the `dest-air` cap (duties do not matter: every box shows every
+ *                   screen). No WS here (`ws: null`): dest-air.js keeps the newest per destination and pushes its own
+ *                   coalesced `cluster:dest-air`. The sender paces it itself (debounced change + heartbeat).
  *
  * Sender: `offer(topic, data)` on every look (≤ 5 Hz). It sends when the data changed, and every HEARTBEAT_MS anyway,
  * so a receiver can tell a quiet server from a gone one. One call per peer is in flight; while it is, only the newest
@@ -41,12 +45,23 @@ const TOPICS = {
 		wants: (d) => d.zones === true,
 		refuses: (has) => (has('zones') ? '' : 'zone actions are off on this server'),
 	},
+	'dest.air': {
+		action: 'exchange.dest_air',
+		ws: null,
+		empty: { destinations: [] },
+		sends: () => true,
+		anyPeer: true, // WO-1029 C8: no duties needed, the cap decides (an older build has no receiver for it)
+		wants: (_d, p) => Array.isArray(p?.caps) && p.caps.includes('dest-air'),
+		refuses: () => '',
+	},
 }
 
 /**
  * @param {{ peers: () => Array<{id:string, name:string, online:boolean|null, duties:object|null}>,
  *   has: (duty: string) => boolean, call: Function, broadcast: (type: string, data: object) => void,
- *   onData?: (topic: string, data: object, source: {id: string, name: string}) => void, now?: () => number,
+ *   onData?: (topic: string, data: object, source: {id: string, name: string}, why?: ''|'expired'|'dropped') => void,
+ *   handlers?: Record<string, (data: object, source: {id: string, name: string}, why: ''|'expired'|'dropped') => void>,
+ *   now?: () => number,
  *   log?: Function }} deps
  */
 function createExchange(deps) {
@@ -55,7 +70,7 @@ function createExchange(deps) {
 	const inbox = new Map() // `${topic}|${peer id}` → { topic, data, json, at, source }
 	let timer = null
 
-	const targets = (t) => deps.peers().filter((p) => p.online && p.duties && t.wants(p.duties))
+	const targets = (t) => deps.peers().filter((p) => p.online && (p.duties || t.anyPeer) && t.wants(p.duties || {}, p))
 
 	/** Sender → how many peers a call was started (or queued) for. */
 	function offer(topic, data) {
@@ -103,8 +118,9 @@ function createExchange(deps) {
 		const source = { id: peer.id, name: peer.name }
 		inbox.set(k, { topic, data, json, at: now(), source })
 		if (!prev || prev.json !== json) {
-			deps.broadcast(t.ws, { ...data, source })
+			if (t.ws) deps.broadcast(t.ws, { ...data, source })
 			deps.onData?.(topic, data, source)
+			deps.handlers?.[topic]?.(data, source, '')
 		}
 		if (!timer) {
 			timer = setInterval(expire, HEARTBEAT_MS)
@@ -119,8 +135,9 @@ function createExchange(deps) {
 			if (t0 - m.at <= EXPIRE_MS) continue
 			inbox.delete(k)
 			const t = TOPICS[m.topic]
-			deps.broadcast(t.ws, { ...t.empty, source: m.source, gone: true })
-			deps.onData?.(m.topic, { ...t.empty }, m.source)
+			if (t.ws) deps.broadcast(t.ws, { ...t.empty, source: m.source, gone: true })
+			deps.onData?.(m.topic, { ...t.empty }, m.source, 'expired')
+			deps.handlers?.[m.topic]?.({ ...t.empty }, m.source, 'expired')
 		}
 	}
 
@@ -136,8 +153,9 @@ function createExchange(deps) {
 			inbox.delete(k)
 			n++
 			const t = TOPICS[m.topic]
-			deps.broadcast(t.ws, { ...t.empty, source: m.source, gone: true })
-			deps.onData?.(m.topic, { ...t.empty }, m.source)
+			if (t.ws) deps.broadcast(t.ws, { ...t.empty, source: m.source, gone: true })
+			deps.onData?.(m.topic, { ...t.empty }, m.source, 'dropped')
+			deps.handlers?.[m.topic]?.({ ...t.empty }, m.source, 'dropped')
 		}
 		for (const k of [...out.keys()]) if (k.endsWith(`|${peerId}`)) out.delete(k)
 		return n
@@ -155,7 +173,8 @@ function createExchange(deps) {
 	function view() {
 		expire()
 		const t0 = now()
-		const topics = Object.fromEntries(Object.keys(TOPICS).map((topic) => [topic, latest(topic)]))
+		// dest.air (WO-1029 C8) is per destination, not "the newest source": it lives in /api/state scene.remoteLive
+		const topics = Object.fromEntries(Object.keys(TOPICS).filter((k) => TOPICS[k].ws).map((topic) => [topic, latest(topic)]))
 		const sources = [...inbox.values()].map((m) => ({ topic: m.topic, source: m.source, age_ms: t0 - m.at }))
 		return { ...topics, sources }
 	}

@@ -168,6 +168,11 @@ function broadcastSceneLive(ctx, opts = {}) {
 	} catch (e) {
 		ctx.log?.('warn', '[on-air] ' + (e?.message || e))
 	}
+	try {
+		require('../cluster/dest-air').changed(ctx) // WO-1029 C8: the linked servers see this server's screens (debounced)
+	} catch (e) {
+		ctx.log?.('warn', '[dest-air] ' + (e?.message || e))
+	}
 }
 
 /**

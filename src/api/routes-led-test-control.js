@@ -14,7 +14,8 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const ctl = require('../engine/led-test-card-control')
 const { airHeldBy } = require('../replication/amcp-fanout')
 const { airHeldReply } = require('../replication/air-held') // WO-1029 B2
-const { notHereFor, notHereList, screenTarget } = require('./screen-not-here') // WO-1029 plan 07 C1c
+const { notHereList, screenTarget } = require('./screen-not-here') // WO-1029 plan 07 C1c
+const destRoute = require('../cluster/dest-route') // WO-1029 Wave B
 
 const reply = (status, body) => ({ status, headers: JSON_HEADERS, body: jsonBody(body) })
 
@@ -64,14 +65,26 @@ async function handlePost(op, body, ctx) {
 		if (refused.length && refused.length === targets.length) return airHeldReply(refused[0], { refused })
 		const held = new Set(refused.map((h) => h.channel))
 		const opts = refused.length ? { channels: targets.filter((c) => !held.has(c)), masterOff: !enabled } : {}
+		// WO-1029 Wave B: pressed on the MASTER, "master" = every screen of every server (each owner shows the card with
+		// its own settings); on any other server it stays this server's screens (the others listed in `notHere`)
+		const isMaster = ctx?._clusterMaster?.view?.()?.is_master === true
+		const remoteRun = isMaster ? destRoute.relayAll(ctx, 'dest.testcard', { on: enabled }).catch(() => []) : Promise.resolve([])
 		const r = await ctl.applyCard(ctx, enabled, opts)
-		const notHere = notHereList(ctx) // the screens on other servers get no card from here
-		return reply(r.ok ? 200 : 502, refused.length || notHere.length ? { ...r, ...(refused.length ? { refused } : {}), ...(notHere.length ? { notHere } : {}) } : r)
+		const remote = await remoteRun
+		const driven = new Set(remote.map((x) => x.screen))
+		const notHere = notHereList(ctx).filter((x) => !driven.has(x.screen))
+		const bad = remote.some((x) => !x.ok)
+		const extra = { ...(refused.length ? { refused } : {}), ...(notHere.length ? { notHere } : {}), ...(remote.length ? { remote } : {}) }
+		return reply(r.ok && !bad ? 200 : 502, Object.keys(extra).length ? { ...r, ...(bad ? { ok: false } : {}), ...extra } : r)
 	}
 	// WO-1029 C1c: `screenIdx` addresses a screen; one on another server is a typed 409 (a raw `channel` stays as is)
+	let backup = null
 	if (b.channel == null && b.screenIdx != null) {
-		const nh = await notHereFor(ctx, { screenIdx: b.screenIdx })
+		const args = { on: b.enabled === true }
+		const nh = await destRoute.relayIfNotHere(ctx, { screenIdx: b.screenIdx }, 'dest.testcard', args) // Wave B: through its owner
 		if (nh) return nh
+		backup = await destRoute.backupPlan(ctx, { screenIdx: b.screenIdx }, 'dest.testcard', args) // hot backup: its other owner too
+		if (backup?.reply) return backup.reply
 		b.channel = screenTarget(ctx, { screenIdx: b.screenIdx }).pgm
 	}
 	const ch = parseInt(String(b.channel), 10)
@@ -79,7 +92,7 @@ async function handlePost(op, body, ctx) {
 	const held = airHeldBy(ctx, ch) // WO-1029 B2: refused before the dialog's choice is stored or anything is sent
 	if (held) return airHeldReply(held)
 	const r = await ctl.setChannel(ctx, ch, b.enabled === true)
-	return reply(r.ok ? 200 : 502, r)
+	return destRoute.finishDest(ctx, reply(r.ok ? 200 : 502, r), backup)
 }
 
 module.exports = { channelRows, handleGet, handlePost }

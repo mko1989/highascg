@@ -18,7 +18,6 @@
  */
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
-const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 
 function out(status, payload) {
 	return { status, headers: JSON_HEADERS, body: jsonBody(payload) }
@@ -74,7 +73,7 @@ async function handleLayerScrub(body, ctx, deps = {}) {
 		: Number.isFinite(scope)
 			? scope
 			: 0
-	const nh = await notHereFor(ctx, { screenIdx: mainIdx }) // WO-1029 C1c
+	const nh = await require('../cluster/dest-route').relayIfNotHere(ctx, { screenIdx: mainIdx }, 'dest.layer', { op: 'layer-scrub', body: { ...b, mainIdx } }) // WO-1029 Wave B
 	if (nh) return nh
 	const pgmCh = Number(map.programChannels?.[mainIdx] ?? map.playbackChannels?.[mainIdx])
 	const prvCh = Number(map.previewChannels?.[mainIdx])
