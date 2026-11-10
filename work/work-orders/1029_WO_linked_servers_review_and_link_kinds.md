@@ -238,3 +238,14 @@ channel + the node's own state: looks, clip positions, paused / loop, routes, CG
 consumers) and restores it once Caspar is back, clips resumed at position + elapsed, mapped by destination (not by
 channel number). WO-1013's restore is folded in. Tests: unit smokes + the virtual box bed with a restartable fake
 Caspar.
+
+### Apply, first run on the real box (10.11 12:28, main ce07da11)
+
+- Plan: main clean, 5867 "clean (older build: running config only)". Forced on main with a clip playing on the LED
+  and the test card on.
+- Snapshot 12:28:38.72 → AMCP RESTART → Caspar back :41.1 → `restored in 1150 ms`; screens black about 3.8 s.
+- Clip on ch 2 layer 10: 63.04 s before, 67.06 s after 4.11 s (expected 67.15) — the SEEK path works on this build.
+  Test card back on layer 999; PRV clip resumed; stream look on ch 7 re-taken.
+- **Bug:** the PGM look came back twice — its old bank layer (10) resumed at the right position AND the re-take on
+  the other bank (110) from 0. The plan did not know look banks. Being fixed (engine).
+- 5867 is not on this build yet (the owner is working on it): the two-box apply is verified only in the virtual bed.
