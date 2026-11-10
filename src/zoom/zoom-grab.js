@@ -22,12 +22,17 @@ const GRAB_DIR = path.join(REPO_ROOT, 'tools', 'window-grab')
 const GRAB_BIN = path.join(GRAB_DIR, 'build', 'window_grab')
 
 let buildError = ''
+const GRAB_SOURCES = ['window_grab.cpp', 'window_fit.h', 'build.sh']
 
 /** @returns {{ ok: boolean, bin: string, error?: string }} */
 function ensureBinary(deps = {}) {
 	const exists = deps.exists || fs.existsSync
 	const build = deps.build || (() => execFileSync(path.join(GRAB_DIR, 'build.sh'), { timeout: 120000, stdio: 'pipe' }))
-	if (exists(GRAB_BIN)) return { ok: true, bin: GRAB_BIN }
+	// a binary older than its source is rebuilt: an update that adds a grabber option must not leave the old one running
+	const mtime = deps.mtime || ((f) => { try { return fs.statSync(f).mtimeMs } catch { return 0 } })
+	const stale = exists(GRAB_BIN) && GRAB_SOURCES.some((f) => mtime(path.join(GRAB_DIR, f)) > mtime(GRAB_BIN))
+	if (exists(GRAB_BIN) && !stale) return { ok: true, bin: GRAB_BIN }
+	if (stale) buildError = ''
 	if (buildError) return { ok: false, bin: GRAB_BIN, error: buildError }
 	try {
 		build()
@@ -46,11 +51,13 @@ function createGrab(o) {
 	const spawnFn = o.spawn || spawn
 	const args = ['--ring', o.ring, '--size', o.size, '--fps', String(o.fps)]
 	if (o.window) args.push('--window', String(o.window))
+	if (o.fit) args.push('--fit', String(o.fit)) // chrome colours: find the picture and fill the ring with it (window_fit.h)
 	const child = spawnFn(o.bin || GRAB_BIN, args, { env: displaySessionEnv(), stdio: ['pipe', 'pipe', 'pipe'] })
 	const grab = {
 		ring: o.ring,
 		size: o.size,
 		fps: o.fps,
+		fit: o.fit || '',
 		status: { window: o.window || null, mapped: false, published: 0, errors: 0 },
 		stderr: '',
 		alive: true,
@@ -97,7 +104,7 @@ function createGrab(o) {
 			try {
 				const s = JSON.parse(line)
 				if (s.t !== 'status') continue
-				grab.status = { window: s.window === '0x0' ? null : s.window, mapped: !!s.mapped, w: s.w, h: s.h, published: s.published, errors: s.errors }
+				grab.status = { window: s.window === '0x0' ? null : s.window, mapped: !!s.mapped, w: s.w, h: s.h, published: s.published, errors: s.errors, box: s.fit && Array.isArray(s.box) && s.box[2] > 0 ? s.box : null }
 				o.onStatus?.({ ...grab.status, note: s.note || '' })
 			} catch {
 				/* not a status line */

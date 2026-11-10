@@ -268,3 +268,54 @@ test('automatic binding: only in a meeting, only large windows, never the home w
 	const realHome = { id: '0x6', title: 'Zoom Workplace - Free account', width: 1280, height: 960 }
 	assert.deepStrictEqual(autoBindable([meeting, second, dialog, realHome]).map((w) => w.id), ['0x3', '0x4'])
 })
+
+test('fit (on by default): the grab gets the Zoom chrome colours, so the ring holds only the picture; off = the window as is', async () => {
+	const grabs = []
+	const s = createZoomSession({
+		exists: () => true,
+		exec: async () => ({ stdout: '' }),
+		listWindows: async () => [{ id: '0x1', title: 'Meeting', width: 1188, height: 800, role: 'meeting' }],
+		guiRect: async () => ({ x: 0, y: 0, width: 1920, height: 1080 }),
+		ensureBinary: () => ({ ok: true, bin: '/x' }),
+		createGrab: (o) => {
+			const g = { ...o, alive: true, status: { window: o.window, box: o.fit ? [2, 73, 1184, 655] : null }, setWindow() {}, below() {}, normal() {}, move() {}, stop: () => (g.alive = false) }
+			grabs.push(g)
+			return g
+		},
+		timers: { setInterval: () => ({ unref() {} }), clearInterval: () => {} },
+	})
+	let st = await s.assign('presenter', { window: '0x1' })
+	assert.match(grabs[0].fit, /^[0-9a-f]{6}(,[0-9a-f]{6})+$/)
+	assert.strictEqual(st.sources.presenter.fit, true)
+	assert.deepStrictEqual(st.sources.presenter.box, [2, 73, 1184, 655])
+	st = await s.assign('presenter', { fit: false })
+	assert.strictEqual(grabs.length, 2, 'a new grabber without the option')
+	assert.strictEqual(grabs[0].alive, false)
+	assert.strictEqual(grabs[1].fit, '')
+	assert.strictEqual(st.sources.presenter.fit, false)
+	assert.strictEqual(st.sources.presenter.box, null)
+})
+
+test('grabber: the fit option reaches the command line; a binary older than its source is rebuilt', () => {
+	const { createGrab, ensureBinary } = require('../../src/zoom/zoom-grab')
+	const { EventEmitter } = require('node:events')
+	let argv = null
+	const spawn = (bin, args) => {
+		argv = args
+		const c = new EventEmitter()
+		c.stdin = { write() {}, end() {}, destroyed: false }
+		c.stdout = new EventEmitter()
+		c.stderr = new EventEmitter()
+		c.kill = () => {}
+		return c
+	}
+	createGrab({ ring: 'zoom-share', size: '1920x1080', fps: 30, window: '0x1', fit: '131619,2a2b2d', spawn })
+	assert.deepStrictEqual(argv.slice(-2), ['--fit', '131619,2a2b2d'])
+	createGrab({ ring: 'zoom-share', size: '1920x1080', fps: 30, window: '0x1', spawn })
+	assert.ok(!argv.includes('--fit'))
+	let built = 0
+	const fresh = ensureBinary({ exists: () => true, mtime: (f) => (f.endsWith('window_grab') ? 200 : 100), build: () => built++ })
+	assert.ok(fresh.ok && built === 0)
+	ensureBinary({ exists: () => true, mtime: (f) => (f.endsWith('window_fit.h') ? 300 : 200), build: () => built++ })
+	assert.strictEqual(built, 1, 'window_fit.h is newer than the binary')
+})

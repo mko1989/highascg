@@ -32,6 +32,11 @@ const ZOOM_BIN = '/usr/bin/zoom'
 const DEFAULT_SIZE = '1920x1080'
 const DEFAULT_FPS = 30
 const REBIND_MS = 2000
+/**
+ * Zoom 7.1 dark theme: background, title bar, window frame, video tile frame. A source with `fit` on shows only the
+ * picture inside the window (the share, the speaker's video), scaled to fill the ring: no title bar, no toolbar.
+ */
+const ZOOM_CHROME = '131619,2a2b2d,242424,1a1a1a'
 
 /** A Zoom meeting link or number → the zoommtg:// URL the client joins, or '' when it is neither. */
 function joinUrl(raw) {
@@ -74,7 +79,7 @@ function createZoomSession(deps = {}) {
 
 	/** @type {Record<string, { window: string|null, title: string, role: string, hidden: boolean, size: string, fps: number, grab: any }>} */
 	const src = {}
-	for (const s of SOURCES) src[s] = { window: null, title: '', role: '', hidden: false, size: DEFAULT_SIZE, fps: DEFAULT_FPS, grab: null }
+	for (const s of SOURCES) src[s] = { window: null, title: '', role: '', hidden: false, fit: true, size: DEFAULT_SIZE, fps: DEFAULT_FPS, grab: null }
 	let rebindTimer = null
 	let lastError = ''
 
@@ -94,7 +99,7 @@ function createZoomSession(deps = {}) {
 	function save() {
 		if (!stateFile) return
 		const out = { ...pending }
-		for (const s of SOURCES) if (src[s].window) out[s] = { title: src[s].title, role: src[s].role, hidden: src[s].hidden, size: src[s].size, fps: src[s].fps }
+		for (const s of SOURCES) if (src[s].window) out[s] = { title: src[s].title, role: src[s].role, hidden: src[s].hidden, fit: src[s].fit, size: src[s].size, fps: src[s].fps }
 		try {
 			fs.mkdirSync(path.dirname(stateFile), { recursive: true })
 			fs.writeFileSync(stateFile, JSON.stringify(out))
@@ -125,7 +130,7 @@ function createZoomSession(deps = {}) {
 			if (!hit) continue
 			const want = pending[s]
 			delete pending[s]
-			await assign(s, { window: hit.id, hidden: !!want.hidden, size: want.size, fps: want.fps }).then(
+			await assign(s, { window: hit.id, hidden: !!want.hidden, fit: want.fit !== false, size: want.size, fps: want.fps }).then(
 				() => log('info', `[zoom] ${s}: binding restored to ${hit.id} "${hit.title}"`),
 				(e) => log('warn', `[zoom] ${s}: binding not restored: ${e.message}`)
 			)
@@ -161,7 +166,8 @@ function createZoomSession(deps = {}) {
 
 	function ensureGrab(s) {
 		const e = src[s]
-		if (e.grab && e.grab.alive && e.grab.size === e.size && e.grab.fps === e.fps) return true
+		const fit = e.fit ? ZOOM_CHROME : ''
+		if (e.grab && e.grab.alive && e.grab.size === e.size && e.grab.fps === e.fps && (e.grab.fit || '') === fit) return true
 		stopGrab(s)
 		const bin = ensureBinary()
 		if (!bin.ok) {
@@ -172,6 +178,7 @@ function createZoomSession(deps = {}) {
 			ring: `zoom-${s}`,
 			size: e.size,
 			fps: e.fps,
+			fit,
 			window: e.window,
 			bin: bin.bin,
 			onStatus: (st) => {
@@ -226,6 +233,8 @@ function createZoomSession(deps = {}) {
 				window: e.window,
 				title: e.title,
 				hidden: e.hidden,
+				fit: e.fit,
+				box: (g && g.status.box) || null,
 				size: e.size,
 				fps: e.fps,
 				grabbing: !!(g && g.alive),
@@ -258,7 +267,7 @@ function createZoomSession(deps = {}) {
 	async function quit() {
 		for (const s of SOURCES) {
 			// kept as a saved binding: the next Zoom start re-binds by title
-			if (src[s].window) pending[s] = { title: src[s].title, role: src[s].role, hidden: src[s].hidden, size: src[s].size, fps: src[s].fps }
+			if (src[s].window) pending[s] = { title: src[s].title, role: src[s].role, hidden: src[s].hidden, fit: src[s].fit, size: src[s].size, fps: src[s].fps }
 			stopGrab(s)
 			src[s].window = null
 			src[s].hidden = false
@@ -286,6 +295,7 @@ function createZoomSession(deps = {}) {
 		const e = src[s]
 		if (o.size != null) e.size = cleanSize(o.size)
 		if (o.fps != null) e.fps = Math.max(5, Math.min(60, parseInt(String(o.fps), 10) || DEFAULT_FPS))
+		if (typeof o.fit === 'boolean') e.fit = o.fit
 		if (o.window !== undefined) {
 			if (!o.window) {
 				if (e.grab && e.hidden) e.grab.normal()

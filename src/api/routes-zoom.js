@@ -7,7 +7,8 @@
  *                                      grabbing, mapped, published } } }
  *   POST /api/zoom/launch  { url? } → start the client (url = a meeting link or number to join)
  *   POST /api/zoom/quit             → stop every grab, quit the client
- *   POST /api/zoom/source  { source, window?: id|null, hidden?, size?: "1920x1080", fps? } → assign / hide / stop
+ *   POST /api/zoom/source  { source, window?: id|null, hidden?, fit?, size?: "1920x1080", fps? } → assign / hide / stop
+ *                                   (fit, on by default: only the picture inside the window, filling the frame — no Zoom bars)
  * Each source is the shm ring zoom-<source>: a Live-tab source at once (shm://zoom-<source>, /api/shm/sources).
  */
 

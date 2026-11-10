@@ -15,16 +15,19 @@
  *   window 0x3a00007     grab this window (hex or decimal id)
  *   none                 publish black
  *   below | normal       hide the window under every normal window (the operator GUI) / bring it back (EWMH)
+ *   fit RRGGBB,RRGGBB…   find the picture inside the window and scale it to fill the ring: pixels of these chrome
+ *                        colours (title bar, frame, background) are not picture (window_fit.h); `fit off` = as is
  *   move X Y [W H]       place (and size) it — keep hidden windows on the OPERATOR monitor: Openbox clamps moves
  *                        past the screen edge, so an "off-screen" move lands on the program monitor (WO-1012 spike)
  * EOF on stdin ends the grab (the parent is gone).
  * Status goes to stdout as one JSON object per line, every second and on changes:
  *   {"t":"status","window":"0x3a00007","mapped":true,"w":1280,"h":720,"published":1234,"errors":0}
  *
- * Usage: window_grab --ring <name> [--size 1920x1080] [--fps 30] [--window <id>]
+ * Usage: window_grab --ring <name> [--size 1920x1080] [--fps 30] [--window <id>] [--fit RRGGBB,RRGGBB…]
  * Build: tools/window-grab/build.sh (needs libx11-dev libxext-dev libxcomposite-dev).
  */
 #include "../../caspar/modules/shm/hshm_writer.h"
+#include "window_fit.h"
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -63,6 +66,8 @@ struct Grab
     XImage*         img    = nullptr;
     XShmSegmentInfo shm{};
     unsigned long   errors = 0;
+    wfit::Fit       fit;
+    wfit::Rect      box; // the picture found by `fit` (empty = the whole window is shown)
 
     void free_image()
     {
@@ -114,6 +119,8 @@ struct Grab
         w = a.width;
         h = a.height;
         depth  = a.depth;
+        fit.reset();
+        box = wfit::Rect{};
         visual = a.visual;
         if (!mapped || w <= 0 || h <= 0)
             return false;
@@ -161,6 +168,14 @@ struct Grab
         if (!XShmGetImage(dpy, pix, img, 0, 0, AllPlanes) || g_xerr) {
             ++errors;
             return false;
+        }
+        if (fit.on) {
+            const uint8_t* data = reinterpret_cast<uint8_t*>(img->data);
+            box = fit.update(data, img->bytes_per_line, w, h);
+            if (box.valid()) {
+                wfit::Fit::scale(data, img->bytes_per_line, box, canvas.data(), cw, ch);
+                return true;
+            }
         }
         std::fill(canvas.begin(), canvas.end(), 0);
         const int sx = w > cw ? (w - cw) / 2 : 0, dx = w < cw ? (cw - w) / 2 : 0;
@@ -218,15 +233,15 @@ static Window parse_window(const std::string& s)
 static void status(const Grab& g, const hshm::writer& w, const char* note)
 {
     std::printf("{\"t\":\"status\",\"window\":\"0x%lx\",\"mapped\":%s,\"w\":%d,\"h\":%d,\"published\":%llu,"
-                "\"errors\":%lu%s%s%s}\n",
+                "\"errors\":%lu,\"fit\":%s,\"box\":[%d,%d,%d,%d]%s%s%s}\n",
                 (unsigned long)g.win, g.mapped ? "true" : "false", g.w, g.h, (unsigned long long)w.published(),
-                g.errors, note ? ",\"note\":\"" : "", note ? note : "", note ? "\"" : "");
+                g.errors, g.fit.on ? "true" : "false", g.box.x, g.box.y, g.box.w, g.box.h, note ? ",\"note\":\"" : "", note ? note : "", note ? "\"" : "");
     std::fflush(stdout);
 }
 
 int main(int argc, char** argv)
 {
-    std::string ring, size = "1920x1080", win_arg;
+    std::string ring, size = "1920x1080", win_arg, fit_arg;
     int         fps = 30;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
@@ -238,6 +253,8 @@ int main(int argc, char** argv)
             fps = std::max(1, std::min(120, std::atoi(v.c_str())));
         else if (k == "--window")
             win_arg = v;
+        else if (k == "--fit")
+            fit_arg = v;
     }
     int cw = 0, ch = 0;
     if (ring.empty() || std::sscanf(size.c_str(), "%dx%d", &cw, &ch) != 2 || cw < 16 || ch < 16 || cw > 7680 ||
@@ -250,6 +267,7 @@ int main(int argc, char** argv)
     std::signal(SIGPIPE, SIG_IGN);
 
     Grab g;
+    g.fit.configure(fit_arg.c_str());
     g.dpy = XOpenDisplay(nullptr);
     if (!g.dpy) {
         std::fprintf(stderr, "window_grab: cannot open display\n");
@@ -300,6 +318,10 @@ int main(int argc, char** argv)
                 } else if (g.win && (cmd == "below" || cmd == "normal")) {
                     set_below(g.dpy, g.win, cmd == "below");
                     status(g, out, cmd.c_str());
+                } else if (cmd.rfind("fit ", 0) == 0) {
+                    g.fit.configure(cmd == "fit off" ? "" : cmd.c_str() + 4);
+                    g.box = wfit::Rect{};
+                    status(g, out, g.fit.on ? "fit on" : "fit off");
                 } else if (g.win && cmd.rfind("move ", 0) == 0) {
                     int x = 0, y = 0, ww = 0, hh = 0;
                     if (std::sscanf(cmd.c_str() + 5, "%d %d %d %d", &x, &y, &ww, &hh) >= 2)

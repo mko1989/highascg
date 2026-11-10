@@ -293,6 +293,32 @@ Proven live with the real client (Zoom 7.1.0.3715, meeting 679 1592 7344, this b
   thread about 200 switches/s throughout), the daemon kept its pid, the grabs, the host layers, the camera relay
   (now saved as enabled) and the return consumer all came back with no client polling.
 
+### In the meeting (10.11, after the owner admitted the box) + "fullscreen, no Zoom bar"
+
+- **In-meeting grabs.** With "Use dual monitors": the main window ("Meeting") has the tabs "Meeting" and
+  "<name>'s screen"; the second window ("Zoom Workplace") shows the share while one runs, else the other video view.
+  Zoom recreated both windows on admit and the saved bindings followed. The share played on program
+  (`route://5-23`), and the box's own tile in Zoom showed the program: the far end gets the camera.
+- **Owner, 10.11:** "both the share and the camera view to display Fullscreen on the layer, no zoom's bar. And for
+  the camera definitely no other participants and the share again."
+  - Zoom's own full-screen mode is out: `_NET_WM_STATE_FULLSCREEN` from outside keeps Zoom's title bar and opens an
+    "annotate_toolbar" window on the operator screen.
+  - **`fit`, on by default** (`tools/window-grab/window_fit.h`): the grabber finds the picture inside the window and
+    scales it to fill the ring. Pixels of Zoom's chrome colours (`ZOOM_CHROME` in `zoom-session.js`: background
+    131619, title bar 2a2b2d, frame 242424, tile frame 1a1a1a) are not picture; a row or column is picture when it
+    holds an unbroken non-chrome run a quarter of the window long. A new box must hold for three looks (about 0.8 s).
+    `POST /api/zoom/source {source, fit:false}` gives the window as it is. Status carries `fit` and `box`.
+  - Live: the share came out 1783×1009 → full frame with no bar; the camera 1184×651 → full frame, only the remote
+    participant (screenshots of both, and the camera on program).
+  - **The camera needs two clicks in Zoom, once per meeting:** the "Meeting" tab in the main window, and right-click
+    the own tile ▸ "Hide self view". Then that window holds only the speaker.
+  - Still Zoom's: the name label on the video (Zoom Settings ▸ Video ▸ names on videos), and the picture is as sharp
+    as the window is big (the visible 1188×800 Meeting window gives a 1184×651 camera, scaled up).
+  - Cost: about 30 % of one core per fitted 1080p30 source (it was a plain copy before).
+  - A grabber binary older than its source is rebuilt (`ensureBinary`), so an update cannot leave the old one running.
+- **Still open from this round:** audio from the far end (two captures were digital silence, the far end was muted
+  or quiet) and whether the far end heard the speech loop.
+
 Not tested, and why:
 
 - **In-meeting pictures: a participant's video, a participant's share, the far end seeing and hearing this box.**
