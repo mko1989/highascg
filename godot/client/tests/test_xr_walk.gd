@@ -134,7 +134,7 @@ func test_headset_launch() -> void:
 		"the runtime WiVRn registered, and a user dir of its own (the kiosk's settings untouched)")
 	var cm := FileAccess.get_file_as_string("res://app/connection_menu.gd")
 	t.ok(cm.contains("args = PackedStringArray([\"--xr-mode\", \"on\"]) + args"),
-		"a restart (A/B switch, following the master) keeps the headset: get_cmdline_args drops --xr-mode")
+		"a restart (a handover or address change) keeps the headset: get_cmdline_args drops --xr-mode")
 	t.eq(HelpDialog.MD.title(HelpDialog.load_md("vr-walk")), "Walk the stage in VR (Meta Quest)", "help/vr-walk.md")
 
 

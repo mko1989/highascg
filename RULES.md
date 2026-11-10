@@ -23,8 +23,9 @@ one is a regression, whatever else it fixes. Add a rule here when the owner stat
 
 1. **Linking is node ↔ node only.** A link joins two HighAsCG node servers, never a client.
 2. **A Godot client talks only to the node on its own machine** (or the one its operator chose explicitly: `--server`,
-   `HIGHASCG_SERVER`, the A/B host). It never opens a socket or HTTP connection to another machine's node or client on
-   its own, and nothing the cluster says changes where it is connected.
+   `HIGHASCG_SERVER`, the one server address in its connection menu). It never opens a socket or HTTP connection to
+   another machine's node or client on its own, and for the on-box client nothing the cluster says changes where it is
+   connected (the one exception, for a remote client whose box is gone, is rule 6).
 3. **All cross-machine traffic goes node ↔ node.** The local node relays what its client needs (Devices "Edit" of a
    linked server: `/api/cluster/peers/:id/relay/…`).
 4. **Unlink restores the local-only state visibly.** No residual remote connection, no stored remote origin a restart

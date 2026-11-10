@@ -11,7 +11,7 @@ var t
 ## WO-802: the client's sockets are the WS, the Api pool, the video feed, uploads and downloads — every one built from
 ## Config.origin. Nothing in the client may point an Api elsewhere or open another socket.
 func test_no_client_socket_to_another_server() -> void:
-	var allowed := {"HTTPRequest.new()": ["core/api.gd", "features/live/media_download.gd"],
+	var allowed := {"HTTPRequest.new()": ["app/handover_watch.gd", "core/api.gd", "features/live/media_download.gd"],
 		"WebSocketPeer.new()": ["core/ws.gd", "video/video_feed.gd"], "StreamPeerTCP.new()": ["core/stream_upload.gd"]}
 	var found := {}
 	var bad := []
@@ -30,7 +30,7 @@ func test_no_client_socket_to_another_server() -> void:
 	t.ok(api.contains('return Config.origin + ("/api/cluster/peers/%s/relay" % relay_peer.uri_encode() if relay_peer != "" else "")'),
 		"every Api goes to Config.origin; a relayed one through it")
 	var cfg := FileAccess.get_file_as_string("res://core/config.gd")
-	t.ok(cfg.contains("\tforget_cluster(UI_CFG)\n\torigin = home_origin()"), "the origin is the operator's choice only")
+	t.ok(cfg.contains("\tforget_cluster(UI_CFG)\n\tmigrate_profiles(UI_CFG)\n\torigin = home_origin()"), "the origin is the operator's choice only")
 
 
 ## WO-802: a [cluster] section an older client left (a followed master, remembered servers) is erased on start.
@@ -46,7 +46,7 @@ func test_old_follow_state_is_erased() -> void:
 	var back := ConfigFile.new()
 	back.load(path)
 	t.eq(back.has_section("cluster"), false, "origin, servers and follow are gone")
-	t.eq(str(back.get_value("connection", "host_a", "")), "127.0.0.1", "the A/B hosts stay")
+	t.eq(str(back.get_value("connection", "host_a", "")), "127.0.0.1", "the other sections stay")
 	t.eq(ConfigScript.forget_cluster(path), false, "nothing left the second time")
 	t.eq(ConfigScript.forget_cluster("user://test_wo802_missing.cfg"), false, "no file")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))

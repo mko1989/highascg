@@ -1,14 +1,17 @@
 extends Node
 ## WO-599 — where the HighAsCG server is. Precedence: `-- --server=http://host:4200`, env
-## HIGHASCG_SERVER, then the active A/B hot-backup profile (ui.cfg [connection], WO-608), then the on-box default
-## http://127.0.0.1:4200 (the client runs next to the server). All of them are chosen by the operator and shown in the
-## header (app/header_project.gd).
+## HIGHASCG_SERVER, then the one saved server address (ui.cfg [server], the eye menu; WO-1029 replaced the A/B host
+## profiles with it), then the on-box default http://127.0.0.1:4200 (the client runs next to the server). All of them are
+## chosen by the operator and shown in the header (app/header_project.gd).
 ## WO-802 (owner 29.10: "linking only the node servers should link; the godot clients should stay connected to their
 ## respective node servers"): nothing the cluster says ever changes it. The WO-670 P3b follow (ui.cfg [cluster] origin
 ## / servers / follow) is gone; a [cluster] section left by an older client is erased on start, so a restart never goes
 ## back to a server this client once followed.
+## WO-1029 (RULES.md "Linked servers" 6): the one exception is a REMOTE client whose box is gone — app/handover_watch.gd
+## restarts it with `--server=<linked server> --handover-from=<old origin> --handover-at=<unix>`; this file only reads
+## those arguments (the password of the first box is tried on the new one).
 
-const Profiles := preload("res://core/connection_profiles_model.gd")
+const ServerAddress := preload("res://core/server_address_model.gd")
 const AuthModel := preload("res://core/auth_model.gd")
 const Platform := preload("res://core/platform.gd")
 
@@ -20,12 +23,12 @@ const UI_CFG := "user://ui.cfg"
 var origin := DEFAULT_ORIGIN
 var demo := false  ## WO-815: Api and Ws answer from core/demo/demo_server.gd, nothing goes on the network
 var args := {}
-var _profiles := {}
 
 
 func _init() -> void:
 	args = parse_args(OS.get_cmdline_user_args())
 	forget_cluster(UI_CFG)
+	migrate_profiles(UI_CFG)
 	origin = home_origin()
 	_load_password()
 	demo = demo_wanted(args, saved_demo(UI_CFG), OS.has_feature("web"))
@@ -61,7 +64,7 @@ func save_demo(on: bool) -> void:
 
 ## Where this client goes (args / env / A/B profile / default) — the only place it ever goes.
 func home_origin() -> String:
-	return resolve_origin(args, OS.get_environment("HIGHASCG_SERVER"), Profiles.active_origin(profiles()))
+	return resolve_origin(args, OS.get_environment("HIGHASCG_SERVER"), saved_server())
 
 
 ## WO-802: erase the WO-670 P3b [cluster] section (a followed master's origin, the remembered servers, the follow
@@ -78,21 +81,31 @@ static func forget_cluster(path: String) -> bool:
 	return true
 
 
-## A/B profiles from ui.cfg (empty when none are set); read once, kept in step by save_profiles().
-func profiles() -> Dictionary:
-	if _profiles.is_empty():
-		var cfg := ConfigFile.new()
-		cfg.load(UI_CFG)
-		_profiles = Profiles.load_cfg(cfg)
-	return _profiles.duplicate()
+## WO-1029: the A/B host profiles are gone (owner 10.11); a ui.cfg that still has them keeps the ACTIVE slot's origin as
+## the one saved server address. → true when there was a [connection] section.
+static func migrate_profiles(path: String) -> bool:
+	var cfg := ConfigFile.new()
+	if cfg.load(path) != OK or not cfg.has_section(ServerAddress.OLD_SECTION):
+		return false
+	ServerAddress.migrate_profiles(cfg)
+	cfg.save(path)
+	print("[client] WO-1029: A/B hosts removed; saved server address is now %s" % (
+		ServerAddress.load_cfg(cfg) if ServerAddress.load_cfg(cfg) != "" else "none (default)"))
+	return true
 
 
-func save_profiles(p: Dictionary) -> void:
+## The one saved server address (ui.cfg [server]); "" when none.
+func saved_server() -> String:
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
-	Profiles.store_cfg(cfg, p)
+	return ServerAddress.load_cfg(cfg)
+
+
+func save_server(address: String) -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	ServerAddress.store_cfg(cfg, address)
 	cfg.save(UI_CFG)
-	_profiles = Profiles.load_cfg(cfg)
 
 
 ## WO-811 — the shared API password for `origin` (ui.cfg [auth]); on the box, the node's own file when ui.cfg has none.
@@ -105,6 +118,8 @@ func _load_password() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
 	AuthModel.password = AuthModel.load_password(cfg, origin)
+	if AuthModel.password == "" and str(args.get("handover-from", "")) != "":  # WO-1029: one shared password per site
+		AuthModel.password = AuthModel.load_password(cfg, str(args["handover-from"]))
 	if AuthModel.password == "":
 		adopt_local_password()
 

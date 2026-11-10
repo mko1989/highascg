@@ -6,7 +6,7 @@ extends RefCounted
 
 const Demo := preload("res://core/demo/demo_server.gd")
 const Video := preload("res://core/demo/demo_video.gd")
-const Profiles := preload("res://core/connection_profiles_model.gd")
+const Profiles := preload("res://core/server_address_model.gd")
 const POST := HTTPClient.METHOD_POST
 const GET := HTTPClient.METHOD_GET
 const PUT := HTTPClient.METHOD_PUT

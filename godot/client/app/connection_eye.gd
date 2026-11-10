@@ -15,7 +15,7 @@ const BLINK_PHASE_S := 0.25
 const CELEBRATION_S := 5.0
 
 signal clicked
-signal context_requested  # right-click → app/connection_menu.gd (A/B hosts)
+signal context_requested  # right-click → app/connection_menu.gd (server address, WO-1029)
 
 var connected := false
 var offline := false

@@ -1,27 +1,23 @@
 extends RefCounted
-## WO-608 — right-click on the connection eyes: A/B hot-backup hosts (web replication-status-banner.js "Connect to
-## A/B" + "A/B hosts", which the web never mounted). Profiles live in ui.cfg [connection] (core/config.gd); a switch
-## flips the active side and restarts the client so every autoload (Api, Ws, Store, Settings) starts on the new
-## host — the web did window.location.reload(). Promote / failover stays on Devices → Server (become leader).
+## WO-608 — right-click on the connection eyes. WO-1029 (owner 10.11: no A/B hosts in the client): ONE editable server
+## address (ui.cfg [server], core/config.gd; a change restarts onto it) and, after a handover, "‹box› is back — return?"
+## (app/handover_watch.gd). Which other boxes exist is the connected box's business, not a client setting.
 
-const Profiles := preload("res://core/connection_profiles_model.gd")
+const ServerAddress := preload("res://core/server_address_model.gd")
+const Platform := preload("res://core/platform.gd")
 const Kit := preload("res://features/settings/pane_kit.gd")
 
 
-static func show_menu(host: Control) -> void:
-	var p := Config.profiles()
+static func show_menu(host: Control, watch: Node = null) -> void:
 	var menu := PopupMenu.new()
-	if Profiles.has_dual(p):
-		menu.add_item("Connect to %s — %s" % [Profiles.peer_letter(p), Profiles.peer_origin(p)], 0)
-	else:
-		menu.add_item("Connect to backup host (set A/B hosts first)", 0)
-		menu.set_item_disabled(0, true)
-	menu.add_item("A/B hosts…", 1)
+	var back: Dictionary = watch.return_target() if watch != null else {}
+	if not back.is_empty():  # WO-1029 rule 6: the first box answers again — nothing moves by itself
+		menu.add_item("%s is back — return?" % (str(back.name) if str(back.get("name", "")) != "" else Platform.host_of(str(back.origin))), 1)
+		menu.add_separator()
+	menu.add_item("Server address…  (%s)" % Config.origin, 0)
 	menu.id_pressed.connect(func(i: int) -> void:
-		if i == 0:
-			var next := Profiles.flipped(Config.profiles())
-			Kit.confirm(host, "Reconnect this client to host %s?\n%s\n\nThe operator GUI restarts on that server."
-				% [next.active, Profiles.active_origin(next)], func() -> void: switch_to(host, next))
+		if i == 1 and watch != null:
+			watch.go_back()
 		else:
 			edit(host))
 	menu.popup_hide.connect(menu.queue_free, CONNECT_DEFERRED)
@@ -33,37 +29,31 @@ static func show_menu(host: Control) -> void:
 	menu.popup(Rect2i(at, Vector2i.ZERO))
 
 
+## The one server address (WO-1029): for a client started without --server / HIGHASCG_SERVER. A change restarts onto it.
 static func edit(host: Control) -> void:
-	var p := Config.profiles()
 	var d := ConfirmationDialog.new()
-	d.title = "A/B hosts"
+	d.title = "Server address"
 	d.ok_button_text = "Save"
 	var box := VBoxContainer.new()
 	box.custom_minimum_size.x = 420
 	d.add_child(box)
-	var edits := {}
-	for k in [["hostA", "Host A — primary playout"], ["hostB", "Host B — hot backup"]]:
-		var l := Label.new()
-		l.text = k[1]
-		box.add_child(l)
-		var e := LineEdit.new()
-		e.text = str(p[k[0]])
-		e.placeholder_text = "192.168.0.10 or http://host:4200"
-		box.add_child(e)
-		d.register_text_enter(e)
-		edits[k[0]] = e
+	var e := LineEdit.new()
+	e.text = Config.saved_server()
+	e.placeholder_text = "192.168.0.10 or http://host:4200"
+	box.add_child(e)
+	d.register_text_enter(e)
 	var note := Label.new()
-	note.text = "Active: host %s. A bare host gets :4200. Leave both empty to use the default server." % p.active
+	note.text = "A bare host gets :4200. Leave empty to use the server on this machine. Linked servers are not set here: " \
+		+ "the box this client is on tells it which ones it has."
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.custom_minimum_size.x = 420
 	box.add_child(note)
 	d.confirmed.connect(func() -> void:
-		var next := Profiles.clean({"hostA": edits.hostA.text, "hostB": edits.hostB.text, "active": p.active})
-		Config.save_profiles(next)
-		var o := Profiles.active_origin(next)
-		if o != "" and o != Config.origin:
-			Kit.confirm(host, "Host %s is now %s.\nReconnect this client there?" % [next.active, o],
-				func() -> void: switch_to(host, next)))
+		var next := ServerAddress.normalize(e.text)
+		Config.save_server(next)
+		if next != "" and next != Config.origin:
+			Kit.confirm(host, "Reconnect this client to %s?\n\nThe operator GUI restarts on that server." % next,
+				func() -> void: switch_to(host)))
 	d.visibility_changed.connect(func() -> void:
 		if not d.visible:
 			d.queue_free())
@@ -71,22 +61,22 @@ static func edit(host: Control) -> void:
 	d.popup_centered()
 
 
-## Store the profile and restart with the same window args minus --server (HIGHASCG_SERVER would still win).
-static func switch_to(host: Node, p: Dictionary) -> void:
-	Config.save_profiles(p)
+## Restart onto the saved address (HIGHASCG_SERVER would still win, so say so instead).
+static func switch_to(host: Node) -> void:
 	if OS.get_environment("HIGHASCG_SERVER") != "":
-		Kit.confirm(host, "HIGHASCG_SERVER is set for this client and overrides A/B hosts — unset it to switch.",
+		Kit.confirm(host, "HIGHASCG_SERVER is set for this client and overrides the saved server address — unset it to switch.",
 			func() -> void: pass)
 		return
 	restart(host)
 
 
-## Restart this client with its window args minus --server: the autoloads start over on the stored origin. The new
-## process is started BEFORE quitting, so a crash on the way out can never cost the restart (it did: WO-676).
-static func restart(host: Node) -> void:
+## Restart this client with its window args (minus --server unless it was handed over): the autoloads start over on the
+## origin that wins. The new process is started BEFORE quitting, so a crash on the way out can never cost the restart
+## (it did: WO-676). `user_args` replaces the current window args (a handover move brings its own, WO-1029).
+static func restart(host: Node, user_args := PackedStringArray(), use_args := false) -> void:
 	# WO-688: an exported client (Mac / Windows) carries its project inside; --path there points at no project.
 	var args := PackedStringArray(["--"] if OS.has_feature("template") else ["--path", ProjectSettings.globalize_path("res://"), "--"])
-	args.append_array(Profiles.restart_user_args(OS.get_cmdline_user_args()))
+	args.append_array(user_args if use_args else ServerAddress.restart_user_args(OS.get_cmdline_user_args()))
 	var xr := XRServer.find_interface("OpenXR")
 	if xr != null and xr.is_initialized():  # WO-741: a client in a headset restarts in it (get_cmdline_args drops --xr-mode)
 		args = PackedStringArray(["--xr-mode", "on"]) + args

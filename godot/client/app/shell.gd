@@ -21,11 +21,12 @@ const TimersDock := preload("res://features/live/timers_dock.gd")
 const AudioDock := preload("res://features/audio/audio_dock.gd")
 const ConnectionEye := preload("res://app/connection_eye.gd")
 const ConnectionMenu := preload("res://app/connection_menu.gd")
-const Profiles := preload("res://core/connection_profiles_model.gd")
 const LogsDialog := preload("res://app/logs_dialog.gd")
 const PerfOverlay := preload("res://app/perf_overlay.gd")
 const UiIcons := preload("res://app/ui_icons.gd")
 const HeaderProject := preload("res://app/header_project.gd")
+const HandoverWatch := preload("res://app/handover_watch.gd")
+const HandoverCue := preload("res://app/handover_cue.gd")
 const HeaderTools := preload("res://app/header_tools.gd")
 const HeaderStatus := preload("res://app/header_status.gd")
 const OperatorDock := preload("res://app/operator_dock.gd")
@@ -37,6 +38,7 @@ const Platform := preload("res://core/platform.gd")
 var _eye: ConnectionEye
 var _logs: LogsDialog
 var header_project: HeaderProject
+var handover: Node  # WO-1029
 var header_tools: HeaderTools
 var header_status: HeaderStatus
 var _status := ""
@@ -222,6 +224,9 @@ func _build_header() -> Control:
 	header_project = HeaderProject.new()  # WO-608 header: name · save · load · new · notice line
 	header_project.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(header_project)
+	handover = HandoverWatch.new()  # WO-1029: a remote client's handover; does nothing on the box
+	add_child(handover)
+	row.add_child(HandoverCue.new(handover))
 	header_tools = HeaderTools.new()  # ⚙ · FTB
 	header_tools.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(header_tools)
@@ -240,7 +245,7 @@ func _build_header() -> Control:
 	row.add_child(_perf_btn)
 	_eye = ConnectionEye.new()
 	_eye.clicked.connect(_open_logs)
-	_eye.context_requested.connect(func() -> void: ConnectionMenu.show_menu(_eye))
+	_eye.context_requested.connect(func() -> void: ConnectionMenu.show_menu(_eye, handover))
 	row.add_child(_eye)
 	return bar
 
@@ -284,7 +289,7 @@ func _refresh_eye() -> void:
 		state = Config.DEMO_LABEL + " (simulated server)"
 	_eye.set_state(Ws.is_open and caspar_ok, Settings.get_setting("offline_mode", false) == true,
 		"%s\n%s%s%s" % [state, Config.origin, ("\n" + _status) if _status != "" else "",
-			("\n" + Profiles.label(Config.profiles()) + " · right-click for A/B hosts") if Profiles.has_dual(Config.profiles()) else "\nRight-click: A/B hosts"])
+			"\nRight-click: server address"])
 
 
 ## WO-964 — a header stream / record badge: that output's page in the Inspector column, on the tab that is showing.
