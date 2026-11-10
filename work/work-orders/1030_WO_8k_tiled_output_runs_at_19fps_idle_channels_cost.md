@@ -77,3 +77,24 @@ Seen at the switch (the consumer steps C1b / C1c / C11 of plan 07 are not on 586
   channel 2. Cleared by hand; the card re-enabled on channel 2.
 - Two `AMCP batch COMMIT ack timeout (64 cmds)` from the template orphan sweep; the restore took 15 s.
 - The two "2box" looks name DeckLink 3 / 4 as `route://9-3` / `route://10-4`; those inputs are on channels 6 / 7 now.
+
+## Third measurement (10.11 15:10) — 5867 with ONLY the wall (5 channels: GUI, wall PGM/PRV, DeckLink 3/4)
+
+Owner: "the box runs in 100% straight when the consumer is enabled. is the gl texture something in the caspar config?"
+`<gpu-texture>true</gpu-texture>` is in the generated screen consumer (on): the window draws the mixer's texture
+directly. GPU utilisation reads 100 % in every state; PCIe bus utilisation 72–76 %.
+
+| State | Wall fps | Caspar CPU |
+|---|---|---|
+| As left: HTML test card on the wall | 31.6 | 90 % |
+| Test card off (wall channel empty, screen consumer on) | 32.0 | 140 % |
+| + the meter consumer removed from the (empty) 8K PRV channel | **51.9** | 140 % |
+| + ForceCompositionPipeline off on the two wall heads | 52.1 | 154 % |
+| … with the HTML test card back on | 36.3 | 420 % |
+
+- The limiter is the 8K PRV channel's meter consumer: even EMPTY, the channel ticks and its 33 Mpixel frame is read
+  back 50 ×/s. Without it the wall runs at the full 50. (Restored afterwards, as found.)
+- The driver's composition pipeline costs nothing measurable here. (Restored to On.)
+- The 8K HTML test card alone takes the wall from 52 to 36 fps and Caspar to 420 % CPU.
+- So the choices are: the tiled destination as PGM only (no 8K PRV channel at all), or the meter-consumer change the
+  owner declined, or a PRV channel at a reduced raster.
