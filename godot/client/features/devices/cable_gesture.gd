@@ -12,6 +12,7 @@ signal applied(data: Dictionary)  # WO-918 F3: devices_follow.gd turns a layoutO
 
 const R := preload("res://features/devices/cable_rules.gd")
 const DragRelease := preload("res://features/devices/cable_drag_release.gd")  # WO-918 F19
+const ApplyFlow := preload("res://features/devices/apply_flow.gd")  # WO-1029
 const Seed := preload("res://features/devices/cable_seed.gd")
 const ApiScript := preload("res://core/api_timeouts.gd")  # WO-805: APPLY_TIMEOUT_S (no autoload deps)
 const PREWARM_S := 2.5  # under the server's 3 s xrandr cache TTL (web device-view-snapshot-prewarm.js)
@@ -27,6 +28,7 @@ var selected_edge := ""
 var restart_dirty := false
 var busy := false
 var applying := false
+var cluster_progress := false  # WO-1029: apply_flow.gd shows per-server progress; [Full apply] log lines would overwrite it
 
 var anchor_at := Callable()  # global pos → anchor key; unset = the parent tab's cable layer (F19 drop target)
 var _drop := DragRelease.new()
@@ -409,29 +411,15 @@ func can_undo() -> bool:
 	return not _undo.is_empty()
 
 
-## Apply always restarts Caspar (WO-440: force); while it runs `[Full apply] Step N` log lines are shown. WO-805: it
-## answers when Caspar is back (typ. 5-15 s, up to ~100 s on the server's own caps) — its own timeout, not the 15 s one.
+## Single-server Apply (WO-440 force, WO-805 long timeout) — the body lives in apply_flow.gd legacy() (WO-1029: that file
+## also owns the cluster-wide Apply and calls this when the node has no /api/cluster/apply-plan).
 func apply_caspar() -> void:
-	if busy:
-		return
-	applying = true
-	_set_busy(true)
-	status.emit("Applying Caspar config — restarting Caspar…", true)
-	var r := await DevicesTarget.api.post_json("/api/caspar-config/apply", {"force": true}, ApiScript.APPLY_TIMEOUT_S)
-	applying = false
-	_set_busy(false)
-	if not r.ok:
-		status.emit(R.s(r.error) if R.s(r.error) != "" else "HTTP %d" % r.status, false)
-		return
-	set_dirty(false)
-	var msg := R.s(R.d(r.data).get("message"))
-	status.emit(msg if msg != "" else "Caspar config applied", true)
-	applied.emit(R.d(r.data))
+	await ApplyFlow.legacy(self)
 
 
 ## WS log_line during an apply → "Applying: Step 2 …" (web applyCasparBtn progress).
 func on_log_line(d: Variant) -> void:
-	if not applying:
+	if not applying or cluster_progress:
 		return
 	var line := R.s(R.d(d).get("line")) if d is Dictionary else R.s(d)
 	var m := RegEx.create_from_string("\\[Full apply\\]\\s+(.{0,80})").search(line)

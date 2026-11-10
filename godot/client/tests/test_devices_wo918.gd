@@ -127,7 +127,7 @@ func test_f3_layout_warning() -> void:
 	t.eq(Follow.status_color(false, true), Follow.ThemeBuilder.WARN, "warn colour")
 	t.eq(Follow.status_color(false, false), Follow.ThemeBuilder.ERROR, "red")
 	var bar := FileAccess.get_file_as_string("res://features/devices/devices_toolbar.gd")
-	t.ok(bar.contains("func set_status(text: String, ok: bool, warn := false)") and bar.contains("Follow.status_color(ok, warn)"), "toolbar takes warn")
+	t.ok(bar.contains("func set_status(text: String, ok: bool, warn := false, tip := \"\")") and bar.contains("Follow.status_color(ok, warn)"), "toolbar takes warn")
 
 
 ## WO-919 F13: after a Load / New the header reloads Settings; the shown local Devices tab refreshes then (its first

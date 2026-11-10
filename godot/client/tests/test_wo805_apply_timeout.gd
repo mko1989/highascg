@@ -15,9 +15,10 @@ func test_request_timeout_default_and_long() -> void:
 
 
 func test_apply_calls_pass_the_long_timeout() -> void:
-	var gesture := FileAccess.get_file_as_string("res://features/devices/cable_gesture.gd")
+	var gesture := FileAccess.get_file_as_string("res://features/devices/apply_flow.gd")  # WO-1029: moved out of cable_gesture.gd
 	t.ok(gesture.contains("post_json(\"/api/caspar-config/apply\", {\"force\": true}, ApiScript.APPLY_TIMEOUT_S)"),
-		"Devices Apply (cable_gesture.gd) uses the long timeout")
+		"Devices Apply (apply_flow.gd legacy) uses the long timeout")
+	t.ok(gesture.contains("\"wait\": false") and gesture.contains("post_json(\"/api/cluster/apply\", body)"), "cluster Apply answers at once (wait:false, WO-1029), so the 15 s default is enough")
 	var flow := FileAccess.get_file_as_string("res://features/devices/server_flow.gd")
 	t.ok(flow.contains("post_json(\"/api/replication/apply-device-view-caspar\", {}, ApiScript.APPLY_TIMEOUT_S)"),
 		"hot-backup Caspar apply (server_flow.gd) uses the long timeout")

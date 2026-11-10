@@ -18,6 +18,9 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const SnapshotDialogs := preload("res://features/devices/snapshot_dialogs.gd")
 const PREFS := "user://devices.cfg"
 const APPLY := "Apply Caspar config (restart)"
+const PlanModel := preload("res://features/devices/apply_plan_model.gd")
+
+var plan: Variant = null  ## WO-1029: last GET /api/cluster/apply-plan (apply_flow.gd sets it, then calls sync)
 const Follow := preload("res://features/devices/devices_follow_model.gd")
 const CableModel := preload("res://features/devices/cable_model.gd")
 const LOOP_STEPS := [0, 1, 2, 4, 8, 16, 32, CableModel.CHAOS]  # WO-674: the slider's stops; the last is "chaos"
@@ -118,9 +121,9 @@ func _pick(other: CheckBox, on: bool) -> void:
 
 
 ## `warn` (WO-918 F3): done, but not what was asked — amber, not green.
-func set_status(text: String, ok: bool, warn := false) -> void:
+func set_status(text: String, ok: bool, warn := false, tip := "") -> void:
 	_status.text = text
-	_status.tooltip_text = text
+	_status.tooltip_text = tip if tip != "" else text  # WO-1029: an apply's per-server lines ride in the tooltip
 	_status.add_theme_color_override("font_color", Follow.status_color(ok, warn))
 
 
@@ -129,8 +132,9 @@ func sync(g: Node) -> void:
 	cancel_btn.visible = g.armed()
 	apply_btn.disabled = g.busy
 	apply_btn.text = "Applying…" if g.applying else APPLY
-	apply_btn.add_theme_color_override("font_color", ThemeBuilder.WARN if g.restart_dirty else ThemeBuilder.TEXT)
-	apply_btn.tooltip_text = "Cabling changed — restart Caspar to apply" if g.restart_dirty else ""
+	var st: Dictionary = PlanModel.button_state(plan, g.restart_dirty)  # WO-1029: the servers' own say-so + the local flag
+	apply_btn.add_theme_color_override("font_color", ThemeBuilder.WARN if st.dirty else ThemeBuilder.TEXT)
+	apply_btn.tooltip_text = st.tip
 
 
 static func saved_view() -> String:

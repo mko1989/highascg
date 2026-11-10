@@ -92,7 +92,6 @@ func _ready() -> void:
 	v.add_child(_bar)
 	_bar.cancel_pressed.connect(func() -> void: _gesture.cancel())
 	_bar.reset_pressed.connect(func() -> void: _confirm.popup_centered())
-	_bar.apply_pressed.connect(_gesture.apply_caspar)
 	_bar.save_pressed.connect(func() -> void: snapshots.open_save(_rear, _cables))
 	_bar.reload_pressed.connect(func() -> void: _sticky = false; refresh())
 	Follow.attach(self, _gesture, _bar, func(sticky: bool) -> void: _sticky = sticky)

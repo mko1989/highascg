@@ -23,6 +23,10 @@ static func attach(host: Node, gesture: Node, bar: Node, set_sticky: Callable) -
 	var f: Node = (load("res://features/devices/devices_follow.gd") as GDScript).new()
 	f.set_meta("targets", [gesture, bar, set_sticky])
 	host.add_child(f)
+	var flow := Node.new()  # WO-1029: the Apply button's cluster-wide path (plan, confirm, progress, results)
+	flow.set_script(load("res://features/devices/apply_flow.gd"))
+	host.add_child(flow)
+	flow.setup(gesture, bar, set_sticky)
 	return f
 
 
