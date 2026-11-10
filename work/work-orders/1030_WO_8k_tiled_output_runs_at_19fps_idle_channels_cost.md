@@ -47,3 +47,11 @@ Causes, in order of cost:
 - **Operator GUI previews of an 8K channel:** route a reduced copy, not the full raster (cost not measured).
 - Measure each remaining item separately (the copy channels with the node's re-add held off; the GUI routes; the
   client closed).
+
+## Owner's decisions (10.11)
+
+- Meter consumer policy / Caspar audio-only consumer: **no** ("this not").
+- Copy channels: **"this defenitly"** → WO-1029 plan 07 (channels only where a destination is cabled), started.
+- Operator GUI previews of an 8K channel: **wait** — "lets first see when only one destination is left on that box".
+  Re-measure 5867 once it creates channels only for what it outputs, then decide.
+- Test card (native pattern / rendered small): no verdict given.

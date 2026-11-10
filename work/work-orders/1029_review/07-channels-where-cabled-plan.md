@@ -492,3 +492,12 @@ Sender side (new `src/cluster/dest-route.js`): `routeFor(ctx, mainIdx) → { loc
 - /home/casparcg/highascg/src/api/routes-scene-take-look.js with src/cluster/look-relay.js and src/engine/take-sync-barrier.js
 - /home/casparcg/highascg/src/system/operator-first-plan.js and src/config/channel-remap.js (the plan-change remap pattern)
 - Also: /home/casparcg/highascg/src/system/video-feed.js, /home/casparcg/highascg/godot/client/video/video_surfaces.gd, /home/casparcg/highascg/src/replication/project-media-refs.js, /home/casparcg/highascg/tools/e2e/virtual-boxes.js
+
+
+---
+
+## Owner's go (10.11)
+
+"Copy channels … They go away with 'channels only where a destination is cabled'. **this defenitly.**" The plan is
+started with the recommendations O1–O11 as written (none was objected to). First target: highascg5867 creating
+channels only for what it outputs, re-measured against WO-1030 (19 fps on the 8K tiled output with 10 channels).
