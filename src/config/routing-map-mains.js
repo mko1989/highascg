@@ -9,9 +9,13 @@
  * operator-first scheme) skips stored host-live pins the way allocCh() does, so a +1 shift can never land a main on a
  * pinned host channel (WO-414: pins never move).
  *
+ * WO-1029 plan 07: `isLocal(i)` (only passed while `cluster.channelsWhereCabled` is on; ignored in virtual mode) —
+ * a screen that is not output here gets `null` holes in every list and does NOT consume a number, so the numbers stay
+ * dense (Caspar numbers channels by their position in casparcg.config). The index stays the screen index.
+ *
  * @param {{ useVirtual: boolean, virtualMainChannels: object[], screenCount: number, previewEnabledByMain: boolean[],
- *   firstCh?: number, isPinned?: ((ch: number) => boolean) | null }} opts
- * @returns {{ programChannels: number[], previewChannels: (number|null)[], switcherBus1Channels: (number|null)[],
+ *   firstCh?: number, isPinned?: ((ch: number) => boolean) | null, isLocal?: ((i: number) => boolean) | null }} opts
+ * @returns {{ programChannels: (number|null)[], previewChannels: (number|null)[], switcherBus1Channels: (number|null)[],
  *   switcherBusChannels: (number|null)[], switcherBusMode: boolean }}
  */
 function allocateMainChannels(opts) {
@@ -51,7 +55,15 @@ function allocateMainChannels(opts) {
 		if (isPinned) while (isPinned(ch)) ch++
 		return ch++
 	}
+	const isLocal = typeof opts.isLocal === 'function' ? opts.isLocal : null
 	for (let i = 0; i < screenCount; i++) {
+		if (isLocal && !isLocal(i)) {
+			programChannels.push(null)
+			previewChannels.push(null)
+			switcherBus1Channels.push(null)
+			switcherBusChannels.push(null)
+			continue
+		}
 		if (switcherBusMode) {
 			const out = next()
 			if (previewEnabledByMain[i]) {

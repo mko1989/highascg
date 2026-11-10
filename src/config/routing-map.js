@@ -9,6 +9,7 @@ const { resolveMonitorBus } = require('./monitor-bus')
 const { routingDestinationsFromConfig, screenLabelsFromConfig } = require('./screen-destinations')
 const { allocateMainChannels } = require('./routing-map-mains')
 const { isOperatorGuiFirst } = require('./operator-gui-first')
+const { makeBusAccessors, channelsWhereCabledEnabled } = require('./screen-channels')
 
 function readCasparSetting(cfg, key) {
 	if (!cfg || typeof cfg !== 'object') return undefined
@@ -152,7 +153,8 @@ function getRouteString(channel, layer) {
  * @param {Record<string, unknown>} config
  * @param {{ screenCount: number, programCh: (n: number) => number, previewCh: (n: number) => number|null, programChannels: number[], multiviewCh: number|null }} map
  * @param {Record<string, unknown>} sc - `streamingChannel`
- * @returns {{ kind: 'dedicated' } | { kind: 'attach', ch: number }}
+ * @returns {{ kind: 'dedicated' } | { kind: 'attach', ch: number|null }} ch null: nothing to attach to here (a hole
+ *   while `cluster.channelsWhereCabled` is on — map.programCh returns null for it)
  */
 function resolveStreamOutputCasparChannel(config, map, sc) {
 	const scObj = sc && typeof sc === 'object' ? sc : {}
@@ -170,6 +172,8 @@ function resolveStreamOutputCasparChannel(config, map, sc) {
 		const mainIdx = Math.max(0, parseInt(String(streamDests[0].mainScreenIndex ?? 0), 10) || 0)
 		const ch = map.programChannels[mainIdx]
 		if (ch != null) return { kind: 'attach', ch }
+		// WO-1029 plan 07: the stream screen is not output here (a hole) — no stream on this server, never screen 1
+		if (map.channelsWhereCabled === true) return { kind: 'attach', ch: null }
 	}
 	/* WO-378: shared vocabulary — a stream can now be fed by `channel_<N>` (any Caspar channel,
 	 * including a cabled host channel), not only by the screen buses. */
@@ -207,6 +211,10 @@ function getChannelMap(config, activeBuses = null) {
 	// WO-243: operator_gui is a dedicated utility channel (CEF web-UI over routed preview holes),
 	// allocated the same way as multiview — never a programChannels[] slot. At most one is expected
 	// (validated in device-view-crud.js), but this mirrors multiview's array shape defensively.
+	/* WO-1029 plan 07 (C3): `cluster.channelsWhereCabled` on ⇒ PGM/PRV only for screens cabled HERE (own device graph,
+	 * destination-cabling.js); other screens are null holes at their index. Off (default) ⇒ this map is byte-identical
+	 * to the legacy one. Lazy require: destination-cabling → device-graph-output-mapping → rtmp-output → routing. */
+	const cwc = !useVirtual && channelsWhereCabledEnabled(config) ? require('./destination-cabling').localScreenPlan(config, screenCount) : null
 	const ogDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'operator_gui')
 	const operatorGuiChannels = []
 	// WO-868: "Operator GUI first" — the GUI takes channel 1 and the mains start right after it (pin-aware).
@@ -221,12 +229,16 @@ function getChannelMap(config, activeBuses = null) {
 	const { programChannels, previewChannels, switcherBus1Channels, switcherBusChannels, switcherBusMode } = allocateMainChannels({
 		useVirtual, virtualMainChannels, screenCount, previewEnabledByMain, firstCh: firstMainCh,
 		isPinned: operatorFirst ? (c) => pinnedHostChannels.has(c) : null,
+		isLocal: cwc ? (i) => cwc.local[i] === true : null,
 	})
 
-	let nextCh = Math.max(0, ...operatorGuiChannels, ...programChannels, ...previewChannels.filter(c => c != null), ...switcherBusChannels.filter(c => c != null)) + 1
+	let nextCh = Math.max(0, ...operatorGuiChannels, ...programChannels.filter(c => c != null), ...previewChannels.filter(c => c != null), ...switcherBusChannels.filter(c => c != null)) + 1
 	const allocCh = () => { while (pinnedHostChannels.has(nextCh)) nextCh++; return nextCh++ }
 
-	const mvDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'multiview')
+	const allMvDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'multiview')
+	// WO-1029 plan 07: a multiview gets its channel where it is cabled; multiviewIndices keeps each one's ordinal
+	// (multiview_<k>_* settings) for the generator.
+	const mvDests = cwc ? allMvDests.filter((d) => require('./destination-cabling').cabledHere(config, d.id)) : allMvDests
 	
 	const multiviewChannels = []
 	if (mvDests.length > 0) {
@@ -316,23 +328,12 @@ function getChannelMap(config, activeBuses = null) {
 	const monitorCh = resolveMonitorBus(config).enabled ? allocCh() : null
 
 	const sc = config?.streamingChannel && typeof config.streamingChannel === 'object' ? config.streamingChannel : {}
+	const bus = makeBusAccessors({ programChannels, previewChannels, switcherBusMode, switcherBus1Channels, switcherBusChannels }, activeBuses, !!cwc)
 	const mapSoFar = {
+		...(cwc ? { channelsWhereCabled: true } : {}),
 		screenCount,
-		programCh: (n) => programChannels[n - 1] || programChannels[0],
-		previewCh: (n) => {
-			const idx = n - 1
-			if (idx >= 0 && idx < previewChannels.length) {
-				if (switcherBusMode && activeBuses) {
-					const pgm = programChannels[idx]
-					const active = Number(activeBuses[String(pgm)] || switcherBus1Channels[idx])
-					const bus1 = Number(switcherBus1Channels[idx])
-					const bus2 = Number(switcherBusChannels[idx])
-					if (bus1 > 0 && bus2 > 0) return active === bus1 ? bus2 : bus1
-				}
-				return previewChannels[idx]
-			}
-			return null
-		},
+		programCh: bus.programCh,
+		previewCh: bus.previewCh,
 		programChannels,
 		multiviewCh,
 		operatorGuiCh,
@@ -349,6 +350,7 @@ function getChannelMap(config, activeBuses = null) {
 			streamingCh = out.ch
 			streamingAttachToChannel = out.ch
 		}
+		if (cwc && streamingCh == null) streamingAttachToChannel = null
 	}
 
 	const hostMerge = hostLive.mergeHostLiveChannelsIntoRouting(config, nextCh)
@@ -382,21 +384,8 @@ function getChannelMap(config, activeBuses = null) {
 		inputsOnMvr,
 		decklinkInputsHost,
 		decklinkCount: effectiveDecklinkInputCount,
-		programCh: (n) => programChannels[n - 1] || programChannels[0],
-		previewCh: (n) => {
-			const idx = n - 1
-			if (idx >= 0 && idx < previewChannels.length) {
-				if (switcherBusMode && activeBuses) {
-					const pgm = programChannels[idx]
-					const active = Number(activeBuses[String(pgm)] || switcherBus1Channels[idx])
-					const bus1 = Number(switcherBus1Channels[idx])
-					const bus2 = Number(switcherBusChannels[idx])
-					if (bus1 > 0 && bus2 > 0) return active === bus1 ? bus2 : bus1
-				}
-				return previewChannels[idx]
-			}
-			return null
-		},
+		programCh: bus.programCh,
+		previewCh: bus.previewCh,
 		programChannels, previewChannels, 
 		playbackChannels: switcherBusMode ? switcherBus1Channels : programChannels,
 		previewEnabledByMain, multiviewCh, inputsCh, audioOnlyChannels,
@@ -426,6 +415,10 @@ function getChannelMap(config, activeBuses = null) {
 		hostLiveChannels: hostMerge.entries,
 		webpageHostChannels: hostMerge.entries.filter((e) => e.kind === 'webpage_host').map((e) => e.channel),
 		ndiHostChannels: hostMerge.entries.filter((e) => e.kind === 'ndi_host').map((e) => e.channel),
+		/* WO-1029 plan 07: only while the rule is on — the off map stays key-for-key the legacy one. screenHosts[i] =
+		 * { idx, destId, here, pgm, prv } (pgm/prv: which half is cabled here); owners on other servers are the
+		 * cluster layer's business (destination-ownership.js). */
+		...(cwc ? { channelsWhereCabled: true, screenHosts: cwc.hosts, multiviewIndices: mvDests.map((d) => allMvDests.indexOf(d)) } : {}),
 	}
 
 	return result
@@ -445,7 +438,9 @@ function resolveStreamingChannelRouteForRole(config, role = 'video') {
 	// channel played route://1 (PGM). Out-of-range / unknown names still fall back to screen 1's PGM, as before.
 	const resolved = resolveOutputSourceToChannel(map, src)
 	if (resolved != null) return getRouteString(resolved)
-	return getRouteString(map.programCh(1))
+	const first = map.programCh(1)
+	if (first == null && map.channelsWhereCabled === true) return null // WO-1029: a hole, never route://null
+	return getRouteString(first)
 }
 
 module.exports = {

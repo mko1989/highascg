@@ -76,7 +76,8 @@ function parseOutputSourceName(raw) {
  *        plumbing and the switcher-aware record path can pass its own.
  * @param {unknown} raw
  * @returns {number|null} null when the name is unknown or the mapping has no such bus — callers
- *          decide their own fallback, they do not all agree on one.
+ *          decide their own fallback, they do not all agree on one. WO-1029 plan 07: `program_N` / `preview_N`
+ *          of a screen this server does not output (a hole, `cluster.channelsWhereCabled`) is null too.
  */
 function resolveOutputSourceToChannel(map, raw) {
 	if (!map) return null

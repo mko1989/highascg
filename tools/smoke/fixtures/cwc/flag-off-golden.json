@@ -1,0 +1,43 @@
+{
+ "_note": "WO-1029 plan 07: sha256[0:24] of the generated casparcg.config and channel map JSON, captured BEFORE the channels-where-cabled code existed (10.11.2026). Flag absent/false must reproduce them byte for byte.",
+ "box7579": {
+  "xml": "ed0b3cc97ffe9f0765aa632c",
+  "map": "dfb20096b440dd6069edba2b",
+  "channels": 10
+ },
+ "box5867": {
+  "xml": "393ca6b444345fc5a1319029",
+  "map": "a1689cd55e6d2e03b9c0c609",
+  "channels": 10
+ },
+ "wo868-off": {
+  "xml": "00312f59cae308b62edb34d0",
+  "map": "cc32865521076bdf72a36bb2",
+  "channels": 8
+ },
+ "wo868-on": {
+  "xml": "402ee144a80ccfe706b7e579",
+  "map": "17a78fa45e172cd30a7fb364",
+  "channels": 8
+ },
+ "wo869-on": {
+  "xml": "aab058e79415a183e1107769",
+  "map": "31c02a66f210311dc5ea0479",
+  "channels": 3
+ },
+ "wo869-off": {
+  "xml": "3810c8485fad398fe2b62e20",
+  "map": "4b5e0ce0ceb6d3450c171608",
+  "channels": 3
+ },
+ "device-view-sample": {
+  "xml": "75c2dfb0c1250810d2311f08",
+  "map": "577c96766f5dcd87711f632f",
+  "channels": 6
+ },
+ "plain-2-screens": {
+  "xml": "30441e5b01641b6a1c906ece",
+  "map": "eafa14e8f1aa2a4a06cb319d",
+  "channels": 4
+ }
+}

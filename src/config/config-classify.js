@@ -25,6 +25,8 @@ const DEVICE_TOP_LEVEL_KEYS = new Set([
 	'usbIngest',
 	'local_template_path',
 	'replication',
+	// WO-1029 plan 07: `cluster.channelsWhereCabled` — which screens get Caspar channels is per server
+	'cluster',
 	...SYSTEM_DISPLAY_KEYS,
 ])
 

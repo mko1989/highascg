@@ -54,6 +54,8 @@ function buildChannelPlan(config, routeMap) {
 	}
 	const screens = []
 	for (let n = 1; n <= screenCount; n++) {
+		// WO-1029 plan 07: a hole (screen output by another server, `cluster.channelsWhereCabled`) emits no <channel>
+		if (routeMap.channelsWhereCabled === true && routeMap.programCh(n) == null) continue
 		const mode = screenModeString(config, n)
 		const dims = getModeDimensions(mode, config, n)
 		const pixelmap = pixelmapByMain.get(n - 1) || null
@@ -64,7 +66,9 @@ function buildChannelPlan(config, routeMap) {
 	multiviewChannels.forEach((ch, idx) => {
 		// WO-842 (sweep 4l): per-output mode + multiview_custom_* — `getModeDimensions(…, ch)` looked a custom
 		// size up under screen_<CASPAR CHANNEL>_custom_* and fell back to 1920x1080
-		multiviews.push({ ch, dims: multiviewModeDimensions(config, idx + 1) })
+		// WO-1029 plan 07: with the cabled rule a multiview not cabled here has no channel — keep each one's own ordinal
+		const k = Array.isArray(routeMap.multiviewIndices) ? routeMap.multiviewIndices[idx] : idx
+		multiviews.push({ ch, dims: multiviewModeDimensions(config, k + 1) })
 	})
 
 	/** Emit multiview `<channel>` blocks only when routing allocated multiview slot(s). */

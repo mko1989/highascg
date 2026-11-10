@@ -35,8 +35,11 @@ function buildChannelMap(ctx) {
 	const programChannels = (map.programChannels || []).map((_, i) => map.programCh(i + 1))
 	const previewChannels = (map.programChannels || []).map((_, i) => map.previewCh(i + 1))
 
-	const programResolutions = programChannels.map((ch) => pickRes(ch))
-	const previewResolutions = previewChannels.map((ch) => pickRes(ch))
+	// WO-1029 plan 07: a hole (screen output by another server) has no resolution here — null, not the 1080p default
+	const holey = map.channelsWhereCabled === true
+	const resOf = (ch) => (holey && ch == null ? null : pickRes(ch))
+	const programResolutions = programChannels.map(resOf)
+	const previewResolutions = previewChannels.map(resOf)
 	const dlFromConfig = ctx.gatheredInfo?.decklinkFromConfig || {}
 	const configuredDlCount = configuredDecklinkInputCount(cfg)
 	const trustSavedConfig = decklinkInputsConfiguredInSettings(cfg)
@@ -127,6 +130,9 @@ function buildChannelMap(ctx) {
 		hostLiveChannels: Array.isArray(map.hostLiveChannels) ? map.hostLiveChannels : [],
 		webpageHostChannels: Array.isArray(map.webpageHostChannels) ? map.webpageHostChannels : [],
 		ndiHostChannels: Array.isArray(map.ndiHostChannels) ? map.ndiHostChannels : [],
+		/* WO-1029 plan 07: present only while `cluster.channelsWhereCabled` is on (off = the legacy shape). Holes in
+		 * programChannels / previewChannels are null; screenHosts says which screens this server outputs. */
+		...(holey ? { channelsWhereCabled: true, screenHosts: Array.isArray(map.screenHosts) ? map.screenHosts : [] } : {}),
 	}
 }
 

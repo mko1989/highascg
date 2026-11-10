@@ -40,6 +40,7 @@ const { createAirJournal } = require('./cluster-air-journal')
 const { channelOnAir } = require('./cluster-peer-info')
 const { staleLayout } = require('./remote-destination')
 const { createHolders } = require('./cluster-holders')
+const { cabledDestinationIds } = require('../config/destination-cabling')
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1'])
 
@@ -59,18 +60,17 @@ function mainChannels(view) {
 	return out
 }
 
-/** Destination ids that have a cable on the box whose device view this is (same rule as Godot cluster_model.gd). */
+/**
+ * Destination ids that have a cable on the box whose device view this is. WO-1029 plan 07 (C2): the one shared
+ * predicate (config/destination-cabling.js — a physical sink, through mapping nodes only when one of their outputs is
+ * cabled; orphan cables of destinations not in the list never count). A view without a destination list (an old
+ * peer) is asked about every `destination_in` it has, as before.
+ */
 function cabledIds(view) {
-	const g = view?.graph || {}
-	const destOf = new Map()
-	for (const c of g.connectors || []) {
-		if (c?.kind === 'destination_in' && c.externalRef) destOf.set(String(c.id), String(c.externalRef))
-	}
-	const out = new Set()
-	for (const e of g.edges || []) {
-		if (e && destOf.has(String(e.sourceId)) && e.sinkId) out.add(destOf.get(String(e.sourceId)))
-	}
-	return out
+	if (Array.isArray(view?.screenDestinations?.destinations)) return cabledDestinationIds(view)
+	const refs = new Set()
+	for (const c of view?.graph?.connectors || []) if (c?.kind === 'destination_in' && c.externalRef) refs.add(String(c.externalRef))
+	return cabledDestinationIds({ graph: view?.graph, screenDestinations: { destinations: [...refs].map((id) => ({ id, mode: 'stream' /* no legacy dst_chN source */ })) } })
 }
 
 /**

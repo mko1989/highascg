@@ -270,6 +270,9 @@ function coreDefaults() {
 			layout: {},
 		},
 		replication: replicationDefaults(),
+		/** WO-1029 plan 07: device-local (config-classify.js). channelsWhereCabled: Caspar channels only for screens
+		 * cabled on this server (set by the cluster switch, never by hand; off = every destination gets channels). */
+		cluster: { channelsWhereCabled: false },
 		companion: {
 			host: '127.0.0.1',
 			port: 8000,

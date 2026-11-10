@@ -1,0 +1,273 @@
+{
+ "_note": "highascg7579: /api/device-view on 10.11.2026 (WO-1029 plan 07), reduced: no stream/record credentials, no layout",
+ "casparServer": {
+  "operator_gui_first": true
+ },
+ "screenDestinations": {
+  "version": 1,
+  "destinations": [
+   {
+    "id": "dst_operator_gui",
+    "label": "Operator GUI",
+    "mainScreenIndex": 0,
+    "mode": "operator_gui",
+    "audioLayout": "stereo",
+    "videoMode": "1080p5000",
+    "width": 1920,
+    "height": 1080,
+    "fps": 50,
+    "caspar": {
+     "bus": "pgm"
+    },
+    "inheritsProjectFps": true,
+    "autoLaunch": true,
+    "headless": false,
+    "videoOutput": "shm",
+    "shmName": "opgui"
+   },
+   {
+    "id": "dst_mw7t9epz_1",
+    "label": "PGM/PRV 1",
+    "mainScreenIndex": 0,
+    "mode": "pgm_prv",
+    "audioLayout": "stereo",
+    "videoMode": "custom",
+    "width": 3072,
+    "height": 1024,
+    "fps": 50,
+    "caspar": {
+     "bus": "pgm"
+    },
+    "inheritsProjectFps": false
+   },
+   {
+    "id": "dst_mw96s6pd_1",
+    "label": "to zoom",
+    "mainScreenIndex": 1,
+    "mode": "pgm_only",
+    "audioLayout": "stereo",
+    "videoMode": "1080p5000",
+    "width": 1920,
+    "height": 1080,
+    "fps": 50,
+    "caspar": {
+     "bus": "pgm"
+    },
+    "inheritsProjectFps": true
+   },
+   {
+    "id": "dst_mw989wyz_1",
+    "label": "PGM/PRV 3",
+    "mainScreenIndex": 2,
+    "mode": "pgm_prv",
+    "audioLayout": "stereo",
+    "videoMode": "custom",
+    "width": 7680,
+    "height": 2160,
+    "fps": 50,
+    "caspar": {
+     "bus": "pgm"
+    },
+    "inheritsProjectFps": false
+   },
+   {
+    "id": "dst_mw9orj4o_1",
+    "label": "Stream PGM",
+    "mainScreenIndex": 3,
+    "mode": "pgm_prv",
+    "audioLayout": "stereo",
+    "videoMode": "1080p5000",
+    "width": 1920,
+    "height": 1080,
+    "fps": 50,
+    "caspar": {
+     "bus": "pgm"
+    },
+    "inheritsProjectFps": true
+   }
+  ]
+ },
+ "deviceGraph": {
+  "version": 1,
+  "devices": [
+   {
+    "id": "caspar_host",
+    "role": "caspar_host",
+    "label": "Caspar / HighAsCG host"
+   },
+   {
+    "id": "destinations",
+    "role": "destinations",
+    "label": "Screen destinations"
+   }
+  ],
+  "connectors": [
+   {
+    "id": "dst_in_dst_operator_gui",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "Operator GUI",
+    "externalRef": "dst_operator_gui"
+   },
+   {
+    "id": "dlsdi_1",
+    "deviceId": "caspar_host",
+    "kind": "decklink_io",
+    "label": "DeckLink 1",
+    "externalRef": "1",
+    "index": 0,
+    "caspar": {
+     "ioDirection": "in"
+    }
+   },
+   {
+    "id": "dlsdi_2",
+    "deviceId": "caspar_host",
+    "kind": "decklink_io",
+    "label": "DeckLink 2",
+    "externalRef": "2",
+    "index": 1,
+    "caspar": {
+     "ioDirection": "in"
+    }
+   },
+   {
+    "id": "dlsdi_3",
+    "deviceId": "caspar_host",
+    "kind": "decklink_io",
+    "label": "DeckLink 3",
+    "externalRef": "3",
+    "index": 2,
+    "caspar": {
+     "ioDirection": "unassigned"
+    }
+   },
+   {
+    "id": "dlsdi_4",
+    "deviceId": "caspar_host",
+    "kind": "decklink_io",
+    "label": "DeckLink 4",
+    "externalRef": "4",
+    "index": 3,
+    "caspar": {
+     "ioDirection": "unassigned"
+    }
+   },
+   {
+    "id": "audio_2",
+    "deviceId": "caspar_host",
+    "kind": "audio_out",
+    "label": "Audio 2",
+    "externalRef": "hw:2,0"
+   },
+   {
+    "id": "dst_in_dst_mw7t9epz_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "PGM/PRV 1",
+    "externalRef": "dst_mw7t9epz_1"
+   },
+   {
+    "id": "dst_in_host_decklink_input_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "DeckLink 1",
+    "externalRef": "host_decklink_input_1",
+    "caspar": {
+     "hostRole": "decklink_input",
+     "hostChannel": 9,
+     "slot": 1
+    }
+   },
+   {
+    "id": "dst_in_dst_mw989wyz_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "PGM/PRV 3",
+    "externalRef": "dst_mw989wyz_1"
+   },
+   {
+    "id": "dst_in_dst_mw96s6pd_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "to zoom",
+    "externalRef": "dst_mw96s6pd_1"
+   },
+   {
+    "id": "dst_in_host_decklink_input_2",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "DeckLink 2",
+    "externalRef": "host_decklink_input_2",
+    "caspar": {
+     "hostRole": "decklink_input",
+     "hostChannel": 7,
+     "slot": 2
+    }
+   },
+   {
+    "id": "dst_in_dst_mw9orj4o_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "Stream PGM",
+    "externalRef": "dst_mw9orj4o_1"
+   },
+   {
+    "id": "gpu_p0",
+    "deviceId": "caspar_host",
+    "kind": "gpu_out",
+    "label": "P0",
+    "externalRef": "DP-0/DP-1",
+    "caspar": {
+     "bus": "pgm",
+     "mainIndex": 0
+    }
+   },
+   {
+    "id": "gpu_p1",
+    "deviceId": "caspar_host",
+    "kind": "gpu_out",
+    "label": "P1",
+    "externalRef": "DP-2",
+    "caspar": {
+     "bus": "pgm",
+     "mainIndex": 1
+    }
+   },
+   {
+    "id": "gpu_p2",
+    "deviceId": "caspar_host",
+    "kind": "gpu_out",
+    "label": "P2",
+    "externalRef": "DP-4/DP-5",
+    "caspar": {
+     "bus": "pgm",
+     "mainIndex": 0
+    }
+   },
+   {
+    "id": "gpu_p3",
+    "deviceId": "caspar_host",
+    "kind": "gpu_out",
+    "label": "P3",
+    "externalRef": "DP-6",
+    "caspar": {
+     "bus": "pgm",
+     "mainIndex": 0
+    }
+   }
+  ],
+  "edges": [
+   {
+    "id": "e_dst_in_dst_operator_gui_gpu_p3",
+    "sourceId": "dst_in_dst_operator_gui",
+    "sinkId": "gpu_p3"
+   },
+   {
+    "id": "e_dst_in_dst_mw7t9epz_1_gpu_p1",
+    "sourceId": "dst_in_dst_mw7t9epz_1",
+    "sinkId": "gpu_p1"
+   }
+  ]
+ }
+}

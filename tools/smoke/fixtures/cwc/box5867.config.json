@@ -1,0 +1,532 @@
+{
+ "_note": "highascg5867: /api/device-view on 10.11.2026 (WO-1029 plan 07), reduced: no stream/record credentials, no layout; streamingChannel reconstructed (live streamingCh 7 = Stream PGM program_4)",
+ "casparServer": {
+  "operator_gui_first": true
+ },
+ "streamingChannel": {
+  "enabled": true,
+  "videoSource": "program_4"
+ },
+ "screenDestinations": {
+  "version": 1,
+  "destinations": [
+   {
+    "id": "dst_operator_gui",
+    "label": "Operator GUI",
+    "mainScreenIndex": 0,
+    "mode": "operator_gui",
+    "audioLayout": "stereo",
+    "videoMode": "1080p5000",
+    "width": 1920,
+    "height": 1080,
+    "fps": 50,
+    "caspar": {
+     "bus": "pgm"
+    },
+    "inheritsProjectFps": true,
+    "autoLaunch": true,
+    "headless": false,
+    "videoOutput": "shm",
+    "shmName": "opgui"
+   },
+   {
+    "id": "dst_mw7t9epz_1",
+    "label": "PGM/PRV 1",
+    "mainScreenIndex": 0,
+    "mode": "pgm_prv",
+    "audioLayout": "stereo",
+    "videoMode": "custom",
+    "width": 3072,
+    "height": 1024,
+    "fps": 50,
+    "caspar": {
+     "bus": "pgm"
+    },
+    "inheritsProjectFps": false
+   },
+   {
+    "id": "dst_mw96s6pd_1",
+    "label": "to zoom",
+    "mainScreenIndex": 1,
+    "mode": "pgm_only",
+    "audioLayout": "stereo",
+    "videoMode": "1080p5000",
+    "width": 1920,
+    "height": 1080,
+    "fps": 50,
+    "caspar": {
+     "bus": "pgm"
+    },
+    "inheritsProjectFps": true
+   },
+   {
+    "id": "dst_mw989wyz_1",
+    "label": "PGM/PRV 3",
+    "mainScreenIndex": 2,
+    "mode": "pgm_prv",
+    "audioLayout": "stereo",
+    "videoMode": "custom",
+    "width": 7680,
+    "height": 2160,
+    "fps": 50,
+    "caspar": {
+     "bus": "pgm"
+    },
+    "inheritsProjectFps": false
+   },
+   {
+    "id": "dst_mw9orj4o_1",
+    "label": "Stream PGM",
+    "mainScreenIndex": 3,
+    "mode": "pgm_prv",
+    "audioLayout": "stereo",
+    "videoMode": "1080p5000",
+    "width": 1920,
+    "height": 1080,
+    "fps": 50,
+    "caspar": {
+     "bus": "pgm"
+    },
+    "inheritsProjectFps": true
+   }
+  ]
+ },
+ "deviceGraph": {
+  "version": 1,
+  "devices": [
+   {
+    "id": "caspar_host",
+    "role": "caspar_host",
+    "label": "Caspar / HighAsCG host"
+   },
+   {
+    "id": "destinations",
+    "role": "destinations",
+    "label": "Screen destinations"
+   },
+   {
+    "id": "mapping_mw2fnwz5_1",
+    "role": "pixel_mapping",
+    "label": "Pixel Mapping 1",
+    "settings": {
+     "numOutputs": 2,
+     "outputs": [
+      {
+       "id": "out_1",
+       "mode": "3840x2160p50",
+       "label": "Output 1",
+       "width": 3840,
+       "height": 2160,
+       "fps": 50
+      },
+      {
+       "id": "out_2",
+       "mode": "3840x2160p50",
+       "label": "Output 2",
+       "width": 3840,
+       "height": 2160,
+       "fps": 50
+      }
+     ],
+     "mappings": [
+      {
+       "id": "map_out_1",
+       "type": "video_slice",
+       "label": "Output 1",
+       "outputId": "out_1",
+       "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 3840,
+        "h": 2160
+       },
+       "rotation": 0
+      },
+      {
+       "id": "map_out_2",
+       "type": "video_slice",
+       "label": "Output 2",
+       "outputId": "out_2",
+       "rect": {
+        "x": 3840,
+        "y": 0,
+        "w": 3840,
+        "h": 2160
+       },
+       "rotation": 0
+      }
+     ],
+     "slices": [
+      {
+       "id": "map_out_1",
+       "name": "Output 1",
+       "outputId": "out_1",
+       "enabled": true,
+       "source": {
+        "kind": "feed"
+       },
+       "src": {
+        "x": 0,
+        "y": 0,
+        "w": 3840,
+        "h": 2160
+       },
+       "dst": {
+        "rect": {
+         "x": 0,
+         "y": 0,
+         "w": 3840,
+         "h": 2160
+        },
+        "rotation": 0,
+        "flipH": false,
+        "flipV": false,
+        "warp": [
+         [
+          0,
+          0
+         ],
+         [
+          0,
+          0
+         ],
+         [
+          0,
+          0
+         ],
+         [
+          0,
+          0
+         ]
+        ]
+       },
+       "opacity": 1,
+       "feather": {
+        "l": 0,
+        "t": 0,
+        "r": 0,
+        "b": 0
+       },
+       "z": 0
+      },
+      {
+       "id": "map_out_2",
+       "name": "Output 2",
+       "outputId": "out_2",
+       "enabled": true,
+       "source": {
+        "kind": "feed"
+       },
+       "src": {
+        "x": 3840,
+        "y": 0,
+        "w": 3840,
+        "h": 2160
+       },
+       "dst": {
+        "rect": {
+         "x": 0,
+         "y": 0,
+         "w": 3840,
+         "h": 2160
+        },
+        "rotation": 0,
+        "flipH": false,
+        "flipV": false,
+        "warp": [
+         [
+          0,
+          0
+         ],
+         [
+          0,
+          0
+         ],
+         [
+          0,
+          0
+         ],
+         [
+          0,
+          0
+         ]
+        ]
+       },
+       "opacity": 1,
+       "feather": {
+        "l": 0,
+        "t": 0,
+        "r": 0,
+        "b": 0
+       },
+       "z": 0
+      }
+     ]
+    }
+   }
+  ],
+  "connectors": [
+   {
+    "id": "dst_in_dst_operator_gui",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "Operator GUI",
+    "externalRef": "dst_operator_gui"
+   },
+   {
+    "id": "dlsdi_1",
+    "deviceId": "caspar_host",
+    "kind": "decklink_io",
+    "label": "DeckLink 1",
+    "externalRef": "1",
+    "index": 0,
+    "caspar": {
+     "ioDirection": "unassigned",
+     "bus": "pgm",
+     "mainIndex": 0
+    }
+   },
+   {
+    "id": "dlsdi_2",
+    "deviceId": "caspar_host",
+    "kind": "decklink_io",
+    "label": "DeckLink 2",
+    "externalRef": "2",
+    "index": 1,
+    "caspar": {
+     "ioDirection": "out",
+     "bus": "pgm",
+     "mainIndex": 3
+    }
+   },
+   {
+    "id": "dlsdi_3",
+    "deviceId": "caspar_host",
+    "kind": "decklink_io",
+    "label": "DeckLink 3",
+    "externalRef": "3",
+    "index": 2,
+    "caspar": {
+     "ioDirection": "in",
+     "bus": "pgm",
+     "mainIndex": 0
+    }
+   },
+   {
+    "id": "dlsdi_4",
+    "deviceId": "caspar_host",
+    "kind": "decklink_io",
+    "label": "DeckLink 4",
+    "externalRef": "4",
+    "index": 3,
+    "caspar": {
+     "ioDirection": "in"
+    }
+   },
+   {
+    "id": "mapping_mw2fnwz5_1_in",
+    "deviceId": "mapping_mw2fnwz5_1",
+    "kind": "pixel_map_in",
+    "label": "Input Feed"
+   },
+   {
+    "id": "dst_in_dst_mw2fn9wr_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "PGM/PRV 1",
+    "externalRef": "dst_mw2fn9wr_1"
+   },
+   {
+    "id": "dst_in_dst_mw7t9epz_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "PGM/PRV 1",
+    "externalRef": "dst_mw7t9epz_1"
+   },
+   {
+    "id": "dst_in_dst_mw96s6pd_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "to zoom",
+    "externalRef": "dst_mw96s6pd_1"
+   },
+   {
+    "id": "dst_in_dst_mw989wyz_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "PGM/PRV 3",
+    "externalRef": "dst_mw989wyz_1"
+   },
+   {
+    "id": "dst_in_host_decklink_input_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "DeckLink 1",
+    "externalRef": "host_decklink_input_1",
+    "caspar": {
+     "hostRole": "decklink_input",
+     "hostChannel": 9,
+     "slot": 1
+    }
+   },
+   {
+    "id": "dst_in_host_decklink_input_2",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "DeckLink 2",
+    "externalRef": "host_decklink_input_2",
+    "caspar": {
+     "hostRole": "decklink_input",
+     "hostChannel": 9,
+     "slot": 2
+    }
+   },
+   {
+    "id": "dst_in_host_decklink_input_3",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "DeckLink 3",
+    "externalRef": "host_decklink_input_3",
+    "caspar": {
+     "hostRole": "decklink_input",
+     "hostChannel": 9,
+     "slot": 3
+    }
+   },
+   {
+    "id": "dst_in_dst_mw9orj4o_1",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "Stream PGM",
+    "externalRef": "dst_mw9orj4o_1"
+   },
+   {
+    "id": "str_1",
+    "deviceId": "caspar_host",
+    "kind": "stream_out",
+    "label": "Stream PGM",
+    "externalRef": "stream_1",
+    "index": 0,
+    "caspar": {
+     "type": "rtmp",
+     "name": "Str1",
+     "quality": "medium"
+    }
+   },
+   {
+    "id": "rec_1",
+    "deviceId": "caspar_host",
+    "kind": "record_out",
+    "label": "Rec PGM",
+    "externalRef": "record_1",
+    "index": 0,
+    "caspar": {
+     "name": "Rec1",
+     "source": "program_4"
+    }
+   },
+   {
+    "id": "dst_in_host_decklink_input_4",
+    "deviceId": "destinations",
+    "kind": "destination_in",
+    "label": "DeckLink 4",
+    "externalRef": "host_decklink_input_4",
+    "caspar": {
+     "hostRole": "decklink_input",
+     "hostChannel": 10,
+     "slot": 4
+    }
+   },
+   {
+    "id": "mapping_mw2fnwz5_1_out_1",
+    "deviceId": "mapping_mw2fnwz5_1",
+    "kind": "pixel_map_out",
+    "label": "Output 1",
+    "index": 0
+   },
+   {
+    "id": "mapping_mw2fnwz5_1_out_2",
+    "deviceId": "mapping_mw2fnwz5_1",
+    "kind": "pixel_map_out",
+    "label": "Output 2",
+    "index": 1
+   },
+   {
+    "id": "gpu_p0",
+    "deviceId": "caspar_host",
+    "kind": "gpu_out",
+    "label": "P0",
+    "externalRef": "DP-0",
+    "caspar": {
+     "bus": "pgm",
+     "mainIndex": 1
+    }
+   },
+   {
+    "id": "gpu_p1",
+    "deviceId": "caspar_host",
+    "kind": "gpu_out",
+    "label": "P1",
+    "externalRef": "HDMI-0",
+    "caspar": {
+     "bus": "pgm",
+     "mainIndex": 0
+    }
+   },
+   {
+    "id": "gpu_p2",
+    "deviceId": "caspar_host",
+    "kind": "gpu_out",
+    "label": "P2",
+    "externalRef": "DP-2/DP-3",
+    "caspar": {
+     "bus": "pgm",
+     "mainIndex": 0
+    }
+   },
+   {
+    "id": "gpu_p3",
+    "deviceId": "caspar_host",
+    "kind": "gpu_out",
+    "label": "P3",
+    "externalRef": "DP-4",
+    "caspar": {
+     "bus": "pgm",
+     "mainIndex": 2
+    }
+   }
+  ],
+  "edges": [
+   {
+    "id": "e_dst_in_dst_mw9orj4o_1_str_1",
+    "sourceId": "dst_in_dst_mw9orj4o_1",
+    "sinkId": "str_1"
+   },
+   {
+    "id": "e_dst_in_dst_mw9orj4o_1_rec_1",
+    "sourceId": "dst_in_dst_mw9orj4o_1",
+    "sinkId": "rec_1"
+   },
+   {
+    "id": "e_dst_in_dst_operator_gui_gpu_p1",
+    "sourceId": "dst_in_dst_operator_gui",
+    "sinkId": "gpu_p1"
+   },
+   {
+    "id": "e_mapping_mw2fnwz5_1_out_2_gpu_p3",
+    "sourceId": "mapping_mw2fnwz5_1_out_2",
+    "sinkId": "gpu_p3"
+   },
+   {
+    "id": "e_dst_in_dst_mw989wyz_1_mapping_mw2fnwz5_1_in",
+    "sourceId": "dst_in_dst_mw989wyz_1",
+    "sinkId": "mapping_mw2fnwz5_1_in"
+   },
+   {
+    "id": "e_mapping_mw2fnwz5_1_out_1_gpu_p0",
+    "sourceId": "mapping_mw2fnwz5_1_out_1",
+    "sinkId": "gpu_p0"
+   }
+  ]
+ }
+}

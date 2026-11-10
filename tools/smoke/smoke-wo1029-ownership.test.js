@@ -100,7 +100,11 @@ describe('WO-1029 2a rule 1: an OWN screen is driven here while the master forwa
 		assert.equal(ftb.status, 200, ftb.body)
 		assert.ok(f.lines().some((l) => /^PLAY 1-11 "X"/.test(l)))
 		await tick()
-		assert.deepEqual(f.calls.map((c) => [c[0], c[1], c[2].destId]), [['M', 'dest.pressed', 'a']], 'debounced: one notice for the burst')
+		// the debounce is 1 s of real time (its exact behaviour is unit-tested with a fake clock below): on a loaded
+		// runner this burst can straddle the window, so one OR two notices — never one per action (5), never another screen
+		const notices = f.calls.map((c) => [c[0], c[1], c[2].destId])
+		assert.ok(notices.length >= 1 && notices.length <= 2, `debounced: ${JSON.stringify(notices)}`)
+		for (const n of notices) assert.deepEqual(n, ['M', 'dest.pressed', 'a'])
 		assert.ok(f.calls[0][2].seq > 0)
 	})
 

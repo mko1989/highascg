@@ -85,6 +85,8 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 		...((appConfig && typeof appConfig.operatorTools === 'object' && appConfig.operatorTools) || {}),
 	}
 	merged.extraLiveSources = Array.isArray(appConfig?.extraLiveSources) ? appConfig.extraLiveSources : []
+	// WO-1029 plan 07: the device-local `cluster.channelsWhereCabled` flag — getChannelMap reads it from this config
+	if (appConfig && appConfig.cluster && typeof appConfig.cluster === 'object') merged.cluster = { ...appConfig.cluster }
 
 	// Attach layout-related bits for buildChannelsSection -> calculateLayoutPositions
 	merged.deviceGraph = appConfig && appConfig.deviceGraph
