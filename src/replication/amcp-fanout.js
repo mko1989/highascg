@@ -21,15 +21,37 @@ function setClusterFanoutSink(fn) {
  */
 let _clusterAirCheck = null
 
+/**
+ * WO-1029 phase 2a: the check may also answer `{ code: 'REMOTE_SCREEN', drivenBy, owners }` — a non-master's copy channel
+ * of a screen cabled only on other servers (destination-ownership.js): refused like a held one, with its own code.
+ */
 function setClusterAirCheck(fn) {
 	_clusterAirCheck = typeof fn === 'function' ? fn : null
 }
 
+/** → '' | the driver's name | { code, drivenBy, owners } */
 function clusterDrivenBy(channel) {
 	try {
-		return String(_clusterAirCheck?.(channel) || '')
+		const v = _clusterAirCheck?.(channel)
+		if (v && typeof v === 'object') return v.drivenBy ? v : ''
+		return String(v || '')
 	} catch {
 		return ''
+	}
+}
+
+/** WO-1029 2a: told about every program-affecting line this server sends itself (the owner's press notice). */
+let _clusterLocalPress = null
+
+function setClusterLocalPress(fn) {
+	_clusterLocalPress = typeof fn === 'function' ? fn : null
+}
+
+function localPress(channel) {
+	try {
+		_clusterLocalPress?.(channel)
+	} catch {
+		/* a notice never blocks a press */
 	}
 }
 
@@ -217,11 +239,13 @@ function isAmcpQueryLine(cmd) {
 function airHeldBy(ctx, channel) {
 	const ch = parseInt(String(channel), 10)
 	if (!Number.isFinite(ch) || ch < 1) return null
-	const drivenBy = isAmcpFanoutReceiveBox(ctx) ? 'the hot-backup leader' : clusterDrivenBy(ch)
-	if (!drivenBy) return null // the usual case: decided before the channel map is built (every AMCP line asks)
+	const v = isAmcpFanoutReceiveBox(ctx) ? 'the hot-backup leader' : clusterDrivenBy(ch)
+	if (!v) return null // the usual case: decided before the channel map is built (every AMCP line asks)
 	const { getChannelMap } = require('../config/routing')
 	const idx = (getChannelMap(ctx?.config || {}).programChannels || []).findIndex((c) => Number(c) === ch)
-	return idx < 0 ? null : { channel: ch, screen: idx + 1, drivenBy }
+	if (idx < 0) return null
+	if (typeof v === 'string') return { channel: ch, screen: idx + 1, drivenBy: v }
+	return { channel: ch, screen: idx + 1, drivenBy: String(v.drivenBy), code: String(v.code || 'AIR_HELD'), owners: Array.isArray(v.owners) ? v.owners : [] }
 }
 
 /** One AMCP line → `{ channel, screen, drivenBy }` when it must not be sent here, else null. */
@@ -231,7 +255,10 @@ function airHeldForLine(ctx, cmd) {
 	if (/^(?:ADD|REMOVE)\s/i.test(String(cmd || '').trim())) return null
 	if (isAmcpQueryLine(cmd)) return null
 	const ch = parseAmcpCommandChannel(cmd)
-	return ch == null ? null : airHeldBy(ctx, ch)
+	if (ch == null) return null
+	const held = airHeldBy(ctx, ch)
+	if (!held) localPress(ch) // WO-1029 2a: it goes out here — the master hears that this owner pressed (debounced)
+	return held
 }
 
 /**
@@ -356,6 +383,7 @@ module.exports = {
 	fanoutAmcpPayload,
 	setClusterFanoutSink,
 	setClusterAirCheck,
+	setClusterLocalPress,
 	DEFAULT_ALLOW,
 	DEFAULT_DENY,
 }

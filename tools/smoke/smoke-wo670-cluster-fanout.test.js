@@ -34,6 +34,12 @@ const own = {
 		],
 	},
 	live: { caspar: { channelMap: { programChannels: [1, 3], previewChannels: [2, 4] } } },
+	// WO-1029 2a: both screens are cabled on the master too → BACKUP on the peer (forwarded and caught up as before; an
+	// own screen of the peer is caught up only while the master holds it: smoke-wo1029-ownership.test.js)
+	graph: {
+		connectors: [{ id: 'm_led', kind: 'destination_in', externalRef: 'dst_led' }, { id: 'm_side', kind: 'destination_in', externalRef: 'dst_side' }],
+		edges: [{ sourceId: 'm_led', sinkId: 'gpu' }, { sourceId: 'm_side', sinkId: 'gpu' }],
+	},
 }
 
 /** Peer B lists the side screen first (screen 0 → ch 1/2), the LED wall second (ch 3/4, no preview). */

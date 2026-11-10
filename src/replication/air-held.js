@@ -9,6 +9,10 @@
  *
  * WO-1029 B4 — a batch is decided per line (`withAirGate`): the lines this server drives go out, the held ones are
  * listed in `refused`; only a batch with nothing left to send rejects.
+ *
+ * WO-1029 phase 2a — a second kind of refusal, same path: `code: 'REMOTE_SCREEN'`, a non-master pressing on its copy
+ * channel of a screen cabled only on other servers (`owners`): `409 { error: 'Screen N is on <server>: drive it there
+ * or from the master', code, owners }`. Never answered ok for a press that showed nowhere.
  */
 
 const { JSON_HEADERS, jsonBody } = require('../api/response')
@@ -17,22 +21,25 @@ class AirHeldError extends Error {
 	/** @param {{ channel: number, screen?: number, drivenBy: string }} held  @param {object[]} [refused] */
 	constructor(held, refused) {
 		const what = held.screen ? `Screen ${held.screen}` : `Channel ${held.channel}`
-		super(`${what} is driven by ${held.drivenBy} (linked servers)`)
-		this.code = 'AIR_HELD'
+		const remote = held.code === 'REMOTE_SCREEN'
+		super(remote ? `${what} is on ${held.drivenBy}: drive it there or from the master` : `${what} is driven by ${held.drivenBy} (linked servers)`)
+		this.code = remote ? 'REMOTE_SCREEN' : 'AIR_HELD'
 		this.statusCode = 409
 		this.channel = held.channel
 		this.screen = held.screen || null
 		this.drivenBy = held.drivenBy
+		if (remote) this.owners = Array.isArray(held.owners) ? held.owners : []
 		if (refused) this.refused = refused
 	}
 }
 
-const isAirHeld = (e) => !!e && e.code === 'AIR_HELD'
+const isAirHeld = (e) => !!e && (e.code === 'AIR_HELD' || e.code === 'REMOTE_SCREEN')
 
 /** The route answer for a refusal (an AirHeldError, or the `{ channel, screen, drivenBy }` it is made from). */
 function airHeldReply(e, extra) {
 	const err = isAirHeld(e) ? e : new AirHeldError(e)
-	const body = { error: err.message, code: 'AIR_HELD', drivenBy: err.drivenBy, channel: err.channel }
+	const body = { error: err.message, code: err.code, drivenBy: err.drivenBy, channel: err.channel }
+	if (err.owners) body.owners = err.owners
 	if (err.refused) body.refused = err.refused
 	return { status: 409, headers: JSON_HEADERS, body: jsonBody({ ...body, ...(extra || {}) }) }
 }

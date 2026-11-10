@@ -32,6 +32,8 @@
  *   POST   /api/cluster/show { on }            → the shared-show view (WO-746, device-local; GET /api/cluster `show`)
  * GET /api/cluster also carries `master` (the view) and `invites` (WO-739: [{ id, fp, host, port, name, version,
  * first_at, asked_at }]). Changes broadcast WS `cluster:peers` (the GET body).
+ * WO-1029 2a: and `destinations: [{ id, label, main, owners: [server ids], here, kind: 'own'|'backup'|'remote'|'local',
+ * holder: '' | server id }]` (destination-ownership.js); `forwarded_here` gains `mirror` (the held backup screens).
  * The service starts on the first call, or at boot when servers are linked (P3b `startIfLinked`: failover never waits
  * for a client), and polls only while the list is not empty.
  */
@@ -56,6 +58,7 @@ const identity = require('../system/device-identity')
 const duties = require('../cluster/server-duties')
 const { isSandbox } = require('../bootstrap/sandbox')
 const { createSendersSync } = require('../cluster/server-senders')
+const { ownView, ownershipDeps } = require('../cluster/ownership-ctx')
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: jsonBody(obj) })
 
@@ -78,6 +81,7 @@ function clusterOf(ctx) {
 		await masterOf(ctx).tick()
 		await showOf(ctx).tick() // WO-746: the master catches every server up; a follower's waiting edit goes again
 		await fanoutOf(ctx).refresh()
+		await ownershipOf(ctx).refresh() // WO-1029 2a: which linked server each destination is cabled on
 		reportOf(ctx).publish() // WO-1029 B1: each linked server hears what this master forwards to it (nothing if not master)
 		require('../cluster/air-state').airChanged(ctx) // WO-712 R3b: the `air` heartbeat
 		duties.refresh() // WO-723: who does what follows the peers' pings
@@ -159,33 +163,49 @@ function airJournalOf(ctx) {
 	return ctx._airJournal
 }
 
+/** WO-1029: the virtual box bed (tools/e2e/virtual-boxes.js) lets a sandbox master forward to its peers' fake Caspars. */
+const sandboxFanout = () => process.env.HIGHASCG_SANDBOX_FANOUT === '1'
+
+/**
+ * WO-1029: a sandbox opens a socket only to a loopback throwaway Caspar, never to :5250 (WO-990: the live Caspar's AMCP
+ * acceptor dies on connect + reset) and never onto the LAN (WO-719). Outside a sandbox every address is allowed.
+ */
+function sandboxCaspar(host, port) {
+	if (!isSandbox()) return true
+	return Number(port) !== 5250 && /^(127\.\d{1,3}\.\d{1,3}\.\d{1,3}|localhost|::1)$/.test(String(host || ''))
+}
+
+/** A connection that never connects: the fan-out shows that server as not connected and sends nothing. */
+function refusedPeerCaspar(ctx, host, port) {
+	ctx.log?.('warn', `[cluster] sandbox: refusing to forward to ${host}:${port} (only a loopback throwaway Caspar, never :5250)`)
+	return { isConnected: false, stop() {}, enqueueSend() {}, enqueueBatchLines() {} }
+}
+
 /** P4a: while this server is master, its takes go to every linked server where the destination is cabled. */
 function fanoutOf(ctx) {
 	if (ctx._clusterFanout) return ctx._clusterFanout
 	const { PeerCasparConnection } = require('../replication/peer-caspar-connection')
 	const { getReplicationConfig } = require('../config/replication-config')
-	const { normalizeScreenDestinations } = require('../config/screen-destinations')
-	const { buildChannelMap } = require('../config/channel-map-from-ctx')
 	ctx._clusterFanout = createClusterFanout({
-		// WO-725: a sandbox never forwards — its peers' Caspar is this box's live one (127.0.0.1:5250)
-		isMaster: () => !isSandbox() && masterOf(ctx).view().is_master === true,
+		// WO-725: a sandbox never forwards — its peers' Caspar is this box's live one (127.0.0.1:5250). WO-1029: unless the
+		// harness that started it gave every node a throwaway Caspar (tools/e2e/virtual-boxes.js) — see sandboxCaspar
+		isMaster: () => (!isSandbox() || sandboxFanout()) && masterOf(ctx).view().is_master === true,
 		pairEnabled: () => !!getReplicationConfig(ctx.config).enabled,
 		members: () => clusterOf(ctx).snapshot().peers.filter((p) => p.online),
 		peerView: async (id) => {
 			const r = await clusterOf(ctx).deviceView(id)
 			return r.status === 200 ? r.body : null
 		},
-		ownView: async () => ({
-			screenDestinations: normalizeScreenDestinations(ctx.config?.screenDestinations),
-			live: { caspar: { channelMap: buildChannelMap(ctx) } },
-		}),
+		ownView: async () => ownView(ctx), // WO-1029 2a: with this server's cables (backup vs own screen)
+		selfId: () => clusterOf(ctx).snapshot().self?.id || '',
 		connect: (host, port, onConnected) => {
+			if (!sandboxCaspar(host, port)) return refusedPeerCaspar(ctx, host, port)
 			const c = new PeerCasparConnection({ log: ctx.log, onConnected })
 			c.connect(host, port)
 			return c
 		},
 		// WO-933: what that Caspar already shows, so a server that kept playing is not cut back to frame 0
-		queryInfo: (host, port, channels) => require('../cluster/cluster-peer-info').queryChannels(host, port, channels),
+		queryInfo: (host, port, channels) => (sandboxCaspar(host, port) ? require('../cluster/cluster-peer-info').queryChannels(host, port, channels) : Promise.resolve(null)),
 		journal: airJournalOf(ctx),
 		log: ctx.log,
 		onChange: () => broadcast(ctx),
@@ -195,8 +215,21 @@ function fanoutOf(ctx) {
 }
 
 /**
+ * WO-1029 2a: destination ownership (destination-ownership.js) — the AMCP check (held backup screens, REMOTE_SCREEN on
+ * a non-master's copy channel), the owner's press notice to the master, the `destinations` view.
+ */
+function ownershipOf(ctx) {
+	if (ctx._clusterOwnership) return ctx._clusterOwnership
+	const { createOwnership } = require('../cluster/destination-ownership')
+	const get = { cluster: () => clusterOf(ctx), master: () => masterOf(ctx), report: () => reportOf(ctx), call: () => callOf(ctx) }
+	ctx._clusterOwnership = createOwnership(ownershipDeps(ctx, get))
+	return ctx._clusterOwnership
+}
+
+/**
  * WO-1029 B1: what the master forwards to each linked server (cluster-fanout-report.js). On a follower it is the drive
- * gate's only evidence: a program channel is blocked only while the current master's fresh report lists it.
+ * gate's only evidence: a program channel is blocked only while the current master's fresh report MIRRORS it (2a: a
+ * backup screen); the check also refuses a non-master's copy of another server's screen (ownershipOf).
  */
 function reportOf(ctx) {
 	if (ctx._clusterReport) return ctx._clusterReport
@@ -206,10 +239,13 @@ function reportOf(ctx) {
 		fanout: () => (ctx._clusterFanout ? ctx._clusterFanout.status() : null),
 		peers: () => clusterOf(ctx).snapshot().peers,
 		call: (id, action, args, o) => callOf(ctx).call(id, action, args, o),
+		pressed: (args, peer) => destPressed(ctx, args, peer), // WO-1029 2a: an owner's `dest.pressed` notice
 		log: ctx.log,
 	})
 	ctx._clusterReport = report
-	require('../replication/amcp-fanout').setClusterAirCheck((ch) => report.heldBy(ch))
+	const fan = require('../replication/amcp-fanout')
+	fan.setClusterAirCheck((ch) => ownershipOf(ctx).verdict(ch)) // report.heldBy(ch) first, then the remote-screen rule
+	fan.setClusterLocalPress((ch) => ownershipOf(ctx).localPress(ch))
 	return report
 }
 
@@ -239,10 +275,19 @@ function callOf(ctx) {
 		masterId: () => (masterOf(ctx).view().is_master ? '' : masterOf(ctx).view().master_id),
 		acceptsRemote: () => require('../cluster/server-duties').has('accept_remote'),
 		info: { ...exchangeOf(ctx).info, ...showOf(ctx).info, ...reportOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
-		actions: { ...createCallActions(ctx, { callMaster: (a, args) => callOf(ctx).callMaster(a, args), isFollower: () => isClusterFollower(ctx) }), ...showOf(ctx).actions },
+		actions: { ...createCallActions(ctx, { callMaster: (a, args, o) => callOf(ctx).callMaster(a, args, o), call: (id, a, args, o) => callOf(ctx).call(id, a, args, o),
+			owners: (ids) => ownershipOf(ctx).owners(ids), isFollower: () => isClusterFollower(ctx) }), ...showOf(ctx).actions },
 		log: ctx.log,
 	})
 	return ctx._clusterCall
+}
+
+/** WO-1029 2a: an owner pressed on its own screen locally → the master stops catching that screen up there. */
+function destPressed(ctx, args, peer) {
+	const destId = String(args?.destId || '')
+	if (!destId || !Number.isFinite(Number(args?.seq))) return { status: 400, body: { error: 'destId and seq required' } }
+	if (!ctx._clusterFanout) return { status: 409, body: { error: 'not forwarding (not the master)' } }
+	return ctx._clusterFanout.ownerPressed(peer?.id, destId, Number(args.seq))
 }
 
 /** WO-746: one show on the linked servers that switched sharing on (shared-show.js); persistProject calls `written`. */
@@ -277,7 +322,16 @@ function exchangeOf(ctx) {
 const full = (ctx) => ({ ...clusterOf(ctx).snapshot(), master: masterOf(ctx).view(),
 	fanout: ctx._clusterFanout ? ctx._clusterFanout.status() : { active: false, peers: {} }, show: showOf(ctx).view(),
 	follows_master: ctx._clusterMaster ? followsMaster(ctx) : false,
-	forwarded_here: ctx._clusterReport ? ctx._clusterReport.view() : null }) // WO-1029: the screens the master drives here
+	forwarded_here: ctx._clusterReport ? ctx._clusterReport.view() : null, // WO-1029: the screens the master drives here
+	destinations: ctx._clusterReport ? safeDestinations(ctx) : [] }) // WO-1029 2a
+
+function safeDestinations(ctx) {
+	try {
+		return ownershipOf(ctx).destinations()
+	} catch {
+		return []
+	}
+}
 
 function broadcast(ctx) {
 	if (typeof ctx._wsBroadcast === 'function') ctx._wsBroadcast('cluster:peers', full(ctx))
@@ -399,4 +453,4 @@ function startIfLinked(ctx) {
 	if (Array.isArray(peers) && peers.length) clusterOf(ctx)
 }
 
-module.exports = { register, clusterOf, masterOf, fanoutOf, followsMaster, isClusterFollower, callOf, exchangeOf, showOf, sendersSyncOf, sendersReceived, startIfLinked }
+module.exports = { register, clusterOf, masterOf, fanoutOf, ownershipOf, followsMaster, isClusterFollower, callOf, exchangeOf, showOf, sendersSyncOf, sendersReceived, startIfLinked }

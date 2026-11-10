@@ -45,15 +45,13 @@ async function runAction(action, ctx, deps = {}) {
 		if (action.type === 'invalid') return { ok: false, detail: action.error }
 		if (action.type === 'look') {
 			const cluster = deps.cluster || (ctx?._clusterMaster ? require('../api/routes-cluster') : null)
-			if (action.target !== 'preview' && cluster?.isClusterFollower(ctx)) {
-				// WO-712 R2: a follower's own PGM take is skipped (the master's fan-out drives air): the master takes it.
-				const r = await cluster.callOf(ctx).callMaster('look.take', { sceneId: action.sceneId, target: 'program' })
-				return { ok: !!r.ok, detail: `look ${action.sceneId} → master${r.ok ? '' : ` (${r.status} ${r.json?.error || r.error || ''})`}` }
-			}
+			const routed = action.target !== 'preview' && cluster ? await routeLook(action, ctx, cluster, deps) : null
+			if (routed && !routed.diverged) return routed
 			const take = deps.takeLook || require('../api/routes-scene-take-look').handleTakeLook
-			const r = await take({ sceneId: action.sceneId, target: action.target }, ctx)
+			const r = await take({ sceneId: action.sceneId, target: action.target, ...(routed ? { relayed: true } : {}) }, ctx)
 			const ok = !r || !r.status || r.status < 400
-			return { ok, detail: `look ${action.sceneId} → ${action.target}${ok ? '' : ` (${r.status} ${bodyError(r)})`}` }
+			const how = routed ? ' (the master did not answer: diverged)' : ''
+			return { ok, detail: `look ${action.sceneId} → ${action.target}${how}${ok ? '' : ` (${r.status} ${bodyError(r)})`}` }
 		}
 		if (action.type === 'companion') {
 			const { resolveCompanionConfig } = require('../companion/companion-config')
@@ -83,6 +81,32 @@ async function runAction(action, ctx, deps = {}) {
 	} catch (e) {
 		return { ok: false, detail: String(e?.message || e) }
 	}
+}
+
+/**
+ * R3 — a zone's PROGRAM look on a linked server. WO-1029 2a (rule 4, src/cluster/look-relay.js) by the look's screen:
+ * a backup screen → the master (no answer in 1 s → here, `diverged`); a remote screen → the master, else an online
+ * owner, else refused; a screen cabled HERE → taken here. A screen nobody is known to own keeps WO-712 R2: a follower
+ * hands it to the master (a tracking server usually has no screen of its own). → null (take here), `{ diverged }`, or
+ * the zone result.
+ */
+async function routeLook(action, ctx, cluster, deps) {
+	const look = require('../api/routes-scene-take-look')
+	const b = { sceneId: action.sceneId, target: 'program' }
+	const held = (deps.heldFor || ((x) => look.airHeldForLook(x, ctx)))(b)
+	const done = (r, to) => ({ ok: r.status < 400, detail: `look ${action.sceneId} → ${to}${r.status < 400 ? '' : ` (${r.status} ${r.body?.error || ''})`}` })
+	if (held) {
+		const { relayLook, relayDeps } = require('../cluster/look-relay')
+		const r = await relayLook(look.relayArgs(b), held, deps.relay || relayDeps(ctx, cluster))
+		if (r?.local) return { diverged: true }
+		return done(r, r.body?.via || 'master')
+	}
+	if (!cluster.isClusterFollower(ctx)) return null
+	const here = cluster.ownershipOf ? cluster.ownershipOf(ctx).cabledHere(look.lookProgramChannel(b, ctx)) : false
+	if (here) return null
+	// WO-712 R2: the master takes it (and forwards it to the screen's owner)
+	const r = await cluster.callOf(ctx).callMaster('look.take', b)
+	return { ok: !!r.ok, detail: `look ${action.sceneId} → master${r.ok ? '' : ` (${r.status} ${r.json?.error || r.error || ''})`}` }
 }
 
 function bodyError(r) {

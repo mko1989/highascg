@@ -76,13 +76,21 @@ describe('WO-1026 follower: a program take-look goes to the master', () => {
 		assert.deepEqual(seen, [['local', 's5', 'program']])
 	})
 
-	it('an unreachable master is an error, not a silent ok', async () => {
+	it('an unreachable master: the backup take runs here and says `diverged` (WO-1029 2a, owner: ~1 s, no silent ok)', async () => {
 		const { seen, deps } = stub(true, { ok: false, status: 0, error: 'timeout' })
 		const r = await handleTakeLook({ sceneId: 's1' }, {}, deps)
-		assert.equal(r.status, 502)
-		assert.equal(JSON.parse(r.body).error, 'timeout')
-		assert.equal(seen.length, 1)
+		assert.equal(r.status, 200)
+		assert.deepEqual(JSON.parse(r.body), { ok: true, diverged: true })
+		assert.deepEqual(seen.map((x) => x[0]), ['look.take', 'local'], 'asked the master first, then took it here')
 		assert.equal((await handleTakeLook({}, {}, deps)).status, 400)
+	})
+
+	it('a master that answers with an error: its answer, nothing taken here', async () => {
+		const { seen, deps } = stub(true, { ok: false, status: 403, json: { error: 'this server refuses remote actions' } })
+		const r = await handleTakeLook({ sceneId: 's1' }, {}, deps)
+		assert.equal(r.status, 403)
+		assert.equal(JSON.parse(r.body).error, 'this server refuses remote actions')
+		assert.equal(seen.length, 1)
 	})
 
 	it('relayArgs carries only what a take reads', () => {

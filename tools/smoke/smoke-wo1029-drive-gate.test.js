@@ -5,6 +5,8 @@
  * The incident (10.11): a server that SAW the master online blocked every program channel, while the master forwarded
  * nothing to it — nobody drove its screens, and every blocked press answered "ok" (the test card, PLAY, takes).
  *   B1  a channel is blocked only while the CURRENT master's fresh fan-out report lists it as forwarded + connected
+ *       (WO-1029 2a: and MIRRORED — a backup screen; the reports here carry `mirror: [7]` for that; a report without
+ *       `mirror` holds nothing: smoke-wo1029-ownership.test.js)
  *   B2  a blocked action is refused: AirHeldError (code AIR_HELD) → HTTP 409 { error, drivenBy }; queries never blocked
  *   B4  a batch is decided per line
  * Everything runs on a fake Caspar socket (no port is opened) and the test-isolated persistence file.
@@ -101,7 +103,7 @@ describe('WO-1029 B1 the incident: the master is online but forwards nothing her
 		const a = followerCtx()
 		assert.equal(amcpFanout.airHeldBy(a.ctx, 7), null, 'no report at all')
 		const b = followerCtx({ settled: false })
-		assert.equal(b.report({ epoch: 3, master: FP_M, channels: [7], connected: true }).status, 200)
+		assert.equal(b.report({ epoch: 3, master: FP_M, channels: [7], mirror: [7], connected: true }).status, 200)
 		assert.equal(amcpFanout.airHeldBy(b.ctx, 7), null, 'unsettled = no evidence')
 	})
 })
@@ -109,7 +111,7 @@ describe('WO-1029 B1 the incident: the master is online but forwards nothing her
 describe('WO-1029 B1 + B2 the master forwards ch 7 only', () => {
 	function held() {
 		const f = followerCtx()
-		assert.equal(f.report({ epoch: 3, master: FP_M, channels: [7], connected: true }).status, 200)
+		assert.equal(f.report({ epoch: 3, master: FP_M, channels: [7], mirror: [7], connected: true }).status, 200)
 		return f
 	}
 
@@ -174,7 +176,7 @@ describe('WO-1029 B1 + B2 the master forwards ch 7 only', () => {
 describe('WO-1029 B4 a batch is decided per line', () => {
 	function held(config) {
 		const f = followerCtx()
-		f.report({ epoch: 3, master: FP_M, channels: [7], connected: true })
+		f.report({ epoch: 3, master: FP_M, channels: [7], mirror: [7], connected: true })
 		return { ctx: f.ctx, cas: fakeCaspar(config), ctxCas: f.cas }
 	}
 
@@ -218,7 +220,7 @@ describe('WO-1029 B1 the report: only fresh evidence from the current master cou
 		const r = createFanoutReport({ master: () => v, fanout: () => null, peers: () => [], call: async () => ({ ok: true }), now: () => t })
 		return { r, v, advance: (ms) => (t += ms) }
 	}
-	const data = (o = {}) => ({ epoch: 3, master: FP_M, channels: [7], connected: true, ...o })
+	const data = (o = {}) => ({ epoch: 3, master: FP_M, channels: [7], mirror: [7], connected: true, ...o })
 
 	it('goes stale after about two polls → the channel unblocks (and the AMCP gate follows it)', async () => {
 		const { r, advance } = rig()
@@ -256,7 +258,8 @@ describe('WO-1029 B1 the report: only fresh evidence from the current master cou
 		const calls = []
 		const logs = []
 		const view = { epoch: 5, master: 'f'.repeat(16), master_id: 'self', is_master: true }
-		const st = { active: true, peers: { B: { connected: true, destinations: [{ pgm: [3, 9] }, { pgm: [1, 7] }] } } }
+			// WO-1029 2a: ch 7 is a backup screen there (cabled on the master too: `mirror`); ch 9 is B's own, held by nobody
+		const st = { active: true, peers: { B: { connected: true, destinations: [{ pgm: [3, 9], holder: 'B' }, { pgm: [1, 7], backup: true }] } } }
 		const r = createFanoutReport({
 			master: () => view,
 			fanout: () => st,
@@ -267,8 +270,8 @@ describe('WO-1029 B1 the report: only fresh evidence from the current master cou
 		assert.equal(r.publish(), 2)
 		await tick()
 		assert.deepEqual(calls, [
-			['B', 'exchange.fanout', { epoch: 5, master: 'f'.repeat(16), channels: [7, 9], connected: true }],
-			['C', 'exchange.fanout', { epoch: 5, master: 'f'.repeat(16), channels: [], connected: false }],
+			['B', 'exchange.fanout', { epoch: 5, master: 'f'.repeat(16), channels: [7, 9], connected: true, mirror: [7], holders: { 9: 'B' } }],
+			['C', 'exchange.fanout', { epoch: 5, master: 'f'.repeat(16), channels: [], connected: false, mirror: [], holders: {} }],
 		])
 		r.publish()
 		await tick()
@@ -285,7 +288,7 @@ describe('WO-1029 R1 the take-look relay follows the gate', () => {
 	it('a held screen goes to the master; a screen the master does not drive is taken here', async () => {
 		const { handleTakeLook } = require('../../src/api/routes-scene-take-look')
 		const { ctx, report } = followerCtx()
-		report({ epoch: 3, master: FP_M, channels: [7], connected: true })
+		report({ epoch: 3, master: FP_M, channels: [7], mirror: [7], connected: true })
 		const seen = []
 		const deps = {
 			cluster: { isClusterFollower: () => true, callOf: () => ({ callMaster: async (a, args) => (seen.push(['master', args.mainIdx]), { ok: true, status: 200, json: { ok: true } }) }) },

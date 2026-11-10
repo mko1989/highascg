@@ -9,6 +9,9 @@
  *                      A follower does not take program itself on a screen the master drives here (WO-1029: the
  *                      master's fresh report lists it; the take would be refused): it hands the take to the master
  *                      (callMaster), marked `relayed` so it is handed on at most once. Any other screen is taken here.
+ *                      WO-1029 2a (rule 4, look-relay.js): a backup screen → the master (1 s, else here + `diverged`);
+ *                      a remote screen → the master, else an online owner, else 409 REMOTE_SCREEN; own → here.
+ *                      A `relayed` take is always taken HERE (an owner never hands a relayed take on: no loops).
  *   tracking.auto.pin  { key, slot }                → the Auto director's POST /api/tracking/auto/pin (auto-routes.js)
  *   tracking.auto.slot { slot, heads?, ptz? }       → … /slot
  *   tracking.auto.home { after_s?, now? }           → … /home
@@ -36,13 +39,22 @@ const asObj = (r) => {
 /**
  * @param {object} ctx  the server ctx (ctx.trackingAuto = the director, ctx.fixtureService = the follow service)
  * @param {{ callMaster: Function, isFollower: () => boolean, takeLook?: Function, runAction?: Function,
- *   heldFor?: (args: object) => object|null }} deps
+ *   heldFor?: (args: object) => object|null, call?: Function, owners?: Function, diverge?: Function }} deps
  */
 function createCallActions(ctx, deps) {
 	const takeLook = deps.takeLook || ((b) => require('../api/routes-scene-take-look').handleTakeLook(b, ctx))
 	// WO-1029 B1: is this look's program screen driven by the master right now?
 	const heldFor = deps.heldFor || ((a) => require('../api/routes-scene-take-look').airHeldForLook(a, ctx))
 	const runAction = deps.runAction || ((a) => require('../tracking/zone-actions').runAction(a, ctx))
+	const { relayLook } = require('./look-relay')
+	const relayDepsOf = () => ({
+		isFollower: deps.isFollower,
+		callMaster: deps.callMaster,
+		call: deps.call || (async () => ({ ok: false, status: 0, error: 'no call' })),
+		owners: deps.owners || (() => []),
+		diverge: deps.diverge || ((ch) => ctx?._clusterReport?.diverge?.(ch)),
+		log: ctx?.log,
+	})
 	const auto = (op) => async (args) => {
 		const { handleAuto } = require('../tracking/auto-routes')
 		return asObj(
@@ -59,17 +71,18 @@ function createCallActions(ctx, deps) {
 			if (!sceneId) return { status: 400, body: { error: 'sceneId required' } }
 			const target = args.target === 'preview' ? 'preview' : 'program'
 			const { relayArgs } = require('../api/routes-scene-take-look')
-			if (target === 'program' && !args.relayed && deps.isFollower() && heldFor({ ...args, sceneId, target })) {
-				const r = await deps.callMaster('look.take', relayArgs({ ...args, sceneId }))
-				return {
-					status: r.status || 502,
-					body: r.json && typeof r.json === 'object' ? r.json : { error: r.error || 'master unreachable' },
-				}
+			const held = target === 'program' && !args.relayed ? heldFor({ ...args, sceneId, target }) : null
+			const routed = held ? await relayLook(relayArgs({ ...args, sceneId }), held, relayDepsOf()) : null
+			if (routed && !routed.local) {
+				const { viaMaster: _v, ...body } = routed.body // R2 answers the master's body as it was
+				return { status: routed.status, body }
 			}
 			// WO-1026: the take's own options travel with it (a follower's relayed press keeps its cut / screen / transition);
-			// `relayed` stays on a relayed take, so the take-look path here never hands it on again.
+			// `relayed` stays on a relayed take, so the take-look path here never hands it on again. WO-1029 2a: a diverged
+			// backup take (the master did not answer) runs here as `relayed` too (decided once).
 			const { relayed: _r, target: _t, ...opts } = relayArgs({ ...args, sceneId })
-			return asObj(await takeLook({ ...opts, target, ...(args.relayed ? { relayed: true } : {}) }))
+			const out = asObj(await takeLook({ ...opts, target, ...(args.relayed || routed ? { relayed: true } : {}) }))
+			return routed && out.status < 400 ? { ...out, body: { ...out.body, diverged: true } } : out
 		},
 		'tracking.auto.pin': auto('pin'),
 		'tracking.auto.slot': auto('slot'),

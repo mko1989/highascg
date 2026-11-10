@@ -73,6 +73,8 @@ describe('WO-670 P4b catch-up', () => {
 	const own = {
 		screenDestinations: { destinations: [{ id: 'd', mode: 'pgm_prv', mainScreenIndex: 0 }] },
 		live: { caspar: { channelMap: { programChannels: [1], previewChannels: [2] } } },
+		// WO-1029 2a: cabled on the master too → a BACKUP screen, caught up from the air journal as before
+		graph: { connectors: [{ id: 'm', kind: 'destination_in', externalRef: 'd' }], edges: [{ sourceId: 'm', sinkId: 'gpu' }] },
 	}
 	const peer = (cabled) => ({
 		graph: {
@@ -172,7 +174,9 @@ describe('WO-670 P4b local PGM takes on a follower', () => {
 		assert.match(read('src/api/routes-scene-take.js'), /airHeldBy\(ctx, channel\)/)
 		assert.match(read('src/caspar/amcp-batch.js'), /withAirGate\(connection, lines/)
 		assert.match(read('src/caspar/amcp-client-transport.js'), /airHeldForLine\(self, trimmed\)/)
-		assert.match(read('src/api/routes-cluster.js'), /setClusterAirCheck\(\(ch\) => report\.heldBy\(ch\)\)/)
+		// WO-1029 2a: the check is destination ownership — report.heldBy (backup screens) first, then the remote-screen rule
+		assert.match(read('src/api/routes-cluster.js'), /setClusterAirCheck\(\(ch\) => ownershipOf\(ctx\)\.verdict\(ch\)\)/)
+		assert.match(read('src/cluster/destination-ownership.js'), /const held = deps\.report\.heldBy\(ch\)\n\t\tif \(held\) return held/)
 		assert.match(read('src/replication/peer-caspar-connection.js'), /this\._onConnected\?\.\(\)/)
 	})
 

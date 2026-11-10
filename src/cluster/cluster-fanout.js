@@ -25,12 +25,21 @@
  * asks that Caspar (`deps.queryInfo`, cluster-peer-info.js): a channel already showing the journal's clips is only
  * given the journal's MIXER lines (idempotent) and is marked synced; the others are replayed. New lines for a channel
  * being checked are held and sent after the decision (a replay already carries them, the journal has them).
+ *
+ * WO-1029 phase 2a (destination ownership): a destination cabled on the master too (its own device graph, `own.graph`)
+ * is a BACKUP there (`backup: true`; that server holds it, cluster-fanout-report.js `mirror`); any other one is that
+ * server's OWN screen. Live lines still go to both (the master's operator drives every screen; the last press wins),
+ * but catch-up / replay of an own screen runs only while the master holds it (cluster-holders.js: its own operator
+ * pressed on it in this mastership; the holders start empty at every promotion), and only from the lines sent since —
+ * a new master writes nothing to another server's screen until its operator presses there (found 10.11: a takeover
+ * replayed the new master's copy channel onto the other box's LED wall).
  */
 
 const { shouldFanOutCommand, parseAmcpCommandChannel } = require('../replication/amcp-fanout')
 const { createAirJournal } = require('./cluster-air-journal')
 const { channelOnAir } = require('./cluster-peer-info')
 const { staleLayout } = require('./remote-destination')
+const { createHolders } = require('./cluster-holders')
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1'])
 
@@ -65,7 +74,9 @@ function cabledIds(view) {
 }
 
 /**
- * { map: Map<masterCh, peerCh>, destinations: [{ id, label, pgm: [a, b], prv: [a, b] | null }], held: [{ id, why }] }
+ * { map: Map<masterCh, peerCh>, destinations: [{ id, label, pgm: [a, b], prv: [a, b] | null, backup }], held: [{ id, why }],
+ *   byCh: Map<masterCh, destination> }
+ * WO-1029 2a: `backup` = cabled on the master too (`own.graph`); otherwise that server owns the screen.
  * WO-1017: a destination whose channels do not run at the same size on both Caspars is held (one box has not applied
  * the shared destination list yet, so its channel numbers belong to something else there).
  */
@@ -75,6 +86,8 @@ function channelPlan(own, peer, peerName) {
 	const map = new Map()
 	const destinations = []
 	const held = []
+	const byCh = new Map()
+	const here = cabledIds(own)
 	for (const id of cabledIds(peer)) {
 		const a = mine.get(id)
 		const b = theirs.get(id)
@@ -87,10 +100,13 @@ function channelPlan(own, peer, peerName) {
 		map.set(a.pgm, b.pgm)
 		const prv = a.prv && b.prv ? [a.prv, b.prv] : null
 		if (prv) map.set(a.prv, b.prv)
-		destinations.push({ id, label: b.label, pgm: [a.pgm, b.pgm], prv })
+		const d = { id, label: b.label, pgm: [a.pgm, b.pgm], prv, backup: here.has(id) }
+		destinations.push(d)
+		byCh.set(a.pgm, d)
+		if (prv) byCh.set(a.prv, d)
 	}
 	destinations.sort((x, y) => x.pgm[0] - y.pgm[0])
-	return { map, destinations, held }
+	return { map, destinations, held, byCh }
 }
 
 /** One AMCP line for that server, or null when it does not go there. */
@@ -123,6 +139,7 @@ function createClusterFanout(deps) {
 	 */
 	const targets = new Map()
 	const journal = deps.journal || createAirJournal()
+	const holders = deps.holders || createHolders() // WO-1029 2a
 	let active = false
 	let lastSig = ''
 	const log = (lvl, msg) => deps.log?.(lvl, `[cluster] ${msg}`)
@@ -147,6 +164,7 @@ function createClusterFanout(deps) {
 
 	async function plan() {
 		const on = deps.isMaster() && !deps.pairEnabled()
+		if (on && !active) holders.clear() // WO-1029 2a: a new mastership holds no other server's screen
 		if (on !== active)
 			log(
 				'info',
@@ -207,10 +225,25 @@ function createClusterFanout(deps) {
 
 	const live = (t) => active && targets.get(t.id) === t && !!t.plan && !!t.conn?.isConnected
 
+	/**
+	 * WO-1029 2a: the lines that rebuild master channel `ch` on that server — the air journal for a backup screen; for
+	 * an own screen only what was sent since the master's operator took it (null: the master does not hold it → nothing).
+	 */
+	function linesFor(t, ch) {
+		const d = t.plan?.byCh?.get(ch)
+		if (!d || d.backup) return journal.replay(new Set([ch]))
+		const j = holders.journal(d.id)
+		return j ? j.replay(new Set([ch])) : null
+	}
+
 	/** Brings the channels that server has not been given yet up to what is on air (WO-933: checked first). */
 	function catchUp(t) {
 		if (!live(t)) return
-		const todo = [...t.plan.map.keys()].filter((ch) => !t.synced.has(ch) && !t.checking.has(ch))
+		let todo = [...t.plan.map.keys()].filter((ch) => !t.synced.has(ch) && !t.checking.has(ch))
+		// WO-1029 2a: an own screen the master does not hold is that server's: nothing is written to it
+		const skip = todo.filter((ch) => linesFor(t, ch) === null)
+		for (const ch of skip) t.synced.add(ch)
+		todo = todo.filter((ch) => !skip.includes(ch))
 		if (!todo.length) return
 		if (deps.queryInfo) check(t, todo)
 		else replayTo(t, todo, [])
@@ -223,7 +256,7 @@ function createClusterFanout(deps) {
 
 	function replayTo(t, todo, kept) {
 		if (!todo.length && !kept.length) return
-		const out = journal.replay(new Set(todo)).map((l) => rewriteLine(l, t.plan.map)).filter(Boolean)
+		const out = todo.flatMap((ch) => linesFor(t, ch) || []).map((l) => rewriteLine(l, t.plan.map)).filter(Boolean)
 		sendLines(t, out)
 		for (const ch of todo) t.synced.add(ch)
 		t.caught_up = { at: Date.now(), lines: out.length, kept }
@@ -239,7 +272,7 @@ function createClusterFanout(deps) {
 			t.checking.add(ch)
 			t.held.set(ch, [])
 		}
-		const before = new Map(todo.map((ch) => [ch, journal.replay(new Set([ch]))]))
+		const before = new Map(todo.map((ch) => [ch, linesFor(t, ch) || []]))
 		let infos
 		try {
 			infos = await deps.queryInfo(t.host, t.port, todo.map((ch) => t.plan.map.get(ch)))
@@ -291,6 +324,8 @@ function createClusterFanout(deps) {
 	function send(payload) {
 		const lines = payloadLines(payload)
 		if (!lines.length) return
+		const pressed = active ? ownScreensOf(lines) : new Map()
+		for (const id of pressed.keys()) if (holders.pressSelf(id)) log('info', `holds ${id} again (its operator pressed on it)`)
 		for (const t of active ? targets.values() : []) {
 			if (!t.plan?.map.size || !t.conn?.isConnected) continue
 			catchUp(t) // the journal without these lines, so they land on the rebuilt state
@@ -308,6 +343,40 @@ function createClusterFanout(deps) {
 			t.sent += out.length
 		}
 		for (const l of lines) if (shouldFanOutCommand(l)) journal.record(l)
+		for (const [id, ls] of pressed) for (const l of ls) holders.record(id, l)
+	}
+
+	/** WO-1029 2a: destination id → its lines, for the lines that land on another server's OWN screen. */
+	function ownScreensOf(lines) {
+		const out = new Map()
+		for (const l of lines) {
+			if (!shouldFanOutCommand(l)) continue
+			const ch = parseAmcpCommandChannel(l)
+			for (const t of targets.values()) {
+				const d = t.plan?.byCh?.get(ch)
+				if (!d || d.backup) continue
+				if (!out.has(d.id)) out.set(d.id, [])
+				out.get(d.id).push(l)
+				break
+			}
+		}
+		return out
+	}
+
+	/**
+	 * WO-1029 2a: an owner's signed notice — it pressed on its own screen locally (`dest.pressed` { destId, seq }). Only
+	 * a server this master forwards that destination to as its OWN screen counts. → { status, body }
+	 */
+	function ownerPressed(peerId, destId, seq) {
+		const t = targets.get(String(peerId || ''))
+		const d = t?.plan?.destinations.find((x) => x.id === destId)
+		if (!active || !d) return { status: 409, body: { error: 'not a screen this master forwards to you' } }
+		if (d.backup) return { status: 409, body: { error: 'a backup screen follows the master' } }
+		if (holders.ownerPressed(d.id, t.id, seq)) {
+			log('info', `${t.id} pressed on ${d.label || d.id}: it holds it now (no catch-up there until this operator presses)`)
+			changed()
+		}
+		return { status: 200, body: { ok: true, holder: holders.holder(d.id) } }
 	}
 
 	/** For the snapshot: { active, peers: { id: { caspar, connected, sent, error, destinations, caught_up } } } */
@@ -319,7 +388,7 @@ function createClusterFanout(deps) {
 				connected: !!t.conn?.isConnected,
 				sent: t.sent,
 				error: t.error || '',
-				destinations: t.plan?.destinations || [],
+				destinations: (t.plan?.destinations || []).map((d) => (d.backup ? d : { ...d, holder: holderId(d.id) })),
 				held: t.plan?.held || [],
 				caught_up: t.caught_up,
 			}
@@ -327,12 +396,19 @@ function createClusterFanout(deps) {
 		return { active, peers }
 	}
 
+	/** 'self' → this master's id (deps.selfId), for the reports and the view. */
+	const holderId = (id) => {
+		const h = holders.holder(id)
+		return h === 'self' ? String(deps.selfId?.() || 'self') : h
+	}
+
 	function stop() {
 		active = false
+		holders.clear()
 		for (const id of [...targets.keys()]) drop(id)
 	}
 
-	return { refresh, send, resync, status, stop, journal }
+	return { refresh, send, resync, status, stop, journal, ownerPressed, holder: holderId }
 }
 
 module.exports = { createClusterFanout, channelPlan, mainChannels, cabledIds, rewriteLine, payloadLines }

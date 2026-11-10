@@ -72,6 +72,9 @@ async function startSandbox(opts) {
 	const root = path.resolve(opts.root)
 	const host = opts.host || '127.0.0.1' // WO-1029: a node's own loopback alias (127.x.y.z) tells peers apart by address
 	if (!/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) throw new Error(`sandbox host must be a loopback address (got ${host})`) // WO-719: never on the LAN
+	// WO-1029: a throwaway Caspar only — loopback, never the live one's port (WO-990: :5250 dies on connect + reset)
+	if (opts.caspar && (!/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(String(opts.caspar.host)) || Number(opts.caspar.port) === 5250))
+		throw new Error(`sandbox caspar must be a loopback throwaway, never :5250 (got ${opts.caspar.host}:${opts.caspar.port})`)
 	const port = opts.port || (await freePort())
 	const log = opts.log || (() => {})
 	const oscPort = await freePort()
@@ -127,6 +130,7 @@ async function startSandbox(opts) {
 		HIGHASCG_GDTF_SHARE_DIR: path.join(root, 'gdtf'),
 		HIGHASCG_CASPAR_LOG_DIR: path.join(root, 'caspar-logs'),
 		HIGHASCG_PGM_RECORD_DIR: path.join(root, 'recordings'),
+		HIGHASCG_API_TOKEN_FILE: path.join(root, 'api-token'), // WO-1029: never the box's own password (.private/api-token)
 		CASPAR_SCREEN_GATE_FILE: path.join(dirs.run, 'gate'),
 		CASPAR_SCREEN_HOLD_FILE: path.join(dirs.run, 'hold'),
 		CASPAR_CONFIG_PATH: path.join(root, 'casparcg.config'),
@@ -149,7 +153,7 @@ async function startSandbox(opts) {
 	while (Date.now() < until && child.exitCode === null) {
 		try {
 			const r = await getJson(`${url}/api/settings`)
-			if (r.status === 200) {
+			if (r.status === 200 || r.status === 401) { // WO-1029: 401 = up with auth on (virtual boxes)
 				up = true
 				break
 			}

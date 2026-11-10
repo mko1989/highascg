@@ -108,7 +108,7 @@ async function handleSyncPush(ctx) {
 		// WO-1029 B2: a screen another server drives right now is not re-taken here — reported, not ok
 		const held = airHeldBy(ctx, channel)
 		if (held) {
-			results.push({ channel, ok: false, skipped: true, reason: 'follower-fanout-pgm', code: 'AIR_HELD', drivenBy: held.drivenBy })
+			results.push({ channel, ok: false, skipped: true, reason: 'follower-fanout-pgm', code: held.code || 'AIR_HELD', drivenBy: held.drivenBy })
 			continue
 		}
 

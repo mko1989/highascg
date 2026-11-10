@@ -87,6 +87,8 @@ describe('WO-933 catch-up checks before it replays', () => {
 	const own = {
 		screenDestinations: { destinations: [{ id: 'd', mode: 'pgm_prv', mainScreenIndex: 0 }] },
 		live: { caspar: { channelMap: { programChannels: [1], previewChannels: [2] } } },
+		// WO-1029 2a: cabled on the master too → a BACKUP screen, caught up from the air journal as before
+		graph: { connectors: [{ id: 'm', kind: 'destination_in', externalRef: 'd' }], edges: [{ sourceId: 'm', sinkId: 'gpu' }] },
 	}
 	const peerView = {
 		graph: { connectors: [{ id: 'c', kind: 'destination_in', externalRef: 'd' }], edges: [{ sourceId: 'c', sinkId: 'gpu' }] },

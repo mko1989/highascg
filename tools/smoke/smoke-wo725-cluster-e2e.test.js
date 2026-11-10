@@ -26,7 +26,13 @@ describe('WO-725 sandbox guards for cluster runs', () => {
 		assert.match(read('src/replication/replication-local-identity.js'), /const hwHostname = isSandbox\(\) \? null : getHardwareHostnameSelfId\(\)/)
 	})
 	it('a sandbox master never forwards takes', () => {
-		assert.match(read('src/api/routes-cluster.js'), /isMaster: \(\) => !isSandbox\(\) && masterOf\(ctx\)\.view\(\)\.is_master === true/)
+		// WO-1029: unless the virtual box bed asked for it (HIGHASCG_SANDBOX_FANOUT=1, every peer a loopback fake Caspar);
+		// even then a sandbox never opens a socket to :5250 or off loopback (sandboxCaspar)
+		const s = read('src/api/routes-cluster.js')
+		assert.match(s, /isMaster: \(\) => \(!isSandbox\(\) \|\| sandboxFanout\(\)\) && masterOf\(ctx\)\.view\(\)\.is_master === true/)
+		assert.match(s, /const sandboxFanout = \(\) => process\.env\.HIGHASCG_SANDBOX_FANOUT === '1'/)
+		assert.match(s, /if \(!sandboxCaspar\(host, port\)\) return refusedPeerCaspar\(ctx, host, port\)/)
+		assert.match(s, /return Number\(port\) !== 5250 && \/\^\(127/)
 	})
 })
 

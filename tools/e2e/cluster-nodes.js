@@ -30,12 +30,13 @@ const { startSandbox } = require('./sandbox-server')
 const { createForwarder } = require('./tcp-forwarder')
 
 /** One JSON request; never throws (status 0 = no answer). */
-function request(method, url, body, timeoutMs = 8000) {
+function request(method, url, body, timeoutMs = 8000, extraHeaders = {}) {
 	return new Promise((resolve) => {
 		const t0 = process.hrtime.bigint()
 		const ms = () => Number(process.hrtime.bigint() - t0) / 1e6
 		const data = body === undefined ? null : Buffer.from(JSON.stringify(body))
-		const req = http.request(url, { method, timeout: timeoutMs, headers: data ? { 'Content-Type': 'application/json', 'Content-Length': data.length } : {} }, (res) => {
+		const headers = { ...extraHeaders, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': data.length } : {}) }
+		const req = http.request(url, { method, timeout: timeoutMs, headers }, (res) => {
 			const c = []
 			res.on('data', (d) => c.push(d))
 			res.on('end', () => {
@@ -67,11 +68,13 @@ async function waitFor(what, fn, timeoutMs, stepMs = 100) {
 	throw new Error(`${what}: not within ${timeoutMs} ms (last: ${JSON.stringify(last)?.slice(0, 200)})`)
 }
 
+/** WO-1029: `node.token` (the shared password of a node with auth on) rides every harness call as a Bearer header. */
 function api(node) {
+	const auth = () => (node.token ? { Authorization: `Bearer ${node.token}` } : {})
 	return {
-		get: (p, t) => request('GET', node.url + p, undefined, t),
-		post: (p, b, t) => request('POST', node.url + p, b, t),
-		del: (p, t) => request('DELETE', node.url + p, undefined, t),
+		get: (p, t) => request('GET', node.url + p, undefined, t, auth()),
+		post: (p, b, t) => request('POST', node.url + p, b, t, auth()),
+		del: (p, t) => request('DELETE', node.url + p, undefined, t, auth()),
 	}
 }
 
@@ -82,8 +85,9 @@ async function clusterView(node, timeoutMs = 3000) {
 }
 
 /**
- * @param {{ log?: Function, extra?: (id: string, root: string) => { config?: object, env?: object, tracking?: boolean } }} [opts]
+ * @param {{ log?: Function, token?: string, extra?: (id: string, root: string) => { config?: object, env?: object, tracking?: boolean, caspar?: object } }} [opts]
  *   extra: per-server startSandbox options (WO-979: a media and a tracking role), asked again on every restart
+ *   token: the shared password of nodes started with auth on (WO-1029 virtual-boxes.js): the harness calls carry it
  */
 let fwdSeq = 0
 
@@ -98,7 +102,7 @@ async function startSandboxNodes(root, ids, opts = {}) {
 	// alive for hours; the caller never got `nodes` to stop.
 	const settled = await Promise.allSettled(
 		ids.map(async (id) => {
-			const node = { id, kind: 'sandbox' }
+			const node = { id, kind: 'sandbox', token: opts.token || '' }
 			const attach = (sb) => Object.assign(node, { sb, url: sb.url, host: sb.host, port: sb.port, address: `${sb.host}:${sb.port}`, pid: sb.pid }, api(node))
 			const forwarders = []
 			attach(await start(id))

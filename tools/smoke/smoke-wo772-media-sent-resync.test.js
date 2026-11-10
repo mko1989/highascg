@@ -15,6 +15,9 @@ const { sendMedia } = require('../../src/cluster/cluster-media')
 const own = {
 	screenDestinations: { destinations: [{ id: 'd', mode: 'pgm_prv', mainScreenIndex: 0 }] },
 	live: { caspar: { channelMap: { programChannels: [1], previewChannels: [2] } } },
+	// WO-1029 2a: cabled on the master too → a BACKUP screen, caught up from the air journal (an own screen of that
+	// server is caught up only while the master holds it: smoke-wo1029-ownership.test.js)
+	graph: { connectors: [{ id: 'm', kind: 'destination_in', externalRef: 'd' }], edges: [{ sourceId: 'm', sinkId: 'gpu' }] },
 }
 const peer = {
 	graph: { connectors: [{ id: 'c', kind: 'destination_in', externalRef: 'd' }], edges: [{ sourceId: 'c', sinkId: 'audio_1' }] },

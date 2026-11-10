@@ -183,3 +183,13 @@ Owner, same day: *"i dont want this godot client a/b the whole linking system is
 for additional linking options"* — the client's A/B host slots go. A remote client has ONE server address
 (`--server`, `HIGHASCG_SERVER`, or the single address in the connection menu); every other box it may move to comes
 from the connected box's linked servers.
+
+## One Devices view for all linked servers (owner, 10.11)
+
+Owner: *"when the view is changed to the follower to edit its setup, which shouldn't be needed. config should be
+shared. and screen destinations become created on a connected machine, we need only operator gui distinction the rest
+should be \"shared\""*
+
+Reading (to be confirmed by the owner): no "Edit" switch of the Devices tab to a linked server — every linked
+server's rear panel is in the one view and a destination is cabled straight to a connector of any server; destinations
+are one shared list; only the operator GUI is per server. Plan: `1029_review/06-unified-devices-plan.md` (pending).

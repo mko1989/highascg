@@ -29,12 +29,24 @@ function bad(status, error) {
  */
 async function handleTakeLook(body, ctx, deps = {}) {
 	const b = parseBody(body)
-	const viaMaster = await relayToMaster(b, ctx, deps)
-	if (viaMaster) return viaMaster
+	const relay = await relayToMaster(b, ctx, deps)
+	if (relay && !relay.diverged) return relay
 	const res = await takeLook(b, ctx, deps)
 	if (res.status >= 400 && !res.handedToTake) require('../engine/take-sync-barrier').joinTakeGroup(b.takeGroup)?.leave()
 	delete res.handedToTake
-	return res
+	return relay?.diverged ? markDiverged(res) : res
+}
+
+/** WO-1029 2a: a backup take the master did not answer ran here — the answer says so (`diverged: true`). */
+function markDiverged(res) {
+	if (!res || res.status >= 400) return res
+	let body
+	try {
+		body = JSON.parse(String(res.body || '{}')) || {}
+	} catch {
+		body = {}
+	}
+	return { ...res, headers: res.headers || JSON_HEADERS, body: jsonBody({ ok: true, ...body, diverged: true }) }
 }
 
 /** What of a take travels to the master with it (cluster-call-actions `look.take` reads the same keys). */
@@ -50,23 +62,27 @@ function relayArgs(b) {
 
 /**
  * WO-1026: a PROGRAM take pressed on a cluster follower is the master's to play when the master's fan-out drives that
- * screen — taken here it would be refused. It is handed to the master once (`relayed`), with its own options; the
- * answer is the master's. A take group is not carried over: the screens of a preset recalled on a follower are the
- * master's separate takes (the group slot is released here so nothing waits for it).
- * WO-1029 B1: only when THAT screen is held (the master's fresh report forwards its program channel here,
- * `airHeldForLook`); a screen the master does not drive here is taken locally like on any server.
- * → null when this server takes it itself.
+ * screen — taken here it would be refused. It is handed on once (`relayed`), with its own options; the answer is the
+ * other server's. A take group is not carried over: the screens of a preset recalled on a follower are the master's
+ * separate takes (the group slot is released here so nothing waits for it).
+ * WO-1029 2a (rule 4, src/cluster/look-relay.js): by the screen's kind (`airHeldForLook`) — an own / local screen is
+ * taken here; a backup screen goes to the master (no answer in 1 s → taken here, `diverged`); a remote screen goes to
+ * the master, else straight to an online owner, else 409 REMOTE_SCREEN.
+ * → null (take here), `{ diverged: true }` (take here and say so) or the route answer.
  */
 async function relayToMaster(b, ctx, deps) {
 	if (b.target === 'preview' || b.relayed) return null
 	const cluster = deps.cluster !== undefined ? deps.cluster : ctx?._clusterMaster ? require('./routes-cluster') : null
-	if (!cluster?.isClusterFollower(ctx)) return null
+	if (!cluster) return null
 	if (!String(b.sceneId || '').trim()) return bad(400, 'sceneId required')
-	if (!airHeldForLook(b, ctx, deps)) return null
+	const held = airHeldForLook(b, ctx, deps)
+	if (!held) return null
+	const { relayLook, relayDeps } = require('../cluster/look-relay')
+	const r = await relayLook(relayArgs(b), held, deps.relay || relayDeps(ctx, cluster))
+	if (!r) return null
+	if (r.local) return { diverged: true }
 	require('../engine/take-sync-barrier').joinTakeGroup(b.takeGroup)?.leave()
-	const r = await cluster.callOf(ctx).callMaster('look.take', relayArgs(b))
-	const json = r?.json && typeof r.json === 'object' ? r.json : { ok: false, error: r?.error || 'master unreachable' }
-	return { status: r?.status || 502, headers: JSON_HEADERS, body: jsonBody({ ...json, viaMaster: true }) }
+	return { status: r.status, headers: JSON_HEADERS, body: jsonBody(r.body) }
 }
 
 /** The look's screen: `mainIdx`, else the look's own `mainScope`, else 0 (same rule as takeLook). */
@@ -78,21 +94,28 @@ function lookMainIdx(b, scene) {
 /**
  * WO-1029 B1: `{ channel, screen, drivenBy }` when a PROGRAM take of this look lands on a screen another server drives
  * right now (amcp-fanout.js airHeldBy), else null. Used by R1 here, R2 (cluster-call-actions) and R3 (zone-actions).
+ * WO-1029 2a: `code: 'REMOTE_SCREEN'` + `owners` when that screen is cabled only on other servers (a non-master).
  * @param {{ sceneId: string, mainIdx?: number, target?: string }} b
  * @param {{ resolveSceneById?: Function, getChannelMap?: Function, airHeldBy?: Function }} [deps]
  */
 function airHeldForLook(b, ctx, deps = {}) {
 	if (b?.target === 'preview') return null
+	const ch = lookProgramChannel(b, ctx, deps)
+	if (!ch) return null
+	const held = deps.airHeldBy || require('../replication/amcp-fanout').airHeldBy
+	return held(ctx, ch) || null
+}
+
+/** The program channel a take of this look lands on here, or 0 (no such look / screen). */
+function lookProgramChannel(b, ctx, deps = {}) {
 	const sceneId = String(b?.sceneId || '').trim()
-	if (!sceneId) return null
+	if (!sceneId) return 0
 	const { resolveLiveSceneById } = require('../engine/project-scenes-transform')
 	const scene = deps.resolveSceneById ? deps.resolveSceneById(sceneId) : resolveLiveSceneById(ctx, sceneId)
 	const getMap = deps.getChannelMap || require('../config/routing').getChannelMap
 	const map = getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}
 	const ch = Number(map.programChannels?.[lookMainIdx(b, scene)])
-	if (!Number.isFinite(ch) || ch <= 0) return null
-	const held = deps.airHeldBy || require('../replication/amcp-fanout').airHeldBy
-	return held(ctx, ch) || null
+	return Number.isFinite(ch) && ch > 0 ? ch : 0
 }
 
 async function takeLook(b, ctx, deps) {
@@ -143,4 +166,4 @@ async function takeLook(b, ctx, deps) {
 	return { ...(await take(takeBody, ctx)), handedToTake: true }
 }
 
-module.exports = { handleTakeLook, relayArgs, airHeldForLook }
+module.exports = { handleTakeLook, relayArgs, airHeldForLook, lookProgramChannel }
