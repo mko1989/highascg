@@ -9,6 +9,8 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { getChannelMap } = require('../config/routing')
 const liveSceneState = require('../state/live-scene-state')
 const { runFadeToBlackAllLayers } = require('../engine/ftb-pgm-prv')
+const { airHeldBy } = require('../replication/amcp-fanout')
+const { isAirHeld, airHeldReply } = require('../replication/air-held') // WO-1029 B2
 
 /**
  * @param {object} map
@@ -71,14 +73,19 @@ async function handlePost(path, body, ctx) {
 			body: jsonBody({ error: 'screenIdx must be a non-negative integer' }),
 		}
 	}
-	const channels = resolveFtbChannels(map, screenIdx)
-	if (!channels) {
+	const asked = resolveFtbChannels(map, screenIdx)
+	if (!asked) {
 		return {
 			status: 400,
 			headers: JSON_HEADERS,
 			body: jsonBody({ error: `screenIdx out of range (0..${Math.max(0, map.screenCount - 1)})` }),
 		}
 	}
+	// WO-1029 B2: a screen another server drives right now is not blacked here (its PGM lines would be refused, and the
+	// live store would claim black while the master's look stays up). One such screen → 409; "all screens" blacks the
+	// screens this server drives and lists the others in `refused`.
+	const { channels, refused } = splitHeldScreens(ctx, map, screenIdx, asked)
+	if (!channels.length && refused.length) return airHeldReply(refused[0], { refused })
 
 	try {
 		// Stop timeline transport first so the ticker cannot PLAY layers again during the fade.
@@ -110,12 +117,32 @@ async function handlePost(path, body, ctx) {
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
-			body: jsonBody({ ok: true, screenIdx, ...result }),
+			body: jsonBody({ ok: true, screenIdx, ...result, ...(refused.length ? { refused } : {}) }),
 		}
 	} catch (e) {
+		if (isAirHeld(e)) return airHeldReply(e)
 		const msg = e?.message || String(e)
 		return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
 	}
+}
+
+/**
+ * WO-1029: drops every screen whose PGM another server drives (its PRV with it: the FTB is that screen's) →
+ * `{ channels, refused: [{ channel, screen, drivenBy }] }`.
+ */
+function splitHeldScreens(ctx, map, screenIdx, asked) {
+	const screens = screenIdx == null ? [...Array(map.screenCount).keys()] : [screenIdx]
+	const drop = new Set()
+	const refused = []
+	for (const i of screens) {
+		const held = airHeldBy(ctx, map.programCh(i + 1))
+		if (!held) continue
+		refused.push(held)
+		drop.add(map.programCh(i + 1))
+		const prv = map.previewCh(i + 1)
+		if (prv != null) drop.add(prv)
+	}
+	return { channels: asked.filter((c) => !drop.has(c)), refused }
 }
 
 module.exports = { handlePost, resolveFtbChannels, shouldStopTimelineForFtb }

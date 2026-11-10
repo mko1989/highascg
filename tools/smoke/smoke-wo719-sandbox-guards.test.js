@@ -80,7 +80,9 @@ test('the e2e launcher always sets the switch and keeps the instance off the liv
 		"DISPLAY: ''",
 		'HOME: dirs.home',
 		"'--no-caspar'",
-		"bindAddress: '127.0.0.1'",
+		"const host = opts.host || '127.0.0.1'", // WO-1029: loopback aliases tell sandbox nodes apart …
+		'sandbox host must be a loopback address', // … and nothing but loopback is accepted
+		'bindAddress: host',
 		"HIGHASCG_DEVICE_IDENTITY_PATH: path.join(root, 'device-identity.json')", // WO-723: never the live box's cluster key
 	]) assert.ok(s.includes(needle), needle)
 	// the Godot client takes its pictures over the sandbox's feed, never by mapping the live /dev/shm segments

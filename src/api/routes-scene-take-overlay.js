@@ -11,7 +11,8 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
 const { takeOverlayLook } = require('../engine/overlay-look')
 const { stopOverlayLook, getAll: getOverlayLive } = require('../engine/overlay-look-live')
-const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
+const { airHeldBy } = require('../replication/amcp-fanout')
+const { airHeldReply, isAirHeld } = require('../replication/air-held')
 const { stripEphemeralTakeFields, resolvePreviewChannel, isPreviewTakeTarget, getRouteMap } = require('./routes-scene-shared')
 
 function mainIdxOf(routeMap, channel) {
@@ -39,10 +40,9 @@ async function handleOverlayLookTake(b, ctx, channel, inc) {
 		}
 	}
 	const target = preview ? bus1 : channel
-	if (!preview && shouldFollowerSkipLocalPgmAmcp(ctx, channel, { previewOnly: false })) {
-		ctx.log?.('info', `[scene-take] follower amcp-fanout: skip local PGM AMCP ch=${channel} (overlay look)`)
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, overlay: true }) }
-	}
+	// WO-1029 B2: another server drives this screen right now → 409, not a 200 with nothing on air
+	const held = preview ? null : airHeldBy(ctx, channel)
+	if (held) return airHeldReply(held)
 	// the channel's take chain (routes-scene-take.js): an overlay never interleaves with a look take there
 	if (!ctx._sceneTakeChainByChannel) ctx._sceneTakeChainByChannel = {}
 	const key = String(target)
@@ -53,6 +53,7 @@ async function handleOverlayLookTake(b, ctx, channel, inc) {
 	try {
 		await run
 	} catch (e) {
+		if (isAirHeld(e)) return airHeldReply(e)
 		ctx.log?.('error', `Overlay look take failed: ${e?.message || e}`)
 		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || 'Overlay look take failed' }) }
 	}
@@ -83,6 +84,9 @@ async function handleOverlayLookStop(body, ctx) {
 	if (!Number.isFinite(channel) || channel < 1) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'channel or mainIdx required' }) }
 	}
+	// WO-1029 B2: the stop runs in the background and answers at once — a held screen is refused before it
+	const held = airHeldBy(ctx, channel)
+	if (held) return airHeldReply(held)
 	const sceneId = b.sceneId != null && b.sceneId !== '' ? String(b.sceneId) : undefined
 	const live = getOverlayLive()[String(channel)] || []
 	if (!live.some((e) => sceneId == null || e.sceneId === sceneId)) {

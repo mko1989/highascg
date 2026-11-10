@@ -152,6 +152,11 @@ function validateBatchLine(line) {
  * @returns {Promise<{ ok: boolean, okAll: boolean, batched: boolean, responses: object[], failures: BatchFailure[] }>}
  */
 function sequentialRaw(lines, client) {
+	// WO-1029 B4: per line — a held program line is left out (and listed in `refused`), the rest still goes out
+	return withAirGate(client?._context, lines, (send) => sequentialSend(send, client))
+}
+
+function sequentialSend(lines, client) {
 	return lines
 		.reduce((acc, line) => {
 			const key = line.trim().split(/\s+/)[0].toUpperCase()
@@ -164,6 +169,7 @@ function sequentialRaw(lines, client) {
 }
 
 const { prepareAmcpLine, carriesSharedPassword, passwordRefusal } = require('./amcp-template-credential')
+const { withAirGate } = require('../replication/air-held')
 const {
 	isBatchCommitAckLine,
 	parseBatchStatusLine,
@@ -179,21 +185,12 @@ function runBeginCommitBatch(client, lines, options) {
 	if (client.isOffline) return sequentialRaw([...lines], client)
 	const skipMixerPreCommit = options?.skipMixerPreCommit === true
 	const connection = client._context
-	const ch = inferProgramChannelFromAmcpLines(lines)
-	try {
-		const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
-		if (ch != null && shouldFollowerSkipLocalPgmAmcp(connection, ch, { previewOnly: false })) {
-			if (typeof connection.log === 'function') {
-				connection.log(
-					'debug',
-					`[replication] skip local PGM AMCP batch ch=${ch} (${lines.length} cmds, leader fan-out drives air)`,
-				)
-			}
-			return Promise.resolve({ ok: true, okAll: true, batched: true, skipped: true, responses: [], failures: [] })
-		}
-	} catch {
-		/* replication optional */
+	// WO-1029 B4: decided per line, not from the first line's channel — held program lines stay out (`refused`), the
+	// preview / consumer lines of the same batch still go out; nothing left → AirHeldError (409 in the routes).
+	if (options?._airGated !== true) {
+		return withAirGate(connection, lines, (send) => runBeginCommitBatch(client, send, { ...options, _airGated: true }))
 	}
+	const ch = inferProgramChannelFromAmcpLines(lines)
 	// WO-811: template key in (enforcement ON), shared password never out — same rule as the single-send path.
 	const prepped = lines.map((l) => prepareAmcpLine(String(l).trim(), connection?.config))
 	if (prepped.some((x) => x.error)) return Promise.reject(passwordRefusal())
@@ -393,6 +390,9 @@ class AmcpBatch {
 		if (clean.length > maxCmd) {
 			return Promise.reject(new Error(`batch: max ${maxCmd} commands`))
 		}
+		if (options?._airGated !== true) {
+			return withAirGate(connection, clean, (send) => this.batchSend(send, { ...options, _airGated: true }))
+		}
 
 		// Multi-command BEGIN…COMMIT expects per-command 202 lines then a final `202 COMMIT OK` (see
 		// {@link isBatchCommitAckLine}). A single AMCP line has one `202 <CMD> OK` reply and no separate
@@ -440,6 +440,9 @@ class AmcpBatch {
 			return Promise.resolve({ ok: true, okAll: true, batched: false, responses: [], failures: [] })
 		}
 		if (clean.some((l) => carriesSharedPassword(l, this._client._context?.config))) return Promise.reject(passwordRefusal()) // WO-811
+		if (options?._airGated !== true) {
+			return withAirGate(this._client._context, clean, (send) => this.batchSendChunked(send, { ...options, _airGated: true }))
+		}
 		const maxCmd = resolveMaxBatchCommands(this._client._context)
 		/** @type {object | null} */
 		let last = null

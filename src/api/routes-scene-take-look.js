@@ -49,11 +49,12 @@ function relayArgs(b) {
 }
 
 /**
- * WO-1026: a PROGRAM take pressed on a cluster follower is the master's to play — the follower's own PGM AMCP is
- * skipped (the master's fan-out drives air), so taken here it answered ok and nothing went on air (the follower's
- * GUI, a preset recall, Companion). It is handed to the master once (`relayed`), with its own options; the answer is
- * the master's. A take group is not carried over: the screens of a preset recalled on a follower are the master's
- * separate takes (the group slot is released here so nothing waits for it).
+ * WO-1026: a PROGRAM take pressed on a cluster follower is the master's to play when the master's fan-out drives that
+ * screen — taken here it would be refused. It is handed to the master once (`relayed`), with its own options; the
+ * answer is the master's. A take group is not carried over: the screens of a preset recalled on a follower are the
+ * master's separate takes (the group slot is released here so nothing waits for it).
+ * WO-1029 B1: only when THAT screen is held (the master's fresh report forwards its program channel here,
+ * `airHeldForLook`); a screen the master does not drive here is taken locally like on any server.
  * → null when this server takes it itself.
  */
 async function relayToMaster(b, ctx, deps) {
@@ -61,10 +62,37 @@ async function relayToMaster(b, ctx, deps) {
 	const cluster = deps.cluster !== undefined ? deps.cluster : ctx?._clusterMaster ? require('./routes-cluster') : null
 	if (!cluster?.isClusterFollower(ctx)) return null
 	if (!String(b.sceneId || '').trim()) return bad(400, 'sceneId required')
+	if (!airHeldForLook(b, ctx, deps)) return null
 	require('../engine/take-sync-barrier').joinTakeGroup(b.takeGroup)?.leave()
 	const r = await cluster.callOf(ctx).callMaster('look.take', relayArgs(b))
 	const json = r?.json && typeof r.json === 'object' ? r.json : { ok: false, error: r?.error || 'master unreachable' }
 	return { status: r?.status || 502, headers: JSON_HEADERS, body: jsonBody({ ...json, viaMaster: true }) }
+}
+
+/** The look's screen: `mainIdx`, else the look's own `mainScope`, else 0 (same rule as takeLook). */
+function lookMainIdx(b, scene) {
+	const scope = parseInt(String(scene?.mainScope ?? ''), 10)
+	return Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+}
+
+/**
+ * WO-1029 B1: `{ channel, screen, drivenBy }` when a PROGRAM take of this look lands on a screen another server drives
+ * right now (amcp-fanout.js airHeldBy), else null. Used by R1 here, R2 (cluster-call-actions) and R3 (zone-actions).
+ * @param {{ sceneId: string, mainIdx?: number, target?: string }} b
+ * @param {{ resolveSceneById?: Function, getChannelMap?: Function, airHeldBy?: Function }} [deps]
+ */
+function airHeldForLook(b, ctx, deps = {}) {
+	if (b?.target === 'preview') return null
+	const sceneId = String(b?.sceneId || '').trim()
+	if (!sceneId) return null
+	const { resolveLiveSceneById } = require('../engine/project-scenes-transform')
+	const scene = deps.resolveSceneById ? deps.resolveSceneById(sceneId) : resolveLiveSceneById(ctx, sceneId)
+	const getMap = deps.getChannelMap || require('../config/routing').getChannelMap
+	const map = getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}
+	const ch = Number(map.programChannels?.[lookMainIdx(b, scene)])
+	if (!Number.isFinite(ch) || ch <= 0) return null
+	const held = deps.airHeldBy || require('../replication/amcp-fanout').airHeldBy
+	return held(ctx, ch) || null
 }
 
 async function takeLook(b, ctx, deps) {
@@ -76,8 +104,7 @@ async function takeLook(b, ctx, deps) {
 
 	const getMap = deps.getChannelMap || require('../config/routing').getChannelMap
 	const map = require('../engine/scene-take-payload').withProgramResolutions(getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
-	const scope = parseInt(String(scene.mainScope ?? ''), 10)
-	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+	const mainIdx = lookMainIdx(b, scene)
 	const programCh = Number(map.programChannels?.[mainIdx])
 	if (!Number.isFinite(programCh) || programCh <= 0) return bad(400, `no program channel for main ${mainIdx}`)
 	const prvCh = Number(map.previewChannels?.[mainIdx])
@@ -116,4 +143,4 @@ async function takeLook(b, ctx, deps) {
 	return { ...(await take(takeBody, ctx)), handedToTake: true }
 }
 
-module.exports = { handleTakeLook, relayArgs }
+module.exports = { handleTakeLook, relayArgs, airHeldForLook }

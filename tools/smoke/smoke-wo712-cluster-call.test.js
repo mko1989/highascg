@@ -222,6 +222,8 @@ describe('WO-712 R2 allow-list: each action runs the local handler', () => {
 	it('look.take on a follower: program goes to the master (once: a relayed take is not handed on); preview stays local', async () => {
 		const { ctx, deps, seen } = stubCtx()
 		deps.isFollower = () => true
+		// WO-1029 B1: only a screen the master drives here goes to it (its fresh fan-out report lists that channel)
+		deps.heldFor = () => ({ channel: 1, screen: 1, drivenBy: 'srv-M' })
 		const a = createCallActions(ctx, deps)
 		assert.deepEqual(await a['look.take']({ sceneId: 's1' }), { status: 200, body: { ok: true, by: 'master' } })
 		await a['look.take']({ sceneId: 's2', target: 'preview' })
@@ -231,6 +233,15 @@ describe('WO-712 R2 allow-list: each action runs the local handler', () => {
 			['take', { sceneId: 's2', target: 'preview' }],
 			['take', { sceneId: 's3', target: 'program', relayed: true }], // WO-1026: so take-look never hands it on again
 		])
+	})
+
+	it('WO-1029: look.take on a follower whose screen the master does not drive is taken here', async () => {
+		const { ctx, deps, seen } = stubCtx()
+		deps.isFollower = () => true
+		deps.heldFor = () => null
+		const a = createCallActions(ctx, deps)
+		assert.deepEqual(await a['look.take']({ sceneId: 's1' }), { status: 200, body: { ok: true } })
+		assert.deepEqual(seen, [['take', { sceneId: 's1', target: 'program' }]])
 	})
 
 	it('tracking.auto.pin / slot / home → the director routes; 503 when the tracking module is off', async () => {

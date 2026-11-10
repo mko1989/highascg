@@ -12,6 +12,8 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const ctl = require('../engine/led-test-card-control')
+const { airHeldBy } = require('../replication/amcp-fanout')
+const { airHeldReply } = require('../replication/air-held') // WO-1029 B2
 
 const reply = (status, body) => ({ status, headers: JSON_HEADERS, body: jsonBody(body) })
 
@@ -52,11 +54,22 @@ async function handlePost(op, body, ctx) {
 	if (op !== 'master' && op !== 'channel') return reply(404, { error: `Unknown test card operation: ${op}` })
 	if (!ctx?.amcp) return reply(503, { error: 'Caspar not connected' })
 	if (op === 'master') {
-		const r = await ctl.applyCard(ctx, b.enabled === true)
-		return reply(r.ok ? 200 : 502, r)
+		const enabled = b.enabled === true
+		// WO-1029 B2: the card goes only on the screens this server drives; a screen the master drives here is refused
+		// (409 when that is every target), so the card is never flagged on for lines that were not sent.
+		const st = typeof ctx?.getState === 'function' ? ctx.getState() || {} : {}
+		const targets = ctl.planTargets(ctl.getSettings(), st.channelMap, enabled)
+		const refused = targets.map((c) => airHeldBy(ctx, c)).filter(Boolean)
+		if (refused.length && refused.length === targets.length) return airHeldReply(refused[0], { refused })
+		const held = new Set(refused.map((h) => h.channel))
+		const opts = refused.length ? { channels: targets.filter((c) => !held.has(c)), masterOff: !enabled } : {}
+		const r = await ctl.applyCard(ctx, enabled, opts)
+		return reply(r.ok ? 200 : 502, refused.length ? { ...r, refused } : r)
 	}
 	const ch = parseInt(String(b.channel), 10)
 	if (!Number.isFinite(ch) || ch < 1) return reply(400, { error: 'channel must be a positive channel number' })
+	const held = airHeldBy(ctx, ch) // WO-1029 B2: refused before the dialog's choice is stored or anything is sent
+	if (held) return airHeldReply(held)
 	const r = await ctl.setChannel(ctx, ch, b.enabled === true)
 	return reply(r.ok ? 200 : 502, r)
 }

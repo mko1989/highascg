@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-554 routes.
+556 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -68,6 +68,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | * | `/api/cluster/call` | handler | `src/server/auth.js` |
 | POST | `/api/cluster/call` | registry | `src/api/routes-cluster.js` |
 | GET | `/api/cluster/exchange` | registry | `src/api/routes-cluster.js` |
+| * | `/api/cluster/hello` | handler | `src/server/auth.js` |
+| POST | `/api/cluster/hello` | registry | `src/api/routes-cluster.js` |
 | GET | `/api/cluster/identity` | registry | `src/api/routes-cluster.js` |
 | POST | `/api/cluster/invites/:id/accept` | registry | `src/api/routes-cluster.js` |
 | POST | `/api/cluster/invites/:id/decline` | registry | `src/api/routes-cluster.js` |
@@ -609,7 +611,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-plugins.js` |  |
 | `src/api/routes-project-files.js` | WO-1009 — the open project's documents (src/media/project-files.js): GET    /api/project-files                 → { slug, files: [{ name, kind: mvr\|model\|pdf\| |
 | `src/api/routes-project-hardware.js` | WO-608 — project hardware reconcile on the node (web lib/project-import-flow.js + project-hardware-apply.js). |
-| `src/api/routes-replication-get.js` | optional |
+| `src/api/routes-replication-get.js` | WO-1029: this server's device-key fingerprint (public, as GET /api/cluster/identity); '' when it has none. |
 | `src/api/routes-replication-post.js` | optional |
 | `src/api/routes-scene.js` |  |
 | `src/api/routes-server-duties.js` | WO-723 — this server's duties, resolved from its config and the linked servers (src/cluster/server-duties.js), and the "which server sends / receives" choice (s |

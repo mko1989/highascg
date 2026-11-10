@@ -19,7 +19,8 @@ const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layer
 const { resolveSceneById } = require('../engine/project-scenes')
 const { withScreenGlobalBorderForChannel } = require('../engine/global-border-control')
 const { missingMediaField } = require('./media-index') // WO-603: web warnMissingMediaOnTake, decided in node
-const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
+const { airHeldBy } = require('../replication/amcp-fanout')
+const { AirHeldError, isAirHeld, airHeldReply } = require('../replication/air-held') // WO-1029 B2
 const { sanitizeVisibilityMap } = require('../engine/timer-visibility-map') // WO-840
 const { programTakeStarted } = require('../engine/scene-take-program-start') // replication + WO-615 T8 fixtures
 const {
@@ -222,15 +223,9 @@ async function handleSceneTakeInner(body, ctx, sync) {
 			return
 		}
 
-		if (shouldFollowerSkipLocalPgmAmcp(ctx, channel, { previewOnly: false })) {
-			if (typeof ctx.log === 'function') {
-				ctx.log(
-					'info',
-					`[scene-take] follower amcp-fanout: skip local PGM AMCP ch=${channel} (leader fan-out drives air)`,
-				)
-			}
-			return
-		}
+		// WO-1029 B2: another server drives this screen right now → refused (409), never a 200 with nothing on air
+		const held = airHeldBy(ctx, channel)
+		if (held) throw new AirHeldError(held)
 
 		takeOpts.mainScreenIndex = mainIdx
 		if (typeof ctx.log === 'function') {
@@ -457,6 +452,7 @@ async function handleSceneTakeInner(body, ctx, sync) {
 			}),
 		])
 	} catch (e) {
+		if (isAirHeld(e)) return airHeldReply(e) // WO-1029 B2: the screen is the master's — 409, live store untouched
 		const log = ctx.log
 		if (typeof log === 'function') log('error', 'Scene take failed: ' + (e?.message || e))
 		const msg = e?.message || String(e)

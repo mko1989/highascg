@@ -57,27 +57,26 @@ module.exports = {
 			try {
 				if (settled) return p
 				if (prep.error) throw prep.error
+				// WO-1029 B2: a program line another server drives right now is refused (409 AIR_HELD in the routes), never
+				// answered with an invented `202 OK`; queries and ADD/REMOVE are never held (amcp-fanout.js airHeldForLine).
+				let held = null
 				try {
-					const { shouldBlockLocalPgmAmcpCommand } = require('../replication/amcp-fanout')
-					if (shouldBlockLocalPgmAmcpCommand(self, trimmed)) {
-						if (typeof self.log === 'function') {
-							self.log(
-								'debug',
-								`[replication] skip local PGM AMCP (leader fan-out drives air): ${redactAmcpCommandForLog(trimmed)}`,
-							)
-						}
-						// WO-670 P4b: nothing was sent, so no reply comes — drop this waiter, or it swallows the
-						// next reply with the same verb (a following PRV `CLEAR` timed out on the box).
-						const waiting = self.response_callback[key]
-						if (waiting && waiting.indexOf(cb) !== -1) waiting.splice(waiting.indexOf(cb), 1)
-						if (!settled) {
-							settled = true
-							resolveP({ ok: true, skipped: true, data: '202 OK' })
-						}
-						return p
-					}
+					held = require('../replication/amcp-fanout').airHeldForLine(self, trimmed)
 				} catch {
-					/* replication optional */
+					held = null // replication optional
+				}
+				if (held) {
+					if (typeof self.log === 'function') self.log('debug', `[cluster] refused local PGM AMCP (${held.drivenBy} drives it): ${redactAmcpCommandForLog(trimmed)}`)
+					// WO-670 P4b: nothing was sent, so no reply comes — drop this waiter, or it swallows the
+					// next reply with the same verb (a following PRV `CLEAR` timed out on the box).
+					const waiting = self.response_callback[key]
+					if (waiting && waiting.indexOf(cb) !== -1) waiting.splice(waiting.indexOf(cb), 1)
+					if (!settled) {
+						settled = true
+						const { AirHeldError } = require('../replication/air-held')
+						rejectP(new AirHeldError(held))
+					}
+					return p
 				}
 				if (!self.socket || !self.socket.isConnected) {
 					throw new Error('Not connected')

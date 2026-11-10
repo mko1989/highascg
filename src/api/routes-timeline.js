@@ -8,6 +8,21 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { runTimelineDirectTake } = require('../engine/timeline-take')
 const { notifyTimelineReplication } = require('../replication/replication-hooks')
+const { airHeldBy } = require('../replication/amcp-fanout')
+const { isAirHeld, airHeldReply } = require('../replication/air-held')
+
+/** WO-1029: the first channel of this routing that another server drives right now, or null. */
+function timelineHeld(ctx, eng, sendTo) {
+	try {
+		for (const ch of eng._channelsFor?.(sendTo || {}) || []) {
+			const held = airHeldBy(ctx, ch)
+			if (held) return held
+		}
+	} catch {
+		/* no routing → nothing held */
+	}
+	return null
+}
 
 /**
  * @param {string} method
@@ -73,6 +88,9 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 				if (!tl) {
 					return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'Timeline not found' }) }
 				}
+				// WO-1029 B2: a timeline routed onto a screen another server drives would run with every PGM line refused
+				const held = timelineHeld(ctx, eng, b.sendTo && typeof b.sendTo === 'object' ? b.sendTo : eng._sendToFor?.(id))
+				if (held) return airHeldReply(held)
 				if (b.sendTo && typeof b.sendTo === 'object') eng.setSendTo(b.sendTo, id)
 				eng.play(id, b.from != null ? Number(b.from) : null)
 				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
@@ -88,6 +106,7 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 					const result = await runTimelineDirectTake(ctx, eng, id, b)
 					return { status: 200, headers: JSON_HEADERS, body: jsonBody(result) }
 				} catch (err) {
+					if (isAirHeld(err)) return airHeldReply(err)
 					return {
 						status: 500,
 						headers: JSON_HEADERS,

@@ -20,11 +20,11 @@ const { handleTakeLook, relayArgs } = require('../../src/api/routes-scene-take-l
 const { createDetectService } = require('../../src/tracking/detect-service')
 
 describe('WO-1026 follower: its own consumers are not air', () => {
-	after(() => fanout.setClusterFollowerCheck(null))
+	after(() => fanout.setClusterAirCheck(null))
 	const ctx = { config: { screen_count: 1 } }
 
 	it('ADD / REMOVE on a program channel pass on a follower; the look still does not', () => {
-		fanout.setClusterFollowerCheck(() => true)
+		fanout.setClusterAirCheck(() => 'srv-M') // WO-1029: the master's report forwards every channel here
 		assert.equal(fanout.shouldBlockLocalPgmAmcpCommand(ctx, 'PLAY 1-10 "clip"'), true, 'air stays the master\'s')
 		assert.equal(fanout.shouldBlockLocalPgmAmcpCommand(ctx, 'ADD 1-97 STREAM rtmp://host/live/key -codec:v libx264'), false)
 		assert.equal(fanout.shouldBlockLocalPgmAmcpCommand(ctx, 'ADD 1-96 FILE Rec1.mp4 -codec:v libx264'), false)
@@ -40,11 +40,14 @@ describe('WO-1026 follower: its own consumers are not air', () => {
 })
 
 describe('WO-1026 follower: a program take-look goes to the master', () => {
-	const stub = (follower, answer = { ok: true, status: 200, json: { ok: true, by: 'master' } }) => {
+	// WO-1029 B1: a follower relays only a screen the master drives here (`held`: the master's fresh report lists its
+	// program channel); 4 screens so mainIdx 3 has a program channel (7) to be held
+	const stub = (follower, answer = { ok: true, status: 200, json: { ok: true, by: 'master' } }, held = follower) => {
 		const seen = []
 		const cluster = { isClusterFollower: () => follower, callOf: () => ({ callMaster: async (a, args) => (seen.push([a, args]), answer) }) }
 		const take = async (b) => (seen.push(['local', b.sceneId, b.target || 'program']), { status: 200, body: '{"ok":true}' })
-		const deps = { cluster, take, resolveSceneById: (id) => ({ id, name: id, layers: [], mainScope: '0' }), getChannelMap: () => ({ programChannels: [1], previewChannels: [2] }), withBorder: (s) => s }
+		const airHeldBy = (_ctx, ch) => (held ? { channel: ch, screen: 1, drivenBy: 'srv-M' } : null)
+		const deps = { cluster, take, airHeldBy, resolveSceneById: (id) => ({ id, name: id, layers: [], mainScope: '0' }), getChannelMap: () => ({ programChannels: [1, 3, 5, 7], previewChannels: [2, 4, 6, 8] }), withBorder: (s) => s }
 		return { seen, deps }
 	}
 
@@ -64,6 +67,13 @@ describe('WO-1026 follower: a program take-look goes to the master', () => {
 		await handleTakeLook({ sceneId: 's4' }, {}, m.deps)
 		assert.deepEqual(f.seen, [['local', 's2', 'preview'], ['local', 's3', 'program']])
 		assert.deepEqual(m.seen, [['local', 's4', 'program']])
+	})
+
+	it('WO-1029: a follower whose screen the master does not drive takes it locally', async () => {
+		const { seen, deps } = stub(true, undefined, false)
+		const r = await handleTakeLook({ sceneId: 's5' }, {}, deps)
+		assert.equal(r.status, 200)
+		assert.deepEqual(seen, [['local', 's5', 'program']])
 	})
 
 	it('an unreachable master is an error, not a silent ok', async () => {

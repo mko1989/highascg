@@ -8,11 +8,26 @@
  *
  *   const nodes = await startSandboxNodes(root, ['sb-a', 'sb-b', 'sb-c'])
  *   const live = liveNodes(['192.168.0.23:4200', '192.168.0.4:4200'])
+ *
+ * WO-1029 — nodes told apart by ADDRESS, and links that can be cut one way:
+ *   startSandboxNodes(root, ids, { hosts: { 'sb-a': '127.0.1.11', 'sb-b': '127.0.1.12' } })
+ *     each listed node binds only its own loopback alias (the whole 127.0.0.0/8 is local on Linux, no setup); unlisted
+ *     nodes stay on 127.0.0.1. node.host / node.address follow the alias.
+ *   node.move('127.0.1.21')   stop + restart the same node (same root, device key, id, port) at the new alias; the old
+ *                             alias is dead (connection refused). node.address updates.
+ *   const f = await other.linkVia()   a tcp-forwarder (tcp-forwarder.js) in front of `other`, on its own alias 127.0.9.x;
+ *                             a node linked to `f.address` instead of other.address reaches `other` only while f is
+ *                             not paused (one direction). It follows other.move().
+ * Limit: the kernel picks 127.0.0.1 as the SOURCE of every loopback connection (`ip route get 127.0.1.12` → src
+ * 127.0.0.1), so a node's own idea of "my address towards peer X" (cluster-peers.js localAddressTo, line 101,
+ * net.connect without localAddress) is 127.0.0.1, not its alias. The link-back it posts therefore names 127.0.0.1:port,
+ * which nobody listens on. Link both directions explicitly (POST /api/cluster/peers with link_back:false on both sides).
  */
 
 const http = require('http')
 const path = require('path')
 const { startSandbox } = require('./sandbox-server')
+const { createForwarder } = require('./tcp-forwarder')
 
 /** One JSON request; never throws (status 0 = no answer). */
 function request(method, url, body, timeoutMs = 8000) {
@@ -70,18 +85,22 @@ async function clusterView(node, timeoutMs = 3000) {
  * @param {{ log?: Function, extra?: (id: string, root: string) => { config?: object, env?: object, tracking?: boolean } }} [opts]
  *   extra: per-server startSandbox options (WO-979: a media and a tracking role), asked again on every restart
  */
+let fwdSeq = 0
+
 async function startSandboxNodes(root, ids, opts = {}) {
+	const hosts = { ...opts.hosts }
 	const start = (id, port) => {
 		const r = path.join(root, id)
 		const x = opts.extra ? opts.extra(id, r) || {} : {}
-		return startSandbox({ ...x, root: r, port, media: false, config: { ...x.config, replication: { enabled: false, selfId: id } }, log: opts.log })
+		return startSandbox({ ...x, root: r, host: hosts[id], port, media: false, config: { ...x.config, replication: { enabled: false, selfId: id } }, log: opts.log })
 	}
 	// WO-752: one sandbox failing must not leak the others — their processes kept the test process (and test:ci)
 	// alive for hours; the caller never got `nodes` to stop.
 	const settled = await Promise.allSettled(
 		ids.map(async (id) => {
 			const node = { id, kind: 'sandbox' }
-			const attach = (sb) => Object.assign(node, { sb, url: sb.url, address: `127.0.0.1:${sb.port}`, pid: sb.pid }, api(node))
+			const attach = (sb) => Object.assign(node, { sb, url: sb.url, host: sb.host, port: sb.port, address: `${sb.host}:${sb.port}`, pid: sb.pid }, api(node))
+			const forwarders = []
 			attach(await start(id))
 			node.freeze = () => process.kill(node.pid, 'SIGSTOP')
 			node.thaw = () => process.kill(node.pid, 'SIGCONT')
@@ -89,7 +108,22 @@ async function startSandboxNodes(root, ids, opts = {}) {
 				await node.sb.stop()
 				attach(await start(id, node.sb.port))
 			}
-			node.stop = () => node.sb.stop()
+			node.move = async (newHost) => {
+				await node.sb.stop()
+				hosts[id] = newHost
+				attach(await start(id, node.sb.port))
+				for (const f of forwarders) f.retarget({ host: node.host, port: node.port }) // forwarders in front of this node follow it
+			}
+			// forwarders IN FRONT OF this node (peers reach it through them); closed with it
+			node.linkVia = async (listenHost) => {
+				const f = await createForwarder({ listenHost: listenHost || `127.0.9.${++fwdSeq}`, target: { host: node.host, port: node.port } })
+				forwarders.push(f)
+				return f
+			}
+			node.stop = async () => {
+				await node.sb.stop()
+				await Promise.all(forwarders.splice(0).map((f) => f.close()))
+			}
 			return node
 		}),
 	)

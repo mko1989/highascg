@@ -180,6 +180,7 @@ function isPublicApiPath(method, apiPath) {
 	if (m === 'GET' && p === '/api/ping') return true
 	// WO-712 R2: a linked server's call carries its own ed25519 signature, checked by the route (cluster-call.js).
 	if (m === 'POST' && p === '/api/cluster/call') return true
+	if (m === 'POST' && p === '/api/cluster/hello') return true // WO-1029: signed by the linked server (cluster-hello.js)
 	return false
 }
 

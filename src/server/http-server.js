@@ -378,8 +378,10 @@ function startHttpServer(options) {
 			res.end(outBody ?? '')
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e)
-			res.writeHead(502, mergeCors({ 'Content-Type': 'application/json; charset=utf-8' }, req))
-			res.end(JSON.stringify({ error: msg }))
+			// WO-1029: a screen held by the cluster master is the operator's to read (409 + who), not a gateway fault
+			const held = e && e.code === 'AIR_HELD'
+			res.writeHead(held ? 409 : 502, mergeCors({ 'Content-Type': 'application/json; charset=utf-8' }, req))
+			res.end(JSON.stringify(held ? { error: msg, code: 'AIR_HELD', drivenBy: e.drivenBy || '', channel: e.channel } : { error: msg }))
 		}
 	})
 

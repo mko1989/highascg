@@ -287,4 +287,9 @@ module.exports = [
 	'tools/smoke/smoke-wo1003-buffered-body-content-length.test.js',
 	'tools/smoke/smoke-wo1024-gdtf-primitive-shapes.test.js',
 	'tools/smoke/smoke-wo1026-two-box-follower.test.js',
+	'tools/smoke/smoke-wo1029-hardware-id.test.js',
+	'tools/smoke/smoke-wo1029-mastership.test.js',
+	'tools/smoke/smoke-wo1029-identity.test.js',
+	'tools/smoke/smoke-wo1029-drive-gate.test.js',
+	'tools/smoke/smoke-wo1029-incident-replay.test.js',
 ]

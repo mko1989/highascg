@@ -51,6 +51,7 @@ const { coalescePerLayerClearStorm } = require('../caspar/amcp-coalesce-clears')
 const { normalizeDecklinkPlayAmcpLines } = require('../config/decklink-amcp')
 const { normalizeClipPlayAmcpLines } = require('../caspar/amcp-clip-resolve')
 const { resolveSceneClipForAmcp } = require('../engine/scene-take-lbg-helpers')
+const { AirHeldError, isAirHeld, airHeldReply } = require('../replication/air-held') // WO-1029 B2
 
 function applyAmcpLineNormalizations(lines, ctx) {
 	const cfg = ctx?.config || {}
@@ -75,11 +76,32 @@ function jsonPlaybackBody(ctx, amcpResult, extra = null) {
 }
 
 /**
+ * WO-1029 B2: a program line another server drives right now is refused by the transport (AirHeldError) — answered
+ * 409 here, and nothing after the send (playback tracker, live invalidation) runs for it.
  * @param {string} path
  * @param {string} body
  * @param {{ amcp: import('../caspar/amcp-client').AmcpClient }} ctx
  */
 async function handlePost(path, body, ctx) {
+	try {
+		return await handlePostInner(path, body, ctx)
+	} catch (e) {
+		if (isAirHeld(e)) return airHeldReply(e)
+		throw e
+	}
+}
+
+/** WO-1029 B4: a batch that sent some lines and refused others → 409 listing the refused ones; only sent lines count. */
+function partialRefusal(ctx, lines, result) {
+	const refused = Array.isArray(result?.refused) ? result.refused : []
+	const skip = new Set(refused.map((r) => r.line))
+	playbackTracker.recordAmcpLines(ctx, lines.filter((l) => !skip.has(l)))
+	if (!refused.length) return null
+	const sent = lines.length - refused.length
+	return airHeldReply(new AirHeldError(refused[0], refused), sent ? { partial: true, sent } : { sent })
+}
+
+async function handlePostInner(path, body, ctx) {
 	const amcp = ctx.amcp
 	if (!amcp) return null
 
@@ -128,7 +150,8 @@ async function handlePost(path, body, ctx) {
 			const lines = applyAmcpLineNormalizations(applyClearCoalescing(normalizeAmcpCommandLines(cmds), ctx), ctx)
 			/** Chunks respect MAX_BATCH_COMMANDS; BEGIN…COMMIT when {@link isAmcpBatchEnabled}. */
 			const last = await amcp.batchSendChunked(lines)
-			playbackTracker.recordAmcpLines(ctx, lines)
+			const refusedReply = partialRefusal(ctx, lines, last)
+			if (refusedReply) return refusedReply
 			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, last) }
 		}
 		case '/api/amcp/raw-batch': {
@@ -155,10 +178,13 @@ async function handlePost(path, body, ctx) {
 					`[AMCP] raw-batch uses ${lines.length} sequential AMCP round-trips — prefer POST /api/amcp/batch for chunked sends (PERF-D4).`,
 				)
 			}
-			for (const line of lines) {
+			// WO-1029 B4: per line — the lines this server drives go out, the held ones are refused (409 below)
+			const { send, refused } = require('../replication/air-held').partitionLines(amcp._context || ctx, lines)
+			for (const line of send) {
 				await amcp.raw(line)
 			}
-			playbackTracker.recordAmcpLines(ctx, lines)
+			const refusedReply = partialRefusal(ctx, lines, { refused })
+			if (refusedReply) return refusedReply
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
@@ -268,6 +294,9 @@ async function handlePost(path, body, ctx) {
 		case '/api/clear': {
 			const ch = parseInt(channel, 10)
 			if (layer === undefined || layer === null || layer === '') {
+				// WO-1029 B2: clearCasparChannel swallows send errors — a held screen is refused before it
+				const held = require('../replication/amcp-fanout').airHeldBy(ctx, ch)
+				if (held) return airHeldReply(held)
 				const { clearCasparChannel } = require('../engine/caspar-channel-clear')
 				await clearCasparChannel(amcp, ch, ctx)
 				notifyProgramMutationMayInvalidateLive(ctx, ch)

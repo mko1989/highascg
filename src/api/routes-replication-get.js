@@ -18,6 +18,15 @@ const { getCasparEndpointForPeer } = require('../replication/caspar-endpoint')
 const { replicationTokenOk, rejectIfNotLeader, localPrimaryIp } = require('./routes-replication-shared')
 const { getLeaderActiveShowPingFields } = require('../replication/active-show-revision')
 
+/** WO-1029: this server's device-key fingerprint (public, as GET /api/cluster/identity); '' when it has none. */
+function devicePingFingerprint() {
+	try {
+		return require('../cluster/cluster-media').fingerprint(require('../system/device-identity').getDevicePublicKeyPem())
+	} catch {
+		return ''
+	}
+}
+
 async function handleGet(path, ctx, req) {
 	if (path === '/api/replication/ping') {
 		const repl = getReplicationConfig(ctx.config)
@@ -102,6 +111,7 @@ async function handleGet(path, ctx, req) {
 				projectMedia,
 				duties: require('../cluster/server-duties').get(), // WO-712 R1: what this server does (linked servers show it)
 				clusterLinked: require('../cluster/cluster-peers').linkedFingerprints(ctx.persistence || require('../utils/persistence')), // WO-732
+				fingerprint: devicePingFingerprint(), // WO-1029: a linker sees whether the box at its saved address is that server
 				activeShowSlug,
 				activeShowRevision,
 				activeShowSavedAt,

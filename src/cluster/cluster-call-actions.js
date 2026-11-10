@@ -6,8 +6,9 @@
  *
  *   look.take          { sceneId, target?: 'program'|'preview', mainIdx?, forceCut?, transitionOverride?, timersVisibility? }
  *                      → routes-scene-take-look.handleTakeLook
- *                      A follower does not take program itself (the follower PGM skip would drop it): it hands the
- *                      take to the master (callMaster), marked `relayed` so it is handed on at most once.
+ *                      A follower does not take program itself on a screen the master drives here (WO-1029: the
+ *                      master's fresh report lists it; the take would be refused): it hands the take to the master
+ *                      (callMaster), marked `relayed` so it is handed on at most once. Any other screen is taken here.
  *   tracking.auto.pin  { key, slot }                → the Auto director's POST /api/tracking/auto/pin (auto-routes.js)
  *   tracking.auto.slot { slot, heads?, ptz? }       → … /slot
  *   tracking.auto.home { after_s?, now? }           → … /home
@@ -34,10 +35,13 @@ const asObj = (r) => {
 
 /**
  * @param {object} ctx  the server ctx (ctx.trackingAuto = the director, ctx.fixtureService = the follow service)
- * @param {{ callMaster: Function, isFollower: () => boolean, takeLook?: Function, runAction?: Function }} deps
+ * @param {{ callMaster: Function, isFollower: () => boolean, takeLook?: Function, runAction?: Function,
+ *   heldFor?: (args: object) => object|null }} deps
  */
 function createCallActions(ctx, deps) {
 	const takeLook = deps.takeLook || ((b) => require('../api/routes-scene-take-look').handleTakeLook(b, ctx))
+	// WO-1029 B1: is this look's program screen driven by the master right now?
+	const heldFor = deps.heldFor || ((a) => require('../api/routes-scene-take-look').airHeldForLook(a, ctx))
 	const runAction = deps.runAction || ((a) => require('../tracking/zone-actions').runAction(a, ctx))
 	const auto = (op) => async (args) => {
 		const { handleAuto } = require('../tracking/auto-routes')
@@ -55,7 +59,7 @@ function createCallActions(ctx, deps) {
 			if (!sceneId) return { status: 400, body: { error: 'sceneId required' } }
 			const target = args.target === 'preview' ? 'preview' : 'program'
 			const { relayArgs } = require('../api/routes-scene-take-look')
-			if (target === 'program' && !args.relayed && deps.isFollower()) {
+			if (target === 'program' && !args.relayed && deps.isFollower() && heldFor({ ...args, sceneId, target })) {
 				const r = await deps.callMaster('look.take', relayArgs({ ...args, sceneId }))
 				return {
 					status: r.status || 502,

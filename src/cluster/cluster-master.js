@@ -294,4 +294,4 @@ function createMaster(deps) {
 	return { accept, set, tick, view, forget, dropped, claim: () => (isSettled() ? claim : null), me }
 }
 
-module.exports = { createMaster, beats, claimText, wellFormed, FAILOVER_MS, STORE_KEY, FLOOR_KEY, BOOT_GRACE_MS, MAX_EPOCH, MAX_EPOCH_JUMP }
+module.exports = { createMaster, beats, claimText, wellFormed, FAILOVER_MS, STORE_KEY, FLOOR_KEY, BOOT_GRACE_MS }

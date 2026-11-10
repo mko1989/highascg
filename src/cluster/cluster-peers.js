@@ -22,12 +22,16 @@
  * its link-backs are refused until this server links it.
  * WO-802: `opts.onRemove(saved)` runs on every removal (unlink here, unlink there, the repair's drop): routes-cluster.js
  * ends the master claim, the fan-out target and the shared-show state that named that server.
+ * WO-1029 P1a: identity = device key. With `opts.sign`/`opts.verify` each poll sends a signed hello (cluster-hello.js)
+ * that re-addresses a moved server; a ping whose `fingerprint` is not the saved key = another server (offline); a
+ * link-back cannot replace a saved key; a re-add with a saved key under a new id replaces that entry.
  */
 
 const http = require('http')
 const net = require('net')
 const os = require('os')
 const { outboundAuthHeaders } = require('../server/auth')
+const { createHello, advertised } = require('./cluster-hello')
 
 const STORE_KEY = 'clusterPeers'
 const TOMBSTONE_KEY = 'clusterUnlinked'
@@ -191,6 +195,7 @@ function createCluster(opts) {
 			duties: ping.duties && typeof ping.duties === 'object' ? ping.duties : null, // WO-712 R1: what that server does (null = older server)
 			linked: Array.isArray(ping.clusterLinked) ? ping.clusterLinked.map(String) : null, // WO-732 (null = older server)
 			error: '',
+			via: 'poll', // WO-1029: 'hello' = seen only by its signed hello (our poll does not reach it)
 		}
 	}
 
@@ -223,6 +228,7 @@ function createCluster(opts) {
 			linked_back: linkedBack(p),
 			link_back_error: linkedBack(p) === true ? '' : p.back?.error || '',
 			link_pending: linkedBack(p) !== true && p.back?.pending === true, // WO-739: waiting for that server's accept
+			reached_by: p.live.online === true ? p.live.via || 'poll' : null, // WO-1029: 'hello' = only it reaches this server
 		}
 	}
 
@@ -254,14 +260,21 @@ function createCluster(opts) {
 	}
 
 	async function pollOne(p) {
-		const r = await fetchJson(p.saved.host, p.saved.port, '/api/replication/ping')
-		if (r.ok && r.json?.appId === 'highascg') p.live = liveFrom(r.json)
+		const { host, port } = p.saved
+		const r = await fetchJson(host, port, '/api/replication/ping')
+		if (p.saved.host !== host || p.saved.port !== port) return // WO-1029: a hello re-addressed it meanwhile
+		const fp = r.ok && typeof r.json?.fingerprint === 'string' ? r.json.fingerprint : '' // '' = older server: not checked
+		if (r.ok && r.json?.appId === 'highascg' && fp && p.saved.device_key && fp !== fingerprint(p.saved.device_key))
+			p.live = { ...p.live, online: false, via: null, error: `another server answers at ${host}` } // WO-1029: not its data
+		else if (r.ok && r.json?.appId === 'highascg') p.live = liveFrom(r.json)
+		else if (hello?.fresh(p)) p.live = { ...p.live, online: true, via: 'hello', error: '' } // WO-1029: one-way reachable
 		else p.live = { ...p.live, online: false, error: r.error || (r.status ? `HTTP ${r.status}` : 'no answer') }
 	}
 
 	/** WO-732: ask that server to link this one back → { ok, status, error, unlinked, pending } (recorded in p.back). */
 	async function linkBack(p) {
-		const local = await localAddress(p.saved.host, p.saved.port)
+		const route = await localAddress(p.saved.host, p.saved.port)
+		const local = route && advertised(route, opts.selfHost?.()) // WO-1029: a node bound to one address links back to it
 		const port = Number(opts.selfPort?.()) || 4200
 		let r
 		if (!local || local.includes(':')) r = { ok: false, status: 0, error: local ? `no IPv4 route to ${p.saved.host}` : `${p.saved.host}:${p.saved.port} unreachable` }
@@ -278,7 +291,7 @@ function createCluster(opts) {
 
 	/** WO-732: a peer that does not list this server (or an older one never asked) is asked again, at most every HEAL_MS. */
 	async function heal(p) {
-		if (!selfFp || p.live.online !== true || linkedBack(p) === true) return
+		if (!selfFp || p.live.online !== true || p.live.via === 'hello' || linkedBack(p) === true) return
 		if (!Array.isArray(p.live.linked) && p.back) return // an older server: asked once (its add has no repair)
 		if (p.back && now() - p.back.at < HEAL_MS) return
 		const wasPending = p.back?.pending === true
@@ -292,10 +305,17 @@ function createCluster(opts) {
 		else log('warn', `${p.saved.name}: link back refused (${r.error})`)
 	}
 
+	// WO-1029 P1a: signed hellos (only with a device key to sign with: routes-cluster.js, the LAN smokes)
+	const hello = opts.sign && opts.verify && selfFp
+		? createHello({ peers, selfKey: opts.selfKey, sign: opts.sign, verify: opts.verify, request, localAddress, selfPort: opts.selfPort, selfHost: opts.selfHost,
+			selfId: () => idFromPing(self, ''), parseAddress, now, save, changed, log })
+		: null
+
 	const pollHooks = []
 	async function poll() {
 		await refreshSelf()
 		await Promise.all([...peers.values()].map(pollOne))
+		if (hello) await Promise.all([...peers.values()].map((p) => hello.send(p).catch(() => {})))
 		await Promise.all([...peers.values()].map(heal))
 		changed()
 		for (const fn of pollHooks) Promise.resolve().then(fn).catch(() => {})
@@ -333,7 +353,11 @@ function createCluster(opts) {
 		if (fromServer && tombstoned(deviceKey)) return { status: 409, body: { error: 'this server unlinked (or declined) yours: link it from here to link again', unlinked: true } }
 		if (!fromServer && tombstoned(deviceKey)) setTombstones(tombstones().filter((t) => t.fp !== fingerprint(deviceKey)))
 		const id = idFromPing(r.json, `${addr.host}:${addr.port}`)
-		const prev = peers.get(id)
+		// WO-1029: the saved entry with this device key is that server, whatever id it reports now (no duplicates)
+		const prev = (deviceKey && [...peers.values()].find((p) => p.saved.device_key?.trim() === deviceKey)) || peers.get(id)
+		// WO-1029: a link-back proves nothing an operator saw: it never replaces a saved key (nor the host under it)
+		if (fromServer && prev?.saved.device_key && prev.saved.device_key.trim() !== deviceKey)
+			return { status: 409, body: { error: `${prev.saved.name} is linked here with another device identity: link it from ${self?.hostname || 'this server'} to replace it` } }
 		if (fromServer && !prev && invites && !invites.autoAccept()) {
 			const name = String(r.json.hostname || id).slice(0, 64)
 			if (invites.record({ id, fp: deviceKey ? fingerprint(deviceKey) : '', host: addr.host, port: addr.port, name, version: versionOf(r.json), device_key: deviceKey }))
@@ -344,6 +368,10 @@ function createCluster(opts) {
 		invites?.drop(id, deviceKey ? fingerprint(deviceKey) : '')
 		const saved = { id, host: addr.host, port: addr.port, name: String(raw?.name || prev?.saved.name || r.json.hostname || id).slice(0, 64),
 			added_at: prev?.saved.added_at || now(), device_key: deviceKey, linked_at: fromServer ? prev?.saved.linked_at || 0 : now() }
+		if (prev && prev.saved.id !== id) {
+			peers.delete(prev.saved.id)
+			log('info', `${saved.name}: now listed as ${id} (was ${prev.saved.id})`)
+		}
 		peers.set(id, { saved, live: liveFrom(r.json), view: null, send: prev?.send || null, back: fromServer ? { ok: true, error: '', at: now() } : null })
 		save()
 		schedule()
@@ -453,7 +481,8 @@ function createCluster(opts) {
 	}
 
 	return { snapshot, poll, add, accept, decline, setAutoAccept, remove, unlink, deviceView, scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
-		saved, list, byDeviceKey, mediaSend, setMediaSend, afterPoll: (fn) => pollHooks.push(fn) }
+		saved, list, byDeviceKey, mediaSend, setMediaSend, afterPoll: (fn) => pollHooks.push(fn),
+		hello: (body) => (hello ? hello.handle(body) : { status: 404, body: { error: 'not found' } }) } // WO-1029
 }
 
 module.exports = { createCluster, versionOf, parseAddress, mediaParity, subnetHosts, getJson, postJson, requestJson, localAddressTo, linkedFingerprints,

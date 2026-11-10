@@ -13,18 +13,23 @@ function setClusterFanoutSink(fn) {
 	_clusterSink = typeof fn === 'function' ? fn : null
 }
 
-/** WO-670 P4b: true while another online server is the cluster master (its fan-out drives this server's PGM). */
-let _clusterFollower = null
+/**
+ * WO-1029 B1: program channel → the name of the cluster master that forwards it to this server right now ('' = this
+ * server drives it). Set by routes-cluster.js from the master's fan-out report (cluster-fanout-report.js): only fresh,
+ * positive evidence from the current master blocks a channel; no report, a stale one, or a channel it does not list
+ * leaves the channel to this server (owner: "local screen destinations must always be driveable from the local box").
+ */
+let _clusterAirCheck = null
 
-function setClusterFollowerCheck(fn) {
-	_clusterFollower = typeof fn === 'function' ? fn : null
+function setClusterAirCheck(fn) {
+	_clusterAirCheck = typeof fn === 'function' ? fn : null
 }
 
-function isClusterFollower() {
+function clusterDrivenBy(channel) {
 	try {
-		return !!_clusterFollower?.()
+		return String(_clusterAirCheck?.(channel) || '')
 	} catch {
-		return false
+		return ''
 	}
 }
 
@@ -170,19 +175,6 @@ function isAmcpFanoutReceiveBox(ctx) {
 }
 
 /**
- * @param {object} ctx
- * @param {number} channel
- * @returns {boolean}
- */
-function isProgramOutputChannel(ctx, channel) {
-	const ch = parseInt(String(channel), 10)
-	if (!Number.isFinite(ch) || ch < 1) return false
-	const { getChannelMap } = require('../config/routing')
-	const map = getChannelMap(ctx?.config || {})
-	return (map.programChannels || []).some((c) => Number(c) === ch)
-}
-
-/**
  * @param {string} cmd
  * @returns {number|null}
  */
@@ -205,21 +197,66 @@ function parseAmcpCommandChannel(cmd) {
 }
 
 /**
+ * WO-1029 B2: a line that only asks (INFO, `MIXER 1-10 OPACITY` with no value, `CG 1-20 INFO`) changes nothing on air,
+ * so it is never held: Caspar answers it (it was answered with an invented `202 OK`, WO-1028 #6).
+ */
+function isAmcpQueryLine(cmd) {
+	const s = String(cmd || '').trim()
+	if (/^(?:INFO|VERSION|CINF|CLS|TLS|FLS|DIAG)\b/i.test(s)) return true
+	if (/^CG\s+\d+(?:-\d+)?\s+INFO\b/i.test(s)) return true
+	const m = s.match(/^MIXER\s+\d+(?:-\d+)?\s+(\S+)\s*$/i)
+	return !!m && !/^(?:CLEAR|COMMIT)$/i.test(m[1])
+}
+
+/**
+ * Who drives this channel instead of this server → `{ channel, screen, drivenBy }`, or null when this server drives it.
+ * Only program channels are ever held (PRV belongs to this server's operator).
+ * @param {object} ctx
+ * @param {number} channel
+ */
+function airHeldBy(ctx, channel) {
+	const ch = parseInt(String(channel), 10)
+	if (!Number.isFinite(ch) || ch < 1) return null
+	const drivenBy = isAmcpFanoutReceiveBox(ctx) ? 'the hot-backup leader' : clusterDrivenBy(ch)
+	if (!drivenBy) return null // the usual case: decided before the channel map is built (every AMCP line asks)
+	const { getChannelMap } = require('../config/routing')
+	const idx = (getChannelMap(ctx?.config || {}).programChannels || []).findIndex((c) => Number(c) === ch)
+	return idx < 0 ? null : { channel: ch, screen: idx + 1, drivenBy }
+}
+
+/** One AMCP line → `{ channel, screen, drivenBy }` when it must not be sent here, else null. */
+function airHeldForLine(ctx, cmd) {
+	// WO-1026: ADD / REMOVE are this server's own consumers (stream, record, shm, a screen) — never air content, and the
+	// leader never sends them (shouldFanOutCommand). Dropped here, a follower's stream and recording never started.
+	if (/^(?:ADD|REMOVE)\s/i.test(String(cmd || '').trim())) return null
+	if (isAmcpQueryLine(cmd)) return null
+	const ch = parseAmcpCommandChannel(cmd)
+	return ch == null ? null : airHeldBy(ctx, ch)
+}
+
+/**
  * @param {object} ctx
  * @param {string} cmd
  * @returns {boolean}
  */
 function shouldBlockLocalPgmAmcpCommand(ctx, cmd) {
-	// WO-1026: ADD / REMOVE are this server's own consumers (stream, record, shm, a screen) — never air content, and the
-	// leader never sends them (shouldFanOutCommand). Dropped here, a follower's stream and recording never started.
-	if (/^(?:ADD|REMOVE)\s/i.test(String(cmd || '').trim())) return false
-	const ch = parseAmcpCommandChannel(cmd)
-	if (ch == null) return false
-	return shouldFollowerSkipLocalPgmAmcp(ctx, ch, { previewOnly: false })
+	return !!airHeldForLine(ctx, cmd)
+}
+
+/** WO-1029 B4: a batch decided per line → `{ send, refused: [{ line, channel, screen, drivenBy }] }`. */
+function partitionAirHeld(ctx, lines) {
+	const send = []
+	const refused = []
+	for (const line of lines) {
+		const held = airHeldForLine(ctx, line)
+		if (held) refused.push({ line: String(line), ...held })
+		else send.push(line)
+	}
+	return { send, refused }
 }
 
 /**
- * Follower with AMCP fan-out: PGM air is driven only by leader fan-out, not local takes.
+ * True when another server drives this program channel (see airHeldBy).
  * @param {object} ctx
  * @param {number} channel — Caspar channel number
  * @param {{ previewOnly?: boolean }} [opts]
@@ -227,8 +264,7 @@ function shouldBlockLocalPgmAmcpCommand(ctx, cmd) {
  */
 function shouldFollowerSkipLocalPgmAmcp(ctx, channel, opts = {}) {
 	if (opts.previewOnly) return false
-	if (!isAmcpFanoutReceiveBox(ctx) && !isClusterFollower()) return false
-	return isProgramOutputChannel(ctx, channel)
+	return !!airHeldBy(ctx, channel)
 }
 
 /**
@@ -310,13 +346,16 @@ module.exports = {
 	shouldSkipSemanticLiveMirror,
 	shouldFollowerSkipLocalPgmAmcp,
 	shouldBlockLocalPgmAmcpCommand,
+	airHeldBy,
+	airHeldForLine,
+	partitionAirHeld,
 	parseAmcpCommandChannel,
 	shouldFanOutCommand,
 	fanoutSingleCommand,
 	fanoutBatchPayload,
 	fanoutAmcpPayload,
 	setClusterFanoutSink,
-	setClusterFollowerCheck,
+	setClusterAirCheck,
 	DEFAULT_ALLOW,
 	DEFAULT_DENY,
 }

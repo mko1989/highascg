@@ -9,7 +9,8 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveAudioOnlyLookState = require('../state/live-audio-only-look-state')
 const { takeAudioOnlyLook, stopAudioOnlyLook } = require('../engine/audio-only-look')
-const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
+const { airHeldBy } = require('../replication/amcp-fanout')
+const { airHeldReply, isAirHeld } = require('../replication/air-held')
 const { resolvePreviewChannel, isPreviewTakeTarget, getRouteMap } = require('./routes-scene-shared')
 
 function resolveMainIdxForChannel(routeMap, channel) {
@@ -49,14 +50,16 @@ async function handleAudioOnlyLookTake(b, ctx, channel, inc) {
 	}
 	const targetChannel = previewOnly ? bus1 : channel
 
-	if (!previewOnly && shouldFollowerSkipLocalPgmAmcp(ctx, channel, { previewOnly: false })) {
-		if (typeof ctx.log === 'function') {
-			ctx.log('info', `[scene-take] follower amcp-fanout: skip local PGM AMCP ch=${channel} (audio-only look)`)
-		}
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
-	}
+	// WO-1029 B2: another server drives this screen right now → 409, not a 200 with nothing on air
+	const held = previewOnly ? null : airHeldBy(ctx, channel)
+	if (held) return airHeldReply(held)
 
-	await takeAudioOnlyLook({ amcp: ctx.amcp, channel: targetChannel, scene: inc, self: ctx, preview: previewOnly })
+	try {
+		await takeAudioOnlyLook({ amcp: ctx.amcp, channel: targetChannel, scene: inc, self: ctx, preview: previewOnly })
+	} catch (e) {
+		if (isAirHeld(e)) return airHeldReply(e)
+		throw e
+	}
 
 	if (inc?.id) {
 		await liveAudioOnlyLookState.setChannel(targetChannel, { sceneId: String(inc.id), scene: inc })
@@ -77,6 +80,9 @@ async function handleAudioOnlyLookStop(body, ctx) {
 	if (!channel || channel < 1) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'channel required' }) }
 	}
+	// WO-1029 B2: stopAudioOnlyLook swallows send errors, so a held screen is refused before it (its live entry stays)
+	const held = airHeldBy(ctx, channel)
+	if (held) return airHeldReply(held)
 	await stopAudioOnlyLook({ amcp: ctx.amcp, channel })
 	await liveAudioOnlyLookState.clearChannel(channel)
 	liveAudioOnlyLookState.broadcastAudioOnlyLive(ctx)

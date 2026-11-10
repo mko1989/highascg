@@ -3,7 +3,8 @@
 /**
  * WO-670 P4b — a server that joins mid-show gets what is on air (src/cluster/cluster-air-journal.js replayed by
  * cluster-fanout.js on connect and on a newly cabled destination), and a server whose master is another online
- * server skips its own local PGM takes (amcp-fanout.js setClusterFollowerCheck, routes-cluster.js followsMaster).
+ * server skips its own local PGM takes (amcp-fanout.js setClusterAirCheck; WO-1029: only the channels the master's report
+ * forwards, routes-cluster.js reportOf).
  */
 
 const { describe, it } = require('node:test')
@@ -154,22 +155,24 @@ describe('WO-670 P4b local PGM takes on a follower', () => {
 		assert.equal(followsMaster(ctxWith(other, [{ id: 'a', online: true }], true)), false, 'the pair decides')
 	})
 
-	it('the follower check gates PGM only; the take, batch and transport paths use it', () => {
+	it('the drive check gates PGM only; the take, batch and transport paths use it', () => {
 		const ctx = { config: {} }
-		amcpFanout.setClusterFollowerCheck(() => true)
+		// WO-1029 B1: the hook answers per channel with the master that drives it ('' = this server drives it); it is
+		// fed by the master's fan-out report (routes-cluster.js reportOf), no longer by "the master is online"
+		amcpFanout.setClusterAirCheck(() => 'srv-M')
 		const pgm = require('../../src/config/routing').getChannelMap({}).programChannels[0]
 		assert.equal(amcpFanout.shouldFollowerSkipLocalPgmAmcp(ctx, pgm), true)
 		assert.equal(amcpFanout.shouldFollowerSkipLocalPgmAmcp(ctx, pgm, { previewOnly: true }), false)
-		amcpFanout.setClusterFollowerCheck(() => {
+		amcpFanout.setClusterAirCheck(() => {
 			throw new Error('boom')
 		})
 		assert.equal(amcpFanout.shouldFollowerSkipLocalPgmAmcp(ctx, pgm), false)
-		amcpFanout.setClusterFollowerCheck(null)
+		amcpFanout.setClusterAirCheck(null)
 		assert.equal(amcpFanout.shouldFollowerSkipLocalPgmAmcp(ctx, pgm), false)
-		assert.match(read('src/api/routes-scene-take.js'), /shouldFollowerSkipLocalPgmAmcp\(ctx, channel/)
-		assert.match(read('src/caspar/amcp-batch.js'), /shouldFollowerSkipLocalPgmAmcp\(connection, ch/)
-		assert.match(read('src/caspar/amcp-client-transport.js'), /shouldBlockLocalPgmAmcpCommand\(self, trimmed\)/)
-		assert.match(read('src/api/routes-cluster.js'), /setClusterFollowerCheck\(\(\) => followsMaster\(ctx\)\)/)
+		assert.match(read('src/api/routes-scene-take.js'), /airHeldBy\(ctx, channel\)/)
+		assert.match(read('src/caspar/amcp-batch.js'), /withAirGate\(connection, lines/)
+		assert.match(read('src/caspar/amcp-client-transport.js'), /airHeldForLine\(self, trimmed\)/)
+		assert.match(read('src/api/routes-cluster.js'), /setClusterAirCheck\(\(ch\) => report\.heldBy\(ch\)\)/)
 		assert.match(read('src/replication/peer-caspar-connection.js'), /this\._onConnected\?\.\(\)/)
 	})
 
@@ -181,10 +184,10 @@ describe('WO-670 P4b local PGM takes on a follower', () => {
 		const connection = { config: {}, _amcpSendQueue: Promise.resolve(), _amcpBatchDrain: null, response_callback: {},
 			socket: { isConnected: true, send: (l) => sent.push(l) }, log() {} }
 		const client = Object.assign(Object.create(transport), { _context: connection, isOffline: false })
-		amcpFanout.setClusterFollowerCheck(() => true)
+		amcpFanout.setClusterAirCheck((ch) => (ch === pgm ? 'srv-M' : ''))
 		try {
-			const skipped = await client._send(`CLEAR ${pgm}-299`)
-			assert.equal(skipped.skipped, true)
+			// WO-1029 B2: refused with a typed error, not answered with an invented `202 OK`
+			await assert.rejects(client._send(`CLEAR ${pgm}-299`), (e) => e.code === 'AIR_HELD' && e.drivenBy === 'srv-M')
 			assert.deepEqual(sent, [], 'not sent to the local Caspar')
 			assert.equal((connection.response_callback.CLEAR || []).length, 0, 'no stale waiter')
 			const p = client._send(`CLEAR ${prv}-299`)
@@ -193,7 +196,7 @@ describe('WO-670 P4b local PGM takes on a follower', () => {
 			connection.response_callback.CLEAR.shift()(null, '202 CLEAR OK')
 			assert.equal((await p).ok, true)
 		} finally {
-			amcpFanout.setClusterFollowerCheck(null)
+			amcpFanout.setClusterAirCheck(null)
 		}
 	})
 })

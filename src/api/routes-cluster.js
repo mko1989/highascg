@@ -25,6 +25,7 @@
  *   POST   /api/cluster/master/set { master: 'self' | peer id, auto? } → the new view (operator: Make master / failover)
  *   POST   /api/cluster/call                   ← a linked server's signed action (WO-712 R2, cluster-call.js; open while
  *                                                  enforceAuth is on: the signature is the auth, auth.js)
+ *   POST   /api/cluster/hello                  ← a linked server's signed "I am at <address>" (WO-1029, cluster-hello.js)
  *   POST   /api/cluster/send { peer, action, args } → that server's answer (WO-712 R3: this server's operator presses
  *                                                  an action there, signed by this server; needs the normal auth)
  *   GET    /api/cluster/exchange              → { 'tracking.auto': snapshot+source | null, sources: [...] } (R3)
@@ -65,6 +66,9 @@ function clusterOf(ctx) {
 		selfPing: async () => JSON.parse((await handleGet('/api/replication/ping', ctx, null)).body),
 		selfKey: identity.getDevicePublicKeyPem(),
 		selfPort: () => ctx.config?.server?.httpPort, // WO-732: the address a peer links back to
+		sign: identity.signMessage, // WO-1029: signed hellos re-address a moved server (cluster-hello.js)
+		verify: identity.verifyMessage,
+		selfHost: () => ctx.config?.server?.bindAddress, // WO-1029: a node bound to one address says that one
 		invites: createInvites({ persistence: ctx.persistence || defaultPersistence }), // WO-739
 		log: ctx.log,
 		onChange: () => broadcast(ctx),
@@ -74,6 +78,7 @@ function clusterOf(ctx) {
 		await masterOf(ctx).tick()
 		await showOf(ctx).tick() // WO-746: the master catches every server up; a follower's waiting edit goes again
 		await fanoutOf(ctx).refresh()
+		reportOf(ctx).publish() // WO-1029 B1: each linked server hears what this master forwards to it (nothing if not master)
 		require('../cluster/air-state').airChanged(ctx) // WO-712 R3b: the `air` heartbeat
 		duties.refresh() // WO-723: who does what follows the peers' pings
 		await sendersSyncOf(ctx).tick()
@@ -94,6 +99,7 @@ function clusterOf(ctx) {
 function removed(ctx, saved) {
 	ctx._clusterMaster?.dropped(saved)
 	if (saved?.id) ctx._clusterExchange?.drop(saved.id) // WO-979: its people / air go now, not after the 15 s expiry
+	if (saved?.id) ctx._clusterReport?.drop(saved.id) // WO-1029: its fan-out report no longer holds a screen here
 	ctx._clusterFanout?.refresh().catch(() => {})
 	broadcast(ctx)
 }
@@ -184,11 +190,33 @@ function fanoutOf(ctx) {
 		log: ctx.log,
 		onChange: () => broadcast(ctx),
 	})
-	require('../replication/amcp-fanout').setClusterFollowerCheck(() => followsMaster(ctx))
+	reportOf(ctx) // WO-1029 B1: the drive gate reads the master's report, not "the master is online"
 	return ctx._clusterFanout
 }
 
-/** P4b: another server is master and online, so its fan-out drives this server's PGM: local PGM takes are skipped. */
+/**
+ * WO-1029 B1: what the master forwards to each linked server (cluster-fanout-report.js). On a follower it is the drive
+ * gate's only evidence: a program channel is blocked only while the current master's fresh report lists it.
+ */
+function reportOf(ctx) {
+	if (ctx._clusterReport) return ctx._clusterReport
+	const { createFanoutReport } = require('../cluster/cluster-fanout-report')
+	const report = createFanoutReport({
+		master: () => masterOf(ctx).view(),
+		fanout: () => (ctx._clusterFanout ? ctx._clusterFanout.status() : null),
+		peers: () => clusterOf(ctx).snapshot().peers,
+		call: (id, action, args, o) => callOf(ctx).call(id, action, args, o),
+		log: ctx.log,
+	})
+	ctx._clusterReport = report
+	require('../replication/amcp-fanout').setClusterAirCheck((ch) => report.heldBy(ch))
+	return report
+}
+
+/**
+ * P4b: another server is master and online here. WO-1029 B1: this alone no longer blocks a screen (the master may forward
+ * nothing here); the drive gate is the master's report (reportOf). It still decides who relays a take (R1) and the show.
+ */
 function followsMaster(ctx) {
 	const v = masterOf(ctx).view()
 	if (v.is_master || !v.master_id || !(v.epoch > 0)) return false
@@ -210,7 +238,7 @@ function callOf(ctx) {
 		post: postJson,
 		masterId: () => (masterOf(ctx).view().is_master ? '' : masterOf(ctx).view().master_id),
 		acceptsRemote: () => require('../cluster/server-duties').has('accept_remote'),
-		info: { ...exchangeOf(ctx).info, ...showOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
+		info: { ...exchangeOf(ctx).info, ...showOf(ctx).info, ...reportOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
 		actions: { ...createCallActions(ctx, { callMaster: (a, args) => callOf(ctx).callMaster(a, args), isFollower: () => isClusterFollower(ctx) }), ...showOf(ctx).actions },
 		log: ctx.log,
 	})
@@ -248,7 +276,8 @@ function exchangeOf(ctx) {
 /** GET /api/cluster body = WS `cluster:peers` (+ `fanout`: P4a forwarding status per server). */
 const full = (ctx) => ({ ...clusterOf(ctx).snapshot(), master: masterOf(ctx).view(),
 	fanout: ctx._clusterFanout ? ctx._clusterFanout.status() : { active: false, peers: {} }, show: showOf(ctx).view(),
-	follows_master: ctx._clusterMaster ? followsMaster(ctx) : false })
+	follows_master: ctx._clusterMaster ? followsMaster(ctx) : false,
+	forwarded_here: ctx._clusterReport ? ctx._clusterReport.view() : null }) // WO-1029: the screens the master drives here
 
 function broadcast(ctx) {
 	if (typeof ctx._wsBroadcast === 'function') ctx._wsBroadcast('cluster:peers', full(ctx))
@@ -329,6 +358,10 @@ function register(routes) {
 	}, opt)
 	routes.post('/api/cluster/call', async ({ ctx, body }) => {
 		const r = await callOf(ctx).handle(parseBody(body))
+		return reply(r.status, r.body)
+	}, opt)
+	routes.post('/api/cluster/hello', ({ ctx, body }) => {
+		const r = clusterOf(ctx).hello(parseBody(body)) // WO-1029: signed; open while enforceAuth is on (auth.js)
 		return reply(r.status, r.body)
 	}, opt)
 	routes.post('/api/cluster/send', async ({ ctx, body }) => {

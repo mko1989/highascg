@@ -61,7 +61,7 @@ function writeFixtureMedia(mediaDir) {
 }
 
 /**
- * @param {{ root: string, port?: number, env?: Record<string, string>, log?: (s: string) => void, media?: boolean, config?: object, caspar?: { host: string, port: number }, tracking?: boolean }} opts
+ * @param {{ root: string, port?: number, host?: string, env?: Record<string, string>, log?: (s: string) => void, media?: boolean, config?: object, caspar?: { host: string, port: number }, tracking?: boolean }} opts
  *   media: false skips the ffmpeg fixture clips (WO-725 cluster runs, CI has no ffmpeg); config: extra top-level
  *   overrides for a fresh root (e.g. `replication.selfId`, the server's id once linked); caspar: a THROWAWAY Caspar
  *   instance to drive instead of the simulated one (WO-744 tools/e2e/shm-source-take.js) — never the box's own.
@@ -70,6 +70,8 @@ function writeFixtureMedia(mediaDir) {
  */
 async function startSandbox(opts) {
 	const root = path.resolve(opts.root)
+	const host = opts.host || '127.0.0.1' // WO-1029: a node's own loopback alias (127.x.y.z) tells peers apart by address
+	if (!/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) throw new Error(`sandbox host must be a loopback address (got ${host})`) // WO-719: never on the LAN
 	const port = opts.port || (await freePort())
 	const log = opts.log || (() => {})
 	const oscPort = await freePort()
@@ -84,6 +86,7 @@ async function startSandbox(opts) {
 	// Fresh-box config: one file of overrides; ConfigManager fills everything else from the factory defaults.
 	// Every path / port that defaults to the live box is pointed into the root (see the WO-719 isolation table).
 	const configFile = path.join(root, 'highascg.config.json')
+	// an existing root keeps its first config: a re-addressed node (WO-1029 move) gets the new bind from --bind
 	if (!fs.existsSync(configFile)) {
 		fs.writeFileSync(configFile, JSON.stringify({
 			offline_mode: true,
@@ -96,7 +99,7 @@ async function startSandbox(opts) {
 			casparServer: { configPath: path.join(root, 'casparcg.config') },
 			replication: { enabled: false },
 			security: { enforceAuth: false, exposeToNetwork: false },
-			server: { httpPort: port, bindAddress: '127.0.0.1' },
+			server: { httpPort: port, bindAddress: host },
 			...(opts.caspar ? { offline_mode: false, caspar: { host: opts.caspar.host, port: opts.caspar.port } } : {}),
 			...opts.config,
 		}, null, 2))
@@ -135,12 +138,12 @@ async function startSandbox(opts) {
 	const out = fs.openSync(path.join(root, 'server.log'), 'a')
 	// exit-with-parent: a killed runner must not leave its sandbox (and its Art-Net output) running (WO-923)
 	const child = spawn(process.execPath, ['--require', path.join(__dirname, 'exit-with-parent.js'), path.join(REPO_ROOT, 'index.js'),
-		...(opts.caspar ? [] : ['--no-caspar']), '--port', String(port), '--bind', '127.0.0.1'], {
+		...(opts.caspar ? [] : ['--no-caspar']), '--port', String(port), '--bind', host], {
 		cwd: root,
 		env,
 		stdio: ['ignore', out, out],
 	})
-	const url = `http://127.0.0.1:${port}`
+	const url = `http://${host}:${port}`
 	const until = Date.now() + 45000
 	let up = false
 	while (Date.now() < until && child.exitCode === null) {
@@ -174,7 +177,7 @@ async function startSandbox(opts) {
 		throw new Error(`sandbox server did not come up on ${url} (exit ${child.exitCode}) — see ${path.join(root, 'server.log')}${tail ? `\n${tail}` : ''}`)
 	}
 	log(`sandbox server ${url} (pid ${child.pid}, root ${root})`)
-	return { url, port, root, dirs, pid: child.pid, stop }
+	return { url, host, port, root, dirs, pid: child.pid, stop }
 }
 
 module.exports = { startSandbox, freePort, getJson, writeFixtureMedia }
