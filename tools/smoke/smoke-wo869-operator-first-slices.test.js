@@ -44,3 +44,30 @@ test('operator-first: the slice window sits on DP-0 (x=1920+gap) and the Dioda P
 	const devices = [...xml.matchAll(/<screen>\s*<device>(\d+)<\/device>\s*<x>(\d+)<\/x>/g)].map((m) => [Number(m[1]), Number(m[2])])
 	assert.deepEqual(devices, [[41, 1920 + GAP]], 'one screen consumer: the slice window on DP-0')
 })
+
+test('WO-1029: without slice windows the mapping-fed PGM window starts at the mapping canvas, not on the operator monitor', () => {
+	// highascg5867, 10.11: operator GUI first, PGM/PRV 3 → mapping node → two GPU heads, no slice plan → the node-canvas
+	// window was generated at 0,0, always on top, over the operator monitor ("no gui, no mouse").
+	const { setCasparCaps, resetCasparCaps } = require('../../src/config/caspar-caps')
+	setCasparCaps({ screenSlices: false, source: 'test' })
+	try {
+		const flat = buildCasparGeneratorFlatConfig(boxConfig())
+		const lay = calculateLayoutPositions(flat)
+		assert.equal(flat.screen_1_slice_windows, undefined, 'no slice windows on a Caspar without slices')
+		if (flat.screen_1_screen_consumer !== false) {
+			assert.equal(flat.screen_1_x, lay.mappingGpuBBox.minX, 'the legacy window sits at the mapping bbox')
+			assert.equal(flat.screen_1_x, 1920 + GAP)
+			assert.equal(flat.screen_1_y, lay.mappingGpuBBox.minY)
+			const xml = buildConfigXml(flat)
+			const xs = [...xml.matchAll(/<screen>[\s\S]*?<x>(\d+)<\/x>/g)].map((m) => Number(m[1]))
+			assert.ok(xs.length >= 1 && xs.every((x) => x >= 1920), `no Caspar window on the operator monitor: ${xs}`)
+		} else {
+			assert.fail('fixture: the mapping-fed screen has no legacy window — the case is not covered')
+		}
+		// legacy order (mapping canvas first): unchanged, x = 0
+		const old = buildCasparGeneratorFlatConfig(boxConfig({ operatorFirst: false }))
+		assert.equal(old.screen_1_x ?? 0, 0)
+	} finally {
+		resetCasparCaps()
+	}
+})

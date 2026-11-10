@@ -82,6 +82,23 @@ function applyLayoutPositionsToMerged(merged) {
 			const wantsScreen =
 				merged[`screen_${n}_screen_consumer`] !== false && merged[`screen_${n}_screen_consumer`] !== 'false'
 			const manualOsX = Number.isFinite(merged[`screen_${n}_os_x`]) ? merged[`screen_${n}_os_x`] : null
+			/* WO-1029: the window of a screen that feeds a mapping node spans the node canvas and belongs at the bbox
+			 * origin whether or not it has DeckLink tiles. With the operator GUI first (WO-868) the bbox starts right of
+			 * the operator head: left at the default 0,0 the always-on-top window covered the operator monitor (5867,
+			 * 10.11: "the dock is on this screen, but mouse isnt and no gui"). Slice windows carry their own offset. */
+			if (
+				wantsScreen &&
+				mappingFeedScreens.has(n) &&
+				!(Array.isArray(tiles) && tiles.length > 0) &&
+				!Array.isArray(merged[`screen_${n}_slice_windows`]) &&
+				hasMappingGpu &&
+				bbox &&
+				manualOsX == null &&
+				!head
+			) {
+				merged[`screen_${n}_x`] = Math.max(0, bbox.minX)
+				merged[`screen_${n}_y`] = Math.max(0, bbox.minY)
+			}
 			if (
 				wantsScreen &&
 				Array.isArray(tiles) &&
