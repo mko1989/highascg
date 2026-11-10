@@ -29,10 +29,15 @@ function memStore() {
 	return { get: (k) => m.get(k), set: (k, v) => m.set(k, v), m }
 }
 
-/** names → servers that all linked each other (unless `links` says otherwise); net.up = which are reachable. */
+/**
+ * names → servers that all linked each other (unless `links` says otherwise); net.up = which are reachable;
+ * WO-1029: net.cut = one-way breaks 'A>B' (A cannot reach B, B may still reach A).
+ */
 function cluster(names, links = {}) {
 	const clock = { t: 1_000_000 }
 	const up = new Set(names)
+	const cut = new Set()
+	const reach = (from, to) => up.has(from) && up.has(to) && !cut.has(`${from}>${to}`)
 	const nodes = {}
 	const keys = {}
 	for (const n of names) {
@@ -47,7 +52,7 @@ function cluster(names, links = {}) {
 			list: () => peers,
 			saved: (id) => peers.find((p) => p.id === id) || null,
 			byDeviceKey: (pem) => peers.find((p) => p.device_key === String(pem).trim()) || null,
-			snapshot: () => ({ peers: peers.map((p) => ({ id: p.id, online: up.has(p.id), last_seen: seen[n][p.id] || 0 })) }),
+			snapshot: () => ({ peers: peers.map((p) => ({ id: p.id, online: reach(n, p.id), last_seen: seen[n][p.id] || 0 })) }),
 		}
 		const logs = []
 		nodes[n] = createMaster({
@@ -58,9 +63,9 @@ function cluster(names, links = {}) {
 			verify,
 			now: () => clock.t,
 			log: (lvl, msg) => logs.push(`${lvl} ${msg}`),
-			fetchJson: async (host) => (up.has(host) && up.has(n) ? { ok: true, status: 200, json: { claim: nodes[host].claim() } } : { ok: false, status: 0, error: 'ECONNREFUSED' }),
+			fetchJson: async (host) => (reach(n, host) ? { ok: true, status: 200, json: { claim: nodes[host].claim() } } : { ok: false, status: 0, error: 'ECONNREFUSED' }),
 			post: async (host, port, p, body) => {
-				if (!up.has(host) || !up.has(n)) return { ok: false, status: 0, error: 'ECONNREFUSED' }
+				if (!reach(n, host)) return { ok: false, status: 0, error: 'ECONNREFUSED' }
 				const r = nodes[host].accept(body)
 				return { ok: r.status === 200, status: r.status, json: r.body }
 			},
@@ -69,9 +74,9 @@ function cluster(names, links = {}) {
 	}
 	/** a poll: every server that is up sees the up ones now. */
 	const poll = () => {
-		for (const n of names) if (up.has(n)) for (const x of names) if (x !== n && up.has(x)) seen[n][x] = clock.t
+		for (const n of names) for (const x of names) if (x !== n && reach(n, x)) seen[n][x] = clock.t
 	}
-	return { nodes, keys, up, clock, poll, fp: (n) => fingerprint(keys[n].pub) }
+	return { nodes, keys, up, cut, clock, poll, fp: (n) => fingerprint(keys[n].pub) }
 }
 
 describe('WO-670 P3a cluster master', () => {
