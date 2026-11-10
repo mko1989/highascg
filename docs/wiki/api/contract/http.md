@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-556 routes.
+560 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -50,6 +50,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/auth/status` | registry | `src/api/router.js` |
 | * | `/api/autofollow/devices` | handler | `src/autofollow/register.js` |
 | POST | `/api/caspar-config/apply` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
+| GET | `/api/caspar-config/dirty` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
 | GET | `/api/caspar-config/generate` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
 | GET | `/api/caspar-config/mode-choices` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
 | GET | `/api/caspar-config/override` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
@@ -64,6 +65,9 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/client-prefs` | registry | `src/api/routes-client-prefs.js` |
 | POST | `/api/client-prefs` | registry | `src/api/routes-client-prefs.js` |
 | GET | `/api/cluster` | registry | `src/api/routes-cluster.js` |
+| POST | `/api/cluster/apply` | registry | `src/api/routes-cluster.js` |
+| GET | `/api/cluster/apply-plan` | registry | `src/api/routes-cluster.js` |
+| GET | `/api/cluster/apply/status` | registry | `src/api/routes-cluster.js` |
 | POST | `/api/cluster/auto-accept` | registry | `src/api/routes-cluster.js` |
 | * | `/api/cluster/call` | handler | `src/server/auth.js` |
 | POST | `/api/cluster/call` | registry | `src/api/routes-cluster.js` |

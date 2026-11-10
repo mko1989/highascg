@@ -223,3 +223,18 @@ a look names "input X of server S", never a channel number — WO-1027).
   me"):** 5867's Pixel Mapping 1 input was held by the cable of a destination deleted on the other box. Removed by
   hand; fix: such cables are no longer served as cables and are dropped when that input is cabled again
   (`device-graph-edges.js`, smoke-wo1029-orphan-cables).
+
+## Apply (restart Caspar) across linked servers, with the air state kept (owner, 10.11)
+
+Owner: *"add a logic hidden underneth the apply caspar config (restart) button, first it should work on both boxes
+(if needed of course for another box, also with the harnes to not restart local machine when only dirty config for
+other box) second hitting that button should grab a full state of the box outputs etc with video frames if running etc
+and restore it back to screens asap after restart is sucessful"*
+
+Spec (in progress): each server decides its own "dirty" (`GET /api/caspar-config/dirty`); the node plans
+(`GET /api/cluster/apply-plan`) and applies only the dirty servers (`POST /api/cluster/apply`), linked servers first,
+the master last, a clean server never restarted. Before a restart the server takes an air snapshot (Caspar's INFO per
+channel + the node's own state: looks, clip positions, paused / loop, routes, CG, test card, timeline, runtime
+consumers) and restores it once Caspar is back, clips resumed at position + elapsed, mapped by destination (not by
+channel number). WO-1013's restore is folded in. Tests: unit smokes + the virtual box bed with a restartable fake
+Caspar.

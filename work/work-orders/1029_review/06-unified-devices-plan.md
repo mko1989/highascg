@@ -64,3 +64,34 @@ Condensed from the planner's read-only review (code + GETs on both boxes). Owner
 - D9 another server's input on this box: placeholder only, an NDI return, or a declared SDI loop?
 - D10 Sources → Live always lists every linked server's inputs?
 - D11 look migration automatic by label + route match (ambiguous listed), or confirmed per look?
+
+## Owner's answers (10.11)
+
+- **D1 — yes, with a condition:** *"yes, but if the other box doesnt have it connected it shouldnt be created as a
+  channel on that box. when it does have connected as a physical output it needs to create the channels on the other
+  box and have the media local."* So a destination exists in the shared list everywhere, but a box creates Caspar
+  channels for it ONLY when it is cabled to a physical output there — no copy channels on boxes that do not output
+  it. Consequences (new work, not in the steps above):
+  - the channel plan of a box depends on its own cables (`routing-map.js`, channel plan, generator);
+  - the master can no longer play a remote destination on a copy channel and mirror AMCP: driving another box's
+    screen becomes a node-to-node call by destination id (the `dest.*` calls of report 02), which is also what
+    "node ↔ node, never AMCP between Caspars" asks for;
+  - the picture of a remote destination on the master (preview, multiview, thumbnails) has no local channel any more:
+    it needs the other box's picture feed relayed, or a placeholder;
+  - media used by looks on a destination must be present on every box that outputs it (media parity / Send media per
+    destination).
+- **D2 — per box, but inside ONE node:** *"but what about a two box setup where i want to be able to run the whole
+  setup from master but have an option to connect the gui for the second operator. i thinnk we need to add
+  distinction of boxes in the operator gui node, make sure you compact the node a bit so the 1 and 2 start at the top.
+  also copact regular screen dests"* — the Operator GUI card shows each linked box (its monitors 1 / 2 cabled on that
+  box), so the master's operator can set up the second operator's screen from the one view. Data stays per box
+  (option b). Cards compacted (in progress).
+- **D9 — NDI, shown as such; SDI loop declared in Devices:** *"i think it should ndi with a clear indication that sent
+  as ndi. sdi loop should be possible to do in the devices tab so it be known."* So when a look on box A uses an input
+  of box B: B sends that input as NDI (new: an NDI consumer on the input channel, on demand), A receives it, and the
+  look layer / Sources row / Devices card all carry a clear "via NDI from ‹B›" mark (latency and bandwidth are real).
+  An SDI loop (DeckLink out of B → DeckLink in of A) is drawn in the Devices tab as a cable between the two servers'
+  jacks — the one cable kind that crosses servers — so the system knows "input N of A is input M of B" and prefers it
+  over NDI.
+- **D11 — yes** (*"i guess"*): looks are migrated automatically by label + route match; ambiguous ones are listed.
+- D3–D8, D10: not answered; recommendations stand until then.

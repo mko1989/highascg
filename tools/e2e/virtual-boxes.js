@@ -47,8 +47,9 @@ function graphFor(dests, cabled) {
 	const connectors = dests.map((d) => ({ id: `dst_in_${d.id}`, deviceId: 'destinations', kind: 'destination_in', label: d.label, externalRef: d.id }))
 	const edges = []
 	dests.forEach((d, i) => {
-		if (!cabled.includes(d.key)) return
+		// every output exists on the box; only `cabled` destinations have a cable on theirs (WO-1029 apply: add one later)
 		connectors.push({ id: `vb_out_${i + 1}`, deviceId: 'caspar_host', kind: 'gpu_out', label: `Out ${i + 1}`, caspar: { bus: 'pgm', mainIndex: i + 1 } })
+		if (!cabled.includes(d.key)) return
 		edges.push({ id: `e_${d.id}_out_${i + 1}`, sourceId: `dst_in_${d.id}`, sinkId: `vb_out_${i + 1}` })
 	})
 	return {
@@ -71,7 +72,8 @@ function threeBoxes(opts = {}) {
 
 /** Layout (a): one box with the LED wall and the stream destination. */
 function oneBox(opts = {}) {
-	return { ...opts, destinations: ['led', 'stream'], boxes: { 'vb-a': { host: '127.0.1.41', caspar: '127.0.2.41', cabled: ['led', 'stream'] } } }
+	// `spare`: a third destination (Backup PGM) exists on the show but is not cabled yet — the cable the apply tests add
+	return { ...opts, destinations: opts.spare ? ['led', 'stream', 'backup'] : ['led', 'stream'], boxes: { 'vb-a': { host: `127.0.1.${opts.base ?? 41}`, caspar: `127.0.2.${opts.base ?? 41}`, cabled: ['led', 'stream'] } } }
 }
 
 /**
@@ -83,7 +85,7 @@ function twoBoxes(opts = {}) {
 	const both = opts.backup ? ['backup'] : []
 	return {
 		...opts,
-		destinations: ['led', 'stream', ...both],
+		destinations: ['led', 'stream', ...(opts.backup || opts.spare ? ['backup'] : [])],
 		boxes: {
 			'vb-a': { host: `127.0.1.${b + 1}`, caspar: `127.0.2.${b + 1}`, cabled: ['led', ...both] },
 			'vb-b': { host: `127.0.1.${b + 2}`, caspar: `127.0.2.${b + 2}`, cabled: ['stream', ...both] },
@@ -109,7 +111,7 @@ async function startVirtualBoxes(root, spec) {
 	const identify = (pid) => pidOwner.get(pid) || ''
 	const casparOf = {}
 	try {
-		for (const id of ids) casparOf[id] = await startFakeCaspar({ host: spec.boxes[id].caspar, channels: 8, pids, identify, log: spec.log })
+		for (const id of ids) casparOf[id] = await startFakeCaspar({ host: spec.boxes[id].caspar, channels: 8, pids, identify, log: spec.log, configFile: path.join(root, id, 'casparcg.config'), ...spec.fake })
 		nodes = await startSandboxNodes(root, ids, {
 			hosts: Object.fromEntries(ids.map((id) => [id, spec.boxes[id].host])),
 			token: spec.password || '',
@@ -117,7 +119,7 @@ async function startVirtualBoxes(root, spec) {
 			extra: (id) => ({
 				caspar: { host: casparOf[id].host, port: casparOf[id].port },
 				// the graph is the virtual box's, not this machine's GPU (the boot hardware sync would swap in its DP ports)
-				env: { HIGHASCG_SANDBOX_FANOUT: '1', HIGHASCG_BOOT_DEVICE_GRAPH_SYNC: '0' },
+				env: { HIGHASCG_SANDBOX_FANOUT: '1', HIGHASCG_BOOT_DEVICE_GRAPH_SYNC: '0', HIGHASCG_SANDBOX_CASPAR_RESTART_URL: casparOf[id].control.url }, // WO-1029: the apply's "restart Caspar" calls this box's fake
 				config: {
 					screenDestinations: { version: 1, destinations: destList },
 					deviceGraph: graphFor(dests, spec.boxes[id].cabled),
@@ -281,6 +283,7 @@ async function startVirtualBoxes(root, spec) {
 			await Promise.all(Object.values(casparOf).map((c) => c.close()))
 		},
 	}
+	Object.assign(bed, require('./virtual-boxes-apply').applyHelpers(bed)) // WO-1029: cable / dirty / plan / apply / screens
 	return bed
 }
 

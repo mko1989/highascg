@@ -22,6 +22,11 @@ function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCas
 		 * one is a reconnect — after Devices ▸ Apply & restart node still knows what was on the screens. */
 		appCtx._casparInfoReadyCount = (appCtx._casparInfoReadyCount || 0) + 1
 		const reconnect = appCtx._casparInfoReadyCount > 1
+		const answeredAt = Date.now()
+		/* WO-1029: what the config Caspar just started with means per channel (the air snapshot maps by role) and
+		 * which casparcg.config it read (GET /api/caspar-config/dirty: written but not restarted). */
+		require('../engine/air-snapshot').rememberConnectRoles(appCtx, getChannelMap)
+		require('../config/caspar-config-dirty').rememberConfigAtConnect(appCtx)
 		handleCasparConnected()
 		/* First connect: is the primed card really on air? (after the boot splash, which fetch-server-info-config ran) */
 		const cardChecked = reconnect
@@ -56,30 +61,17 @@ function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCas
 			})
 			.then(async () => {
 				const Setup = require('../config/routing-setup')
-				/* WO-1013: put back what was on the screens — program looks (after routing, so route:// sources and
-				 * audio buses exist), then the preview re-stage, then the test card LAST so layer 999 sits on top of
-				 * everything restored. Capped wait: a hung routing setup must not hold the restore forever. */
-				const restore = require('../engine/restore-on-screens')
+				/* WO-1013 / WO-1029: put back what was on the screens — one owner per connect (restore-on-screens.js
+				 * `restoreOnConnect`): program looks (after routing, so route:// sources and audio buses exist), the
+				 * preview re-stage, with an Apply's air snapshot every other layer at its position, the timeline, then
+				 * the test card LAST so layer 999 sits on top. Capped wait inside: a hung routing setup must not hold
+				 * the restore forever. */
 				await cardChecked
-				await Promise.race([
-					routingDone,
-					new Promise((r) => {
-						const t = setTimeout(r, 20000)
-						if (t.unref) t.unref()
-					}),
-				])
-				await restore.restoreProgramLooks(appCtx, { reconnect }).catch((e) => {
-					appCtx.log('warn', '[restore-on-screens] program looks: ' + (e?.message || e))
-				})
-				await Setup.restagePersistedPreviewLooks(appCtx).catch((e) => {
-					appCtx.log('warn', 'Preview re-stage: ' + (e?.message || e))
-				})
-				/* The first connect's card is the boot splash startup-led-test-pattern.js has just painted. */
-				if (reconnect) {
-					await restore.restoreLedTestCard(appCtx).catch((e) => {
-						appCtx.log('warn', '[restore-on-screens] test card: ' + (e?.message || e))
+				await require('../engine/restore-on-screens')
+					.restoreOnConnect(appCtx, { reconnect, answeredAt, routingDone, setup: Setup })
+					.catch((e) => {
+						appCtx.log('warn', '[restore-on-screens] ' + (e?.message || e))
 					})
-				}
 				await Setup.warmLookDeckThumbnails(appCtx).catch((e) => {
 					appCtx.log('warn', 'Look thumb warm: ' + (e?.message || e))
 				})

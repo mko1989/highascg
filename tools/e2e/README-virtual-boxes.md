@@ -10,6 +10,7 @@ ephemeral ports), every Caspar is fake.
 |---|---|---|
 | Box | `virtual-boxes.js` | a real node (`sandbox-server.js`) on `127.0.1.x` + its own fake Caspar on `127.0.2.x` + its own device graph (which destinations are cabled on its outputs) + the shared show (destinations, two looks per destination) |
 | Caspar | `fake-caspar.js` | AMCP server: `VERSION`, `INFO`, `INFO <ch>` (stage XML the catch-up check parses), `INFO CONFIG`, `CLS`/`CINF` (`LOOK_A`, `LOOK_B`, `LOOK_C`, `E2E_*`), `REQ`/`RES`, `BEGIN…COMMIT`. A **screen model** per channel/layer (fg/bg source and kind, playing, CG template, MIXER) and an append-only **write log** `{ seq, t, from, who, channel, layer, line }` of every mutating line. `who` = the box whose node process holds the connection (found via `/proc/net/tcp` → socket inode → `/proc/<pid>/fd`; loopback sources are all 127.0.0.1) |
+| Apply helpers | `virtual-boxes-apply.js` | `bed.baseline()` (one plain apply per box so the Caspar runs the generated config: dirty starts false), `bed.touch(id, { via })` (dirty a box without moving content), `bed.cable`, `bed.dirtyOf` / `planOf` / `apply` (`GET /api/caspar-config/dirty`, `GET /api/cluster/apply-plan`, `POST /api/cluster/apply`), `bed.screens(id)` (every cabled destination's layers with clip positions), `bed.waitRestored`, `bed.restartsOf` / `restartOrder` (restart markers after a `bed.mark()`), `bed.refreshChannels` |
 | Fan-out | `src/api/routes-cluster.js` `fanoutOf` | a sandbox master forwards only when `HIGHASCG_SANDBOX_FANOUT=1` (set by the bed), and a sandbox never opens a socket to `:5250` or a non-loopback address |
 | Operator client | `remote-client.js` | what the Godot client on a laptop does: Bearer password on HTTP + WS, its own source alias `127.0.3.x`; take / test card / FTB / raw AMCP / media play / video feed; handover (`learnTargets`, `decide` → `handoverDecision`, `moveTo`) |
 | Invariants | `virtual-boxes-checks.js` | `assertOnlyWriters`, `assertNoStrays` (every cabled destination: only its own box wrote, unless a scenario allows more), `wrote`, `topClip` |
@@ -50,3 +51,35 @@ await bed.stop()
 - End every window in which no cross-box press was made with `assertNoStrays`: that is what catches the next stray.
 - Thaw frozen nodes in `finally` / `after`; `bed.stop()` closes nodes, forwarders and fake Caspars.
 - Each smoke file stays under 60 s (failover alone is 12 s).
+
+## Restart, playback model, the hook (WO-1029 apply)
+
+**Restart.** `fake.restart({ channels?, downMs?, fromConfig? })` (also AMCP `RESTART`/`KILL`, and the control endpoint below):
+every connection is dropped (`fake.dropped()` counts the ones the fake dropped itself), the listener closes (the node sees a
+real disconnect), the screen model and the AMCP-added consumers are forgotten, and after `downMs` (default 300) it listens
+again on the SAME address. The channel list comes from the new `casparcg.config` the node wrote (bed: `configFile` = the
+node's `<root>/casparcg.config`; INFO CONFIG shows the file as it was at the last start), or from `channels` (a count, or a
+list of video modes: numbering = position). The write log survives and gets a marker `{ seq, restart: true, n, channels,
+line: 'RESTART', channel: null }` (so per-channel filters skip it); `fake.restarts(sinceSeq)`; `fake.rejected(sinceSeq)` =
+mutating lines the fake refused (reply >= 400, e.g. a write to a channel that does not exist yet).
+
+**Playback model** (`fake-caspar-model.js`). A clip has a position that advances with the clock (`opts.now`, or
+`fake.advance(ms)` to skip time) at one second per second, wraps modulo its length when looping, holds the last frame
+otherwise. Length: `opts.lengths[NAME]` / `opts.clipLengthS` (default 600 s). This build: `SEEK n` (as a `PLAY`/`LOADBG`/`LOAD`
+argument and `CALL ch-l SEEK n`) = n x CHANNEL fps (fps from the channel's video mode: 1080p5000 = 50, 720p2500 = 25).
+`LOADBG / LOAD / PLAY / PAUSE / RESUME / STOP / CALL SEEK / CALL LOOP` update it; `fake.clip(ch, layer)`,
+`fake.position(ch, layer)`. `ADD ch[-idx] <consumer> …` / `REMOVE` are listed in INFO and `fake.consumers(ch)`.
+`INFO <ch>` follows the real state tree (src-v2 av_producer.cpp / output.cpp): `channel.{format, framerate,
+stage.layer.layer_N.{background, foreground.{producer, file.{name, path, time=position, time=length, clip, clip}, loop,
+paused, route.{channel, layer}}}, output.port.port_N.consumer}`. `fake.set({ refuseInfo: true })` makes `INFO <ch>` answer 500.
+
+**The hook.** The bed starts every node with `HIGHASCG_SANDBOX_CASPAR_RESTART_URL` = the loopback control endpoint of THAT
+box's fake (`fake.control.url`: `POST /restart`, `GET /state`). In a sandbox, `applyFullServerConfig`
+(`src/utils/full-config-apply.js`, sandbox branch) writes the config and then `reloadCasparViaSandboxHook`
+(`src/utils/caspar-restart.js`) POSTs there, waits for the node's AMCP client to see the disconnect, then for the
+reconnect (the fake says when it listens again), and answers `{ attempted, restartSent, disconnected, reconnected }`.
+Without the variable (or a non-loopback / :5250 URL) a sandbox apply still only writes the config. Never systemctl, never a process.
+
+**Making a box dirty.** A cable change on a virtual box does not alter the generated casparcg.config (its outputs are not
+GPU / DeckLink heads), so the box is not dirty; `bed.touch()` flips the video mode of a destination that is not cabled on
+that box, which does (through the box's own device-view API, or another box's relay with `via`).

@@ -272,7 +272,69 @@ async function reloadCasparAfterConfigWrite(ctx, opts = {}) {
 	}
 }
 
+/** WO-1029: loopback http URL of a virtual box's fake Caspar control endpoint ('' = no hook / not acceptable). */
+function sandboxRestartHookUrl() {
+	if (!require('../bootstrap/sandbox').isSandbox()) return ''
+	const raw = String(process.env.HIGHASCG_SANDBOX_CASPAR_RESTART_URL || '').trim()
+	if (!raw) return ''
+	try {
+		const u = new URL(raw)
+		const loop = /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(u.hostname)
+		return u.protocol === 'http:' && loop && u.port !== '5250' ? u.origin : ''
+	} catch {
+		return ''
+	}
+}
+
+function hookRequest(origin, method, p, ms = 5000) {
+	return new Promise((resolve) => {
+		const req = require('http').request(origin + p, { method, timeout: ms }, (res) => {
+			const c = []
+			res.on('data', (d) => c.push(d))
+			res.on('end', () => {
+				try {
+					resolve({ status: res.statusCode, data: JSON.parse(Buffer.concat(c).toString('utf8')) })
+				} catch {
+					resolve({ status: res.statusCode, data: null })
+				}
+			})
+		})
+		req.on('timeout', () => req.destroy(new Error('timeout')))
+		req.on('error', () => resolve({ status: 0, data: null }))
+		req.end()
+	})
+}
+
+/**
+ * WO-1029: the sandbox branch of the Caspar restart. A virtual box (tools/e2e/virtual-boxes.js) gives its node the
+ * loopback control URL of ITS OWN fake Caspar; "restart" POSTs there, so the node sees a real disconnect and reconnect.
+ * Never systemctl, never a process, never :5250. Same answer shape as {@link reloadCasparAfterConfigWrite}.
+ * @param {object} ctx
+ * @param {{ log?: Function, disconnectMs?: number, reconnectMs?: number }} [opts]
+ */
+async function reloadCasparViaSandboxHook(ctx, opts = {}) {
+	const log = typeof opts.log === 'function' ? opts.log : () => {}
+	const origin = sandboxRestartHookUrl()
+	if (!origin || !ctx?.amcp) return { attempted: false, restartSent: false, disconnected: false, reconnected: false }
+	const r = await hookRequest(origin, 'POST', '/restart')
+	if (r.status !== 200) {
+		log('warn', `[Caspar restart] sandbox hook failed (${r.status})`)
+		return { attempted: true, restartSent: false, disconnected: false, reconnected: false }
+	}
+	log('info', '[Caspar restart] sandbox hook: fake Caspar restarting')
+	const disconnected = await waitForAmcpDisconnect(ctx, opts.disconnectMs ?? resolveApplyDisconnectWaitMs())
+	// "port listening" = the fake says it listens again (no ss, no probe connection); the nudge reconnects the client
+	const reconnected = await waitForAmcpReady(ctx, opts.reconnectMs ?? resolveApplyReconnectWaitMs(), {
+		log,
+		pollMs: 100,
+		isPortListening: async () => (await hookRequest(origin, 'GET', '/state', 1500)).data?.listening === true,
+	})
+	return { attempted: true, restartSent: true, disconnected: !!disconnected, reconnected: !!reconnected }
+}
+
 module.exports = {
+	reloadCasparViaSandboxHook,
+	sandboxRestartHookUrl,
 	isAmcpTcpConnected,
 	isAmcpPortListening,
 	isCasparMainProcessRunning,

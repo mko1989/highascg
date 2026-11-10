@@ -64,6 +64,22 @@ function resolveCasparConfigWritePath(ctx) {
 }
 
 /**
+ * The XML Apply writes: editor one-shot, else the saved override, else the generator over ctx.config.
+ * WO-717: hand-written XML (editor one-shot, saved override) gets the screen-consumer policy too — vsync
+ * off, gpu-texture on. A no-op on generated XML, which already carries it.
+ * @returns {{ xml: string, policyChanged: boolean }}
+ */
+function effectiveConfigXml(ctx, oneShot = '') {
+	const persistedOverride = String(ctx.config?.casparServer?.casparConfigOverride || '').trim()
+	const rawXml = oneShot || persistedOverride || buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
+	const { xml, changed } = enforceScreenConsumerPolicy(rawXml)
+	return { xml, policyChanged: changed }
+}
+
+/** WO-1029: what Apply would write now (caspar-config-dirty.js compares it with the file on disk). */
+const generatedCasparConfigXml = (ctx) => effectiveConfigXml(ctx).xml
+
+/**
  * Write generated casparcg.config XML to disk (no restart).
  *
  * @param {object} ctx
@@ -122,10 +138,7 @@ async function writeCasparConfigToDiskUnserialized(ctx, opts = {}) {
 	apiLog(ctx, 'info', `[Caspar config] Writing casparcg.config → ${filePath}`)
 	const oneShot = typeof opts.xml === 'string' ? opts.xml.trim() : ''
 	const persistedOverride = String(ctx.config?.casparServer?.casparConfigOverride || '').trim()
-	const rawXml = oneShot || persistedOverride || buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
-	// WO-717: hand-written XML (editor one-shot, saved override) gets the screen-consumer policy too — vsync
-	// off, gpu-texture on. A no-op on generated XML, which already carries it.
-	const { xml, changed: policyChanged } = enforceScreenConsumerPolicy(rawXml)
+	const { xml, policyChanged } = effectiveConfigXml(ctx, oneShot)
 	if (policyChanged) {
 		apiLog(ctx, 'info', '[Caspar config] Screen consumers set to vsync off + gpu-texture on (WO-717 policy)')
 	}
@@ -195,6 +208,10 @@ async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 		? (applyCtx) => writeCasparConfigToDisk(applyCtx, { xml: oneShotXml })
 		: writeCasparConfigToDisk
 	let fullApply
+	/* WO-1029: what is on the outputs, persisted before the restart; restore-on-screens.js puts it back on the
+	 * reconnect. A failed snapshot never blocks the Apply. */
+	const AirApply = require('../engine/air-snapshot-apply')
+	const snapRes = await AirApply.takeForApply(ctx, { skip: opts.skipCasparRestart === true })
 	ctx._fullApplyInProgress = true
 	try {
 		fullApply = await applyFullServerConfig(ctx, {
@@ -207,6 +224,7 @@ async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e)
 		apiLog(ctx, 'warn', `[Caspar config] Full apply failed: ${msg}`)
+		await AirApply.settleAfterApply(ctx, snapRes, null)
 		return {
 			status: 502,
 			headers: JSON_HEADERS,
@@ -218,6 +236,9 @@ async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 	} finally {
 		delete ctx._fullApplyInProgress
 	}
+
+	const air = await AirApply.settleAfterApply(ctx, snapRes, fullApply)
+	pendingAfterApply(ctx, fullApply, opts)
 
 	if (fullApply.step === 'caspar_write' && fullApply.caspar) {
 		return {
@@ -263,7 +284,28 @@ async function applyCasparConfigToDiskAndRestart(ctx, opts = {}) {
 			xrandrCommand: fullApply.layout?.postXrandrCommand || fullApply.layout?.preXrandrCommand || null,
 			fullApply,
 			message: fullApply.message,
+			restored: air.restored, // WO-1029: what came back on the outputs (null + restored_reason when nothing)
+			restored_reason: air.restored_reason,
+			snapshot: snapRes,
 		}),
+	}
+}
+
+/**
+ * WO-1029: the server's own "restart needed" (caspar-config-dirty.js): answered by a good Apply (Caspar restarted, or
+ * the config and layout already matched); recorded when the config was written but the restart skipped.
+ */
+function pendingAfterApply(ctx, fullApply, opts) {
+	try {
+		const D = require('../config/caspar-config-dirty')
+		if (!fullApply?.ok) return
+		if (opts.skipCasparRestart === true) {
+			if (fullApply.caspar?.ok) D.markRestartPending(ctx, 'config written, restart skipped')
+			return
+		}
+		if (fullApply.step === 'no_changes' || fullApply.casparRestart?.reconnected || fullApply.step === 'sandbox') D.clearRestartPending(ctx)
+	} catch (e) {
+		apiLog(ctx, 'debug', `[Caspar config] restart-pending bookkeeping: ${e?.message || e}`)
 	}
 }
 
@@ -293,6 +335,11 @@ function handleGet(p, query, ctx) {
 			headers['Content-Disposition'] = 'attachment; filename="casparcg.config"'
 		}
 		return { status: 200, headers, body: xml }
+	}
+
+	if (p === '/api/caspar-config/dirty') {
+		// WO-1029: decided here, the same for every client and for a linked server's apply plan
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(require('../config/caspar-config-dirty').casparConfigDirty(ctx)) }
 	}
 
 	if (p === '/api/caspar-config/override') {
@@ -382,5 +429,6 @@ module.exports = {
 	applyCasparConfigToDiskAndRestart,
 	writeCasparConfigToDisk,
 	resolveCasparConfigWritePath,
+	generatedCasparConfigXml,
 	normalizeCasparServerConfigPath,
 }

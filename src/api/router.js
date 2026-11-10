@@ -95,6 +95,7 @@ routes.post('/api/auth/logout', ({ path, body, ctx, req }) => routesAuth.handleP
 routes.get('/api/caspar-config/generate', ({ path, query, ctx }) => routesCasparConfig.handleGet(path, query, ctx), { requireCaspar: false })
 routes.get('/api/caspar-config/mode-choices', ({ path, query, ctx }) => routesCasparConfig.handleGet(path, query, ctx), { requireCaspar: false })
 routes.get('/api/caspar-config/override', ({ path, query, ctx }) => routesCasparConfig.handleGet(path, query, ctx), { requireCaspar: false })
+routes.get('/api/caspar-config/dirty', ({ path, query, ctx }) => routesCasparConfig.handleGet(path, query, ctx), { requireCaspar: false }) // WO-1029
 routes.post('/api/caspar-config/apply', ({ path, body, ctx }) => routesCasparConfig.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/caspar-config/override', ({ path, body, ctx }) => routesCasparConfig.handlePost(path, body, ctx), { requireCaspar: false })
 

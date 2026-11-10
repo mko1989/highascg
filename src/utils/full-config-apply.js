@@ -8,6 +8,8 @@ const { applyOperatorDisplaySession, displaySessionEnv } = xDisplaySession
 const { applyNvidiaDisplayPolicy } = require('./nvidia-display-policy')
 const {
 	reloadCasparAfterConfigWrite,
+	reloadCasparViaSandboxHook,
+	sandboxRestartHookUrl,
 	killStuckCasparMainProcess,
 	waitForAmcpDisconnect,
 } = require('./caspar-restart')
@@ -174,6 +176,12 @@ async function applyFullServerConfig(ctx, opts = {}) {
 	 * marker in /tmp, and the fast kill, whose `ss` sees the live Caspar on :5250). Write the config and stop. */
 	if (require('../bootstrap/sandbox').isSandbox()) {
 		log('info', '[Full apply] sandbox instance — config written; display, restart and NVIDIA steps skipped (WO-805)')
+		/* WO-1029: a virtual box hands its node a loopback hook to ITS fake Caspar; "restart" calls it (caspar-restart.js) */
+		if (!opts.skipCasparRestart && ctx.amcp && typeof sandboxRestartHookUrl === 'function' && sandboxRestartHookUrl()) {
+			out.casparRestart.attempted = true
+			Object.assign(out.casparRestart, await reloadCasparViaSandboxHook(ctx, { log }))
+			return { ...out, layoutOk: true, step: 'sandbox', message: out.casparRestart.reconnected ? 'Config written; fake Caspar restarted (sandbox hook).' : 'Config written; sandbox Caspar restart pending.' }
+		}
 		return { ...out, layoutOk: true, step: 'sandbox', message: 'Config written (sandbox: no display or Caspar restart).' }
 	}
 

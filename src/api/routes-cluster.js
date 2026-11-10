@@ -30,6 +30,9 @@
  *                                                  an action there, signed by this server; needs the normal auth)
  *   GET    /api/cluster/exchange              → { 'tracking.auto': snapshot+source | null, sources: [...] } (R3)
  *   POST   /api/cluster/show { on }            → the shared-show view (WO-746, device-local; GET /api/cluster `show`)
+ *   GET    /api/cluster/apply-plan · POST /api/cluster/apply { servers?, force?, wait? } · GET /api/cluster/apply/status
+ *                                              → WO-1029: Apply (restart Caspar) on every linked server that needs it
+ *                                                (cluster-apply.js); progress WS `cluster:apply`
  * GET /api/cluster also carries `master` (the view) and `invites` (WO-739: [{ id, fp, host, port, name, version,
  * first_at, asked_at }]). Changes broadcast WS `cluster:peers` (the GET body).
  * WO-1029 2a: and `destinations: [{ id, label, main, owners: [server ids], here, kind: 'own'|'backup'|'remote'|'local',
@@ -439,6 +442,40 @@ function register(routes) {
 	routes.get('/api/cluster/peers/:id/relay/*', relay, opt) // WO-802
 	routes.post('/api/cluster/peers/:id/relay/*', relay, opt)
 	routes.delete('/api/cluster/peers/:id/relay/*', relay, opt)
+	routes.get('/api/cluster/apply-plan', async ({ ctx }) => { // WO-1029 part 1
+		const a = applyOf(ctx)
+		const servers = await a.plan()
+		const self = servers.find((x) => x.self)
+		return reply(200, { generatedAt: Date.now(), self_id: self?.id || '', master_id: servers.find((x) => x.master)?.id || '', running: a.status().running, servers })
+	}, opt)
+	routes.post('/api/cluster/apply', async ({ ctx, body }) => {
+		const r = await applyOf(ctx).apply(parseBody(body) || {})
+		return reply(r.status, r.body)
+	}, opt)
+	routes.get('/api/cluster/apply/status', ({ ctx }) => reply(200, applyOf(ctx).status()), opt)
+}
+
+/** WO-1029: one Apply for every linked server that needs it, only those (cluster-apply.js); each runs on its own server. */
+function applyOf(ctx) {
+	if (ctx._clusterApply) return ctx._clusterApply
+	const selfId = () => clusterOf(ctx).snapshot().self?.id || 'self'
+	ctx._clusterApply = require('../cluster/cluster-apply').createClusterApply({
+		selfId,
+		selfName: () => clusterOf(ctx).snapshot().self?.hostname || '',
+		peers: () => clusterOf(ctx).snapshot().peers,
+		masterId: () => (masterOf(ctx).view().is_master ? selfId() : masterOf(ctx).view().master_id || ''),
+		localDirty: () => require('../config/caspar-config-dirty').casparConfigDirty(ctx),
+		localApply: (b) => require('./routes-caspar-config').handlePost('/api/caspar-config/apply', JSON.stringify(b), ctx),
+		relay: (method, id, p, b) => relayOf(ctx)({ method, id, tail: p.replace(/^\/+/, ''), query: {}, body: b == null ? undefined : JSON.stringify(b) }),
+		screens: () => {
+			const by = {}
+			for (const d of safeDestinations(ctx)) for (const o of d.owners || []) (by[o] = by[o] || []).push(d.label || d.id)
+			return by
+		},
+		broadcast: (data) => typeof ctx._wsBroadcast === 'function' && ctx._wsBroadcast('cluster:apply', data),
+		log: ctx.log,
+	})
+	return ctx._clusterApply
 }
 
 function relayOf(ctx) {

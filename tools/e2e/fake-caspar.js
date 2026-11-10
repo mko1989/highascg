@@ -28,12 +28,14 @@
 
 const fs = require('fs')
 const net = require('net')
+const M = require('./fake-caspar-model')
+const { startControl } = require('./fake-caspar-control')
+const { pidOfClientPort } = require('./fake-caspar-who')
 
 const LOOPBACK = /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/
 const QUERY = new Set(['VERSION', 'INFO', 'CLS', 'TLS', 'FLS', 'CINF', 'DATA', 'THUMBNAIL', 'PING', 'DIAG', 'GL', 'HELP', 'LOG', 'LOCK', 'BYE'])
 const LINE = /^(\S+)\s+(\d+)(?:-(\d+))?(?:\s+(.*))?$/
 
-const xmlEscape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 /** The quoted or first-token source of a PLAY / LOAD / LOADBG argument list ('' = none). */
 function sourceOf(rest) {
@@ -67,37 +69,8 @@ function isMutating(line) {
 	return true
 }
 
-/** Linux: the pid owning the client end (local port `port`) of a loopback TCP connection to `serverPort`; 0 = unknown. */
-function pidOfClientPort(port, serverPort, pids) {
-	try {
-		const hex = (n) => n.toString(16).toUpperCase().padStart(4, '0')
-		const rows = fs.readFileSync('/proc/net/tcp', 'utf8').split('\n').slice(1)
-		const row = rows.map((r) => r.trim().split(/\s+/)).find((c) => c[1]?.endsWith(':' + hex(port)) && c[2]?.endsWith(':' + hex(serverPort)))
-		if (!row) return 0
-		const want = `socket:[${row[9]}]`
-		for (const pid of pids()) {
-			let fds = []
-			try {
-				fds = fs.readdirSync(`/proc/${pid}/fd`)
-			} catch {
-				continue
-			}
-			for (const fd of fds) {
-				try {
-					if (fs.readlinkSync(`/proc/${pid}/fd/${fd}`) === want) return pid
-				} catch {
-					/* closed meanwhile */
-				}
-			}
-		}
-	} catch {
-		/* not Linux / no /proc */
-	}
-	return 0
-}
-
 /**
- * @param {{ host?: string, port?: number, channels?: number, mode?: string,
+ * @param {{ host?: string, port?: number, channels?: number | string[], mode?: string, configFile?: string, clipLengthS?: number, lengths?: Record<string, number>, now?: () => number, downMs?: number,
  *   media?: string[], identify?: (pid: number) => string, pids?: () => number[], log?: (s: string) => void }} [opts]
  *   channels: how many channels `INFO` lists (all `mode`); media: clip names CLS lists; pids: candidate processes for
  *   `who` (default: none → `who` = from); identify: pid → a label ('sb-a node', …)
@@ -106,17 +79,42 @@ async function startFakeCaspar(opts = {}) {
 	const host = opts.host || '127.0.0.1'
 	if (!LOOPBACK.test(host)) throw new Error(`fake Caspar must bind a loopback address (got ${host})`)
 	if (Number(opts.port) === 5250) throw new Error('fake Caspar refuses port 5250 (the live Caspar\'s)')
-	const mode = opts.mode || '1080p5000'
-	const nCh = opts.channels || 16
+	const defMode = opts.mode || '1080p5000'
+	/** per-channel video modes, 1-based by position; a restart may bring a different list (WO-1029 apply) */
+	let chModes = Array.isArray(opts.channels) ? opts.channels.slice() : Array.from({ length: opts.channels || 16 }, () => defMode)
+	let nCh = chModes.length
+	const modeOf = (ch) => chModes[ch - 1] || defMode
+	const fpsOf = (ch) => M.fpsOfMode(modeOf(ch))
+	/** the clock: injectable (opts.now), and skewable by tests (api.advance) so "30 s later" costs no waiting */
+	let skew = 0
+	const now = () => (opts.now ? opts.now() : Date.now()) + skew
+	const lengths = opts.lengths || {}
+	const lengthOf = (name) => lengths[String(name).toUpperCase()] ?? opts.clipLengthS ?? 600
+	/** channel → Map<index, { name, spec }> consumers added over AMCP (ADD) */
+	const consumers = new Map()
+	/** the casparcg.config this Caspar was started with (what INFO CONFIG shows): read from opts.configFile at start / restart */
+	const readConfig = () => {
+		try {
+			return opts.configFile ? fs.readFileSync(opts.configFile, 'utf8') : ''
+		} catch {
+			return ''
+		}
+	}
+	let loadedConfig = readConfig()
+	const flags = { refuseInfo: false, infoDelayMs: 0 }
+	const restartLog = []
+	let dropped = 0
 	const media = (opts.media || ['E2E_BARS', 'E2E_STILL', 'LOOK_A', 'LOOK_B', 'LOOK_C']).map((s) => String(s).toUpperCase())
 	const log = opts.log || (() => {})
 	/** channel → Map<layer, { fg, bg, cg, mixer }> */
 	const channels = new Map()
 	const channelMixer = new Map()
 	const writes = []
-	const conns = []
+	let conns = []
 	let seq = 0
 	const sockets = new Set()
+	let server = null
+	let listening = false
 
 	const layerOf = (ch, l, create = true) => {
 		if (!channels.has(ch)) channels.set(ch, new Map())
@@ -163,24 +161,50 @@ async function startFakeCaspar(opts = {}) {
 			else layerOf(ch, l).mixer[P] = vals.join(' ')
 			return ''
 		}
-		if (l === null) return '' // channel-wide forms (ADD / REMOVE consumers, SWAP, CALL…): logged, nothing on a layer
+		if (verb === 'ADD') {
+			const m2 = consumers.get(ch) || new Map()
+			consumers.set(ch, m2)
+			const idx = l ?? Math.max(9999, ...m2.keys()) + 1
+			m2.set(idx, { name: M.consumerName(rest), spec: rest })
+			return ''
+		}
+		if (verb === 'REMOVE') {
+			const m2 = consumers.get(ch)
+			if (!m2) return '404 REMOVE FAILED'
+			if (l !== null) return m2.delete(l) ? '' : '404 REMOVE FAILED'
+			const kind = String(rest.trim().split(/\s+/)[0] || '').toUpperCase()
+			const hit = [...m2.entries()].find(([, c]) => String(c.spec).trim().toUpperCase().startsWith(kind))
+			return kind && hit && m2.delete(hit[0]) ? '' : '404 REMOVE FAILED'
+		}
+		if (l === null) return '' // channel-wide forms (SWAP, …): logged, nothing on a layer
 		const L = layerOf(ch, l)
+		const t = now()
+		const fps = fpsOf(ch)
+		const clipOf = (source, playing) => M.makeClip({ source, kind: kindOf(source), args: rest, fps, length: lengthOf(source), now: t, playing })
 		if (verb === 'LOADBG') {
 			if (!src) return '402 LOADBG FAILED'
 			if (kindOf(src) === 'clip' && !media.includes(src.toUpperCase())) return '404 LOADBG FAILED'
-			L.bg = { source: src, kind: kindOf(src), args: rest }
+			L.bg = clipOf(src, false)
 		} else if (verb === 'LOAD' || (verb === 'PLAY' && src)) {
 			if (kindOf(src) === 'clip' && !media.includes(src.toUpperCase())) return `404 ${verb} FAILED`
-			L.fg = { source: src, kind: kindOf(src), playing: verb === 'PLAY', args: rest }
+			L.fg = clipOf(src, verb === 'PLAY')
 		} else if (verb === 'PLAY') {
 			if (L.bg) {
-				L.fg = { ...L.bg, playing: true }
+				L.fg = { ...L.bg, playing: true, since: t }
 				L.bg = null
-			} else if (L.fg) L.fg.playing = true
-		} else if (verb === 'PAUSE' || verb === 'RESUME') {
-			if (L.fg) L.fg.playing = verb === 'RESUME'
-		} else if (verb === 'STOP') L.fg = null
-		else if (verb === 'CG') {
+			} else M.setPlaying(L.fg, true, t)
+		} else if (verb === 'PAUSE' || verb === 'RESUME') M.setPlaying(L.fg, verb === 'RESUME', t)
+		else if (verb === 'STOP') L.fg = null
+		else if (verb === 'CALL') {
+			const sub = rest.trim().split(/\s+/)
+			const op = String(sub[0] || '').toUpperCase()
+			if (op === 'SEEK' && L.fg) M.seekTo(L.fg, Number(sub[1]) / fps, t) // this build: channel frames
+			else if (op === 'LOOP' && L.fg) {
+				L.fg.at = M.positionOf(L.fg, t) ?? L.fg.at
+				L.fg.since = t
+				L.fg.loop = sub[1] === '1'
+			}
+		} else if (verb === 'CG') {
 			const sub = rest.trim().split(/\s+/) // CG ch-l ADD <cg layer> "template" <play> "data"
 			const op = String(sub[0] || '').toUpperCase()
 			if (op === 'ADD') L.cg = { template: sourceOf(sub.slice(2).join(' ')), playing: true }
@@ -192,24 +216,11 @@ async function startFakeCaspar(opts = {}) {
 		return ''
 	}
 
-	function channelXml(ch) {
-		let stage = ''
-		for (const [num, L] of [...(channels.get(ch) || new Map()).entries()].sort((a, b) => a[0] - b[0])) {
-			const fgXml = L.fg
-				? L.fg.kind === 'clip'
-					? `<foreground><file><name>${xmlEscape(L.fg.source)}</name><path>${xmlEscape(L.fg.source)}</path><time>0</time><time>10</time></file><paused>${!L.fg.playing}</paused><producer>ffmpeg</producer></foreground>`
-					: `<foreground><producer>${L.fg.kind === 'route' ? 'route' : L.fg.kind === 'color' ? 'color' : L.fg.kind}</producer></foreground>`
-				: L.cg
-					? '<foreground><producer>html</producer></foreground>'
-					: '<foreground><producer>empty</producer></foreground>'
-			const bgXml = L.bg ? `<background><file><name>${xmlEscape(L.bg.source)}</name></file><producer>ffmpeg</producer></background>` : '<background><producer>empty</producer></background>'
-			stage += `<layer_${num}>${bgXml}${fgXml}</layer_${num}>`
-		}
-		return `<?xml version="1.0" encoding="utf-8"?><channel><format>${mode}</format><framerate>50</framerate><stage><layer>${stage}</layer></stage></channel>`
-	}
+	const channelXml = (ch) => M.channelXml({ mode: modeOf(ch), fps: fpsOf(ch), layers: channels.get(ch) || new Map(), consumers: consumers.get(ch) || new Map(), now: now() })
 
 	const configXml = () =>
-		`<?xml version="1.0" encoding="utf-8"?><configuration><paths><media-path>media/</media-path></paths><channels>${Array.from({ length: nCh }, () => `<channel><video-mode>${mode}</video-mode><consumers/></channel>`).join('')}</channels></configuration>`
+		loadedConfig ||
+		`<?xml version="1.0" encoding="utf-8"?><configuration><paths><media-path>media/</media-path></paths><channels>${Array.from({ length: nCh }, (_, i) => `<channel><video-mode>${modeOf(i + 1)}</video-mode><consumers/></channel>`).join('')}</channels></configuration>`
 
 	/** The reply lines for one command (without the RES prefix). */
 	function answer(line, conn) {
@@ -220,7 +231,8 @@ async function startFakeCaspar(opts = {}) {
 		if (verb === 'VERSION') return ['201 VERSION OK', '2.5.0 fake-caspar (WO-1029)']
 		if (verb === 'INFO') {
 			const sub = rest.split(/\s+/)[0] || ''
-			if (!sub) return ['200 INFO OK', ...Array.from({ length: nCh }, (_, i) => `${i + 1} ${mode} PLAYING`), '']
+			if (!sub) return ['200 INFO OK', ...Array.from({ length: nCh }, (_, i) => `${i + 1} ${modeOf(i + 1)} PLAYING`), '']
+			if (flags.refuseInfo && /^\d+(-\d+)?$/.test(sub)) return ['500 INFO FAILED']
 			if (/^\d+$/.test(sub)) return Number(sub) >= 1 && Number(sub) <= nCh ? ['201 INFO OK', channelXml(Number(sub))] : ['401 INFO ERROR']
 			if (/^\d+-\d+$/.test(sub)) return ['201 INFO OK', channelXml(parseInt(sub, 10))]
 			if (/^CONFIG$/i.test(sub)) return ['201 INFO OK', configXml()]
@@ -243,23 +255,31 @@ async function startFakeCaspar(opts = {}) {
 			return ['201 MIXER OK', v || '1']
 		}
 		if (QUERY.has(verb)) return [`202 ${verb} OK`]
-		record(s, conn)
+		if (verb === 'RESTART' || verb === 'KILL') {
+			record(s, conn)
+			setImmediate(() => api.restart().catch(() => {})) // AMCP RESTART: reply first, then go down
+			return [`202 ${verb} OK`]
+		}
+		const entry = record(s, conn)
 		const err = apply(s)
+		entry.reply = err ? Number(err.slice(0, 3)) : 202
 		return [err || `202 ${verb} OK`]
 	}
 
 	function record(line, conn) {
 		if (!conn.pid && opts.pids && !conn.closed) whoIs(conn) // the node may have been unknown when it connected
 		const m = LINE.exec(line)
-		writes.push({ seq: ++seq, t: Date.now(), from: conn.from, who: conn.who, channel: m ? Number(m[2]) : null, layer: m && m[3] !== undefined ? Number(m[3]) : null, line })
+		const e = { seq: ++seq, t: Date.now(), from: conn.from, who: conn.who, channel: m ? Number(m[2]) : null, layer: m && m[3] !== undefined ? Number(m[3]) : null, line, reply: 0 }
+		writes.push(e)
+		return e
 	}
 
 	function whoIs(conn) {
-		conn.pid = pidOfClientPort(conn.remotePort, server.address().port, opts.pids)
+		conn.pid = pidOfClientPort(conn.remotePort, port, opts.pids)
 		if (conn.pid) conn.who = opts.identify?.(conn.pid) || `pid ${conn.pid}`
 	}
 
-	const server = net.createServer((sock) => {
+	const makeServer = () => net.createServer((sock) => {
 		sockets.add(sock)
 		const from = `${sock.remoteAddress}:${sock.remotePort}`
 		const conn = { from, remotePort: sock.remotePort, pid: 0, who: from, at: Date.now(), closed: 0, lines: 0 }
@@ -315,11 +335,17 @@ async function startFakeCaspar(opts = {}) {
 			sockets.delete(sock)
 		})
 	})
-	await new Promise((resolve, reject) => {
-		server.once('error', reject)
-		server.listen(opts.port || 0, host, resolve)
-	})
-	const port = server.address().port
+	const listen = (p) =>
+		new Promise((resolve, reject) => {
+			server = makeServer()
+			server.once('error', reject)
+			server.listen(p, host, () => {
+				listening = true
+				resolve()
+			})
+		})
+	await listen(opts.port || 0)
+	let port = server.address().port
 	if (port === 5250) {
 		server.close()
 		throw new Error('fake Caspar got port 5250: refusing')
@@ -346,20 +372,104 @@ async function startFakeCaspar(opts = {}) {
 		relabel() {
 			for (const c of conns) if (c.pid && opts.identify) c.who = opts.identify(c.pid) || c.who
 		},
-		/** A Caspar restart: the screens go black, open connections drop. */
+		/** The screens go black (no connection change). */
 		wipe() {
 			channels.clear()
 			channelMixer.clear()
+			consumers.clear()
 		},
 		dropConnections() {
-			for (const s of sockets) s.destroy()
+			for (const s of sockets) {
+				dropped++
+				s.destroy()
+			}
 		},
+
+		// --- WO-1029 apply: restart, playback, consumers, faults --------------------------------------------------
+		/**
+		 * A Caspar restart: every connection is dropped, the listener closes (the node sees a real disconnect), the
+		 * screen model and the consumers are forgotten (a restarted Caspar is empty), the channel list may change, and
+		 * after `downMs` it listens again on the SAME address. The write log survives and gets a marker
+		 * { seq, restart: true, n, channels, line: 'RESTART' } (channel null, so per-channel filters skip it).
+		 * @param {{ channels?: number | string[], downMs?: number, fromConfig?: string }} [o]
+		 *   channels: a count (same mode) or a list of video modes (numbering = position); fromConfig: a casparcg.config
+		 *   path whose <channels> the new Caspar reads (what the real one does)
+		 * @returns {Promise<{ seq: number, n: number }>} resolves once it listens again; `restart.down(o)` resolves when it went down
+		 */
+		restart: (o = {}) => api.restartStaged(o).up,
+		/** Options the NEXT hook-triggered restart uses (a scenario sets the new channel list here); cleared by use. */
+		nextRestart: null,
+		/** Same, but { down, up } promises: `down` resolves when connections are dropped and the port closed. */
+		restartStaged(o = {}) {
+			let downResolve
+			const down = new Promise((r) => (downResolve = r))
+			const up = (async () => {
+				listening = false
+				for (const s of sockets) {
+					dropped++
+					s.destroy()
+				}
+				await new Promise((r) => server.close(() => r()))
+				api.wipe()
+				loadedConfig = readConfig() // a restarted Caspar runs the file as it is now
+				if (o.fromConfig || (opts.configFile && o.fromConfig !== false && !o.channels)) {
+					const xml = o.fromConfig && typeof o.fromConfig === 'string' ? fs.readFileSync(o.fromConfig, 'utf8') : loadedConfig
+					const modes = [...(/<channels>([\s\S]*)<\/channels>/.exec(xml)?.[1] || '').matchAll(/<video-mode>([^<]+)<\/video-mode>/g)].map((m) => m[1])
+					if (modes.length) chModes = modes
+				} else if (Array.isArray(o.channels)) chModes = o.channels.slice()
+				else if (o.channels) chModes = Array.from({ length: o.channels }, () => defMode)
+				nCh = chModes.length
+				const marker = { seq: ++seq, t: Date.now(), from: 'fake', who: 'caspar', channel: null, layer: null, line: 'RESTART', restart: true, n: restartLog.length + 1, channels: nCh }
+				writes.push(marker)
+				restartLog.push({ ...marker })
+				downResolve(marker)
+				await new Promise((r) => setTimeout(r, o.downMs ?? opts.downMs ?? 300))
+				await listen(port)
+				return marker
+			})()
+			return { down, up }
+		},
+		/** Restart markers after a write-log mark: [{ seq, t, n, channels }]. */
+		restarts: (sinceSeq = 0) => restartLog.filter((r) => r.seq > sinceSeq).map((r) => ({ ...r })),
+		/** Connections this fake dropped itself (restart / dropConnections), not ones a node closed. */
+		dropped: () => dropped,
+		isListening: () => listening,
+		/** Time passes without waiting: every playing clip is `ms` further along. */
+		advance(ms) {
+			skew += ms
+		},
+		/** Faults: { refuseInfo: true } makes `INFO <ch>` answer 500. */
+		set(f) {
+			Object.assign(flags, f)
+		},
+		channelCount: () => nCh,
+		/** Take the config file as the running one now (the bed does this once the node wrote its first config). */
+		loadConfig() {
+			loadedConfig = readConfig()
+		},
+		fps: fpsOf,
+		/** Position (seconds) of the clip in the foreground of a layer now; null = nothing / not a clip. */
+		position: (ch, l) => M.positionOf(channels.get(ch)?.get(l)?.fg, now()),
+		/** What is on a layer, for assertions: { source, kind, playing, paused, loop, length, position } | null. */
+		clip(ch, l) {
+			const fg = channels.get(ch)?.get(l)?.fg
+			return fg ? { source: fg.source, kind: fg.kind, playing: fg.playing, paused: !fg.playing, loop: !!fg.loop, length: fg.length, position: M.positionOf(fg, now()) } : null
+		},
+		/** Consumers added over AMCP: [{ index, name, spec }]. */
+		consumers: (ch) => [...(consumers.get(ch) || new Map()).entries()].map(([index, c]) => ({ index, ...c })),
+		/** Write-log entries after a mark that the fake refused (reply >= 400). */
+		rejected: (mark = 0) => writes.filter((e) => e.seq > mark && e.reply >= 400).map((e) => ({ ...e })),
+		/** Loopback control endpoint (the sandbox node's restart hook): POST /restart?channels=N&downMs=M, GET /state. */
+		control: null,
 		close: () =>
 			new Promise((r) => {
 				for (const s of sockets) s.destroy()
+				if (api.control) api.control.server.close()
+				if (!server.listening) return r()
 				server.close(() => r())
 			}),
 	}
+	api.control = await startControl(host, api)
 	return api
 }
 

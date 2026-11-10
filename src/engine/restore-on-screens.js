@@ -296,7 +296,97 @@ async function restoreLedTestCard(ctx, { deps: injected } = {}) {
 	return { restored: ok, ...r }
 }
 
+/**
+ * WO-1029 — THE restore of one Caspar connect (the only caller of the steps above and of air-snapshot-restore.js), so
+ * nothing is restored twice. Without an armed air snapshot it is WO-1013 as before: looks (re-take on a reconnect,
+ * clear on the first connect), preview re-stage, test card on a reconnect. With the snapshot an Apply took for THIS
+ * reconnect (air-snapshot.js `armedSnapshot`): live looks follow their destination first, then the looks, the preview
+ * re-stage, every other layer from Caspar's INFO at `position + elapsed`, the timeline, the card last (layer 999 on
+ * top), then the stream; the report goes to the waiting apply route and the log.
+ * @param {object} ctx
+ * @param {{ reconnect: boolean, answeredAt?: number, routingDone?: Promise<unknown>, setup?: object, deps?: object }} o
+ * @returns {Promise<object|null>} the snapshot's restore report, null without a snapshot
+ */
+async function restoreOnConnect(ctx, { reconnect, answeredAt, routingDone, setup, deps: injected } = {}) {
+	const deps = { ...defaultDeps(), ...(injected || {}) }
+	const Air = deps.airSnapshot || require('./air-snapshot')
+	const AirRestore = deps.airRestore || require('./air-snapshot-restore')
+	const Setup = setup || require('../config/routing-setup')
+	const persistence = deps.persistence || ctx?.persistence || require('../utils/persistence')
+	const now = deps.now || (() => Date.now())
+	const t0 = Number.isFinite(answeredAt) ? answeredAt : now()
+	let snap = null
+	try {
+		const armed = Air.armedSnapshot({ reconnect, persistence, now: now(), uptimeMs: (deps.uptimeMs || (() => require('os').uptime() * 1000))() })
+		snap = armed.snap
+		if (!snap && armed.stale) {
+			Air.discardSnapshot(persistence)
+			log(ctx, 'info', `[air-snapshot] not restored: ${armed.why}`)
+		}
+	} catch (e) {
+		log(ctx, 'warn', `[air-snapshot] armed check: ${e?.message || e}`)
+	}
+	const report = { looks: [], clips: [], layers: [], card: null, timeline: null, consumers: null, skipped: [], ms: 0 }
+	const step = async (name, fn) => {
+		try {
+			return await fn()
+		} catch (e) {
+			log(ctx, 'warn', `[restore-on-screens] ${name}: ${e?.message || e}`)
+			report.skipped.push({ what: name, why: e?.message || String(e) })
+			return null
+		}
+	}
+	if (routingDone) {
+		await Promise.race([routingDone, new Promise((r) => { const t = setTimeout(r, 20000); if (t.unref) t.unref() })])
+	}
+	if (snap) {
+		const rk = await step('live looks re-key', () => AirRestore.rekeyLiveLooks(ctx, snap, { deps: injected }))
+		if (rk) report.skipped.push(...rk.dropped)
+	}
+	report.looks = (await step('program looks', () => module.exports.restoreProgramLooks(ctx, { reconnect: reconnect || !!snap, deps: injected }))) || []
+	await step('preview re-stage', () => Setup.restagePersistedPreviewLooks(ctx))
+	if (snap) {
+		const ch = await step('layers', () => AirRestore.restoreChannels(ctx, snap, { deps: injected }))
+		if (ch) {
+			report.clips = ch.clips
+			report.layers = ch.layers
+			report.skipped.push(...ch.skipped)
+		}
+		report.timeline = await step('timeline', () => AirRestore.resumeTimeline(ctx, snap, { deps: injected }))
+		/* The first connect's card check may have switched a card off that the snapshot saw on air. */
+		if (snap.card?.active && ctx._ledTestPatternActive !== true) {
+			ctx._ledTestPatternActive = true
+			ctx._ledTestCardSource = snap.card.source || 'control'
+		}
+	}
+	/* The first connect's card is the boot splash startup-led-test-pattern.js has just painted. */
+	if (reconnect || snap) report.card = await step('test card', () => module.exports.restoreLedTestCard(ctx, { deps: injected }))
+	if (!snap) return null
+	const cons = await step('consumers', () => AirRestore.restoreConsumers(ctx, snap, { deps: injected }))
+	if (cons) {
+		report.consumers = { stream: cons.stream, records: cons.records }
+		report.skipped.push(...cons.skipped)
+	}
+	report.ms = Math.max(0, now() - t0)
+	try {
+		Air.discardSnapshot(persistence)
+	} catch {
+		/* advisory */
+	}
+	log(
+		ctx,
+		report.skipped.length ? 'warn' : 'info',
+		`[air-snapshot] restored in ${report.ms} ms after Caspar answered: ${report.looks.filter((l) => l.action === 'retaken').length} look(s), ` +
+			`${report.clips.length} clip(s), ${report.layers.length} layer(s)` +
+			(report.timeline?.resumed_ms != null ? `, timeline at ${report.timeline.resumed_ms} ms` : '') +
+			(report.skipped.length ? ` — not put back: ${report.skipped.map((s) => `${s.what}: ${s.why}`).join('; ')}` : ''),
+	)
+	Air.reportRestored(snap.id, report)
+	return report
+}
+
 module.exports = {
+	restoreOnConnect,
 	retakeSkipReason,
 	splashCardBody,
 	restoreProgramLooks,
