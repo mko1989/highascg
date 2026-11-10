@@ -55,3 +55,25 @@ Causes, in order of cost:
 - Operator GUI previews of an 8K channel: **wait** — "lets first see when only one destination is left on that box".
   Re-measure 5867 once it creates channels only for what it outputs, then decide.
 - Test card (native pattern / rendered small): no verdict given.
+
+## Re-measured with channels only where cabled (10.11 13:50, 5867 on 2026-11-10T124525Z, flag on)
+
+5867 now runs **7 channels** (was 10): 1 operator GUI, 2/3 PGM/PRV 3 (the 8K wall), 4/5 Stream PGM, 6/7 DeckLink 3/4.
+The copies of the LED and of "to zoom" are gone. GPU still 100 % in every state.
+
+| State | 10 channels (before) | 7 channels |
+|---|---|---|
+| A clip frame on the wall, no card, 8K PRV empty | 41 fps (both 8K empty) | **50.0** |
+| Test card on the wall, 8K PRV empty | — | 37.0 |
+| A clip frame on the wall + one on the 8K PRV, no card | 26.2 | 29.4 |
+| Both + the HTML test card (the state the owner reported) | 18.7 | 20.6 |
+
+So removing the copy channels is what gets the idle wall to a full 50 fps, but it barely moves the reported state:
+the 8K PRV holding a picture (-20 fps) and the 8K HTML test card (-13 fps with the PRV empty) still dominate.
+
+Seen at the switch (the consumer steps C1b / C1c / C11 of plan 07 are not on 5867 yet):
+- The restore put content back by channel NUMBER: the test card and the ended clip of the wall landed on channel 5
+  (now Stream PRV), and a `visuals` shm layer that sat on the old LED copy channel 2 appeared on the wall's new
+  channel 2. Cleared by hand; the card re-enabled on channel 2.
+- Two `AMCP batch COMMIT ack timeout (64 cmds)` from the template orphan sweep; the restore took 15 s.
+- The two "2box" looks name DeckLink 3 / 4 as `route://9-3` / `route://10-4`; those inputs are on channels 6 / 7 now.
