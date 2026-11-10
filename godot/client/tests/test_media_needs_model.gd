@@ -45,6 +45,17 @@ func test_row_states() -> void:
 	t.eq(M.states(all_known)["X/HERE.MOV"].state, "here", "everywhere: here")
 
 
+## Owner 10.11: "ZZ_TL_RAMP needed on highascg5867" although 5867 holds the file — used there is not a notice.
+func test_used_where_it_already_is_has_no_notice() -> void:
+	var n := _needs()
+	n.files.append({"id": "X/there.mov", "size": 9, "on": ["b"], "missing_on": [], "differs_on": [],
+		"needed_on": [{"server": "b", "destinations": [{"id": "d2", "label": "Screen 2"}], "looks": ["Ramp"]}]})
+	var st: Dictionary = M.states(n)["X/THERE.MOV"]
+	t.eq(st.state, "elsewhere", "only on B, and B is where it is used")
+	t.eq(st.text, "on Box B", "no 'needed on' wording")
+	t.eq(st.amber, false, "not amber")
+
+
 func test_unknown_peer_is_never_missing() -> void:
 	var n := _needs()
 	n.files.append({"id": "X/maybe.mov", "size": 5, "on": ["a"], "missing_on": ["c"], "needed_on": [{"server": "c", "destinations": [], "looks": ["L"]}]})

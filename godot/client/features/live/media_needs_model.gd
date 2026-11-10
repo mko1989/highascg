@@ -92,7 +92,8 @@ static func row_state(needs: Variant, f: Dictionary) -> Dictionary:
 			continue
 		var sid := str(n.server)
 		var dest := _dest_text(n)
-		needed_lines.append("needed on %s%s" % [server_name(needs, sid), " (%s)" % dest if dest != "" else ""])
+		if not on.has(sid):  # used there AND absent there; a file the server already holds is no notice
+			needed_lines.append("needed on %s%s" % [server_name(needs, sid), " (%s)" % dest if dest != "" else ""])
 		var looks: Array = n.get("looks", []) if n.get("looks") is Array else []
 		var users: Array = looks.map(func(l: Variant) -> String: return _look_name(l))
 		for tl in n.get("timelines", []) if n.get("timelines") is Array else []:

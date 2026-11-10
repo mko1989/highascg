@@ -94,7 +94,7 @@ func test_fanout_line() -> void:
 	snap.fanout.peers.b.caught_up = {"lines": 0}
 	t.eq(M.fanout_line(snap, "b"), "Takes forwarded: PGM/PRV 1 (ch 1→11, 2→12), LED (ch 3→1) · 7 sent", "nothing to catch up → no mention")
 	t.eq(M.fanout_line({"fanout": {"active": false, "peers": {}}}, "b"), "", "not master → no line")
-	t.eq(M.follow_note({"follows_master": true}), "PGM here is driven by the master: local PGM takes are skipped (PRV still works).", "follower")
+	t.eq(M.follow_note({"follows_master": true}), "Not master: this server still drives the screens cabled here. A screen cabled on both servers follows the master.", "follower")
 	t.eq(M.follow_note({}), "", "not a follower")
 
 

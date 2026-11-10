@@ -236,7 +236,7 @@ static func is_fanout_error(line: String) -> bool:
 ## P4b — under the master line on a server that is not master: its PGM follows the master.
 static func follow_note(snap: Dictionary) -> String:
 	if snap.get("follows_master") == true:
-		return "PGM here is driven by the master: local PGM takes are skipped (PRV still works)."
+		return "Not master: this server still drives the screens cabled here. A screen cabled on both servers follows the master."
 	return ""
 
 
