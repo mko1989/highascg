@@ -29,6 +29,17 @@ static func expanded_size(n: int, separators: int) -> Vector2i:
 
 
 ## Bottom-centre placement of `size` inside the usable rect of the client's screen.
+## Where the dock may sit: the usable rect of the client window's monitor — never wider than that monitor, and when
+## the window system reports one "screen" spanning several heads (5867, 10.11: operator monitor + a tiled 7680x2160
+## wall as one RandR monitor; the WM work area is the whole desktop) the client window's own rect, so the dock can
+## never land on a program output.
+static func area(usable: Rect2i, screen: Rect2i, window: Rect2i) -> Rect2i:
+	var r := usable.intersection(screen) if screen.has_area() and usable.intersects(screen) else (screen if screen.has_area() else usable)
+	if window.has_area() and (r.size.x >= window.size.x * 2 or r.size.y >= window.size.y * 2 or not r.intersects(window)):
+		return window
+	return r
+
+
 static func place(usable: Rect2i, size: Vector2i) -> Rect2i:
 	return Rect2i(usable.position.x + (usable.size.x - size.x) / 2, usable.end.y - size.y, size.x, size.y)
 

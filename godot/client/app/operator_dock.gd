@@ -299,5 +299,7 @@ func set_expanded(on: bool) -> void:
 
 
 func _usable_rect() -> Rect2i:
-	var scr := DisplayServer.window_get_current_screen(get_tree().root.get_window_id())
-	return DisplayServer.screen_get_usable_rect(scr)
+	var win := get_tree().root
+	var scr := DisplayServer.window_get_current_screen(win.get_window_id())
+	return D.area(DisplayServer.screen_get_usable_rect(scr), Rect2i(DisplayServer.screen_get_position(scr), DisplayServer.screen_get_size(scr)),
+		Rect2i(win.position, win.size))

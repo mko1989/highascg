@@ -52,3 +52,15 @@ func test_picker_app_prefers_gpick_else_built_in() -> void:
 	t.eq(D.picker_app([{"action": "app:nl.hjdskes.gcolor3"}]), "app:nl.hjdskes.gcolor3", "next best installed one")
 	t.eq(D.picker_app([{"action": "app:mc"}]), "", "none installed: the built-in picker")
 	t.eq(D.picker_app(null), "", "no app list yet: the built-in picker")
+
+
+## WO-1029 (owner 10.11): "on the 5867 the dock moved to the output, pgm" — the usable rect was the whole desktop.
+func test_dock_area_stays_on_the_client_windows_monitor() -> void:
+	var op := Rect2i(0, 0, 1920, 1080)
+	var desktop := Rect2i(0, 0, 9728, 2160)
+	t.eq(D.area(desktop, desktop, op), op, "one 'screen' spanning the wall too: the client window's rect")
+	t.eq(D.place(D.area(desktop, desktop, op), D.HANDLE), Rect2i(880, 1076, 160, 4), "bottom centre of the operator monitor")
+	t.eq(D.area(desktop, op, op), op, "work area wider than the monitor: clipped to the monitor")
+	t.eq(D.area(Rect2i(0, 0, 1920, 1050), op, op), Rect2i(0, 0, 1920, 1050), "a normal monitor with a panel: its usable rect")
+	t.eq(D.area(Rect2i(0, 0, 2560, 1410), Rect2i(0, 0, 2560, 1440), Rect2i(200, 100, 1600, 900)), Rect2i(0, 0, 2560, 1410), "a windowed client on one monitor: the monitor")
+	t.eq(D.area(Rect2i(2048, 0, 7680, 2160), Rect2i(2048, 0, 7680, 2160), op), op, "the reported screen does not hold the window at all: the window")
