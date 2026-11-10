@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-938 live WOs (32 open, 129 in progress, 777 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+939 live WOs (33 open, 129 in progress, 777 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -281,7 +281,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 974 DONE [audio+engine,godot-client] LTC timecode in (reader + timeline chase) and out (generator) → 974_WO_ltc_timecode_in_out.md
 - 976 DONE [audio+engine,godot-client] A Caspar channel / screen destination (e.g. Dioda PGM) as the audio-reactive FF… → 976_WO_caspar_channel_as_fft_source.md
 
-## video-io — DeckLink, NDI, v4l2, virtual camera, recording (33)
+## video-io — DeckLink, NDI, v4l2, virtual camera, recording (34)
 
 - 27 IN PROGRESS [video-io] Streaming Channel and UI Tab → 27_WO_STREAMING_CHANNEL.md
 - 28 DONE [video-io] DeckLink input / output routing → 28_WO_DECKLINK_INPUT_OUTPUT_ROUTING.md
@@ -316,6 +316,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 942 DONE [video-io+mapping,caspar-build] DeckLink outputs fed by a mapping node show solid green on yuv (v210 ignores su… → 942_WO_decklink_yuv_subregion_solid_green.md
 - 947 DONE [video-io+godot-client] Record and stream outputs checked end to end; a stream that cannot reach its re… → 947_WO_record_stream_output_checks.md
 - 1012 IN PROGRESS [video-io+audio,devices-config,godot-client] Zoom integration via the Zoom desktop client: its windows on hidden virtual des… → 1012_WO_zoom_desktop_client_windows_as_live_inputs_and_return_feed.md
+- 1030 OPEN [video-io+engine,caspar-build,mapping] An 8K tiled output runs at 19 fps on highascg5867: idle channels read back full… → 1030_WO_8k_tiled_output_runs_at_19fps_idle_channels_cost.md
 
 ## mapping — Pixel map, screens, multiview, destinations (42)
 
