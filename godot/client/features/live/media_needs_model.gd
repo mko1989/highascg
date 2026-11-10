@@ -94,8 +94,11 @@ static func row_state(needs: Variant, f: Dictionary) -> Dictionary:
 		var dest := _dest_text(n)
 		needed_lines.append("needed on %s%s" % [server_name(needs, sid), " (%s)" % dest if dest != "" else ""])
 		var looks: Array = n.get("looks", []) if n.get("looks") is Array else []
-		if not looks.is_empty():
-			tips.append("%s: used by %s" % [server_name(needs, sid), ", ".join(looks.map(func(l: Variant) -> String: return _look_name(l)))])
+		var users: Array = looks.map(func(l: Variant) -> String: return _look_name(l))
+		for tl in n.get("timelines", []) if n.get("timelines") is Array else []:
+			users.append("timeline " + str(tl))
+		if not users.is_empty():
+			tips.append("%s: used by %s" % [server_name(needs, sid), ", ".join(users)])
 	if not needed_lines.is_empty():
 		out.state = "needed"
 		parts.append("; ".join(needed_lines))
@@ -192,6 +195,10 @@ static func button(needs: Variant, running := false) -> Dictionary:
 	var items := plan(needs)
 	var n := items.size()
 	var b := total_bytes(items)
+	var ts: Variant = (((needs as Dictionary).get("summary") as Dictionary).get("to_send") if (needs as Dictionary).get("summary") is Dictionary else null)
+	if ts is Dictionary and (ts as Dictionary).has("files"):  # the server's own count of what a default spread copies
+		n = int(ts.files)
+		b = float(ts.get("bytes", b))
 	var tip := IDLE_TIP if n == 0 else "Copy %d file%s (%s) to the servers that need them" % [n, "" if n == 1 else "s", bytes_text(b)]
 	return {"visible": true, "text": "Spread (%d)" % n, "disabled": n == 0 or running, "tip": tip, "count": n, "bytes": b}
 
@@ -252,9 +259,10 @@ static func look_tips(needs: Variant) -> Dictionary:
 			var by_box := {}
 			for m in l.get("missing", []) if l is Dictionary and l.get("missing") is Array else []:
 				if m is Dictionary and reliable(needs, str(m.get("server", ""))):
-					var arr: Array = by_box.get(server_name(needs, str(m.server)), [])
-					by_box[server_name(needs, str(m.server))] = arr
-					arr.append(str(m.get("file", "")).get_file())
+					var box := str(m.get("server_name", "")) if str(m.get("server_name", "")) != "" else server_name(needs, str(m.server))
+					var arr: Array = by_box.get(box, [])
+					by_box[box] = arr
+					arr.append(str(m.get("file", "")).get_file() + (" (%s)" % str(m.screen) if str(m.get("screen", "")) != "" else ""))
 			if by_box.is_empty():
 				continue
 			var parts: Array = []
@@ -311,84 +319,6 @@ static func take_notice(data: Variant, needs: Variant = null) -> String:
 	return "⚠ Media missing: " + "; ".join(parts) + " — Spread copies it"
 
 
-## --- explicit send (selected local files to chosen servers; WO-1029 owner 10.11) ---------------------------------
-## Servers a file can be sent to: linked, online, inventory known (an unknown box is asked nothing it cannot answer).
-static func send_targets(needs: Variant) -> Array:
-	return servers(needs).filter(func(s: Dictionary) -> bool: return s.get("self") != true and reliable(needs, str(s.get("id", ""))))
-
-
-## The selected ids that can go: real files (a folder row or "" never), once each.
-static func sendable(ids: Array) -> Array:
-	var out: Array = []
-	for i in ids:
-		var s := str(i)
-		if s != "" and not out.has(s):
-			out.append(s)
-	return out
-
-
-## Size of a local file: the library answer's size (files / elsewhere) when it lists it, else the row's own.
-static func size_of(needs: Variant, id: String, rows: Array = []) -> float:
-	for f in _files(needs):
-		if key(str(f.get("id", ""))) == key(id) and float(f.get("size", 0)) > 0.0:
-			return float(f.size)
-	for r in rows:
-		if r is Dictionary and key(str(r.get("id", ""))) == key(id):
-			return float(r.get("size", 0)) if r.get("size") != null else 0.0
-	return 0.0
-
-
-## True when the inventory shows `target` already holds this file (same size, not differing).
-static func already_there(needs: Variant, id: String, target: String) -> bool:
-	for f in _files(needs):
-		if key(str(f.get("id", ""))) == key(id):
-			return _ids(f.get("on")).has(target) and not _ids(f.get("differs_on")).has(target)
-	return false
-
-
-static func send_body(ids: Array, to: Array) -> Dictionary:
-	return {"files": ids, "to": to}
-
-
-## "Copy 1 file (34.2 GB) to highascg5867, same folder: TESTOWE/. The original stays here."
-static func send_confirm(needs: Variant, ids: Array, to: Array, rows: Array = []) -> String:
-	var total := 0.0
-	var folders := {}
-	var there: Array = []
-	for i in ids:
-		total += size_of(needs, str(i), rows)
-		folders[str(i).get_base_dir() + "/" if str(i).get_base_dir() != "" else "the media root"] = true
-		for s in to:
-			if already_there(needs, str(i), str(s)):
-				there.append("%s on %s" % [str(i).get_file(), server_name(needs, str(s))])
-	var boxes := _names(needs, to)
-	var text := "Copy %d file%s (%s) to %s, same folder%s: %s. The originals stay here." % [ids.size(), "" if ids.size() == 1 else "s",
-		bytes_text(total * to.size()) if total > 0.0 else "size unknown", boxes, "" if folders.size() == 1 else "s", ", ".join(folders.keys())]
-	if not there.is_empty():
-		text += "\n\nAlready there, skipped: " + ", ".join(there.slice(0, 6)) + (" …" if there.size() > 6 else "")
-	return text
-
-
-## Free-space refusal (a 400 / failed row): "Not enough space on B: needs 34.2 GB, 8.0 GB free".
-static func space_text(needs: Variant, d: Dictionary) -> String:
-	if d.get("needed") == null or d.get("available") == null:
-		return ""
-	var box := server_name(needs, str(d.get("server", ""))) if str(d.get("server", "")) != "" else "the target"
-	return "Not enough space on %s: needs %s, %s free" % [box, bytes_text(float(d.needed)), bytes_text(float(d.available))]
-
-
-## "~12 min left" from bytes done in `elapsed` seconds; "" while the rate is not trustworthy yet.
-static func eta_text(done: float, total: float, elapsed: float) -> String:
-	if elapsed < 5.0 or done <= 0.0 or total <= done:
-		return ""
-	var left := (total - done) / (done / elapsed)
-	if left < 90.0:
-		return "~%d s left" % int(ceil(left))
-	if left < 5400.0:
-		return "~%d min left" % int(ceil(left / 60.0))
-	return "~%.1f h left" % (left / 3600.0)
-
-
 ## --- progress ----------------------------------------------------------------------------------------------------
 static func bytes_text(b: float) -> String:
 	if b >= 1073741824.0:
@@ -400,100 +330,3 @@ static func bytes_text(b: float) -> String:
 	return "%d B" % int(b)
 
 
-static func run_of(status: Variant) -> Dictionary:
-	if status is Dictionary:
-		var r: Variant = (status as Dictionary).get("run")
-		if r is Dictionary:
-			return r
-		if (status as Dictionary).get("files") is Array:
-			return status
-	return {}
-
-
-static func is_running(status: Variant) -> bool:
-	return status is Dictionary and (status as Dictionary).get("running") == true
-
-
-## The in-place progress line from a status answer (or the run in a 409): "Spreading 2 of 5 · a.mov → B · 1.2 / 4.0 GB".
-static func progress_line(status: Variant, needs: Variant = null, elapsed := 0.0) -> String:
-	var run := run_of(status)
-	var files: Array = run.get("files", []) if run.get("files") is Array else []
-	if files.is_empty():
-		return "Spreading media…"
-	var done := 0
-	var cur := ""
-	for f in files:
-		var st := str(f.get("state", ""))
-		if st in ["done", "failed", "skipped"]:
-			done += 1
-		elif st == "copying" and cur == "":
-			cur = "%s → %s" % [str(f.get("id", "")).get_file(), server_name(needs, str(f.get("to", "")))]
-			if float(f.get("bytes", 0)) > 0.0:  # a multi-GB file: its own bytes, not only the run's
-				cur += " (%s / %s)" % [bytes_text(float(f.get("done_bytes", 0))), bytes_text(float(f.bytes))]
-	var line := "Spreading %d of %d" % [mini(done + (1 if cur != "" else 0), files.size()), files.size()]
-	if cur != "":
-		line += " · " + cur
-	if float(run.get("bytes", 0)) > 0.0 and files.size() > 1:
-		line += " · %s / %s" % [bytes_text(float(run.get("done_bytes", 0))), bytes_text(float(run.bytes))]
-	var eta := eta_text(float(run.get("done_bytes", 0)), float(run.get("bytes", 0)), elapsed)
-	return line + (" · " + eta if eta != "" else "")
-
-
-## An event on `cluster:media` ({phase|type|event: start | file | done, ...}) -> a line, "" if it says nothing.
-static func event_line(d: Variant, needs: Variant = null) -> String:
-	if not (d is Dictionary):
-		return ""
-	var e := str(d.get("phase", d.get("event", d.get("type", ""))))
-	match e:
-		"start":
-			return "Spreading media…"
-		"file":
-			var f: Dictionary = d.get("file") if d.get("file") is Dictionary else d
-			return "Spreading · %s → %s%s" % [str(f.get("id", "")).get_file(), server_name(needs, str(f.get("to", ""))),
-				" (%s)" % str(f.state) if str(f.get("state", "")) != "" else ""]
-	return ""
-
-
-static func finishes(d: Variant) -> bool:
-	return d is Dictionary and str((d as Dictionary).get("phase", (d as Dictionary).get("event", (d as Dictionary).get("type", "")))) == "done"
-
-
-## Final one-liner + failure list. {ok, text, tip}. Skipped (differs, no space) are counted, failures listed.
-static func result(status: Variant, needs: Variant = null) -> Dictionary:
-	var run := run_of(status)
-	var files: Array = run.get("files", []) if run.get("files") is Array else []
-	var n_done := 0
-	var n_skip := 0
-	var fails: Array = []
-	var skips: Array = []
-	var bytes := 0.0
-	for f in files:
-		match str(f.get("state", "")):
-			"done":
-				n_done += 1
-				bytes += float(f.get("bytes", 0))
-			"skipped":
-				n_skip += 1
-				skips.append("%s → %s: %s" % [str(f.get("id", "")).get_file(), server_name(needs, str(f.get("to", ""))), str(f.get("error", "skipped"))])
-			"failed":
-				fails.append("%s → %s: %s" % [str(f.get("id", "")).get_file(), server_name(needs, str(f.get("to", ""))), str(f.get("error", "failed"))])
-	if n_done == 0 and fails.is_empty() and not files.is_empty() and skips.size() > 0:
-		return {"ok": true, "text": "Nothing copied — " + str(skips[0]), "tip": "\n".join(skips)}
-	var text := "✓ Spread: %d cop%s (%s)" % [n_done, "y" if n_done == 1 else "ies", bytes_text(bytes)]
-	if n_skip > 0:
-		text += ", %d skipped" % n_skip
-	if not fails.is_empty():
-		text = "✗ Spread: %d copied, %d failed" % [n_done, fails.size()] + (", %d skipped" % n_skip if n_skip > 0 else "")
-	return {"ok": fails.is_empty(), "text": text, "tip": "\n".join(fails)}
-
-
-## POST /api/cluster/media-spread answer -> {how: started | attached | refused, run_id, error}.
-static func start_outcome(status: int, data: Variant) -> Dictionary:
-	var d: Dictionary = data if data is Dictionary else {}
-	if status == 202 or (status == 200 and d.has("run_id")):
-		return {"how": "started", "run_id": str(d.get("run_id", ""))}
-	if status == 409:
-		var run := run_of(d)
-		return {"how": "attached", "run_id": str(d.get("run_id", run.get("id", run.get("run_id", ""))))}
-	var space := space_text(null, d)
-	return {"how": "refused", "run_id": "", "error": space if space != "" else str(d.get("error", "HTTP %d" % status))}

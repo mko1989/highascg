@@ -6,6 +6,7 @@ extends Node
 ## no markers, no button, no further calls. No linked server = no polling at all (only a cluster change re-reads).
 
 const M := preload("res://features/live/media_needs_model.gd")
+const S := preload("res://features/live/media_spread_text.gd")
 const POLL_S := 15.0
 const FOLLOW_S := 1.5
 const MAX_RUN_S := 3600.0
@@ -32,6 +33,8 @@ var _quiet := 0.0
 var _done: Dictionary = {}
 var _run_id := ""
 var _t0 := 0
+var _snap := {}  # the run as the WS events build it up (≤ 4 file events a second)
+var _drawn := 0
 
 
 func _ready() -> void:
@@ -158,19 +161,20 @@ func _say(text: String, tip := "") -> void:
 
 
 func _go() -> void:
-	await _run({"files": M.plan(needs).map(func(i: Dictionary) -> String: return i.id)})
+	await _run({})  # the default run = exactly what summary.to_send counts (missing + older differing, known servers)
 
 
 ## Explicit send (selection bar "Send…"): these local files to the chosen servers, needed there or not.
 func send(ids: Array, rows: Array) -> void:
-	ids = M.sendable(ids)
+	ids = S.sendable(ids)
 	if running or ids.is_empty():
 		return
 	await refresh(true)
-	var targets := M.send_targets(needs)
+	var targets := S.send_targets(needs)
 	if targets.is_empty():
 		_say("✗ No linked server to send to (offline or its media is not known)")
 		return
+	var lib := await _library()
 	var dlg := ConfirmationDialog.new()
 	dlg.title = "Send media"
 	dlg.ok_button_text = "Copy"
@@ -192,7 +196,7 @@ func send(ids: Array, rows: Array) -> void:
 		return checks.filter(func(c: CheckBox) -> bool: return c.button_pressed).map(func(c: CheckBox) -> String: return str(c.get_meta("sid"))) if not checks.is_empty() else [str(targets[0].id)]
 	var upd := func() -> void:
 		var to: Array = chosen.call()
-		label.text = M.send_confirm(needs, ids, to, rows) if not to.is_empty() else "Pick at least one server."
+		label.text = S.send_confirm(needs, ids, to, rows, lib) if not to.is_empty() else "Pick at least one server."
 		dlg.get_ok_button().disabled = to.is_empty()
 	for c in checks:
 		c.toggled.connect(func(_on: bool) -> void: upd.call())
@@ -200,25 +204,42 @@ func send(ids: Array, rows: Array) -> void:
 	dlg.confirmed.connect(func() -> void:
 		var to: Array = chosen.call()
 		dlg.queue_free()
-		_run(M.send_body(ids, to)))
+		_run(S.send_body(ids, to)))
 	dlg.canceled.connect(dlg.queue_free)
 	add_child(dlg)
 	upd.call()
 	dlg.popup_centered()
 
 
+## GET /api/cluster/media-library (paged): every file any linked server has, so sizes and "already there" are known.
+func _library() -> Dictionary:
+	var items: Array = []
+	var off := 0
+	while off < 20000:
+		var r: Dictionary = await Api.get_json("/api/cluster/media-library?offset=%d&limit=5000" % off)
+		if r.get("ok") != true or not (r.data is Dictionary) or not ((r.data as Dictionary).get("items") is Array):
+			break
+		items.append_array(r.data.items)
+		off += (r.data.items as Array).size()
+		if (r.data.items as Array).is_empty() or off >= int(r.data.get("total", 0)):
+			break
+	return S.library_index(items)
+
+
 func _run(body: Dictionary) -> void:
 	_t0 = Time.get_ticks_msec()
 	running = true
 	_apply()
+	_snap = {}
 	_say("Spreading media…")
 	var r: Dictionary = await Api.post_json("/api/cluster/media-spread", body)
-	var o := M.start_outcome(int(r.get("status", 0)), r.get("data"))
+	var o := S.start_outcome(int(r.get("status", 0)), r.get("data"))
 	if o.how == "refused":
 		running = false
 		_apply()
 		_say("✗ Spread refused: %s" % str(o.get("error", r.get("error", ""))))
 		return
+	_snap = S.run_of(r.get("data"))
 	if o.how == "attached":
 		_say("A spread is already running — following it…")
 	await _follow(o.run_id)
@@ -238,8 +259,9 @@ func _follow(run_id: String) -> void:
 			_quiet = 0.0
 			var st: Dictionary = await Api.get_json("/api/cluster/media-spread/status")
 			if st.get("ok") == true:
-				if M.is_running(st.data):
-					_say(M.progress_line(st.data, needs, (Time.get_ticks_msec() - _t0) / 1000.0))
+				if S.is_running(st.data):
+					_snap = S.run_of(st.data)
+					_draw(true)
 				else:
 					_done = st.data if st.data is Dictionary else {"run": {}}
 	running = false
@@ -252,8 +274,8 @@ func _follow(run_id: String) -> void:
 
 func _finish() -> void:
 	var st: Dictionary = await Api.get_json("/api/cluster/media-spread/status")  # the event carries no file list we rely on
-	var answer: Variant = st.data if st.get("ok") == true and M.run_of(st.data).size() > 0 else _done
-	var res := M.result(answer, needs)
+	var answer: Variant = st.data if st.get("ok") == true and S.run_of(st.data).size() > 0 else _done
+	var res := S.result(answer, needs)
 	_say(res.text, res.tip)
 	absent = false
 	await refresh(true)
@@ -263,9 +285,28 @@ func _on_event(d: Variant) -> void:
 	if not running or not d is Dictionary:
 		return
 	_quiet = 0.0
-	if M.finishes(d):
+	if S.finishes(d):
 		_done = d
 		return
-	var line := M.event_line(d, needs)
-	if line != "":
-		_say(line)
+	_snap = S.apply_event(_snap, d)
+	_draw(str(d.get("event", "")) != "file" or str((d.get("file", {}) as Dictionary).get("state", "")) != "copying")
+
+
+## Repaint the running line: at once on a state change, otherwise at most twice a second.
+func _draw(force: bool) -> void:
+	var now := Time.get_ticks_msec()
+	if not force and now - _drawn < 500:
+		return
+	_drawn = now
+	_say(S.progress_line({"run": _snap}, needs, (now - _t0) / 1000.0))
+
+
+## The ✕ on the running line (media_panel): stop the file being copied; the queued ones become skipped.
+func linked() -> bool:
+	return M.linked(needs)
+
+
+func cancel() -> void:
+	if running:
+		var r: Dictionary = await Api.post_json("/api/cluster/media-spread/cancel", {})
+		_say("Cancelling…" if r.get("ok") == true else "Nothing to cancel")

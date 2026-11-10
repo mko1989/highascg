@@ -78,7 +78,7 @@ func _send_selected() -> void:
 
 
 func _sync_send() -> void:
-	_send.visible = NeedsFlow.current != null and NeedsFlow.current.M.linked(NeedsFlow.current.needs) and not NeedsFlow.current.M.send_targets(NeedsFlow.current.needs).is_empty()
+	_send.visible = NeedsFlow.current != null and NeedsFlow.current.linked() and not NeedsFlow.current.S.send_targets(NeedsFlow.current.needs).is_empty()
 
 
 func set_selection(sel: Array, at_folder: String) -> void:

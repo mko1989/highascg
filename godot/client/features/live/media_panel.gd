@@ -187,6 +187,8 @@ func _ready() -> void:
 	stop.pressed.connect(func() -> void:
 		if _dl.active():
 			_dl.cancel()
+		elif needs_flow.running:  # WO-1029: the running spread
+			needs_flow.cancel()
 		elif _ingest_label.text.begins_with("Copying"):
 			Api.post_json("/api/media/ingest-local/cancel", {})
 		else:
