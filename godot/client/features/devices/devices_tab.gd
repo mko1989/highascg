@@ -290,7 +290,7 @@ func refresh() -> void:
 		_gesture.selected_edge = ""
 	var payload := H.merge_settings(r.data, DevicesTarget.settings.settings if DevicesTarget.settings.is_loaded else null)
 	show_model(Model.build(payload, DevicesTarget.value("channelMap"), DevicesTarget.value("configComparison"),
-		RearPanel.DO.saved(), Model.GL.saved()), payload)
+		RearPanel.DO.saved(DevicesTarget.prefs_server()), Model.GL.saved(DevicesTarget.prefs_server())), payload)
 
 
 func show_model(m: Dictionary, payload: Dictionary) -> void:

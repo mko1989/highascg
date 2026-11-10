@@ -20,7 +20,7 @@ var _rows: Array = []
 func setup(payload: Dictionary) -> void:
 	add_theme_constant_override("separation", 4)
 	_items = DO.merged(payload)
-	_ids = DO.ids(DO.current(_items, DO.saved()))
+	_ids = DO.ids(DO.current(_items, DO.saved(DevicesTarget.prefs_server())))
 	var box := PanelContainer.new()
 	box.add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_PANEL, ThemeBuilder.BORDER, 1, 4))
 	var v := VBoxContainer.new()
@@ -96,7 +96,7 @@ static func _row_box(top: int, bottom: int) -> StyleBoxFlat:
 
 
 func _persist() -> void:
-	DO.save(_ids)
+	DO.save(_ids, DevicesTarget.prefs_server(), DevicesTarget.api)
 	changed.emit()
 
 
@@ -128,7 +128,7 @@ func _load() -> void:
 func _reset() -> void:
 	if confirm.is_valid() and not await confirm.call(DO.RESET_CONFIRM):
 		return
-	DO.clear()
+	DO.clear(DevicesTarget.prefs_server(), DevicesTarget.api)
 	changed.emit()
 
 

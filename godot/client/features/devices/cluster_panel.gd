@@ -285,15 +285,15 @@ func _fill(id: String, body: VBoxContainer) -> void:
 	if not _views.has(id):
 		var r: Dictionary = await DevicesTarget.api.get_json("/api/cluster/peers/%s/device-view" % id.uri_encode())
 		_views[id] = r.data if r.ok and r.data is Dictionary else {"error": str(r.get("error", "no data"))}
+		await RearPanel.GL.SP.load_peer(id, DevicesTarget.box_api, "/api/cluster/peers/%s/relay/api/client-prefs" % id.uri_encode())  # WO-1029
 	if not is_instance_valid(body):
 		return
-	for c in body.get_children():
-		c.queue_free()
+	for c in body.get_children(): c.queue_free()
 	var view: Dictionary = _views[id]
 	if view.has("error"):
 		body.add_child(_small("Devices unavailable: " + str(view.error), ThemeBuilder.ERROR))
 		return
-	var m := Model.build(view)
+	var m := Model.build(view, null, null, RearPanel.DO.saved(id), RearPanel.GL.saved(id))  # WO-1029
 	body.add_child(_small("Roles (from its cables): " + M.roles_text(M.roles(_own, view)), ThemeBuilder.TEXT))
 	var rear := RearPanel.new()
 	body.add_child(rear)

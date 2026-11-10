@@ -318,7 +318,7 @@ func _input(event: InputEvent) -> void:
 		elif _same_kind(from, to) and _gpu_slots.has(to):
 			gpu_edit.emit("swap", _gpu_slots[from], _gpu_slots[to])
 		elif _same_kind(from, to):
-			DO.save(DO.swap(_deck_ids, from, to))
+			DO.save(DO.swap(_deck_ids, from, to), DevicesTarget.prefs_server(), DevicesTarget.api)
 			order_changed.emit()
 
 

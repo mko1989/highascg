@@ -10,7 +10,8 @@ const E := preload("res://features/devices/gpu_entries.gd")
 const R := preload("res://features/devices/cable_rules.gd")
 const H := preload("res://features/devices/host_channels.gd")
 
-const CP := preload("res://core/client_prefs.gd")
+const SP := preload("res://core/server_prefs.gd")
+const CP := preload("res://core/client_prefs.gd")  
 const PREFS := "user://devices.cfg"
 
 ## Rear-panel GPU edit mode (web gpuEditMode: the pencil; the GPU page shows the layout editor while it is on).
@@ -239,29 +240,22 @@ static func _parse_int(t: String) -> int:
 	return int(m.get_string()) if m != null else 0
 
 
-# ---------------------------------------------------------------- this client's saved layout
+# ---------------------------------------------------------------- the saved layout, per server (WO-1029)
 
-## This machine's own copy (null = none).
-static func local() -> Variant:
-	var cfg := ConfigFile.new()
-	return cfg.get_value("gpu", "layout") if cfg.load(PREFS) == OK and cfg.has_section_key("gpu", "layout") else null
-
-
-static func saved() -> Array:
-	return R.a(CP.value("gpuLayout", local()))
+## WO-1029: every reader / writer names the server whose rear panel it describes ("" = this box, else the peer id);
+## the layout of one server is never shown or saved for another.
+static func local(server := "") -> Variant:
+	return SP.local("gpu", "layout", server)
 
 
-static func save(items: Array) -> void:
-	var cfg := ConfigFile.new()
-	cfg.load(PREFS)
-	cfg.set_value("gpu", "layout", items)
-	cfg.save(PREFS)
-	CP.post("gpuLayout", items)
+static func saved(server := "") -> Array:
+	return R.a(SP.value(server, "gpuLayout", "gpu", "layout"))
 
 
-static func clear() -> void:
-	var cfg := ConfigFile.new()
-	if cfg.load(PREFS) == OK and cfg.has_section_key("gpu", "layout"):
-		cfg.erase_section_key("gpu", "layout")
-		cfg.save(PREFS)
-	CP.post("gpuLayout", null)
+## `api` = the api that also takes this server's topology POST (DevicesTarget.api); null for this box.
+static func save(items: Array, server := "", api: Variant = null) -> void:
+	SP.save(server, api, "gpuLayout", "gpu", "layout", items)
+
+
+static func clear(server := "", api: Variant = null) -> void:
+	SP.save(server, api, "gpuLayout", "gpu", "layout", null)

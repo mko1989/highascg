@@ -16,6 +16,7 @@ const DTM := preload("res://core/devices_target_model.gd")
 const SettingsScript := preload("res://core/settings_state.gd")
 const ApiScript := preload("res://core/api.gd")
 const Platform := preload("res://core/platform.gd")
+const SP := preload("res://core/server_prefs.gd")
 const STATE_KEYS := ["channelMap", "configComparison", "hostOperatorFullscreen", "templates"]
 const POLL_S := 3.0  # an edited server's WS events do not reach this client: its views are polled instead
 
@@ -84,11 +85,17 @@ func value(key: String, fallback: Variant = null) -> Variant:
 	return Store.get_value(key, fallback)
 
 
+## WO-1029: whose GPU layout / DeckLink order the Devices tab shows and saves: "" = this box, else the edited server's id.
+func prefs_server() -> String:
+	return editing_id if editing != "" else ""
+
+
 ## Before a Devices load: the edited server's channel map, config comparison and templates, from one /api/state.
 func refresh_state() -> void:
 	await wait()
 	if editing == "":
 		return
+	await SP.load_peer(editing_id, api)  ## WO-1029: its own saved GPU layout / DeckLink order, never this box's
 	var st: Dictionary = await api.get_json("/api/state")
 	if st.ok and st.data is Dictionary:
 		for k in STATE_KEYS:
@@ -111,6 +118,7 @@ func edit_peer(peer_id: String, peer_name: String, peer_origin := "") -> String:
 	_peer_settings.api = relayed
 	add_child(_peer_settings)
 	_peer_state = {}
+	SP.peers.erase(peer_id)  ## WO-1029: a fresh read on every Edit
 	editing = peer_origin if peer_origin != "" else peer_id
 	editing_id = peer_id
 	editing_name = peer_name

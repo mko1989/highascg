@@ -6,7 +6,8 @@ extends RefCounted
 ## Export and swaps work on the unsorted id order, so the first edit reshuffles the panel. Here the panel order IS
 ## the edited / saved / exported order. The order functions are pure (tests preload them).
 
-const CP := preload("res://core/client_prefs.gd")
+const SP := preload("res://core/server_prefs.gd")
+const CP := preload("res://core/client_prefs.gd")  
 const PREFS := "user://devices.cfg"
 const EDIT_TIP := "Edit DeckLink port order — drag markers on the rear panel, or use Save / Export / Load in the inspector (same as GPU layout)."
 const HEADING := "DeckLink rear order (drag to reorder)"
@@ -136,29 +137,19 @@ static func _js(x: Variant) -> String:
 	return "null" if x == null else str(x)
 
 
-## This machine's own copy (null = none).
-static func local() -> Variant:
-	var cfg := ConfigFile.new()
-	return cfg.get_value("decklink", "rear_order") if cfg.load(PREFS) == OK and cfg.has_section_key("decklink", "rear_order") else null
+## WO-1029: per server ("" = this box, else the peer id), see core/server_prefs.gd.
+static func local(server := "") -> Variant:
+	return SP.local("decklink", "rear_order", server)
 
 
-static func saved() -> Array:
-	var v: Variant = CP.value("decklinkRearOrder", local())
+static func saved(server := "") -> Array:
+	var v: Variant = SP.value(server, "decklinkRearOrder", "decklink", "rear_order")
 	return (v as Array).map(func(x: Variant) -> String: return str(x)) if v is Array else []
 
 
-static func save(list: Array) -> void:
-	var ids := list.map(func(x: Variant) -> String: return str(x))
-	var cfg := ConfigFile.new()
-	cfg.load(PREFS)
-	cfg.set_value("decklink", "rear_order", ids)
-	cfg.save(PREFS)
-	CP.post("decklinkRearOrder", ids)
+static func save(list: Array, server := "", api: Variant = null) -> void:
+	SP.save(server, api, "decklinkRearOrder", "decklink", "rear_order", list.map(func(x: Variant) -> String: return str(x)))
 
 
-static func clear() -> void:
-	var cfg := ConfigFile.new()
-	if cfg.load(PREFS) == OK and cfg.has_section_key("decklink", "rear_order"):
-		cfg.erase_section_key("decklink", "rear_order")
-		cfg.save(PREFS)
-	CP.post("decklinkRearOrder", null)
+static func clear(server := "", api: Variant = null) -> void:
+	SP.save(server, api, "decklinkRearOrder", "decklink", "rear_order", null)

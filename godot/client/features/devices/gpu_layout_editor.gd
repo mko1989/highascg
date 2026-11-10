@@ -19,9 +19,11 @@ class Io:
 	var confirm_fn: Callable  # (text) -> bool, awaited
 	var status_fn: Callable  # (text, ok)
 	var reload_fn: Callable
+	var server := ""  ## WO-1029: the server edited when the io was made; prefs and topology both go to it
+	var api: Variant = null
 
 	func post_json(path: String, body: Variant) -> Dictionary:
-		return await DevicesTarget.api.post_json(path, body)
+		return await api.post_json(path, body)
 
 	func confirm(text: String) -> bool:
 		return await confirm_fn.call(text)
@@ -33,10 +35,10 @@ class Io:
 		status_fn.call(text, ok)
 
 	func prefs_save(items: Array) -> void:
-		FLOW.GL.save(items)
+		FLOW.GL.save(items, server, api)
 
 	func prefs_clear() -> void:
-		FLOW.GL.clear()
+		FLOW.GL.clear(server, api)
 
 
 static func make_io(confirm_fn: Callable, status_fn: Callable, reload_fn: Callable) -> Io:
@@ -44,6 +46,8 @@ static func make_io(confirm_fn: Callable, status_fn: Callable, reload_fn: Callab
 	io.confirm_fn = confirm_fn
 	io.status_fn = status_fn
 	io.reload_fn = reload_fn
+	io.server = DevicesTarget.prefs_server()
+	io.api = DevicesTarget.api
 	return io
 
 

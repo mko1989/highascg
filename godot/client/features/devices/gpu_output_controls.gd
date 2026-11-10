@@ -66,7 +66,7 @@ func show_connector(conn: Dictionary, payload: Dictionary, settings: Variant) ->
 	page.add_child(_summary(GO.summary_rows(conn, payload, settings)))
 	if GLE.FLOW.GL.edit:  # web: the layout editor sits between the summary and the toggles
 		if _layout == null or _layout.stale:
-			_layout = GLE.FLOW.new(payload, GLE.FLOW.GL.saved(), _io())
+			_layout = GLE.FLOW.new(payload, GLE.FLOW.GL.saved(DevicesTarget.prefs_server()), _io())
 		var ed := GLE.new()
 		ed.setup(_layout)
 		page.add_child(ed)
@@ -117,13 +117,13 @@ func rear_action(what: String, a: String, b: String, payload: Dictionary) -> voi
 	_layout = null
 	match what:
 		"show_all":
-			GLE.FLOW.GL.save(GLE.FLOW.show_all(payload.get("live"), GLE.FLOW.suggested_outs(payload)))
+			GLE.FLOW.GL.save(GLE.FLOW.show_all(payload.get("live"), GLE.FLOW.suggested_outs(payload)), DevicesTarget.prefs_server(), DevicesTarget.api)
 			status.emit("All GPU ports shown", true)
 			reload.emit(false)
 		"clear":
 			await GLE.FLOW.clear_layout(_io())
 		"swap":
-			var saved := GLE.FLOW.GL.saved()
+			var saved := GLE.FLOW.GL.saved(DevicesTarget.prefs_server())
 			var flow = GLE.FLOW.new(payload, saved, _io())
 			flow.items = GLE.FLOW.GL.layout_items(GLE.FLOW.GL.column_entries(payload, saved))
 			await flow.swap(a, b)
