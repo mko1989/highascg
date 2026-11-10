@@ -233,7 +233,11 @@ function handleRemoveDestination(j, ctx) {
 function handleAddEdge(j, ctx, liveSnapshot) {
 	const suggested = require('../config/device-graph').suggestConnectorsAndDevicesFromLive(liveSnapshot, ctx.config || {})
 	const sid = String(j.addEdge.sourceId), tid = String(j.addEdge.sinkId)
-	const merged = ensureConnectorsFromSuggested(ctx.config?.deviceGraph, [sid, tid], suggested)
+	// WO-1029: a cable left by a destination that no longer exists here must not keep this input occupied
+	const destIds = normalizeScreenDestinations(ctx.config?.screenDestinations).destinations.map((d) => d.id)
+	const freed = require('../config/device-graph-edges').withoutOrphanDestinationEdges(normalizeDeviceGraph(ctx.config?.deviceGraph), destIds, tid)
+	for (const e of freed.orphans) ctx.log?.('info', `[device-view] removed the cable of a deleted destination (${e.sourceId} → ${e.sinkId})`)
+	const merged = ensureConnectorsFromSuggested(freed.graph, [sid, tid], suggested)
 	const res = addEdgeToGraph(merged, sid, tid); if (!res.ok) return { error: res.reason }
 	let nextGraph = res.graph
 	const wired = require('./device-view-decklink-wiring').applyDecklinkOutputOnDestinationEdge(ctx, nextGraph, sid, tid)

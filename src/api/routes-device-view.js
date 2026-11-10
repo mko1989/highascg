@@ -99,7 +99,13 @@ async function handleGet(path, ctx, query, req) {
 			}),
 		}
 	}
-	const graph = withEffectiveSlices(normalizeDeviceGraph(ctx.config?.deviceGraph)) // WO-869: unsaved nodes show their migration
+	// WO-1029: cables of destinations that no longer exist here are not served as cables (no card to hang them on, and
+	// the client would treat their input as taken); they are listed apart and dropped when that input is cabled again.
+	const { withoutOrphanDestinationEdges } = require('../config/device-graph-edges')
+	const { normalizeScreenDestinations: destsOf } = require('../config/screen-destinations')
+	const shown = withoutOrphanDestinationEdges(normalizeDeviceGraph(ctx.config?.deviceGraph), destsOf(ctx.config?.screenDestinations).destinations.map((d) => d.id))
+	const graph = withEffectiveSlices(shown.graph) // WO-869: unsaved nodes show their migration
+	graph.orphanEdges = shown.orphans
 	augmentGraphWithSources(graph, live)
 	const { maskDeviceGraphConnectorKeys } = require('../engine/project-stream-credentials')
 	const payload = {

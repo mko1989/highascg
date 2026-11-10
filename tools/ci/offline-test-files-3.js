@@ -293,6 +293,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1029-drive-gate.test.js',
 	'tools/smoke/smoke-wo1029-incident-replay.test.js',
 	'tools/smoke/smoke-wo1029-ownership.test.js',
+	'tools/smoke/smoke-wo1029-orphan-cables.test.js',
 	'tools/smoke/smoke-wo1029-virtual-remote-client.test.js',
 	'tools/smoke/smoke-wo1029-virtual-takeover.test.js',
 	'tools/smoke/smoke-wo1029-virtual-handover.test.js',

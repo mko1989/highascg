@@ -192,4 +192,34 @@ should be \"shared\""*
 
 Reading (to be confirmed by the owner): no "Edit" switch of the Devices tab to a linked server — every linked
 server's rear panel is in the one view and a destination is cabled straight to a connector of any server; destinations
-are one shared list; only the operator GUI is per server. Plan: `1029_review/06-unified-devices-plan.md` (pending).
+are one shared list; only the operator GUI and the live inputs are per server. Plan:
+[`1029_review/06-unified-devices-plan.md`](./1029_review/06-unified-devices-plan.md) (steps S1–S18, decisions D1–D11; not started).
+
+Owner, same day: *"and distinction in the live inputs is needed apart from gui"* — two things are per server in the
+otherwise shared setup: the operator GUI and the **live inputs** (an input belongs to the box whose hardware it is on;
+a look names "input X of server S", never a channel number — WO-1027).
+
+## Phase 2a verified on the two boxes (10.11, main 832cb496 from the tree, highascg5867 on 2026-11-10T104723Z)
+
+- Gates green, CI green on 832cb496; virtual box bed: remote client 13/13, takeover 11/11 (the stray layer reproduces
+  on the old code), handover 8/8; ownership smoke 18/18; Godot 26654 / 0.
+- **Takeover, live:** main's node frozen 22 s → 5867 master (epoch 12). Main's LED channel unchanged
+  (`10: BIG_BUCK_BUNNY`), although 5867's copy channel held `1: shm visuals` — nothing replayed. Main reports
+  `forwarded_here: [2], mirror: []`, LED = `own`.
+- **A follower drives its own screen:** test card on main's LED → 200, `html` on layer 999 of its own Caspar; 5867 then
+  shows holder `highascg7579`. **The master still can:** 5867's test card on its channel 2 lands on main's LED, holder
+  `self`; off → gone.
+- **Make master on main** (epoch 13, accepted): 5867's channels 2 and 7 and main's LED unchanged — no stray writes.
+- 5867 post-update sweep: 27 pass, 2 warn, 1 fail = `app.logs`, two `403 APPLY FAILED` per node start: the WO-869
+  capability probe (`APPLY 1-65535 SLICES CLEAR`), which runs because the owner's new cabling on 5867 (operator GUI →
+  P1, mapping outputs → P2 / P3) left no screen consumer. Not from this work; the probe's expected 403 should not be
+  logged as an error.
+- WO-1026 harness on the owner's NEW 5867 cabling: 38 pass / 4 fail / 2 warn / 1 skip. T2.4 (Stream PGM no longer on
+  DeckLink 2: cabling), T5.6 (2 log lines), T7.1 and T8.1 (recording 7.1 s of 10 s, 41.4 s of 60 s). The record loss
+  is NOT attributed: it appeared together with the new cabling (a mapping on two GPU heads, shm visuals on 5867's
+  channel 2); the same checks passed at 10:55 on the previous cabling. To be re-run on the old cabling before blaming
+  either.
+- **Orphan cable (owner: "connecting the screen 3 to a mapping node and send it to other box gpu outputs … doesnt let
+  me"):** 5867's Pixel Mapping 1 input was held by the cable of a destination deleted on the other box. Removed by
+  hand; fix: such cables are no longer served as cables and are dropped when that input is cabled again
+  (`device-graph-edges.js`, smoke-wo1029-orphan-cables).

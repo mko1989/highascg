@@ -133,7 +133,41 @@ function pruneDestinationFromGraph(baseGraph, destinationId) {
 	return normalizeDeviceGraph(g)
 }
 
+/** A generated screen-destination id (`dst_<stamp>_<n>`, `dst_operator_gui`) — never a host channel (`host_…`). */
+const DEST_ID_RE = /^dst_(?:[a-z0-9]+_\d+|operator_gui)$/
+
+/**
+ * WO-1029: cables left behind by a destination that no longer exists on this server (a destination removed on a
+ * linked server is pruned only there, so its cable stayed here, invisible — no card — and kept its sink "occupied":
+ * the operator could not cable anything else into that mapping input).
+ * @param {object} graph
+ * @param {string[]} destinationIds ids in this server's screen destinations
+ * @returns {object[]} the orphan edges
+ */
+function orphanDestinationEdges(graph, destinationIds) {
+	const known = new Set((destinationIds || []).map(String))
+	return (graph?.edges || []).filter((e) => {
+		const src = String(e?.sourceId || '')
+		if (!src.startsWith('dst_in_')) return false
+		const ref = src.slice('dst_in_'.length)
+		return DEST_ID_RE.test(ref) && !known.has(ref)
+	})
+}
+
+/** The graph without its orphan destination cables (and their connectors), plus what was taken out. */
+function withoutOrphanDestinationEdges(graph, destinationIds, onlySinkId) {
+	const orphans = orphanDestinationEdges(graph, destinationIds).filter((e) => !onlySinkId || String(e.sinkId) === String(onlySinkId))
+	if (!orphans.length) return { graph, orphans }
+	const gone = new Set(orphans.map((e) => e.id))
+	const edges = (graph.edges || []).filter((e) => !gone.has(e.id))
+	const stillUsed = new Set(edges.flatMap((e) => [String(e.sourceId), String(e.sinkId)]))
+	const dead = new Set(orphans.map((e) => String(e.sourceId)).filter((id) => !stillUsed.has(id)))
+	return { graph: { ...graph, edges, connectors: (graph.connectors || []).filter((c) => !dead.has(String(c?.id))) }, orphans }
+}
+
 module.exports = {
+	orphanDestinationEdges,
+	withoutOrphanDestinationEdges,
 	isCasparOutputConnector,
 	isDestinationInputConnector,
 	isDecklinkIoInputConnector,
