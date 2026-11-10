@@ -98,3 +98,22 @@ directly. GPU utilisation reads 100 % in every state; PCIe bus utilisation 72–
 - The 8K HTML test card alone takes the wall from 52 to 36 fps and Caspar to 420 % CPU.
 - So the choices are: the tiled destination as PGM only (no 8K PRV channel at all), or the meter-consumer change the
   owner declined, or a PRV channel at a reduced raster.
+
+## Fourth measurement (10.11 ~16:00) — cost of watching the wall from the other box (WO-1029 picture relay)
+
+5867 on 2026-11-10T150805Z, 2 channels (GUI + wall PGM 7680x2160p50), wall content light (clip + visuals layer).
+Wall fps = screen consumer `presented_frames` of channel 2; CPU from `top` (20 threads = 2000 %).
+
+| Who watches the wall | Wall fps | Dropped | GPU | Caspar CPU | SHM consumer on ch 2 |
+|---|---|---|---|---|---|
+| Nobody (both clients closed) | 50.0 | 0 | 62–64 % | ~12 % | no |
+| Only 7579 (relayed tile) | 50.0 | 0 | 64 % | ~141 % | yes |
+| Only 5867's client open | 50.0 | 0 | 91 % | ~122 % | **no** |
+| Both | 50.0 | 0 | 89–91 % | ~300–400 % | yes |
+
+- The relay costs about 1.3–2 CPU threads of Caspar on the wall's box and no GPU. The wall kept 50 fps, 0 drops.
+- Cause: `modules/shm/consumer` publishes every frame at full size (66 MB x 50/s) for a 480 px / 10 fps picture.
+  A reduced publish (every Nth frame and/or a scaled copy) needs a Caspar change — not done.
+- The GPU step 64 → 91 % comes from 5867's own client (visuals layer), not from the relay.
+- With only 5867's client open there was no SHM consumer on the wall channel: its own wall tile was not leasing
+  at that moment (tab not checked) — open.
