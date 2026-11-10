@@ -164,3 +164,22 @@ From report 02 section 3 and report 03 section 3:
 2. **A new master's catch-up replays its own copy channel onto the other box's screen** (B5): a probe layer put on
    5867's ch 2 (`PLAY 2-99 EMPTY`) appeared on main's LED channel after 5867 took over. Cure = the same ownership
    rule: catch-up only for destinations the master holds.
+
+## Remote operator client (owner, 10.11)
+
+Research: [`1029_review/05-remote-client.md`](./1029_review/05-remote-client.md) — builds, connecting, auth, pictures,
+what degrades off the box, two boxes.
+
+Owner: *"when i run the godot client on my mac, i want to connect it to one of my boxes, making it work like a local
+on that box, but with a good handover system for backup."* — *"Say im connected to the master and driving it as a
+local, in case of the master failaure i want to be moved to the backup/follower, so i have controll etc."* After the
+first box is back: stay and offer to go back. Handover targets: the box's linked servers, learned from the box.
+Rule 6 added to RULES.md "Linked servers".
+
+Design: automatic move only when a linked server confirms the loss (it is master now, or lists the box offline);
+an offer when only the client's own path is broken; never for the on-box client; persistent amber cue; no flapping.
+
+Owner, same day: *"i dont want this godot client a/b the whole linking system is done in a different place and no need
+for additional linking options"* — the client's A/B host slots go. A remote client has ONE server address
+(`--server`, `HIGHASCG_SERVER`, or the single address in the connection menu); every other box it may move to comes
+from the connected box's linked servers.

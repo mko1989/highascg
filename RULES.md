@@ -31,6 +31,11 @@ one is a regression, whatever else it fixes. Add a rule here when the owner stat
    goes back to.
 5. **No silent fallback.** The header always shows which server the client is connected to ("local", or amber
    "on <host>").
+6. **A remote client hands over; the on-box client never does** (owner, 10.11, WO-1029). A client the operator
+   pointed at another machine works like a local client of that box. When that box is gone and a linked server
+   confirms it (it is master now, or lists the box offline), the client moves to that server by itself, with a
+   persistent amber cue; when the first box is back it stays and offers to return. Targets are the box's linked
+   servers as the box reports them. A client on loopback stays on its own node, whatever happens.
 
 ## Test tooling (owner, 30.10, WO-836)
 
