@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-937 live WOs (32 open, 128 in progress, 777 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+938 live WOs (33 open, 128 in progress, 777 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -820,7 +820,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 996 DONE [os-iso+process] Retire the dd-flash / scripted-partition stick tools (sticks are Ventoy-only) → 996_WO_retire_dd_flash_stick_tools.md
 - 1023 DONE [os-iso+caspar-build] Web-UI update "FAILED" on boxes without the drop-update volume (and no Caspar s… → 1023_WO_update_apply_fails_without_drop_volume.md
 
-## network — Cluster, replication, Tailscale, auth (44)
+## network — Cluster, replication, Tailscale, auth (45)
 
 - 13 DONE [network+companion] Final Polish & Security Hardening → 13_WO_FINAL_POLISH_AND_HARDENING.md
 - 15 DONE [network+web-client] Client-Server Preshow Sync & Split Architecture → 15_WO_CLIENT_SERVER_SYNC.md
@@ -866,6 +866,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 986 DONE [network+media,testing-ci] Security sweep of the node server and tools → 986_WO_security_sweep.md
 - 1017 IN PROGRESS [network+mapping] A screen destination rendered on the linked server (mapping node → the peer's D… → 1017_WO_screen_destination_rendered_on_peer_server.md
 - 1028 OPEN [network+video-io,tracking-vr,devices-config] Two-server workflow: the small findings of the WO-1026 runs → 1028_WO_two_server_workflow_small_findings.md
+- 1029 OPEN [network+engine,testing-ci,devices-config] Linked servers: full review, link kinds (one operator / peers), identity that s… → 1029_WO_linked_servers_review_and_link_kinds.md
 
 ## media — Media library, thumbnails, ingest, transcode (25)
 
