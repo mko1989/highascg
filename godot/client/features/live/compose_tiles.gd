@@ -70,6 +70,7 @@ func _ready() -> void:
 	_over.z_index = 1
 	_over.draw.connect(_draw_over)
 	add_child(_over)
+	add_child(preload("res://features/live/compose_remote_feed.gd").new(self))  # WO-1029 C9: relayed pictures
 	_retile_timer = Timer.new()
 	_retile_timer.one_shot = true
 	_retile_timer.wait_time = 0.25  # a panel drag-resize posts once it settles, not per frame
@@ -217,14 +218,7 @@ func _screen(i: int) -> Rect2:
 	return Rect2(ir.position + p.position * k, p.size * k)
 
 func label_text(c: Dictionary) -> String:
-	var r := str(c.get("role", ""))
-	if r in ["pgm", "prv"]:
-		var mi := int(c.get("mainIndex", 0))
-		var cm: Variant = Store.get_value("channelMap", {})
-		var sl := RC.screen_label(c, cm)  # WO-1029: by destination id first
-		var cue := SC.cue(cm, mi, Store.cluster)  # WO-1029 C15
-		return "%s %d / %s%s" % [r.to_upper(), mi + 1, sl, " · " + cue if cue != "" else ""]
-	return str(c.get("label", c.get("id", r)))
+	return CR.label_text(c)  # WO-1029: moved to compose_remote.gd (this file is at its line limit)
 
 
 func _draw() -> void:

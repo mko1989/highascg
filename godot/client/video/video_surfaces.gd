@@ -6,12 +6,15 @@ extends Node
 ## Uses the hshm GDExtension when installed (godot/extensions/hshm/build.sh), else the GDScript reader.
 ## WO-670 P1: when the server is on another machine (or `--video=feed`) there is no /dev/shm to read — every role's
 ## reader is then a video_feed.gd RoleReader fed by one JPEG WebSocket; textures, holders and leases are unchanged.
+## WO-1029 C9: per-role transport — a role the node marks `transport: "feed"` (a screen on another linked server,
+## relayed by the node: feed_roles.gd) is read from the node's feed even on the box; the others keep shm.
 
 const ShmReader := preload("res://video/shm_reader.gd")
 const ShmNative := preload("res://video/shm_native.gd")
 const ShmTexture := preload("res://video/shm_texture.gd")
 const SurfaceHolders := preload("res://video/surface_holders.gd")
 const VideoFeed := preload("res://video/video_feed.gd")
+const FeedRoles := preload("res://video/feed_roles.gd")
 const Demo := preload("res://core/demo/demo_server.gd")
 const DemoVideo := preload("res://core/demo/demo_video.gd")
 const DemoStage := preload("res://core/demo/demo_stage.gd")
@@ -26,6 +29,7 @@ var _surfaces := {}  # role -> { reader, tex, native, path }
 var holders := SurfaceHolders.new()  # WO-617: only held roles are polled, uploaded and leased
 var _timer: Timer
 var feed: VideoFeed = null  # WO-670 P1: set when pictures come over the network
+var local_feed: VideoFeed = null  # WO-1029 C9: on the box, the node's feed for relayed roles only (made on first use)
 var _stage: DemoStage = null  # WO-865: a demo's display engine (SubViewports are the role textures)
 
 
@@ -79,6 +83,31 @@ func is_held(role: String) -> bool:
 	return holders.is_held(role)
 
 
+## WO-1029 C9: does the node relay this role from another linked server (its picture comes over the feed)?
+func relayed(role: String) -> bool:
+	return FeedRoles.is_relayed(descriptors.get(role))
+
+
+## WO-1029 C9: the owner's name of a relayed role ("" when it is not relayed).
+func relay_server(role: String) -> String:
+	return FeedRoles.server_name(descriptors.get(role))
+
+
+func _relay_feed() -> VideoFeed:
+	if local_feed == null:
+		local_feed = VideoFeed.new(VideoFeed.url_for(Config.origin, Config.args))
+	return local_feed
+
+
+## The reader of `role` for its transport: the network feed (remote client / relayed role) or shared memory.
+func _reader_for(role: String, path: String, native: bool) -> Variant:
+	if feed != null:
+		return feed.reader(role)
+	if relayed(role):
+		return _relay_feed().reader(role)
+	return ShmNative.new(path) if native else ShmReader.new(path)
+
+
 func _ensure(role: String) -> Dictionary:
 	if not _surfaces.has(role):
 		var path := path_for(role)
@@ -87,10 +116,11 @@ func _ensure(role: String) -> Dictionary:
 		if Config.demo:  # WO-815 phase 2: the look the simulated server has on that bus, as a still
 			r = DemoVideo.new(role, Demo.shared())
 		else:
-			r = feed.reader(role) if feed != null else (ShmNative.new(path) if native else ShmReader.new(path))
+			r = _reader_for(role, path, native)
 		# WO-865: in a demo the texture is the engine's SubViewport, nothing is uploaded
 		var tex: Variant = {"texture": demo_stage().texture(role)} if Config.demo else ShmTexture.new()
-		_surfaces[role] = {"reader": r, "tex": tex, "native": native, "path": path}
+		var via := feed != null or (not Config.demo and relayed(role))
+		_surfaces[role] = {"reader": r, "tex": tex, "native": native and not via, "path": path, "via_feed": via}
 	return _surfaces[role]
 
 
@@ -136,10 +166,14 @@ func _apply_descriptors(list: Variant) -> void:
 		return  # the feed reads by role on the server (a demo draws its stills); no local path to reopen
 	for role in _surfaces.keys():
 		var want := path_for(role)
-		if want != str(_surfaces[role].path):
-			# swap the reader only — the Texture2D object must stay the same for everything bound to it
-			var s: Dictionary = _surfaces[role]
-			s.reader = ShmNative.new(want) if s.native else ShmReader.new(want)
+		var s: Dictionary = _surfaces[role]
+		if relayed(role) != bool(s.get("via_feed", false)) or (not s.via_feed and want != str(s.path)):
+			# swap the reader only — the Texture2D object must stay the same for everything bound to it (WO-1029 C9: a
+			# screen that moved to / from another server swaps transport the same way)
+			var native := relayed(role) == false and is_native()
+			s.reader = _reader_for(role, want, native)
+			s.native = native
+			s.via_feed = relayed(role)
 			s.path = want
 
 
@@ -151,13 +185,15 @@ func _process(_delta: float) -> void:
 		return
 	if feed != null:
 		feed.pump(holders.roles())
+	elif local_feed != null:
+		local_feed.pump(FeedRoles.feed_roles(holders.roles(), descriptors, false))
 	for role in holders.roles():
 		var s: Dictionary = _ensure(role)
 		var r: Variant = s.reader
 		if r.poll():
 			if s.native:
 				s.tex.update_native(r.src)
-			elif feed != null or Config.demo:
+			elif feed != null or Config.demo or s.get("via_feed", false):
 				s.tex.update_rgba(r.frame, r.width, r.height)
 			else:
 				s.tex.update(r.frame, r.width, r.height)

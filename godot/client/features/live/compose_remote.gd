@@ -1,9 +1,23 @@
 extends RefCounted
 ## WO-1029 plan 07 (C15) — a Live compose tile (PGM / PRV window) whose screen is output by another linked server:
-## no picture exists here (the relay is a later step), so the window is a quiet labelled placeholder.
+## the server routes nothing into its slot, so the window is a quiet labelled placeholder. C9: when the node relays the
+## owner's picture, compose_remote_feed.gd draws it over this placeholder (the "on <box>" cue stays on the picture).
 
 const RC := preload("res://features/live/remote_cue.gd")
 const SC := preload("res://core/screen_channels.gd")
+const RCn := preload("res://features/live/compose_reconcile.gd")
+
+
+## The label strip of a compose window ("PGM 3 / LED wall · on highascg5867"; compose_tiles.gd label_text).
+static func label_text(c: Dictionary) -> String:
+	var r := str(c.get("role", ""))
+	if r in ["pgm", "prv"]:
+		var mi := int(c.get("mainIndex", 0))
+		var cm: Variant = Store.get_value("channelMap", {})
+		var sl := RCn.screen_label(c, cm)  # WO-1029: by destination id first
+		var cue := SC.cue(cm, mi, Store.cluster)  # WO-1029 C15
+		return "%s %d / %s%s" % [r.to_upper(), mi + 1, sl, " · " + cue if cue != "" else ""]
+	return str(c.get("label", c.get("id", r)))
 
 
 static func is_remote(c: Dictionary) -> bool:

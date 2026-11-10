@@ -203,7 +203,10 @@ function createVideoSurfaceManager(deps) {
 	/** WO-1026: does this server have a channel for `role` (a DeckLink input, a PGM / PRV, a Caspar channel)? */
 	const has = (role) => resolveRoleChannel(role, deps.getChannelMap()) != null
 
-	return { lease, sweep, onCasparReady, list, has, _state: { leases, active } }
+	/** WO-1029 C9: does some client hold a live lease on `role` (feed-relay.js keeps an upstream only while one does)? */
+	const leased = (role) => [...(leases.get(String(role))?.values() || [])].some((exp) => exp > now())
+
+	return { lease, sweep, onCasparReady, list, has, leased, _state: { leases, active } }
 }
 
 let singleton = null

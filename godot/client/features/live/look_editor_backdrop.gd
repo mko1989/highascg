@@ -14,6 +14,12 @@ static func _autoload(name: String) -> Node:
 	return (Engine.get_main_loop() as SceneTree).root.get_node_or_null(name)
 
 
+## WO-1029 C9: does this client's node relay `role` from the screen's owner (VideoSurfaces descriptor)?
+static func _relayed(role: String) -> bool:
+	var vs := _autoload("VideoSurfaces")
+	return vs != null and vs.has_method("relayed") and bool(vs.call("relayed", role))
+
+
 static func _cm() -> Dictionary:
 	var cm: Variant = _autoload("Store").get_value("channelMap", {})
 	return cm if cm is Dictionary else {}
@@ -30,7 +36,8 @@ static func open_with(ed: Control, cm: Dictionary, make_thumb := Callable()) -> 
 	if ed._thumb != null:
 		ed._thumb.queue_free()
 		ed._thumb = null
-	var prv := DeckModel.preview_bus_available(cm, ed.main) and SC.is_here(cm, ed.main)  # WO-1029: no PRV picture of a remote screen
+	# WO-1029 C9: a remote screen's PRV when its owner's picture is relayed (small, ~10 fps); otherwise thumbnails
+	var prv := DeckModel.preview_bus_available(cm, ed.main) and (SC.is_here(cm, ed.main) or _relayed("prv%d" % (ed.main + 1)))
 	ed._video.visible = prv
 	if prv:
 		var role := "prv%d" % (ed.main + 1)

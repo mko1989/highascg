@@ -1,7 +1,7 @@
 extends Label
 ## WO-1029 plan 07 (C15) — the quiet "on <box>" cue of a screen that is output by ANOTHER linked server: in the Live
-## deck column (instead of the PGM timer), and its text for the compose tiles. The picture relay is a later step, so
-## this is a labelled placeholder plus whatever the owner reports in scene.remoteLive (look on PGM / PRV, extrapolated
+## deck column (instead of the PGM timer), and its text for the compose tiles. C9: the compose window shows the relayed
+## picture (compose_remote_feed.gd); this cue stays the label plus whatever the owner reports in scene.remoteLive (look on PGM / PRV, extrapolated
 ## playback time, test card / FTB). Older server without remoteLive: just "on <box>". unknown is shown as unknown ("?"),
 ## never as "nothing on air" (remote_air_model.gd).
 
@@ -72,4 +72,5 @@ func _on_changed(path: String, _v: Variant) -> void:
 func _refresh() -> void:
 	var l := lines(Store.get_value("channelMap", {}), Store.cluster, Store.get_value("scene", {}), main, Time.get_ticks_msec() - _seen_ms)
 	text = "   ·   ".join(PackedStringArray(l))
-	tooltip_text = "This screen is output by another linked server — drive it from there (a picture of it is not relayed yet)."
+	# WO-1029 C9: the Live window shows a small relayed picture (when that server relays); multiview cells and audio do not
+	tooltip_text = "This screen is output by another linked server — drive it from there. Its Live window shows a small picture relayed through this server; its multiview cells and its audio are not relayed."
