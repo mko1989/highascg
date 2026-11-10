@@ -86,7 +86,7 @@ static func source_aspect(c: Dictionary, cm: Variant) -> float:
 	var m: Dictionary = cm if cm is Dictionary else {}
 	var mi := int(c.get("mainIndex", -1))
 	var chans: Variant = m.get("programChannels" if str(c.get("role", "")) == "pgm" else "previewChannels")
-	if chans is Array and mi >= 0 and mi < chans.size():
+	if chans is Array and mi >= 0 and mi < chans.size() and chans[mi] != null:  # WO-1029: null = screen not on this server
 		var by: Variant = m.get("channelResolutionsByChannel")
 		var res: Variant = (by as Dictionary).get(str(int(chans[mi]))) if by is Dictionary else null
 		if res is Dictionary and float(res.get("w", 0)) > 0 and float(res.get("h", 0)) > 0:

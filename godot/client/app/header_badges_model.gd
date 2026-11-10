@@ -93,6 +93,8 @@ static func timer_chips(cm: Dictionary) -> Array:
 	var labels: Array = cm.get("screenLabels", []) if cm.get("screenLabels") is Array else []
 	var out: Array = []
 	for i in list.size():
+		if list[i] == null:
+			continue  # WO-1029: a screen that is not on this server has no channel here — no timer chip
 		var full := str(labels[i]) if i < labels.size() and str(labels[i]) != "" else "S%d" % (i + 1)
 		var short := full.strip_edges().substr(0, 3)
 		out.append({"main": i, "channel": int(list[i]), "label": short if short != "" else "P%d" % (i + 1), "tip": "Show playback timer for %s (channel %d)" % [full, int(list[i])]})
@@ -107,8 +109,17 @@ static func monitor_options(cm: Dictionary) -> Dictionary:
 		return {"title": "", "note": "", "options": []}
 	var pgm: Array = cm.get("programChannels", [1]) if cm.get("programChannels") is Array else [1]
 	var prv: Array = cm.get("previewChannels", [2]) if cm.get("previewChannels") is Array else [2]
-	var opts := [{"id": "pgm_1", "label": "PGM · ch %d" % int(pgm[0] if not pgm.is_empty() else 1)},
-		{"id": "prv_1", "label": "PRV · ch %d" % int(prv[0] if not prv.is_empty() else 2)}]
+	# WO-1029: the first screen that IS on this server (a null entry = a screen cabled on another server)
+	var first := 0
+	for i in pgm.size():
+		if pgm[i] != null:
+			first = i
+			break
+	var opts := []
+	if first < pgm.size() and pgm[first] != null:
+		opts.append({"id": "pgm_%d" % (first + 1), "label": "PGM · ch %d" % int(pgm[first])})
+	if first < prv.size() and prv[first] != null:
+		opts.append({"id": "prv_%d" % (first + 1), "label": "PRV · ch %d" % int(prv[first])})
 	if cm.get("multiviewCh") != null:
 		opts.append({"id": "multiview", "label": "Multiview · ch %d" % int(cm.multiviewCh)})
 	if preview_on:

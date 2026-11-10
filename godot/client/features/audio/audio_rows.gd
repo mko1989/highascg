@@ -341,7 +341,7 @@ static func screen_label(cm: Dictionary, ch: int) -> String:
 	var idx := -1
 	if progs is Array:
 		for i in progs.size():
-			if int(progs[i]) == ch:
+			if progs[i] != null and int(progs[i]) == ch:  # WO-1029: null = screen not on this server
 				idx = i
 				break
 	if idx < 0:
