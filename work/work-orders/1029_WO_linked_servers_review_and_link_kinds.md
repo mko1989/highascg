@@ -256,3 +256,17 @@ Caspar.
 - Open: the virtual bed's fake looks do not alternate banks (the scenario could not have caught this); a program
   channel in bus mode was not considered; CG templates played by hand outside a look come back without their data;
   mixer state set outside a look is not captured.
+
+### Two-box Apply on the real boxes (10.11 12:53, 5867 on 2026-11-10T113912Z, main on 87f8643b)
+
+- 5867 updated (owner's go): sweep 27 pass, 3 warn, 0 fail. Plan: both servers `clean`, build `current`.
+- `POST /api/cluster/apply {servers: [highascg5867]}` on main: 3.5 s. **Only 5867's Caspar restarted** (pid
+  2415357 → 2424359); main's Caspar pid and its LED channel unchanged, main reported `skipped: clean`.
+- 5867 restored its own screens in 349 ms: looks on its channels 5 and 7 re-taken, 1 clip.
+- Seen: the look on Stream PGM was on layer 110 before (written there by the master's AMCP mirror, on the MASTER's
+  bank) and came back on layer 10 — 5867's node did not know the mirror's bank (its own pointer said A), so it
+  reported the layer 110 route as a leftover. One copy on screen, but the two nodes now disagree about the bank until
+  the next take. Root cause is the Caspar-to-Caspar mirror (the follower's node does not see what the master writes);
+  it goes away with node-to-node `dest.*` calls (plan 07).
+- After its restore 5867 holds PGM/PRV 3 and Stream PGM (`it holds it now`): the master replays nothing there until
+  its operator presses.
