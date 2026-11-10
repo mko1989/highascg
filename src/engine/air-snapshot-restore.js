@@ -142,6 +142,11 @@ async function restoreChannels(ctx, snap, { deps: injected, newRoles } = {}) {
 	const cardActive = !!snap.card?.active
 	const list = [...(snap.channels || [])].sort((a, b) => (KIND_ORDER[a.kind] ?? 2) - (KIND_ORDER[b.kind] ?? 2) || a.channel - b.channel)
 	for (const sc of list) {
+		// WO-1029: the operator GUI channel and the multiview channels are laid out by their own modules on every
+		// connect (operator-gui-channel.js, multiview apply: route layers WITH their MIXER FILL, from the CURRENT
+		// channel map). Replaying the snapshot's routes there put plain full-frame routes — and routes to the OLD
+		// channel numbers — over that layout: the Live tiles went black after an Apply (5867, 10.11).
+		if (/^(opgui|mv):/.test(String(sc.role || ''))) continue
 		if (!sc.layers?.length) continue
 		const ch = mapChannel(sc.channel)
 		const name = `${sc.label || sc.role} (was ch ${sc.channel})`

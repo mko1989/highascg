@@ -44,6 +44,29 @@ static func server_name(e: Dictionary) -> String:
 	return str((s as Dictionary).get("name", (s as Dictionary).get("id", ""))) if s is Dictionary else ""
 
 
+## Current position (s) of a reported clip {position_s, length_s|null, paused, loop, age_ms}: position_s plus (paused ? 0 :
+## age_ms/1000 + the time since the message arrived), wrapped by length_s when it loops, else clamped to it.
+static func clip_pos_s(c: Dictionary, waited_ms := 0.0) -> float:
+	var pos := float(c.get("position_s", 0.0))
+	if c.get("paused") != true:
+		pos += maxf(0.0, float(c.get("age_ms", 0.0))) / 1000.0 + maxf(0.0, waited_ms) / 1000.0
+	var len: Variant = c.get("length_s")
+	if len != null and float(len) > 0.0:
+		pos = fposmod(pos, float(len)) if c.get("loop") == true else minf(pos, float(len))
+	return pos
+
+
+## The first reported clip of bus "pgm" | "prv" as {name, pos_s} ({} when none / unknown).
+static func clip_of(e: Dictionary, bus: String, waited_ms := 0.0) -> Dictionary:
+	if not is_known(e):
+		return {}
+	for c in (e.get("clips") if e.get("clips") is Array else []):
+		if c is Dictionary and str(c.get("bus", "pgm")) == bus:
+			var segs := str(c.get("clip", "")).replace("\\", "/").split("/", false)
+			return {"name": segs[segs.size() - 1] if segs.size() > 0 else "", "pos_s": clip_pos_s(c, waited_ms)}
+	return {}
+
+
 ## "on" | "off" | "unknown" for `testcard` / `ftb`.
 static func flag(e: Dictionary, key: String) -> String:
 	if not is_known(e) or not e.has(key) or e.get(key) == null:

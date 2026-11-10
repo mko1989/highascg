@@ -32,10 +32,15 @@ static func lines(cm: Variant, cluster: Variant, scene: Variant, idx: int, waite
 	var s := RA.summary(e)
 	if s != "":
 		out.append(s)
-	elif RA.is_known(e) == false and not (scene is Dictionary and (scene as Dictionary).has("remoteLive")):
+	elif not (scene is Dictionary and (scene as Dictionary).has("remoteLive")):
 		pass  # older server: nothing but the cue
 	else:
-		out.append("on air: unknown")
+		var who := RA.server_name(e)
+		out.append("unknown on " + (who if who != "" else cue.trim_prefix("on ")))  # never the last thing seen
+	for bus in ["pgm", "prv"]:
+		var c := RA.clip_of(e, bus, waited_ms)
+		if not c.is_empty():
+			out.append("%s clip %s %d:%02d" % [bus.to_upper(), c.name, int(c.pos_s / 60.0), int(c.pos_s) % 60])
 	var ms := RA.timer_ms(e, waited_ms)
 	if ms >= 0.0:
 		out.append("%d:%02d" % [int(ms / 60000.0), int(ms / 1000.0) % 60])

@@ -189,7 +189,11 @@ static func quick_info(row: Dictionary) -> String:
 ## WO-818 — NotchLC rows are marked in the media tree: stock Caspar decodes them on the CPU (ffmpeg's notchlc decoder);
 ## the HighAsCG build decodes them on the GPU (WO-820).
 ## The probed codec decides; the file name ("…notchlc…") only when nothing was probed.
-const NOTCHLC_TIP := "NotchLC: the HighAsCG Caspar build decodes it on the GPU. Stock CasparCG decodes it on the CPU, far heavier than HAP.\nOn a stock Caspar, transcode it to HAP in HighAsCG before using it on air."
+## Owner 10.11: it read as a warning although this build decodes it on the GPU — a neutral codec tag now (no ⚠, muted).
+## The state carries no field that says whether the Caspar has the GPU decoder (serverInfo.version is "2.5.1 <sha> Stable" for
+## stock and HighAsCG builds alike), so the neutral form is always used; NOTCHLC_TIP_STOCK is for a server that reports one.
+const NOTCHLC_TIP := "NotchLC — decoded on the GPU by the HighAsCG Caspar build"
+const NOTCHLC_TIP_STOCK := "NotchLC: this Caspar decodes it on the CPU, far heavier than HAP.\nTranscode it to HAP in HighAsCG before using it on air."
 
 
 static func is_notchlc(row: Dictionary) -> bool:

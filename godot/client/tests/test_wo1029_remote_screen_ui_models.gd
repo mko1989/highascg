@@ -39,7 +39,7 @@ func test_remote_cue_lines() -> void:
 	t.eq(RC.lines(A, CL, {}, 2), ["on highascg5867"], "older server: only the cue")
 	var sc := {"remoteLive": [null, null, {"server": {"id": "x", "name": "Z"}, "unknown": false, "pgm": {"sceneId": "a", "name": "Loop"}, "prv": null, "timeline": {"state": "playing", "position_ms": 61000, "age_ms": 0}}, null]}
 	t.eq(RC.lines(A, CL, sc, 2, 1000.0), ["on Z", "PGM Loop · PRV —", "1:02"], "look and extrapolated time")
-	t.eq(RC.lines(A, CL, sc, 3), ["on highascg5867", "on air: unknown"], "unknown stays unknown")
+	t.eq(RC.lines(A, CL, sc, 3), ["on highascg5867", "unknown on highascg5867"], "unknown stays unknown")
 
 
 func test_destination_card_cue() -> void:
@@ -77,3 +77,24 @@ func test_timeline_dest_and_timer() -> void:
 	t.eq(o.map(func(x: Array) -> String: return x[0]), ["All screens", "PGM/PRV 1", "to zoom · on highascg5867", "PGM/PRV 3 · on highascg5867", "Stream PGM · on highascg5867"], "remote targets are marked")
 	t.eq(PT.resolve_pgm(B, {}, 0).channel, 0, "timer of a remote screen: no channel")
 	t.eq(PT.resolve_pgm(B, {}, 2).channel, 2, "timer of a local screen")
+
+
+func test_clip_position_and_unknown_wording() -> void:
+	const RA := preload("res://features/live/remote_air_model.gd")
+	t.eq(RA.clip_pos_s({"position_s": 10.0, "paused": false, "age_ms": 500, "length_s": 100.0}, 500.0), 11.0, "playing: + age + waited")
+	t.eq(RA.clip_pos_s({"position_s": 10.0, "paused": true, "age_ms": 5000}, 5000.0), 10.0, "paused: fixed")
+	t.eq(RA.clip_pos_s({"position_s": 9.0, "age_ms": 3000, "length_s": 10.0, "loop": true}), 2.0, "loop wraps")
+	t.eq(RA.clip_pos_s({"position_s": 9.0, "age_ms": 3000, "length_s": 10.0, "loop": false}), 10.0, "no loop: clamped")
+	var sc := {"remoteLive": [null, null, {"server": {"id": "b", "name": "B"}, "unknown": false, "pgm": {"sceneId": "a", "name": "L"}, "prv": null, "timeline": {"state": "held", "position_ms": 1000, "age_ms": 9000},
+		"clips": [{"bus": "pgm", "clip": "m/x.mp4", "position_s": 3.0, "paused": false, "age_ms": 0, "length_s": null}]}, {"server": {"id": "b", "name": "B"}, "unknown": true, "last_seen_age_ms": 20000, "pgm": null, "prv": null, "timeline": null, "clips": []}]}
+	t.eq(RA.timer_ms(RA.entry(sc, 2), 5000.0), 1000.0, "held does not run")
+	t.eq(RC.lines(A, CL, sc, 2)[2], "PGM clip x.mp4 0:03", "clip line")
+	t.eq(RC.lines(A, CL, sc, 3), ["on B", "unknown on B"], "unknown entry: no content")
+
+
+func test_atlas_slot_of_box_b_own_screen() -> void:
+	# the Live tile of box B's own screen 3 finds its slot by id (not by position)
+	const TM := preload("res://features/live/compose_tile_math.gd")
+	var atlas := {"slots": {"pgm_3": {"x": 0.62, "y": 0.0, "w": 0.19, "h": 0.094}, "prv_3": {"x": 0.38, "y": 0.0, "w": 0.23, "h": 0.117}}}
+	t.ok(TM.slot_px(atlas, "pgm_3", Vector2(1920, 1080)).size.x > 0.0, "pgm_3 has its slot")
+	t.eq(TM.source_aspect({"role": "pgm", "mainIndex": 2}, B), 16.0 / 9.0, "B pgm aspect without resolutions")

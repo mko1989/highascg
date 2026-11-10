@@ -226,6 +226,20 @@ describe('WO-1029 C1b live state / air', () => {
 		assert.equal(out.skipped.length, 1)
 		assert.match(out.skipped[0].why, /NOT_HERE/)
 		assert.equal(rolesOf(off5867()).notHere.size, 0, 'flag off: no role is ever "not here"')
+		// WO-1029: the operator GUI / multiview channels are laid out by their own modules on every connect (routes WITH
+		// their MIXER FILL, from the current map) — the snapshot's plain routes are never replayed over them
+		// (5867, 10.11: Live tiles black after an Apply; routes to the old channel numbers on the operator channel).
+		let asked = 0
+		snap.channels = [
+			{ channel: 1, role: 'opgui:0', label: 'Operator GUI', kind: 'other', layers: [{ layer: 10, producer: 'route', route: 'route://5' }, { layer: 14, producer: 'route', route: 'route://7' }] },
+			{ channel: 9, role: 'mv:0', label: 'Multiview', kind: 'other', layers: [{ layer: 10, producer: 'route', route: 'route://2' }] },
+		]
+		const gui = await restoreChannels({ config: on5867() }, snap, {
+			deps: { getChannelMap, airHeld: () => null, info: async () => void asked++, send: async () => void asked++ },
+			newRoles: after,
+		})
+		assert.deepEqual(gui, { clips: [], layers: [], skipped: [] }, 'nothing planned, nothing reported for them')
+		assert.equal(asked, 0, 'Caspar is not even asked about those channels')
 	})
 })
 

@@ -1,5 +1,5 @@
 extends RefCounted
-## WO-818 — the media tree's NotchLC warning: which rows get the ⚠ (media_ops.is_notchlc) and its tooltip text.
+## WO-818 — the media tree's NotchLC tag: which rows get the ⚠ (media_ops.is_notchlc) and its tooltip text.
 
 const O := preload("res://features/live/media_ops.gd")
 var t
@@ -22,7 +22,8 @@ func test_file_name_fallback_only_without_codec() -> void:
 	t.ok(not O.is_notchlc({}), "empty row")
 
 
-func test_tooltip_is_two_lines() -> void:
-	t.eq(O.NOTCHLC_TIP.split("\n").size(), 2, "two lines")
-	t.ok(O.NOTCHLC_TIP.contains("GPU") and O.NOTCHLC_TIP.contains("CPU") and O.NOTCHLC_TIP.contains("transcode it to HAP in HighAsCG"), "WO-820: GPU here, CPU on stock, what to do there")
-	t.ok(not O.NOTCHLC_TIP.contains("ffmpeg"), "no command line: HighAsCG transcodes to HAP itself")
+func test_tooltip_is_a_neutral_tag() -> void:
+	# owner 10.11: no warning form while the client cannot know the Caspar lacks the GPU decoder
+	t.eq(O.NOTCHLC_TIP, "NotchLC — decoded on the GPU by the HighAsCG Caspar build", "neutral text")
+	t.ok(not O.NOTCHLC_TIP.contains("⚠") and not O.NOTCHLC_TIP.contains("CPU"), "no warning wording")
+	t.ok(O.NOTCHLC_TIP_STOCK.contains("CPU") and O.NOTCHLC_TIP_STOCK.contains("Transcode it to HAP in HighAsCG"), "stock form kept for a server that reports it")
