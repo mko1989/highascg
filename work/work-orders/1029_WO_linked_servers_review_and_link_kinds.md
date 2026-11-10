@@ -100,15 +100,21 @@ From report 02 section 3 and report 03 section 3:
 - The direct AMCP mirror stays only as an opt-in frame-accurate backup transport, and takes over the old pair.
 - Shared show: per-link sharing, destinations carry their owner, peers get a symmetric merge.
 
-Open questions for the owner: failback after the old master returns; link kind per cluster or per link; what a local
-press on a backup destination does; whether the old pair is retired into the backup mode.
+**Owner's answers (10.11):**
+1. **Failback:** stay where it is. Whoever took over stays master until an operator presses Make master.
+2. **Link kind:** per link (each pair of servers has its own kind), not one per cluster.
+3. **A press on the backup box of a hot-backup destination:** sent to the master; played locally and marked
+   "diverged" when the master does not answer in about 1 s.
+4. **The old pair (`src/replication/`):** folded into the link. Hot backup is a link mode; the direct AMCP mirror
+   stays only as an opt-in frame-accurate backup transport; the separate pair UI and roles are retired.
 
 ## Work
 
 - [ ] P1a identity hello + proof
 - [ ] P1b mastership
 - [ ] P1c drive gate
-- [ ] P1d hardware id
+- [x] P1d hardware id — one rule for the boot unit and the node; a hostname one of the box's NICs derives wins over a
+      flipped file (this box: file said 7580, name 7579 → stays 7579, file repaired on the next start)
 - [ ] P1e harness + incident replay
 - [ ] Phase 1 on both boxes (update 5867, change an address under a live link, reboot each box)
 - [ ] Phase 2 after the owner's answers

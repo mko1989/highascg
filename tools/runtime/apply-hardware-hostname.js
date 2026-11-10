@@ -2,8 +2,11 @@
 'use strict'
 
 const fs = require('fs')
+const path = require('path')
 const { execFileSync } = require('child_process')
 const { ensureHardwareHostname, HARDWARE_IDENTITY_PATH } = require('../../src/system/hardware-identity')
+const { loadNetworkConfig } = require('../../src/system/hardware-identity-select')
+const { REPO_ROOT } = require('../../src/repo-paths')
 
 /**
  * Boot / manual apply: migrate clone ISO hostnames (highascg-nvidia-*) → highascg####.
@@ -15,7 +18,8 @@ function log(level, msg) {
 	else console.log(line)
 }
 
-const hw = ensureHardwareHostname({ log })
+// WO-1029 P1d: read the same config.network the node reads (it used to pass none -> eno1 -> 7580 vs node 7579).
+const hw = ensureHardwareHostname({ log, config: { network: loadNetworkConfig(path.join(REPO_ROOT, 'config')) } })
 
 if (typeof process.getuid === 'function' && process.getuid() === 0) {
 	try {

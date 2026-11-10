@@ -7,7 +7,7 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 const { REPO_ROOT } = require('../repo-paths')
 const { isSandbox } = require('../bootstrap/sandbox')
-const { isAllowedEthernetIface } = require('../config/network-settings')
+const { isUsableMac, pickPrimaryInterface, storedIdentityStillValid } = require('./hardware-identity-select')
 const { listEthernetInterfaces } = require('./network-inventory')
 
 const HARDWARE_IDENTITY_PATH = path.join(REPO_ROOT, 'config', 'hardware-identity.json')
@@ -52,40 +52,20 @@ function hardwareIdToHostname(hardwareId) {
 }
 
 /**
- * @param {string} mac
- * @returns {boolean}
- */
-function isUsableMac(mac) {
-	const norm = String(mac || '').trim().toLowerCase()
-	if (!norm || norm === '00:00:00:00:00:00') return false
-	return /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/.test(norm)
-}
-
-/**
  * @param {object} [networkCfg]
+ * @param {Array<{ name: string, mac?: string, internal?: boolean }>} [interfaces] test seam (default: live NICs)
  * @returns {{ mac: string, primaryInterface: string | null }}
  */
-function getPrimaryEthernetMac(networkCfg) {
-	const interfaces = listEthernetInterfaces()
-	const primaryName =
-		(networkCfg?.primaryInterface && isAllowedEthernetIface(networkCfg.primaryInterface)
-			? networkCfg.primaryInterface
-			: null) ||
-		interfaces.find((i) => i.address && !i.internal)?.name ||
-		interfaces.find((i) => !i.internal && isUsableMac(i.mac))?.name ||
-		interfaces[0]?.name ||
-		null
-	if (!primaryName) return { mac: '', primaryInterface: null }
-	const iface = interfaces.find((i) => i.name === primaryName)
-	return { mac: iface?.mac || '', primaryInterface: primaryName }
+function getPrimaryEthernetMac(networkCfg, interfaces) {
+	return pickPrimaryInterface(interfaces || listEthernetInterfaces(), networkCfg) // WO-1029 P1d: one rule
 }
 
 /**
  * @param {object} [networkCfg]
  * @returns {{ hardwareId: string, mac: string, hostname: string, derivedAt: string, source: string, primaryInterface: string | null }}
  */
-function deriveHardwareIdentity(networkCfg) {
-	const { mac, primaryInterface } = getPrimaryEthernetMac(networkCfg)
+function deriveHardwareIdentity(networkCfg, interfaces) {
+	const { mac, primaryInterface } = getPrimaryEthernetMac(networkCfg, interfaces)
 	let hardwareId = isUsableMac(mac) ? deriveHardwareIdFromMac(mac) : null
 	let source = 'mac'
 	if (!hardwareId) {
@@ -165,6 +145,15 @@ function writeHardwareIdentityFile(identity) {
 	}
 }
 
+/** The identity a `highascg<NNNN>` hostname stands for, when one of the box's wired NICs derives that id; else null. */
+function identityOfHostname(hostname, interfaces) {
+	const m = /^highascg(\d{4})$/.exec(String(hostname || '').trim())
+	if (!m) return null
+	const nic = (interfaces || []).find((i) => deriveHardwareIdFromMac(i.mac) === m[1])
+	if (!nic) return null
+	return { hardwareId: m[1], mac: String(nic.mac).toLowerCase(), hostname: `highascg${m[1]}`, derivedAt: new Date().toISOString(), source: 'mac', primaryInterface: nic.name }
+}
+
 /**
  * @param {object} [opts]
  * @param {object} [opts.networkCfg]
@@ -174,20 +163,29 @@ function writeHardwareIdentityFile(identity) {
 function getHardwareIdentity(opts = {}) {
 	if (_cached && !opts.refresh) return _cached
 
-	const networkCfg = opts.networkCfg
-	const derived = deriveHardwareIdentity(networkCfg)
-	const cached = readHardwareIdentityFile()
-	const currentMac = derived.mac
-	const cachedMac = cached?.mac || ''
-
-	if (cached && (!currentMac || !cachedMac || cachedMac === currentMac)) {
-		_cached = {
-			...cached,
-			hostname: cached.hostname || hardwareIdToHostname(cached.hardwareId),
-		}
+	// WO-1029 P1d: a stored id whose MAC is still on the box wins over any derivation, so the boot unit
+	// (no config) and the node (config.network) can never disagree and a config change cannot rename the box.
+	// opts.interfaces / opts.stored / opts.persist=false are test seams.
+	const interfaces = opts.interfaces || listEthernetInterfaces()
+	const cached = opts.stored !== undefined ? opts.stored : readHardwareIdentityFile()
+	// The name the box already carries is what linked servers know it by: when the stored file disagrees with a
+	// highascg<NNNN> hostname that one of the box's own NICs derives, the hostname wins and the file is repaired
+	// (boxes whose file was flipped by the old two-rule derivation heal without a rename).
+	const named = identityOfHostname(opts.hostname !== undefined ? opts.hostname : os.hostname(), interfaces)
+	if (named && cached?.hardwareId !== named.hardwareId) {
+		if (opts.persist === false) return named
+		if (isSandbox()) return (_cached = named)
+		writeHardwareIdentityFile(named)
 		return _cached
 	}
+	if (cached && storedIdentityStillValid(cached, interfaces)) {
+		const kept = { ...cached, hostname: cached.hostname || hardwareIdToHostname(cached.hardwareId) }
+		if (opts.persist === false) return kept
+		return (_cached = kept)
+	}
 
+	const derived = deriveHardwareIdentity(opts.networkCfg, interfaces)
+	if (opts.persist === false) return derived
 	if (isSandbox()) return (_cached = { ...derived, hostname: os.hostname() }) // WO-719: no write to the live config/
 	writeHardwareIdentityFile(derived)
 	return _cached
@@ -312,6 +310,7 @@ module.exports = {
 	deriveHardwareIdFromMac,
 	deriveHardwareIdFromMachineId,
 	hardwareIdToHostname,
+	isUsableMac,
 	getPrimaryEthernetMac,
 	deriveHardwareIdentity,
 	readHardwareIdentityFile,
