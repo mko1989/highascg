@@ -12,6 +12,9 @@
  *   assertNoStrays(bed, mark, owners)  for every box and every destination cabled there: only `owners(box, dest)` wrote
  *     (default: the box itself) — "nobody but X touched X's screens in this window"
  *   wrote(bed, box, dest, since, who) → entries by `who` (positive evidence: "this press DID land there")
+ *   assertOneCopy(box, channel, clip, { n, layers })  exactly n layers (default 1) of the channel show `clip` in their
+ *     foreground, whatever layer or look bank (A 10-99, B 110-199) they are on — a second copy on the look's other bank
+ *     (the real-box Apply duplicate, WO-1029) is what this catches. Returns the layers found.
  */
 
 const assert = require('node:assert/strict')
@@ -58,4 +61,13 @@ function topClip(bed, box, destId, bus = 'pgm') {
 	return v.length ? v[v.length - 1].fg.source : ''
 }
 
-module.exports = { onlyWriters, assertOnlyWriters, assertNoStrays, wrote, topClip }
+/** `box` = bed.box(id); layers of `channel` whose foreground is `clip`, optionally limited to `layers` (a Set / array). */
+function assertOneCopy(box, channel, clip, { n = 1, layers } = {}) {
+	const want = layers ? new Set(layers) : null
+	const hits = box.caspar.visible(channel).filter((l) => l.fg && String(l.fg.source).toUpperCase() === String(clip).toUpperCase() && (!want || want.has(l.layer)))
+	const where = box.caspar.visible(channel).map((l) => `${l.layer}:${l.fg?.source ?? '-'}`).join(' ')
+	assert.equal(hits.length, n, `${box.id}: ${hits.length} layer(s) of ch ${channel} show ${clip} (want ${n}) — channel has [${where}]`)
+	return hits.map((l) => l.layer)
+}
+
+module.exports = { assertOneCopy, onlyWriters, assertOnlyWriters, assertNoStrays, wrote, topClip }

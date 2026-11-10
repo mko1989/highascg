@@ -25,7 +25,8 @@ const os = require('node:os')
 const path = require('node:path')
 const { startVirtualBoxes, oneBox, twoBoxes, DEST } = require('../e2e/virtual-boxes')
 const { waitFor } = require('../e2e/cluster-nodes')
-const { assertNoStrays } = require('../e2e/virtual-boxes-checks')
+const { assertNoStrays, assertOneCopy } = require('../e2e/virtual-boxes-checks')
+const { seedTwoLayerLooks, bankScenario } = require('../e2e/virtual-boxes-banks')
 
 const LED = DEST.led.id
 const STREAM = DEST.stream.id
@@ -202,6 +203,8 @@ describe('WO-1029 virtual boxes: apply with the air state kept', { timeout: 5800
 			const wantLoop = (byLayer(before.pgm)[202].position + elapsed) % LOOP_LEN_S
 			assert.ok(modDist(L[202].position, wantLoop, LOOP_LEN_S) <= POS_TOL_S, `looping clip at ${L[202].position.toFixed(2)} s, wanted ~${wantLoop.toFixed(2)} modulo ${LOOP_LEN_S}`)
 			assert.ok(L[999], 'the test card is back on 999')
+			assertOneCopy(a, pgm, 'LOOK_A') // a look comes back once (WO-1029: the re-take must not add a copy on the other bank)
+			assertOneCopy(a, a.ch(STREAM), 'LOOK_A')
 
 			// the answer says what it did
 			const rs = row.restored
@@ -283,6 +286,26 @@ describe('WO-1029 virtual boxes: apply with the air state kept', { timeout: 5800
 			assert.ok(!bk[200] && !bk[202], 'the stream content is not on the old channel number (now the backup destination)')
 			if (hadLed) assert.ok((row.restored?.skipped || []).length >= 1, 'content of the removed destination is dropped and reported')
 			assert.deepEqual(a.caspar.rejected(bed.restartsOf('vb-a', m)[0].seq).map((e) => e.line), [])
+		})
+	})
+
+	describe('one box: a program look on bank B / bank A comes back once, on its own bank', { concurrency: false }, () => {
+		const c = bedFor('banks', oneBox({ base: 190, spare: true }), async (bed, c) => {
+			c.base = await bed.baseline()
+			await seedTwoLayerLooks(bed) // two-layer looks look_led_2a / 2b beside the seeded ones
+		})
+		const ctx = { LED, take, raw, dirtify, POS_TOL_S }
+		const scenario = (...args) => bankScenario(c.bed, ctx, ...args)
+		const one = (v) => `look_led_${v}`
+		const two = (v) => `look_led_2${v}`
+		it('one-layer look on bank B (three takes, previous look still on bank A) comes back once', async () => {
+			await scenario([one('a'), one('b'), one('a')], { 10: 'LOOK_A' }, 'LOOK_B', 'b')
+		})
+		it('one-layer look on bank A (two takes) comes back once, the leftover sits on bank B', async () => {
+			await scenario([one('a'), one('b')], { 10: 'LOOK_B' }, 'LOOK_A', 'a')
+		})
+		it('two-layer look on bank B comes back once per clip, on bank B', async () => {
+			await scenario([two('a'), two('b'), two('a')], { 10: 'LOOK_A', 11: 'LOOK_C' }, 'LOOK_B', 'b')
 		})
 	})
 

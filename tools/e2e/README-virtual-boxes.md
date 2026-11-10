@@ -83,3 +83,16 @@ Without the variable (or a non-loopback / :5250 URL) a sandbox apply still only 
 **Making a box dirty.** A cable change on a virtual box does not alter the generated casparcg.config (its outputs are not
 GPU / DeckLink heads), so the box is not dirty; `bed.touch()` flips the video mode of a destination that is not cabled on
 that box, which does (through the box's own device-view API, or another box's relay with `via`).
+
+**Look banks (WO-1029).** Program looks alternate between bank A (Caspar layers 10-99) and bank B (110-199): a take plays
+the incoming look on the bank opposite the node's pointer (`programLayerBankByChannel`, exposed at
+`GET /api/state` → `scene.programLayerBankByChannel[<program channel>]`), flips it and clears the outgoing look. Odd takes
+from a fresh box leave the look on bank B, even ones on bank A. The fake treats layers >= 110 like any other: `INFO <ch>`
+lists every layer under its physical number with clip name and position / length, and every verb acts on exactly the layer
+named, so a second copy of a clip on the other bank is visible. `assertOneCopy(box, channel, clip, { n, layers })`
+(`virtual-boxes-checks.js`) asserts how many layers of a channel show a clip, whatever bank; the apply scenarios use it
+after every restore. The "program look on bank B / bank A" scenarios in `smoke-wo1029-virtual-apply.test.js` take looks
+through the real take route, put the previous look back by hand on the other bank (a fading outgoing look), Apply, and
+expect one layer per look clip on the same bank, position within 1.5 s, `via: 'look'`, the leftover in `restored.skipped`,
+the pointer equal to the bank on Caspar, and a normal next take. Before 87f8643b they fail with
+`2 layer(s) of ch 1 show LOOK_A (want 1) — channel has [10:LOOK_A 110:LOOK_A]`.
