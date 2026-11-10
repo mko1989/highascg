@@ -298,6 +298,8 @@ module.exports = [
 	'tools/smoke/smoke-wo1029-apply-dirty.test.js',
 	'tools/smoke/smoke-wo1029-apply-plan.test.js',
 	'tools/smoke/smoke-wo1029-virtual-apply.test.js',
+	'tools/smoke/smoke-cwc-caps.test.js',
+	'tools/smoke/smoke-cwc-call-transport.test.js',
 	'tools/smoke/smoke-wo1029-virtual-remote-client.test.js',
 	'tools/smoke/smoke-wo1029-virtual-takeover.test.js',
 	'tools/smoke/smoke-wo1029-virtual-handover.test.js',

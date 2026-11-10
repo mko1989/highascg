@@ -271,6 +271,7 @@ function callOf(ctx) {
 	if (ctx._clusterCall) return ctx._clusterCall
 	ctx._clusterCall = createClusterCall({
 		cluster: clusterOf(ctx),
+		peerCaps: (id) => clusterOf(ctx).peerCaps(id), // plan 07 C4: v2 calls only to a peer that advertises 'call-signed'
 		selfKey: identity.getDevicePublicKeyPem(),
 		sign: identity.signMessage,
 		verify: identity.verifyMessage,
@@ -349,6 +350,7 @@ function mediaDeps(ctx) {
 		selfKey: identity.getDevicePublicKeyPem(),
 		sign: identity.signMessage,
 		verify: identity.verifyMessage,
+		peerCaps: (id) => clusterOf(ctx).peerCaps(id),
 		install: (key, opts) => ssh.installPeerAuthorizedKey(key, { ...opts, log: ctx.log }),
 		sshKey: () => ssh.ensureReplicationSshKey(ctx.log).publicKeyLine,
 		post: postJson,

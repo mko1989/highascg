@@ -17,11 +17,11 @@ const SUPPORTED = [
 	'dest-pressed', // holder notices: a destination's pressed state reaches the other servers
 	'apply', // cluster apply: GET /api/caspar-config/dirty + the apply plan answer for this server
 	'orphan-edges', // the cabling view lists orphan edges (cabled outputs with no destination)
+	'call-signed', // clock-free signed node-to-node call transport (cluster-call.js)
 ]
 
 /** Names reserved for the coming plan 07 steps. NOT advertised until the step lands: move a name into SUPPORTED. */
 const RESERVED = [
-	'call-signed', // clock-free signed node-to-node call transport (cluster-call.js)
 	'dest-actions', // node-to-node dest.* calls
 	'channels-cabled', // channels only where cabled
 	'feed-relay', // the picture relay

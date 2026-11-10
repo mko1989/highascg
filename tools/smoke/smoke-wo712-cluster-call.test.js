@@ -3,7 +3,7 @@
 /**
  * WO-712 R2 — one signed "call another linked server" primitive (src/cluster/cluster-call.js) and its allow-list
  * (src/cluster/cluster-call-actions.js). Two in-process servers with test ed25519 keys (never the box's device key,
- * never the persistence file): a signed call is taken; every rejection (unlinked, wrong `to`, stale, replay, bad sig,
+ * never the persistence file): a signed call is taken; every rejection (unlinked, wrong `to`, stale, replay, bad sig, WO-1029 C4 clock-free v2,
  * accept_remote off, unknown action); each action reaches its local handler; a follower hands look.take and its zone
  * `look:` to the master; POST /api/cluster/call is reachable through the real router, also while enforceAuth is on.
  */
@@ -156,6 +156,33 @@ describe('WO-712 R2 cluster call: wire + receiver checks', () => {
 		await expect({ ...signed(s, 'A', 'B'), args: [1] }, 400, /args must be an object/)
 		await expect(null, 400, /malformed/)
 		assert.equal(s.ran.length, 3, 'only the three good calls ran')
+	})
+
+	it('WO-1029 C4: two current builds 10 min apart still talk (the v1 "stale" answer names the cap → v2), replay refused', async () => {
+		const s = servers(['A', 'B'])
+		const sent = []
+		const real = s.nodes.B.call.handle
+		s.nodes.B.call.handle = async (b) => (sent.push(b), real(b))
+		const node = s.nodes.A
+		node.call = createClusterCall({
+			cluster: { saved: (id) => (id === 'B' ? { id: 'B', host: 'B', port: 4200, name: 'srv-B', device_key: s.keys.B.pub.trim() } : null), list: () => [] },
+			selfKey: s.keys.A.pub,
+			sign: (msg) => crypto.sign(null, Buffer.from(msg), s.keys.A.priv).toString('base64'),
+			verify,
+			now: () => s.clock.t + 10 * 60000,
+			post: async (host, port, p, body) => {
+				const r = await s.nodes[host].call.handle(JSON.parse(JSON.stringify(body)))
+				return { ok: r.status >= 200 && r.status < 300, status: r.status, json: r.body }
+			},
+			acceptsRemote: () => true,
+			masterId: () => '',
+			actions: {},
+		})
+		const r = await node.call.call('B', 'ping', { q: 1 })
+		assert.equal(r.status, 200, JSON.stringify(r.json))
+		assert.deepEqual(sent.map((b) => b.v || 1), [1, 2])
+		assert.equal((await real(sent[1])).body.code, 'CALL_REPLAY')
+		assert.deepEqual(s.ran, [['B', 'ping', { q: 1 }, 'A']])
 	})
 
 	it('callMaster: goes to the master id, refuses when there is no other master', async () => {
