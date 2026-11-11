@@ -5,7 +5,7 @@
 Message types on the node's WebSocket (`/` on the HTTP port; envelope `{ type, data }`). **server → clients** =
 broadcasts and direct sends; **client → server** = types the node acts on. Payloads: the sending / handling module.
 
-92 types.
+93 types.
 
 | Direction | Type | Module | Note |
 |---|---|---|---|
@@ -50,6 +50,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | client → server | `tracking:marker` | `src/tracking/register.js` |  |
 | server → clients | `amcp_result` | `src/server/ws-server.js` |  |
 | server → clients | `audio_fft` | `src/bootstrap/audio-capture-lifecycle.js` |  |
+| server → clients | `capture` | `src/tracking/detect-service.js` |  |
 | server → clients | `catalog_chunk` | `src/server/ws-catalog-handlers.js`, `src/utils/media-catalog-broadcast.js` |  |
 | server → clients | `catalog_error` | `src/server/ws-catalog-handlers.js` |  |
 | server → clients | `change` | `index.js`, `src/api/host-live-browser.js`, `src/api/host-live-decklink.js`, `src/api/host-live-ndi.js`, `src/api/host-live-webpage.js`, `src/api/host-operator-fullscreen.js`, `src/api/routes-caspar-config.js`, `src/api/routes-data-project-handlers.js`, `src/api/routes-data-project-new.js`, `src/api/routes-device-snapshot.js`, `src/api/routes-device-view.js`, `src/api/routes-led-test-card.js`, `src/api/routes-project-files.js`, `src/api/routes-screens.js`, `src/api/routes-sources.js`, `src/api/routes-stage-mvr.js`, `src/api/routes-zoom-host.js`, `src/api/settings-post.js`, `src/audio/input-audio-routing.js`, `src/audio/mixer-state.js`, `src/bootstrap/os-layout-issue.js`, `src/bootstrap/startup-led-test-pattern.js`, `src/cluster/shared-show-dests-ctx.js`, `src/config/config-compare.js`, `src/engine/project-activate.js`, `src/engine/project-dest-scope.js`, `src/server/ws-server.js`, `src/state/live-audio-only-look-state.js`, `src/state/live-scene-state.js`, `src/system/caspar-cef-health.js`, `src/system/channels-cabled-switch.js`, `src/system/operator-first-switch.js`, `src/utils/media-catalog-broadcast.js`, `src/utils/periodic-sync.js` |  |

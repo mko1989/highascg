@@ -70,6 +70,8 @@ function createDetectService(ctx, deps = {}) {
 	let bodies = false // WO-675 P2: …and body features while a presenter with a body feature is
 	let onFaces = null // (cameraId, [{ tid, feature }], 'face' | 'body') — never stored in `latest`, never broadcast
 	let sidecarCams = {} // camera id → sidecar status { state, detail, fps, ms }
+	let captureSeq = 0
+	const captures = new Map() // WO-1036: request id → { want: Set<camera id>, shots, done }
 
 	// WO-1026: under a shared show the detection config is on every linked server — the one that tracks is the one that
 	// can read a camera (a DeckLink input is on ONE server). Without this both ran the detector and held the duty.
@@ -130,6 +132,14 @@ function createDetectService(ctx, deps = {}) {
 			if (seen.length && typeof onFaces === 'function') onFaces(ce.id, seen.map((t) => ({ tid: Number(t.tid), feature: t.face })))
 			const shapes = Array.isArray(msg.tracks) ? msg.tracks.filter((t) => Array.isArray(t?.body)) : []
 			if (shapes.length && typeof onFaces === 'function') onFaces(ce.id, shapes.map((t) => ({ tid: Number(t.tid), feature: t.body })), 'body')
+		} else if (msg.type === 'captured') {
+			const c = captures.get(Number(msg.id))
+			if (!c) return
+			for (const s of Array.isArray(msg.shots) ? msg.shots : []) {
+				if (/^cap-\d+-\w+-\d+\.jpg$/.test(String(s?.file))) c.shots.push({ camera: String(msg.camera), tid: Number(s.tid), file: String(s.file), box: s.box })
+			}
+			c.want.delete(String(msg.camera))
+			if (!c.want.size) c.done()
 		} else if (msg.type === 'status') {
 			sidecarCams = msg.cameras && typeof msg.cameras === 'object' ? msg.cameras : {}
 			if (msg.ready === false) ready = false
@@ -323,6 +333,24 @@ function createDetectService(ctx, deps = {}) {
 		status: () => ({ ...snapshot(), config: det, model: det.model, models: listModels(), models_dir: modelsDir, python, providers, error,
 			pid: child?.pid ?? null, sidecar: sidecarCams }),
 		_handle: handle,
+		/** WO-1036: a JPEG crop of every person the watched cameras see right now, written by the sidecar into `dir`.
+		 * → [{ camera, tid, file, box }]; resolves with what arrived after `waitMs` (a camera with no new frame, the
+		 * imitated camera) — never rejects. */
+		capture(dir, waitMs = 1500) {
+			if (!child?.stdin?.writable || !ready) return Promise.resolve([])
+			const id = ++captureSeq
+			return new Promise((resolve) => {
+				const entry = { want: new Set(cams.map((c) => c.id)), shots: [], done: null }
+				const timer = setTimeout(() => entry.done(), waitMs)
+				entry.done = () => {
+					clearTimeout(timer)
+					captures.delete(id)
+					resolve(entry.shots)
+				}
+				captures.set(id, entry)
+				child.stdin.write(JSON.stringify({ type: 'capture', id, dir }) + '\n')
+			})
+		},
 		_renewLease: renewLease,
 		/** WO-675: ask the sidecar for face (and P2 body) features — resends the config only on a change — and where they go. */
 		setFaces(on, sink, bodiesOn = false) {

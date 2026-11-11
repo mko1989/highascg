@@ -332,4 +332,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1032-timeline-cues.test.js',
 	'tools/smoke/smoke-wo1034-destination-fanout-gpu-jacks.test.js',
 	'tools/smoke/smoke-wo1035-pixelhue-layer-read.test.js',
+	'tools/smoke/smoke-wo1036-presenter-camera-capture.test.js',
 ]

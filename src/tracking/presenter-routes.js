@@ -11,6 +11,14 @@
  *   DELETE /api/tracking/presenters/<id>
  *   POST   /api/tracking/presenters/<id>/assign    { key }  (the operator's confirmation, owner D1)
  *   POST   /api/tracking/presenters/<id>/release
+ *   WO-1036 — camera pictures of the persons on stage, for the operator to name:
+ *   POST   /api/tracking/presenters/capture              take them now → { taken: [{ id, key, camera, at }], captures }
+ *                                                        409 when person detection is not running here
+ *   GET    /api/tracking/presenters/captures/<cid>/photo image/jpeg
+ *   POST   /api/tracking/presenters/captures/<cid>/name  { name, mic?, note?, consent: true } → 201 { presenter }
+ *                                                        (a presenter from that picture, bound to that person)
+ *   DELETE /api/tracking/presenters/captures/<cid>       discard one;  DELETE …/captures  discard all
+ *   The roster GET and WS tracking:presenters carry `captures`.
  * WO-712 R1 / WO-723: with this server's `presenters` duty resolved off (a linked server does tracking;
  * src/cluster/server-duties.js) the phone page and POST (new intake) answer 409 with a plain message; the roster, its
  * GET and the operator's edit / assign / release stay.
@@ -45,7 +53,7 @@ function intakeUrls(port, nets = os.networkInterfaces()) {
 }
 
 /** → a response, or null when the path is not a presenter route. */
-async function handlePresenters(presenters, { method, path: rawPath, body, req, duties = require('../cluster/server-duties') }) {
+async function handlePresenters(presenters, { method, path: rawPath, body, req, capture, duties = require('../cluster/server-duties') }) {
 	const p = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath
 	if (p !== BASE && !p.startsWith(BASE + '/')) return null
 	if (!presenters) return reply(503, { error: 'presenter roster not running' })
@@ -69,6 +77,31 @@ async function handlePresenters(presenters, { method, path: rawPath, body, req, 
 		if (method === 'DELETE') {
 			presenters.clear()
 			return reply(200, { ok: true })
+		}
+		return null
+	}
+	if (p === BASE + '/capture' && method === 'POST') {
+		if (typeof capture !== 'function') return reply(409, { error: 'Person detection is not running on this server: nothing to take a picture of.' })
+		const r = await capture()
+		return reply(r.status, r.body)
+	}
+	if (p === BASE + '/captures' && method === 'DELETE') {
+		presenters.clearCaptures()
+		return reply(200, { ok: true })
+	}
+	const c = /^\/api\/tracking\/presenters\/captures\/(c\d+)(?:\/(photo|name))?$/.exec(p)
+	if (c) {
+		const [, cid, sub] = c
+		if (sub === 'photo' && method === 'GET') {
+			const jpg = presenters.capturePhoto(cid)
+			return jpg ? { status: 200, headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' }, body: jpg } : reply(404, { error: 'no such camera picture' })
+		}
+		if (!sub && method === 'DELETE') return reply(presenters.dropCapture(cid) ? 200 : 404, { ok: true })
+		if (sub === 'name' && method === 'POST') {
+			const { data, error } = parse(body)
+			if (error) return error
+			const r = presenters.nameCapture(cid, data)
+			return reply(r.status, r.body)
 		}
 		return null
 	}

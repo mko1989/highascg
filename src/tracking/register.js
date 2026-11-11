@@ -63,6 +63,7 @@ const { Pose3D } = require('./pose3d')
 const { VerifyWalk } = require('./verify-walk')
 const { createPresenters } = require('./presenters')
 const { handlePresenters } = require('./presenter-routes')
+const { takeCameraPictures } = require('./presenter-capture')
 const { createDeskService } = require('../audio-desk/desk-service')
 const { handleAudioDesk } = require('../audio-desk/audio-routes')
 
@@ -329,7 +330,7 @@ async function handleApi({ method, path, body, req }) {
 	const audio = await handleAudioDesk(_desk, _presenters, { method, path, body }) // WO-731, before the presenter routes
 	if (audio) return audio
 	const pr =
-		(await handlePresenters(_presenters, { method, path, body, req })) || handleAuto(auto, { method, path, body }) || puppet.handle(method, path, body)
+		(await handlePresenters(_presenters, { method, path, body, req, capture: () => takeCameraPictures({ presenters: _presenters, detect: _detect, worldPersons: () => fusion.persons(hub.now()) }) })) || handleAuto(auto, { method, path, body }) || puppet.handle(method, path, body)
 	if (pr) return pr
 	if (method === 'GET' && path === '/api/tracking/stats') {
 		return reply(200, {

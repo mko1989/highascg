@@ -23,6 +23,24 @@ static func label_of(key: String) -> String:
 	return "P" + key.get_slice(":", 1) if key.begins_with("w:") else key.replace(":", " #")
 
 
+## WO-1036 — a camera picture waiting for a name: who it shows and whether that person is still there to be bound.
+static func capture_line(c: Dictionary, choices: Array) -> String:
+	var key := str(c.get("key", ""))
+	for p in choices:
+		if p is Dictionary and str(p.get("key", "")) == key:
+			return "%s — on stage now" % label_of(key)
+	return "%s — left the stage (naming still saves the picture for recognition)" % label_of(key)
+
+
+## What the Save button needs before it sends: a name, and the consent tick.
+static func capture_problem(name: String, consent: bool) -> String:
+	if name.strip_edges() == "":
+		return "Type the name first"
+	if not consent:
+		return "Tick the consent box first"
+	return ""
+
+
 ## One line under the name: where the presenter is, or what recognition thinks (face, and P2 body for wide shots).
 static func status_of(p: Dictionary, suggestion: Dictionary) -> String:
 	if p.get("person") != null and str(p.person) != "":

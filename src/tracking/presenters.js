@@ -16,6 +16,11 @@
  * (person, presenter); a suggestion needs SUGGEST_MIN (SFace's published 0.363 same-person threshold) and a margin
  * over the next presenter. Bodies (P2): the same photo's whole-body feature (youtureid, 768-d) for wide shots where
  * faces are too small; face and body evidence are fused in presenter-match.js.
+ *
+ * WO-1036 (owner 11.11: a crew member's photo "might not always work"): the second way in. The operator asks for a
+ * picture of everyone the tracking cameras see (`capture`), names the ones that matter (`nameCapture`), and each name
+ * becomes a presenter built from that camera picture — same light, same angle as what recognition will see later —
+ * already bound to the person it was taken of. Same rules as the phone photo: /tmp only, consent, operator decides.
  */
 
 const fs = require('fs')
@@ -42,7 +47,9 @@ function underTmp(dir) {
 	return TMP_ROOTS().some((r) => d.startsWith(path.resolve(r) + path.sep))
 }
 
-const STALE = /^(roster\.json(\.tmp)?|p\d+\.jpg)$/
+const STALE = /^(roster\.json(\.tmp)?|p\d+\.jpg|c\d+\.jpg|cap-\d+-\w+-\d+\.jpg)$/
+const MAX_CAPTURES = 40
+const CAPTURE_TTL_MS = 20 * 60 * 1000 // an unnamed camera picture is deleted after this
 
 const clip = (v, n) => String(v ?? '').trim().slice(0, n)
 
@@ -70,6 +77,7 @@ function createPresenters(ctx, deps = {}) {
 	const embed = deps.embed || defaultEmbed
 	const roster = new Map() // id → presenter (with `face` / `body`: unit feature | null)
 	const matcher = createMatcher(now)
+	const shots = new Map() // WO-1036: capture id → { id, slot, key, camera, at } — a camera picture waiting for a name
 	let rev = 0
 	const changed = () => {
 		rev++
@@ -132,7 +140,11 @@ function createPresenters(ctx, deps = {}) {
 		const name = clip(data.name, TEXT_MAX.name)
 		if (!name) return { status: 400, body: { error: 'name is required' } }
 		const b64 = String(data.photo || '').replace(/^data:image\/jpeg;base64,/, '')
-		const jpg = Buffer.from(b64, 'base64')
+		return add(Buffer.from(b64, 'base64'), data, name)
+	}
+
+	/** A validated name + a JPEG (the phone's photo, or a camera picture — WO-1036) → a roster entry; features follow. */
+	function add(jpg, data, name) {
 		if (jpg.length < 100 || jpg[0] !== 0xff || jpg[1] !== 0xd8) return { status: 400, body: { error: 'photo must be a JPEG' } }
 		if (jpg.length > MAX_PHOTO_BYTES) return { status: 413, body: { error: 'photo too large' } }
 		const slot = nextSlot()
@@ -228,6 +240,7 @@ function createPresenters(ctx, deps = {}) {
 
 	function tick(locate) {
 		for (const p of roster.values()) if (p.person) drive(p, locate)
+		expireCaptures()
 	}
 
 	/** Zone action `presenter` (zone-service.js): the parsed actions of the presenter driving `marker`. */
@@ -241,6 +254,85 @@ function createPresenters(ctx, deps = {}) {
 	function clear() {
 		for (const id of [...roster.keys()]) remove(id)
 		matcher.clear()
+		clearCaptures()
+	}
+
+	const shotPath = (cid) => path.join(dir, `${cid}.jpg`)
+	const unlink = (file) => {
+		try {
+			fs.unlinkSync(file)
+		} catch (_) {
+			/* already gone */
+		}
+	}
+	const shotView = (s) => ({ id: s.id, key: s.key, camera: s.camera, at: s.at })
+
+	function dropCapture(cid, quiet = false) {
+		if (!shots.delete(cid)) return false
+		unlink(shotPath(cid))
+		if (!quiet) changed()
+		return true
+	}
+
+	function clearCaptures() {
+		const n = shots.size
+		for (const cid of [...shots.keys()]) dropCapture(cid, true)
+		if (n) changed()
+	}
+
+	/** WO-1036: the sidecar's camera pictures (`file` in this dir) of the persons on stage → captures waiting for a
+	 * name. `list`: [{ key, camera, file }], one per person. A person who already is a presenter needs no picture; a
+	 * new picture of a person replaces the old one. */
+	function capture(list) {
+		const taken = []
+		for (const it of list || []) {
+			const src = path.join(dir, path.basename(String(it.file)))
+			const bound = [...roster.values()].some((p) => p.person === it.key)
+			for (const s of [...shots.values()]) if (s.key === it.key) dropCapture(s.id, true)
+			let slot = 1
+			while (shots.has(`c${slot}`)) slot++
+			if (bound || slot > MAX_CAPTURES || !/^\S+:\d+$/.test(String(it.key))) {
+				unlink(src)
+				continue
+			}
+			try {
+				fs.renameSync(src, shotPath(`c${slot}`))
+			} catch (_) {
+				continue
+			}
+			const s = { id: `c${slot}`, slot, key: String(it.key), camera: String(it.camera || ''), at: now() }
+			shots.set(s.id, s)
+			taken.push(shotView(s))
+		}
+		if (taken.length) changed()
+		return taken
+	}
+
+	/** The operator's name for a camera picture: it becomes a presenter with that picture and is bound to the person
+	 * it was taken of (the operator just identified them — owner D1 holds). */
+	function nameCapture(cid, data) {
+		const s = shots.get(cid)
+		if (!s) return { status: 404, body: { error: 'no such camera picture (it may have expired)' } }
+		if (data?.consent !== true) return { status: 400, body: { error: 'consent is required (the presenter agreed to the picture being used for show automation)' } }
+		const name = clip(data.name, TEXT_MAX.name)
+		if (!name) return { status: 400, body: { error: 'name is required' } }
+		let jpg
+		try {
+			jpg = fs.readFileSync(shotPath(cid))
+		} catch (_) {
+			dropCapture(cid)
+			return { status: 404, body: { error: 'the camera picture is gone' } }
+		}
+		const r = add(jpg, data, name)
+		if (r.status !== 201) return r
+		dropCapture(cid, true)
+		return { status: 201, body: assign(r.body.presenter.id, s.key).body }
+	}
+
+	function expireCaptures() {
+		const old = [...shots.values()].filter((s) => now() - s.at > CAPTURE_TTL_MS)
+		for (const s of old) dropCapture(s.id, true)
+		if (old.length) changed()
 	}
 
 	// WO-835: boot starts empty. The roster entries go with the photos: an entry exists only to be matched against its
@@ -252,13 +344,25 @@ function createPresenters(ctx, deps = {}) {
 		/** Shutdown: delete photos + roster now (the consent text promises it). */
 		dispose: () => {
 			roster.clear()
+			shots.clear()
 			wipe()
 		},
 		get rev() {
 			return rev
 		},
 		list: () => [...roster.values()].sort((a, b) => a.slot - b.slot).map(view),
-		snapshot: () => ({ presenters: [...roster.values()].sort((a, b) => a.slot - b.slot).map(view), suggestions: suggestions() }),
+		snapshot: () => ({ presenters: [...roster.values()].sort((a, b) => a.slot - b.slot).map(view), suggestions: suggestions(),
+			captures: [...shots.values()].sort((a, b) => a.slot - b.slot).map(shotView) }),
+		/** Where the sidecar writes camera pictures (created on demand). */
+		captureDir: () => {
+			ensureDir()
+			return dir
+		},
+		capture,
+		nameCapture,
+		dropCapture,
+		clearCaptures,
+		capturePhoto: (cid) => (shots.has(cid) ? fs.readFileSync(shotPath(cid)) : null),
 		wantsFaces: () => [...roster.values()].some((p) => p.face),
 		wantsBodies: () => [...roster.values()].some((p) => p.body),
 		photo: (id) => (roster.has(id) ? fs.readFileSync(photoPath(id)) : null),

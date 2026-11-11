@@ -18,6 +18,9 @@ Protocol (JSON lines):
           box another person covers
          {"type": "status", "cameras": {id: {"state": "ok" | "waiting" | "stale", "detail", "fps", "ms"}}}  — 1 Hz
          {"type": "error", "detail"}
+  stdin  {"type": "capture", "id": 7, "dir": "/tmp/highascg-presenters"}  — WO-1036: at each camera's next detection
+          step, a JPEG crop of every live person goes into `dir`, and
+  stdout {"type": "captured", "id": 7, "camera", "shots": [{"tid", "file", "box"}]}  (an empty list: nobody there)
 Exits when stdin closes (the server went away), so it never outlives its owner.
 """
 
@@ -64,7 +67,7 @@ def read_stdin(q, done):
         except ValueError:
             emit({"type": "error", "detail": "bad config line"})
             continue
-        if isinstance(msg, dict) and msg.get("type") == "config":
+        if isinstance(msg, dict) and msg.get("type") in ("config", "capture"):
             q.put(msg)
     done.set()
 
@@ -85,6 +88,7 @@ class Camera:
         self.steps = 0
         self.ms = 0.0
         self.detail = ""
+        self.capture = None  # WO-1036: a pending {"id", "dir"} request, served at the next detection step
 
     def configure(self, c):
         if c.get("path") != self.path:
@@ -132,6 +136,37 @@ class Camera:
         self.last_frame = time.monotonic()
         self.detail = ""
         return info, pixels
+
+
+CAPTURE_PAD = 0.12  # of the box, each side: the crop keeps hair, feet and a little of the stage
+CAPTURE_MIN_PX = 48  # box height in source pixels; smaller is nobody an operator could name
+
+
+def capture_shots(cam, tracks, bgr, req):
+    """WO-1036: one JPEG per live person of this camera (the operator names them from these). → [{tid, file, box}]"""
+    import cv2
+
+    h, w = bgr.shape[:2]
+    shots = []
+    for t in tracks:
+        if t["age_s"] > 0:
+            continue
+        x1, y1, x2, y2 = t["box"]
+        px, py = (x2 - x1) * CAPTURE_PAD, (y2 - y1) * CAPTURE_PAD
+        cx1, cx2 = int(max(0, (x1 - px) * w)), int(min(w, (x2 + px) * w))
+        cy1, cy2 = int(max(0, (y1 - py) * h)), int(min(h, (y2 + py) * h))
+        if cy2 - cy1 < CAPTURE_MIN_PX or cx2 - cx1 < CAPTURE_MIN_PX // 4:
+            continue
+        name = "cap-%s-%s-%s.jpg" % (int(req["id"]), "".join(ch if ch.isalnum() else "_" for ch in cam.id), int(t["tid"]))
+        path = os.path.join(str(req["dir"]), name)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        ok, jpg = cv2.imencode(".jpg", np.ascontiguousarray(bgr[cy1:cy2, cx1:cx2]), [cv2.IMWRITE_JPEG_QUALITY, 90])
+        with os.fdopen(fd, "wb") as f:
+            if ok:
+                f.write(jpg.tobytes())
+        if ok:
+            shots.append({"tid": int(t["tid"]), "file": name, "box": t["box"]})
+    return shots
 
 
 def load_faces(models_dir):
@@ -210,7 +245,12 @@ def main():
     last_status = 0.0
     while not done.is_set():
         while not q.empty():
-            cfg = {**DEFAULTS, **q.get()}
+            msg = q.get()
+            if msg.get("type") == "capture":  # WO-1036
+                for cam in cams.values():
+                    cam.capture = msg
+                continue
+            cfg = {**DEFAULTS, **msg}
             want = {str(c.get("id")): c for c in cfg["cameras"] if isinstance(c, dict)}
             for cid in list(cams):
                 if cid not in want:
@@ -259,6 +299,10 @@ def main():
                 detector.seg.attach(tracks, raw, backend.last_seg)  # WO-665: cut-out masks (seg models only)
                 if poser is not None:  # WO-667: body keypoints for the posed dummies
                     pose.attach(tracks, poser.predict(rgb, cfg["confidence"]))
+                if cam.capture is not None:  # WO-1036: the operator asked for a picture of everyone on stage
+                    req, cam.capture = cam.capture, None
+                    emit({"type": "captured", "id": req.get("id"), "camera": cam.id,
+                        "shots": capture_shots(cam, tracks, face.bgr_from_bgra(pixels, r.width, r.height, r.stride), req)})
                 if faces or bodies:  # WO-675: presenter recognition
                     bgr = face.bgr_from_bgra(pixels, r.width, r.height, r.stride)
                     if faces:

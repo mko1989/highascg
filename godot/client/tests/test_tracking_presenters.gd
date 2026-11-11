@@ -30,3 +30,12 @@ func test_status_line() -> void:
 	t.eq(M.status_of({"person": null, "face": "unavailable", "body": "unavailable"}, {}), "Recognition unavailable: bind by hand", "no venv")
 	t.eq(M.status_of({"person": null}, {"key": "w:4", "score": 0.6, "via": "body"}), "Looks like P4 by body (60 %) — confirm?", "body suggestion")
 	t.eq(M.status_of({"person": null}, {"key": "w:4", "score": 0.7, "via": "face+body"}), "Looks like P4 by face + body (70 %) — confirm?", "fused")
+
+
+func test_capture_line_and_save_gate() -> void:
+	var choices := [{"key": "w:3", "label": "P3"}]
+	t.eq(M.capture_line({"key": "w:3"}, choices), "P3 — on stage now", "the pictured person is still tracked")
+	t.eq(M.capture_line({"key": "cam_1:9"}, choices), "cam_1 #9 — left the stage (naming still saves the picture for recognition)", "gone")
+	t.eq(M.capture_problem("  ", true), "Type the name first", "no name")
+	t.eq(M.capture_problem("Anna", false), "Tick the consent box first", "no consent")
+	t.eq(M.capture_problem("Anna", true), "", "ready to save")

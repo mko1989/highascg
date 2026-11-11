@@ -5,6 +5,8 @@ extends VBoxContainer
 ## A bound presenter drives the hub marker "Name (mic N)"; a zone whose action is `presenter` fires the presenter's
 ## own On enter / On exit actions (look:<id>[@preview], companion:<page>/<row>/<col> — the mic, owner D4).
 ## Live data: WS `tracking:presenters`; the persons to bind come from the marker driver's last tracking:detections.
+## WO-1036 — the second way in: "Take pictures" asks the tracking cameras for a picture of everyone on stage; the
+## operator types a name under a picture and it becomes a presenter bound to that person (no crew photo needed).
 
 const M := preload("res://features/previs/tracking/presenters_model.gd")
 const BASE := "/api/tracking/presenters"
@@ -15,6 +17,9 @@ var _snap := {}  # {presenters, suggestions}
 var _urls: Array = []
 var _photos := {}  # "id:created" → ImageTexture (memory only, never user://)
 var _list: VBoxContainer
+var _caps: VBoxContainer  # WO-1036: camera pictures waiting for a name
+var _consent: CheckBox
+var _cap_note: Label
 var _url_box: VBoxContainer
 var _note: Label
 var _confirm_clear: ConfirmationDialog
@@ -34,6 +39,22 @@ func _ready() -> void:
 	_note.modulate = Color(1, 1, 1, 0.7)
 	_note.text = "Face and body recognition only suggest: confirm each match. On stage, a zone with the action \"presenter\" fires that presenter's actions. Photos live in /tmp and are gone after a reboot."
 	add_child(_note)
+	var take := Button.new()
+	take.text = "Take pictures of the people on stage"
+	take.tooltip_text = "Grabs a picture of every person the tracking cameras see now. Name the ones you need; the rest are deleted after 20 minutes."
+	take.pressed.connect(_take_pictures)
+	add_child(take)
+	_consent = CheckBox.new()
+	_consent.text = "The people I name agreed to be recognised for show automation"
+	add_child(_consent)
+	_cap_note = Label.new()
+	_cap_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_cap_note.modulate = Color(1, 1, 1, 0.7)
+	_cap_note.visible = false
+	add_child(_cap_note)
+	_caps = VBoxContainer.new()
+	_caps.add_theme_constant_override("separation", 8)
+	add_child(_caps)
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 10)
 	add_child(_list)
@@ -78,7 +99,7 @@ func _on_ws(type: String, data: Variant) -> void:
 ## A rebuild would drop the operator's half-typed actions: wait until the field loses focus (it saves, then reloads).
 func _editing() -> bool:
 	var f := get_viewport().gui_get_focus_owner()
-	return f is LineEdit and _list.is_ancestor_of(f)
+	return f is LineEdit and (_list.is_ancestor_of(f) or _caps.is_ancestor_of(f))
 
 
 func _render() -> void:
@@ -96,6 +117,11 @@ func _render() -> void:
 		e.editable = false
 		e.select_all_on_focus = true
 		_url_box.add_child(e)
+	for c in _caps.get_children():
+		c.queue_free()
+	for c in _snap.get("captures", []):
+		if c is Dictionary:
+			_caps.add_child(_capture_row(c, choices))
 	for c in _list.get_children():
 		c.queue_free()
 	var best := {}
@@ -178,6 +204,70 @@ func _actions_field(title: String, key: String, p: Dictionary, id: String) -> Co
 	e.text_submitted.connect(func(_t: String) -> void: save.call())
 	e.focus_exited.connect(save)
 	row.add_child(e)
+	return row
+
+
+func _say(text: String) -> void:
+	_cap_note.text = text
+	_cap_note.visible = text != ""
+
+
+func _take_pictures() -> void:
+	_say("Taking pictures…")
+	var r: Dictionary = await Api.post_json(BASE + "/capture", {})
+	if not r.ok:
+		var why := str(r.data.get("error", "")) if r.get("data") is Dictionary else ""
+		_say(why if why != "" else "Could not take pictures.")
+	else:
+		var n: int = (r.data.get("taken", []) as Array).size() if r.data is Dictionary else 0
+		_say("Nobody new on camera right now." if n == 0 else "%d picture(s) — type a name under the ones you need." % n)
+	reload()
+
+
+## A camera picture: thumbnail, who it shows, name + mic fields, Save (→ a bound presenter) and Discard.
+func _capture_row(c: Dictionary, choices: Array) -> Control:
+	var cid := str(c.id)
+	var row := HBoxContainer.new()
+	var pic := TextureRect.new()
+	pic.custom_minimum_size = THUMB
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	row.add_child(pic)
+	_photo("captures/" + cid, pic, "%s:%s" % [cid, str(c.get("at", 0))])
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var who := Label.new()
+	who.text = M.capture_line(c, choices)
+	who.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	who.modulate = Color(1, 1, 1, 0.75)
+	col.add_child(who)
+	var fields := HBoxContainer.new()
+	var name_e := LineEdit.new()
+	name_e.placeholder_text = "Name"
+	name_e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fields.add_child(name_e)
+	var mic_e := LineEdit.new()
+	mic_e.placeholder_text = "Mic"
+	mic_e.custom_minimum_size.x = 56
+	fields.add_child(mic_e)
+	col.add_child(fields)
+	var acts := HBoxContainer.new()
+	var save := func() -> void:
+		var problem := M.capture_problem(name_e.text, _consent.button_pressed)
+		if problem != "":
+			_say(problem)
+			return
+		var r: Dictionary = await Api.post_json("%s/captures/%s/name" % [BASE, cid], {"name": name_e.text.strip_edges(), "mic": mic_e.text.strip_edges(), "consent": true})
+		_say("" if r.ok else "Could not save: " + (str(r.data.get("error", "")) if r.get("data") is Dictionary else "no answer"))
+		name_e.release_focus()
+		reload()
+	name_e.text_submitted.connect(func(_t: String) -> void: save.call())
+	acts.add_child(_button("Save as presenter", save))
+	acts.add_child(_button("Discard", func() -> void:
+		await Api.delete_json("%s/captures/%s" % [BASE, cid])
+		reload()))
+	col.add_child(acts)
+	row.add_child(col)
 	return row
 
 
