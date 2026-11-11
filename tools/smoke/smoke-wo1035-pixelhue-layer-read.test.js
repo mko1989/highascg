@@ -74,6 +74,9 @@ describe('WO-1035 PixelHue layer read', () => {
 		assert.deepEqual(s.layers.map((l) => `${l.scene}:${l.name}`), ['pgm:BG', 'pvw:Next', 'pgm:PIP'])
 		const pip = s.layers[2]
 		assert.deepEqual([pip.x, pip.y, pip.width, pip.height, pip.zorder, pip.source], [2000, 100, 800, 450, 3, 'Input 7'])
+		// the same rectangle as a look-layer fill (fractions of the 3072x1024 screen)
+		assert.deepEqual(pip.fill, { x: 0.651042, y: 0.097656, scaleX: 0.260417, scaleY: 0.439453 })
+		assert.deepEqual(s.layers[0].fill, { x: 0, y: 0, scaleX: 1, scaleY: 1 })
 	})
 
 	it('reads inside the cache window share one round trip; a switcher restart re-authenticates once', async () => {

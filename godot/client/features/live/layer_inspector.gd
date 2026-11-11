@@ -17,6 +17,7 @@ const LayerStyleRow := preload("res://features/live/layer_style_row.gd")
 const PlaylistSection := preload("res://features/live/playlist_section.gd")
 const ClipTrimSection := preload("res://features/live/clip_trim_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const PixelhueMatch := preload("res://features/live/pixelhue_match_model.gd")
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"], ["vertical", "Fill height"], ["stretch", "Stretch"]]
 const T := preload("res://features/live/clip_trim_model.gd")
 const STARTS: Array = preload("res://features/live/clip_trim_model.gd").STARTS  # WO-813: no Custom — trim works under both
@@ -52,6 +53,16 @@ func _ready() -> void:
 	g.columns = 2
 	add_child(g)
 	_row(g, "Content sizing", _option("fit", FITS.map(func(o: Array) -> String: return o[1]), _on_fit))
+	# WO-1035: copy a PixelHue layer's rectangle onto this layer (an empty layer + PIP border over the switcher's PIP)
+	var ph := OptionButton.new()
+	ph.add_item("Match PixelHue layer…")
+	ph.tooltip_text = "Puts this layer exactly where a layer of the PixelHue switcher is (read live from the switcher)."
+	ph.pressed.connect(func() -> void: _load_pixelhue(ph))
+	ph.item_selected.connect(func(i: int) -> void:
+		if i > 0 and ph.get_item_metadata(i) is Dictionary:
+			patch.emit(PixelhueMatch.patch_for(ph.get_item_metadata(i)))
+		ph.select(0))
+	_row(g, "Position from", ph)
 	_row(g, "Clip start point", _option("start", STARTS.map(func(o: Array) -> String: return o[1]),
 		func(i: int) -> void: _emit({"startBehaviour": STARTS[i][0]})))
 	_trim = ClipTrimSection.new()
@@ -166,6 +177,20 @@ func _refresh_content() -> void:
 	content_known = Vector2(c) if known else Vector2.ZERO
 	_content = c
 	_fx.show_effects(_layer.get("effects", []) if _layer.get("effects") is Array else [], _content)
+
+
+## The switcher's program layers, read when the drop-down opens (they move; nothing is cached).
+func _load_pixelhue(ph: OptionButton) -> void:
+	var res: Dictionary = await Api.get_json("/api/pixelhue/layers?scene=pgm")
+	var list := PixelhueMatch.choices(res.data) if res.ok else []
+	while ph.item_count > 1:
+		ph.remove_item(ph.item_count - 1)
+	for c in list:
+		ph.add_item(str(c.label))
+		ph.set_item_metadata(ph.item_count - 1, c)
+	if list.is_empty():
+		var why := str(res.data.get("error", "")) if res.get("data") is Dictionary else ""
+		status.emit(why if why != "" else "PixelHue: no program layers to match.")
 
 
 func _load_options() -> void:

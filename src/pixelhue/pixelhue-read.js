@@ -91,6 +91,15 @@ function normalizeLayer(l) {
 	}
 }
 
+const r6 = (v) => Math.round(v * 1e6) / 1e6
+
+/** The layer's rectangle as a look-layer `fill` (top-left + size, as fractions of the screen): a HighAsCG layer with
+ * this fill on an output of the same shape covers exactly what the switcher layer covers. */
+function withFill(l, sw, sh) {
+	if (!(sw > 0) || !(sh > 0) || !(l.width > 0) || !(l.height > 0)) return l
+	return { ...l, fill: { x: r6(l.x / sw), y: r6(l.y / sh), scaleX: r6(l.width / sw), scaleY: r6(l.height / sh) } }
+}
+
 /** Screens with their layers, bottom layer first. */
 function normalize(screensRes, layersRes) {
 	const layers = listOf(layersRes).map(normalizeLayer)
@@ -102,7 +111,10 @@ function normalize(screensRes, layersRes) {
 			enabled: s?.enable === 1,
 			width: int(win.width),
 			height: int(win.height),
-			layers: layers.filter((l) => l.screenId === s?.screenId).sort((a, b) => a.zorder - b.zorder),
+			layers: layers
+				.filter((l) => l.screenId === s?.screenId)
+				.sort((a, b) => a.zorder - b.zorder)
+				.map((l) => withFill(l, int(win.width), int(win.height))),
 		}
 	})
 }

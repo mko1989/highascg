@@ -7,7 +7,9 @@
  *   POST /api/pixelhue/config { host }   the switcher (or its control PC) address; '' forgets it
  *   GET  /api/pixelhue/layers            { ok, host, device, at, screens: [{ screenId, name, enabled, width, height,
  *                                          layers: [{ layerId, name, scene, type, zorder, enabled, opacity,
- *                                                     x, y, width, height, source, … }] }] }
+ *                                                     x, y, width, height, source, fill, … }] }] }
+ *                                        fill = the rectangle as a look-layer fill { x, y, scaleX, scaleY }: the
+ *                                        layer inspector's "Match PixelHue layer" copies it onto a look layer
  *        ?screen=<screenId>              that screen only
  *        ?scene=pgm|pvw                  layers of that bus only
  *
