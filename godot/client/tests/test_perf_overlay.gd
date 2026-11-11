@@ -38,14 +38,14 @@ func test_proc_parsing() -> void:
 
 func test_host_rows() -> void:
 	var d := _pairs(M.host_rows(HOST))
-	t.eq(d["CPU"], ["21% · load 6.6/28", 0], "machine busy % (not load) + load for context")
+	t.eq(d["CPU"], ["21% of box · load 6.6/28", 0], "machine busy % (not load) + load for context")
 	t.eq(d["RAM"], ["11.1 GiB / 62.6 GiB", 0], "used / total")
 	t.eq(d["GPU"], ["32% · 57 °C", 0], "utilisation + temperature")
 	t.eq(d["VRAM"], ["2.3 GiB / 23.9 GiB", 0], "MiB from nvidia-smi")
 	t.eq(d["Media disk"][0], "111.6 GiB free", "media volume free space")
 	t.eq(d["Media disk"][1], 1, "88% full warns")
-	t.eq(d["CasparCG"], ["290% (10.4% box) · 5.3 GiB", 0], "Caspar: per-core % + machine share + RSS")
-	t.eq(d["HighAsCG"], ["5% (0.2% box) · 236 MiB", 0], "node server")
+	t.eq(d["CasparCG"], ["290% of 1 core (10.4% of box) · 5.3 GiB", 0], "Caspar: per-core % + machine share + RSS")
+	t.eq(d["HighAsCG"], ["5% of 1 core (0.2% of box) · 236 MiB", 0], "node server")
 
 
 func test_host_levels_and_degraded() -> void:
@@ -77,7 +77,7 @@ func test_client_rows() -> void:
 	t.eq(d["Render"], ["cpu 1.5 · gpu 3.0 ms", 0], "measured viewport render time")
 	t.eq(d["Draw calls"], ["412 · 380 obj", 0], "draw calls")
 	t.eq(d["VRAM (Godot)"], ["500 MiB", 0], "Godot's own VRAM")
-	t.eq(d["CPU"], ["140% (5.0% box)", 0], "per-core % + share of the 28-core box")
+	t.eq(d["CPU"], ["140% of 1 core (5.0% of box)", 0], "per-core % says so + share of the 28-core box")
 	t.eq(d["RAM"], ["700 MiB", 0], "RSS")
 	c.fps = 15
 	c.cpu_pct = -1.0

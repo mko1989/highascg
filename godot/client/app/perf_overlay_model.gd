@@ -67,10 +67,16 @@ static func client_rows(c: Dictionary, cores: int) -> Array:
 	rows.append(_row("Draw calls", "%d · %d obj" % [int(c.get("draw_calls", 0)), int(c.get("objects", 0))]))
 	rows.append(_row("VRAM (Godot)", fmt_bytes(float(c.get("vram", -1)))))
 	var pct := float(c.get("cpu_pct", -1))
-	var share := " (%.1f%% box)" % (pct / cores) if pct >= 0 and cores > 0 else ""
-	rows.append(_row("CPU", ("%d%%" % roundi(pct) + share) if pct >= 0 else "—", level(pct / maxi(1, cores), 25, 50) if pct >= 0 else 0))
+	var share := " (%.1f%% of box)" % (pct / cores) if pct >= 0 and cores > 0 else ""
+	rows.append(_row("CPU", (core_pct(pct) + share) if pct >= 0 else "—", level(pct / maxi(1, cores), 25, 50) if pct >= 0 else 0))
 	rows.append(_row("RAM", fmt_bytes(float(c.get("rss", -1)))))
 	return rows
+
+
+## A process's CPU reading says what it is a percentage OF: one core (100% = one core fully busy, 290% = almost
+## three), unlike the box rows, which are a share of the whole machine (owner 11.11: the bare "290%" read as the box).
+static func core_pct(pct: float) -> String:
+	return "%d%% of 1 core" % roundi(pct)
 
 
 ## host: the /api/host-stats body. Preshow (mode "preshow") and unreachable both give a single note row.
@@ -85,7 +91,7 @@ static func host_rows(h: Variant) -> Array:
 	var pct := _num(cpu, "usagePct")
 	var load := _num(cpu, "load1")
 	var cores := int(_num(cpu, "cores"))
-	var cpu_txt := ("%d%%" % roundi(pct)) if pct >= 0 else "—"
+	var cpu_txt := ("%d%% of box" % roundi(pct)) if pct >= 0 else "—"
 	if load >= 0:
 		cpu_txt += " · load %.1f/%d" % [load, cores]
 	rows.append(_row("CPU", cpu_txt, level(pct, 70, 90) if pct >= 0 else 0))
@@ -116,9 +122,9 @@ static func host_rows(h: Variant) -> Array:
 			continue
 		var pc := _num(p, "cpuPct")
 		var share := _num(p, "cpuPctOfMachine")
-		var txt := ("%d%%" % roundi(pc)) if pc >= 0 else "—"
+		var txt := core_pct(pc) if pc >= 0 else "—"
 		if share >= 0:
-			txt += " (%.1f%% box)" % share
+			txt += " (%.1f%% of box)" % share
 		rows.append(_row(spec[1], "%s · %s" % [txt, fmt_bytes(_num(p, "rssBytes"))], level(share, 50, 80) if share >= 0 else 0))
 	return rows
 
