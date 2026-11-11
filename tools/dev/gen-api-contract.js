@@ -22,8 +22,9 @@ const { TYPE_TO_PATH } = require('../../src/server/ws-amcp-dispatch')
 function walk(dir, out = []) {
 	for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
 		const p = path.join(dir, e.name)
-		if (e.isDirectory()) walk(p, out)
-		else if (e.name.endsWith('.js')) out.push(p)
+		if (e.isDirectory()) {
+			if (e.name !== 'vendor') walk(p, out) // vendored apps (pixelhue-studio) have their own /api — not this server's routes
+		} else if (e.name.endsWith('.js')) out.push(p)
 	}
 	return out
 }

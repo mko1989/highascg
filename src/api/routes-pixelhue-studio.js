@@ -45,8 +45,9 @@ async function handleStudio(method, p, query, body, deps = {}) {
 
 function register(routes) {
 	const opt = { requireCaspar: false }
-	routes.get(BASE + '*', ({ path: p, query }) => handleStudio('GET', p, query), opt)
-	routes.post(BASE + '*', ({ path: p, query, body }) => handleStudio('POST', p, query, body), opt)
+	// the literal paths (= BASE + '*'): the API contract generator reads registrations as written
+	routes.get('/api/pixelhue/studio/*', ({ path: p, query }) => handleStudio('GET', p, query), opt)
+	routes.post('/api/pixelhue/studio/*', ({ path: p, query, body }) => handleStudio('POST', p, query, body), opt)
 }
 
 module.exports = { register, handleStudio }

@@ -1,7 +1,7 @@
 # WO-1039 — PixelHue main tab: the owner's PixelHue Studio as native panels
 
 **Area:** mapping, godot-client, devices-config
-**Status: IN PROGRESS (11.11 — foundation DONE 9b779736: vendored Studio engine in the server, `/api/pixelhue/studio/*`, the tab shell; panels being built)**
+**Status: IN PROGRESS (11.11 — engine, tab and all seven panels built and committed; verified by tests + headless boot + live reads of the P20; NOT yet seen on the glass and no panel write has been run against the switcher)**
 
 Owner, 11.11: *"Add basically the whole pixelhue studio ui under pixelhue tab (when one connected) that will be after
 devices in the main tabs."*
@@ -60,3 +60,33 @@ Rules for every panel:
    or keyboard automation on the box's display.
 10. What Studio does through a file dialog or a raw upload (EDID files, gallery upload, layout save / load) is left
     out and listed in the hand-back.
+
+## What was built (11.11)
+
+| Unit | Commit | Files (`godot/client/features/pixelhue/`) | Tests |
+|---|---|---|---|
+| Engine + tab shell | 9b779736 | server: `studio-bridge.js`, `routes-pixelhue-studio.js`, vendor copy; `pixelhue_tab.gd`, `studio_api.gd` | `smoke-wo1039-pixelhue-studio-bridge.test.js` (4), `test_pixelhue_studio_api.gd` |
+| Audio | 8f2dad53 | `audio_*.gd` | 14 |
+| Device, Screens, Outputs | 357f09d4 | `device_*.gd`, `screens_*.gd`, `outputs_*.gd` | 59 / 47 / 33 |
+| Inputs | 2aa95caf | `inputs_*.gd` | 64 |
+| MVR | 33956d39 | `mvr_*.gd` | 275 |
+| Programming | d07ee99b | `programming_*.gd` | 326 |
+
+Each panel was built by a subagent against the contract above and checked by the lead: request bodies against
+`vendor/pixelhue-studio/lib`, the area's suite, `run-client.sh --check`, file-size gate; then committed by the lead.
+
+Left out, as the contract says: EDID file import / export, gallery picture upload, MVR layout save / load to a file.
+Studio's discard-changes dialogs became "staged edits are kept + a Discard button" in Inputs and Screens.
+
+## Verified
+
+- Server: all 14 Studio read resources answered from the owner's P20 through `/api/pixelhue/studio/*` (model P20,
+  capabilities inputs / mvr / audio); `GET …/connect` is 404 by design.
+- Client: full suite 28087 passed / 0 failed; `run-client.sh --check` boots with no script errors with every panel.
+- Offline suite green, API contract regenerated (the generator now skips `vendor/`).
+- **Not verified:** nothing has been seen on the glass; no panel write has been sent to the switcher (the builders
+  were not allowed to, the lead did not); the lazily filled menus in Outputs depend on `about_to_popup`, untried.
+- Incidents while building: `mvr_panel.gd` did not parse for a few minutes (a constant named `Side`); the Programming
+  builder booted a headless client twice outside `run-client.sh` against the live server and the owner's `user://`
+  (log rotated, `ui.cfg` re-saved; the server journal of that minute shows no compose or autosave line, the project
+  files were untouched). Two test files carried the P20's serial number; replaced with a placeholder before any push.

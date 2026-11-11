@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-589 routes.
+580 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -119,7 +119,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/compose-preview/stats` | handler | `src/api/routes-compose-preview.js` |
 | GET | `/api/config` | registry | `src/api/router.js` |
 | POST | `/api/config/reset` | registry | `src/api/router.js`, `src/api/routes-config.js` |
-| * | `/api/connect` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
 | GET | `/api/contract/constants` | registry | `src/api/routes-contract.js` |
 | GET | `/api/countdown` | registry | `src/api/router.js` |
 | POST | `/api/countdown` | registry | `src/api/router.js` |
@@ -134,10 +133,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/device-view/gpu-map-debug` | registry | `src/api/router.js` |
 | GET | `/api/device-view/snapshot` | registry | `src/api/router.js`, `src/api/routes-device-view.js` |
 | POST | `/api/device-view/snapshot` | registry | `src/api/router.js` |
-| * | `/api/discovery` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
 | GET | `/api/dmx-monitor` | registry | `src/api/routes-dmx-monitor.js` |
 | POST | `/api/dmx-monitor/poll` | registry | `src/api/routes-dmx-monitor.js` |
-| * | `/api/edid` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
 | * | `/api/export` | handler | `src/cg-studio/routes.js` |
 | GET | `/api/fixtures/console-selection` | registry | `src/api/routes-console-selection.js` |
 | POST | `/api/fixtures/console-selection` | registry | `src/api/routes-console-selection.js` |
@@ -178,10 +175,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/fixtures/types/*` | registry | `src/api/routes-fixture-types.js` |
 | GET | `/api/fonts` | registry | `src/api/router.js` |
 | POST | `/api/ftb/*` | registry | `src/api/router.js` |
-| * | `/api/gallery` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
-| * | `/api/gallery/manage` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
-| * | `/api/gallery/thumb` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
-| * | `/api/gallery/upload` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
 | GET | `/api/hardware/displays` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | GET | `/api/hardware/modeline-preview` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | * | `/api/health` | handler | `src/cg-studio/routes.js` |
@@ -200,7 +193,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/ingest/download-status` | registry | `src/api/router.js` |
 | GET | `/api/ingest/preview` | registry | `src/api/router.js` |
 | POST | `/api/ingest/upload` | registry | `src/api/router.js` |
-| * | `/api/inputs` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
 | POST | `/api/led-test-card/:op` | registry | `src/api/router.js` |
 | GET | `/api/led-test-card/settings` | registry | `src/api/router.js` |
 | DELETE | `/api/lighting/consoles` | registry | `src/api/routes-lighting.js` |
@@ -270,7 +262,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/multiview/apply` | handler | `src/api/routes-multiview.js` |
 | POST | `/api/multiview/audio-focus` | handler | `src/api/routes-multiview.js` |
 | GET | `/api/multiview/debug` | registry | `src/api/router.js` |
-| * | `/api/mvr-layers` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
 | GET | `/api/ndi` | registry | `src/api/router.js` |
 | GET | `/api/ndi/*` | registry | `src/api/router.js` |
 | POST | `/api/network/tailscale/enable` | registry | `src/api/router.js`, `src/api/routes-network-tailscale.js` |
@@ -303,6 +294,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/pixelhue/config` | registry | `src/api/routes-pixelhue.js` |
 | GET | `/api/pixelhue/layers` | registry | `src/api/routes-pixelhue.js` |
 | GET | `/api/pixelhue/sources` | registry | `src/api/routes-pixelhue.js` |
+| GET | `/api/pixelhue/studio/*` | registry | `src/api/routes-pixelhue-studio.js` |
+| POST | `/api/pixelhue/studio/*` | registry | `src/api/routes-pixelhue-studio.js` |
 | POST | `/api/playlist/control` | registry | `src/api/router.js`, `src/api/routes-playlist.js` |
 | POST | `/api/playlist/edit` | registry | `src/api/router.js` |
 | POST | `/api/playlist/edit/next` | registry | `src/api/router.js` |
@@ -439,7 +432,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | DELETE | `/api/stage/mvr/*` | registry | `src/api/routes-stage-mvr.js` |
 | GET | `/api/stage/mvr/*` | registry | `src/api/routes-stage-mvr.js` |
 | POST | `/api/stage/mvr/*` | registry | `src/api/routes-stage-mvr.js` |
-| * | `/api/state` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
 | GET | `/api/state` | registry | `src/api/router.js` |
 | GET | `/api/state/*` | registry | `src/api/router.js` |
 | POST | `/api/stop` | handler | `src/api/routes-amcp.js` |
@@ -588,7 +580,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/vr/start` | registry | `src/api/routes-vr.js` |
 | GET | `/api/vr/status` | registry | `src/api/routes-vr.js` |
 | POST | `/api/vr/stop` | registry | `src/api/routes-vr.js` |
-| * | `/api/windows` | handler | `src/pixelhue/vendor/pixelhue-studio/server.js` |
 | * | `/api/ws` | handler | `src/server/ws-server.js` |
 | GET | `/api/zoom` | registry | `src/api/routes-zoom.js` |
 | GET | `/api/zoom/audio` | registry | `src/api/routes-zoom-audio.js` |
@@ -642,6 +633,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-pgm-layer.js` | WO-803 — each program screen's main layer, for the Companion PGM readback button: GET /api/screens/pgm-layer. |
 | `src/api/routes-pip-overlay.js` | PIP overlay routes — apply, update, remove HTML-template overlays on PIP layers. |
 | `src/api/routes-pixel-map.js` | WO-807 — region-to-fixture-pixel mapping (src/fixtures/pixel-map-service.js, via ctx.fixtureService.pixelMap): GET  /api/fixtures/pixelmap         → { ok, mappi |
+| `src/api/routes-pixelhue-studio.js` | routes-pixelhue-studio.js — WO-1039: the vendored PixelHue Studio's API for the Godot client's PixelHue tab. |
 | `src/api/routes-pixelhue.js` | routes-pixelhue.js — WO-1035: read-only PixelHue layer positions for overlays that follow switcher layers. |
 | `src/api/routes-playlist.js` | routes-playlist.js — Manual playlist advance API (WO-224). |
 | `src/api/routes-plugins.js` |  |
@@ -673,7 +665,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/system-network-wifi.js` | WO-692 — Wi-Fi from the GUI: status (radio, adapters, last scan), rescan, connect (WPA passphrase), disconnect, radio on / off. |
 | `src/autofollow/register.js` | Stage auto-follow module registration (WO-31 / WO-30). |
 | `src/cg-studio/routes.js` | CG Studio HTTP handlers (runs on Electron launcher, not playout server). |
-| `src/pixelhue/vendor/pixelhue-studio/server.js` |  |
 | `src/previs/register.js` | Previs module registration (WO-17 / WO-30). |
 | `src/server/auth.js` |  |
 | `src/server/ws-server.js` | WebSocket server on the same HTTP port (upgrade `/api/ws`, `/ws`, and Companion-style `/instance/<id>/api/ws`). |
