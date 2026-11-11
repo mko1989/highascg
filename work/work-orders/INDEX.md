@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-942 live WOs (34 open, 130 in progress, 778 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+948 live WOs (34 open, 131 in progress, 783 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -186,7 +186,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1027 OPEN [engine+network,video-io] A look cannot name another server's input: raw route://N-L gives a 403, an empt… → 1027_WO_looks_cannot_name_another_servers_inputs.md
 - 1032 DONE [engine+companion,lighting] Timeline cues: fire on program only, and never drop one → 1032_WO_timeline_cues_program_only_and_dropped_cues.md
 
-## amcp — AMCP client and protocol (20)
+## amcp — AMCP client and protocol (21)
 
 - 07 DONE [amcp] Complete AMCP Protocol API Implementation → 07_WO_AMCP_PROTOCOL_API.md
 - 08 DONE [amcp+audio] CasparCG Client Features — OSC status, VU meters, layer/channel status → 08_WO_CASPARCG_CLIENT_FEATURES.md
@@ -208,6 +208,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 845 DONE [amcp+lighting] Sweep: AMCP client, Art-Net/sACN, audio and media bugs → 845_WO_sweep_amcp_dmx_audio_media.md
 - 867 DONE [amcp+os-iso] Caspar build: CasparCG/server#1762 effects (BLUR / SHARPEN / GRAIN) brought up… → 867_WO_caspar_pr1762_effects_fixes.md
 - 943 DONE [amcp+mapping] "APPLY 1-65535 SLICES CLEAR … 403 APPLY FAILED" logged as an error on every Cas… → 943_WO_caps_probe_apply_noise_without_gpu_mapping.md
+- 1037 DONE [amcp+engine] A PIP border new on a layer of a PGM-only screen never showed (batch: clear bef… → 1037_WO_batch_clear_before_cg_add_loses_border.md
 
 ## caspar-build — CasparCG server build and binaries (20)
 
@@ -320,7 +321,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1012 IN PROGRESS [video-io+audio,devices-config,godot-client] Zoom integration via the Zoom desktop client: its windows on hidden virtual des… → 1012_WO_zoom_desktop_client_windows_as_live_inputs_and_return_feed.md
 - 1030 OPEN [video-io+engine,caspar-build,mapping] An 8K tiled output runs at 19 fps on highascg5867: idle channels read back full… → 1030_WO_8k_tiled_output_runs_at_19fps_idle_channels_cost.md
 
-## mapping — Pixel map, screens, multiview, destinations (42)
+## mapping — Pixel map, screens, multiview, destinations (45)
 
 - 18 IN PROGRESS [mapping] Pixel & Output Mapping — Unified Node-Based System → 18_WO_OUTPUT_SLICER.md
 - 40 IN PROGRESS [mapping+devices-config] Device View — GPU xrandr sync with screen destinations and override → 40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md
@@ -364,6 +365,9 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 915 DONE [mapping+lighting] PixelLines on the Dioda wall's edges: mappings follow the bus, the previs shows… → 915_WO_pixeline_edges_follow_the_dioda_bus.md
 - 916 DONE [mapping+lighting] Pixel map: always on, cheap sampling, its own output to the lighting console → 916_WO_pixel_map_always_on_console_output.md
 - 917 DONE [mapping+lighting] Pixel map: an intensity override switch for playing with it in the previs → 917_WO_pixel_map_intensity_override.md
+- 1035 DONE [mapping+godot-client,devices-config] PixelHue: read layer positions; placeholder layers for PIP borders over the key… → 1035_WO_pixelhue_layer_read_and_placeholders.md
+- 1038 DONE [mapping+engine,godot-client] Looks drive the PixelHue switcher (side feature, off by default) → 1038_WO_looks_drive_pixelhue.md
+- 1039 IN PROGRESS [mapping+godot-client,devices-config] PixelHue main tab: the owner's PixelHue Studio as native panels → 1039_WO_pixelhue_studio_tab.md
 
 ## lighting — DMX, Art-Net, sACN, fixtures, consoles (36)
 
@@ -672,7 +676,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 791 DONE [companion] Companion: recall look presets to PRV, to PGM, or to PGM with auto take → 791_WO_companion_look_preset_recall.md
 - 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
 
-## devices-config — Devices tab, settings, config generation (59)
+## devices-config — Devices tab, settings, config generation (60)
 
 - 33 IN PROGRESS [devices-config+web-client] Device view (program): index & dependency order → 33_WO_DEVICE_VIEW_INDEX.md
 - 33a OPEN [devices-config+web-client] Device view: data model, persistence, and HTTP API → 33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md
@@ -733,6 +737,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1019 OPEN [devices-config+video-io] A second NDI sender (or RTMP/ffmpeg output) on one channel silently replaces th… → 1019_WO_second_ndi_or_rtmp_output_on_a_channel_replaces_the_first.md
 - 1021 OPEN [devices-config+video-io] Route-heal points live sources at channels of a config that has not been applie… → 1021_WO_route_heal_points_live_sources_at_unapplied_channels.md
 - 1031 IN PROGRESS [devices-config+tracking-vr,video-io,network] Narvil show on the real setup: LED walls + tracking cameras on this box, camera… → 1031_WO_narvil_show_real_setup_two_boxes_and_custom_ptz.md
+- 1034 DONE [devices-config+mapping] One PGM destination on several GPU jacks (fill + key-only pair) → 1034_WO_destination_on_several_gpu_jacks_fill_key.md
 
 ## os-iso — ISO, sticks, kernel, NVIDIA, boot (87)
 
@@ -900,7 +905,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 922 DONE [media] Media import keeps Polish file names on every path (URL downloads saved the %-e… → 922_WO_media_import_utf8_names.md
 - 951 DONE [media+godot-client] Import a .gtzip lower third (NewTek LiveGraphics-style) as a CG Studio template → 951_WO_gtzip_lower_third_import.md
 
-## tracking-vr — Tracking, previs, VR (33)
+## tracking-vr — Tracking, previs, VR (34)
 
 - 17 DONE [tracking-vr+web-client] 3D Previs — Live Video on Imported 3D Stage Models → 17_WO_3D_PREVIS.md
 - 30 IN PROGRESS [tracking-vr+process] Previs & Tracking Module — Packaging and Integration → 30_WO_PREVIS_TRACKING_MODULE.md
@@ -935,6 +940,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 957 DONE [tracking-vr+godot-client] VR headset black while the GUI mirror shows the scene: WO-892's SMAA on the mul… → 957_WO_vr_headset_black_smaa_multiview.md
 - 969 IN PROGRESS [tracking-vr+godot-client] VR starts inside the loaded MVR room, facing its rig, not 8 m +Z of the origin… → 969_WO_vr_starts_inside_the_mvr_room.md
 - 978 DONE [tracking-vr+lighting,godot-client] Tracking → lighting desk test environment: puppet marker, PSN to ChamSys MagicQ → 978_WO_tracking_desk_test_env_puppet_psn_magicq.md
+- 1036 DONE [tracking-vr+godot-client] Presenters from a tracking-camera picture, named by the operator → 1036_WO_presenters_from_tracking_camera.md
 
 ## testing-ci — Tests and CI (28)
 

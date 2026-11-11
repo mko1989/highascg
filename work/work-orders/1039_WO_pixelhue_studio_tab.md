@@ -1,6 +1,6 @@
 # WO-1039 — PixelHue main tab: the owner's PixelHue Studio as native panels
 
-**Area:** pixelhue, godot-client
+**Area:** mapping, godot-client, devices-config
 **Status: IN PROGRESS (11.11 — foundation DONE 9b779736: vendored Studio engine in the server, `/api/pixelhue/studio/*`, the tab shell; panels being built)**
 
 Owner, 11.11: *"Add basically the whole pixelhue studio ui under pixelhue tab (when one connected) that will be after
