@@ -44,6 +44,7 @@ func reload() -> void:
 	var parent := get_parent() as Control
 	if parent == null or not parent.is_visible_in_tree():
 		return
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var r: Dictionary = await Api.get_json("/api/pixelhue/layers?scene=pgm")
 	visible = r.ok  # no switcher added, or it does not answer: no list
 	if not r.ok:

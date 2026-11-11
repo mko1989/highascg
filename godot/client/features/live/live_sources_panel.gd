@@ -51,11 +51,16 @@ func _ready() -> void:
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(_scroll)
+	var content := VBoxContainer.new()  # the live sources, then the PixelHue layers — one scroll for both
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(content)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_theme_constant_override("separation", 2)
-	_scroll.add_child(_list)
-	add_child(preload("res://features/live/pixelhue_layers_list.gd").new())  # WO-1035: its own list under the live sources
+	content.add_child(_list)
+	# WO-1035: its own list under the live sources, inside the same scroll (outside it, a switcher with many layers
+	# squeezed the live sources out of the panel — owner 11.11)
+	content.add_child(preload("res://features/live/pixelhue_layers_list.gd").new())
 	_scroll.set_drag_forwarding(Callable(), can_drop_connector, func(_at: Vector2, data: Variant) -> void: drop_connector(Drop.parse(data)))
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
 		if path in STATE_KEYS:

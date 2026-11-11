@@ -41,6 +41,9 @@ signal status(text: String)
 var _content_key := ""
 var _content := Vector2i.ZERO
 var content_known := Vector2.ZERO  # the server-reported media size only (no channel fallback): the aspect lock's ratio
+var _grid: GridContainer
+var _media_from := 0  # grid child range of the media-only rows (hidden for an empty PixelHue placeholder layer)
+var _media_to := 0
 
 
 func _ready() -> void:
@@ -52,6 +55,7 @@ func _ready() -> void:
 	var g := GridContainer.new()
 	g.columns = 2
 	add_child(g)
+	_media_from = g.get_child_count()  # WO-1035: the rows from here to _media_to are about media a layer plays
 	_row(g, "Content sizing", _option("fit", FITS.map(func(o: Array) -> String: return o[1]), _on_fit))
 	# WO-1035: copy a PixelHue layer's rectangle onto this layer (an empty layer + PIP border over the switcher's PIP)
 	var ph := OptionButton.new()
@@ -62,6 +66,7 @@ func _ready() -> void:
 		if i > 0 and ph.get_item_metadata(i) is Dictionary:
 			patch.emit(PixelhueMatch.patch_for(ph.get_item_metadata(i)))
 		ph.select(0))
+	_w["ph"] = ph
 	_row(g, "Position from", ph)
 	_row(g, "Clip start point", _option("start", STARTS.map(func(o: Array) -> String: return o[1]),
 		func(i: int) -> void: _emit({"startBehaviour": STARTS[i][0]})))
@@ -96,6 +101,8 @@ func _ready() -> void:
 	fade.add_child(_check("fade", func(on: bool) -> void: _emit({"fadeOnEnd": {"enabled": on}})))
 	fade.add_child(_spin("fade_fr", 1, 250, 1, func(v: float) -> void: _emit({"fadeOnEnd": {"frames": int(v)}})))
 	_row(g, "Fade on end (fr)", fade)
+	_media_to = g.get_child_count()
+	_grid = g
 	_pl = PlaylistSection.new()  # web inspector-layer-playlist.js sits under the mixer
 	_pl.patch.connect(func(p: Dictionary) -> void: patch.emit(p))
 	add_child(_pl)
@@ -142,6 +149,10 @@ func show_layer(look_id: String, main_idx: int, layer: Dictionary, index := -1) 
 		_tpl.show_layer(look_id, main_idx, layer)
 		_lt.show_layer(look_id, main_idx, layer)
 		_cd.show_layer(look_id, main_idx, layer, index)
+		var plays := not PixelhueMatch.is_empty_placeholder(layer)  # WO-1035: nothing to style, list or template
+		_style.visible = plays
+		for sec in [_pl, _tpl, _lt, _cd]:
+			(sec as Control).visible = plays and (sec as Control).visible
 		_refresh_content()
 
 
@@ -208,6 +219,7 @@ func _is_route_source() -> bool:
 func _sync() -> void:
 	if _layer.is_empty():
 		return
+	_show_media_rows(not PixelhueMatch.is_empty_placeholder(_layer))
 	_syncing = true
 	var fit := str(_layer.get("contentFit", "native"))
 	(_w.fit as OptionButton).select(maxi(0, FITS.map(func(o: Array) -> String: return o[0]).find(fit)))
@@ -241,6 +253,18 @@ func _sync() -> void:
 	(_w.fade as CheckBox).button_pressed = fo.get("enabled", false) == true
 	(_w.fade_fr as SpinBox).value = float(fo.get("frames", 12))
 	_syncing = false
+
+
+## WO-1035 (owner 11.11: "a lot of useless settings like for a media"): an empty placeholder layer plays nothing —
+## sizing, start point, trim, speed, loop, alpha, audio, volume, fade (and, in show_layer, the style row, playlist,
+## template, lower third and countdown sections) go; "Position from", rotation, effects and the PIP overlays stay.
+func _show_media_rows(on: bool) -> void:
+	var keep := [_w.get("rot"), _w.get("ph")]
+	var n := mini(_media_to, _grid.get_child_count())
+	for i in range(_media_from, n):
+		var c := _grid.get_child(i) as Control
+		var value_of_label: Control = _grid.get_child(i + 1) as Control if i + 1 < n else null
+		c.visible = on or c in keep or value_of_label in keep
 
 
 func _emit(p: Dictionary) -> void:

@@ -16,8 +16,8 @@ static func choices(data: Variant) -> Array:
 		for l in s.get("layers", []):
 			if not l is Dictionary or l.get("enabled") != true or not l.get("fill") is Dictionary:
 				continue
-			if str(l.get("scene", "")) != "pgm" or str(l.get("type", "")) == "bkg":
-				continue
+			if str(l.get("scene", "")) != "pgm" or str(l.get("type", "")) in ["bkg", "mvr", "aux"]:
+				continue  # the multiviewer's tiles and the AUX outputs are not pictures on a screen a border goes over
 			var name := str(l.get("name", "")).strip_edges()
 			var src := str(l.get("source", "")).strip_edges()
 			out.append({
@@ -32,6 +32,14 @@ static func choices(data: Variant) -> Array:
 ## Colour source of a dropped switcher layer: fully transparent black — nothing on the fill, nothing on the key, so
 ## only what the layer carries (a PIP border, an effect) reaches the switcher's key + fill inputs.
 const EMPTY_COLOR := "#00000000"
+
+
+## A look layer made from a switcher layer: it plays nothing, so the inspector leaves the media rows out.
+static func is_empty_placeholder(layer: Variant) -> bool:
+	if not layer is Dictionary or not layer.get("source") is Dictionary:
+		return false
+	var src: Dictionary = layer.source
+	return src.get("isPlaceholder") == true and str(src.get("value", "")) == EMPTY_COLOR
 
 
 ## What a row of the Sources ▸ Live "PixelHue layers" list drags: an empty placeholder source that remembers the

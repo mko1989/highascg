@@ -13,6 +13,8 @@ func test_choices_are_enabled_program_layers_with_a_rectangle() -> void:
 			{"name": "PIP", "type": "normal", "scene": "pgm", "enabled": true, "x": 1536, "y": 256, "width": 768, "height": 512, "source": "Input 7", "fill": fill},
 			{"name": "Next", "type": "normal", "scene": "pvw", "enabled": true, "fill": fill},
 			{"name": "Off", "type": "normal", "scene": "pgm", "enabled": false, "fill": fill},
+			{"name": "Tile", "type": "mvr", "scene": "pgm", "enabled": true, "fill": fill},
+			{"name": "Aux", "type": "aux", "scene": "pgm", "enabled": true, "fill": fill},
 			{"name": "NoSize", "type": "normal", "scene": "pgm", "enabled": true}]},
 		{"name": "Screen 2", "enabled": false, "layers": [{"name": "X", "scene": "pgm", "enabled": true, "fill": fill}]}]}
 	var c := M.choices(data)
@@ -49,3 +51,10 @@ func test_ui_scripts_compile() -> void:
 			"res://features/devices/devices_tab.gd", "res://features/live/layer_inspector.gd", "res://features/previs/tracking/presenters_section.gd"]:
 		var s: GDScript = load(p)
 		t.ok(s != null and s.can_instantiate(), p + " compiles")
+
+
+func test_empty_placeholder_layers_are_recognised() -> void:
+	t.ok(M.is_empty_placeholder({"source": {"type": "media", "value": "#00000000", "isPlaceholder": true}}), "a dropped switcher layer")
+	t.ok(not M.is_empty_placeholder({"source": {"type": "media", "value": "#FF112233", "isPlaceholder": true}}), "a solid offline placeholder plays a colour")
+	t.ok(not M.is_empty_placeholder({"source": {"type": "media", "value": "clip.mov"}}), "media")
+	t.ok(not M.is_empty_placeholder({}), "no source")
