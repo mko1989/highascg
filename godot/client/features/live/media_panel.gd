@@ -52,6 +52,7 @@ var _fx: Dictionary = {}  # GET /api/scene/effect-registry {effects, categories}
 var inspector: MediaInspector
 var _press_row: Variant = null  # WO-967: a pressed file's page waits for the release — a drag (to a playlist) never covers its target
 var _tabs: TabContainer
+static var current: Node  # the shell's Sources browser — a feature may lend it a tab (WO-1039: PixelHue sources)
 var live: LivePanel
 var visuals: VisualsPanel
 var templates: ListPanel
@@ -85,6 +86,7 @@ func _ready() -> void:
 	_tabs = TabContainer.new()
 	_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(_tabs)
+	current = self
 	var media := VBoxContainer.new()
 	media.name = "Media"
 	media.add_theme_constant_override("separation", 4)
@@ -308,6 +310,11 @@ func _drop(at: Vector2, data: Variant) -> void:
 		return
 	_tabs.current_tab = live.get_index()
 	live.drop_connector(Drop.parse(data))
+
+
+## The browser's tab strip: a feature adds its own tab while its view is up and takes it away again (WO-1039).
+func browser_tabs() -> TabContainer:
+	return _tabs
 
 
 func _reload_current() -> void:

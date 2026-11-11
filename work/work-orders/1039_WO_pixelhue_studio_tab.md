@@ -125,3 +125,14 @@ released when it is not; without the app shell (unit tests) they stay a column o
 sub-tabs (the stage and the MVR layout gained the width). Not checked: the release when leaving the tab (it follows
 `visibility_changed`; nothing was clicked). Device, Inputs, Outputs, Screens and Audio have no properties column.
 
+## Sources browser (11.11, owner: "When in Pixelhue tab also use sources browser as pixelhue sources, add the tab to the browser only when In pixelhue tab")
+
+`features/pixelhue/sources_dock.gd` + `media_panel.gd` (`MediaPanel.current`, `browser_tabs()`): while the Programming
+or the MVR sub-tab is on screen its source list (Programming: the source tabs and list; MVR: output picker, windows,
+"Add to MVR") is a "PixelHue" tab of the left-hand Sources browser, selected when it appears; when the sub-tab hides,
+the tab is removed and the browser returns to the tab it was on. Without the app shell the list stays a column of the
+panel. Seen on the glass: the tab on Programming and on MVR, no tab on Device; the chip row wraps so the browser
+column keeps its width. Not checked (nothing was clicked): dragging a row from the browser tab onto the stage, and the
+return to the previous browser tab. `programming_sources.gd` did not compile for about a minute while this was done
+(a typed variable); the running client was not affected.
+

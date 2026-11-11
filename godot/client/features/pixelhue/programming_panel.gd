@@ -121,7 +121,7 @@ func _ready() -> void:
 	add_child(_work)
 	_sources = Sources.new()
 	_sources.host = self
-	_work.add_child(_sources)
+	preload("res://features/pixelhue/sources_dock.gd").dock(self, _sources, _work)  # a tab of the app's Sources browser
 	var right := HSplitContainer.new()
 	_work.add_child(right)
 	var center := VBoxContainer.new()

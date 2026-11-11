@@ -19,7 +19,7 @@ var picked := ""
 var gallery_edit := false
 var _state: Dictionary = {}
 var _gallery: Dictionary = {}
-var _tabs: HBoxContainer
+var _tabs: HFlowContainer
 var _hint: Label
 var _filter: LineEdit
 var _scroll: ScrollContainer
@@ -33,8 +33,9 @@ func _init() -> void:
 	title.text = "Sources"
 	title.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
 	add_child(title)
-	_tabs = HBoxContainer.new()
-	_tabs.add_theme_constant_override("separation", 2)
+	_tabs = HFlowContainer.new()  # wraps: as a tab of the Sources browser it must not widen that column
+	_tabs.add_theme_constant_override("h_separation", 2)
+	_tabs.add_theme_constant_override("v_separation", 2)
 	add_child(_tabs)
 	_hint = Label.new()
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

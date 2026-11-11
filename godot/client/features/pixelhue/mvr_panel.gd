@@ -54,7 +54,7 @@ func _ready() -> void:
 	_side.screen_chosen.connect(_on_screen)
 	_side.window_picked.connect(_on_pick)
 	_side.source_added.connect(func(key: String) -> void: _add_source(key, null))
-	body.add_child(_side)
+	preload("res://features/pixelhue/sources_dock.gd").dock(self, _side, body)  # a tab of the app's Sources browser
 	var mid := VBoxContainer.new()
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(mid)
