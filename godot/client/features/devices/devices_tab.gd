@@ -193,6 +193,7 @@ func _ready() -> void:
 	_list.remove.connect(func(id: String) -> void: _gesture.remove_edge(id))
 	right.add_child(_list)
 	right.add_child(preload("res://features/devices/lighting_consoles_panel.gd").new())  # WO-837: lighting consoles for timeline light cues
+	right.add_child(preload("res://features/devices/pixelhue_panel.gd").new())  # WO-1035: the PixelHue switcher (layer positions)
 	var cluster := ClusterPanel.new()
 	cluster.self_role.connect(func(server_name: String, badge: String) -> void: _rear.set_identity(server_name, badge))
 	right.add_child(cluster)

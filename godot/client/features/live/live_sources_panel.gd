@@ -55,6 +55,7 @@ func _ready() -> void:
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_theme_constant_override("separation", 2)
 	_scroll.add_child(_list)
+	add_child(preload("res://features/live/pixelhue_layers_list.gd").new())  # WO-1035: its own list under the live sources
 	_scroll.set_drag_forwarding(Callable(), can_drop_connector, func(_at: Vector2, data: Variant) -> void: drop_connector(Drop.parse(data)))
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
 		if path in STATE_KEYS:

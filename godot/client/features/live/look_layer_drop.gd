@@ -13,6 +13,7 @@ const Ops := preload("res://features/live/look_layer_ops.gd")
 const LP := preload("res://features/live/layer_preset_model.gd")
 const S := preload("res://features/live/layer_style_model.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
+const Pixelhue := preload("res://features/live/pixelhue_match_model.gd")  # WO-1035: a dragged switcher layer
 const IMAGE := "(?i)\\.(jpe?g|png|gif|bmp|webp|tiff?)$"  # web setLayerSource: a still never loops
 
 
@@ -41,12 +42,25 @@ static func drop_data(ed: Variant, api: Variant, target: int, data: Variant) -> 
 static func drop(ed: Variant, api: Variant, target: int, sources: Array) -> void:
 	for k in sources.size():  # in drag order; a refusal stops the rest
 		var ok := false
-		if k == 0 and target >= 0:
+		if k == 0 and target >= 0 and not Pixelhue.patch_of_source(sources[k]).is_empty():
+			ok = move_to_pixelhue(ed, target, sources[k])  # WO-1035: on a layer it moves that layer, its media stays
+		elif k == 0 and target >= 0:
 			ok = await exchange(ed, api, target, sources[k])
 		else:
 			ok = await add(ed, api, sources[k])
 		if not ok:
 			return
+
+
+## WO-1035: a PixelHue layer dropped ON a look layer puts that layer on the switcher layer's rectangle.
+static func move_to_pixelhue(ed: Variant, i: int, src: Dictionary) -> bool:
+	var layers: Array = ed._layers()
+	if i >= layers.size() or not (layers[i] is Dictionary):
+		return false
+	ed._select(i)
+	ed._apply_layer(Pixelhue.patch_of_source(src))
+	ed.show_status("L%d moved onto %s" % [int((layers[i] as Dictionary).get("layerNumber", 0)), str(src.get("label", "the PixelHue layer"))])
+	return true
 
 
 ## web isLayerSourceExchange: a layer that already shows something keeps its transform.
@@ -103,6 +117,9 @@ static func add(ed: Variant, api: Variant, src: Dictionary) -> bool:
 	var lk: Dictionary = ed.look()
 	if not (lk.get("layers") is Array):
 		lk["layers"] = []
+	(res.data.layer as Dictionary).merge(Pixelhue.patch_of_source(src), true)  # WO-1035: an empty layer on the switcher layer
+	if res.data.layer.get("source") is Dictionary:
+		(res.data.layer.source as Dictionary).erase("pixelhueFill")
 	(lk.layers as Array).append(res.data.layer)
 	ed._refresh_list()
 	ed._select((lk.layers as Array).size() - 1)

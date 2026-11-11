@@ -24,3 +24,28 @@ func test_choices_are_enabled_program_layers_with_a_rectangle() -> void:
 func test_patch_copies_the_rectangle_and_stretches_to_it() -> void:
 	var p := M.patch_for({"fill": {"x": 0.5, "y": 0.25, "scaleX": 0.25, "scaleY": 0.5}})
 	t.eq(p, {"fill": {"x": 0.5, "y": 0.25, "scaleX": 0.25, "scaleY": 0.5}, "contentFit": "stretch", "aspectLocked": false}, "rectangle + stretch, no aspect lock")
+
+
+func test_dragged_row_is_an_empty_placeholder_that_carries_the_rectangle() -> void:
+	var fill := {"x": 0.5, "y": 0.25, "scaleX": 0.25, "scaleY": 0.5}
+	var p := M.drag_payload({"name": "Screen 1 · PIP", "fill": fill})
+	t.eq([p.type, p.value, p.isPlaceholder, p.label], ["media", "#00000000", true, "PixelHue · Screen 1 · PIP"], "transparent black: nothing on fill or key")
+	t.eq(M.patch_of_source(p), {"fill": fill, "contentFit": "stretch", "aspectLocked": false}, "the drop puts the layer on the rectangle")
+	t.eq(M.patch_of_source({"type": "media", "value": "clip.mov"}), {}, "any other source: no rectangle")
+
+
+func test_status_line() -> void:
+	t.eq(M.status_line(false, {"error": "PixelHue at 10.0.0.9 did not answer: timeout"}), "PixelHue at 10.0.0.9 did not answer: timeout", "the server's reason")
+	t.eq(M.status_line(true, {"device": {"ip": "10.0.0.7", "port": 8088}, "screens": [
+		{"enabled": true, "layers": [{"enabled": true, "scene": "pgm"}, {"enabled": false, "scene": "pgm"}, {"enabled": true, "scene": "pvw"}]},
+		{"enabled": false, "layers": [{"enabled": true, "scene": "pgm"}]}]}),
+		"Connected — device 10.0.0.7:8088 · 1 screen(s) · 1 program layer(s)", "connected: what was read")
+	t.eq(M.status_line(false, null), "No answer from the server.", "no body")
+
+
+## The UI scripts are not instantiated by any suite: at least they compile with the autoloads present.
+func test_ui_scripts_compile() -> void:
+	for p in ["res://features/devices/pixelhue_panel.gd", "res://features/live/pixelhue_layers_list.gd", "res://features/live/live_sources_panel.gd",
+			"res://features/devices/devices_tab.gd", "res://features/live/layer_inspector.gd", "res://features/previs/tracking/presenters_section.gd"]:
+		var s: GDScript = load(p)
+		t.ok(s != null and s.can_instantiate(), p + " compiles")

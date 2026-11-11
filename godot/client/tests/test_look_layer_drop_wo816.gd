@@ -168,3 +168,22 @@ func test_deselect_releases_the_inspector_page() -> void:
 	t.ok(rm.contains("_refresh_list()\n\t_select(-1)"), "Remove layer releases the Inspector page")
 	var op := src.substr(src.find("\t_hold(true)\n\t_sel = -1"), 120)
 	t.ok(op.contains("_refresh_list()\n\t_select(-1)"), "opening a look drops the previous look's layer page")
+
+
+## WO-1035: a row of Sources ▸ Live ▸ PixelHue layers.
+func test_pixelhue_layer_drop_adds_an_empty_layer_on_its_rectangle_or_moves_the_layer_under_it() -> void:
+	var PH := preload("res://features/live/pixelhue_match_model.gd")
+	var fill := {"x": 0.5, "y": 0.25, "scaleX": 0.25, "scaleY": 0.5}
+	var drag := PH.drag_payload({"name": "Screen 1 · PIP", "fill": fill})
+	t.eq(O.drop_sources(drag).size(), 1, "the look editor takes the drag")
+	var ed := _ed()
+	var api := FakeApi.new()
+	D.drop(ed, api, -1, O.drop_sources(drag))  # off every layer → a new empty layer
+	var made: Dictionary = ed.lk.layers[2]
+	t.eq([ed.lk.layers.size(), made.source.value, made.source.isPlaceholder, made.source.has("pixelhueFill")], [3, "#00000000", true, false], "an empty placeholder layer, no leftover drag field")
+	t.eq([made.fill, made.contentFit, made.aspectLocked], [fill, "stretch", false], "exactly on the switcher layer's rectangle")
+	var ed2 := _ed()
+	var api2 := FakeApi.new()
+	D.drop(ed2, api2, 0, O.drop_sources(drag))  # on L10 → L10 moves there, its media stays
+	t.eq([api2.posts.size(), ed2.lk.layers.size(), ed2.lk.layers[0].source.value, ed2.lk.layers[0].fill], [0, 2, "CLIPS/old.mov", fill], "moved, not exchanged")
+	t.ok(ed2.status.begins_with("L10 moved onto PixelHue"), "status says what happened")
