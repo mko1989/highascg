@@ -71,6 +71,38 @@ if [[ -f "$DISABLE" ]]; then
 	bash "$DISABLE"
 fi
 
+# The factory reset (twice: inside prepare, and again after the preflight) deletes every config/*.json. The bridge sync
+# brings the settings back afterwards, but its pair leaves out this box's own identity files, so the 03.11 build
+# left the host with a NEW device key on the next node start — a linked server (WO-1029) pins that key and would
+# treat this box as a stranger. Keep them aside (~/.highascg/backup is not in the squashfs) and put them back at the end.
+IDENTITY_STASH="/home/casparcg/.highascg/backup/build-host-identity"
+IDENTITY_FILES=(device-identity.json cluster-call-floor.json replication-local-identity.json replication.json)
+IDENTITY_STASHED=0
+stash_build_host_identity() {
+	rm -rf -- "$IDENTITY_STASH"
+	install -d -m 0700 -o casparcg -g casparcg "$IDENTITY_STASH"
+	local f
+	for f in "${IDENTITY_FILES[@]}"; do
+		[[ -f "${REPO_ROOT}/config/${f}" ]] && cp -a -- "${REPO_ROOT}/config/${f}" "${IDENTITY_STASH}/${f}"
+	done
+	IDENTITY_STASHED=1
+	echo "==> Build host identity kept aside in ${IDENTITY_STASH} ($(ls "$IDENTITY_STASH" | paste -sd' '))"
+}
+restore_build_host_identity() {
+	[[ "$IDENTITY_STASHED" == 1 ]] || return 0
+	local f
+	for f in "${IDENTITY_FILES[@]}"; do
+		[[ -f "${IDENTITY_STASH}/${f}" ]] && cp -a -- "${IDENTITY_STASH}/${f}" "${REPO_ROOT}/config/${f}"
+	done
+	IDENTITY_STASHED=0
+	echo "==> Build host identity restored into ${REPO_ROOT}/config"
+}
+trap restore_build_host_identity EXIT
+# The build stops highascg for the squashfs; start it again at the end when it was running (03.11: it stayed down).
+HIGHASCG_WAS_ACTIVE=0
+systemctl is-active --quiet highascg.service && HIGHASCG_WAS_ACTIVE=1
+stash_build_host_identity
+
 echo "==> WO-47 exFAT + empty mount stubs + eggs exclude merge (operator-stick truth baked into clone snapshot)"
 HIGHASCG_SKIP_BOOT_BRANDING_IN_PREPARE=1 SKIP_HIGHASCG_SYSTEMD_RESTART=1 bash "${HERE}/prepare-eggs-clone-with-exfat.sh"
 
@@ -154,7 +186,7 @@ syncthing_left_paused() {
 	echo "        sudo bash ${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh casparcg" >&2
 	echo "        sudo systemctl start ${SYNCTHING_UNIT}" >&2
 }
-trap syncthing_left_paused EXIT
+trap 'syncthing_left_paused; restore_build_host_identity' EXIT
 echo "==> Factory operator config (not eggs build-host JSON / .env; highascg + volume sync stopped)"
 HIGHASCG_RESET_PART=tree bash "${HERE}/reset-iso-operator-config.sh"
 
@@ -247,6 +279,8 @@ bash "${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" casparcg 2>/dev/null 
 # WO-724: reset-iso-operator-config.sh put the factory casparcg.config in place and the npm step's
 # pause/restore restarted Caspar on it; the sync above brings the real config back, so restart Caspar
 # onto it (23.10: the build host ran the 1-channel factory config until the next Caspar restart).
+restore_build_host_identity
+
 echo "==> Restart Caspar on the restored config"
 systemctl try-restart casparcg-server.service || echo "WARN: casparcg-server did not restart — sudo systemctl restart casparcg-server" >&2
 
@@ -254,6 +288,11 @@ if [[ "$SYNCTHING_PAUSED" == 1 && "$REMOUNT_SYNCED" == 1 ]]; then
 	echo "==> Resume ${SYNCTHING_UNIT} (this host's own config/ + projects/ are back)"
 	systemctl start "$SYNCTHING_UNIT" || echo "WARN: ${SYNCTHING_UNIT} did not start — sudo systemctl start ${SYNCTHING_UNIT}" >&2
 	SYNCTHING_PAUSED=0
+fi
+
+if [[ "$HIGHASCG_WAS_ACTIVE" == 1 && "$REMOUNT_SYNCED" == 1 ]]; then
+	echo "==> Start highascg (stopped for the squashfs)"
+	systemctl start highascg.service || echo "WARN: highascg.service did not start — sudo systemctl start highascg" >&2
 fi
 
 # The squashfs step above stops companion.service; nothing started it again (22.10, Companion stayed down after a build).

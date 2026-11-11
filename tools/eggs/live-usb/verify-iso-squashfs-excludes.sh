@@ -162,6 +162,9 @@ if squash_has_path 'home/casparcg/.config/gh/hosts.yml'; then
 else
 	ok "no gh auth token in squashfs"
 fi
+for leak in '.codex|the Codex CLI login (auth.json; codex logout on the build host, then sign in again)' 'backups|build-host config snapshots (box identities)'; do
+	if squash_has_tree "home/casparcg/${leak%%|*}"; then bad "home/casparcg/${leak%%|*} is in squashfs — ${leak#*|} leaked; check exclude fragment merge"; else ok "no home/casparcg/${leak%%|*} in squashfs"; fi
+done
 if squash_has_path 'home/casparcg/.bash_history'; then
 	bad "home/casparcg/.bash_history is in squashfs — shell history leaked (WO-429); check exclude fragment merge"
 else

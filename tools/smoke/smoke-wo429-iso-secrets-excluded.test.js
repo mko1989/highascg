@@ -26,6 +26,8 @@ const REQUIRED = [
 	'home/casparcg/.bash_history',
 	'home/casparcg/.local/share/keyrings',
 	'home/casparcg/highascg/vendor',
+	'home/casparcg/.codex',
+	'home/casparcg/backups',
 	// pre-existing identity lines that must never regress
 	'var/lib/tailscale',
 	'home/casparcg/.config/syncthing',

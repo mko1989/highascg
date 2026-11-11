@@ -81,3 +81,32 @@ test('WO-471: a produce stamp outranks the frozen legacy value at runtime', () =
 		fs.rmSync(dir, { recursive: true, force: true })
 	}
 })
+
+/* 11.11 — the factory reset deletes config/*.json and the bridge pair leaves out the box's identity files, so the
+ * 03.11 build gave the build host a new device key (a linked server pins it). The build keeps them aside and puts
+ * them back; it also starts highascg again when it was running. */
+test('the build keeps the host identity files across the factory reset and restarts highascg', () => {
+	const src = read(EGG)
+	const at = (needle) => {
+		const i = src.indexOf(needle)
+		assert.ok(i >= 0, `${EGG} contains ${needle}`)
+		return i
+	}
+	const stash = at('\nstash_build_host_identity\n')
+	const prepare = at('prepare-eggs-clone-with-exfat.sh"')
+	const produce = at('\nhighascg_eggs_build_iso ')
+	const restore = at('\nrestore_build_host_identity\n')
+	assert.ok(stash < prepare, 'stashed before prepare runs the first factory reset')
+	assert.ok(produce < restore, 'restored only after the clone (the ISO must not carry the host key)')
+	assert.match(src, /IDENTITY_FILES=\(device-identity\.json /, 'device key is in the kept set')
+	assert.match(src, /IDENTITY_STASH="\/home\/casparcg\/\.highascg\/backup\//, 'kept in a folder the squashfs excludes')
+	for (const frag of ['embed-server', 'fragment']) {
+		assert.match(
+			read(`tools/eggs/live-usb/penguins-eggs-exclude-highascg-${frag}.list`),
+			/^home\/casparcg\/\.highascg\/backup$/m,
+			`${frag} list excludes ~/.highascg/backup`,
+		)
+	}
+	assert.match(src, /trap 'syncthing_left_paused; restore_build_host_identity' EXIT/, 'a failed build restores it too')
+	assert.ok(at('systemctl start highascg.service') > produce, 'highascg starts again after the clone')
+})

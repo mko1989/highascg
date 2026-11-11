@@ -297,6 +297,31 @@ home/casparcg/.mozilla/*
 home/casparcg/.claude
 home/casparcg/.claude/*
 home/casparcg/.claude.json
+# 11.11: found before the build — the Codex CLI login (auth.json, an OpenAI token) arrived on 07.11 and had no line;
+# ~/backups (config tarballs + other boxes' snapshots, with box identities) shipped in the 02.11 and 03.11 ISOs.
+home/casparcg/.codex
+home/casparcg/.codex/*
+home/casparcg/backups
+home/casparcg/backups/*
+# WiVRn headset pairing (cookie + known keys) is this box's; a clone pairs its own.
+home/casparcg/.config/wivrn
+home/casparcg/.config/wivrn/*
+home/casparcg/.pki
+home/casparcg/.pki/*
+# Dev-box leftovers in home: third-party tools, compat debs (the libs ship in ~/highascg/lib), notes, patches, test rigs.
+home/casparcg/Pixelhue-Studio-*
+home/casparcg/highascg-noble-compat-debs
+home/casparcg/highascg-noble-compat-debs/*
+home/casparcg/*.md
+home/casparcg/*.patch
+home/casparcg/.vscode
+home/casparcg/.vscode/*
+home/casparcg/.config/go
+home/casparcg/.config/go/*
+home/casparcg/.config/ChamSys
+home/casparcg/.config/ChamSys/*
+home/casparcg/.highascg/test-env
+home/casparcg/.highascg/test-env/*
 home/casparcg/highascg/.operator-firefox-profile
 home/casparcg/highascg/.operator-firefox-profile/*
 home/casparcg/snap
