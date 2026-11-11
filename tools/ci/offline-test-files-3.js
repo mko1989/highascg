@@ -329,4 +329,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1029-virtual-remote-client.test.js',
 	'tools/smoke/smoke-wo1029-virtual-takeover.test.js',
 	'tools/smoke/smoke-wo1029-virtual-handover.test.js',
+	'tools/smoke/smoke-wo1032-timeline-cues.test.js',
 ]

@@ -93,7 +93,7 @@ module.exports = {
 		}
 
 		const pos = wasPausedResume ? (cell.position ?? 0) : fromMs != null ? fromMs : (cell.position ?? 0)
-
+		if (!wasPausedResume) this._armFlagStart(cell, pos, opts?.restart === true) // WO-1032
 		this._airTimelineId = id
 		setCellPosition(cell, pos)
 		cell.playing = true
@@ -167,6 +167,7 @@ module.exports = {
 		}
 
 		const pos = fromMs != null ? fromMs : (cell.position ?? 0)
+		this._armFlagStart(cell, pos, true) // WO-1032
 		this._airTimelineId = id
 		setCellPosition(cell, pos)
 		cell.playing = true
@@ -281,6 +282,7 @@ module.exports = {
 			this._prevKey = new Map()
 			this._lastKfValues.clear()
 			this._lastKfSegment.clear()
+			this._armFlagStart(cell, pos, true) // WO-1032
 			setCellPosition(cell, pos)
 			cell.playing = false
 			this._applyAt(id, pos, true)
@@ -297,6 +299,7 @@ module.exports = {
 			this._emitPb(id)
 			return
 		}
+		this._armFlagStart(cell, pos, true) // WO-1032: a cue exactly on the seek target fires
 		if (cell.playing && !this._timelineSeekFrameChanged(id, pos)) {
 			this._emitPb(id)
 			return

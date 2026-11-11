@@ -204,7 +204,7 @@ describe('WO-555: wired end-to-end', () => {
 
 	it('timeline-take.js preserves an existing program claim under restrictToPreview', () => {
 		const src = fs.readFileSync(path.join(__dirname, '../../src/engine/timeline-take.js'), 'utf8')
-		assert.match(src, /opts\.restrictToPreview \? !!eng\._sendToFor\(tlId\)\?\.program : true/)
+		assert.match(src, /opts\.restrictToPreview \? onAir && !!eng\._sendToFor\(tlId\)\?\.program : true/) // WO-1032: only while on air
 	})
 
 	it('scene-take-lbg.js calls resolveTimelineIdToReleaseFromPreview and releases via setSendTo', () => {

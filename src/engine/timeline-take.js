@@ -263,7 +263,9 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 	 * the one path still forcing both. */
 	const onAir = eng._airTimelineId === tlId
 	const before = onAir && !opts.restrictToPreview ? eng._sendToFor(tlId) || {} : {} // WO-828 D3: routing before this take
-	const program = opts.restrictToPreview ? !!eng._sendToFor(tlId)?.program : true
+	/* WO-1032: only a timeline that is ON AIR holds a program claim worth keeping. A stored `program: true` on a
+	 * timeline that is not running (saved after an earlier Take) made a preview take play it on program too. */
+	const program = opts.restrictToPreview ? onAir && !!eng._sendToFor(tlId)?.program : true
 	const preview = !!opts.restrictToPreview
 	const joinsRunning = opts.restrictToPreview && onAir && program
 	// already playing on this preview channel (e.g. PRV took it earlier): a re-join would STOP/PLAY PRV for nothing

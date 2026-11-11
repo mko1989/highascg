@@ -225,6 +225,7 @@ describe('WO-837 light control flags', () => {
 		rig.eng.create({
 			id: 'T',
 			duration: 10000,
+			sendTo: { preview: false, program: true, screenIdx: 0 }, // WO-1032: cues fire on program only
 			flags: [
 				{ id: 'f1', timeMs: 500, type: 'light', label: 'Cue 5', consoleId: 'mq', action: 'go', list: 1, cue: 5 },
 				{ id: 'f2', timeMs: 800, type: 'companion_press', label: 'x' },

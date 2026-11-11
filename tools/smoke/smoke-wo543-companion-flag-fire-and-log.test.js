@@ -96,7 +96,7 @@ describe('WO-543: crossing detection dispatches to _fireCompanionPress', () => {
 		const log = []
 		const eng = makeEngine(log)
 		makeFlagTimeline(eng)
-		eng.setSendTo({ preview: false, program: true, screenIdx: 0 })
+		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1') // by id: nothing is on air yet (WO-1032 program guard)
 		eng.play('tl1', 0)
 		const fired = []
 		eng._fireCompanionPress = (f) => fired.push(f.id)
@@ -113,7 +113,7 @@ describe('WO-543: crossing detection dispatches to _fireCompanionPress', () => {
 		const log = []
 		const eng = makeEngine(log)
 		makeFlagTimeline(eng, { timeMs: 120 })
-		eng.setSendTo({ preview: false, program: true, screenIdx: 0 })
+		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1') // by id: nothing is on air yet (WO-1032 program guard)
 		const fired = []
 		eng._fireCompanionPress = (f) => fired.push(f.id)
 
@@ -128,7 +128,7 @@ describe('WO-543: crossing detection dispatches to _fireCompanionPress', () => {
 		const log = []
 		const eng = makeEngine(log)
 		makeFlagTimeline(eng, { timeMs: 250 })
-		eng.setSendTo({ preview: false, program: true, screenIdx: 0 })
+		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1') // by id: nothing is on air yet (WO-1032 program guard)
 		const fired = []
 		eng._fireCompanionPress = (f) => fired.push(f.id)
 
@@ -149,7 +149,7 @@ describe('WO-543: crossing detection dispatches to _fireCompanionPress', () => {
 		const eng = makeEngine(log)
 		const tl = makeFlagTimeline(eng, { timeMs: 60 })
 		tl.duration = 150
-		eng.setSendTo({ preview: false, program: true, screenIdx: 0 })
+		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1') // by id: nothing is on air yet (WO-1032 program guard)
 		const fired = []
 		eng._fireCompanionPress = (f) => fired.push(f.id)
 
@@ -166,7 +166,7 @@ describe('WO-543: crossing detection dispatches to _fireCompanionPress', () => {
 		const eng = makeEngine(log)
 		makeFlagTimeline(eng)
 		eng.create({ id: 'tl2', duration: 10000, fps: 25, layers: [] })
-		eng.setSendTo({ preview: false, program: true, screenIdx: 0 })
+		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1') // by id: nothing is on air yet (WO-1032 program guard)
 		eng.play('tl1', 0)
 		const fired = []
 		eng._fireCompanionPress = (f) => fired.push(f.id)

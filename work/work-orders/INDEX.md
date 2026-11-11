@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-940 live WOs (33 open, 130 in progress, 777 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+941 live WOs (33 open, 130 in progress, 778 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (177)
+## engine — Looks, takes, timeline, playback (178)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -184,6 +184,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 989 DONE [engine] FTB blacks PRV in Caspar but kept its look in the server state, so the next pre… → 989_WO_ftb_forgets_preview_state.md
 - 1013 DONE [engine+mapping] After Devices ▸ Apply & restart, put back what was on the screens: the test car… → 1013_WO_restore_screens_after_caspar_restart.md
 - 1027 OPEN [engine+network,video-io] A look cannot name another server's input: raw route://N-L gives a 403, an empt… → 1027_WO_looks_cannot_name_another_servers_inputs.md
+- 1032 DONE [engine+companion,lighting] Timeline cues: fire on program only, and never drop one → 1032_WO_timeline_cues_program_only_and_dropped_cues.md
 
 ## amcp — AMCP client and protocol (20)
 

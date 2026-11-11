@@ -242,50 +242,78 @@ function applyPlaybackMixin(TimelineEngineClass) {
 		},
 
 		/**
-		 * When the playhead crosses a flag time (prevMs < flag.timeMs <= ms), run the action.
+		 * WO-1032: a start that was not reached by ticking (fresh play, restart, loop wrap, take, seek) includes a
+		 * cue sitting exactly on the start position — the crossing test below (prevMs < t) can never see it.
+		 * Called BEFORE the cell takes `pos`; a Play from where the playhead already stands arms nothing, so a cue
+		 * that fired just before a pause cannot fire twice.
+		 */
+		_armFlagStart(cell, pos, force) {
+			if (force || pos === 0 || Math.abs(pos - (cell?.position ?? 0)) >= 1) this._flagStartAt = pos
+		},
+
+		/**
+		 * Run the flags the playhead crossed in this tick (prevMs < flag.timeMs <= ms).
+		 * WO-1032: EVERY crossed cue (companion_press / light) fires — one per tick dropped the second of two cues
+		 * on the same frame, or behind a late tick — and only while the timeline is routed to PROGRAM (a look on
+		 * preview, or the editor playing to PRV, presses nothing). Of the transport flags (pause / play / jump) the
+		 * first crossed one runs, after the cues, so a cue on the same time as a pause is not swallowed.
 		 * @returns {boolean} True if playback state changed such that this _tick should stop (pause / play restart).
 		 */
 		_processTimelineFlags(tlId, prevMs, ms) {
+			const startAt = this._flagStartAt
+			this._flagStartAt = null
 			const tl = this.timelines.get(tlId)
 			if (!tl?.flags?.length) return false
 			const flags = [...tl.flags].sort(
 				(a, b) => a.timeMs - b.timeMs || String(a.id).localeCompare(String(b.id))
 			)
+			const log = (msg) => typeof this.self?.log === 'function' && this.self.log('debug', msg)
+			const onProgram = !!this._sendToFor(tlId)?.program
+			let transport = null
 			for (const f of flags) {
-				if (prevMs < f.timeMs && ms >= f.timeMs) {
-					const t = f.type || 'pause'
-					if (t === 'pause') {
-						this.pause(tlId)
-						return true
-					}
-					if (t === 'play') {
-						this.play(tlId, f.timeMs)
-						return true
-					}
-					if (t === 'jump') {
-						const target = this._resolveJumpTarget(f, tl)
-						if (target != null) this.seek(tlId, target)
-					}
-					if (t === 'companion_press') {
-						// Dispatch off-tick to prevent blocking playback sync; guard against stale execution
-						const capturedId = tlId
-						if (typeof this.self?.log === 'function') {
-							this.self.log('debug', `[Timeline] playhead crossed companion_press flag "${f.label || f.id}" at ${f.timeMs}ms (tl=${tlId})`)
-						}
-						setImmediate(() => {
-							if (this._airTimelineId === capturedId) {
-								this._fireCompanionPress(f)
-							} else if (typeof this.self?.log === 'function') {
-								this.self.log(
-									'warn',
-									`[Timeline] companion_press flag "${f.label || f.id}" crossed but a different timeline (${this._airTimelineId}) took over before it fired — press dropped`,
-								)
-							}
-						})
-					}
-					if (t === 'light') this._dispatchLightFlag(tlId, f) // WO-837
-					return false
+				const t = f.type || 'pause'
+				const cue = t === 'companion_press' || t === 'light'
+				const atStart = cue && startAt != null && Math.abs(f.timeMs - startAt) < 1
+				if (!(ms >= f.timeMs && (prevMs < f.timeMs || atStart))) continue
+				if (!cue) {
+					if (!transport) transport = f
+					continue
 				}
+				if (!onProgram) {
+					log(`[Timeline] ${t} flag "${f.label || f.id}" crossed at ${f.timeMs}ms but tl=${tlId} is not on program — not fired`)
+					continue
+				}
+				if (t === 'light') {
+					this._dispatchLightFlag(tlId, f) // WO-837
+					continue
+				}
+				// Dispatch off-tick to prevent blocking playback sync; guard against stale execution
+				log(`[Timeline] playhead crossed companion_press flag "${f.label || f.id}" at ${f.timeMs}ms (tl=${tlId})`)
+				setImmediate(() => {
+					if (this._airTimelineId === tlId) {
+						this._fireCompanionPress(f)
+					} else if (typeof this.self?.log === 'function') {
+						this.self.log(
+							'warn',
+							`[Timeline] companion_press flag "${f.label || f.id}" crossed but a different timeline (${this._airTimelineId}) took over before it fired — press dropped`,
+						)
+					}
+				})
+			}
+			if (!transport) return false
+			const t = transport.type || 'pause'
+			if (t === 'pause') {
+				this.pause(tlId)
+				return true
+			}
+			if (t === 'play') {
+				this.play(tlId, transport.timeMs)
+				this._flagStartAt = null // the cues on this flag's own time fired above
+				return true
+			}
+			if (t === 'jump') {
+				const target = this._resolveJumpTarget(transport, tl)
+				if (target != null) this.seek(tlId, target)
 			}
 			return false
 		},
