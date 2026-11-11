@@ -71,7 +71,7 @@ function planRoles(config) {
 	const gui = new Map()
 	try {
 		const plan = require('../utils/os-layout-calculator').calculateLayoutPositions(config)
-		const rows = [plan?.screens, plan?.prv, plan?.multiview].flatMap((g) => Object.values(g || {}))
+		const rows = [plan?.screens, plan?.prv, plan?.screenExtra, plan?.multiview].flatMap((g) => Object.values(g || {}))
 		for (const r of rows.concat(plan?.mappingGpuOutputs || [])) if (r?.sysId) caspar.add(String(r.sysId))
 		for (const [n, r] of Object.entries(plan?.operatorGui || {})) {
 			const num = parseInt(n, 10)

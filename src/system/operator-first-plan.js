@@ -67,6 +67,7 @@ function layoutRows(config) {
 	for (const [n, info] of Object.entries(lay.screens || {})) put('screen', n, info)
 	for (const [n, info] of Object.entries(lay.multiview || {})) put('multiview', n, info)
 	for (const [n, info] of Object.entries(lay.prv || {})) put('prv', n, info)
+	for (const info of Object.values(lay.screenExtra || {})) put('screen_extra', info.extraOfScreen, info) /* WO-1034 */
 	return { rows: rows.sort((a, b) => a.x - b.x || a.y - b.y), mappingGpuOutputs: (lay.mappingGpuOutputs || []).length }
 }
 

@@ -56,7 +56,7 @@ function operatorGuiPlacementOrder(assignments) {
  *   swap: boolean,
  * }} assignments
  */
-function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, operatorGuiAssignments, prvAssignments, effectiveScreenCount, swap }) {
+function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, operatorGuiAssignments, prvAssignments, extraScreenAssignments, effectiveScreenCount, swap }) {
 	const placements = []
 	/* WO-868: "Operator GUI first" — the operator monitor heads the canvas (x=0), the screens follow to its right.
 	 * Which jack is the operator stays the per-boot / cabled choice (WO-638, WO-412); only the order changes. */
@@ -73,6 +73,9 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 	if (!operatorFirst) pushOperatorGui()
 	/* WO-364: PRV heads placed after screens+multiview; keyed by their main's n. */
 	;(prvAssignments || []).forEach((pa) => placements.push({ kind: 'prv', n: pa.n, data: pa }))
+	/* WO-1034: extra jacks of a screen (fill + key pair) — after everything else, so adding one moves no other head.
+	 * `n` is the screen whose raster they show; `key` numbers them in results.screenExtra. */
+	;(extraScreenAssignments || []).forEach((xa, idx) => placements.push({ kind: 'screen_extra', n: xa.n, key: idx + 1, data: xa }))
 
 	const results = { screens: {}, multiview: {}, operatorGui: {}, prv: {} }
 	let cumulativeX = 0
@@ -176,8 +179,8 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 				}
 				if (Number.isFinite(dims?.height) && dims.height > 0) h = dims.height
 			}
-		} else if (p.kind === 'prv') {
-			/* WO-364: the PRV bus is the same raster as its main's pair. */
+		} else if (p.kind === 'prv' || p.kind === 'screen_extra') {
+			/* WO-364: the PRV bus is the same raster as its main's pair. WO-1034: so is an extra jack of the screen. */
 			const topoDims = resolveScreenDimsFromTopology(config, p.n)
 			if (topoDims && topoDims.width > 0 && topoDims.height > 0) {
 				w = topoDims.width
@@ -229,7 +232,7 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 			if (!hasCasparDims) {
 				w = parseInt(resMatch[1], 10) || w
 				h = parseInt(resMatch[2], 10) || h
-			} else if (p.kind === 'screen' || p.kind === 'multiview' || p.kind === 'operator_gui' || p.kind === 'prv') {
+			} else if (p.kind === 'screen' || p.kind === 'multiview' || p.kind === 'operator_gui' || p.kind === 'prv' || p.kind === 'screen_extra') {
 				w = parseInt(resMatch[1], 10) || w
 				h = parseInt(resMatch[2], 10) || h
 			}
@@ -276,6 +279,11 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 
 		if (p.kind === 'screen') results.screens[p.n] = info
 		else if (p.kind === 'prv') results.prv[p.n] = info
+		else if (p.kind === 'screen_extra') {
+			/* absent unless a destination fans out: layouts without one stay byte-identical */
+			if (!results.screenExtra) results.screenExtra = {}
+			results.screenExtra[p.key] = { ...info, extraOfScreen: p.n, connectorId: data.connectorId }
+		}
 		else if (p.kind === 'operator_gui') results.operatorGui[p.n] = info
 		else results.multiview[p.n] = info
 

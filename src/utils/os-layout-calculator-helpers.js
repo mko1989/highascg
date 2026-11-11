@@ -192,6 +192,12 @@ function mergeMappingGpuOutputsWithScreens(config, results, mappingGpuOutputs) {
 		if (!id || !mappingBySysId.has(id)) continue
 		delete results.prv[idx]
 	}
+	/* WO-1034: and extra jacks of a screen. */
+	for (const [idx, info] of Object.entries(results.screenExtra || {})) {
+		const id = resolveSysIdToXrandrOutput(String(info?.sysId || ''), { config })
+		if (!id || !mappingBySysId.has(id)) continue
+		delete results.screenExtra[idx]
+	}
 	const kept = [...mappingBySysId.values()]
 	return {
 		mappingGpuOutputs: kept,

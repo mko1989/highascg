@@ -143,6 +143,7 @@ async function handleOsPost(path, body, ctx) {
 				...Object.values(layout.multiview || {}),
 				...Object.values(layout.operatorGui || {}) /* WO-573 follow-up */,
 				...Object.values(layout.prv || {}) /* WO-364 PRV heads */,
+				...Object.values(layout.screenExtra || {}) /* WO-1034 extra jacks of a screen */,
 				...(Array.isArray(layout.mappingGpuOutputs) ? layout.mappingGpuOutputs : []),
 			]
 			const seenHead = new Set()

@@ -102,6 +102,10 @@ function applyMappingGpuPlacementOffsets(
 		if (manual(`screen_${n}_prv_os_${axis}`) != null) continue
 		info[axis] = (Number(info[axis]) || 0) + off
 	}
+	/* WO-1034: extra jacks of a screen are always auto-placed */
+	for (const info of Object.values(results.screenExtra || {})) {
+		if (info) info[axis] = (Number(info[axis]) || 0) + off
+	}
 }
 
 module.exports = { applyMappingGpuPlacementOffsets }

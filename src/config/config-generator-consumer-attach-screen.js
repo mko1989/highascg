@@ -17,6 +17,7 @@ const { SCREEN_VSYNC_XML, SCREEN_GPU_TEXTURE_XML } = require('./config-generator
 const { buildRtmpFfmpegConsumersForChannel } = require('./rtmp-output')
 /* WO-869: one extra <screen> per mapping-node slice window fed by this PGM (device 41+, APPLY-addressable). */
 const { sliceWindowScreensXml } = require('./config-generator-slice-windows')
+const { extraOutputScreensXml } = require('./config-generator-extra-screens')
 /* WO-507: which DeckLink slots are bound as INPUTS — never emit an output consumer on one. */
 const { resolveDecklinkInputSlots } = require('./decklink-input-slots')
 const {
@@ -204,7 +205,7 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 
 	const pgmXml = `${channelXmlComment(`Caspar channel ${pgmChNum}: Screen ${n} program output (PGM)`)}        <channel>
             <video-mode>${pgmChannelModeId}</video-mode>${layoutXml}
-            <consumers>${screenConsumerXml}${sliceWindowScreensXml(config, n)}${screenSystemAudioXml}${portAudioXml}${ffmpegXml}${composePgmXml}${profConsumersXml}${rtmpPgmXml}
+            <consumers>${screenConsumerXml}${sliceWindowScreensXml(config, n)}${extraOutputScreensXml(config, n)}${screenSystemAudioXml}${portAudioXml}${ffmpegXml}${composePgmXml}${profConsumersXml}${rtmpPgmXml}
             </consumers>
             <mixer>
                 <audio-osc>true</audio-osc>

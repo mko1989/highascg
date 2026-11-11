@@ -85,6 +85,29 @@ function reachesGpuFromSource(sourceId, ctx, opts = {}) {
 }
 
 /**
+ * WO-1034: the GPU jacks a destination's PROGRAM half is cabled to DIRECTLY (no pixel-map hop), in graph edge order.
+ * [0] is the destination's primary jack (it carries `screen_N`'s window and OS head); every further one is an extra
+ * output — a second window of the same channel on its own head, with that jack's own flags (fill + key-only pair).
+ * @param {object} dest
+ * @param {number} destIndex
+ * @param {ReturnType<typeof createDestinationWiringContext>} ctx
+ * @returns {object[]} gpu_out connectors
+ */
+function destinationPgmGpuConnectors(dest, destIndex, ctx) {
+	const out = []
+	const seen = new Set()
+	for (const src of destinationSourceIds(dest, destIndex, ctx)) {
+		for (const sinkId of ctx.outgoingPgm.get(src) || []) {
+			const sink = ctx.byId.get(String(sinkId || ''))
+			if (!sink || sink.kind !== 'gpu_out' || seen.has(sink.id)) continue
+			seen.add(sink.id)
+			out.push(sink)
+		}
+	}
+	return out
+}
+
+/**
  * @param {object} dest
  * @param {number} destIndex
  * @param {ReturnType<typeof createDestinationWiringContext>} ctx
@@ -202,6 +225,7 @@ module.exports = {
 	createDestinationWiringContext,
 	destinationSourceIds,
 	reachesGpuFromSource,
+	destinationPgmGpuConnectors,
 	destinationReachesGpu,
 	destinationHasStreamOrRecordOutput,
 	destinationHasDecklinkOutput,

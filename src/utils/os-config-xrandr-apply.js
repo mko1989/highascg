@@ -261,6 +261,7 @@ async function applyX11Layout(config, opts = {}) {
 	Object.values(layout.multiview).forEach(processHeadDeduped)
 	Object.values(layout.operatorGui || {}).forEach(processHeadDeduped) /* WO-573 follow-up */
 	Object.values(layout.prv || {}).forEach(processHeadDeduped) /* WO-364 PRV heads */
+	Object.values(layout.screenExtra || {}).forEach(processHeadDeduped) /* WO-1034 extra jacks of a screen */
 	mapGpu.forEach(processHeadDeduped)
 
 	// WO-919 F4/F20: no head on an unplugged output (it failed the whole command); a lit unplanned head moves off the plan

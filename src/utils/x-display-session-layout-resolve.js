@@ -172,6 +172,12 @@ function findLayoutRectBySysId(layout, sysId) {
 			return { ...pv, kind: 'prv', index: parseInt(idx, 10) || 1 }
 		}
 	}
+	/* WO-1034: an extra jack of a screen shows that screen */
+	for (const xs of Object.values(layout.screenExtra || {})) {
+		if (String(xs?.sysId || '') === id && xs.width > 0 && xs.height > 0) {
+			return { ...xs, kind: 'screen', index: parseInt(xs.extraOfScreen, 10) || 1 }
+		}
+	}
 	return null
 }
 

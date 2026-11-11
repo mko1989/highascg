@@ -20,6 +20,7 @@ function plannedHeadsFromLayout(layout, opts = {}) {
 		...Object.values(layout?.multiview || {}),
 		...Object.values(layout?.operatorGui || {}) /* WO-573 follow-up */,
 		...Object.values(layout?.prv || {}) /* WO-364 PRV heads */,
+		...Object.values(layout?.screenExtra || {}) /* WO-1034 extra jacks of a screen */,
 		...(Array.isArray(layout?.mappingGpuOutputs) ? layout.mappingGpuOutputs : []),
 	]
 	const seen = new Set()

@@ -21,6 +21,8 @@ function collectGpuLayoutAssignments(config) {
 	/* WO-364: PRV heads — a GPU jack cabled from the PRV half of a pgm_prv destination.
 	 * Separate collection like mvAssignments: PRV never feeds effectiveScreenCount. */
 	const prvAssignments = []
+	/* WO-1034: further GPU jacks cabled from the PGM half of a destination whose first jack already holds screen_<N>. */
+	const extraScreenAssignments = []
 	const explicitScreenAssignments = new Map()
 	/** Operator Apply OS / Device View screen_N_* — must survive graph rebuild. */
 	const operatorScreenAssignments = new Map()
@@ -213,6 +215,25 @@ function collectGpuLayoutAssignments(config) {
 				manualX: Number.isFinite(config[`screen_${n}_os_x`]) ? config[`screen_${n}_os_x`] : null,
 				manualY: Number.isFinite(config[`screen_${n}_os_y`]) ? config[`screen_${n}_os_y`] : null,
 			}
+			/* WO-1034: one destination, several jacks — the first cable in graph order keeps screen_<n> (the rule
+			 * destinationPgmGpuConnectors / the port-flag resolver use); the others are extra heads of the same screen.
+			 * Before this the last connector silently replaced the first and the other jack got no window. */
+			if (inferredFromEdge && boundDest && inEdge) {
+				const firstEdge = edges.find((e) => {
+					if (String(e?.sourceId || '') !== String(inEdge.sourceId || '')) return false
+					const k = String(connectorById.get(String(e?.sinkId || ''))?.kind || '')
+					if (k !== 'gpu_out' && k !== 'gpu_output') return false
+					try {
+						return require('../config/device-graph-output-mapping').readEdgeOutputLayer(e) < 2
+					} catch { return true }
+				})
+				if (firstEdge && String(firstEdge.sinkId) !== String(c.id)) {
+					if (!extraScreenAssignments.some((a) => a.sysId === sysId)) {
+						extraScreenAssignments.push({ ...assign, manualX: null, manualY: null, n, connectorId: String(c.id) })
+					}
+					return
+				}
+			}
 			allGpuAssignments.set(n, assign)
 			if (isScreenBinding || inferredFromEdge) explicitScreenAssignments.set(n, assign)
 		} else {
@@ -366,6 +387,7 @@ function collectGpuLayoutAssignments(config) {
 		mvAssignments,
 		operatorGuiAssignments,
 		prvAssignments,
+		extraScreenAssignments,
 		operatorScreenAssignments,
 		graphHasDestinationGpuBinding,
 		effectiveScreenCount,

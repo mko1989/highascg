@@ -63,6 +63,16 @@ function applyLayoutPositionsToMerged(merged) {
 				merged[k] = merged[k].map((w) => ({ ...w, x: (Number(w.x) || 0) + lead }))
 			}
 		}
+		/* WO-1034: each extra jack of a screen takes its window geometry from its placed head; no head, no window. */
+		const extraHeads = Object.values(layout?.screenExtra || {})
+		for (const k of Object.keys(merged)) {
+			if (!/^screen_\d+_extra_outputs$/.test(k) || !Array.isArray(merged[k])) continue
+			merged[k] = merged[k].map((o) => {
+				const head = extraHeads.find((h) => String(h?.connectorId || '') === String(o.connectorId))
+				if (!head || !(head.width > 0) || !(head.height > 0)) return { ...o, placed: false }
+				return { ...o, placed: true, x: head.x, y: head.y, width: head.width, height: head.height }
+			})
+		}
 		const bbox = layout?.mappingGpuBBox
 		const hasMappingGpu = Array.isArray(layout?.mappingGpuOutputs) && layout.mappingGpuOutputs.length > 0
 		for (let n = 1; n <= 16; n++) {

@@ -40,17 +40,18 @@ function parseScreenConsumerRects(xml) {
 	if (!xml || typeof xml !== 'string') return out
 	const channels = xml.match(/<channel>[\s\S]*?<\/channel>/g) || []
 	channels.forEach((block, idx) => {
-		const screen = block.match(/<screen>[\s\S]*?<\/screen>/)
-		if (!screen) return
-		const s = screen[0]
-		const num = (tag) => {
-			const m = s.match(new RegExp(`<${tag}>(-?\\d+)</${tag}>`))
-			return m ? parseInt(m[1], 10) : null
+		/* WO-1034: every <screen> of the channel — a destination on two jacks (fill + key) and slice windows are
+		 * further windows of the same channel, each with its own place. */
+		for (const s of block.match(/<screen>[\s\S]*?<\/screen>/g) || []) {
+			const num = (tag) => {
+				const m = s.match(new RegExp(`<${tag}>(-?\\d+)</${tag}>`))
+				return m ? parseInt(m[1], 10) : null
+			}
+			const x = num('x')
+			const y = num('y')
+			if (x == null || y == null) continue
+			out.push({ channel: idx + 1, x, y, width: num('width') ?? 0, height: num('height') ?? 0 })
 		}
-		const x = num('x')
-		const y = num('y')
-		if (x == null || y == null) return
-		out.push({ channel: idx + 1, x, y, width: num('width') ?? 0, height: num('height') ?? 0 })
 	})
 	return out
 }
@@ -63,6 +64,29 @@ function parseScreenConsumerRects(xml) {
  */
 function consumerTitlePattern(channel) {
 	return `Screen consumer \\[${channel}\\|`
+}
+
+/**
+ * WO-1034: which window of a channel belongs to which configured rect. The windows of one channel share a title, so
+ * a window already standing on a rect IS that rect's window (pairing by search order pulled the fill window of a
+ * fill + key pair onto the key's jack); what is left pairs up by size first, then in window-id order.
+ * @param {{ x: number, y: number, width: number, height: number }[]} rects
+ * @param {{ wid: string, x: number|null, y: number|null, width?: number|null, height?: number|null }[]} wins
+ * @returns {{ rect: object, win: object | null }[]} one row per rect
+ */
+function pairWindowsWithRects(rects, wins) {
+	/* ascending window id = the order Caspar created them = config order: the tie-break when no position tells them apart */
+	const free = [...wins].sort((a, b) => (Number(a.wid) || 0) - (Number(b.wid) || 0))
+	const take = (pred) => {
+		const i = free.findIndex(pred)
+		return i < 0 ? null : free.splice(i, 1)[0]
+	}
+	const rows = rects.map((rect) => ({ rect, win: take((w) => w.x === rect.x && w.y === rect.y) }))
+	for (const row of rows) {
+		if (!row.win) row.win = take((w) => w.width === row.rect.width && w.height === row.rect.height)
+	}
+	for (const row of rows) if (!row.win) row.win = take(() => true)
+	return rows
 }
 
 /**
@@ -101,42 +125,49 @@ async function placeScreenConsumers(ctx = {}) {
 	}
 	const opts = { env, timeout: 4000 }
 
-	for (const rect of rects) {
-		let wid = ''
+	const geometry = async (wid) => {
 		try {
-			const { stdout } = await exec('xdotool', ['search', '--name', consumerTitlePattern(rect.channel)], opts)
-			wid = String(stdout || '').trim().split(/\s+/).filter(Boolean)[0] || ''
+			const { stdout } = await exec('xdotool', ['getwindowgeometry', '--shell', wid], opts)
+			const n = (k) => {
+				const m = String(stdout).match(new RegExp(`^${k}=(-?\\d+)$`, 'm'))
+				return m ? parseInt(m[1], 10) : null
+			}
+			return { x: n('X'), y: n('Y'), width: n('WIDTH'), height: n('HEIGHT') }
+		} catch {
+			return { x: null, y: null, width: null, height: null } // falls through to an unconditional move
+		}
+	}
+
+	for (const channel of [...new Set(rects.map((r) => r.channel))]) {
+		const wanted = rects.filter((r) => r.channel === channel)
+		let wids = []
+		try {
+			const { stdout } = await exec('xdotool', ['search', '--name', consumerTitlePattern(channel)], opts)
+			wids = String(stdout || '').trim().split(/\s+/).filter(Boolean)
 		} catch {
 			/* no window for this channel yet */
 		}
-		if (!wid) {
-			result.missing++
-			continue
-		}
-		let curX = null
-		let curY = null
-		try {
-			const { stdout } = await exec('xdotool', ['getwindowgeometry', '--shell', wid], opts)
-			const mx = String(stdout).match(/^X=(-?\d+)$/m)
-			const my = String(stdout).match(/^Y=(-?\d+)$/m)
-			curX = mx ? parseInt(mx[1], 10) : null
-			curY = my ? parseInt(my[1], 10) : null
-		} catch {
-			/* fall through to an unconditional move */
-		}
-		if (curX === rect.x && curY === rect.y) {
-			result.alreadyCorrect++
-			continue
-		}
-		try {
-			await exec('xdotool', ['windowmove', wid, String(rect.x), String(rect.y)], opts)
-			result.moved++
-			log(
-				'info',
-				`[Screen placement] ch ${rect.channel}: ${curX == null ? '?' : `${curX},${curY}`} → ${rect.x},${rect.y} (WM placed it elsewhere)`,
-			)
-		} catch (e) {
-			log('warn', `[Screen placement] ch ${rect.channel}: windowmove failed: ${e?.message || e}`)
+		const wins = []
+		for (const wid of wids.slice(0, wanted.length + 4)) wins.push({ wid, ...(await geometry(wid)) })
+		for (const { rect, win } of pairWindowsWithRects(wanted, wins)) {
+			if (!win) {
+				result.missing++
+				continue
+			}
+			if (win.x === rect.x && win.y === rect.y) {
+				result.alreadyCorrect++
+				continue
+			}
+			try {
+				await exec('xdotool', ['windowmove', win.wid, String(rect.x), String(rect.y)], opts)
+				result.moved++
+				log(
+					'info',
+					`[Screen placement] ch ${rect.channel}: ${win.x == null ? '?' : `${win.x},${win.y}`} → ${rect.x},${rect.y} (WM placed it elsewhere)`,
+				)
+			} catch (e) {
+				log('warn', `[Screen placement] ch ${rect.channel}: windowmove failed: ${e?.message || e}`)
+			}
 		}
 	}
 
@@ -149,4 +180,4 @@ async function placeScreenConsumers(ctx = {}) {
 	return result
 }
 
-module.exports = { parseScreenConsumerRects, consumerTitlePattern, placeScreenConsumers }
+module.exports = { parseScreenConsumerRects, consumerTitlePattern, pairWindowsWithRects, placeScreenConsumers }

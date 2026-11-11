@@ -3,6 +3,7 @@
 const {
 	createDestinationWiringContext,
 	destinationSourceIds,
+	destinationPgmGpuConnectors,
 } = require('./device-graph-destination-wiring')
 
 /** Caspar screen-consumer fields saved per physical rear port in Device View (`screen_${portN}_*`). */
@@ -130,18 +131,47 @@ function copyInteractiveConsumerField(merged, fromKey, toKey) {
 }
 
 /**
+ * WO-1034: a PGM destination cabled to more than one GPU jack — every jack after the first gets its own window of
+ * the same channel, with ITS port's flags (owner 11.11: one PGM on two jacks, one of them key-only → fill + key).
+ * Recorded as `screen_N_extra_outputs`; layout-sync adds the head geometry, config-generator-extra-screens writes them.
+ */
+function recordExtraOutputs(merged, saved, dest, destIndex, ctx) {
+	const extras = destinationPgmGpuConnectors(dest, destIndex, ctx).slice(1)
+	if (!extras.length) return
+	const n = Math.max(1, (parseInt(String(dest?.mainScreenIndex ?? 0), 10) || 0) + 1)
+	const list = []
+	for (const connector of extras) {
+		const port = physicalPortIndexFromGpuConnector(connector)
+		if (!port) continue
+		const flags = {}
+		for (const field of PHYSICAL_PORT_CONSUMER_FIELDS) {
+			if (field === 'x' || field === 'y') continue
+			const v = saved[`screen_${port}_${field}`]
+			if (v !== undefined && v !== null) flags[field] = v
+		}
+		flags.always_on_top = true // program video, same as the primary jack below
+		list.push({ port, connectorId: String(connector.id), flags })
+	}
+	if (list.length) merged[`screen_${n}_extra_outputs`] = list
+}
+
+/**
  * Device View stores window chrome on physical rear-port keys; Caspar generator reads per Caspar screen / multiview index.
  * @param {Record<string, unknown>} merged flat generator config (mutated)
  * @param {Record<string, unknown>} appConfig
  */
 function applyPhysicalPortConsumerFlagsToScreens(merged, appConfig) {
+	for (const k of Object.keys(merged)) if (/^screen_\d+_extra_outputs$/.test(k)) delete merged[k]
 	const ctx = createDestinationWiringContext(appConfig || {})
 	if (!ctx.destinations.length) return
+	/* WO-1034: the port flags as saved — the loop below copies port keys over screen keys of the same namespace */
+	const saved = { ...merged }
 
 	for (let destIndex = 0; destIndex < ctx.destinations.length; destIndex++) {
 		const dest = ctx.destinations[destIndex]
 		const mode = String(dest?.mode || 'pgm_prv').toLowerCase()
 		if (mode === 'stream') continue
+		if (PGM_DESTINATION_MODES.has(mode)) recordExtraOutputs(merged, saved, dest, destIndex, ctx)
 		// The operator-GUI destination drives its own consumer (config-generator-operator-gui.js) and
 		// carries a meaningless mainScreenIndex (always 0). Letting it fall through to the generic
 		// branch below copied its rear-port flags — always_on_top=false per WO-263, plus x/y/name/
