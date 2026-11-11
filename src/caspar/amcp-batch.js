@@ -190,6 +190,7 @@ function runBeginCommitBatch(client, lines, options) {
 	if (options?._airGated !== true) {
 		return withAirGate(connection, lines, (send) => runBeginCommitBatch(client, send, { ...options, _airGated: true }))
 	}
+	lines = require('./amcp-batch-cg-clear').dropClearsBeforeCgAdd(lines) // WO-1037: a clear before a CG ADD loses the add
 	const ch = inferProgramChannelFromAmcpLines(lines)
 	// WO-811: template key in (enforcement ON), shared password never out — same rule as the single-send path.
 	const prepped = lines.map((l) => prepareAmcpLine(String(l).trim(), connection?.config))
