@@ -4,7 +4,8 @@
  * WO-1035 — read-only view of a PixelHue switcher: which layers sit on which screen, and where.
  *
  * Purpose: HighAsCG feeds the switcher a key + fill pair for overlays (WO-1034); to draw something that follows a
- * switcher layer (a border round a PIP) it has to know that layer's rectangle. Nothing here writes to the switcher.
+ * switcher layer (a border round a PIP) it has to know that layer's rectangle. Reading never writes; the only write
+ * is `put`, used by pixelhue-look-drive.js when "looks drive the switcher" is on (off by default).
  *
  * Transport (docs/reference/PIXELHUE_API.md): discovery on https://{host}:19998 (self-signed) names the device
  * address and its HTTP API port; `node/open-detail` gives sn + startTime; the token is an HS256 JWT of { SN } signed
@@ -33,11 +34,14 @@ function makeToken(sn, startTime) {
 	return `${head}.${body}.${sig}`
 }
 
-/** GET a JSON document; https targets are the switcher's self-signed discovery service. */
-function httpJson(url, headers = {}) {
+/** GET (or, with a body, PUT) a JSON document; https targets are the switcher's self-signed discovery service. */
+function httpJson(url, headers = {}, body) {
 	return new Promise((resolve, reject) => {
 		const lib = url.startsWith('https:') ? https : http
-		const req = lib.get(url, { headers, timeout: TIMEOUT_MS, rejectUnauthorized: false }, (res) => {
+		const data = body === undefined ? null : JSON.stringify(body)
+		const opts = { method: data ? 'PUT' : 'GET', timeout: TIMEOUT_MS, rejectUnauthorized: false,
+			headers: { ...headers, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}) } }
+		const req = lib.request(url, opts, (res) => {
 			const chunks = []
 			res.on('data', (c) => chunks.push(c))
 			res.on('end', () => {
@@ -50,6 +54,7 @@ function httpJson(url, headers = {}) {
 		})
 		req.on('timeout', () => req.destroy(new Error(`timeout: ${url}`)))
 		req.on('error', reject)
+		req.end(data || undefined)
 	})
 }
 
@@ -140,11 +145,11 @@ function createPixelhueReader(host, deps = {}) {
 		token = makeToken(od.data.sn, od.data.startTime)
 	}
 
-	async function authed(path) {
+	async function authed(path, body) {
 		for (let attempt = 0; ; attempt++) {
 			if (!token) await login()
-			const r = await get(`http://${device.ip}:${device.port}${path}`, { Authorization: token })
-			if (r?.code === 0) return r
+			const r = await get(`http://${device.ip}:${device.port}${path}`, { Authorization: token }, body)
+			if (r?.code === 0 || (body !== undefined && r?.code === 200)) return r
 			if (attempt > 0) throw new Error(`PixelHue ${path}: code ${r?.code} ${r?.message || r?.msg || ''}`.trim())
 			token = '' // refused: the switcher restarted since the token was made
 		}
@@ -167,7 +172,14 @@ function createPixelhueReader(host, deps = {}) {
 		return pending
 	}
 
-	return { host, read }
+	/** The ONE write (pixelhue-look-drive.js): PUT a body to the switcher; the next read is fresh. */
+	async function put(path, body) {
+		const r = await authed(path, body)
+		cache = null
+		return r
+	}
+
+	return { host, read, put }
 }
 
 module.exports = { makeToken, normalize, createPixelhueReader }

@@ -21,6 +21,7 @@ static func choices(data: Variant) -> Array:
 			var name := str(l.get("name", "")).strip_edges()
 			var src := str(l.get("source", "")).strip_edges()
 			out.append({
+				"layerId": l.get("layerId"), "screenId": s.get("screenId"),
 				"name": "%s · %s" % [str(s.get("name", "Screen")), name if name != "" else "layer"],
 				"where": "%d×%d at %d,%d%s" % [int(l.get("width", 0)), int(l.get("height", 0)), int(l.get("x", 0)), int(l.get("y", 0)), " · " + src if src != "" else ""],
 				"label": "%s · %s · %d×%d at %d,%d%s" % [str(s.get("name", "Screen")), name if name != "" else "layer", int(l.get("width", 0)), int(l.get("height", 0)), int(l.get("x", 0)), int(l.get("y", 0)), " · " + src if src != "" else ""],
@@ -45,8 +46,34 @@ static func is_empty_placeholder(layer: Variant) -> bool:
 ## What a row of the Sources ▸ Live "PixelHue layers" list drags: an empty placeholder source that remembers the
 ## switcher layer's rectangle (look_layer_drop.gd puts the new layer there).
 static func drag_payload(choice: Dictionary) -> Dictionary:
-	return {"type": "media", "value": EMPTY_COLOR, "label": "PixelHue · " + str(choice.get("name", "layer")), "isPlaceholder": true,
+	var p := {"type": "media", "value": EMPTY_COLOR, "label": "PixelHue · " + str(choice.get("name", "layer")), "isPlaceholder": true,
 		"pixelhueFill": choice.get("fill", {})}
+	if choice.get("layerId") != null:  # WO-1038: which switcher layer this placeholder programs
+		p["pixelhueLayer"] = {"layerId": choice.layerId, "screenId": choice.get("screenId"), "name": str(choice.get("name", ""))}
+	return p
+
+
+## WO-1038 — what a new look layer keeps of the switcher layer it was dropped from (`layer.pixelhue`): on a program
+## take the server moves that switcher layer onto this layer's rectangle (when "looks drive the switcher" is on).
+## {} for every other source.
+static func link_of_source(src: Variant) -> Dictionary:
+	if src is Dictionary and src.get("pixelhueLayer") is Dictionary and (src.pixelhueLayer as Dictionary).get("layerId") != null:
+		var l: Dictionary = src.pixelhueLayer
+		return {"layerId": l.layerId, "screenId": l.get("screenId"), "name": str(l.get("name", "")), "drive": true}
+	return {}
+
+
+## The link of a look layer, or {} — and the patch that ticks / unticks "Move the switcher layer on take".
+static func link_of_layer(layer: Variant) -> Dictionary:
+	if layer is Dictionary and layer.get("pixelhue") is Dictionary and (layer.pixelhue as Dictionary).get("layerId") != null:
+		return layer.pixelhue
+	return {}
+
+
+static func drive_patch(layer: Dictionary, on: bool) -> Dictionary:
+	var link := link_of_layer(layer).duplicate()
+	link["drive"] = on
+	return {"pixelhue": link}
 
 
 ## The rectangle patch a dragged source carries, or {} for every other source.

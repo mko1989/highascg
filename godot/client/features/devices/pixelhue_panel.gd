@@ -11,6 +11,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Kit := preload("res://features/settings/pane_kit.gd")
 
 var _host := ""
+var _drive := false  # WO-1038: looks move the switcher's layers on a program take
 var _list: VBoxContainer
 var _status: Label
 var _plus: Button
@@ -48,6 +49,7 @@ func reload() -> void:
 	var r: Dictionary = await DevicesTarget.api.get_json("/api/pixelhue/config")
 	_loading = false
 	_host = str(r.data.get("host", "")) if r.ok and r.data is Dictionary else ""
+	_drive = r.ok and r.data is Dictionary and r.data.get("drive") == true
 	_render()
 	if _host != "":
 		_test()
@@ -87,6 +89,12 @@ func _render() -> void:
 	x.pressed.connect(func() -> void: Kit.confirm(self, "Remove the PixelHue switcher at %s?" % _host, func() -> void: _store("")))
 	top.add_child(x)
 	_list.add_child(card)
+	var drive := CheckBox.new()  # WO-1038 — the only thing that lets HighAsCG write to the switcher
+	drive.text = "Looks drive the switcher"
+	drive.tooltip_text = "On: taking a look to program moves the switcher layers its PixelHue placeholders came from onto their rectangles in the look.\nOff (default): HighAsCG only reads the switcher."
+	drive.button_pressed = _drive
+	drive.toggled.connect(func(on: bool) -> void: _set_drive(on))
+	_list.add_child(drive)
 
 
 func _edit() -> void:
@@ -100,6 +108,12 @@ func _store(host: String) -> void:
 		_status.text = "The server refused it: %s" % (str(r.data.get("error", "")) if r.get("data") is Dictionary else str(r.get("error", "no answer")))
 		return
 	reload()
+
+
+func _set_drive(on: bool) -> void:
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/pixelhue/config", {"drive": on})
+	_status.text = ("Looks now move the switcher's layers on a program take." if on else "HighAsCG only reads the switcher.") if r.ok else "The server refused it."
+	_drive = r.ok and r.data is Dictionary and r.data.get("drive") == true
 
 
 func _test() -> void:

@@ -34,6 +34,13 @@ func test_dragged_row_is_an_empty_placeholder_that_carries_the_rectangle() -> vo
 	t.eq([p.type, p.value, p.isPlaceholder, p.label], ["media", "#00000000", true, "PixelHue · Screen 1 · PIP"], "transparent black: nothing on fill or key")
 	t.eq(M.patch_of_source(p), {"fill": fill, "contentFit": "stretch", "aspectLocked": false}, "the drop puts the layer on the rectangle")
 	t.eq(M.patch_of_source({"type": "media", "value": "clip.mov"}), {}, "any other source: no rectangle")
+	# WO-1038: the placeholder remembers its switcher layer
+	var linked := M.drag_payload({"name": "Screen 1 · PIP", "fill": fill, "layerId": 121831424, "screenId": 1})
+	t.eq(M.link_of_source(linked), {"layerId": 121831424, "screenId": 1, "name": "Screen 1 · PIP", "drive": true}, "link carried by the drag")
+	t.eq(M.link_of_source(p), {}, "an older row without ids: no link")
+	var layer := {"pixelhue": M.link_of_source(linked)}
+	t.eq(M.drive_patch(layer, false).pixelhue.drive, false, "unticking keeps the link, stops the drive")
+	t.eq(M.link_of_layer({"source": {}}), {}, "an ordinary layer has no link")
 
 
 func test_status_line() -> void:

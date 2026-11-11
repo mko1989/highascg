@@ -68,6 +68,10 @@ func _ready() -> void:
 		ph.select(0))
 	_w["ph"] = ph
 	_row(g, "Position from", ph)
+	var drv := _check("ph_drive", func(on: bool) -> void: _emit(PixelhueMatch.drive_patch(_layer, on)))  # WO-1038
+	drv.text = "Move the switcher layer here on a program take"
+	drv.tooltip_text = "This layer was dropped from a PixelHue layer. When Devices ▸ PixelHue ▸ \"Looks drive the switcher\" is on, taking the look to program moves that switcher layer onto this layer's rectangle."
+	_row(g, "PixelHue", drv)
 	_row(g, "Clip start point", _option("start", STARTS.map(func(o: Array) -> String: return o[1]),
 		func(i: int) -> void: _emit({"startBehaviour": STARTS[i][0]})))
 	_trim = ClipTrimSection.new()
@@ -220,6 +224,12 @@ func _sync() -> void:
 	if _layer.is_empty():
 		return
 	_show_media_rows(not PixelhueMatch.is_empty_placeholder(_layer))
+	var link := PixelhueMatch.link_of_layer(_layer)  # WO-1038: the tick exists only on a layer that has a switcher layer
+	var drv := _w.ph_drive as CheckBox
+	var drv_i := drv.get_index()
+	drv.visible = not link.is_empty()
+	(_grid.get_child(drv_i - 1) as Control).visible = not link.is_empty()
+	drv.button_pressed = not link.is_empty() and link.get("drive") != false
 	_syncing = true
 	var fit := str(_layer.get("contentFit", "native"))
 	(_w.fit as OptionButton).select(maxi(0, FITS.map(func(o: Array) -> String: return o[0]).find(fit)))
@@ -259,7 +269,7 @@ func _sync() -> void:
 ## sizing, start point, trim, speed, loop, alpha, audio, volume, fade (and, in show_layer, the style row, playlist,
 ## template, lower third and countdown sections) go; "Position from", rotation, effects and the PIP overlays stay.
 func _show_media_rows(on: bool) -> void:
-	var keep := [_w.get("rot"), _w.get("ph")]
+	var keep := [_w.get("rot"), _w.get("ph"), _w.get("ph_drive")]
 	var n := mini(_media_to, _grid.get_child_count())
 	for i in range(_media_from, n):
 		var c := _grid.get_child(i) as Control

@@ -174,7 +174,7 @@ func test_deselect_releases_the_inspector_page() -> void:
 func test_pixelhue_layer_drop_adds_an_empty_layer_on_its_rectangle_or_moves_the_layer_under_it() -> void:
 	var PH := preload("res://features/live/pixelhue_match_model.gd")
 	var fill := {"x": 0.5, "y": 0.25, "scaleX": 0.25, "scaleY": 0.5}
-	var drag := PH.drag_payload({"name": "Screen 1 · PIP", "fill": fill})
+	var drag := PH.drag_payload({"name": "Screen 1 · PIP", "fill": fill, "layerId": 77, "screenId": 1})
 	t.eq(O.drop_sources(drag).size(), 1, "the look editor takes the drag")
 	var ed := _ed()
 	var api := FakeApi.new()
@@ -182,6 +182,7 @@ func test_pixelhue_layer_drop_adds_an_empty_layer_on_its_rectangle_or_moves_the_
 	var made: Dictionary = ed.lk.layers[2]
 	t.eq([ed.lk.layers.size(), made.source.value, made.source.isPlaceholder, made.source.has("pixelhueFill")], [3, "#00000000", true, false], "an empty placeholder layer, no leftover drag field")
 	t.eq([made.fill, made.contentFit, made.aspectLocked], [fill, "stretch", false], "exactly on the switcher layer's rectangle")
+	t.eq([made.pixelhue, made.source.has("pixelhueLayer")], [{"layerId": 77, "screenId": 1, "name": "Screen 1 · PIP", "drive": true}, false], "WO-1038: the layer programs switcher layer 77")
 	var ed2 := _ed()
 	var api2 := FakeApi.new()
 	D.drop(ed2, api2, 0, O.drop_sources(drag))  # on L10 → L10 moves there, its media stays

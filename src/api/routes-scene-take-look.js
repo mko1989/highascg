@@ -200,6 +200,7 @@ async function takeLook(b, ctx, deps) {
 		...(target === 'program' && sanitizeVisibilityMap(b.timersVisibility) ? { timersVisibility: sanitizeVisibilityMap(b.timersVisibility) } : {}),
 		...(b.takeGroup ? { takeGroup: b.takeGroup } : {}),
 	}
+	if (target === 'program') require('../pixelhue/pixelhue-look-drive').driveLookOnTake(scene, ctx) // WO-1038, beside the take
 	const take = deps.take || require('./routes-scene-take').handleSceneTake
 	// WO-1029 C10: `media_missing` when the last media-needs knows this look's media is missing on the box of its screen
 	const res = require('../cluster/cluster-media-service').withMediaMissing(ctx, await take(takeBody, ctx), sceneId, mainIdx)

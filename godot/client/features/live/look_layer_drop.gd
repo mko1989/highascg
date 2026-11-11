@@ -120,6 +120,9 @@ static func add(ed: Variant, api: Variant, src: Dictionary) -> bool:
 	(res.data.layer as Dictionary).merge(Pixelhue.patch_of_source(src), true)  # WO-1035: an empty layer on the switcher layer
 	if res.data.layer.get("source") is Dictionary:
 		(res.data.layer.source as Dictionary).erase("pixelhueFill")
+		(res.data.layer.source as Dictionary).erase("pixelhueLayer")
+	if not Pixelhue.link_of_source(src).is_empty():
+		res.data.layer["pixelhue"] = Pixelhue.link_of_source(src)  # WO-1038: this layer programs that switcher layer
 	(lk.layers as Array).append(res.data.layer)
 	ed._refresh_list()
 	ed._select((lk.layers as Array).size() - 1)
