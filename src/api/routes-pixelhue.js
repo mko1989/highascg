@@ -14,6 +14,8 @@
  *                                        layer inspector's "Match PixelHue layer" copies it onto a look layer
  *        ?screen=<screenId>              that screen only
  *        ?scene=pgm|pvw                  layers of that bus only
+ *   GET  /api/pixelhue/sources           { ok, sources: [{ id, type, name, connected, connectorType? }] } — what a
+ *                                        switcher layer can show (inputs, then screen PGM / PVW), for WO-1038
  *
  * The address is machine-local (~/.highascg/pixelhue.json), like the box's other per-site facts: a show file moved to
  * another venue must not point at this venue's switcher.
@@ -86,11 +88,22 @@ async function handleLayers(query, deps = {}) {
 	return reply(200, { ok: true, host: snap.host, device: snap.device, at: snap.at, screens })
 }
 
+async function handleSources(deps = {}) {
+	const host = readHost(deps)
+	if (!host) return reply(409, { error: 'no PixelHue address set — POST /api/pixelhue/config { host }' })
+	try {
+		return reply(200, { ok: true, sources: await readerFor(host, deps).sources() })
+	} catch (e) {
+		return reply(502, { error: `PixelHue at ${host} did not answer: ${e?.message || e}` })
+	}
+}
+
 function register(routes) {
 	const opt = { requireCaspar: false }
 	routes.get('/api/pixelhue/config', () => reply(200, readSettings()), opt)
 	routes.post('/api/pixelhue/config', ({ body }) => handleSetConfig(body), opt)
 	routes.get('/api/pixelhue/layers', ({ query }) => handleLayers(query), opt)
+	routes.get('/api/pixelhue/sources', () => handleSources(), opt)
 }
 
-module.exports = { register, handleSetConfig, handleLayers, readSettings, readerFor }
+module.exports = { register, handleSetConfig, handleLayers, handleSources, readSettings, readerFor }

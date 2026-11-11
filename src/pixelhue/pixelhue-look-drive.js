@@ -9,24 +9,37 @@
  * placeholder like any other layer, save the look. On a PROGRAM take of that look the server moves each such
  * switcher layer onto its placeholder's rectangle, so one look places the CasparCG layers and the switcher's layers.
  *
- * The write is the one the owner's PixelHue Studio app uses and has tested: `PUT /unico/v1/layers/window` with
- * `[{ layerId, window: { x, y, width, height } }]`, then a read-back (some firmware answers OK and keeps its own
- * geometry). Only layers whose rectangle differs are sent; a layer that is gone from the switcher is skipped and
- * named. A failure never fails the take — the picture on the wall is CasparCG's job either way.
+ * A placeholder can also name the SOURCE its switcher layer shows (`layer.pixelhue.source = { id, type, name }`, picked
+ * in the layer inspector; none = leave the switcher's source alone).
+ *
+ * Based on the owner's pixelhue-studio (github.com/mko1989/pixelhue-studio, 1.6.0-alpha.2, lib/studio-programming.js
+ * + lib/program-geometry.js): the same requests, order, limits and read-back; the same editable layer types
+ * (normal, AUX, logo, the fill layer of a Cut & Fill pair); screen-relative coordinates; a locked PGM is respected.
+ * Only layers that differ are written; one that is gone from the switcher is skipped and named. A failure never
+ * fails the take — the picture on the wall is CasparCG's job either way.
  *
  * Removing it: delete this file and pixelhue-look-drive hooks — the single line in routes-scene-take-look.js, the
  * `drive` key in routes-pixelhue.js, the tick in the Godot Devices panel. Look layers keep an unused `pixelhue` key.
  */
 
-const MIN_SIDE = 16 // px: smaller than this is a slip of the hand, not a picture
+// Device limits as pixelhue-studio's program-geometry.js reads them from layer_2.xml: a side 64–131070 px, global
+// X / Y ±500000. Layers may roam off the screen (the device default, PixelFlow's behaviour); a switcher set to keep
+// windows inside the screen refuses such a window and the read-back says so.
+const SIDE_MIN = 64
+const SIDE_MAX = 131070
+const POS_MAX = 500000
+const PROGRAMMABLE = new Set(['normal', 'aux', 'logo']) // studio programmingLayers: types 2, 4, 32 and 256 (Cut & Fill fill)
 
 const int = (v) => Math.round(Number(v) || 0)
+const sameWindow = (l, w) => l && l.x === w.x && l.y === w.y && l.width === w.width && l.height === w.height
+const sameSource = (l, src) => l && Number(l.sourceId) === Number(src.id) && Number(l.sourceType) === Number(src.type)
 
 /**
- * The switcher windows a look asks for.
+ * What a look asks of the switcher. Windows are screen-relative here (as the read gives them); `driveLook` adds the
+ * screen origin when it writes.
  * @param {{ layers?: object[] }} scene a stored look
  * @param {{ screens: object[] }} snap pixelhue-read snapshot
- * @returns {{ changes: { layerId: number, window: object, name: string }[], skipped: string[] }}
+ * @returns {{ changes: { layerId: number, name: string, screen: object, window?: object, source?: object }[], skipped: string[] }}
  */
 function windowsFromLook(scene, snap) {
 	const changes = []
@@ -45,46 +58,78 @@ function windowsFromLook(scene, snap) {
 			skipped.push(`${name}: not on the switcher any more`)
 			continue
 		}
-		const f = l.fill && typeof l.fill === 'object' ? l.fill : {}
-		let width = int(Number(f.scaleX) * screen.width)
-		let height = int(Number(f.scaleY) * screen.height)
-		if (!(width >= MIN_SIDE) || !(height >= MIN_SIDE)) {
-			skipped.push(`${name}: ${width}×${height} is too small`)
+		if (!PROGRAMMABLE.has(cur.type)) {
+			skipped.push(`${name}: a ${cur.type} layer is not programmed from a look`)
 			continue
 		}
-		width = Math.min(width, screen.width)
-		height = Math.min(height, screen.height)
-		// kept inside the screen: the switcher refuses, or clips, a window that leaves it
-		const x = Math.max(0, Math.min(screen.width - width, int(Number(f.x) * screen.width)))
-		const y = Math.max(0, Math.min(screen.height - height, int(Number(f.y) * screen.height)))
-		if (cur.x === x && cur.y === y && cur.width === width && cur.height === height) continue
-		changes.push({ layerId, name, window: { x, y, width, height } })
+		if (cur.scene === 'pgm' && screen.pgmLocked) {
+			skipped.push(`${name}: PGM of ${screen.name || 'its screen'} is locked on the switcher`)
+			continue
+		}
+		const f = l.fill && typeof l.fill === 'object' ? l.fill : {}
+		const window = { x: int(Number(f.x) * screen.width), y: int(Number(f.y) * screen.height),
+			width: int(Number(f.scaleX) * screen.width), height: int(Number(f.scaleY) * screen.height) }
+		if (window.width < SIDE_MIN || window.height < SIDE_MIN || window.width > SIDE_MAX || window.height > SIDE_MAX) {
+			skipped.push(`${name}: ${window.width}×${window.height} is outside the switcher's ${SIDE_MIN}–${SIDE_MAX} px`)
+			continue
+		}
+		if (Math.abs(window.x + int(screen.x)) > POS_MAX || Math.abs(window.y + int(screen.y)) > POS_MAX) {
+			skipped.push(`${name}: too far off the screen`)
+			continue
+		}
+		const change = { layerId, name, screen }
+		const src = link.source && typeof link.source === 'object' && Number.isFinite(Number(link.source.id)) && Number.isFinite(Number(link.source.type)) ? link.source : null
+		// a screen cannot show its own PGM / PVW (studio sourcePayload)
+		if (src && [3, 4].includes(Number(src.type)) && Number(src.id) === Number(screen.screenId)) skipped.push(`${name}: a screen cannot show itself`)
+		else if (src && !sameSource(cur, src)) change.source = { id: Number(src.id), type: Number(src.type), ...(src.connectorType != null ? { connectorType: Number(src.connectorType) } : {}) }
+		if (!sameWindow(cur, window) || change.source) change.window = window
+		if (change.window || change.source) changes.push(change)
 	}
 	return { changes, skipped }
 }
 
-const same = (l, w) => l && l.x === w.x && l.y === w.y && l.width === w.width && l.height === w.height
+const globalWindow = (c) => ({ ...c.window, x: c.window.x + int(c.screen.x), y: c.window.y + int(c.screen.y) })
+const sourcePayload = (src) => ({
+	general: { sourceId: src.id, sourceType: src.type, ...(src.connectorType != null ? { connectorType: src.connectorType } : {}) },
+	primary: { sourceId: src.id, sourceType: src.type },
+})
 
 /**
+ * Writes, in pixelhue-studio's order (applyProgramming 'source' / applyProgramGeometry):
+ *   layers/aspect-ratio { 5, locked }   for a layer whose source changes — a custom ratio, so routing a source of
+ *                                       another shape cannot resize the rectangle (the look's rectangle is the truth;
+ *                                       unlike Studio it is NOT re-locked to the source's own ratio afterwards)
+ *   layers/source                        the new sources
+ *   layers/window                        every changed rectangle, one request
+ * then a read-back (some firmware answers OK and keeps its own geometry).
  * @param {{ layers?: object[] }} scene
  * @param {{ read: Function, put: Function }} reader pixelhue-read reader
  * @param {{ wait?: (ms: number) => Promise<void> }} [deps]
- * @returns {Promise<{ sent: number, kept: number, skipped: string[] }>} kept: windows the switcher shows after the write
+ * @returns {Promise<{ sent: number, kept: number, skipped: string[] }>} sent / kept: switcher layers asked / as asked afterwards
  */
 async function driveLook(scene, reader, deps = {}) {
 	const wait = deps.wait || ((ms) => new Promise((r) => setTimeout(r, ms)))
 	const { changes, skipped } = windowsFromLook(scene, await reader.read())
 	if (!changes.length) return { sent: 0, kept: 0, skipped }
-	await reader.put('/unico/v1/layers/window', changes.map(({ layerId, window }) => ({ layerId, window })))
+	const routed = changes.filter((c) => c.source)
+	if (routed.length) {
+		await reader.put('/unico/v1/layers/aspect-ratio', routed.map((c) => ({ layerId: c.layerId, aspectRatio: 5, locked: 1 })))
+		await reader.put('/unico/v1/layers/source', routed.map((c) => ({ layerId: c.layerId, source: sourcePayload(c.source) })))
+	}
+	const moved = changes.filter((c) => c.window)
+	if (moved.length) await reader.put('/unico/v1/layers/window', moved.map((c) => ({ layerId: c.layerId, window: globalWindow(c) })))
+	const ok = (all, c) => {
+		const l = all.find((x) => x.layerId === c.layerId)
+		return (!c.window || sameWindow(l, c.window)) && (!c.source || sameSource(l, c.source))
+	}
 	let lost = changes
 	for (let attempt = 0; attempt < 3 && lost.length; attempt++) {
 		if (attempt) await wait(200)
 		const all = (await reader.read()).screens.flatMap((s) => s.layers || [])
-		lost = changes.filter((c) => !same(all.find((l) => l.layerId === c.layerId), c.window))
+		lost = changes.filter((c) => !ok(all, c))
 	}
-	for (const c of lost) skipped.push(`${c.name}: the switcher did not keep the rectangle`)
-	const kept = changes.length - lost.length
-	return { sent: changes.length, kept, skipped }
+	for (const c of lost) skipped.push(`${c.name}: the switcher did not keep the ${c.source ? 'source / rectangle' : 'rectangle'}`)
+	return { sent: changes.length, kept: changes.length - lost.length, skipped }
 }
 
 /** Does this look carry anything for the switcher? (cheap: no network) */

@@ -16,7 +16,7 @@ static func choices(data: Variant) -> Array:
 		for l in s.get("layers", []):
 			if not l is Dictionary or l.get("enabled") != true or not l.get("fill") is Dictionary:
 				continue
-			if str(l.get("scene", "")) != "pgm" or str(l.get("type", "")) in ["bkg", "mvr", "aux"]:
+			if str(l.get("scene", "")) != "pgm" or str(l.get("type", "")) in ["bkg", "mvr", "aux", "cut"]:
 				continue  # the multiviewer's tiles and the AUX outputs are not pictures on a screen a border goes over
 			var name := str(l.get("name", "")).strip_edges()
 			var src := str(l.get("source", "")).strip_edges()
@@ -68,6 +68,36 @@ static func link_of_layer(layer: Variant) -> Dictionary:
 	if layer is Dictionary and layer.get("pixelhue") is Dictionary and (layer.pixelhue as Dictionary).get("layerId") != null:
 		return layer.pixelhue
 	return {}
+
+
+## WO-1038 — the source the switcher layer shows when the look is taken: `src` = a row of GET /api/pixelhue/sources,
+## or {} to leave whatever the switcher has.
+static func source_patch(layer: Dictionary, src: Dictionary) -> Dictionary:
+	var link := link_of_layer(layer).duplicate()
+	if src.is_empty() or src.get("id") == null:
+		link.erase("source")
+	else:
+		var s := {"id": src.id, "type": src.get("type"), "name": str(src.get("name", ""))}
+		if src.get("connectorType") != null:
+			s["connectorType"] = src.connectorType
+		link["source"] = s
+	return {"pixelhue": link}
+
+
+## The source drop-down's rows: [{label, src}] — "leave it" first, then the switcher's sources (no signal marked).
+static func source_choices(data: Variant) -> Array:
+	var out := [{"label": "Leave the switcher's source", "src": {}}]
+	if data is Dictionary:
+		for s in data.get("sources", []):
+			if s is Dictionary and s.get("id") != null:
+				out.append({"label": str(s.get("name", "source")) + ("" if s.get("connected") != false else "  (no signal)"), "src": s})
+	return out
+
+
+## What the closed drop-down shows for a layer.
+static func source_label(layer: Variant) -> String:
+	var src: Variant = link_of_layer(layer).get("source")
+	return str(src.get("name", "source")) if src is Dictionary and src.get("id") != null else "Leave the switcher's source"
 
 
 static func drive_patch(layer: Dictionary, on: bool) -> Dictionary:

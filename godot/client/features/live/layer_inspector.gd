@@ -72,6 +72,15 @@ func _ready() -> void:
 	drv.text = "Move the switcher layer here on a program take"
 	drv.tooltip_text = "This layer was dropped from a PixelHue layer. When Devices ▸ PixelHue ▸ \"Looks drive the switcher\" is on, taking the look to program moves that switcher layer onto this layer's rectangle."
 	_row(g, "PixelHue", drv)
+	var psrc := OptionButton.new()  # WO-1038: the source that switcher layer shows when the look is taken
+	psrc.add_item("Leave the switcher's source")
+	psrc.tooltip_text = "Pick a source and taking the look to program also routes it to the switcher layer. \"Leave\" changes only position and size."
+	psrc.pressed.connect(func() -> void: _load_pixelhue_sources(psrc))
+	psrc.item_selected.connect(func(i: int) -> void:
+		if not _syncing and psrc.get_item_metadata(i) is Dictionary:
+			_emit(PixelhueMatch.source_patch(_layer, psrc.get_item_metadata(i))))
+	_w["ph_src"] = psrc
+	_row(g, "PixelHue source", psrc)
 	_row(g, "Clip start point", _option("start", STARTS.map(func(o: Array) -> String: return o[1]),
 		func(i: int) -> void: _emit({"startBehaviour": STARTS[i][0]})))
 	_trim = ClipTrimSection.new()
@@ -208,6 +217,22 @@ func _load_pixelhue(ph: OptionButton) -> void:
 		status.emit(why if why != "" else "PixelHue: no program layers to match.")
 
 
+func _load_pixelhue_sources(psrc: OptionButton) -> void:
+	var res: Dictionary = await Api.get_json("/api/pixelhue/sources")
+	if not res.ok:
+		status.emit(str(res.data.get("error", "")) if res.get("data") is Dictionary else "PixelHue: no answer.")
+		return
+	var cur: Variant = PixelhueMatch.link_of_layer(_layer).get("source")
+	_syncing = true
+	psrc.clear()
+	for c in PixelhueMatch.source_choices(res.data):
+		psrc.add_item(str(c.label))
+		psrc.set_item_metadata(psrc.item_count - 1, c.src)
+		if cur is Dictionary and c.src.get("id") == cur.get("id") and c.src.get("type") == cur.get("type"):
+			psrc.select(psrc.item_count - 1)
+	_syncing = false
+
+
 func _load_options() -> void:
 	var res: Dictionary = await Api.get_json("/api/scene/layer-options?mainIdx=%d" % main)
 	if res.ok and res.data is Dictionary:
@@ -230,6 +255,12 @@ func _sync() -> void:
 	drv.visible = not link.is_empty()
 	(_grid.get_child(drv_i - 1) as Control).visible = not link.is_empty()
 	drv.button_pressed = not link.is_empty() and link.get("drive") != false
+	var psrc := _w.ph_src as OptionButton
+	psrc.visible = not link.is_empty()
+	(_grid.get_child(psrc.get_index() - 1) as Control).visible = not link.is_empty()
+	psrc.clear()  # the closed drop-down names the saved choice; the full list loads when it opens
+	psrc.add_item(PixelhueMatch.source_label(_layer))
+	psrc.set_item_metadata(0, link.get("source", {}) if link.get("source") is Dictionary else {})
 	_syncing = true
 	var fit := str(_layer.get("contentFit", "native"))
 	(_w.fit as OptionButton).select(maxi(0, FITS.map(func(o: Array) -> String: return o[0]).find(fit)))
@@ -269,7 +300,7 @@ func _sync() -> void:
 ## sizing, start point, trim, speed, loop, alpha, audio, volume, fade (and, in show_layer, the style row, playlist,
 ## template, lower third and countdown sections) go; "Position from", rotation, effects and the PIP overlays stay.
 func _show_media_rows(on: bool) -> void:
-	var keep := [_w.get("rot"), _w.get("ph"), _w.get("ph_drive")]
+	var keep := [_w.get("rot"), _w.get("ph"), _w.get("ph_drive"), _w.get("ph_src")]
 	var n := mini(_media_to, _grid.get_child_count())
 	for i in range(_media_from, n):
 		var c := _grid.get_child(i) as Control

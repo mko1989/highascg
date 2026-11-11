@@ -77,6 +77,21 @@ describe('WO-1035 PixelHue layer read', () => {
 		// the same rectangle as a look-layer fill (fractions of the 3072x1024 screen)
 		assert.deepEqual(pip.fill, { x: 0.651042, y: 0.097656, scaleX: 0.260417, scaleY: 0.439453 })
 		assert.deepEqual(s.layers[0].fill, { x: 0, y: 0, scaleX: 1, scaleY: 1 })
+		assert.deepEqual([s.x, s.y, s.pgmLocked], [0, 0, false])
+	})
+
+	it('as pixelhue-studio: a screen origin makes layers screen-relative; Cut & Fill fill is a normal layer; sources list', () => {
+		const { normalize, normalizeSources } = require('../../src/pixelhue/pixelhue-read')
+		const screens = { data: { list: [{ screenId: 1, enable: 1, pgmEdit: 0, screenIdObj: { type: 2 }, general: { name: 'Wall' }, mosaic: { window: { x: 4000, y: 100, width: 2000, height: 1000 } } }] } }
+		const mk = (type, win) => ({ ...layer(1, 2, 1, 'L', win, 'In'), layerIdObj: { attachScreenId: 1, sceneType: 2, type } })
+		const out = normalize(screens, { data: { list: [mk(256, { x: 4500, y: 350, width: 500, height: 250 }), mk(128, { x: 4000, y: 100, width: 64, height: 64 })] } })[0]
+		assert.deepEqual([out.x, out.y, out.pgmLocked], [4000, 100, true])
+		const fillLayer = out.layers.find((l) => l.cutFill)
+		assert.deepEqual([fillLayer.type, fillLayer.x, fillLayer.y, fillLayer.fill], ['normal', 500, 250, { x: 0.25, y: 0.25, scaleX: 0.25, scaleY: 0.25 }])
+		assert.equal(out.layers.find((l) => !l.cutFill).type, 'cut')
+		const iface = (id, state, extra = {}) => ({ interfaceId: id, state, general: { name: `Input ${id}` }, auxiliaryInfo: { online: 1, connectorInfo: { interfaceType: 2, type: 8, workMode: 0, ...extra } } })
+		const src = normalizeSources({ data: { list: [iface(5, 0), iface(9, 1), iface(7, 1, { workMode: 2 }), iface(3, 1, { interfaceType: 3 })] } }, screens)
+		assert.deepEqual(src.map((x) => [x.id, x.type, x.name, x.connected]), [[9, 2, 'Input 9', true], [5, 2, 'Input 5', false], [1, 3, 'Wall PGM', true], [1, 4, 'Wall PVW', true]])
 	})
 
 	it('reads inside the cache window share one round trip; a switcher restart re-authenticates once', async () => {

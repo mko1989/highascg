@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-577 routes.
+578 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -293,6 +293,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/pixelhue/config` | registry | `src/api/routes-pixelhue.js` |
 | POST | `/api/pixelhue/config` | registry | `src/api/routes-pixelhue.js` |
 | GET | `/api/pixelhue/layers` | registry | `src/api/routes-pixelhue.js` |
+| GET | `/api/pixelhue/sources` | registry | `src/api/routes-pixelhue.js` |
 | POST | `/api/playlist/control` | registry | `src/api/router.js`, `src/api/routes-playlist.js` |
 | POST | `/api/playlist/edit` | registry | `src/api/router.js` |
 | POST | `/api/playlist/edit/next` | registry | `src/api/router.js` |

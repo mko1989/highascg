@@ -22,7 +22,9 @@ const CACHE_MS = 200
 const TIMEOUT_MS = 4000
 
 const SCENE = { 2: 'pgm', 4: 'pvw' }
-const LAYER_TYPE = { 2: 'normal', 4: 'aux', 8: 'mvr', 16: 'bkg', 32: 'logo' }
+// As pixelhue-studio's programmingLayers: 256 is the fill layer of a Cut & Fill pair — a normal, editable layer —
+// and 128 its linked cut layer, which follows the fill and is not programmed by itself.
+const LAYER_TYPE = { 2: 'normal', 4: 'aux', 8: 'mvr', 16: 'bkg', 32: 'logo', 128: 'cut', 256: 'normal' }
 
 const b64url = (buf) => Buffer.from(buf).toString('base64url')
 
@@ -93,6 +95,7 @@ function normalizeLayer(l) {
 		source: String(l?.source?.general?.sourceName || ''),
 		sourceType: l?.source?.general?.sourceType ?? null,
 		sourceId: l?.source?.general?.sourceId ?? null,
+		cutFill: o.type === 256,
 	}
 }
 
@@ -105,21 +108,47 @@ function withFill(l, sw, sh) {
 	return { ...l, fill: { x: r6(l.x / sw), y: r6(l.y / sh), scaleX: r6(l.width / sw), scaleY: r6(l.height / sh) } }
 }
 
+/** What a layer can show, as pixelhue-studio lists it: the inputs (interface type 2, not in backup work mode), with
+ * live ones first, then every screen's PGM (source type 3) and PVW (4). */
+function normalizeSources(interfacesRes, screensRes) {
+	const inputs = listOf(interfacesRes)
+		.filter((i) => i?.auxiliaryInfo?.connectorInfo?.interfaceType === 2 && i.auxiliaryInfo.connectorInfo.workMode !== 2)
+		.map((i) => ({
+			id: i.interfaceId,
+			type: 2,
+			connectorType: i.auxiliaryInfo.connectorInfo.type,
+			name: String(i?.general?.name || `Input ${i.interfaceId}`),
+			connected: i?.auxiliaryInfo?.online !== 0 && [1, 2, 3, 4, 7].includes(i?.state),
+		}))
+		.sort((a, b) => Number(b.connected) - Number(a.connected) || a.id - b.id)
+	const screens = listOf(screensRes)
+		.filter((s) => [2, 4].includes(s?.screenIdObj?.type) && s?.enable !== 0)
+		.flatMap((s) => [3, 4].map((type) => ({ id: s.screenId, type, name: `${String(s?.general?.name || `Screen ${s.screenId}`).trim()} ${type === 3 ? 'PGM' : 'PVW'}`, connected: true })))
+	return [...inputs, ...screens]
+}
+
 /** Screens with their layers, bottom layer first. */
 function normalize(screensRes, layersRes) {
 	const layers = listOf(layersRes).map(normalizeLayer)
 	return listOf(screensRes).map((s) => {
 		const win = s?.mosaic?.window || {}
+		// the switcher's layer coordinates are global; a screen's own origin (mosaic window) makes them screen-relative,
+		// as in pixelhue-studio (programmingLayers / geometry): local = global − screen origin
+		const ox = int(win.x)
+		const oy = int(win.y)
 		return {
 			screenId: s?.screenId,
 			name: String(s?.general?.name || '').trim(),
 			enabled: s?.enable === 1,
+			pgmLocked: s?.pgmEdit === 0,
+			x: ox,
+			y: oy,
 			width: int(win.width),
 			height: int(win.height),
 			layers: layers
 				.filter((l) => l.screenId === s?.screenId)
 				.sort((a, b) => a.zorder - b.zorder)
-				.map((l) => withFill(l, int(win.width), int(win.height))),
+				.map((l) => withFill({ ...l, x: l.x - ox, y: l.y - oy }, int(win.width), int(win.height))),
 		}
 	})
 }
@@ -172,6 +201,13 @@ function createPixelhueReader(host, deps = {}) {
 		return pending
 	}
 
+	/** Inputs and screen buses a layer can show (the layer inspector's PixelHue source list). */
+	async function sources() {
+		const interfaces = await authed('/unico/v1/interface/list-detail')
+		const screens = await authed('/unico/v1/screen/list-detail')
+		return normalizeSources(interfaces, screens)
+	}
+
 	/** The ONE write (pixelhue-look-drive.js): PUT a body to the switcher; the next read is fresh. */
 	async function put(path, body) {
 		const r = await authed(path, body)
@@ -179,7 +215,7 @@ function createPixelhueReader(host, deps = {}) {
 		return r
 	}
 
-	return { host, read, put }
+	return { host, read, sources, put }
 }
 
-module.exports = { makeToken, normalize, createPixelhueReader }
+module.exports = { makeToken, normalize, normalizeSources, createPixelhueReader }

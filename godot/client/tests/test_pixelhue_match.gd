@@ -41,6 +41,13 @@ func test_dragged_row_is_an_empty_placeholder_that_carries_the_rectangle() -> vo
 	var layer := {"pixelhue": M.link_of_source(linked)}
 	t.eq(M.drive_patch(layer, false).pixelhue.drive, false, "unticking keeps the link, stops the drive")
 	t.eq(M.link_of_layer({"source": {}}), {}, "an ordinary layer has no link")
+	# the source the switcher layer shows on take
+	var routed: Dictionary = M.source_patch(layer, {"id": 31, "type": 2, "name": "Input 7", "connectorType": 8, "connected": true}).pixelhue
+	t.eq(routed.source, {"id": 31, "type": 2, "name": "Input 7", "connectorType": 8}, "a picked source is kept on the link")
+	t.eq([M.source_label({"pixelhue": routed}), M.source_label(layer)], ["Input 7", "Leave the switcher's source"], "what the closed drop-down shows")
+	t.ok(not (M.source_patch({"pixelhue": routed}, {}).pixelhue as Dictionary).has("source"), "\"leave\" removes it")
+	var rows := M.source_choices({"sources": [{"id": 31, "type": 2, "name": "Input 7", "connected": true}, {"id": 5, "type": 2, "name": "Input 5", "connected": false}]})
+	t.eq(rows.map(func(r: Dictionary) -> String: return r.label), ["Leave the switcher's source", "Input 7", "Input 5  (no signal)"], "source rows")
 
 
 func test_status_line() -> void:
