@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-574 routes.
+577 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -290,6 +290,9 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/pip-overlay/remove` | handler | `src/api/routes-pip-overlay.js` |
 | GET | `/api/pip-overlay/templates` | handler | `src/api/routes-pip-overlay.js` |
 | POST | `/api/pip-overlay/update` | handler | `src/api/routes-pip-overlay.js` |
+| GET | `/api/pixelhue/config` | registry | `src/api/routes-pixelhue.js` |
+| POST | `/api/pixelhue/config` | registry | `src/api/routes-pixelhue.js` |
+| GET | `/api/pixelhue/layers` | registry | `src/api/routes-pixelhue.js` |
 | POST | `/api/playlist/control` | registry | `src/api/router.js`, `src/api/routes-playlist.js` |
 | POST | `/api/playlist/edit` | registry | `src/api/router.js` |
 | POST | `/api/playlist/edit/next` | registry | `src/api/router.js` |
@@ -627,6 +630,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-pgm-layer.js` | WO-803 — each program screen's main layer, for the Companion PGM readback button: GET /api/screens/pgm-layer. |
 | `src/api/routes-pip-overlay.js` | PIP overlay routes — apply, update, remove HTML-template overlays on PIP layers. |
 | `src/api/routes-pixel-map.js` | WO-807 — region-to-fixture-pixel mapping (src/fixtures/pixel-map-service.js, via ctx.fixtureService.pixelMap): GET  /api/fixtures/pixelmap         → { ok, mappi |
+| `src/api/routes-pixelhue.js` | routes-pixelhue.js — WO-1035: read-only PixelHue layer positions for overlays that follow switcher layers. |
 | `src/api/routes-playlist.js` | routes-playlist.js — Manual playlist advance API (WO-224). |
 | `src/api/routes-plugins.js` |  |
 | `src/api/routes-project-files.js` | WO-1009 — the open project's documents (src/media/project-files.js): GET    /api/project-files                 → { slug, files: [{ name, kind: mvr\|model\|pdf\| |
