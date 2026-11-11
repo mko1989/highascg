@@ -4,6 +4,8 @@ extends VBoxContainer
 ## Studio engine the server runs (studio_api.gd). Each sub-tab is one panel script in this folder: a Control with
 ## `func refresh() -> void` (called when its tab is shown and by the header's Refresh) and an optional
 ## `signal status(text: String)` shown in the header.
+## Launch argument `--pixelhue-tab=<sub-tab>` (Device, Inputs, …) opens the client on that sub-tab once the switcher
+## answers — for looking at a panel without touching the pointer.
 
 signal available_changed(on: bool)
 
@@ -89,6 +91,10 @@ func _poll() -> void:
 			_tabs.set_tab_hidden(i, cap != "" and caps.get(cap) != true)
 	if on != _available:
 		_available = on
+		if on and Config.args.has("pixelhue-tab"):  # launch argument --pixelhue-tab=<sub-tab title>, e.g. Programming
+			for i in _tabs.get_tab_count():
+				if _tabs.get_tab_control(i).name.to_lower() == str(Config.args["pixelhue-tab"]).to_lower():
+					_tabs.current_tab = i
 		available_changed.emit(on)
 		if on and is_visible_in_tree():
 			_refresh_current()

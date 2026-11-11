@@ -118,7 +118,10 @@ func _command(req: Dictionary) -> void:
 func _lbl(parent: Node, text: String, muted := false) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# a wrapping label in a row has no minimum width: it wrapped to one letter per line and made the row as tall as
+	# the word (seen on the glass, 11.11) — only free-standing lines wrap
+	if not (parent is HBoxContainer):
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if muted:
 		l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	parent.add_child(l)

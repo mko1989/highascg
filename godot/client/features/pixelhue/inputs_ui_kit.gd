@@ -9,8 +9,7 @@ const NF := preload("res://core/numeric_field.gd")
 static func option(options: Array, value: Variant, tip: String, on_pick: Callable) -> OptionButton:
 	var ob := OptionButton.new()
 	ob.tooltip_text = tip
-	ob.fit_to_longest_item = false
-	ob.clip_text = true
+	ob.fit_to_longest_item = true  # clipped to the column, the capacity read "D" and the scan "Progre" (glass, 11.11)
 	var chosen := 0
 	for i in options.size():
 		ob.add_item(str(options[i][1]), i)

@@ -1,7 +1,7 @@
 # WO-1039 — PixelHue main tab: the owner's PixelHue Studio as native panels
 
 **Area:** mapping, godot-client, devices-config
-**Status: IN PROGRESS (11.11 — engine, tab and all seven panels built and committed; verified by tests + headless boot + live reads of the P20; NOT yet seen on the glass and no panel write has been run against the switcher)**
+**Status: IN PROGRESS (11.11 — all seven panels built; live-tested on the owner's P20 and seen on the glass; open: the owner's own use, the left-out file features, the beacon finding)**
 
 Owner, 11.11: *"Add basically the whole pixelhue studio ui under pixelhue tab (when one connected) that will be after
 devices in the main tabs."*
@@ -90,3 +90,29 @@ Studio's discard-changes dialogs became "staged edits are kept + a Discard butto
   builder booted a headless client twice outside `run-client.sh` against the live server and the owner's `user://`
   (log rotated, `ui.cfg` re-saved; the server journal of that minute shows no compose or autosave line, the project
   files were untouched). Two test files carried the P20's serial number; replaced with a placeholder before any push.
+
+## Live test on the P20 (11.11, owner: "You can live test on the connected P20")
+
+Reversible writes, each body built by the panel's own model, read back, restored and read back again (headless
+`--script` harness with its own `XDG_DATA_HOME`, HTTP to `/api/pixelhue/studio/*` only; not kept in the repo):
+
+| Panel | Write | Result |
+|---|---|---|
+| Audio | mute one output channel | flipped, restored |
+| Device | identify beacon off | **refused: "The device did not retain the device settings"** — the request equals Studio's web UI (`{beacon: 0}` → `node/beacon {enable: 0}`); the P20 keeps reporting the beacon on. A device / Studio-engine matter, the panel shows Studio's sentence |
+| Screens | freeze AUX Screen 2 | flipped, restored |
+| Outputs | rename OUTPUT 1-1 | renamed, restored (no timing reset) |
+| Inputs | rename Input 12 (no signal) | renamed, restored |
+| MVR | move a window 2 px (`windows`) | moved, restored |
+| Programming | Layer 3 +6 px (`programming/geometry`); create a layer on Screen 1 PVW from Input 8, stacking, clear; PGM lock | all accepted and read back, restored |
+
+The real `programming_panel.gd` and `mvr_panel.gd` were then run against the switcher with a real HTTP client:
+Programming `refresh` (3 screens, 6 layers, 18 sources) → `drop` created a PVW layer → `command` stacking → `command`
+clear; MVR `refresh` (14 windows) → autosave `_flush` moved a window and put it back. 27 of 28 checks passed (the
+beacon). Not exercised live: Take / Cut, presets, capacity / timing / format changes, network, restart, reset.
+
+On the glass (the owner's client relaunched per sub-tab with the new `--pixelhue-tab=<name>` argument, screenshots of
+the operator screen): all seven sub-tabs render the P20's data. Fixed from what was seen: Screens' row labels wrapped
+one letter per line and stretched the rows (`screens_panel.gd` `_lbl`); Inputs' drop-downs were clipped to "D" /
+"Progre" (`inputs_ui_kit.gd`). Seen and left: with all three screens shown the Programming stage cells are small
+(they share one scale, as in Studio — hide screens with the chips).

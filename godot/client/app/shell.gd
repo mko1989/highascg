@@ -111,7 +111,10 @@ func _ready() -> void:
 	var pixelhue: Control = preload("res://features/pixelhue/pixelhue_tab.gd").new()  # WO-1039: after Devices, only while a switcher answers
 	pixelhue.name = "PixelHue"
 	tabs.add_child(pixelhue)
-	var ph_sync := func(on: bool) -> void: tabs.set_tab_hidden(tabs.get_tab_idx_from_control(pixelhue), not on)
+	var ph_sync := func(on: bool) -> void:
+		tabs.set_tab_hidden(tabs.get_tab_idx_from_control(pixelhue), not on)
+		if on and Config.args.has("pixelhue-tab"):  # --pixelhue-tab=MVR: open on that sub-tab once the switcher answers
+			show_tab(pixelhue)
 	pixelhue.available_changed.connect(ph_sync)
 	ph_sync.call_deferred(false)
 	var multiview := MultiviewTab.new()  # WO-600 M
