@@ -93,7 +93,7 @@ func _ready() -> void:
 		if not _selected().is_empty():
 			_structure(M.source_body(_screen_id, _selected_id, key), "Window source changed."))
 	_inspector.delete_requested.connect(_on_delete)
-	body.add_child(_inspector)
+	preload("res://features/pixelhue/inspector_dock.gd").dock(self, _inspector, body)  # the app's main Inspector
 	var bar := HBoxContainer.new()
 	_dirty = Label.new()
 	_dirty.size_flags_horizontal = Control.SIZE_EXPAND_FILL

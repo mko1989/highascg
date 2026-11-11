@@ -116,3 +116,12 @@ the operator screen): all seven sub-tabs render the P20's data. Fixed from what 
 one letter per line and stretched the rows (`screens_panel.gd` `_lbl`); Inputs' drop-downs were clipped to "D" /
 "Progre" (`inputs_ui_kit.gd`). Seen and left: with all three screens shown the Programming stage cells are small
 (they share one scale, as in Studio — hide screens with the chips).
+
+## Main Inspector (11.11, owner: "Use the main inspector for Pixelhue studio when in that tab")
+
+`features/pixelhue/inspector_dock.gd`: the Programming panel's Layer / Presets column and the MVR panel's Properties
+column are handed to the app's right-hand Inspector (`InspectorPanel.present`) while their sub-tab is on screen and
+released when it is not; without the app shell (unit tests) they stay a column of the panel. Seen on the glass on both
+sub-tabs (the stage and the MVR layout gained the width). Not checked: the release when leaving the tab (it follows
+`visibility_changed`; nothing was clicked). Device, Inputs, Outputs, Screens and Audio have no properties column.
+

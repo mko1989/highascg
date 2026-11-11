@@ -133,14 +133,9 @@ func _ready() -> void:
 	_tools = Tools.new()
 	_tools.host = self
 	center.add_child(_tools)
-	var insp_scroll := ScrollContainer.new()
-	insp_scroll.custom_minimum_size.x = 320
-	insp_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	right.add_child(insp_scroll)
 	_inspector = Inspector.new()
 	_inspector.host = self
-	_inspector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	insp_scroll.add_child(_inspector)
+	preload("res://features/pixelhue/inspector_dock.gd").dock(self, _inspector, right, 320)  # the app's main Inspector
 	_work.visible = false
 	shown = Bands.saved_shown(CFG)
 	var t := Timer.new()
