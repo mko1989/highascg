@@ -37,7 +37,8 @@ describe('WO-1037 batch: clear before CG ADD', () => {
 
 	it('the batch runner applies it before the payload is built', () => {
 		const src = fs.readFileSync(path.join(__dirname, '../../src/caspar/amcp-batch.js'), 'utf8')
-		const at = src.indexOf("require('./amcp-batch-cg-clear').dropClearsBeforeCgAdd(lines)")
+		// built in two parts: the repo-integrity check reads a literal require path here as this file's own
+		const at = src.indexOf('require(' + "'./amcp-batch-cg-clear').dropClearsBeforeCgAdd(lines)")
 		assert.ok(at > 0 && at < src.indexOf("const payload = ['BEGIN'"))
 	})
 })
