@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-941 live WOs (33 open, 130 in progress, 778 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+942 live WOs (34 open, 130 in progress, 778 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -209,7 +209,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 867 DONE [amcp+os-iso] Caspar build: CasparCG/server#1762 effects (BLUR / SHARPEN / GRAIN) brought up… → 867_WO_caspar_pr1762_effects_fixes.md
 - 943 DONE [amcp+mapping] "APPLY 1-65535 SLICES CLEAR … 403 APPLY FAILED" logged as an error on every Cas… → 943_WO_caps_probe_apply_noise_without_gpu_mapping.md
 
-## caspar-build — CasparCG server build and binaries (19)
+## caspar-build — CasparCG server build and binaries (20)
 
 - 233 DONE [caspar-build] Caspar rebuild research: CasparCG_Enhanced base + improved-artnet + live-events… → 233_WO_CASPAR_REBUILD_RESEARCH.md
 - 234 DONE [caspar-build] Assemble + build the final (for now) CasparCG for highascg → 234_WO_CASPAR_FINAL_BUILD.md
@@ -230,6 +230,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 993 DONE [caspar-build+engine] Native DXV (Resolume DXV2 / DXV3) in Caspar: CPU unpack, GPU block decode, corr… → 993_WO_caspar_native_dxv_gpu_decode.md
 - 1020 IN PROGRESS [caspar-build+devices-config] Caspar fork: add/remove channels and video modes at runtime (dynamic config res… → 1020_WO_caspar_dynamic_channels_video_modes_runtime_config.md
 - 1022 IN PROGRESS [caspar-build+os-iso] Server releases carry the hand-built Caspar (and point at its complete source) → 1022_WO_releases_carry_hand_built_caspar.md
+- 1033 OPEN [caspar-build+video-io,engine] Zero-copy GPU frames in the Caspar build: future work for headroom → 1033_WO_zero_copy_gpu_frames_future_work.md
 
 ## audio — Audio routing, devices, meters (48)
 
