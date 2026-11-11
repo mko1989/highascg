@@ -13,8 +13,13 @@ static func read(api: Variant, resource: String, query := "") -> Dictionary:
 	return shape(await api.get_json(BASE + resource + ("?" + query if query != "" else "")))
 
 
+## A write waits as long as Studio itself does: a layer create or a self-test can take over a minute on the switcher
+## (the server's bridge allows 90 s), far past the client's ordinary request timeout.
+const WRITE_TIMEOUT_S := 95.0
+
+
 static func write(api: Variant, resource: String, body: Dictionary) -> Dictionary:
-	return shape(await api.post_json(BASE + resource, body))
+	return shape(await api.post_json(BASE + resource, body, WRITE_TIMEOUT_S))
 
 
 ## Api's answer → {ok, data, error}. Studio's errors are `{ "error": "…" }` with a 4xx/5xx status.
