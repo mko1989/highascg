@@ -1,0 +1,9 @@
+{
+  "name": "pixelhue-studio",
+  "version": "1.6.0-alpha.2",
+  "private": true,
+  "type": "module",
+  "description": "Fast local Pixelhue device, input, output, screen, programming and multiviewer client",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node server.js", "test": "node tools/ci/run-offline-tests.js", "check:size": "node tools/ci/check-max-file-lines.js", "build:client": "node tools/ci/check-client.js", "build:dist": "node scripts/build-dist.mjs", "verify:dist": "node scripts/verify-dist.mjs" }
+}

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#191919">
+  <title>Pixelhue Studio</title>
+  <link rel="preload" href="/fonts/Rewir-Light.woff" as="font" type="font/woff" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/inputs.css">
+  <link rel="stylesheet" href="/connection.css">
+  <link rel="stylesheet" href="/studio.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand">Pixelhue <small>Studio</small></div>
+    <nav class="studio-tabs" role="tablist" aria-label="Device tools">
+      <button id="device-tab" role="tab" aria-selected="true" aria-controls="device-panel">Device</button>
+      <button id="inputs-tab" role="tab" aria-selected="false" aria-controls="inputs-panel" tabindex="-1">Inputs</button>
+      <button id="outputs-tab" role="tab" aria-selected="false" aria-controls="outputs-panel" tabindex="-1">Outputs</button>
+      <button id="screens-tab" role="tab" aria-selected="false" aria-controls="screens-panel" tabindex="-1">Screens</button>
+      <button id="programming-tab" role="tab" aria-selected="false" aria-controls="programming-panel" tabindex="-1">Programming</button>
+      <button id="mvr-tab" role="tab" aria-selected="false" aria-controls="mvr-panel" tabindex="-1">MVR</button>
+      <button id="audio-tab" role="tab" aria-selected="false" aria-controls="audio-panel" tabindex="-1" hidden>Audio</button>
+    </nav>
+    <div class="connection-controls">
+      <form id="connect-form" class="connect-bar">
+        <label class="host-field"><span class="visually-hidden">Device address</span><input id="host" placeholder="Device IP" autocomplete="off" spellcheck="false" required></label>
+        <button id="connect" class="button primary" type="submit">Connect</button>
+        <button id="find-devices" class="button secondary" type="button">Find</button>
+        <details class="advanced"><summary title="Connection options" aria-label="Connection options">⋯</summary><div class="advanced-fields">
+          <label>API port <input id="api-port" type="number" min="1" max="65535" placeholder="Auto-discover"></label>
+          <label>Device serial <input id="serial" placeholder="Optional override" autocomplete="off"></label>
+          <p>Leave the port empty to discover via HTTPS :19998.</p>
+        </div></details>
+      </form>
+      <div class="connection-state"><span class="dot" id="connection-dot"></span><span id="connection-label">Not connected</span></div>
+    </div>
+  </header>
+
+  <div id="notice" role="status" aria-live="polite">Find a Pixelhue device or enter its address.</div>
+
+  <section id="device-panel" class="tool-panel" role="tabpanel" aria-labelledby="device-tab">
+    <section class="discovery-section"><div class="tool-heading"><h1>Devices</h1><button id="scan-lan" class="button secondary">Scan LAN</button></div><p id="discovery-status" class="muted">Finding devices…</p><div id="discovered-devices" class="discovered-devices"></div></section>
+    <section id="device-settings"><p class="muted">Connect a device to load its setup.</p></section>
+  </section>
+  <section id="outputs-panel" class="tool-panel" role="tabpanel" aria-labelledby="outputs-tab" hidden><div id="outputs-content"></div></section>
+  <section id="screens-panel" class="tool-panel" role="tabpanel" aria-labelledby="screens-tab" hidden><div id="screens-content"></div></section>
+  <section id="programming-panel" class="tool-panel" role="tabpanel" aria-labelledby="programming-tab" hidden><div id="programming-content"></div></section>
+  <section id="audio-panel" class="tool-panel" role="tabpanel" aria-labelledby="audio-tab" hidden><div id="audio-content"></div></section>
+
+  <div id="mvr-panel" role="tabpanel" aria-labelledby="mvr-tab" hidden>
+  <main class="workspace">
+    <aside class="panel windows-panel">
+      <div class="panel-heading"><h1>Windows</h1><span id="window-count" class="count">0</span></div>
+      <label class="output-label" for="screen">MVR output</label>
+      <select id="screen" disabled><option>Choose a connection</option></select>
+      <div id="window-list" class="window-list"><p class="empty-hint">No connection.</p></div>
+      <div class="mvr-add"><h2>Add to MVR</h2><p class="empty-hint">Drag onto the layout, or double-click to place. Drop on a window to swap its source.</p><div id="mvr-sources" class="mvr-source-list"></div></div>
+    </aside>
+
+    <section class="canvas-panel" aria-label="Layout editor">
+      <div class="canvas-toolbar">
+        <div class="canvas-title">Layout <span id="resolution">—</span></div>
+        <div class="toolbar-actions">
+          <select id="mvr-template" aria-label="Device MVR layouts" hidden></select>
+          <button id="fix-aspect" class="button secondary" title="Fit input and PGM/PVW screen content to its source ratio, accounting for UMD and avoiding overlaps" disabled>Fix aspect ratios</button>
+          <button id="undo" class="button quiet" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled>Undo</button>
+          <button id="redo" class="button quiet" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled>Redo</button>
+          <span class="toolbar-separator"></span>
+          <label class="snap-label">Snap <select id="snap"><option value="1">Off</option><option value="8">8 px</option><option value="16">16 px</option><option value="32">32 px</option></select></label>
+        </div>
+      </div>
+      <div class="canvas-surround">
+        <div class="canvas-meta"><span>Layout preview</span><span id="preview-mode">Positions in pixels</span></div>
+        <div id="stage" class="stage" tabindex="0" aria-label="MVR canvas. Select a window and use arrow keys to move it. Shift moves by 10 pixels.">
+          <div class="welcome"><p>Connect to a P20 or Q8 to load its MVR layout.</p></div>
+        </div>
+        <div class="canvas-meta canvas-meta-bottom"><span id="canvas-origin">X 0 / Y 0</span><span id="canvas-end">—</span></div>
+      </div>
+      <div class="canvas-footer"><span><kbd>↑ ↓ ← →</kbd> Move <span class="footer-divider">·</span> <kbd>Shift</kbd> 10 px</span><span>Drag to move · Corner handles to resize</span></div>
+    </section>
+
+    <aside class="panel inspector-panel">
+      <div class="panel-heading"><h2>Properties</h2></div>
+      <div id="inspector-empty" class="empty-hint">Select a window to adjust its position and size.</div>
+      <fieldset id="inspector" disabled hidden>
+        <div class="selected-heading"><span id="selected-swatch" class="swatch"></span><div><strong id="selected-name"></strong><small id="selected-source"></small></div></div>
+        <div class="property-section"><h3>Position <span>px</span></h3><div class="field-grid">
+          <label>X <input id="x" type="number" min="0" step="1"></label><label>Y <input id="y" type="number" min="0" step="1"></label>
+        </div></div>
+        <div class="property-section"><h3>Size <span>px</span></h3><div class="field-grid">
+          <label>Width <input id="width" type="number" min="64" step="1"></label><label>Height <input id="height" type="number" min="64" step="1"></label>
+        </div><label class="checkbox-label"><input id="aspect" type="checkbox"> Keep aspect ratio</label><small id="aspect-info" class="input-slot"></small></div>
+        <div class="property-section"><h3>Align to output</h3><div class="align-buttons">
+          <button id="center-x" class="button secondary" title="Center horizontally">Center X</button>
+          <button id="center-y" class="button secondary" title="Center vertically">Center Y</button>
+        </div></div>
+        <div class="property-section"><h3>Source</h3><select id="mvr-source" aria-label="MVR window source"></select>
+          <button id="delete-window" class="button danger" type="button">Delete window</button></div>
+        <p id="layer-id" class="layer-id"></p>
+      </fieldset>
+    </aside>
+  </main>
+
+  <footer class="action-bar">
+    <div class="layout-files"><button id="save" class="button secondary" disabled>Save layout</button><button id="load" class="button secondary" disabled>Load layout</button><input id="layout-file" type="file" accept="application/json,.json" hidden></div>
+    <div class="apply-actions"><span id="dirty-label" aria-live="polite">Changes save automatically</span><button id="refresh" class="button secondary" disabled>Refresh</button><button id="apply" class="button primary" disabled hidden>Retry save</button></div>
+  </footer>
+  </div>
+
+  <section id="inputs-panel" role="tabpanel" aria-labelledby="inputs-tab" hidden>
+    <div class="inputs-heading"><h1>Inputs</h1><span id="inputs-count" class="count">Not connected</span></div>
+    <div class="input-bulk">
+      <label class="checkbox-label"><input id="input-select-all" type="checkbox" disabled> Select all</label>
+      <label>Port choice <select id="bulk-port" aria-label="Bulk port choice"><option value="">Keep port</option><option value="hdmi">HDMI</option><option value="dp">DisplayPort</option></select></label>
+      <label>Capacity <select id="bulk-capacity" aria-label="Bulk capacity"><option value="">Keep capacity</option></select></label>
+      <label>EDID <select id="bulk-edid" aria-label="Bulk EDID"><option value="">Keep EDID</option><option value="1920,1080,60">1080p60</option><option value="1920,1080,50">1080p50</option><option value="3840,2160,30">2160p30</option><option value="3840,2160,60">2160p60</option></select></label>
+      <label class="bulk-name-field">Name pattern <input id="bulk-name" placeholder="e.g. Camera {n}" maxlength="32"></label>
+      <button id="fill-inputs" class="button secondary" disabled>Fill selected</button>
+    </div>
+    <div class="input-table-wrap"><table class="input-table"><thead><tr><th scope="col">Input</th><th scope="col">Port</th><th scope="col">Capacity</th><th scope="col">Source name</th><th scope="col">EDID resolution</th><th scope="col">Hz</th><th scope="col">Timing standard</th></tr></thead><tbody id="input-rows"><tr><td colspan="7" class="inputs-empty">Connect to a device to load its inputs.</td></tr></tbody></table></div>
+    <p id="input-help" class="input-help">Connect a P10, P20, P80 or Q8 to load its input configuration.</p>
+    <footer class="action-bar inputs-actions"><span id="inputs-dirty-label">No pending input changes</span><div class="apply-actions"><button id="refresh-inputs" class="button secondary" disabled>Refresh inputs</button><button id="apply-inputs" class="button primary" disabled>Apply inputs</button></div></footer>
+  </section>
+</body>
+</html>

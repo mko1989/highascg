@@ -335,4 +335,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1036-presenter-camera-capture.test.js',
 	'tools/smoke/smoke-wo1037-batch-clear-before-cg-add.test.js',
 	'tools/smoke/smoke-wo1038-pixelhue-look-drive.test.js',
+	'tools/smoke/smoke-wo1039-pixelhue-studio-bridge.test.js',
 ]

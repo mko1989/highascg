@@ -108,6 +108,12 @@ func _ready() -> void:
 	audio.inspect_destination.connect(func(id: String) -> void:  # WO-604: a live-audio strip → its host-channel page
 		show_tab(devices)
 		devices.inspect_destination(id))
+	var pixelhue: Control = preload("res://features/pixelhue/pixelhue_tab.gd").new()  # WO-1039: after Devices, only while a switcher answers
+	pixelhue.name = "PixelHue"
+	tabs.add_child(pixelhue)
+	var ph_sync := func(on: bool) -> void: tabs.set_tab_hidden(tabs.get_tab_idx_from_control(pixelhue), not on)
+	pixelhue.available_changed.connect(ph_sync)
+	ph_sync.call_deferred(false)
 	var multiview := MultiviewTab.new()  # WO-600 M
 	multiview.name = "Multiview"
 	tabs.add_child(multiview)

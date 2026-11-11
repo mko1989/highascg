@@ -1,0 +1,32 @@
+/* Compact single-row chrome: brand, tabs and connection share one bar (WO-015). */
+.masthead { display: flex; align-items: center; gap: 6px 18px; padding: 0 12px; min-height: 42px; border-bottom: 1px solid var(--border); }
+.brand { font-size: 15px; gap: 5px; color: var(--text); }
+.brand small { font-size: 12px; }
+.masthead .studio-tabs { flex: 1 1 auto; min-width: 0; margin: 0; gap: 16px; border-bottom: 0; align-self: stretch; }
+.masthead .studio-tabs button { padding: 0 1px; font-size: 14px; border-bottom-width: 2px; }
+.studio-tabs button:disabled { opacity: .45; cursor: default; }
+.connection-controls { display: flex; align-items: center; gap: 12px; min-width: 0; margin-left: auto; }
+.connect-bar { align-items: center; gap: 6px; }
+.host-field { width: 150px; }
+.masthead input, .masthead .button { min-height: 28px; padding-top: 3px; padding-bottom: 3px; font-size: 13px; }
+.advanced { margin: 0; }
+.advanced summary { list-style: none; padding: 2px 6px; font-size: 16px; line-height: 1; }
+.advanced summary::-webkit-details-marker { display: none; }
+.advanced-fields { top: 30px; }
+.masthead .connection-state { max-width: 260px; font-size: 12px; white-space: nowrap; }
+.masthead .connection-state span:last-child { overflow: hidden; text-overflow: ellipsis; }
+#notice { margin: 4px 12px; padding: 3px 8px; min-height: 0; font-size: 13px; }
+#notice:empty { display: none; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 1100px) {
+  .masthead { flex-wrap: wrap; padding: 4px 12px; }
+  .masthead .studio-tabs { order: 3; flex-basis: 100%; min-height: 34px; }
+}
+@media (max-width: 600px) {
+  .connection-controls { flex-wrap: wrap; gap: 6px; }
+  .host-field { flex: 1; width: auto; min-width: 120px; }
+  .masthead .connection-state { max-width: 100%; }
+}
+@media (max-width: 450px) {
+  .advanced-fields { left: auto; right: 0; max-width: calc(100vw - 26px); }
+}

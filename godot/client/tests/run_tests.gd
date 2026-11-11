@@ -31,7 +31,8 @@ func _init() -> void:
 	var dir := DirAccess.open("res://tests")
 	var files := PackedStringArray()
 	for f in dir.get_files():
-		if f.begins_with("test_") and f.ends_with(".gd"):
+		# HIGHASCG_TEST_ONLY=test_pixelhue runs only the suites whose file name starts with that (a quick loop on one area)
+		if f.begins_with("test_") and f.ends_with(".gd") and f.begins_with(OS.get_environment("HIGHASCG_TEST_ONLY")):
 			files.append(f)
 	files.sort()
 	for f in files:

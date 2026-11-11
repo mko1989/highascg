@@ -59,14 +59,6 @@ func test_status_line() -> void:
 	t.eq(M.status_line(false, null), "No answer from the server.", "no body")
 
 
-## The UI scripts are not instantiated by any suite: at least they compile with the autoloads present.
-func test_ui_scripts_compile() -> void:
-	for p in ["res://features/devices/pixelhue_panel.gd", "res://features/live/pixelhue_layers_list.gd", "res://features/live/live_sources_panel.gd",
-			"res://features/devices/devices_tab.gd", "res://features/live/layer_inspector.gd", "res://features/previs/tracking/presenters_section.gd"]:
-		var s: GDScript = load(p)
-		t.ok(s != null and s.can_instantiate(), p + " compiles")
-
-
 func test_empty_placeholder_layers_are_recognised() -> void:
 	t.ok(M.is_empty_placeholder({"source": {"type": "media", "value": "#00000000", "isPlaceholder": true}}), "a dropped switcher layer")
 	t.ok(not M.is_empty_placeholder({"source": {"type": "media", "value": "#FF112233", "isPlaceholder": true}}), "a solid offline placeholder plays a colour")

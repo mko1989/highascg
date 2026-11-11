@@ -5,7 +5,7 @@ extends RefCounted
 
 ## Owner 31.10: "live, timeline, visuals, previs, audio, devices settings" — Multiview stays in the main window.
 const MOVABLE := ["Live", "Timeline", "Visuals", "Previs", "Audio", "Devices", "Settings"]
-const ORDER := ["Live", "Timeline", "Visuals", "Previs", "Audio", "Devices", "Multiview", "Settings"]  # shell.gd order
+const ORDER := ["Live", "Timeline", "Visuals", "Previs", "Audio", "Devices", "PixelHue", "Multiview", "Settings"]  # shell.gd order
 const SECTION := "second_window"
 const MIN_RECT := Vector2i(480, 320)
 
