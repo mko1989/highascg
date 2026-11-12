@@ -160,14 +160,33 @@ static func slice_of(project: Variant) -> Dictionary:
 	var o: Dictionary = d.get("output") if d.get("output") is Dictionary else {}
 	var layers: Array = Layers.normalize(d.layers) if d.get("layers") is Array else Layers.migrate(d)
 	var c := Layers.compat(layers)
-	return {"graph": normalize_graph(d.get("graph")), "params": params_of(d.get("params")),
-		"output": {"screen": maxi(0, int(_num(o.get("screen")))), "layer": clampi(int(_num(o.get("layer", 1))), 1, 9999),
-			"size": clampi(int(_num(o.get("size"))), 0, SIZE_SCREEN), "ring": o.get("ring") is bool and o.ring},
+	var out := {"screen": maxi(0, int(_num(o.get("screen")))), "layer": clampi(int(_num(o.get("layer", 1))), 1, 9999),
+		"size": clampi(int(_num(o.get("size"))), 0, SIZE_SCREEN), "ring": o.get("ring") is bool and o.ring}
+	if not solo_of(o.get("solo")).is_empty():  # WO-1051: stored only when used (an older show stays byte-identical)
+		out.solo = solo_of(o.get("solo"))
+	return {"graph": normalize_graph(d.get("graph")), "params": params_of(d.get("params")), "output": out,
 		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0), "layers": layers, "scene": c.scene, "overlay": c.overlay,
 		"shader": c.shader, "game": c.game, "fade": clampf(_num(d.get("fade", 1.0)), 0.0, 10.0),
 		"playlists": d.get("playlists") if d.get("playlists") is Array else [],  # WO-895: raw, like looks (visuals_playlist.gd normalize)
 		"dj": d.get("dj") if d.get("dj") is Dictionary else {},  # WO-908: raw, visuals_dj.gd normalizes
 		"looks": d.get("looks") if d.get("looks") is Array else [], "auto": Auto.cfg_of(d.get("auto")), "camera": Cam.normalize(d.get("camera"))}
+
+
+## WO-1051: `output.solo` — the 1-based layer-stack positions that each play as their own shm ring (solo_ring) while the
+## canvas is a Live source: unique, sorted, 1..Layers.MAX; anything else is dropped. Absent / empty = every layer in the canvas.
+static func solo_of(v: Variant) -> Array:
+	var out := []
+	for x in (v if v is Array else []):
+		var n := int(_num(x)) if (x is float or x is int or x is String) else 0
+		if n >= 1 and n <= Layers.MAX and not n in out and float(_num(x)) == float(n):
+			out.append(n)
+	out.sort()
+	return out
+
+
+## WO-1051: the ring of solo position `n` — `visuals-L4` (dev `--visuals-ring=<r>` → `<r>-L4`).
+static func solo_ring(ring: String, n: int) -> String:
+	return "%s-L%d" % [ring, n]
 
 
 ## WO-890: `slice` (changed in place, and returned) with the layer stack `layers` and the fields derived from it.

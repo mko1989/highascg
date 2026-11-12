@@ -54,6 +54,7 @@ var show_ctl: ShowCtl  # WO-877/878: looks, autopilot, master, show keys
 var cam_ctl: CamCtl  # WO-896: the 3D view's orbit → the output camera ("Drive output"), saved per look
 var midi: Node  # WO-900: visuals_midi.gd
 var dj: Dj  # WO-908: A/B banks (the PRV view and the bar under the canvas)
+var solo: Node  # WO-1051: visuals_solo.gd — stack positions as their own rings (Sources ▸ Live)
 
 
 func _ready() -> void:
@@ -85,7 +86,7 @@ func _ready() -> void:
 		slice.params = M.params_of(p)
 		_store())
 	page.output_changed.connect(func(o: Dictionary) -> void:
-		slice.output = o
+		slice.output = solo.keep(slice.output, o)
 		_resize()
 		_store())
 	page.send_toggled.connect(func(on: bool) -> void: send(on))
@@ -132,6 +133,7 @@ func _ready() -> void:
 	add_child(publisher)
 	if _g("Config") and _g("Config").args.has("visuals-ring"):
 		ring_name = str(_g("Config").args["visuals-ring"])
+	solo = preload("res://features/visuals/visuals_solo.gd").new(self)
 	if _g("Ws"):
 		_g("Ws").on("change", func(d: Variant) -> void: Air.show_cleared(self, d))  # WO-919 F11
 		_g("Ws").on("audio_fft", func(d: Variant) -> void:
@@ -417,6 +419,7 @@ func _sync_ring() -> String:
 			why = publisher.start(out_vp, ring_name, _fps())
 	elif not want and publisher.sink != null:
 		publisher.stop()
+	solo.sync()
 	_on_shown()
 	return why if slice.output.get("ring") == true else ""
 

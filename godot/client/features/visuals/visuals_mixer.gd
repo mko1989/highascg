@@ -7,6 +7,9 @@ extends Node
 ## WO-908: `dj` — A/B banks (visuals_dj.gd): both decks stay on stage, `x` is the crossfader (moved by hand, MIDI, or AUTO /
 ## CUT towards the other side over `fade_s`), `live` is the bank being edited (on air or in PRV) and every stack edit or look
 ## goes into it in place — faded when it is on the canvas, cut when it is not.
+## WO-1051: `solo_out[n]` per solo position — the two decks' `solo[n]` (visuals_deck.gd) mixed with the same crossfader, master
+## and strobe, kept premultiplied (MIX2, from WO-1049): blackout is transparent there, not black. Made and freed with
+## set_solo(); visuals_solo.gd publishes each as its own ring.
 
 const Deck := preload("res://features/visuals/visuals_deck.gd")
 const MIX := """shader_type canvas_item;
@@ -19,6 +22,20 @@ void fragment() {
 	// strobe: the whole mixed picture towards white, above every layer of both decks; the master (blackout) still wins
 	vec3 c = mix(texture(a, UV).rgb, texture(b, UV).rgb, x);
 	COLOR = vec4(mix(c, vec3(1.0), strobe) * master, 1.0);
+}
+"""
+## WO-1051 (WO-1049's MIX2): premultiplied in, premultiplied out (blend_premul_alpha over the transparent viewport: no second
+## multiply by alpha). The strobe whitens what is there, keeping its coverage; master 0 is fully transparent.
+const MIX2 := """shader_type canvas_item;
+render_mode blend_premul_alpha;
+uniform sampler2D a : filter_nearest;
+uniform sampler2D b : filter_nearest;
+uniform float x = 0.0;
+uniform float master = 1.0;
+uniform float strobe = 0.0;
+void fragment() {
+	vec4 c = mix(texture(a, UV), texture(b, UV), x);
+	COLOR = vec4(mix(c.rgb, vec3(c.a), strobe), c.a) * master;
 }
 """
 const BLACKOUT_S := 0.4
@@ -39,6 +56,9 @@ var dj := false
 var goal := -1.0  # WO-908: where AUTO is moving `x` (0 or 1); -1 = still
 var _mat: ShaderMaterial
 var _rect: ColorRect
+var solo_out := {}  # WO-1051: solo position → its mixed SubViewport (transparent, premultiplied)
+var _solo_mats := {}  # position → its MIX2 material
+static var _mix2: Shader
 
 
 func _init() -> void:
@@ -87,6 +107,9 @@ func weight(i: int) -> float:
 func resize(size: Vector2i) -> void:
 	out_vp.size = size
 	_rect.size = Vector2(size)
+	for n in solo_out:
+		solo_out[n].size = size
+		solo_out[n].get_child(0).size = Vector2(size)
 	for d in decks:
 		d.resize(size)
 
@@ -140,7 +163,7 @@ func set_dj(on: bool, edit := 0, at := 0.0) -> void:
 func set_x(v: float) -> void:
 	x = clampf(v, 0.0, 1.0)
 	goal = -1.0
-	_mat.set_shader_parameter("x", x)
+	_param("x", x)
 
 
 ## WO-908: AUTO — the crossfader to the other side over `fade_s`; `cut` (or fade 0) jumps there.
@@ -152,7 +175,7 @@ func take(cut := false) -> void:
 	if cut or fade_s <= 0.0:
 		x = goal
 		goal = -1.0
-	_mat.set_shader_parameter("x", x)
+	_param("x", x)
 
 
 ## Stage audio goes to both decks (a fading-out spectrum keeps moving).
@@ -170,8 +193,8 @@ func step(delta: float) -> void:
 		if dj and x == goal:
 			goal = -1.0
 	master = move_toward(master, 0.0 if blackout else level, delta / BLACKOUT_S)
-	_mat.set_shader_parameter("x", x)
-	_mat.set_shader_parameter("master", master)
+	_param("x", x)
+	_param("master", master)
 	set_strobe(float(deck().params.get("strobe", 0.0)))
 	for d in decks:
 		d.step(delta)
@@ -182,7 +205,52 @@ func step(delta: float) -> void:
 ## WO-1011 strobe: 0..1 white over the whole canvas (the final composite, so the output ring gets it too).
 func set_strobe(v: float) -> void:
 	strobe = clampf(v, 0.0, 1.0)
-	_mat.set_shader_parameter("strobe", strobe)
+	_param("strobe", strobe)
+
+
+## WO-1051: solo positions `route` draw into their own composites on both decks and get `solo_out[n]`; `keep` positions
+## keep an (empty, transparent) composite while their ring drains (visuals_solo.gd). The rest are freed.
+func set_solo(route: Array, keep: Array = []) -> void:
+	for d in decks:
+		d.set_solo(route, keep)
+	for n in route + keep:
+		if solo_out.has(n):
+			continue
+		var vp := SubViewport.new()
+		vp.disable_3d = true
+		vp.transparent_bg = true
+		vp.size = out_vp.size
+		add_child(vp)
+		if _mix2 == null:
+			_mix2 = Shader.new()
+			_mix2.code = MIX2
+		var mat := ShaderMaterial.new()
+		mat.shader = _mix2
+		mat.set_shader_parameter("a", decks[0].solo[n].get_texture())
+		mat.set_shader_parameter("b", decks[1].solo[n].get_texture())
+		for p in [["x", x], ["master", master], ["strobe", strobe]]:
+			mat.set_shader_parameter(p[0], p[1])
+		var r := ColorRect.new()
+		r.material = mat
+		r.size = Vector2(vp.size)
+		vp.add_child(r)
+		solo_out[n] = vp
+		_solo_mats[n] = mat
+	for n in solo_out.keys():
+		if not n in route and not n in keep:
+			var vp: SubViewport = solo_out[n]
+			solo_out.erase(n)
+			_solo_mats.erase(n)
+			remove_child(vp)
+			vp.queue_free()
+	_apply()
+
+
+## One parameter on the canvas mix and every solo mix.
+func _param(param: String, v: float) -> void:
+	_mat.set_shader_parameter(param, v)
+	for n in _solo_mats:
+		_solo_mats[n].set_shader_parameter(param, v)
 
 
 func _apply() -> void:
@@ -192,4 +260,6 @@ func _apply() -> void:
 			decks[i].clear()
 		decks[i].set_running(shows)
 	out_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if running else SubViewport.UPDATE_DISABLED
-	_mat.set_shader_parameter("x", x)
+	for n in solo_out:  # WO-1051: published like the canvas (a dark position is a transparent picture, not a stale one)
+		solo_out[n].render_target_update_mode = SubViewport.UPDATE_ALWAYS if running else SubViewport.UPDATE_DISABLED
+	_param("x", x)

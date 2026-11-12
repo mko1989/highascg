@@ -6,6 +6,8 @@ extends VBoxContainer
 ## A Sources ▸ Visuals row dropped on a layer replaces that layer's picture (its fader, mute and blend kept); dropped
 ## anywhere else in the list it is a new layer on top. Clicking a row selects it (Shift-drops on the canvas and
 ## double-clicks in Sources replace the selected layer; the 3D view looks into it).
+## WO-1051: a muted `L<n>` badge on a layer whose stack position plays as its own ring (Sources ▸ Live, visuals_solo.gd) —
+## why that layer is missing from the canvas.
 
 const L := preload("res://features/visuals/visuals_layers.gd")
 const Catalog := preload("res://features/visuals/visuals_catalog.gd")
@@ -18,7 +20,8 @@ signal selected(i: int)
 
 var layers := []  # bottom → top, as in the slice
 var sel := -1  # the selected layer's index in `layers`
-var rows := []  # by layer index: {panel, name, slider, spin, eye, blend, up, down, del}
+var rows := []  # by layer index: {panel, name, solo, slider, spin, eye, blend, up, down, del}
+var solo := []  # WO-1051: the 1-based positions playing as their own rings (badged)
 var _box: VBoxContainer
 var _empty: Label
 var _note: Label
@@ -64,6 +67,13 @@ func set_layers(ls: Array, names := {}, errors := {}) -> void:
 func set_note(text: String) -> void:
 	_note.text = text
 	_note.visible = text != ""
+
+
+## WO-1051: the solo positions to badge.
+func set_solo(positions: Array) -> void:
+	if positions != solo:
+		solo = positions.duplicate()
+		_fill()
 
 
 func select(i: int) -> void:
@@ -116,6 +126,13 @@ func _row(i: int) -> Dictionary:
 	r.name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	r.name.mouse_filter = Control.MOUSE_FILTER_PASS
 	top.add_child(r.name)
+	r.solo = Label.new()  # WO-1051
+	r.solo.text = "L%d" % (i + 1)
+	r.solo.add_theme_font_size_override("font_size", 11)
+	r.solo.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+	r.solo.tooltip_text = "Plays as its own Live source (Sources ▸ Live ▸ visuals ▸ L%d), not in this canvas" % (i + 1)
+	r.solo.mouse_filter = Control.MOUSE_FILTER_PASS
+	top.add_child(r.solo)
 	r.blend = Button.new()
 	r.blend.text = "Add"
 	r.blend.toggle_mode = true
@@ -183,6 +200,7 @@ func _fill() -> void:
 		r.name.tooltip_text = "Layer %d — %s%s\nDrop a visual here to replace it · click to select" % [i + 1, L.describe(l, _names),
 			"\n" + str(_errors[i]) if _errors.has(i) else ""]
 		r.name.modulate = Color(1, 1, 1, 1.0 if on else 0.5)
+		r.solo.visible = (i + 1) in solo
 		r.blend.set_pressed_no_signal(l.get("blend", "normal") == "add")
 		var pct := roundf(float(l.get("opacity", 1.0)) * 100.0)
 		if r.slider.value != pct:

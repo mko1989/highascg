@@ -1,7 +1,7 @@
 # WO-1051 — Visuals layers as their own sources: pick a layer in Sources ▸ Live, stack it on look layers
 
 **Area:** godot-client, engine
-**Status: IN PROGRESS (13.11 — design contract; build delegated)**
+**Status: IN PROGRESS (13.11 — built; offline suite + compile boot green; on-air check pending)**
 
 Owner, 12.11: *"i also want to be able to select from live tab, with a expand, visuals layers routing, so i can play for
 instance first 2 layers on the bg output pgm1 and layers 4 5 on overlay channel pgm2."* Clarified 13.11, after the misread
@@ -65,8 +65,80 @@ are on, give me layers to pick and stack them on look layers."*
 
 ## What was done
 
-(to fill)
+Built to the contract; deviations are marked **Deviation**.
+
+- `godot/client/features/visuals/visuals_model.gd` — `solo_of(v)`: unique, sorted, whole numbers 1..`Layers.MAX`, junk dropped;
+  `solo_ring(ring, n)` = `<ring>-L<n>`. `slice_of` stores `output.solo` **only when non-empty**, so an older show (and the
+  exact-dict test of `output` in test_visuals_model.gd) stays byte-identical; empty = today's behaviour.
+- `visuals_deck.gd` — `solo` {position → transparent SubViewport, no `_back`}, `set_solo(route, keep = [])`. `_order()` now
+  places every draw rect by stack position (a slot at index i → position i+1, a `leaving` one → `at`+1) into `solo[n]` when
+  `n` is routed, else `out`, and orders each composite separately (out after the backdrop). Re-parenting only — slot, stage
+  and viewport are reused, so a solo on / off never restarts or fades a layer (WO-1049's `_route` idea, done inside
+  `_order` because the target depends on the position, which only `_order` knows). Positions, not scenes: a pad swap on slot
+  4 puts the new layer into `solo[4]` and fades the old one out there too. `_base()` = bottom slot drawn into `out`: the tint
+  backdrop and `set_base` follow the bottom non-solo layer. Solo composites render `UPDATE_ALWAYS` while running and drawn
+  into, `UPDATE_ONCE` when empty (one transparent frame), disabled when asleep with content. `draws_solo(n)`, `gpu_ms` and
+  `resize` cover them. **Deviation (addition):** the `keep` list — a composite that stays (empty, transparent) while its
+  ring drains, so the drain has something transparent to publish while the layer is already back in the canvas.
+- `visuals_mixer.gd` — WO-1049's `MIX2` premultiplied shader (blackout / master 0 = transparent, strobe keeps coverage);
+  `solo_out[n]` + `_solo_mats[n]` made and freed in `set_solo(route, keep)` (which also sets both decks), new mixes start at
+  the current `x` / master / strobe; `_param()` sets a uniform on the canvas mix and every solo mix (x, master, strobe);
+  `resize` follows `out_vp`; solo mixes render with the canvas (`running`).
+- `visuals_solo.gd` (NEW, 143 lines; `visuals_tab.gd` was at 495) — a Node under the tab. `positions()` (stored), `active()`
+  (= positions only while `output.ring`), `set_solo(n, on)` (slice.output.solo, removing the key when empty → `tab._store()`
+  → autosave/undo, then `sync()`), `sync()` (mixer `set_solo(active, draining)`, one `viewport_publisher.gd` per active
+  position publishing `solo_out[n]` as `solo_ring(ring_name, n)` at `tab._fps()`; a failed start leaves the reason in
+  `note`), `_drain(n)` (publishes on for `drain_s` = 1 s, then stops + frees; solo again within the window cancels it and
+  keeps the same ring), `air_layers()` (A/B: `slice.dj.other.layers` when the crossfader's side is the other bank, else
+  `slice.layers`, as WO-1049), `keep(prev, o)` (the page's Output edit replaces `slice.output` wholesale — the list rides
+  along) and the layer-list badges. `make_publisher` / `publish_check` / `drain_s` are settable for tests.
+- `visuals_tab.gd` (+3 → 498) — `var solo`, `solo = …visuals_solo.gd.new(self)` after the publisher/ring name, `solo.sync()`
+  in `_sync_ring()` (project load / undo / Live source toggle / Send), and `output_changed` stores `solo.keep(slice.output, o)`.
+- `visuals_layer_list.gd` — a muted `L<n>` label per row, visible when that position is active solo (`set_solo(positions)`,
+  called from `visuals_solo.gd`). Row shape key unchanged (no rebuild under a dragged fader).
+- `features/live/visuals_solo_rows.gd` (NEW, 117 lines) — `insert(rows, tab)`: drops server rows matching `^shm://<ring>-L\d+$` and puts
+  `children(tab)` right after the `shm://<ring>` row; children only while the tab is a Live source, top layer first,
+  `{type: "shm", value: "shm://<ring>-L<n>", label: "Visuals L<n>", routeType: "shm", visualsSolo, text: "L<n> · <describe>",
+  muted, solo}`. `payload()` = exactly the ring-row shape (equal to `live_sources_model.gd drag_payload` of the row).
+  `row()` builds the indented row with a flat `solo` toggle (toggled → `tab.solo.set_solo(n, on)`) and a drag getter that
+  solos the position before returning the payload. `signature(tab)` for cheap change detection.
+- `features/live/live_sources_panel.gd` (+19) — `_rows()` goes through `VSolo.insert(…, _visuals())` (tab found by group
+  `visuals_canvas`), the view key / builder handle child rows, a 0.5 s timer rebuilds when `VSolo.signature` changes (stack or
+  solo edits, besides the 3 s shm poll), and `_rebuild` is skipped while a drag is in flight (a child drag start changes the
+  rows; rebuilding would free the drag source mid-drag). **Deviation (small):** the toggle works both ways (on as well as
+  off) — it is a toggle; a click on an off toggle solos the position without a drag. Child rows have no DeckLink drop
+  forwarding (the top-level rows keep theirs).
+- No server change: `/api/shm/sources` lists the `visuals-L<n>` rings like any writer; looks play them as `shm://…`.
+- Known limits: the project slice is shared, so a client that cannot publish (remote, no libhshm_sink) still drops solo
+  layers from its own canvas preview while the slice says Live source; a solo layer is not in the A/B PRV view either (that
+  view shows the deck's `out`). Each solo position costs one canvas-size readback (3072×1024 here) only while solo + Live
+  source (+ 1 s drain).
 
 ## What was verified
 
-(to fill)
+Offline only. **No on-air / Caspar check was done** (no GUI relaunch, no Caspar, no :0).
+
+- New `godot/client/tests/test_visuals_solo_wo1051.gd` — 6 tests: model (normalising, ring names, no key when absent / empty,
+  `keep`); deck (solo positions in their own transparent composites, others over the backdrop in order, solo off/on keeps the
+  same stage + viewport with no fade, base tint = bottom non-solo, pad-swap at a solo position → new + fading-out layer both
+  in `solo[1]`, a position past the stack = empty `UPDATE_ONCE` composite, `keep` routes nothing); mixer (`solo_out`
+  transparent, premultiplied MIX2 on both decks' `solo[n]`, resize, master 0.5, blackout 0 on both, crossfader incl. a new
+  mix, free / keep); rings with a stub publisher (no ring while Live source off, `visuals-L2` on `solo_out[2]` at 25 fps,
+  no double start, a position past the stack runs, solo off → closed (drain 0) and back in the canvas, Live source off →
+  all stop with the list kept, last one off removes the key, publish failure → `note`); the drain in the tree (0.1 s: ring
+  still publishing while the layer is already back, solo again within the window → same ring, then closed and freed);
+  Sources ▸ Live on a real Visuals tab (child rows top-first under `visuals`, server `visuals-L2` hidden while
+  `visuals-L2x` / other rows stay, labels incl. a named shader, hidden layer muted, payload == ring-row drag payload, drag
+  start solos 2 and starts `visuals-L2`, layer 2 left the canvas, `L2` badge, toggle off ends it and closes the ring, the
+  page's Output edit keeps the list, no children when not a Live source, no tab → rows unchanged, A/B → the canvas bank).
+- Full suite: `GODOT=~/.local/opt/godot/godot godot/client/run-client.sh --test` → `[tests] 28224 passed, 0 failed` (run twice;
+  a first run had an unrelated timing flake in `test_pixelhue_programming_panel::test_live_geometry_coalesces`, green on both
+  re-runs).
+- Compile boot: `GODOT=~/.local/opt/godot/godot godot/client/run-client.sh --check` → `[check] boot OK (no script errors)`.
+- `node tools/ci/check-max-file-lines.js` → `Files over 500 lines: 0`.
+- Smokes that read touched files: `node --test tools/smoke/smoke-wo919-sweep-followups.test.js
+  tools/smoke/smoke-wo908-visuals-ab-banks.test.js` → 15/15 pass.
+- **Still open (on air, after a GUI relaunch):** Live source on, drag layer N from Sources ▸ Live ▸ visuals onto a look layer →
+  `PLAY … SHM NAME visuals-LN` shows that layer alone over what is below (transparent), and the main `visuals` picture no
+  longer has it; the layer does not restart; toggle off → it returns to `visuals` and the look layer goes clear after ~1 s;
+  APC pad on that slot changes what the ring shows; blackout / master / crossfader on the solo rings.

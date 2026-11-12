@@ -10,6 +10,7 @@ extends VBoxContainer
 ## decklink_drop_flow.gd): progress / errors show at the top of this tab, and the new source is highlighted in the list.
 ## Not ported: per-row actions (Stop, Apply PLAY, ⛶ operator monitor, host inspectors, capture / upload thumbnail —
 ## manual recapture is API-only by owner request: POST /api/thumbnail/live/recapture, WO-887).
+## WO-1051: the Visuals' layer positions as child rows under the `visuals` ring (visuals_solo_rows.gd).
 
 signal tab_requested(name: String)
 signal caspar_changed
@@ -21,6 +22,7 @@ const LookThumb := preload("res://features/live/look_thumb.gd")
 const Drop := preload("res://features/devices/decklink_drop_flow.gd")
 const DropIo := preload("res://features/devices/decklink_drop_io.gd")
 const Shm := preload("res://features/live/shm_sources_model.gd")  # WO-744
+const VSolo := preload("res://features/live/visuals_solo_rows.gd")  # WO-1051
 const STATE_KEYS := ["*", "channelMap", "extraLiveSources", "decklinkInputsStatus", "liveAudioInputsStatus", "v4l2InputsStatus"]
 const THUMB := Vector2(48, 27)
 const THUMB_REFETCH_MAX := 8  # WO-887: re-fetches per channel while the server's session capture is pending
@@ -38,6 +40,7 @@ var _thumb_rects := {}  # channel → Array[TextureRect] of the current rows (a 
 var _thumb_gen := 0  # bumped by reload(): a pending re-fetch of an older generation drops out
 var _highlight := ""  # connector id of a DeckLink just dropped here
 var dropping := false
+var _vsig := ""  # WO-1051: the Visuals child rows last shown (a stack or solo change rebuilds)
 
 
 func _ready() -> void:
@@ -75,7 +78,19 @@ func _ready() -> void:
 	shm_poll.timeout.connect(_poll_shm)
 	add_child(shm_poll)
 	shm_poll.start()
+	var vis_poll := Timer.new()  # WO-1051: the Visuals stack / solo list changed → the child rows follow
+	vis_poll.wait_time = 0.5
+	vis_poll.timeout.connect(func() -> void:
+		if is_visible_in_tree() and VSolo.signature(_visuals()) != _vsig:
+			_rebuild())
+	add_child(vis_poll)
+	vis_poll.start()
 	reload()
+
+
+## WO-1051: the Visuals tab of this client (null when it was never built).
+func _visuals() -> Node:
+	return get_tree().get_first_node_in_group("visuals_canvas") if is_inside_tree() else null
 
 
 ## WO-883: only the shm rings, every 3 s while shown; _rebuild skips when nothing changed.
@@ -110,16 +125,20 @@ func reload() -> void:
 
 func _rows() -> Array:
 	var cm: Variant = M.effective_cm(Settings.settings.get("channelMap"), Store.get_value("channelMap"))
-	return M.sources(cm, _connectors, _audio, _v4l2, Store.get_value("extraLiveSources", [])) + Shm.rows(_shm)  # WO-744
+	return VSolo.insert(M.sources(cm, _connectors, _audio, _v4l2, Store.get_value("extraLiveSources", [])) + Shm.rows(_shm),
+		_visuals())  # WO-744; WO-1051 the Visuals' layer rows
 
 
 func _rebuild() -> void:
-	if _list == null:
-		return
+	if _list == null or (is_inside_tree() and get_viewport().gui_is_dragging()):
+		return  # WO-1051: never under a drag in flight (a child row's drag start solos and changes the rows)
+	_vsig = VSolo.signature(_visuals())
 	var rows := _rows()
 	var status := {"decklink": Store.get_value("decklinkInputsStatus"), "audio": Store.get_value("liveAudioInputsStatus"),
 		"v4l2": Store.get_value("v4l2InputsStatus")}
 	var view := rows.map(func(s: Dictionary) -> Array:
+		if s.has("visualsSolo"):  # WO-1051
+			return [s.value, s.text, s.muted, s.solo, null, null]
 		return [s.get("value"), s.get("label"), M.meta(s) + Shm.meta_suffix(s), M.slot_message(s, status) + Shm.warning(s),
 			M.thumb_channel(s), s.get("connectorId")])
 	var key := JSON.stringify([view, _highlight])
@@ -131,7 +150,7 @@ func _rebuild() -> void:
 	_thumb_rects.clear()
 	var focus: Control = null
 	for i in rows.size():
-		var row := _row(rows[i], view[i])
+		var row: Control = VSolo.row(rows[i], _visuals()).panel if rows[i].has("visualsSolo") else _row(rows[i], view[i])
 		_list.add_child(row)
 		if _highlight != "" and str(view[i][5]) == _highlight:
 			focus = row

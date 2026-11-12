@@ -9,6 +9,10 @@ extends Node
 ## one render per layer (hence the cap, visuals_layers.gd MAX, and muted / 0 % layers do not render at all).
 ## Edits are in place: a layer whose picture is unchanged keeps running (no restart, no shader recompile), a new one fades
 ## in and a removed one fades out over `fade` seconds, at its place in the stack; a fader moves at once.
+## WO-1051: solo positions (1-based stack positions, the Visuals as a Live source picked per layer in Sources ▸ Live): each has
+## its own transparent composite `solo[n]` (premultiplied, no black back, no base tint) and the layer at that position — a
+## fading-out one at its old place too — draws there instead of `out`. Re-routing only re-parents the draw rect (WO-1049's
+## pattern): nothing restarts. A solo composite renders while something draws there, then once more (transparent).
 
 const Stage := preload("res://features/visuals/visuals_stage.gd")
 const L := preload("res://features/visuals/visuals_layers.gd")
@@ -21,6 +25,8 @@ const SRC := {
 static var _shaders := {}
 
 var out: SubViewport
+var solo := {}  # WO-1051: position (1-based) → its composite SubViewport (transparent)
+var _route_to: Array = []  # WO-1051: the positions whose layer draws into its solo composite (a kept one may be empty)
 var slots := []  # the layers on stage, bottom → top: {vp, stage, rect, mat, key, layer, w (fade-in weight), to}
 var leaving := []  # removed or replaced layers fading out, then freed: the same, + `at` (their place in the stack)
 var running := true
@@ -153,6 +159,8 @@ func resize(size: Vector2i) -> void:
 	_size = size
 	out.size = size
 	_back.size = Vector2(size)
+	for n in solo:
+		solo[n].size = size
 	for s in slots + leaving:
 		s.vp.size = size
 		s.rect.size = Vector2(size)
@@ -180,6 +188,8 @@ func step(delta: float) -> void:
 ## GPU ms of the last frame (dev probes, with `measure` set before the layers were made): every layer + the composite.
 func gpu_ms() -> float:
 	var ms := RenderingServer.viewport_get_measured_render_time_gpu(out.get_viewport_rid())
+	for n in solo:
+		ms += RenderingServer.viewport_get_measured_render_time_gpu(solo[n].get_viewport_rid())
 	for s in slots + leaving:
 		ms += RenderingServer.viewport_get_measured_render_time_gpu(s.vp.get_viewport_rid())
 	return ms
@@ -217,6 +227,39 @@ func _slot(l: Dictionary, cfgs: Dictionary) -> Dictionary:
 	return {"vp": vp, "stage": st, "rect": rect, "mat": mat, "key": L.key(l), "layer": l, "w": 1.0, "to": 1.0, "at": 0}
 
 
+## WO-1051: positions `route` draw into their own composites; `keep` composites stay (empty, transparent: a ring draining
+## after its position stopped being solo). Composites outside both are freed. Only draw rects move — nothing restarts.
+func set_solo(route: Array, keep: Array = []) -> void:
+	_route_to = route.duplicate()
+	for n in route + keep:
+		if not solo.has(n):
+			var vp := SubViewport.new()
+			vp.disable_3d = true
+			vp.transparent_bg = true
+			vp.size = _size
+			vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+			add_child(vp)
+			solo[n] = vp
+	_order()
+	for n in solo.keys():
+		if not n in route and not n in keep:
+			var vp: SubViewport = solo[n]
+			solo.erase(n)
+			remove_child(vp)
+			vp.queue_free()
+	_update()
+
+
+## WO-1051: does anything on stage (fading out included) draw into solo position `n`?
+func draws_solo(n: int) -> bool:
+	return solo.has(n) and (slots + leaving).any(func(s: Dictionary) -> bool: return s.rect.get_parent() == solo[n])
+
+
+## WO-1051: the composite stack position `n` (1-based) draws into: its solo composite while routed there, else `out`.
+func _target(n: int) -> SubViewport:
+	return solo[n] if n in _route_to and solo.has(n) else out
+
+
 ## Drawing order: the stack, each fading-out layer back at its old place. Every layer renders on a transparent world; the
 ## bottom one is the base, whose tinted background the deck paints behind the stack (_backdrop). WO-945: the base used to
 ## switch its viewport to an opaque background, and a SubViewport whose transparent_bg flips draws nothing for that frame —
@@ -227,10 +270,24 @@ func _order() -> void:
 	gone.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.at < b.at)
 	for s in gone:
 		order.insert(clampi(s.at, 0, order.size()), s)
-	for i in order.size():
-		out.move_child(order[i].rect, i + 1)  # 0 is the black backdrop
+	var at := {out: 1}  # the next child index per composite (out: 0 is the black backdrop; a solo composite has none)
+	for s in order:
+		var i := slots.find(s)
+		var to := _target((i if i >= 0 else int(s.at)) + 1)  # WO-1051: by stack position (a leaving layer: its old one)
+		if s.rect.get_parent() != to:
+			if s.rect.get_parent() != null:
+				s.rect.get_parent().remove_child(s.rect)
+			to.add_child(s.rect)
+		to.move_child(s.rect, at.get(to, 0))
+		at[to] = at.get(to, 0) + 1
+	var base := _base()
 	for i in slots.size():
-		slots[i].stage.set_base(i == 0)  # WO-945: the tint and a game's overlay mode only — the viewport stays transparent
+		slots[i].stage.set_base(i == base)  # WO-945: the tint and a game's overlay mode only — the viewport stays transparent
+
+
+## WO-1051: the base (its tint behind `out`) is the bottom layer that is not solo; -1 = none.
+func _base() -> int:
+	return slots.find_custom(func(s: Dictionary) -> bool: return s.rect.get_parent() == out)
 
 
 func _reap() -> void:
@@ -252,8 +309,9 @@ func _free(s: Dictionary) -> void:
 ## what its opaque world used to give, the fader dimming it to black as before.
 func _backdrop() -> void:
 	var c := Color.BLACK
-	if not slots.is_empty():
-		var b: Dictionary = slots[0]
+	var i := _base()
+	if i >= 0:
+		var b: Dictionary = slots[i]
 		c = (b.stage.bg_tint as Color) * float(b.get("a", 0.0))
 	_back.color = Color(c.r, c.g, c.b, 1.0)
 
@@ -272,3 +330,7 @@ func _update() -> void:
 		s.vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if on else SubViewport.UPDATE_DISABLED
 		s.stage.set_process(on)
 	out.render_target_update_mode = SubViewport.UPDATE_ALWAYS if running else SubViewport.UPDATE_DISABLED
+	for n in solo:  # WO-1051: while something draws there; ONCE leaves it transparent after the last layer left (or asleep)
+		var used := draws_solo(n)
+		solo[n].render_target_update_mode = SubViewport.UPDATE_ALWAYS if running and used else (
+			SubViewport.UPDATE_ONCE if not used else SubViewport.UPDATE_DISABLED)
