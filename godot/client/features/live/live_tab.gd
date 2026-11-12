@@ -18,7 +18,6 @@ const ScreensMenu := preload("res://features/live/screens_menu.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
 const LivePreview := preload("res://features/live/live_preview.gd")
-const VisualsRouting := preload("res://features/live/visuals_routing_panel.gd")
 const ACTION_HINT := "Click a look: stage on PRV · double-click: TAKE"
 
 var preview: LivePreview  # WO-789: the 2D / 3D preview, shared with the Timeline tab
@@ -33,7 +32,6 @@ var _action: Label
 var _slug := ""  # WO-918 F24: the project the status line talks about
 var osc: Node  # the shell's OscMirror (set before _ready)
 var shader_live: ShaderLivePanel  # WO-606: replaces the deck while open (web shader-live-overlay)
-var visuals_routing: VisualsRouting  # WO-1049: collapsed "Visuals routing" (layers → PGM 1 / PGM 2)
 
 
 func _ready() -> void:
@@ -66,8 +64,6 @@ func _ready() -> void:
 		add_child(osc)
 	var bar := _transition_toolbar()
 	bottom.add_child(bar)
-	visuals_routing = VisualsRouting.new()
-	bottom.add_child(visuals_routing)
 	preview.set_osc(osc)
 	deck = DeckView.new()
 	deck.osc_mirror = osc
@@ -85,7 +81,7 @@ func _ready() -> void:
 	editor.visible = false
 	inner.add_child(editor)
 	editor.visibility_changed.connect(func() -> void:  # WO-621 N5: an open editor is the only thing at the bottom
-		for c in [_action, bar, deck, visuals_routing]:
+		for c in [_action, bar, deck]:
 			c.visible = not editor.visible)
 	if Config.args.has("probe-select"):  # dev (WO-813): --probe-select=<layer index> once --probe-edit opened the editor
 		editor.visibility_changed.connect(func() -> void:
@@ -100,7 +96,7 @@ func _ready() -> void:
 	bottom.add_child(shader_live)
 	shader_live.visibility_changed.connect(func() -> void:
 		inner.visible = not shader_live.visible
-		for c in [_action, bar, visuals_routing]:
+		for c in [_action, bar]:
 			c.visible = not shader_live.visible and not editor.visible)
 	timers = ScreenTimerPanel.new()  # R2: screen timers / border are Inspector pages, not tab panels
 	timers.visible = false

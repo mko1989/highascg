@@ -21,7 +21,6 @@ const ShaderMode := preload("res://features/visuals/visuals_shader_mode.gd")
 const CamCtl := preload("res://features/visuals/visuals_camera_ctl.gd")
 const Dj := preload("res://features/visuals/visuals_dj.gd")
 const Publisher := preload("res://features/shm_out/viewport_publisher.gd")
-const Route := preload("res://features/visuals/visuals_route.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const AUDIO_STALE_MS := 1000
 
@@ -55,7 +54,6 @@ var show_ctl: ShowCtl  # WO-877/878: looks, autopilot, master, show keys
 var cam_ctl: CamCtl  # WO-896: the 3D view's orbit → the output camera ("Drive output"), saved per look
 var midi: Node  # WO-900: visuals_midi.gd
 var dj: Dj  # WO-908: A/B banks (the PRV view and the bar under the canvas)
-var route: Route  # WO-1049: output 2 — the layers routed to the keyed overlay, published as `visuals-2` and played
 
 
 func _ready() -> void:
@@ -132,7 +130,6 @@ func _ready() -> void:
 	page.sensitivity_changed.connect(_post_sensitivity)
 	publisher = Publisher.new()
 	add_child(publisher)
-	route = Route.new(self)  # (adds itself under the tab)
 	if _g("Config") and _g("Config").args.has("visuals-ring"):
 		ring_name = str(_g("Config").args["visuals-ring"])
 	if _g("Ws"):
@@ -496,4 +493,3 @@ func _sync_send_ui(why: String) -> void:
 	elif note == "":
 		note = can_send()
 	page.set_sending(on, can_send() == "", note, publisher.sink != null, can_publish() == "")
-	route.sync()  # WO-1049: output 2 follows Send (and a reloaded slice's routes / target)

@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-959 live WOs (34 open, 135 in progress, 790 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+958 live WOs (34 open, 134 in progress, 790 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -413,7 +413,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 - 1024 IN PROGRESS [lighting+godot-client] GDTF fixture models missing in the previs (built-in primitives drawn as boxes;… → 1024_WO_gdtf_models_missing_primitives_and_share_swap.md
 
-## godot-client — Godot client (160)
+## godot-client — Godot client (159)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -574,7 +574,6 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1044 IN PROGRESS [godot-client+engine] Live tab: "PGM edit" — open the look editor on the look on PGM, edits go to air → 1044_WO_live_look_editor_pgm_edit_lock.md
 - 1047 DONE [godot-client] Visuals Controller: Sel on an empty track arms a new layer, so the pads can fil… → 1047_WO_visuals_apc_sel_empty_track_adds_layer.md
 - 1048 IN PROGRESS [godot-client] APC40 hardware Sel: the device knobs' bank resend nudged parameters and rings s… → 1048_WO_visuals_apc_device_knob_bank_resend.md
-- 1049 IN PROGRESS [godot-client+engine] Visuals: route layers to two outputs (PGM 1 background, PGM 2 keyed overlay), s… → 1049_WO_visuals_layer_routing_two_outputs.md
 
 ## web-client — Web client (82)
 
@@ -1015,7 +1014,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 923 DONE [process+godot-client,amcp] Full test run 01.11: test:live hung forever, stale live probes, two GUI e2e fai… → 923_WO_full_test_run_fixes.md
 - 995 DONE [process+testing-ci] Sanitization sweep: delete dead and deprecated code (Electron launcher, kiosk l… → 995_WO_dead_and_deprecated_code_sweep.md
 
-## Deprecated (49)
+## Deprecated (50)
 
 - 11 DEPRECATED [os-iso+devices-config] Boot Orchestrator & OS Setup → deprecated/11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md
 - 19 DEPRECATED [tracking-vr] Person Tracking — Stage Performer Detection from Camera Inputs & 3D Previs → deprecated/19_WO_PERSON_TRACKING.md
@@ -1066,3 +1065,4 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 853 DEPRECATED [companion+mapping] Work order: PixelHue API integration & tandem multi-screen control → deprecated/853_WO_pixelhue_companion_and_tandem_looks.md
 - 854 DEPRECATED [mapping+web-client] Work order: PixelHue API in HighAsCG — Caspar + PixelHue layer mixing in the we… → deprecated/854_WO_pixelhue_highascg_webui_mixing.md
 - 906 DEPRECATED [devices-config+os-iso,mapping] Playout outputs on a second X screen (:0.1) of the same X server, operator head… → deprecated/906_WO_outputs_on_second_x_screen.md
+- 1049 DEPRECATED [godot-client+engine] Visuals: route layers to two outputs (PGM 1 background, PGM 2 keyed overlay), s… → deprecated/1049_WO_visuals_layer_routing_two_outputs.md

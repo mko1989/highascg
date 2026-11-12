@@ -1,7 +1,7 @@
 # WO-1049 — Visuals: route layers to two outputs (PGM 1 background, PGM 2 keyed overlay), set from a Live tab expander
 
 **Area:** godot-client, engine
-**Status: IN PROGRESS (12.11 — built; offline suite + compile boot green; on-air check pending)**
+**Status: DEPRECATED (13.11 — misread "live tab": the owner meant Sources ▸ Live, per-layer picks onto look layers; code reverted; successor WO-1051)**
 
 Owner, 12.11: *"i also want to be able to select from live tab, with a expand, visuals layers routing, so i can play for
 instance first 2 layers on the bg output pgm1 and layers 4 5 on overlay channel pgm2."*
@@ -154,3 +154,12 @@ nothing for them.
   (1 s) before it stops, because Caspar's shm producer holds the last frame (`shm_producer.cpp` header).
 - `visuals_routing_panel.gd`: the note names `shm://visuals-2` in Live source mode.
 - Test `test_route_live_source_publishes_without_play`, plus a panel note check. Godot suite 28236 / 0, compile boot OK.
+
+## Deprecated 13.11
+
+Owner, 13.11: *"i wanted to be able to pick layers from the live tab of the sources, when the shm visuals are on, give me
+layers to pick and stack them on look layers."* "Live tab" meant **Sources ▸ Live**, not the Live main tab, and the owner works
+with the Visuals as a Live source on looks, not Send. The per-layer `out` (1 | 2), the second composite / `visuals-2` ring,
+the route's PLAY logic and the Live-tab expander were reverted (commits 0d41d941 and ac9aa3e8). Successor: WO-1051, one shm
+ring per picked layer position, listed under `visuals` in Sources ▸ Live. Reusable from this WO: the transparent premultiplied
+composite pattern (deck `out2`, mixer MIX2 shader) and the drain-before-stop rule (Caspar's shm producer holds the last frame).
