@@ -88,4 +88,6 @@ module.exports = [
 	'tools/smoke/smoke-wo974-ltc-roundtrip.test.js', // skips without libltc11
 	'tools/smoke/smoke-wo974-timeline-still-seek.test.js', // Caspar never answers CALL SEEK on an image
 	'tools/smoke/smoke-wo975-nvidia-sync-auto.test.js',
+	'tools/smoke/smoke-wo1035-pixelhue-layer-read.test.js', // WO-1042: discovery lists every switcher on the network
+	'tools/smoke/smoke-wo1038-pixelhue-look-drive.test.js',
 ]

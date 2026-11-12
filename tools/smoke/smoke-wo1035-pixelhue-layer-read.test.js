@@ -125,4 +125,23 @@ describe('WO-1035 PixelHue layer read', () => {
 		assert.equal((await handleLayers({}, dead)).status, 502)
 		fs.rmSync(path.dirname(storePath), { recursive: true, force: true })
 	})
+
+	it('WO-1042: discovery listing several switchers → the one at the host address, never simply the first', async () => {
+		const list = [
+			{ ip: '10.0.0.11', protocols: [{ port: 8088, linkType: 'http' }] },
+			{ ip: '10.0.0.254', protocols: [{ port: 8090, linkType: 'http' }] },
+		]
+		const seen = []
+		const get = (opens) => async (url) => {
+			seen.push(url)
+			if (url.endsWith('/ucenter/device-list')) return { code: 0, data: { list } }
+			if (url.endsWith('/node/open-detail')) return opens(url)
+			return { code: 0, data: { list: [] } }
+		}
+		const ok = async () => ({ code: 0, data: { sn: 'SN', startTime: 1 } })
+		const snap = await createPixelhueReader('10.0.0.254', { get: get(ok) }).read()
+		assert.deepEqual(snap.device, { ip: '10.0.0.254', port: 8090 })
+		assert.ok(!seen.some((u) => u.includes('10.0.0.11')), 'the other switcher is never asked')
+		await assert.rejects(createPixelhueReader('10.0.0.15', { get: get(ok) }).read(), /lists 2 switchers \(10\.0\.0\.11, 10\.0\.0\.254\)/)
+	})
 })

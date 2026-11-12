@@ -63,16 +63,24 @@ function httpJson(url, headers = {}, body) {
 const listOf = (r) => (Array.isArray(r?.data) ? r.data : Array.isArray(r?.data?.list) ? r.data.list : [])
 const int = (v) => Math.round(Number(v) || 0)
 
-/** The address + HTTP API port to talk to: what discovery advertises, else the host itself on the default port. */
+/** The address + HTTP API port to talk to: what discovery advertises, else the host itself on the default port.
+ * Discovery lists EVERY switcher it sees on the network (WO-1042: the P80 at .254 listed the P20 at .11 first, and
+ * the Live tab showed the P20's layers): the entry at the host's own address wins; a single entry is a control PC
+ * naming its switcher; several with none at the host is ambiguous and refused rather than guessed. */
 async function resolveDevice(host, get) {
+	let list
 	try {
-		const dev = listOf(await get(`https://${host}:${UNICO_PORT}/unico/v1/ucenter/device-list`))[0]
-		const proto = (dev?.protocols || []).find((p) => p?.linkType === 'http')
-		if (dev?.ip) return { ip: String(dev.ip), port: int(proto?.port) || DEFAULT_API_PORT }
+		list = listOf(await get(`https://${host}:${UNICO_PORT}/unico/v1/ucenter/device-list`)).filter((d) => d?.ip)
 	} catch {
-		/* no discovery service on this address: it may be the device itself */
+		list = [] /* no discovery service on this address: it may be the device itself */
 	}
-	return { ip: host, port: DEFAULT_API_PORT }
+	const dev = list.find((d) => String(d.ip) === String(host)) || (list.length === 1 ? list[0] : null)
+	if (!dev && list.length > 1) {
+		throw new Error(`PixelHue discovery on ${host} lists ${list.length} switchers (${list.map((d) => d.ip).join(', ')}) — set Devices ▸ PixelHue to one of them`)
+	}
+	if (!dev) return { ip: host, port: DEFAULT_API_PORT }
+	const proto = (dev.protocols || []).find((p) => p?.linkType === 'http')
+	return { ip: String(dev.ip), port: int(proto?.port) || DEFAULT_API_PORT }
 }
 
 /** One layer as HighAsCG needs it: rectangle in screen pixels (top-left origin), order, visibility, source. */
