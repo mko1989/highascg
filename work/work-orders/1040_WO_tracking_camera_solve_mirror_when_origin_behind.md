@@ -1,7 +1,7 @@
 # WO-1040 — Tracking camera solve: camera 2 lands under the deck, facing away (stage out of the picture)
 
 **Area:** tracking-vr, godot-client
-**Status: IN PROGRESS (12.11 — fix + regression test in, Godot suite green; live re-solve of camera 2 pending)**
+**Status: DONE (12.11 — regression test fails on the old solve, Godot suite 28092/0; camera 2 re-solved live, stage projects back into its picture)**
 
 Owner, 12.11: *"from camera 2 for tracking i have center stage visible i do calibration based on a couple of points
 that the camera sees and after solving the stage is out of the picture."*
@@ -53,3 +53,9 @@ and it is exactly the invariant the origin test was approximating (the calibrati
 - Remaining click quality (not this bug): `obj:led_wall_2:1` misses by 178 px (clicked at 124,159; the solve puts it
   ~180 px lower) — either a wrong click or LED wall 2's previs position is off; the far grid row (Y10) was clicked at
   screen y 2–7 px, at the frame edge, with errors up to 70 px. Without the LED wall 2 point rms is 25 px.
+- Live (12.11): GUI relaunched on the fixed code (22c0eb2b); camera 2's pose written through
+  `POST /api/project/autosave` (rev 404 → 405, points untouched), still there after the client's sync. Through the
+  server's `src/tracking/camera-model.js` `project()`: deck points X5/Y0 → (49, 988), X10/Y0 → (1945, 1012),
+  X5/Y10 → (283, -26), X12/Y10 → (1804, 21), stage centre (1, 23.24) → (892, 359) — on the clicks / in frame.
+  The old pose projected all five to null (behind the lens). Not looked at on the glass (needs the Tracking tab
+  driven on :0).

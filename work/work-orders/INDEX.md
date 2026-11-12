@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-949 live WOs (34 open, 132 in progress, 783 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+949 live WOs (34 open, 131 in progress, 784 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -941,7 +941,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 969 IN PROGRESS [tracking-vr+godot-client] VR starts inside the loaded MVR room, facing its rig, not 8 m +Z of the origin… → 969_WO_vr_starts_inside_the_mvr_room.md
 - 978 DONE [tracking-vr+lighting,godot-client] Tracking → lighting desk test environment: puppet marker, PSN to ChamSys MagicQ → 978_WO_tracking_desk_test_env_puppet_psn_magicq.md
 - 1036 DONE [tracking-vr+godot-client] Presenters from a tracking-camera picture, named by the operator → 1036_WO_presenters_from_tracking_camera.md
-- 1040 IN PROGRESS [tracking-vr+godot-client] Tracking camera solve: camera 2 lands under the deck, facing away (stage out of… → 1040_WO_tracking_camera_solve_mirror_when_origin_behind.md
+- 1040 DONE [tracking-vr+godot-client] Tracking camera solve: camera 2 lands under the deck, facing away (stage out of… → 1040_WO_tracking_camera_solve_mirror_when_origin_behind.md
 
 ## testing-ci — Tests and CI (28)
 
