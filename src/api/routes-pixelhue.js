@@ -16,6 +16,8 @@
  *        ?scene=pgm|pvw                  layers of that bus only
  *   GET  /api/pixelhue/sources           { ok, sources: [{ id, type, name, connected, connectorType? }] } — what a
  *                                        switcher layer can show (inputs, then screen PGM / PVW), for WO-1038
+ *   POST /api/pixelhue/layer-opacity { layerId, opacity 0..100 }   { ok, queued, sent, error } at once — WO-1050: a
+ *                                        controller fader on a switcher layer; coalesced per layer (pixelhue-opacity.js)
  *
  * The address is machine-local (~/.highascg/pixelhue.json), like the box's other per-site facts: a show file moved to
  * another venue must not point at this venue's switcher.
@@ -26,6 +28,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { createPixelhueReader } = require('../pixelhue/pixelhue-read')
+const { createOpacityWriter } = require('../pixelhue/pixelhue-opacity')
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: jsonBody(obj) })
 const HOST_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/
@@ -98,12 +101,32 @@ async function handleSources(deps = {}) {
 	}
 }
 
+/** WO-1050: one coalescing writer per reader (a new address = a new reader = fresh slots). */
+const writers = new WeakMap()
+function writerFor(r) {
+	if (!writers.has(r)) writers.set(r, createOpacityWriter((p, b) => r.put(p, b)))
+	return writers.get(r)
+}
+
+function handleLayerOpacity(body, deps = {}) {
+	const b = parseBody(body) || {}
+	const layerId = Number(b.layerId)
+	const opacity = Number(b.opacity)
+	if (b.layerId == null || b.layerId === '' || !Number.isSafeInteger(layerId) || layerId < 0) return reply(400, { error: 'layerId must be a switcher layer id' })
+	if (b.opacity == null || b.opacity === '' || !Number.isFinite(opacity) || opacity < 0 || opacity > 100) return reply(400, { error: 'opacity must be 0..100' })
+	const host = readHost(deps)
+	if (!host) return reply(409, { error: 'no PixelHue address set — POST /api/pixelhue/config { host }' })
+	const r = writerFor(readerFor(host, deps)).set(layerId, Math.round(opacity))
+	return reply(200, { ok: true, ...r })
+}
+
 function register(routes) {
 	const opt = { requireCaspar: false }
 	routes.get('/api/pixelhue/config', () => reply(200, readSettings()), opt)
 	routes.post('/api/pixelhue/config', ({ body }) => handleSetConfig(body), opt)
 	routes.get('/api/pixelhue/layers', ({ query }) => handleLayers(query), opt)
 	routes.get('/api/pixelhue/sources', () => handleSources(), opt)
+	routes.post('/api/pixelhue/layer-opacity', ({ body }) => handleLayerOpacity(body), opt)
 }
 
-module.exports = { register, handleSetConfig, handleLayers, handleSources, readSettings, readerFor }
+module.exports = { register, handleSetConfig, handleLayers, handleSources, handleLayerOpacity, readSettings, readerFor }

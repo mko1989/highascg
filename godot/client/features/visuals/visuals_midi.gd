@@ -19,6 +19,7 @@ const Auto := preload("res://features/visuals/visuals_autopilot.gd")
 const Looks := preload("res://features/visuals/visuals_looks.gd")
 const Apc := preload("res://features/visuals/visuals_midi_apc.gd")
 const Clips := preload("res://features/visuals/visuals_midi_clips.gd")
+const Pxl := preload("res://features/visuals/visuals_midi_pxl.gd")  # WO-1050: "pxl:<layerId>" = a PixelHue layer's opacity
 const SECTION := "midi"
 
 var tab: Node
@@ -236,6 +237,8 @@ func control_of(target: String) -> Control:
 			return apc_view.surface if clips.has(n + 1) else null
 		"edit":  # WO-913: Edit A / B (A/B on only)
 			return tab.dj.control(target)
+		"pxl":
+			return Pxl.control_of(tab.page, target)
 		"clear":  # WO-913: the selected layer's ✕
 			var rs: Array = tab.page.layer_list.rows
 			return rs[tab._target()].del if not rs.is_empty() and tab._target() >= 0 and tab._target() < rs.size() else null
@@ -260,7 +263,7 @@ func wants_click() -> bool:
 
 ## A click at `pos` (canvas coordinates) while Learn / Unmap waits: true when it hit a target (the click is used up).
 func click_at(pos: Vector2) -> bool:
-	for id in targets():
+	for id in targets() + Pxl.targets(tab.page):
 		var c := control_of(id)
 		if c != null and c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
 			pick_target(id)
@@ -333,6 +336,7 @@ func _menu(id: int) -> void:
 
 ## Every 0.1 s: a slider moved from elsewhere puts its fader back to waiting (and shows the tick); the lights follow.
 func tick() -> void:
+	Pxl.tick(tab.page)
 	for b in map:
 		var k := MidiMap.key(b)
 		if pick.has(k) and not _encoder(b):  # an encoder is never waiting (WO-912)

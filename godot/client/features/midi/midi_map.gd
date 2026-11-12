@@ -2,14 +2,17 @@ extends RefCounted
 ## WO-900 — MIDI bindings, pure: which physical control (a source: a CC or a note, on one channel or any) drives which
 ## target id. A binding is {kind: "cc" | "note", ch: 0..15 or ANY, num: 0..127, target}. Targets are the Visuals' ids
 ## (visuals_midi.gd resolves them to controls): "layer:N" (opacity of layer N, 1 = the bottom one), "mute:N", "master",
-## "fade", "param:<name>", "look:N", "burst", "tap", "audio" (the beat follows the music again), "blackout", "auto".
+## "fade", "param:<name>", "look:N", "burst", "tap", "audio" (the beat follows the music again), "blackout", "auto",
+## "pxl:<layerId>" (WO-1050: a PixelHue switcher layer's opacity).
 ## The default map is the Akai APC40 mkII's power-on Generic mode (Akai "APC40 Mk2 Communications Protocol" v1.2;
 ## the faders and knobs send absolute 7-bit values there, no init sysex needed).
 
 const ANY := -1
-const RANGES := ["layer", "master", "fade", "param", "xfade", "dev"]  # dev: WO-909 device knobs · continuous targets (a slider; picked up, midi_pickup.gd)
+const RANGES := ["layer", "master", "fade", "param", "xfade", "dev", "pxl"]  # dev: WO-909 device knobs · pxl: WO-1050 a PixelHue layer's opacity · continuous targets (a slider; picked up, midi_pickup.gd)
 const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select", "clip", "edit", "clear"]  # take / cut / xfade: WO-908 A/B · clip / edit / clear: WO-913
 const PARAM_LABELS := {"cam_yaw": "Camera yaw", "cam_pitch": "Camera pitch", "cam_zoom": "Camera zoom"}
+## WO-1050: "pxl:<layerId>" → the switcher layer's name, as the Visuals' PixelHue block last read it (visuals_pixelhue.gd)
+static var pxl_names := {}
 
 
 ## InputEventMIDI → {kind: "cc" | "note" | "off", ch, num, val}; {} for anything else (clock, sysex, pitch bend, …).
@@ -119,6 +122,8 @@ static func target_label(target: String) -> String:
 			return "Edit bank %s" % ("A" if p.size() > 1 and p[1] == "1" else "B")
 		"clear":
 			return "Clear the selected layer"
+		"pxl":
+			return "PixelHue %s opacity" % pxl_names.get(p[1], "layer " + p[1]) if p.size() > 1 else "PixelHue opacity"
 	return target.capitalize()
 
 

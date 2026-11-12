@@ -14,6 +14,7 @@ const L := preload("res://features/midi/apc40_layout.gd")
 const Surface := preload("res://features/midi/apc40_surface.gd")
 const Layers := preload("res://features/visuals/visuals_layers.gd")
 const Catalog := preload("res://features/visuals/visuals_catalog.gd")
+const Pxl := preload("res://features/visuals/visuals_midi_pxl.gd")
 const FALLBACK := ["param:cam_yaw", "param:cam_pitch", "param:cam_zoom", "param:burst"]
 const HINT := "Controller: what every APC40 control does now, and a virtual one — drag a fader, drag a knob up / down (or the wheel), click a button or pad to press it · right-click anything to Learn it · drop a visual on a pad · ◀ ▶ = edit bank A / B"
 
@@ -115,6 +116,8 @@ func label(target: String) -> String:
 			return "Fade time"
 		"clip":
 			return midi.clips.label(n + 1)
+		"pxl":  # WO-1050
+			return Pxl.label(target)
 	return MidiMap.target_label(target)
 
 
