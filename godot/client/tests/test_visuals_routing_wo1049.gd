@@ -206,6 +206,44 @@ func test_route_with_a_stub_tab() -> void:
 	host.free()
 
 
+## Owner 13.11: the Visuals run as a Live source (shm://visuals on a look), not Send — output 2 is then the `visuals-2` ring,
+## published while a layer is on PGM 2 (for a look on the overlay screen) and never PLAYed by the route.
+func test_route_live_source_publishes_without_play() -> void:
+	var host := _Host.new()
+	var api := _Api.new()
+	host.replay_api = api
+	host.slice = M.slice_of({"visuals": {"output": {"screen": 0, "layer": 20, "ring": true},
+		"layers": [{"scene": "tunnel"}, {"scene": "rings"}]}})
+	host.mixer = Mixer.new()
+	host.add_child(host.mixer)
+	host.mixer.go(host.slice.layers, {}, 0.0)
+	var r: Node = Route.new(host)
+	var pub := _Pub.new()
+	r.publisher.free()
+	r.publisher = pub
+	r.add_child(pub)
+	r.drain_s = 0.0
+	await r.sync()
+	t.eq([api.posts, pub.sink], [[], null], "Live source, nothing on PGM 2: no ring")
+	host.slice.layers = L.routed(host.slice.layers, 1, 2)
+	host.mixer.go(host.slice.layers, {}, 0.0)
+	await r.sync()
+	t.eq([api.posts, pub.sink, r.sending], [[], "visuals-2", {}], "a layer on PGM 2: visuals-2 published, no PLAY")
+	t.ok(pub.started[0][0] == host.mixer.out_vp2, "the ring is out_vp2")
+	host.sending = {"channel": 1, "layer": 20}
+	await r.sync()
+	t.eq([api.posts.size(), r.sending, pub.started.size()], [1, {"channel": 3, "layer": 20}, 1], "Send on as well: PLAYed, same ring")
+	api.posts.clear()
+	host.sending = {}
+	await r.sync()
+	t.eq([api.posts, pub.sink], [[["/api/stop", {"channel": 3, "layer": 20}]], "visuals-2"], "Send off: STOP, the Live-source ring stays")
+	host.slice.layers = L.routed(host.slice.layers, 1, 1)
+	host.mixer.go(host.slice.layers, {}, 0.0)
+	await r.sync()
+	t.eq(pub.sink, null, "nothing on PGM 2 any more: the ring stops")
+	host.free()
+
+
 ## The Visuals tab's surface the route reads (visuals_tab.gd: sending, slice, mixer, ring_name, replay_api, _cm, can_publish).
 class _Host:
 	extends Node
@@ -253,7 +291,11 @@ func test_live_expander_routes_through_the_tab() -> void:
 	t.eq(tab.slice.output2, {"screen": 0, "layer": 7}, "output 2's target stored in the slice")
 	tab.route.set_output(1, 0, 9)
 	t.eq(tab.slice.output.layer, 9, "output 1's target through the page's Output path")
-	t.ok(p.note.text.begins_with("Send is off"), "says why nothing plays yet")
+	t.ok(p.note.text.begins_with("Send and Live source are off"), "says why nothing plays yet")
+	tab.slice.output.ring = true
+	p._sig = ""
+	p.refresh()
+	t.ok(p.note.text.contains("shm://visuals-2"), "Live source: names the PGM 2 ring to put on a look")
 	p.free()
 	tab.free()
 

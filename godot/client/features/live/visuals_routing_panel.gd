@@ -200,7 +200,10 @@ func _note(t: Node, cm: Variant) -> String:
 	if str(t.route.note) != "":
 		return str(t.route.note)
 	if t.sending.is_empty():
-		return "Send is off (Visuals ▸ Send to screen): the routes apply when the Visuals are sent."
+		if t.route.live_source():
+			return ("Live source: PGM 1 layers are shm://visuals, PGM 2 layers are shm://%s (Sources ▸ Live while a layer is on PGM 2) —"
+				+ " put it on a look on the overlay screen.") % t.route.ring()
+		return "Send and Live source are off (Visuals ▸ Output): the routes apply when the Visuals are on air."
 	var s := "On air: PGM 1 → ch %d-%d" % [int(t.sending.channel), int(t.sending.layer)]
 	if not t.route.sending.is_empty():
 		s += "  ·  PGM 2 → ch %d-%d (shm://%s)" % [int(t.route.sending.channel), int(t.route.sending.layer), t.route.ring()]

@@ -21,6 +21,7 @@ var tab: Node
 var publisher: Node  # the output-2 ring writer (tests put a stand-in here: start(vp, ring, fps) -> "", stop(), sink)
 var sending := {}  # {channel, layer} while output 2 is on air
 var note := ""  # why output 2 is not on air although a layer is routed there ("" = fine)
+var drain_s := 1.0  # Live-source ring: seconds of transparent frames before it stops (the shm producer holds the last)
 var _busy := false
 var _again := false
 
@@ -46,6 +47,17 @@ func target() -> Dictionary:
 ## Output 2 belongs on air: the Visuals are sent and a deck draws into it.
 func want() -> bool:
 	return not tab.sending.is_empty() and tab.mixer.uses_out2()
+
+
+## The `visuals-2` ring runs: a deck draws into output 2 and the canvas is on air (Send) OR a Live source (output.ring, WO-883 —
+## the owner's way: `shm://visuals` on a look). As a Live source, `visuals-2` is listed in Sources ▸ Live for a PGM 2 look.
+func want_ring() -> bool:
+	return (live_source() or not tab.sending.is_empty()) and tab.mixer.uses_out2()
+
+
+## The canvas is a Live source (Visuals ▸ Output ▸ Live source).
+func live_source() -> bool:
+	return tab.slice.get("output") is Dictionary and tab.slice.output.get("ring") == true
 
 
 ## What sync() does: "start" (publish + PLAY), "move" (STOP the old target, PLAY the new), "stop" (STOP + publisher off)
@@ -77,31 +89,36 @@ func sync() -> void:
 func _step() -> void:
 	var tg := target()
 	var wanted := want()
-	var what := plan(wanted, sending, tg, publisher.sink != null)
-	if wanted and int(tg.channel) <= 0:
-		note = "Output 2: no screen destination."
+	var ring_on := want_ring()
+	var what := plan(wanted, sending, tg, publisher.sink != null and not ring_on)
+	note = "Output 2: no screen destination." if wanted and int(tg.channel) <= 0 else ""
+	var played := not sending.is_empty()
 	if what == "stop" or what == "move":
-		if not sending.is_empty() and _api() != null:
+		if played and _api() != null:
 			await _api().post_json("/api/stop", M.stop_body(int(sending.channel), int(sending.layer)))
 		sending = {}
-	if what == "stop":
+	if not ring_on and publisher.sink != null:
+		if not played and drain_s > 0.0:  # a Live source on someone's look: Caspar holds the last frame — let it go transparent
+			await tab.get_tree().create_timer(drain_s).timeout
+			if want_ring():
+				return
 		publisher.stop()
-		if not wanted:
-			note = ""
+	elif ring_on and publisher.sink == null:
+		var why: String = tab.can_publish()
+		if why == "":
+			why = publisher.start(tab.mixer.out_vp2, ring(), _fps(tg))
+		if why != "":
+			note = why
+			return
 	if what != "start" and what != "move":
 		return
-	var why: String = tab.can_publish()
-	if why == "" and publisher.sink == null:
-		why = publisher.start(tab.mixer.out_vp2, ring(), _fps(tg))
-	if why == "":
-		var r: Dictionary = await _api().post_json("/api/play", M.play_body(int(tg.channel), int(tg.layer), ring()))
-		if r.get("ok"):
-			sending = {"channel": int(tg.channel), "layer": int(tg.layer)}
-		else:
-			why = "Output 2 PLAY failed: %s" % str(r.get("error", r.get("status", "")))
-	if why != "":
-		publisher.stop()
-	note = why
+	var r: Dictionary = await _api().post_json("/api/play", M.play_body(int(tg.channel), int(tg.layer), ring()))
+	if r.get("ok"):
+		sending = {"channel": int(tg.channel), "layer": int(tg.layer)}
+	else:
+		note = "Output 2 PLAY failed: %s" % str(r.get("error", r.get("status", "")))
+		if not live_source():
+			publisher.stop()
 
 
 ## WO-914: Caspar's AMCP link came back — PLAY output 2 again (the ring never stopped).

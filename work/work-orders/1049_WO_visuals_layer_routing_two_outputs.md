@@ -140,3 +140,17 @@ Offline only (no sandbox Godot/Caspar on this box):
   Visuals routing → `PLAY <pgm2 ch>-<layer> SHM NAME visuals-2` lands, PGM 2 shows only those layers keyed (transparent
   around them, fill + key into the PixelHue), PGM 1 keeps the rest; the moved layers do not restart; back to PGM 1 stops
   the second ring and layer; blackout/master on both; a Caspar restart replays both.
+
+## Follow-up 13.11 — Live source mode
+
+After a GUI relaunch the owner said they did not see the options. Their screenshot showed the Visuals in **Live source** mode
+(`shm://visuals` on a look, "Send to screen" off). The first build only put output 2 on air with Send, so routing did
+nothing for them.
+
+- `visuals_route.gd`: new `want_ring()` / `live_source()`. The `visuals-2` ring is published while a layer is on PGM 2 and
+  the canvas is on air **or a Live source**. The ring then shows in Sources ▸ Live, ready for a look on the overlay screen.
+  The route only PLAYs it when Send is on.
+  When the last PGM 2 layer leaves and nothing was PLAYed, the ring keeps writing transparent frames for `drain_s`
+  (1 s) before it stops, because Caspar's shm producer holds the last frame (`shm_producer.cpp` header).
+- `visuals_routing_panel.gd`: the note names `shm://visuals-2` in Live source mode.
+- Test `test_route_live_source_publishes_without_play`, plus a panel note check. Godot suite 28236 / 0, compile boot OK.
