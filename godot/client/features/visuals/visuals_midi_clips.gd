@@ -49,11 +49,20 @@ func drop(num: int, payload: Dictionary) -> void:
 
 
 ## Pad `num` pressed: its visual into the edited bank's selected layer.
+## Owner 12.11: "i cant change select slot/layer on the controller to set different layer with a visual from the pads" —
+## the edited bank had one layer, so Sel 2–8 had nothing to pick and every pad replaced layer 1. Sel on an empty track
+## arms a new slot (its index, -1 = none): the next pad ADDS its visual on top (Layers.drop target -1) and that layer
+## becomes the selected one. Picking a layer (Sel, a click) or switching the edited bank disarms it.
+var new_slot := -1
+
+
 func fire(num: int) -> void:
 	var c: Variant = clips.get(str(num))
 	if not c is Dictionary:
 		return
-	midi.tab.drop_visual(c.payload, midi.tab._target())
+	var target: int = -1 if new_slot >= 0 else midi.tab._target()
+	new_slot = -1
+	midi.tab.drop_visual(c.payload, target)
 
 
 func has(num: int) -> bool:

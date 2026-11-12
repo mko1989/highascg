@@ -66,6 +66,35 @@ func test_drop_and_fire() -> void:
 	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["particles", "rings"], "Stop clears the selected layer")
 
 
+## WO-1047 (owner 12.11): Sel on an empty track arms a new layer — the next pad adds on top instead of replacing.
+func test_sel_on_an_empty_track_adds_a_layer() -> void:
+	var tab := _tab()
+	var midi: Node = tab.midi
+	var scenes := func() -> Array: return tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene)
+	midi.clips.drop(37, {"type": "visual", "scene": "starfield", "label": "Starfield"})
+	midi.clips.drop(38, {"type": "visual", "scene": "tunnel", "label": "Tunnel"})
+	midi.handle(T.note(4, 51, 127))  # Sel 5 — three layers: empty track
+	t.eq(midi.clips.new_slot, 4, "Sel 5 on an empty track arms a new slot")
+	t.eq(midi.led_state.call("select:5"), Leds.ON, "its light is on")
+	t.eq(midi.led_state.call("select:6"), Leds.OFF, "the other empty tracks stay dark")
+	t.eq(midi.led_state.call("select:1"), Leds.AVAIL, "the selected layer is not lit while a new slot is armed")
+	midi.handle(T.note(0, 37, 127))
+	t.eq(scenes.call(), ["tunnel", "particles", "rings", "starfield"], "the pad ADDS its visual on top")
+	t.eq([tab.sel, midi.clips.new_slot], [3, -1], "the new layer is selected, the slot disarmed")
+	midi.handle(T.note(0, 38, 127))
+	t.eq(scenes.call(), ["tunnel", "particles", "rings", "tunnel"], "the next pad replaces the new layer")
+	midi.handle(T.note(5, 51, 127))  # Sel 6: armed
+	midi.handle(T.note(1, 51, 127))  # Sel 2: an existing layer disarms
+	t.eq([tab.sel, midi.clips.new_slot], [1, -1], "Sel on a layer picks it and disarms")
+	midi.handle(T.note(5, 51, 127))
+	tab.page.layer_selected.emit(0)
+	t.eq(midi.clips.new_slot, -1, "a click on a layer disarms too")
+	while tab.slice.layers.size() < L.MAX:
+		tab.drop_visual({"type": "visual", "scene": "rings"}, -1)
+	midi.handle(T.note(7, 51, 127))
+	t.eq([tab.slice.layers.size(), midi.clips.new_slot, tab.sel], [L.MAX, -1, 7], "a full stack: Sel 8 picks layer 8, nothing to arm")
+
+
 func test_arrows_pick_the_edited_bank() -> void:
 	var tab := _tab()
 	var midi: Node = tab.midi

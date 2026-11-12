@@ -163,9 +163,13 @@ func _button(b: Dictionary, msg: Dictionary, c: Control) -> void:
 			_auto(c as OptionButton)
 		"select":
 			apc_view.select(b.target)
+			if clips.new_slot >= 0:  # WO-1047: an empty track
+				_say("%s → next pad adds layer %d on top" % [_name(msg), tab.slice.get("layers", []).size() + 1])
+				return
 		"clip":
 			clips.fire(int(b.target.get_slice(":", 1)))
 		"edit":
+			clips.new_slot = -1
 			tab.dj.focus(int(b.target.get_slice(":", 1)) - 1)
 			_say("Editing bank %s%s" % [b.target.get_slice(":", 1).replace("1", "A").replace("2", "B"),
 				" — ON AIR: changes are live" if tab.mixer.live == tab.mixer.air() else " (PRV)"])
@@ -342,7 +346,12 @@ func led_state(target: String) -> int:
 		"blackout":
 			return Leds.ALERT if tab.mixer.blackout else Leds.AVAIL
 		"select":
-			return Leds.OFF if c == null else (Leds.ON if int(target.get_slice(":", 1)) - 1 == tab.sel else Leds.AVAIL)
+			var si := int(target.get_slice(":", 1)) - 1
+			if c == null:
+				return Leds.OFF
+			if si >= tab.page.layer_list.rows.size():  # WO-1047: an empty track — lit while it is the armed new slot
+				return Leds.ON if si == clips.new_slot else Leds.OFF
+			return Leds.ON if si == tab.sel and clips.new_slot < 0 else Leds.AVAIL
 		"clip":
 			return Leds.OFF if c == null else Leds.ON
 		"edit":  # the edited bank lit; blinking (ALERT) while that is the bank on air

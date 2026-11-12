@@ -101,6 +101,8 @@ func _ready() -> void:
 		page.set_state(slice, _cm()))
 	page.layer_selected.connect(func(i: int) -> void:
 		sel = i
+		if midi != null and midi.get("clips") != null:
+			midi.clips.new_slot = -1  # WO-1047: a picked layer disarms Sel's new slot
 		_orbit_world())
 	page.visual_dropped.connect(drop_visual)
 	page.burst_pressed.connect(func() -> void: mixer.deck_of(mixer.air()).fire())  # WO-908: on the canvas

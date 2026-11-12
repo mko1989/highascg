@@ -63,6 +63,8 @@ func control_of(target: String) -> Control:
 		var p := page()
 		return p[n].control if n >= 0 and n < p.size() and is_instance_valid(p[n].control) else null
 	var rows: Array = midi.tab.page.layer_list.rows
+	if target.begins_with("select:") and n >= rows.size() and n < 8:
+		return surface  # WO-1047: an empty track's Sel arms a new layer (visuals_midi_clips.gd new_slot)
 	return rows[n].panel if n >= 0 and n < rows.size() else null
 
 
@@ -70,6 +72,7 @@ func control_of(target: String) -> Control:
 func select(target: String) -> void:
 	var n := int(target.get_slice(":", 1)) - 1
 	var list: Node = midi.tab.page.layer_list
+	midi.clips.new_slot = n if n >= list.rows.size() and n < 8 else -1
 	if n >= 0 and n < list.rows.size():
 		list.select(n)
 		list.selected.emit(n)
