@@ -1,33 +1,23 @@
 'use strict'
 
+const INT32_FULL = 2147483647
+
 /**
- * `/channel/N/mixer/audio/volume` bundles linear or packed **amplitude** samples (not dBFS).
- * Map one sample to dBFS for `levels[].dBFS`. Amplitude **0** is true silence → ~−120 dBFS.
- * Do **not** use this for `/M/dBFS` floats: there **0** means **0 dBFS** (digital full scale).
+ * `/channel/N/mixer/audio/volume` (and WO-800 `…/layer/<L>/volume`): one int32 per audio channel, the peak |sample| of
+ * the frame in Caspar's int32 audio (src-v2 core/mixer/audio/audio_mixer.cpp) — full scale is 2^31−1, ALWAYS.
+ * WO-1046: values ≤ 65535 used to be read as 16-bit (÷32767), so a quiet int32 peak (≤ −90 dBFS: dither, a muted
+ * input's noise floor) lit the meter near full scale (19698 → −4.4 dB instead of −100.8 dB).
+ * Amplitude **0** is true silence → −120. abs(INT32_MIN) overflows to INT32_MIN in Caspar (a negative full-scale sample)
+ * → 0 dBFS. Not for `/M/dBFS` floats: there **0** means **0 dBFS**.
  * @param {number} raw
  * @returns {number}
  */
 function intMeterSampleToDbfs(raw) {
 	const n = Number(raw)
-	if (!Number.isFinite(n)) return -120
-	// Linear amplitude 0 — no signal (not the same semantic as 0 dBFS on the float meter path).
-	if (n === 0) return -120
-	if (n >= -120 && n < 0) return n
-	// Fixed-point dBFS (negative millibels / millidecibels)
-	if (n < 0 && n >= -120000) return n / 1000
-	if (n < 0 && n >= -12000) return n / 100
-	if (n < 0) return Math.max(-120, n / 1000)
-	// Linear amplitude 0..32767 (common packed meter) → dBFS
-	if (n > 0 && n <= 65535) {
-		const lin = Math.min(1, Math.max(1e-10, n / 32767))
-		return 20 * Math.log10(lin)
-	}
-	// Large positive int32 (e.g. unsigned linear packed) — avoid falling through to -120
-	if (n > 65535 && n <= 0x7fffffff) {
-		const lin = Math.min(1, Math.max(1e-10, n / 2147483647))
-		return 20 * Math.log10(lin)
-	}
-	return -120
+	if (!Number.isFinite(n) || n === 0) return -120
+	if (n <= -INT32_FULL) return 0
+	if (n < 0) return -120
+	return Math.max(-120, 20 * Math.log10(Math.min(1, n / INT32_FULL)))
 }
 
 /**
@@ -210,4 +200,4 @@ const audioMethods = {
 	},
 }
 
-module.exports = { audioMethods }
+module.exports = { audioMethods, intMeterSampleToDbfs }

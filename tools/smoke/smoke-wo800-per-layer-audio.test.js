@@ -89,3 +89,19 @@ describe('WO-800 per-layer audio levels', () => {
 		osc.destroy()
 	})
 })
+
+describe('WO-1046: Caspar meter ints are int32 peaks (full scale 2^31−1), never 16-bit', () => {
+	const { intMeterSampleToDbfs: f } = require('../../src/osc/osc-state-audio')
+	it('quiet peaks stay quiet (were read ÷32767: 19698 → −4.4 dB)', () => {
+		assert.ok(Math.abs(f(19698) - -100.75) < 0.01)
+		assert.ok(Math.abs(f(65535) - -90.31) < 0.01)
+		assert.ok(Math.abs(f(65536) - f(65535)) < 0.001, 'no jump at the old 16-bit boundary')
+	})
+	it('full scale, half scale, silence, abs(INT32_MIN) overflow', () => {
+		assert.equal(f(2147483647), 0)
+		assert.ok(Math.abs(f(1073741824) - -6.0206) < 0.001)
+		assert.equal(f(0), -120)
+		assert.equal(f(-2147483648), 0)
+		assert.equal(f(1), -120)
+	})
+})
