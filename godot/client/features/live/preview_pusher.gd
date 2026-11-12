@@ -17,6 +17,8 @@ var _busy := false
 var _again := false
 var pushes := 0
 var last_mode := ""
+var last_target := ""  # "pgm" when the push went to air (WO-1044)
+var to_pgm := Callable()  # WO-1044: () -> bool, asked per push — the editor's PGM edit lock + whether the look is on air
 
 
 func schedule(scene_id: String, main: int) -> void:
@@ -46,7 +48,11 @@ func _process(_d: float) -> void:
 func _run() -> void:
 	_busy = true
 	ProjectSync.send_deck_sync(true)
-	var res: Dictionary = await Api.post_json("/api/scene/preview-push", {"sceneId": _scene_id, "mainIdx": _main})
+	var body := {"sceneId": _scene_id, "mainIdx": _main}
+	last_target = "pgm" if to_pgm.is_valid() and to_pgm.call() == true else ""
+	if last_target != "":
+		body["target"] = last_target
+	var res: Dictionary = await Api.post_json("/api/scene/preview-push", body)
 	pushes += 1
 	last_mode = str((res.data as Dictionary).get("mode", "")) if res.data is Dictionary else ""
 	ProjectSync.mark_dirty()

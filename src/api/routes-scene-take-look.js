@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-598 C1 — POST /api/scene/take-look { sceneId, mainIdx?, target?: 'program'|'preview', forceCut?, transitionOverride? }
+ * WO-598 C1 — POST /api/scene/take-look { sceneId, mainIdx?, target?: 'program'|'preview', forceCut?, transitionOverride?, previewExchange? }
  *
  * Take (or stage on PRV) a stored look BY ID: the server builds the incomingScene itself
  * (src/engine/scene-take-payload.js — parity-tested against the web builder) and hands the exact body
@@ -83,6 +83,7 @@ function relayArgs(b) {
 	const out = { sceneId: String(b.sceneId || '').trim(), target: 'program', relayed: true }
 	if (Number.isFinite(Number(b.mainIdx)) && b.mainIdx !== null && b.mainIdx !== '') out.mainIdx = Math.max(0, Math.floor(Number(b.mainIdx)))
 	if (b.forceCut === true) out.forceCut = true
+	if (b.previewExchange === false) out.previewExchange = false // WO-1044
 	if (b.transitionOverride && typeof b.transitionOverride === 'object') out.transitionOverride = b.transitionOverride
 	const tv = sanitizeVisibilityMap(b.timersVisibility)
 	if (tv) out.timersVisibility = tv
@@ -199,6 +200,8 @@ async function takeLook(b, ctx, deps) {
 		// WO-840: a look-preset item's per-screen timer visibility rides the program take (a plain look take sends none).
 		...(target === 'program' && sanitizeVisibilityMap(b.timersVisibility) ? { timersVisibility: sanitizeVisibilityMap(b.timersVisibility) } : {}),
 		...(b.takeGroup ? { takeGroup: b.takeGroup } : {}),
+		// WO-1044: a PGM edit re-takes the look already on air — no pgm→prv flip-flop of the outgoing (same) look
+		...(target === 'program' && b.previewExchange === false ? { previewExchange: false } : {}),
 	}
 	if (target === 'program') require('../pixelhue/pixelhue-look-drive').driveLookOnTake(scene, ctx) // WO-1038, beside the take
 	const take = deps.take || require('./routes-scene-take').handleSceneTake

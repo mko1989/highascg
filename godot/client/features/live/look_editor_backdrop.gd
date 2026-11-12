@@ -36,11 +36,14 @@ static func open_with(ed: Control, cm: Dictionary, make_thumb := Callable()) -> 
 	if ed._thumb != null:
 		ed._thumb.queue_free()
 		ed._thumb = null
-	# WO-1029 C9: a remote screen's PRV when its owner's picture is relayed (small, ~10 fps); otherwise thumbnails
-	var prv := DeckModel.preview_bus_available(cm, ed.main) and (SC.is_here(cm, ed.main) or _relayed("prv%d" % (ed.main + 1)))
+	# WO-1029 C9: a remote screen's PRV when its owner's picture is relayed (small, ~10 fps); otherwise thumbnails.
+	# WO-1044: editing the look on air (PGM edit unlocked) shows the PGM picture — what the edits change.
+	var bus := "pgm" if str(ed.get_meta("backdrop_bus", "prv")) == "pgm" else "prv"
+	var has_bus := bus == "pgm" or DeckModel.preview_bus_available(cm, ed.main)
+	var prv := has_bus and (SC.is_here(cm, ed.main) or _relayed("%s%d" % [bus, ed.main + 1]))
 	ed._video.visible = prv
 	if prv:
-		var role := "prv%d" % (ed.main + 1)
+		var role := "%s%d" % [bus, ed.main + 1]
 		ed._video.texture = _autoload("VideoSurfaces").texture(role)
 		return role
 	ed._thumb = make_thumb.call() if make_thumb.is_valid() else load(LOOK_THUMB).new()

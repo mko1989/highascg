@@ -106,6 +106,10 @@ async function handlePreviewPush(body, ctx, deps = {}) {
 	// WO-1029 C1c → Wave B: a look of a screen on another server is pushed there (dest.preview), else 409 NOT_HERE
 	const nh = await relayIfNotHere(ctx, { screenIdx: mainIdx }, 'dest.preview', { body: { ...b, mainIdx } })
 	if (nh) return nh
+	// WO-1044: the editor's screen has PGM edit unlocked — the edit goes to air (routes-scene-pgm-edit-push.js)
+	if (String(b.target || '').toLowerCase() === 'pgm') {
+		return require('./routes-scene-pgm-edit-push').pushEditToPgm({ b, ctx, deps, scene, sceneId, map, mainIdx })
+	}
 	const pgmCh = Number(map.programChannels?.[mainIdx] ?? map.playbackChannels?.[mainIdx])
 	const prvCh = Number(map.previewChannels?.[mainIdx])
 	if (!(Number.isFinite(prvCh) && prvCh > 0 && prvCh !== pgmCh)) {

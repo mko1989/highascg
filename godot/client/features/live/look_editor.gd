@@ -20,6 +20,7 @@ const Audio := preload("res://features/live/look_layer_audio.gd")  # WO-817: aud
 const Backdrop := preload("res://features/live/look_editor_backdrop.gd")  # WO-860: PRV, or HQ thumbnails without one
 const Stale := preload("res://features/live/look_editor_stale.gd")  # WO-918 F12: closes when the project / look / bus is gone
 const Drag := preload("res://features/live/look_editor_drag.gd")  # WO-960: move / resize / crop drags, snapping + guides
+const Pgm := preload("res://features/live/look_editor_pgm.gd")  # WO-1044: per-screen PGM edit lock
 const HANDLE := 8.0
 
 var scene_id := ""
@@ -42,6 +43,8 @@ var _geo: Geometry
 var _page: VBoxContainer  # WO-608 R2: geometry + layer inspector, shown in the global Inspector while a layer is selected
 var _crop_mode := false
 var _crop_btn: Button
+var _lock: Button  # WO-1044
+var _on_pgm := false  # edits go to air right now (unlocked + the look is on this PGM)
 var _fit := Fit.new()
 var _view := View.new()
 var _snap := Drag.new()
@@ -53,7 +56,8 @@ func _ready() -> void:
 	pusher = Pusher.new()
 	add_child(pusher)
 	pusher.pushed.connect(func(r: Dictionary) -> void:
-		_status.text = "PRV: %s" % (pusher.last_mode if r.ok else "push failed (%s)" % r.error))
+		_status.text = "%s: %s" % ["PGM" if pusher.last_target == "pgm" else "PRV", pusher.last_mode if r.ok else "push failed (%s)" % r.error])
+	pusher.to_pgm = func() -> bool: return Pgm.live(scene_id, main)
 	var head := HBoxContainer.new()
 	_title = Label.new()
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -63,6 +67,10 @@ func _ready() -> void:
 	take.tooltip_text = "Take this look to PGM"
 	take.pressed.connect(_take)
 	head.add_child(take)
+	_lock = Button.new()  # WO-1044: per screen, locked by default
+	_lock.toggle_mode = true
+	_lock.toggled.connect(func(on: bool) -> void: Pgm.set_unlocked(main, on); Pgm.refresh(self))
+	head.add_child(_lock)
 	var close := Button.new()
 	close.text = "Close"
 	close.pressed.connect(close_editor)
@@ -139,7 +147,8 @@ func _ready() -> void:
 		if visible and not Stale.close_if_stale(self):
 			Backdrop.follow_media(self); _refresh_list())  # WO-921: media moved by the server restages PRV
 	Store.changed.connect(func(path: String, _v: Variant) -> void:  # a destination removed: its bus's editor goes with it
-		if visible and (path == "*" or path.begins_with("channelMap")): Stale.close_if_stale(self))
+		if visible and (path == "*" or path.begins_with("channelMap")): Stale.close_if_stale(self)
+		if visible and (path == "*" or path.begins_with("scene.")): Pgm.refresh(self))
 
 
 func open(look_id: String, main_idx: int) -> void:
@@ -147,13 +156,18 @@ func open(look_id: String, main_idx: int) -> void:
 	main = main_idx
 	slug = str(Store.project.get("slug", ""))
 	_view.reset()
+	_on_pgm = Pgm.live(scene_id, main)
+	set_meta("backdrop_bus", "pgm" if _on_pgm else "prv")
 	_role = Backdrop.open(self)
+	Pgm.style_button(_lock, main, Pgm.pgm_look(main) == scene_id)
 	visible = true
 	_hold(true)
 	_sel = -1
 	_refresh_list()
 	_select(-1)  # a previous look's layer must not stay in the Inspector
-	if _layers().any(func(l: Variant) -> bool: return l is Dictionary and (l as Dictionary).get("source") is Dictionary):
+	if _on_pgm:  # WO-1044: already on air — opening must not re-take it; the first edit goes out
+		_status.text = "Editing PGM live — every edit goes to air"
+	elif _layers().any(func(l: Variant) -> bool: return l is Dictionary and (l as Dictionary).get("source") is Dictionary):
 		pusher.schedule(scene_id, main)  # stage it on PRV (re-take or nudge, server decides)
 	else:  # WO-623 B: a new empty look (deck "+") — the web stages nothing; the take route refuses a look with no sources
 		_status.text = "Empty look — drop a source on the frame to stage it on PRV"
@@ -348,7 +362,8 @@ func _sync_fields() -> void:
 
 
 func _refresh_list() -> void:
-	_title.text = "Edit look: %s  (main %d → PRV)" % [look().get("name", "?"), main + 1]
+	_title.text = "Edit look: %s  (main %d → %s)" % [look().get("name", "?"), main + 1, "PGM ● LIVE" if _on_pgm else "PRV"]
+	_title.add_theme_color_override("font_color", ThemeBuilder.ERROR if _on_pgm else ThemeBuilder.TEXT)
 	Backdrop.refresh(self)
 	_list.clear()
 	for l in _layers():
