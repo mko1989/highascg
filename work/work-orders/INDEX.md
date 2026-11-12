@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-955 live WOs (34 open, 133 in progress, 788 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+955 live WOs (34 open, 132 in progress, 789 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -284,7 +284,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 974 DONE [audio+engine,godot-client] LTC timecode in (reader + timeline chase) and out (generator) → 974_WO_ltc_timecode_in_out.md
 - 976 DONE [audio+engine,godot-client] A Caspar channel / screen destination (e.g. Dioda PGM) as the audio-reactive FF… → 976_WO_caspar_channel_as_fft_source.md
 - 1045 DONE [audio+engine,web-client] Audio mixer VU meters not real time: a web client's Media tab polled the projec… → 1045_WO_vu_meters_starved_by_project_list_polling.md
-- 1046 IN PROGRESS [audio+caspar-build] Audio meters read far too hot: 16-bit scaling of Caspar's int32 peaks + frozen… → 1046_WO_audio_meter_levels_too_hot.md
+- 1046 DONE [audio+caspar-build] Audio meters read far too hot: 16-bit scaling of Caspar's int32 peaks + frozen… → 1046_WO_audio_meter_levels_too_hot.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (34)
 

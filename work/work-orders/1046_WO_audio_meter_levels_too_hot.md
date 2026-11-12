@@ -1,7 +1,7 @@
 # WO-1046 — Audio meters read far too hot: 16-bit scaling of Caspar's int32 peaks + frozen layer levels
 
 **Area:** audio, caspar-build
-**Status: IN PROGRESS (12.11 — node scaling fix live on the box + smoke 6/6; Caspar frozen-layer fix built, deploy needs a Caspar restart)**
+**Status: DONE (12.11 — on the box: node scaling + Caspar 8a2e29372 deployed; quiet peaks read true, frozen layer meters gone, PGM restored, feed 21 Hz; smoke 6/6)**
 
 Owner, 12.11 (after WO-1045): *"check if the levels of audio are adequate. they seem pretty huge."*
 
@@ -53,4 +53,14 @@ affects every meter.
   the OSC smokes (stale-audio, WO-830a parsers, WO-715 bundle-once) pass 24/24.
 - On the box, after a node restart, `/api/osc/audio-layers` shows ch 8 L10 R at −93.1 (was drawn about −4) and ch 7 L3
   at −85.4. Layers still frozen hot (1-11, 2-10, 2-111, 3-10, 3-12) are bug 2, waiting for the Caspar deploy.
-- Caspar: pending, see the status line.
+- Caspar `8a2e29372` (`src-v2` `highascg-main`, built with `build-26.sh`; VERSION `2.5.1 8a2e29372`). Deployed 12.11
+  23:10 with the owner's OK. The old binary is kept as `bin/casparcg.pre-wo1046` (5c3373ec5). After
+  `systemctl restart casparcg-server` and a node restart:
+  - `/api/osc/audio-layers` lists only layers that are playing: 5-1, 6-2, 7-3 and 8-10 (−19.3 / −93.4). The frozen
+    1-11, 2-10, 2-111, 2-112, 3-10 and 3-12 entries are gone.
+  - PGM ch 2 came back on the same look (e9772b27, `shm://visuals`), restored by node.
+  - The WS meter feed runs at 21.4 Hz, gap max 55 ms.
+  - The new binary's log shows only startup noise: DeckLink 3 `EnableVideoInput` failed once while the old process
+    still held the card (ch 7 plays since), and the http_request error the old binary also logged.
+- Not done: the WO-1022 publish (fork push, tag `highascg-8a2e29372`, `publish-caspar-build.sh`). Until then, server
+  releases still carry 5c3373ec5, which has the frozen-meter bug; the node scaling fix ships with the next release.

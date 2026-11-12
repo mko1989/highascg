@@ -71,6 +71,7 @@ start a fresh branch off upstream: the binary would silently lose these features
 | 2476644c4 | Native DXV (Resolume DXV2/DXV3): CPU unpack to BC blocks, GPU shader decode; DXV3 HQ in correct colours (`ffmpeg.producer.dxv-gpu`) | WO-993 |
 | 3c15fbe7a, 9e243d9b4, 2f168f91f, d8e02f9ef | Runtime CHANNEL ADD/REMOVE (tombstoned slots, COW channel list, generation-checked commands, lazy per-channel AMCP queues), VIDEO-MODE ADD, route format refresh on SET MODE + source_removed (black/silent instead of frozen loop), LOCK callback UAF fix, INFO CONFIG lists live channels — branch `wo1020-dynamic-channels`, deployed 09.11 (`build-wo1020`, md5 6372ec07…, rollback `bin/casparcg.pre-wo1020`) | WO-1020 |
 | 5c3373ec5 | ADD ch[-idx] XML <consumer element> (quoted or base64; every XML consumer option live) — same branch | WO-1020 (WO-1016 P-a/P-b) |
+| 8a2e29372 | Mixer builds a fresh monitor state per frame: a layer that stops contributing audio leaves `audio/layer/<L>/volume` (the merge kept its last peak forever) — deployed 12.11 (md5 a77e28ed…, rollback `bin/casparcg.pre-wo1046`) | WO-1046 |
 
 Run `git -C ~/caspar-build/src-v2 log --oneline v2.5.1-stable..highascg-main` for the live list. Update this table
 when you add a commit.
