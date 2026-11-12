@@ -6,6 +6,7 @@ const { loadExfatSyncMapFromDisk } = require('../system/exfat-sync-map')
 const { copyFilePreserveTimes } = require('../system/exfat-sync-fs')
 const { shouldAllowExfatPullShowData } = require('../replication/replication-show-authority')
 const { isBootStick } = require('../system/boot-stick')
+const { readProjectHead } = require('./project-head-cache') // WO-1045
 // Lazy: project-store requires this module back — a top-level require creates a require cycle
 // (project-store's exports are incomplete when read from here at load time; Node floods
 // "Accessing non-existent property ... inside circular dependency" per project file scanned).
@@ -157,8 +158,10 @@ function scanProjectsDir(projectsDir, source) {
 		if (!slug || slug === AUTOSAVE_SUBDIR) continue
 		const p = path.join(projectsDir, ent)
 		let sizeBytes
+		let st = null
 		try {
-			sizeBytes = fs.statSync(p).size
+			st = fs.statSync(p)
+			sizeBytes = st.size
 		} catch {
 			sizeBytes = null
 		}
@@ -178,7 +181,7 @@ function scanProjectsDir(projectsDir, source) {
 		}
 		let project
 		try {
-			project = JSON.parse(fs.readFileSync(p, 'utf8'))
+			project = readProjectHead(p, st)
 		} catch {
 			projectStoreLazy().quarantineCorruptFile(p)
 			out.push({

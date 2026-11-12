@@ -74,7 +74,7 @@ export function createSourcesPanelRender(ctx) {
 		if (currentTab === 'media') {
 			listEl.classList.add('sources-media-list')
 			listEl.tabIndex = 0
-			void refreshProjectMediaBar()
+			void refreshProjectMediaBar({ fetch: false }) // WO-1045: never a fetch per render
 			let mediaList = mergeMediaProbeOverlay(s.media || [], getMediaWithProbe())
 			if (getFilterProjectOnly()) mediaList = filterMediaForActiveProject(mediaList)
 			renderMediaBrowser(listEl, mediaList, getFilter(), refreshMedia, {

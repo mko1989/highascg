@@ -12,6 +12,7 @@ import { planGatherProjectMediaIntoFolder, executeGatherProjectMedia } from '../
 import { mergeMediaProbeOverlay } from './sources-panel-helpers.js'
 import {
 	refreshProjectMediaContext,
+	getProjectMediaContext,
 	getDefaultUploadSubdir,
 } from '../lib/project-media-context.js'
 
@@ -71,8 +72,13 @@ export function createProjectMediaGather(ctx) {
 		}, 400)
 	}
 
-	async function refreshProjectMediaBar() {
-		projectMediaCtx = await refreshProjectMediaContext()
+	/**
+	 * @param {{ fetch?: boolean }} [opts] fetch:false (every render) paints from the cached context — WO-1045: fetching
+	 * here on each render sent /api/project/list + /api/settings ~7×/s while the Media tab was open, and every list call
+	 * parsed all show files on the server's event loop (starved the VU meter feed). Load / project / settings events fetch.
+	 */
+	async function refreshProjectMediaBar(opts = {}) {
+		projectMediaCtx = opts.fetch === false ? getProjectMediaContext() : await refreshProjectMediaContext()
 		const { projectScopedEnabled, mediaFolder, activeSlug } = projectMediaCtx
 		const show = ctx.getCurrentTab() === 'media' && projectScopedEnabled && !!activeSlug && !!mediaFolder
 		if (ctx.projectMediaBar) ctx.projectMediaBar.style.display = show ? 'flex' : 'none'
