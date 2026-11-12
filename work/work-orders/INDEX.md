@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-958 live WOs (34 open, 134 in progress, 790 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+959 live WOs (34 open, 135 in progress, 790 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -413,7 +413,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 - 1024 IN PROGRESS [lighting+godot-client] GDTF fixture models missing in the previs (built-in primitives drawn as boxes;… → 1024_WO_gdtf_models_missing_primitives_and_share_swap.md
 
-## godot-client — Godot client (159)
+## godot-client — Godot client (160)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -574,6 +574,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1044 IN PROGRESS [godot-client+engine] Live tab: "PGM edit" — open the look editor on the look on PGM, edits go to air → 1044_WO_live_look_editor_pgm_edit_lock.md
 - 1047 DONE [godot-client] Visuals Controller: Sel on an empty track arms a new layer, so the pads can fil… → 1047_WO_visuals_apc_sel_empty_track_adds_layer.md
 - 1048 IN PROGRESS [godot-client] APC40 hardware Sel: the device knobs' bank resend nudged parameters and rings s… → 1048_WO_visuals_apc_device_knob_bank_resend.md
+- 1051 IN PROGRESS [godot-client+engine] Visuals layers as their own sources: pick a layer in Sources ▸ Live, stack it o… → 1051_WO_visuals_layers_as_sources_live_picks.md
 
 ## web-client — Web client (82)
 
