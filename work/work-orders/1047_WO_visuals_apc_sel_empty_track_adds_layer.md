@@ -1,7 +1,7 @@
 # WO-1047 — Visuals Controller: Sel on an empty track arms a new layer, so the pads can fill layers 2–8
 
 **Area:** godot-client
-**Status: IN PROGRESS (12.11 — built; suite 28109/0, `--check` boot OK; the running GUI still has the old code — it renders `shm://visuals` on PGM, so no relaunch without the owner)**
+**Status: DONE (12.11 — suite 28109/0; owner relaunched the GUI 23:33 and confirmed on the virtual controller: "i can do it from the virtual controller now"; on the real APC the right-hand knobs then shifted → WO-1048)**
 
 Owner, 12.11: *"i cant change select slot/layer on the controller to set different layer with a visual from the pads."*
 
@@ -45,3 +45,8 @@ layer is the only place a new visual can go. The MIDI line says which layer it w
   - Godot suite 28109 passed / 0 failed. `run-client.sh --check` boot OK.
 - **Not yet on the hardware:** the operator GUI (pid running since 22:47) renders the Visuals on PGM (`shm://visuals`
   on ch 2). It picks this up on its next relaunch, then: Sel 2 → a pad → layer 2 added.
+
+## Owner QA
+
+Owner 12.11, after relaunching the GUI: *"i can do it from the virtual controller now, but on the real apc it seems to shift
+the encoders on the right to some other values"*. The hardware side is WO-1048.

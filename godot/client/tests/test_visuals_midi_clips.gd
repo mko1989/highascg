@@ -161,3 +161,30 @@ func test_apc_knob_is_an_encoder() -> void:
 	midi.handle(T.cc(0, 50, 3))
 	t.ok(absf(tab.slice.params.hue - (hue + 3 / 127.0)) < 0.011, "3 steps up from the knob's own 0: the hue moves up 3 steps from %.2f" % hue)
 	t.eq(midi.waiting, false, "never waiting")
+
+
+## WO-1048 (owner 12.11: "on the real apc it seems to shift the encoders on the right to some other values"): Generic mode
+## banks the device knobs per track select and resends the new bank's 8 positions — positions, not turns; rings follow.
+func test_track_select_bank_resend_moves_nothing() -> void:
+	var tab := _tab()
+	var midi: Node = tab.midi
+	midi.apc = true
+	midi.handle(T.cc(0, 16, 60))  # bank 1: the encoder knows the knob is at 60
+	midi.handle(T.note(1, 51, 127))  # Sel 2 on the hardware
+	midi._hello_until = 0
+	var c: Range = midi.control_of("dev:1")
+	t.ok(c != null, "device knob 1 drives something on layer 2's page")
+	var was := c.ratio
+	midi.handle(T.cc(1, 16, 64))  # bank 2's stored position, 4 steps from bank 1's: read as a turn it stepped +4
+	t.eq([c.ratio, midi.dev_bank], [was, 1], "the resend moves nothing; the knobs are on bank 2 (ch 1)")
+	midi._bank_until = 0
+	midi.handle(T.cc(1, 16, 66))
+	t.ok(absf(c.ratio - clampf(was + 2 / 127.0, 0.0, 1.0)) < 0.011, "the next turn moves by its own 2 steps")
+	var before := c.ratio
+	midi.handle(T.cc(2, 16, 69))  # the bank changed while nobody listened (3 steps from 66)
+	t.eq([c.ratio, midi.dev_bank], [before, 2], "a device CC on another channel primes, never steps")
+	var f: Dictionary = Leds.frame(midi.map, midi.led_state, Callable(), midi.dev_bank)
+	t.ok(f.has("178:16") and not f.has("176:16"), "the device rings go to the bank's channel (B2)")
+	t.ok(f.has("176:48"), "the track knobs' rings stay on channel 0 (not banked)")
+	midi.handle(T.note(1, 51, 127, true))
+	t.eq(midi._bank_until > 0, true, "a hardware Sel opens the resend window")

@@ -37,6 +37,12 @@ var out := Out.new()
 var apc := false  ## an APC40 is plugged in: its control names in the texts
 var _lit := {}  # the lights as last sent
 var _cc_last := {}  # source key → last CC value: a CC on a button target presses on its rising edge
+## WO-1048 — APC40 mkII Generic mode banks the 8 device knobs per track select (ch 0–7, master 8): a Sel press makes the
+## APC resend that bank's 8 positions on the new channel. Those are positions, not turns (read as encoder steps they
+## nudged the parameters), and the rings must go to that channel (sent on ch 0 they showed the other bank's values).
+var dev_bank := 0  ## the channel the device knobs last spoke on
+var _bank_until := 0  # msec: device-knob CCs before this are the APC's bank resend
+const BANK_RESEND_MS := 300
 var _ghosts := {}  # target → its Ghost
 var _auto_back := 2  # Auto switched on from a button goes back to this item (8 bars)
 var clips: Clips  # WO-913: visual pads
@@ -97,6 +103,7 @@ func handle_msg(msg: Dictionary) -> void:
 			_captured(msg)
 		return
 	var hello := Time.get_ticks_msec() < _hello_until  # the APC reporting its faders: positions, not moves
+	var resend := _bank(msg)
 	var b := MidiMap.find(map, msg)
 	if b.is_empty():
 		if msg.kind != "off" and not hello:
@@ -108,9 +115,26 @@ func handle_msg(msg: Dictionary) -> void:
 			_say("%s → %s: not there" % [_name(msg), MidiMap.target_label(b.target)])
 		return
 	if MidiMap.is_range(b.target):
-		_move(b, msg, c as Range, hello)
+		_move(b, msg, c as Range, hello or resend)
 	elif not hello:
 		_button(b, msg, c)
+
+
+## WO-1048: a hardware track select opens the bank-resend window; a device-knob CC names the bank. True = this CC is
+## the APC's resend of the new bank's positions (prime the encoder, move nothing).
+func _bank(msg: Dictionary) -> bool:
+	if not apc or msg.get("virtual", false):
+		return false
+	var num := int(msg.num)
+	if msg.kind == "note" and (num == 51 or num == 80):  # track select 1–8 / master
+		_bank_until = Time.get_ticks_msec() + BANK_RESEND_MS
+		return false
+	if msg.kind != "cc" or num < 16 or num > 23:
+		return false
+	var ch := clampi(int(msg.ch), 0, 8)
+	var switched := ch != dev_bank
+	dev_bank = ch
+	return switched or Time.get_ticks_msec() < _bank_until
 
 
 func _move(b: Dictionary, msg: Dictionary, c: Range, hello := false) -> void:
@@ -317,7 +341,7 @@ func tick() -> void:
 				Pickup.observe(pick[k], c.ratio)
 				_ghost(b.target, pick[k], c)
 	if out.port != "":  # the knob rings always (WO-912: the APC then turns on from the app's value); the pad lights when on
-		var f := Leds.frame(map, led_state, clips.velocity)
+		var f := Leds.frame(map, led_state, clips.velocity, dev_bank)
 		if not leds:
 			f = Leds.rings(f)
 		out.send(Leds.diff(_lit, f))

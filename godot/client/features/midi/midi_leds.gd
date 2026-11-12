@@ -27,7 +27,9 @@ static func ring(num: int) -> bool:
 ## The lights the map asks for: {"status:num": value}. `state.call(target)` = OFF..ALERT for a button target, 0..127 (its
 ## value) for a range one. Only notes light; a CC lights only when it is an APC knob (its ring).
 ## `vel.call(target)` (optional, WO-913): an RGB pad's own palette colour, -1 = the state's.
-static func frame(map: Array, state: Callable, vel := Callable()) -> Dictionary:
+## `dev_ch` (WO-1048): the channel the device knobs (CC 16–23) are on now — in Generic mode the APC banks them per track
+## select (track 1–8 = ch 0–7, master = 8) and shows that bank's ring, so their rings go to that channel.
+static func frame(map: Array, state: Callable, vel := Callable(), dev_ch := 0) -> Dictionary:
 	var out := {}
 	for b in map:
 		var num := int(b.num)
@@ -37,7 +39,7 @@ static func frame(map: Array, state: Callable, vel := Callable()) -> Dictionary:
 			var own := int(vel.call(b.target)) if rgb(num) and vel.is_valid() else -1
 			out["%d:%d" % [0x90 | ch, num]] = own if own >= 0 else (RGB_VEL[s] if rgb(num) else [0, 0, 1, 2 if num in [52, 96, 97] else 1][s])
 		elif b.kind == "cc" and ring(num):
-			out["%d:%d" % [0xB0, num]] = clampi(int(state.call(b.target)), 0, 127)
+			out["%d:%d" % [0xB0 | (clampi(dev_ch, 0, 8) if num <= 23 else 0), num]] = clampi(int(state.call(b.target)), 0, 127)
 	return out
 
 
