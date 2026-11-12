@@ -62,5 +62,6 @@ affects every meter.
   - The WS meter feed runs at 21.4 Hz, gap max 55 ms.
   - The new binary's log shows only startup noise: DeckLink 3 `EnableVideoInput` failed once while the old process
     still held the card (ch 7 plays since), and the http_request error the old binary also logged.
-- Not done: the WO-1022 publish (fork push, tag `highascg-8a2e29372`, `publish-caspar-build.sh`). Until then, server
-  releases still carry 5c3373ec5, which has the frozen-meter bug; the node scaling fix ships with the next release.
+- Published 12.11 (owner: *"yes publish. seems to have fixed"*): fork `highascg-main` + tag `highascg-8a2e29372`,
+  release `caspar-8a2e29372` (binary + complete source), `caspar/PINNED.json` → 8a2e29372, so the next server
+  release carries it.
