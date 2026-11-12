@@ -355,6 +355,9 @@ func tick() -> void:
 		_say(out.error)
 	if _hello_until > 0 and Time.get_ticks_msec() >= _hello_until:
 		_hello_until = 0
+		if leds and out.port != "":  # WO-1052: sent beside the Generic one (one amidi run) the APC kept Generic mode —
+			out.send(Leds.SYSEX_ABLETON)  # Sel stayed internal (no note 51) and banked the device knobs
+			_lit = {}  # the next tick re-sends every light in the new mode
 		var n := pick.values().filter(func(st: Dictionary) -> bool: return Pickup.waiting(st)).size()
 		_say("Controller ready — %d fader%s wait%s: bring each to its amber tick" % [n, "" if n == 1 else "s", "s" if n == 1 else ""]
 			if n > 0 else "Controller ready — every fader is at its slider", n > 0)
@@ -411,9 +414,7 @@ func _port(listing: String) -> void:
 	out.port = Leds.port_of(listing)
 	_lit = {}
 	if out.port != "":
-		_hello()
-		if leds:
-			out.send(Leds.SYSEX_ABLETON)
+		_hello()  # WO-1052: the Ableton Introduction follows once the APC has answered this one (tick)
 
 
 ## The Generic-mode Introduction (its power-on mode, so nothing changes on it): the APC answers with every fader's position
@@ -473,7 +474,7 @@ func _load() -> void:
 	if cfg_path == "" or c.load(cfg_path) != OK or not c.has_section_key(SECTION, "map"):
 		map = MidiMap.apc40()
 	else:
-		map = MidiMap.with_new_defaults(MidiMap.normalize(c.get_value(SECTION, "map")), ["edit", "clear"])  # WO-913
+		map = MidiMap.with_new_defaults(MidiMap.without_phantoms(MidiMap.normalize(c.get_value(SECTION, "map"))), ["edit", "clear"])  # WO-913, WO-1052
 	leds = cfg_path != "" and c.get_value(SECTION, "leds", false) == true
 	clips.load_from(c)
 

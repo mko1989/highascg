@@ -10,6 +10,8 @@ extends RefCounted
 const ANY := -1
 const RANGES := ["layer", "master", "fade", "param", "xfade", "dev", "pxl"]  # dev: WO-909 device knobs · pxl: WO-1050 a PixelHue layer's opacity · continuous targets (a slider; picked up, midi_pickup.gd)
 const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select", "clip", "edit", "clear"]  # take / cut / xfade: WO-908 A/B · clip / edit / clear: WO-913
+const CLEAR_NOTE := 62  # WO-1052: Dev on/off — Clear layer
+const PHANTOM_STOP := 92  # the APC40 mk1 Stop, absent on the mkII
 const PARAM_LABELS := {"cam_yaw": "Camera yaw", "cam_pitch": "Camera pitch", "cam_zoom": "Camera zoom"}
 ## WO-1050: "pxl:<layerId>" → the switcher layer's name, as the Visuals' PixelHue block last read it (visuals_pixelhue.gd)
 static var pxl_names := {}
@@ -188,8 +190,24 @@ static func apc40() -> Array:
 	m.append({"kind": "note", "ch": ANY, "num": 86, "target": "cut"})  # scene launch 5 → A/B CUT
 	m.append({"kind": "note", "ch": ANY, "num": 97, "target": "edit:1"})  # WO-913: ◀ / ▶ = edit bank A / B (PGM too)
 	m.append({"kind": "note", "ch": ANY, "num": 96, "target": "edit:2"})
-	m.append({"kind": "note", "ch": ANY, "num": 92, "target": "clear"})  # WO-913: Stop = clear the selected layer
+	m.append({"kind": "note", "ch": ANY, "num": CLEAR_NOTE, "target": "clear"})  # WO-1052: Dev on/off = clear the selected layer
 	return m
+
+
+## WO-1052: the mkII has no Stop button — note 92 is the mk1's (WO-913 put Clear layer there, unreachable on the owner's unit).
+## A stored binding on note 92 moves to Dev on/off (CLEAR_NOTE) when that is free, else it is dropped.
+static func without_phantoms(map: Array) -> Array:
+	var free := not map.any(func(b: Dictionary) -> bool: return b.kind == "note" and int(b.num) == CLEAR_NOTE)
+	var out := []
+	for b in map:
+		if b.kind == "note" and int(b.num) == PHANTOM_STOP:
+			if not free:
+				continue
+			b = b.duplicate()
+			b.num = CLEAR_NOTE
+			free = false
+		out.append(b)
+	return out
 
 
 ## WO-913: a stored map gains the default bindings of target kinds newer than it (`kinds`) whose control it leaves free.

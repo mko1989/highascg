@@ -62,8 +62,8 @@ func test_drop_and_fire() -> void:
 	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["starfield", "particles", "rings"],
 		"track select 1, then the pad: layer 1 replaced, whatever the pad's column")
 	t.eq(tab.slice.layers[0].opacity, 0.6, "its fader kept")
-	midi.handle(T.note(0, 92, 127))  # Stop = clear
-	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["particles", "rings"], "Stop clears the selected layer")
+	midi.handle(T.note(0, 62, 127))  # WO-1052: Dev on/off = clear
+	t.eq(tab.slice.layers.map(func(l: Dictionary) -> String: return l.scene), ["particles", "rings"], "Dev on/off clears the selected layer")
 
 
 ## WO-1047 (owner 12.11): Sel on an empty track arms a new layer — the next pad adds on top instead of replacing.
@@ -122,9 +122,23 @@ func test_arrows_pick_the_edited_bank() -> void:
 func test_stored_map_gains_the_new_buttons() -> void:
 	var stored := [{"kind": "note", "ch": -1, "num": 92, "target": "blackout"}]
 	var m := T.MM.with_new_defaults(stored, ["edit", "clear"])
-	t.eq(m.map(func(b: Dictionary) -> String: return b.target), ["blackout", "edit:1", "edit:2"],
-		"◀ / ▶ added; Stop kept what the operator put on it, so no clear")
-	t.eq(T.MM.with_new_defaults(m, ["edit", "clear"]).size(), 3, "no duplicates on the next load")
+	t.eq(m.map(func(b: Dictionary) -> String: return b.target), ["blackout", "edit:1", "edit:2", "clear"],
+		"◀ / ▶ added; note 92 keeps what the operator put on it; clear goes to its own default (WO-1052: Dev on/off)")
+	t.eq(T.MM.with_new_defaults(m, ["edit", "clear"]).size(), 4, "no duplicates on the next load")
+
+
+## WO-1052 (owner 13.11: "there is no clear layer button on my akai"): the mkII has no Stop — a stored note-92 binding moves
+## to Dev on/off when that is free, and the drawing has no Stop button.
+func test_phantom_stop_moves_to_dev_on_off() -> void:
+	var stored := [{"kind": "note", "ch": -1, "num": 92, "target": "clear"}, {"kind": "note", "ch": 0, "num": 51, "target": "select:1"}]
+	var m := T.MM.without_phantoms(stored)
+	t.eq(m.map(func(b: Dictionary) -> Array: return [b.num, b.target]), [[62, "clear"], [51, "select:1"]], "Clear layer → Dev on/off")
+	t.eq(stored[0].num, 92, "the stored array is not changed in place")
+	var taken := [{"kind": "note", "ch": -1, "num": 62, "target": "blackout"}, {"kind": "note", "ch": -1, "num": 92, "target": "clear"}]
+	t.eq(T.MM.without_phantoms(taken).map(func(b: Dictionary) -> String: return b.target), ["blackout"], "Dev on/off taken: dropped")
+	t.ok(T.MM.apc40().any(func(b: Dictionary) -> bool: return b.target == "clear" and b.num == 62), "the default map: Dev on/off")
+	var L := preload("res://features/midi/apc40_layout.gd")
+	t.ok(not L.controls().any(func(c: Dictionary) -> bool: return c.kind == "note" and c.num == 92), "no Stop on the drawing")
 
 
 func test_click_on_the_drawing_presses_a_pad() -> void:

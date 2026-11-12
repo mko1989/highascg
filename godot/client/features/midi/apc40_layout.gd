@@ -44,7 +44,7 @@ static func controls() -> Array:
 	var row := [[87, "Pan"], [88, "Sends"], [89, "User"], [90, "Metronome"]]
 	for i in row.size():
 		out.append(_c("note", ANY, row[i][0], "btn", Rect2(rx + i * 1.6 + 0.1, 4.15, 1.4, 0.4), row[i][1]))
-	row = [[91, "Play"], [92, "Stop"], [93, "Record"], [102, "Session rec"]]
+	row = [[91, "Play"], [93, "Record"], [102, "Session rec"]]  # WO-1052: the mkII has no Stop (92 is the mk1's)
 	for i in row.size():
 		out.append(_c("note", ANY, row[i][0], "btn", Rect2(rx + i * 1.6 + 0.1, 4.75, 1.4, 0.4), row[i][1]))
 	out.append(_c("cc", ANY, 13, "encoder", Rect2(rx + 0.3, 5.5, 1.0, 1.0), "Tempo knob"))
