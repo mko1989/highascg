@@ -2,7 +2,8 @@ extends RefCounted
 ## WO-890 — the Visuals' layer stack, pure half (owner 31.10: "dynamically add visual layers and have an opacity fader for each
 ## layer added. similar to looks editor"). `project.visuals.layers` is an ordered list, bottom → top, of at most MAX layers:
 ##   {scene, shader (scene "shader": the library id), game (scene "game": the ROM path), label (the Sources row's name),
-##    opacity 0..1, visible, blend ("normal" = drawn over the layers below, "add" = added onto them)}
+##    opacity 0..1, visible, blend ("normal" = drawn over the layers below, "add" = added onto them),
+##    out (WO-1049: 2 = routed to the second, keyed output; stored only when 2 — absent = 1, so older shows are unchanged)}
 ## Each layer renders alone in its own world and the deck (visuals_deck.gd) stacks them with their opacity and blend.
 ## Before WO-890 the slice had a fixed pair — `scene` (main) + `overlay` (layer 2) + one `shader` + one `game`; migrate()
 ## turns that into layers on read (old projects, saved looks), and compat() derives those fields back from the layers so an
@@ -31,7 +32,30 @@ static func layer_of(v: Variant) -> Variant:
 		l.game = str(v.get("game", "")) if v.get("game") is String else ""
 	if v.get("label") is String and str(v.label).strip_edges() != "":
 		l.label = str(v.label).strip_edges().left(60)
+	if out_of(v) == 2:
+		l.out = 2
 	return l
+
+
+## WO-1049: the output a layer is routed to — 1 (the background composite) or 2 (the transparent overlay composite).
+static func out_of(l: Variant) -> int:
+	return 2 if l is Dictionary and int(_num(l.get("out", 1))) == 2 else 1
+
+
+## WO-1049: `layers` with layer `i` routed to `out` (1 erases the field); the list itself is not changed.
+static func routed(layers: Array, i: int, out: int) -> Array:
+	var next := layers.duplicate(true)
+	if i >= 0 and i < next.size():
+		if out == 2:
+			next[i].out = 2
+		else:
+			next[i].erase("out")
+	return next
+
+
+## WO-1049: does any layer go to output 2?
+static func uses_out2(layers: Variant) -> bool:
+	return layers is Array and (layers as Array).any(func(l: Variant) -> bool: return out_of(l) == 2)
 
 
 ## A stored list made safe: known scenes only, at most MAX, one game layer (the first).
@@ -78,16 +102,17 @@ static func compat(layers: Array) -> Dictionary:
 
 
 ## What a layer shows — layers with the same key are the same running picture (the deck keeps it running across edits).
+## WO-1049: never the route (`out`): moving a layer between the outputs re-parents its draw rect, the scene keeps running.
 static func key(l: Dictionary) -> String:
 	return "%s|%s|%s" % [l.get("scene", ""), l.get("shader", ""), l.get("game", "")]
 
 
 ## A Sources ▸ Visuals payload ({type: "visual", label, scene, shader?, game?}) as a layer; `keep` = the layer it replaces
-## (its opacity, visible and blend stay).
+## (its opacity, visible, blend and route stay).
 static func from_payload(payload: Dictionary, keep := {}) -> Dictionary:
 	var l := {"scene": str(payload.get("scene", "")), "label": payload.get("label", ""), "shader": payload.get("shader", ""),
 		"game": payload.get("game", ""), "opacity": keep.get("opacity", 1.0), "visible": keep.get("visible", true),
-		"blend": keep.get("blend", "normal")}
+		"blend": keep.get("blend", "normal"), "out": out_of(keep)}
 	var n: Variant = layer_of(l)
 	return n if n != null else {}
 

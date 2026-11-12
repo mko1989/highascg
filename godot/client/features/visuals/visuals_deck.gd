@@ -9,6 +9,9 @@ extends Node
 ## one render per layer (hence the cap, visuals_layers.gd MAX, and muted / 0 % layers do not render at all).
 ## Edits are in place: a layer whose picture is unchanged keeps running (no restart, no shader recompile), a new one fades
 ## in and a removed one fades out over `fade` seconds, at its place in the stack; a fader moves at once.
+## WO-1049: a second composite, `out2` (transparent, no black back, no base tint), draws the layers routed to output 2
+## (visuals_layers.gd `out`) in stack order — the keyed overlay. A layer renders once (its own viewport) whatever its route;
+## re-routing moves its draw rect between `out` and `out2` and nothing restarts. `out2` renders only while it has layers.
 
 const Stage := preload("res://features/visuals/visuals_stage.gd")
 const L := preload("res://features/visuals/visuals_layers.gd")
@@ -21,6 +24,7 @@ const SRC := {
 static var _shaders := {}
 
 var out: SubViewport
+var out2: SubViewport  # WO-1049: the output-2 composite (premultiplied alpha over transparent)
 var slots := []  # the layers on stage, bottom → top: {vp, stage, rect, mat, key, layer, w (fade-in weight), to}
 var leaving := []  # removed or replaced layers fading out, then freed: the same, + `at` (their place in the stack)
 var running := true
@@ -51,6 +55,12 @@ func _init() -> void:
 	_back.color = Color.BLACK
 	_back.size = Vector2(_size)
 	out.add_child(_back)
+	out2 = SubViewport.new()
+	out2.disable_3d = true
+	out2.transparent_bg = true
+	out2.size = _size
+	out2.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(out2)
 
 
 static func _shader(blend: String) -> Shader:
@@ -79,6 +89,7 @@ func apply(layers: Array, cfgs: Dictionary, seconds: float) -> void:
 			s.w = 0.0 if seconds > 0.0 else 1.0
 		if l.scene == "shader" and cfgs.get(str(l.get("shader", ""))) != null:
 			s.stage.set_shader(cfgs[str(l.shader)])  # the same config again is no recompile (visuals_stage.gd)
+		_route(s.rect, L.out_of(l))  # WO-1049: re-routed → only the draw rect moves
 		s.layer = l.duplicate(true)
 		s.to = 1.0
 		next.append(s)
@@ -105,6 +116,11 @@ func clear() -> void:
 
 func is_empty() -> bool:
 	return slots.is_empty() and leaving.is_empty()
+
+
+## WO-1049: does anything on stage (fading out included) draw into output 2?
+func uses_out2() -> bool:
+	return (slots + leaving).any(func(s: Dictionary) -> bool: return s.rect.get_parent() == out2)
 
 
 ## The scene ids on stage, bottom first.
@@ -153,6 +169,7 @@ func resize(size: Vector2i) -> void:
 	_size = size
 	out.size = size
 	_back.size = Vector2(size)
+	out2.size = size
 	for s in slots + leaving:
 		s.vp.size = size
 		s.rect.size = Vector2(size)
@@ -180,6 +197,7 @@ func step(delta: float) -> void:
 ## GPU ms of the last frame (dev probes, with `measure` set before the layers were made): every layer + the composite.
 func gpu_ms() -> float:
 	var ms := RenderingServer.viewport_get_measured_render_time_gpu(out.get_viewport_rid())
+	ms += RenderingServer.viewport_get_measured_render_time_gpu(out2.get_viewport_rid())
 	for s in slots + leaving:
 		ms += RenderingServer.viewport_get_measured_render_time_gpu(s.vp.get_viewport_rid())
 	return ms
@@ -213,7 +231,7 @@ func _slot(l: Dictionary, cfgs: Dictionary) -> Dictionary:
 	rect.size = Vector2(_size)
 	rect.material = mat
 	rect.visible = false
-	out.add_child(rect)
+	_route(rect, L.out_of(l))
 	return {"vp": vp, "stage": st, "rect": rect, "mat": mat, "key": L.key(l), "layer": l, "w": 1.0, "to": 1.0, "at": 0}
 
 
@@ -227,10 +245,29 @@ func _order() -> void:
 	gone.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.at < b.at)
 	for s in gone:
 		order.insert(clampi(s.at, 0, order.size()), s)
-	for i in order.size():
-		out.move_child(order[i].rect, i + 1)  # 0 is the black backdrop
+	var at := [1, 0]  # the next index in out (0 is the black backdrop) and in out2 (WO-1049: no backdrop)
+	for s in order:
+		var two := int(s.rect.get_parent() == out2)
+		s.rect.get_parent().move_child(s.rect, at[two])
+		at[two] += 1
+	var base := _base()
 	for i in slots.size():
-		slots[i].stage.set_base(i == 0)  # WO-945: the tint and a game's overlay mode only — the viewport stays transparent
+		slots[i].stage.set_base(i == base)  # WO-945: the tint and a game's overlay mode only — the viewport stays transparent
+
+
+## WO-1049: the base is the bottom layer of output 1 (its tint is output 1's backdrop; an output-2 layer is never tinted).
+func _base() -> int:
+	return slots.find_custom(func(s: Dictionary) -> bool: return s.rect.get_parent() != out2)
+
+
+## WO-1049: a layer's draw rect into the composite of output `n` (1 = `out`, 2 = `out2`); already there → nothing.
+func _route(rect: TextureRect, n: int) -> void:
+	var to := out2 if n == 2 else out
+	if rect.get_parent() == to:
+		return
+	if rect.get_parent() != null:
+		rect.get_parent().remove_child(rect)
+	to.add_child(rect)
 
 
 func _reap() -> void:
@@ -252,8 +289,9 @@ func _free(s: Dictionary) -> void:
 ## what its opaque world used to give, the fader dimming it to black as before.
 func _backdrop() -> void:
 	var c := Color.BLACK
-	if not slots.is_empty():
-		var b: Dictionary = slots[0]
+	var i := _base()
+	if i >= 0:
+		var b: Dictionary = slots[i]
 		c = (b.stage.bg_tint as Color) * float(b.get("a", 0.0))
 	_back.color = Color(c.r, c.g, c.b, 1.0)
 
@@ -272,3 +310,5 @@ func _update() -> void:
 		s.vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if on else SubViewport.UPDATE_DISABLED
 		s.stage.set_process(on)
 	out.render_target_update_mode = SubViewport.UPDATE_ALWAYS if running else SubViewport.UPDATE_DISABLED
+	# WO-1049: out2 only while something draws there; ONCE clears it to transparent after the last layer left
+	out2.render_target_update_mode = SubViewport.UPDATE_ALWAYS if running and uses_out2() else SubViewport.UPDATE_ONCE

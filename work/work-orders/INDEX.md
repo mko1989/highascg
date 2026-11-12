@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-959 live WOs (36 open, 133 in progress, 790 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+959 live WOs (34 open, 135 in progress, 790 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -372,7 +372,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1039 IN PROGRESS [mapping+godot-client,devices-config] PixelHue main tab: the owner's PixelHue Studio as native panels → 1039_WO_pixelhue_studio_tab.md
 - 1042 DONE [mapping+godot-client] PixelHue P80: Live showed one layer (another switcher's), no MVR tab → 1042_WO_pixelhue_p80_live_layers_wrong_switcher_and_mvr_tab.md
 - 1043 DONE [mapping+engine] PIP edge strip set to "outside" still drew over the inside of the PIP (PixelHue… → 1043_WO_pip_edge_strip_outside_glow_inside_pip.md
-- 1050 OPEN [mapping+godot-client] APC40 fader → a PixelHue layer's opacity (Learn onto a PixelHue layer) → 1050_WO_apc_fader_drives_pixelhue_layer_opacity.md
+- 1050 IN PROGRESS [mapping+godot-client] APC40 fader → a PixelHue layer's opacity (Learn onto a PixelHue layer) → 1050_WO_apc_fader_drives_pixelhue_layer_opacity.md
 
 ## lighting — DMX, Art-Net, sACN, fixtures, consoles (36)
 
@@ -574,7 +574,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1044 IN PROGRESS [godot-client+engine] Live tab: "PGM edit" — open the look editor on the look on PGM, edits go to air → 1044_WO_live_look_editor_pgm_edit_lock.md
 - 1047 DONE [godot-client] Visuals Controller: Sel on an empty track arms a new layer, so the pads can fil… → 1047_WO_visuals_apc_sel_empty_track_adds_layer.md
 - 1048 IN PROGRESS [godot-client] APC40 hardware Sel: the device knobs' bank resend nudged parameters and rings s… → 1048_WO_visuals_apc_device_knob_bank_resend.md
-- 1049 OPEN [godot-client+engine] Visuals: route layers to two outputs (PGM 1 background, PGM 2 keyed overlay), s… → 1049_WO_visuals_layer_routing_two_outputs.md
+- 1049 IN PROGRESS [godot-client+engine] Visuals: route layers to two outputs (PGM 1 background, PGM 2 keyed overlay), s… → 1049_WO_visuals_layer_routing_two_outputs.md
 
 ## web-client — Web client (82)
 

@@ -6,6 +6,7 @@ extends VBoxContainer
 ## A Sources ▸ Visuals row dropped on a layer replaces that layer's picture (its fader, mute and blend kept); dropped
 ## anywhere else in the list it is a new layer on top. Clicking a row selects it (Shift-drops on the canvas and
 ## double-clicks in Sources replace the selected layer; the 3D view looks into it).
+## WO-1049: a small `2` badge on a layer routed to output 2 (set in Live ▸ Visuals routing).
 
 const L := preload("res://features/visuals/visuals_layers.gd")
 const Catalog := preload("res://features/visuals/visuals_catalog.gd")
@@ -18,7 +19,7 @@ signal selected(i: int)
 
 var layers := []  # bottom → top, as in the slice
 var sel := -1  # the selected layer's index in `layers`
-var rows := []  # by layer index: {panel, name, slider, spin, eye, blend, up, down, del}
+var rows := []  # by layer index: {panel, name, route, slider, spin, eye, blend, up, down, del}
 var _box: VBoxContainer
 var _empty: Label
 var _note: Label
@@ -116,6 +117,12 @@ func _row(i: int) -> Dictionary:
 	r.name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	r.name.mouse_filter = Control.MOUSE_FILTER_PASS
 	top.add_child(r.name)
+	r.route = Label.new()  # WO-1049
+	r.route.text = "2"
+	r.route.tooltip_text = "Routed to output 2 (the keyed overlay) — Live ▸ Visuals routing"
+	r.route.mouse_filter = Control.MOUSE_FILTER_PASS
+	r.route.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
+	top.add_child(r.route)
 	r.blend = Button.new()
 	r.blend.text = "Add"
 	r.blend.toggle_mode = true
@@ -183,6 +190,7 @@ func _fill() -> void:
 		r.name.tooltip_text = "Layer %d — %s%s\nDrop a visual here to replace it · click to select" % [i + 1, L.describe(l, _names),
 			"\n" + str(_errors[i]) if _errors.has(i) else ""]
 		r.name.modulate = Color(1, 1, 1, 1.0 if on else 0.5)
+		r.route.visible = L.out_of(l) == 2
 		r.blend.set_pressed_no_signal(l.get("blend", "normal") == "add")
 		var pct := roundf(float(l.get("opacity", 1.0)) * 100.0)
 		if r.slider.value != pct:

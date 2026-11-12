@@ -154,15 +154,18 @@ static func params_of(v: Variant) -> Dictionary:
 ## and those four are always derived back from the layers (what an older client still reads). `camera` (WO-896): {drive, yaw,
 ## pitch, dist} — the output stage camera's orbit pose and whether the 3D view drives it (visuals_camera.gd).
 ## `playlists` (WO-895): the visual playlists, raw (visuals_playlist.gd); `auto.playlist` names the one Auto runs.
+## `output2` (WO-1049): {screen, layer} — where the layers routed to output 2 (visuals_layers.gd `out`) play, keyed.
 static func slice_of(project: Variant) -> Dictionary:
 	var v: Variant = project.get("visuals") if project is Dictionary else null
 	var d: Dictionary = v if v is Dictionary else {}
 	var o: Dictionary = d.get("output") if d.get("output") is Dictionary else {}
 	var layers: Array = Layers.normalize(d.layers) if d.get("layers") is Array else Layers.migrate(d)
 	var c := Layers.compat(layers)
+	var layer := clampi(int(_num(o.get("layer", 1))), 1, 9999)
 	return {"graph": normalize_graph(d.get("graph")), "params": params_of(d.get("params")),
-		"output": {"screen": maxi(0, int(_num(o.get("screen")))), "layer": clampi(int(_num(o.get("layer", 1))), 1, 9999),
+		"output": {"screen": maxi(0, int(_num(o.get("screen")))), "layer": layer,
 			"size": clampi(int(_num(o.get("size"))), 0, SIZE_SCREEN), "ring": o.get("ring") is bool and o.ring},
+		"output2": output2_of(d.get("output2"), layer),
 		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0), "layers": layers, "scene": c.scene, "overlay": c.overlay,
 		"shader": c.shader, "game": c.game, "fade": clampf(_num(d.get("fade", 1.0)), 0.0, 10.0),
 		"playlists": d.get("playlists") if d.get("playlists") is Array else [],  # WO-895: raw, like looks (visuals_playlist.gd normalize)
@@ -201,6 +204,35 @@ static func render_size(preset: int, w: float, h: float) -> Vector2i:
 	if w <= 0.0 or h <= 0.0:
 		return p
 	return Vector2i(maxi(16, roundi(p.y * w / h / 2.0) * 2), p.y)
+
+
+## WO-1049: output 2's target, stored or not. Default screen 1 (the second main; output2_target() falls back to the first
+## screen when there is none) and the same Caspar layer number as output 1.
+static func output2_of(v: Variant, layer1 := 1) -> Dictionary:
+	var o: Dictionary = v if v is Dictionary else {}
+	return {"screen": maxi(0, int(_num(o.get("screen", 1)))), "layer": clampi(int(_num(o.get("layer", layer1))), 1, 9999)}
+
+
+## WO-1049: output 2's shm ring — `visuals-2` (a dev --visuals-ring=<n> → `<n>-2`).
+static func ring2(ring := RING) -> String:
+	return ring + "-2"
+
+
+## WO-1049: where output 2 PLAYs — {channel, layer} on this server (channel 0 = no screen). `screen` indexes screens(cm),
+## the list Send's picker shows; past its end → the first screen (one main only). The same channel AND layer as output 1
+## would replace output 1's PLAY, so output 2 then goes one layer up.
+static func output2_target(cm: Variant, slice: Dictionary) -> Dictionary:
+	var sc := screens(cm)
+	var o2: Dictionary = output2_of(slice.get("output2"), int(slice.get("output", {}).get("layer", 1)))
+	if sc.is_empty():
+		return {"channel": 0, "layer": o2.layer}
+	var o1: Dictionary = slice.get("output", {})
+	var ch := int(sc[o2.screen if o2.screen < sc.size() else 0].channel)
+	var ch1 := int(sc[clampi(int(o1.get("screen", 0)), 0, sc.size() - 1)].channel)
+	var layer := int(o2.layer)
+	if ch == ch1 and layer == int(o1.get("layer", 1)):
+		layer += 1
+	return {"channel": ch, "layer": layer}
 
 
 static func play_body(channel: int, layer: int, ring := RING) -> Dictionary:
