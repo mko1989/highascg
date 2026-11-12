@@ -27,6 +27,7 @@ const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
 signal edit_requested(scene_id: String, main: int)
+signal pgm_edit_requested(scene_id: String, main: int)  # WO-1044: the column's "PGM edit" — the editor on air
 signal timers_requested(main: int, label: String)  # WO-601: web per-screen ⏱ → screen-timer inspector
 signal border_requested(main: int, label: String)  # WO-601: global border inspector
 signal look_deleted(scene_id: String)  # WO-623 B: the live tab closes the editor if it shows this look

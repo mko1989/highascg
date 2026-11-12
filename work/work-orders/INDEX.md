@@ -568,7 +568,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1018 IN PROGRESS [godot-client+network] Devices tab: the destinations and the rear panels scroll apart, and the master… → 1018_WO_devices_split_scroll_and_master_marker.md
 - 1025 DONE [godot-client+tracking-vr] Previs camera: zoom stops at the orbit point and nothing moves forward → 1025_WO_previs_camera_dolly_forward.md
 - 1041 DONE [godot-client] Visuals: APC40 faders did not move layer opacity (fader 1 re-learned to Pulse,… → 1041_WO_visuals_apc_fader1_relearned_to_pulse.md
-- 1044 IN PROGRESS [godot-client+engine] Live tab: per-screen PGM edit lock (edit the look that is on PGM, on air) → 1044_WO_live_look_editor_pgm_edit_lock.md
+- 1044 IN PROGRESS [godot-client+engine] Live tab: "PGM edit" — open the look editor on the look on PGM, edits go to air → 1044_WO_live_look_editor_pgm_edit_lock.md
 
 ## web-client — Web client (82)
 

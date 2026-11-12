@@ -1,7 +1,8 @@
 extends RefCounted
 ## A deck column's header (web scene-list-column.js head): the screen's title — WO-781: a click highlights the screen as
 ## a look-preset destination (E2 style, destinations.gd) — then TAKE, FTB, screen timers and global border
-## (WO-959: one tick button — tick = on / off, label = its Inspector page).
+## (WO-959: one tick button — tick = on / off, label = its Inspector page). WO-1044: "PGM edit" between FTB and the
+## timer opens the look editor on the look on PGM, its edits going to air.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Icons := preload("res://app/ui_icons.gd")
@@ -46,6 +47,12 @@ static func build(deck: Node, title: String, n_looks: int, bus: Dictionary, main
 	ftb.tooltip_text = "Fade to black (PGM + PRV), then clear"
 	ftb.pressed.connect(func() -> void: deck.request_ftb(main, cm))
 	head_row.add_child(ftb)
+	var pe := Button.new()  # WO-1044 (owner 12.11: "a button PGM-edit between the ftb and timer")
+	pe.text = "PGM edit"
+	pe.disabled = str(bus.get("pgm", "")) == ""
+	pe.tooltip_text = "Nothing on PGM" if pe.disabled else "Edit the look on PGM — every edit goes straight to air"
+	pe.pressed.connect(func() -> void: deck.pgm_edit_requested.emit(str(bus.pgm), main))
+	head_row.add_child(pe)
 	var tmr := Icons.button("timer", "Screen timers")
 	tmr.pressed.connect(func() -> void: deck.timers_requested.emit(main, title))
 	head_row.add_child(tmr)

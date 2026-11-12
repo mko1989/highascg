@@ -119,6 +119,7 @@ func _ready() -> void:
 		add_child(layer_presets)
 	layer_presets.said.connect(func(text: String, ok: bool) -> void: deck.action_result.emit(text, ok))
 	deck.edit_requested.connect(func(id: String, m: int) -> void: editor.open(id, m))
+	deck.pgm_edit_requested.connect(func(id: String, m: int) -> void: editor.open(id, m, true))  # WO-1044
 	editor.take_requested.connect(func(id: String, m: int) -> void: deck.request_take(id, m, "program"))
 	deck.look_deleted.connect(func(id: String) -> void:
 		if editor.visible and editor.scene_id == id:
