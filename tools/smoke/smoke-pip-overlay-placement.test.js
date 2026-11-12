@@ -141,3 +141,10 @@ test('pip_border template uses box-shadow outside pattern (CEF-safe)', () => {
 	assert.match(tpl, /docs\/reference\/pip-overlay-outside-border\.md/)
 	assert.doesNotMatch(tpl, /outline:/)
 })
+
+test('WO-1043: pip_edge_strip outside cuts the content hole out (its glow never washes over the picture)', () => {
+	const tpl = fs.readFileSync(path.join(__dirname, '../../template/pip_edge_strip.html'), 'utf8')
+	assert.match(tpl, /wrap\.style\.overflow = side === 'inside' \? 'hidden' : 'visible'/, 'inside still clips to the hole')
+	assert.match(tpl, /wrap\.style\.clipPath = side === 'inside' \? '' :\s*\n\s*"path\(evenodd, 'M -100000 -100000 H 100000 V 100000 H -100000 Z M 0 0 H " \+ wPx \+ ' V ' \+ hPx \+ " H 0 Z'\)"/)
+	assert.match(tpl, /rx = -th \/ 2/, 'outside stroke centred half its width outside the edge')
+})

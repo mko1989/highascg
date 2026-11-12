@@ -175,6 +175,11 @@
 			wrap.style.setProperty('--ih', String(inn.h))
 			wrap.style.opacity = String(clamp01(state.opacity))
 			wrap.style.overflow = side === 'inside' ? 'hidden' : 'visible'
+			// WO-1043: outside = nothing over the picture. The strip already runs just outside the content edge, but its
+			// glow is centred on it and half of the blur washed into the PIP; cut the content hole out of the whole slice
+			// (CSS order: the glow's blur filter first, then this clip), the mirror of inside's overflow: hidden.
+			wrap.style.clipPath = side === 'inside' ? '' :
+				"path(evenodd, 'M -100000 -100000 H 100000 V 100000 H -100000 Z M 0 0 H " + wPx + ' V ' + hPx + " H 0 Z')"
 
 			var rx
 			var ry

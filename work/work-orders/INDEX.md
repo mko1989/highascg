@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-951 live WOs (34 open, 131 in progress, 786 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+952 live WOs (34 open, 131 in progress, 787 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -321,7 +321,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1012 IN PROGRESS [video-io+audio,devices-config,godot-client] Zoom integration via the Zoom desktop client: its windows on hidden virtual des… → 1012_WO_zoom_desktop_client_windows_as_live_inputs_and_return_feed.md
 - 1030 OPEN [video-io+engine,caspar-build,mapping] An 8K tiled output runs at 19 fps on highascg5867: idle channels read back full… → 1030_WO_8k_tiled_output_runs_at_19fps_idle_channels_cost.md
 
-## mapping — Pixel map, screens, multiview, destinations (46)
+## mapping — Pixel map, screens, multiview, destinations (47)
 
 - 18 IN PROGRESS [mapping] Pixel & Output Mapping — Unified Node-Based System → 18_WO_OUTPUT_SLICER.md
 - 40 IN PROGRESS [mapping+devices-config] Device View — GPU xrandr sync with screen destinations and override → 40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md
@@ -369,6 +369,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1038 DONE [mapping+engine,godot-client] Looks drive the PixelHue switcher (side feature, off by default) → 1038_WO_looks_drive_pixelhue.md
 - 1039 IN PROGRESS [mapping+godot-client,devices-config] PixelHue main tab: the owner's PixelHue Studio as native panels → 1039_WO_pixelhue_studio_tab.md
 - 1042 DONE [mapping+godot-client] PixelHue P80: Live showed one layer (another switcher's), no MVR tab → 1042_WO_pixelhue_p80_live_layers_wrong_switcher_and_mvr_tab.md
+- 1043 DONE [mapping+engine] PIP edge strip set to "outside" still drew over the inside of the PIP (PixelHue… → 1043_WO_pip_edge_strip_outside_glow_inside_pip.md
 
 ## lighting — DMX, Art-Net, sACN, fixtures, consoles (36)
 
