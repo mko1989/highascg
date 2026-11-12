@@ -15,7 +15,7 @@ async function list(client) {
 }
 export async function readMvrTemplates(client) {
   const base = { session: client.session };
-  if (!['P20', 'Q8'].includes(client.model) || !await supported(client)) return { ...base, supported: false, templates: [] };
+  if (!['P20', 'Q8', 'P80'].includes(client.model) || !await supported(client)) return { ...base, supported: false, templates: [] };
   // A firmware that advertises templates without serving the list shows none.
   const rows = await list(client).catch(() => []);
   return { ...base, supported: true, templates: rows.map(t => ({ id: t.templateId, type: t.templateIdObj.type, windows: Array.isArray(t.cells) ? t.cells.length : null,

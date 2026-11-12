@@ -1,7 +1,7 @@
 # WO-1042 — PixelHue P80: Live showed one layer (another switcher's), no MVR tab
 
 **Area:** mapping, godot-client
-**Status: IN PROGRESS (12.11 — Live reads the P80 again (fixed, smoke + live read); MVR tab waits on the owner's choice: P80 is gated out inside the vendored Studio)**
+**Status: DONE (12.11 — Live lists the P80's 3 program layers (smoke, live read, seen on the glass); P80 MVR on in the vendored Studio, a window moved 2 px and restored on the P80)**
 
 Owner, 12.11: *"i've connected a pixelhue p80. its missing mvr tab at all. only one layer shows up in the live tab."*
 
@@ -30,9 +30,12 @@ Owner, 12.11: *"i've connected a pixelhue p80. its missing mvr tab at all. only 
   entry = a control PC naming its switcher (as before); several with none at the host → an error naming them
   instead of a guess.
 - `tools/smoke/smoke-wo1035-pixelhue-layer-read.test.js`: two switchers listed, the second at the host → that one, the
-  other never asked; a host matching neither → refused. The smoke and WO-1038's were not in the curated CI list —
-  both added (`tools/ci/offline-test-files-2.js`).
-- MVR: nothing changed yet — enabling it means editing the vendored Studio's model gates (owner's call).
+  other never asked; a host matching neither → refused (already in the curated CI list, `offline-test-files-3.js`).
+- MVR (owner 12.11: "Patch vendored copy"): `src/pixelhue/vendor/pixelhue-studio` — `['P20', 'Q8']` →
+  `['P20', 'Q8', 'P80']` in `lib/pixelhue.js` (capability :204, read :205, apply :221), `lib/mvr-layers.js:33` (window
+  add / edit) and `lib/mvr-templates.js:18`; messages say "P20, Q8 and P80". The P80 takes the rules Studio already
+  has for non-P10/P20 models (no 512 × 480 input-window cap, AUX screens allowed as sources). `VENDORED.md` lists the
+  patch: a re-vendor (`tools/dev/vendor-pixelhue-studio.sh`) drops it unless it lands upstream first.
 
 ## What was verified
 
@@ -41,3 +44,10 @@ Owner, 12.11: *"i've connected a pixelhue p80. its missing mvr tab at all. only 
 - Live after a node restart: `/api/pixelhue/layers?scene=pgm` → `device {ip: 192.168.50.254}`; Screen 1 (3072×1024):
   Layer 1 Input 2-4 DP, Layer 3 Input 1-1 HDMI (1359×764 at 1594,130), Layer 2 Input 1-4 DP, plus the Cut & Fill cut
   layer; the four Flex screens carry `aux` layers (left out of the Live list by design, WO-1035).
+- MVR after a node restart: status → `capabilities {inputs, mvr: true, audio}` (the tab polls it every 5 s and shows
+  the MVR sub-tab); `state` → MVR 1 / MVR 2 (1920×1080), 11 windows with sources and aspect, 26 sources;
+  `mvr-templates` → supported, layouts 0… (10, 10, 18 … windows). Reversible write through `POST …/studio/windows`
+  (the panel's body): window 21168130 (Input 1-3 DP) x 965 → 967, read back 967, restored → 965, read back 965.
+  WO-1039 bridge smoke 4/0. Not exercised on the P80: add / remove windows, template recall, sources swaps.
+- On the glass (operator screen capture): Sources ▸ Live ▸ PixelHue layers shows Screen 1 · Layer 1 / Layer 3 /
+  Layer 2. The PixelHue ▸ MVR sub-tab itself was not looked at (the client was on Settings; not driven).

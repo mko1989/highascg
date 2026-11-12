@@ -30,7 +30,7 @@ function window(value, screen) {
 }
 
 export async function applyMvrLayer(client, request) {
-  if (!['P20', 'Q8'].includes(client.model)) throw fail('Multiviewer editing is available for P20 and Q8.', 403);
+  if (!['P20', 'Q8', 'P80'].includes(client.model)) throw fail('Multiviewer editing is available for P20, Q8 and P80.', 403);
   const [screenList, layerList, interfaceList] = await Promise.all([client.call('screen/list-detail'), client.call('layers/list-detail'), client.call('interface/list-detail')]);
   const state = await client.read();
   const screen = state.screens.find(s => s.id === request.screenId);

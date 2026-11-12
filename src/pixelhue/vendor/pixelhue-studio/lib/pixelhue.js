@@ -201,8 +201,8 @@ export class PixelhueClient {
 
   async read() {
     this.audioSupport ??= await audioSupported(this).catch(() => false);
-    const metadata = { session: this.session, device: this.deviceInfo(), capabilities: { inputs: true, mvr: ['P20', 'Q8'].includes(this.model), audio: this.audioSupport } };
-    if (!['P20', 'Q8'].includes(this.model)) return { screens: [], layers: [], ...metadata };
+    const metadata = { session: this.session, device: this.deviceInfo(), capabilities: { inputs: true, mvr: ['P20', 'Q8', 'P80'].includes(this.model), audio: this.audioSupport } };
+    if (!['P20', 'Q8', 'P80'].includes(this.model)) return { screens: [], layers: [], ...metadata };
     const [screens, layers, interfaces] = await Promise.all([this.call('screen/list-detail'), this.call('layers/list-detail'), this.call('interface/list-detail')]);
     if (!Array.isArray(interfaces.data?.list)) throw fail('Device did not return its interface list.', 502);
     if (this.umdConfig === undefined) {
@@ -218,7 +218,7 @@ export class PixelhueClient {
   }
 
   async apply(changes) {
-    if (!['P20', 'Q8'].includes(this.model)) throw fail('Multiviewer editing is available for P20 and Q8. This device supports inputs in this app.', 403);
+    if (!['P20', 'Q8', 'P80'].includes(this.model)) throw fail('Multiviewer editing is available for P20, Q8 and P80. This device supports inputs in this app.', 403);
     const before = await this.read(), body = validateChanges(changes, before);
     const changedGeometry = body.filter((item) => {
       const old = before.layers.find((layer) => layer.id === item.layerId).window;

@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-951 live WOs (34 open, 132 in progress, 785 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+951 live WOs (34 open, 131 in progress, 786 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -368,7 +368,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1035 DONE [mapping+godot-client,devices-config] PixelHue: read layer positions; placeholder layers for PIP borders over the key… → 1035_WO_pixelhue_layer_read_and_placeholders.md
 - 1038 DONE [mapping+engine,godot-client] Looks drive the PixelHue switcher (side feature, off by default) → 1038_WO_looks_drive_pixelhue.md
 - 1039 IN PROGRESS [mapping+godot-client,devices-config] PixelHue main tab: the owner's PixelHue Studio as native panels → 1039_WO_pixelhue_studio_tab.md
-- 1042 IN PROGRESS [mapping+godot-client] PixelHue P80: Live showed one layer (another switcher's), no MVR tab → 1042_WO_pixelhue_p80_live_layers_wrong_switcher_and_mvr_tab.md
+- 1042 DONE [mapping+godot-client] PixelHue P80: Live showed one layer (another switcher's), no MVR tab → 1042_WO_pixelhue_p80_live_layers_wrong_switcher_and_mvr_tab.md
 
 ## lighting — DMX, Art-Net, sACN, fixtures, consoles (36)
 
