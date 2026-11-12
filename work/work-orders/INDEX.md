@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-957 live WOs (34 open, 133 in progress, 790 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+959 live WOs (36 open, 133 in progress, 790 done) and 49 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -323,7 +323,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1012 IN PROGRESS [video-io+audio,devices-config,godot-client] Zoom integration via the Zoom desktop client: its windows on hidden virtual des… → 1012_WO_zoom_desktop_client_windows_as_live_inputs_and_return_feed.md
 - 1030 OPEN [video-io+engine,caspar-build,mapping] An 8K tiled output runs at 19 fps on highascg5867: idle channels read back full… → 1030_WO_8k_tiled_output_runs_at_19fps_idle_channels_cost.md
 
-## mapping — Pixel map, screens, multiview, destinations (47)
+## mapping — Pixel map, screens, multiview, destinations (48)
 
 - 18 IN PROGRESS [mapping] Pixel & Output Mapping — Unified Node-Based System → 18_WO_OUTPUT_SLICER.md
 - 40 IN PROGRESS [mapping+devices-config] Device View — GPU xrandr sync with screen destinations and override → 40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md
@@ -372,6 +372,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1039 IN PROGRESS [mapping+godot-client,devices-config] PixelHue main tab: the owner's PixelHue Studio as native panels → 1039_WO_pixelhue_studio_tab.md
 - 1042 DONE [mapping+godot-client] PixelHue P80: Live showed one layer (another switcher's), no MVR tab → 1042_WO_pixelhue_p80_live_layers_wrong_switcher_and_mvr_tab.md
 - 1043 DONE [mapping+engine] PIP edge strip set to "outside" still drew over the inside of the PIP (PixelHue… → 1043_WO_pip_edge_strip_outside_glow_inside_pip.md
+- 1050 OPEN [mapping+godot-client] APC40 fader → a PixelHue layer's opacity (Learn onto a PixelHue layer) → 1050_WO_apc_fader_drives_pixelhue_layer_opacity.md
 
 ## lighting — DMX, Art-Net, sACN, fixtures, consoles (36)
 
@@ -412,7 +413,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 - 1024 IN PROGRESS [lighting+godot-client] GDTF fixture models missing in the previs (built-in primitives drawn as boxes;… → 1024_WO_gdtf_models_missing_primitives_and_share_swap.md
 
-## godot-client — Godot client (159)
+## godot-client — Godot client (160)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -573,6 +574,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1044 IN PROGRESS [godot-client+engine] Live tab: "PGM edit" — open the look editor on the look on PGM, edits go to air → 1044_WO_live_look_editor_pgm_edit_lock.md
 - 1047 DONE [godot-client] Visuals Controller: Sel on an empty track arms a new layer, so the pads can fil… → 1047_WO_visuals_apc_sel_empty_track_adds_layer.md
 - 1048 IN PROGRESS [godot-client] APC40 hardware Sel: the device knobs' bank resend nudged parameters and rings s… → 1048_WO_visuals_apc_device_knob_bank_resend.md
+- 1049 OPEN [godot-client+engine] Visuals: route layers to two outputs (PGM 1 background, PGM 2 keyed overlay), s… → 1049_WO_visuals_layer_routing_two_outputs.md
 
 ## web-client — Web client (82)
 
