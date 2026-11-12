@@ -42,6 +42,27 @@ func test_concert_with_lens() -> void:
 	t.ok(no_lens.ok and no_lens.rms > 3.0, "the same clicks without a lens fit leave a visible error (%s px)" % no_lens.get("rms"))
 
 
+## WO-1040 (owner 12.11, camera 2): a camera standing upstage of PSN 0,0 and looking further upstage has the world
+## origin behind it — the floor seed took its sign from the origin and solved the mirror (under the deck, facing away).
+func test_camera_upstage_of_origin_looking_away() -> void:
+	var truth := C.camera(-0.2, 7.0, 8.0, -22.0, 5.0, 2.0, 23.0)
+	var world := []
+	for x in range(-2, 6):
+		world.append([float(x), 18.24, 2.3])
+		world.append([float(x), 28.24, 2.3])
+	var pts := _clicks(truth, world, 0.5)
+	t.eq(pts.size(), 16, "both grid rows on screen")
+	var r := R.calibrate(T.new_camera([]).cam, pts, 1920.0, 1080.0)
+	t.ok(r.ok and r.rms < 1.0, "solved (rms %s, %s, %s)" % [r.get("rms"), r.get("method"), r.get("error", "")])
+	t.ok(r.ok and Vector3(r.cam.pos_x + 0.2, r.cam.pos_y - 7.0, r.cam.pos_z - 8.0).length() < 0.2, "above the deck, not under it: %s" % r.get("cam"))
+	t.ok(r.ok and absf(cos(deg_to_rad(r.cam.yaw - 5.0)) - 1.0) < 1e-4, "facing upstage")
+	var bad := pts.duplicate(true)
+	for p in bad:  # clicks mirrored top ↔ bottom: no camera above the floor sees them like that
+		p.screen = [p.screen[0], 1080.0 - p.screen[1]]
+	var rb := R.calibrate(C.camera(-0.2, 7.0, -3.4, -22.0, -175.0, 2.0, 23.0), bad, 1920.0, 1080.0)
+	t.ok(not rb.ok or not C.project(rb.cam, world, 1920.0, 1080.0).has(null), "never ok with points behind the lens: %s" % [rb])
+
+
 func test_mixed_heights_with_noise() -> void:
 	var truth := C.camera(2.0, -14.0, 5.0, -12.0, 8.0, 1.5, 55.0)
 	var wall := {"id": "w", "name": "Wall", "type": "led_wall", "panels": [12, 6], "position": [0.0, 0.5, -2.0]}

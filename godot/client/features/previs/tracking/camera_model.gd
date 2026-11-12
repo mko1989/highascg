@@ -239,6 +239,17 @@ static func _radial(pts: Array, w: float, h: float, k1: float, k2: float, invers
 
 # --- calibration -------------------------------------------------------------------------------------------------
 
+## Mean [x, y] of plane points — a point the camera sees (decompose_homography's `front`).
+static func centroid(plane: Array) -> Array:
+	var sx := 0.0
+	var sy := 0.0
+	for p in plane:
+		sx += float(p[0])
+		sy += float(p[1])
+	var n := maxf(1.0, plane.size())
+	return [sx / n, sy / n]
+
+
 ## Camera from ≥ 4 coplanar world points (same z; e.g. the stage-floor corners) and where they appear on screen
 ## (pinhole pixels). {} when degenerate, outside the pose range, or when the solve misses its own input by > 20 px
 ## (this also rejects the homography's mirror branch, whose points reproject behind the lens).
@@ -251,7 +262,7 @@ static func solve_floor(world: Array, screen: Array, w: float, h: float) -> Dict
 	var hm := Hg.homography(plane, screen)
 	if hm.is_empty():
 		return {}
-	var cam := Hg.decompose_homography(hm, w, h, float(world[0][2]))
+	var cam := Hg.decompose_homography(hm, w, h, float(world[0][2]), centroid(plane))
 	if cam.is_empty():
 		return {}
 	var rep := reprojection(cam, world, screen, w, h)

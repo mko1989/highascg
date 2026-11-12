@@ -420,3 +420,4 @@ Previously: 2026-07-28 (late) — implemented and committed: WO-370, WO-365, WO-
 Previously: 2026-07-28 — completeness audit of todos 14.07→28.07 (see `work/checklist28.07.26_manual_verify.md`) + checklist27 note sweep; WO-365..373 opened, none implemented. Stale statuses corrected: WO-342, WO-345. Suite 1559 pass / 0 fail / 2 skip at 637965c.
 
 Previously: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)
+| WO-1040 | Tracking camera solve picked the mirror pose (under the deck, facing away) for a camera upstage of PSN 0,0 — camera 2 lost the stage | [1040](./work-orders/1040_WO_tracking_camera_solve_mirror_when_origin_behind.md) | IN PROGRESS — fix + test in; live re-solve pending |

@@ -66,7 +66,10 @@ static func homography(plane: Array, screen: Array) -> Array:
 
 
 ## Camera {pos_*, pitch, yaw, roll, fov (horizontal)} from H at plane height z_offset; {} when invalid.
-static func decompose_homography(hm: Array, w: float, h: float, z_offset: float) -> Dictionary:
+## `front` = a plane point [x, y] the camera sees (callers pass the clicked points' centroid): it picks the sign of
+## H so that point is in front of the lens. OpenFollow used the world origin, which is behind a camera standing
+## upstage of PSN 0,0 (WO-1040: camera 2 at y 7 m looking upstage solved 3 m under the floor, facing away).
+static func decompose_homography(hm: Array, w: float, h: float, z_offset: float, front := [0.0, 0.0]) -> Dictionary:
 	var h1 := [hm[0], hm[3], hm[6]]
 	var h2 := [hm[1], hm[4], hm[7]]
 	var h3 := [hm[2], hm[5], hm[8]]
@@ -103,7 +106,8 @@ static func decompose_homography(hm: Array, w: float, h: float, z_offset: float)
 	var lam := _len(v1)
 	if lam < 1e-12:
 		return {}
-	if v3[2] / lam < 0.0:
+	var depth: float = hm[6] * float(front[0]) + hm[7] * float(front[1]) + hm[8]  # ∝ that point's camera depth
+	if depth / lam < 0.0:
 		lam = -lam
 	var b1 := v1.map(func(x: float) -> float: return x / lam)
 	var b2 := v2.map(func(x: float) -> float: return x / lam)

@@ -45,10 +45,15 @@ static func calibrate(cam: Dictionary, points: Array, w: float, h: float, opts :
 	var res := residuals(out, world, screen, w, h)
 	var errs := []
 	var sum := 0.0
+	var behind := 0
 	for i in world.size():
 		var e := Vector2(res[2 * i], res[2 * i + 1]).length()
 		errs.append(e)
 		sum += e * e
+		if res[2 * i] >= 1e4:  # residuals(): behind the lens
+			behind += 1
+	if behind > 0:  # WO-1040: never store a pose that cannot see its own points (it threw the stage out of the picture)
+		return {"ok": false, "error": "%d of %d points end up behind the camera — check each click is on its mark" % [behind, world.size()]}
 	return {"ok": true, "cam": out, "rms": sqrt(sum / world.size()), "errors": errs, "method": method}
 
 
@@ -75,8 +80,9 @@ static func _floor_seed(cam: Dictionary, world: Array, screen: Array, w: float, 
 	var pin := C.invert_distortion(sz, w, h, float(cam.get("lens_k1", 0.0)), float(cam.get("lens_k2", 0.0)))
 	var s := C.solve_floor(wz, pin, w, h)
 	if s.is_empty():  # solve_floor's 20 px gate is for clean input — a noisier seed is still a good start
-		var hm := Hg.homography(wz.map(func(p: Array) -> Array: return [float(p[0]), float(p[1])]), pin)
-		s = Hg.decompose_homography(hm, w, h, float(wz[0][2])) if not hm.is_empty() else {}
+		var plane := wz.map(func(p: Array) -> Array: return [float(p[0]), float(p[1])])
+		var hm := Hg.homography(plane, pin)
+		s = Hg.decompose_homography(hm, w, h, float(wz[0][2]), C.centroid(plane)) if not hm.is_empty() else {}
 	return s
 
 
