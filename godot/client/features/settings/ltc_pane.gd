@@ -14,7 +14,7 @@ static func build(f: Form) -> void:
 	var src := f.option("From", "ltc.input.source", [["alsa", "Audio input device"], ["bridge", "Live-audio input slot"]], "alsa")
 	var dev := f.group()
 	f.target = dev
-	f.text("Device", "ltc.input.device", "plughw:2,0")
+	_device(f, "Device", "ltc.input.device", "capture")  # WO-1055: a dropdown of the capture cards
 	f.number("Channels on the device", "ltc.input.channels", 1, 64, 2)
 	f.target = f
 	var slot := f.group()
@@ -28,7 +28,7 @@ static func build(f: Form) -> void:
 	f.heading("LTC out")
 	f.check("Generate LTC", "ltc.output.enabled", false)
 	f.option("Time", "ltc.output.source", [["timeline", "Timeline playhead"], ["clock", "Time of day"]], "timeline")
-	f.text("Device", "ltc.output.device", "plughw:3,0")
+	_device(f, "Device", "ltc.output.device", "playback")  # WO-1055: a dropdown of the playback cards
 	f.number("Channels on the device", "ltc.output.channels", 1, 64, 2)
 	f.number("LTC on channel", "ltc.output.channel", 1, 64, 1)
 	f.text("Timeline 0 is at", "ltc.output.offset", "00:00:00:00")
@@ -48,3 +48,29 @@ static func build(f: Form) -> void:
 	t.autostart = true
 	t.timeout.connect(poll)
 	f.add_child(t)
+
+
+## WO-1055 (owner 13.11: "there is also an input box for the device instead of a drop down"): the sound cards of one direction
+## (GET /api/audio/alsa-cards?dir=…), fetched once when the pane first hydrates. `items` is the array f.option() reads, so the
+## pick writes the card's stable `plughw:CARD=<id>,DEV=<n>` (survives a USB replug renumbering the card).
+static func _device(f: Form, label: String, path: String, dir: String) -> void:
+	var items := [["", "None"]]
+	var cards := []
+	var state := {"fetched": false}
+	var ob := f.option(label, path, items, "")
+	var show := func() -> void:
+		var cur := str(Settings.get_setting(path, ""))
+		var next := LM.device_items(cards, cur)
+		items.clear()
+		items.append_array(next)
+		ob.clear()
+		for it in items:
+			ob.add_item(str(it[1]))
+		ob.select(maxi(0, LM.index_of(items, cur, cards)))
+	f.on_hydrate(func() -> void:
+		if not state.fetched:
+			state.fetched = true
+			var r: Dictionary = await Api.get_json("/api/audio/alsa-cards?dir=" + dir)
+			if r.ok and r.data is Dictionary and r.data.get("cards") is Array:
+				cards.append_array(r.data.cards)
+		show.call())

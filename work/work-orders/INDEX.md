@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-962 live WOs (34 open, 138 in progress, 790 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+963 live WOs (34 open, 139 in progress, 790 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -233,7 +233,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1022 IN PROGRESS [caspar-build+os-iso] Server releases carry the hand-built Caspar (and point at its complete source) → 1022_WO_releases_carry_hand_built_caspar.md
 - 1033 OPEN [caspar-build+video-io,engine] Zero-copy GPU frames in the Caspar build: future work for headroom → 1033_WO_zero_copy_gpu_frames_future_work.md
 
-## audio — Audio routing, devices, meters (50)
+## audio — Audio routing, devices, meters (51)
 
 - 06 DONE [audio] Multi-Channel Audio Playout Architecture (CasparCG on Ubuntu) → 06_WO_AUDIO_PLAYOUT.md
 - 16 DONE [audio] Yamaha DM3 Audio Integration → 16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md
@@ -285,6 +285,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 976 DONE [audio+engine,godot-client] A Caspar channel / screen destination (e.g. Dioda PGM) as the audio-reactive FF… → 976_WO_caspar_channel_as_fft_source.md
 - 1045 DONE [audio+engine,web-client] Audio mixer VU meters not real time: a web client's Media tab polled the projec… → 1045_WO_vu_meters_starved_by_project_list_polling.md
 - 1046 DONE [audio+caspar-build] Audio meters read far too hot: 16-bit scaling of Caspar's int32 peaks + frozen… → 1046_WO_audio_meter_levels_too_hot.md
+- 1055 IN PROGRESS [audio+godot-client] LTC in / out Device: a dropdown of the box's sound cards instead of a text box → 1055_WO_ltc_device_dropdowns.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (34)
 

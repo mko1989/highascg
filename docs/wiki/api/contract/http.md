@@ -7,13 +7,14 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-581 routes.
+582 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
 | GET | `/api/about` | registry | `src/api/router.js` |
 | POST | `/api/amcp/*` | registry | `src/api/router.js` |
 | GET | `/api/artnet/input` | registry | `src/api/router.js` |
+| GET | `/api/audio/alsa-cards` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
 | GET | `/api/audio/alsa-mixer` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
 | POST | `/api/audio/alsa-mixer` | registry | `src/api/router.js`, `src/api/routes-audio.js` |
 | POST | `/api/audio/auto-mix` | registry | `src/api/router.js` |

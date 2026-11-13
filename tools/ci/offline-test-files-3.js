@@ -339,4 +339,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1044-pgm-edit-push.test.js',
 	'tools/smoke/smoke-wo1045-project-list-load.test.js',
 	'tools/smoke/smoke-wo1050-pixelhue-layer-opacity.test.js',
+	'tools/smoke/smoke-wo1055-alsa-cards.test.js',
 ]

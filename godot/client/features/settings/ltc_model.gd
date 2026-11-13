@@ -50,3 +50,32 @@ static func _out_text(o: Variant) -> String:
 	if o.get("running") == true and o.get("tc") != null:
 		return str(o.tc)
 	return "silent (timeline not playing)" if str(o.get("source", "")) == "timeline" else "starting"
+
+
+## WO-1055: the Device dropdown's items [[value, label], …] from GET /api/audio/alsa-cards — "None" first, then the cards;
+## a stored device that is not connected (or typed by hand before) stays listed so a save never silently changes it.
+static func device_items(cards: Array, current: String) -> Array:
+	var out := [["", "None"]]
+	for c in cards:
+		if c is Dictionary and str(c.get("value", "")) != "":
+			out.append([str(c.value), str(c.get("label", c.value))])
+	if current != "" and index_of(out, current, cards) < 0:
+		out.append([current, "%s (not connected)" % current])
+	return out
+
+
+## The item showing `value`: the same string, else the card it names by number (a stored "plughw:4,0" / "hw:4,0" is the
+## card listed as card 4, device 0). -1 = none.
+static func index_of(items: Array, value: String, cards := []) -> int:
+	for i in items.size():
+		if str(items[i][0]) == value:
+			return i
+	var m := RegEx.create_from_string("^(plug)?hw:(\\d+),(\\d+)$").search(value)
+	if m == null:
+		return -1
+	for c in cards:
+		if c is Dictionary and int(c.get("card", -1)) == int(m.get_string(2)) and int(c.get("device", -1)) == int(m.get_string(3)):
+			for i in items.size():
+				if str(items[i][0]) == str(c.get("value", "")):
+					return i
+	return -1

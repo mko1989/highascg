@@ -7,7 +7,7 @@
 
 const defaults = require('../config/defaults')
 const { normalizeAudioRouting } = require('../config/config-generator')
-const { listAudioDevices, listPortAudioDevices } = require('../audio/audio-devices')
+const { listAudioDevices, listPortAudioDevices, listAlsaCards } = require('../audio/audio-devices')
 const {
 	getAlsaMixerState,
 	setAlsaMixerControl,
@@ -112,6 +112,11 @@ function handleGet(path, query, ctx) {
 		const refresh = query.refresh === '1' || query.refresh === 'true'
 		const data = listAudioDevices({ refresh })
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(data) }
+	}
+	if (path === '/api/audio/alsa-cards') {
+		// WO-1055: LTC device pickers — ?dir=capture | playback
+		const dir = query && query.dir === 'capture' ? 'capture' : 'playback'
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody(listAlsaCards(dir)) }
 	}
 	if (path === '/api/audio/fft-source') {
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(require('../audio/fft-channel-source').describeFftSource(ctx?.config || {})) } // WO-976

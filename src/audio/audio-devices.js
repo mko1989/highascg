@@ -430,7 +430,48 @@ function listPortAudioDevices(opts = {}) {
 	return payload
 }
 
+/**
+ * WO-1055: `aplay -l` / `arecord -l` card lines → picker entries whose value names the card by its ALSA id
+ * (`plughw:CARD=USB,DEV=0`), which survives USB re-enumeration (the Scarlett was card 4 on 13.11; a replug can renumber it).
+ * `plughw` converts rate / format / channel count, as LTC's aplay / arecord need.
+ * @param {string} text
+ * @returns {Array<{ value: string, label: string, card: number, device: number }>}
+ */
+function parseAlsaCardList(text) {
+	const out = []
+	for (const line of String(text || '').split('\n')) {
+		const m = line.match(/^card\s+(\d+):\s*(\S+)\s*\[([^\]]*)\],\s*device\s+(\d+):\s*(.*?)\s*(?:\[([^\]]*)\])?\s*$/i)
+		if (!m) continue
+		const dev = parseInt(m[4], 10)
+		const what = (m[6] || m[5] || '').trim()
+		out.push({ value: `plughw:CARD=${m[2]},DEV=${dev}`, label: `${m[3].trim()} — ${what}`, card: parseInt(m[1], 10), device: dev })
+	}
+	return out
+}
+
+/**
+ * WO-1055: the sound cards for one direction — `playback` (aplay -l) or `capture` (arecord -l) — for the LTC device pickers.
+ * @param {'playback'|'capture'} dir
+ * @param {(bin: string) => string|null} [run] test seam: returns the tool's `-l` output
+ */
+function listAlsaCards(dir, run) {
+	const bin = dir === 'capture' ? 'arecord' : 'aplay'
+	const exec =
+		run ||
+		((b) => {
+			try {
+				return execFileSync(b, ['-l'], { encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'pipe'] })
+			} catch {
+				return null
+			}
+		})
+	const text = exec(bin)
+	return { dir: dir === 'capture' ? 'capture' : 'playback', cards: text == null ? [] : parseAlsaCardList(text), ok: text != null }
+}
+
 module.exports = {
+	listAlsaCards,
+	parseAlsaCardList,
 	listAudioDevices,
 	listPortAudioDevices,
 	parseAplayList,
