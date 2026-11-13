@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-964 live WOs (35 open, 139 in progress, 790 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+965 live WOs (35 open, 140 in progress, 790 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -666,7 +666,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 827 DONE [web-client] Web client: Looks deck says "No looks" after a server import (+ six ReferenceEr… → 827_WO_web_looks_deck_empty_after_import.md
 - 844 DONE [web-client] Sweep: web client bugs → 844_WO_sweep_web_client_bugs.md
 
-## companion — Companion integration (22)
+## companion — Companion integration (23)
 
 - 01 DONE [companion] Analyze Companion Module (companion-module-casparcg-server) → 01_WO_ANALYZE_MODULE.md
 - 24 DONE [companion] Companion Button Press from Timeline → 24_WO_COMPANION_BUTTON_PRESS.md
@@ -690,6 +690,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 734 DONE [companion+web-client] Show timers on the served pages: presentation (OSCPoint via Companion), video i… → 734_WO_show_timers_served_pages.md
 - 791 DONE [companion] Companion: recall look presets to PRV, to PGM, or to PGM with auto take → 791_WO_companion_look_preset_recall.md
 - 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
+- 1057 IN PROGRESS [companion] Companion: timeline transport did nothing (module 1.0.3) → 1057_WO_companion_timeline_transport_dead.md
 
 ## devices-config — Devices tab, settings, config generation (60)
 
