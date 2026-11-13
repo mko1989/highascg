@@ -61,7 +61,7 @@ func _toggle() -> void:
 	var tl: Dictionary = transport.tab.active() if transport != null else {}
 	if tl.is_empty():
 		return
-	var on := tl.get("ltcOut") != true
+	var on: bool = tl.get("ltcOut") != true
 	if on:
 		tl["ltcOut"] = true
 	else:

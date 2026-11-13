@@ -28,6 +28,6 @@ func test_controls_row_sits_between_preview_and_timeline() -> void:
 
 func test_timeline_tab_uses_the_middle_row() -> void:
 	var src := FileAccess.get_file_as_string("res://features/timeline/timeline_tab.gd")
-	t.ok(src.contains("TimelineLayout.stack(preview_slot, [transport, dest], view)"), "the tab stacks via timeline_layout.gd")
+	t.ok(src.contains("TimelineLayout.stack(preview_slot, [transport, transport.ltc, dest], view)"), "the tab stacks via timeline_layout.gd")
 	t.ok(not src.contains("add_child(transport)") and not src.contains("add_child(dest)"), "no controls at the tab's top")
 	t.ok(src.contains("LivePreview.current.host(preview_slot)"), "the WO-789 preview borrow is unchanged")

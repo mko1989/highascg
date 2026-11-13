@@ -18,7 +18,7 @@ var pb_last := ""  # timelineId of the latest timeline.playback (the web's state
 var _pick: OptionButton
 var _play: Button
 var _loop: Button
-var _ltc: TimelineLtc
+var ltc: TimelineLtc  # WO-1059/1060 read-out; the tab puts it in the controls row as its own item, so it wraps instead of being cut off
 var _hold: Button  # WO-834: end of a non-looping timeline — on = hold the last frame (default), off = black
 var _cur: LineEdit
 var _tot: LineEdit
@@ -75,10 +75,6 @@ func _ready() -> void:
 	fol.button_pressed = true
 	fol.toggled.connect(func(on: bool) -> void: tab.view.follow = on)
 	add_child(fol)
-	add_child(VSeparator.new())
-	_ltc = TimelineLtc.new()  # WO-1059: LTC out read-out; WO-1060: click = this timeline sends LTC
-	_ltc.transport = self
-	add_child(_ltc)
 	Ws.on("timeline.tick", _on_tick)
 	Ws.on("timeline.playback", _on_playback)
 
@@ -121,7 +117,8 @@ func sync() -> void:
 	_loop.set_pressed_no_signal(p.get("loop", false))
 	_hold.set_pressed_no_signal(str(tl.get("endBehaviour", "hold")) != "black")
 	_hold.disabled = tl.is_empty()
-	_ltc.set_timeline_on(tl.get("ltcOut") == true)
+	if ltc != null:
+		ltc.set_timeline_on(tl.get("ltcOut") == true)
 	var fps := int(tl.get("fps", 25))
 	if not _cur.has_focus():
 		_cur.text = TM.fmt_smpte(tab.view.playhead_ms, fps) if not tl.is_empty() else "--:--:--:--"

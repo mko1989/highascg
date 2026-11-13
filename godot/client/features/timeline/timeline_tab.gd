@@ -21,6 +21,7 @@ extends VBoxContainer
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TimelineView := preload("res://features/timeline/timeline_view.gd")
 const TimelineTransport := preload("res://features/timeline/timeline_transport.gd")
+const TimelineLtc := preload("res://features/timeline/timeline_ltc.gd")
 const TimelineDest := preload("res://features/timeline/timeline_dest.gd")
 const TimelineKeys := preload("res://features/timeline/timeline_keys.gd")
 const TimelineLayout := preload("res://features/timeline/timeline_layout.gd")
@@ -90,7 +91,9 @@ func _ready() -> void:
 	_borrow_preview.call_deferred()
 	if is_instance_valid(LivePreview.current):  # WO-891: the Live tab (other monitor) hid it — take it while shown here
 		LivePreview.current.visibility_changed.connect(func() -> void: _borrow_preview.call_deferred())
-	var split := TimelineLayout.stack(preview_slot, [transport, dest], view)  # WO-810: preview, controls row, timeline
+	transport.ltc = TimelineLtc.new()
+	transport.ltc.transport = transport
+	var split := TimelineLayout.stack(preview_slot, [transport, transport.ltc, dest], view)  # WO-810: preview, controls row, timeline
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
 	split.split_offset = int(cfg.get_value("timeline", "preview_h", 480))
