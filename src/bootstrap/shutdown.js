@@ -28,6 +28,7 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 			if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onShutdown()
 			if (appCtx._audioCaptureLifecycle) appCtx._audioCaptureLifecycle.onShutdown()
 			if (appCtx._ltcService) appCtx._ltcService.onShutdown() // WO-974
+			if (appCtx._pixelhueFollow) appCtx._pixelhueFollow.stop() // WO-1063
 			try {
 				const { stopAllLiveAudioBridges } = require('../audio/live-audio-bridge')
 				stopAllLiveAudioBridges()

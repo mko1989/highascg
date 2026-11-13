@@ -336,6 +336,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1037-batch-clear-before-cg-add.test.js',
 	'tools/smoke/smoke-wo1038-pixelhue-look-drive.test.js',
 	'tools/smoke/smoke-wo1062-pixelhue-mask-read.test.js',
+	'tools/smoke/smoke-wo1063-pixelhue-follow.test.js',
 	'tools/smoke/smoke-wo1039-pixelhue-studio-bridge.test.js',
 	'tools/smoke/smoke-wo1044-pgm-edit-push.test.js',
 	'tools/smoke/smoke-wo1045-project-list-load.test.js',

@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-967 live WOs (35 open, 140 in progress, 792 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+971 live WOs (35 open, 142 in progress, 794 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (178)
+## engine — Looks, takes, timeline, playback (180)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -185,6 +185,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1013 DONE [engine+mapping] After Devices ▸ Apply & restart, put back what was on the screens: the test car… → 1013_WO_restore_screens_after_caspar_restart.md
 - 1027 OPEN [engine+network,video-io] A look cannot name another server's input: raw route://N-L gives a 403, an empt… → 1027_WO_looks_cannot_name_another_servers_inputs.md
 - 1032 DONE [engine+companion,lighting] Timeline cues: fire on program only, and never drop one → 1032_WO_timeline_cues_program_only_and_dropped_cues.md
+- 1060 IN PROGRESS [engine+godot-client] LTC out only on the timelines the operator chooses → 1060_WO_ltc_out_per_timeline.md
+- 1061 DONE [engine+amcp] Timeline opacity keyframes do not fade during playback (fine when scrubbing) → 1061_WO_timeline_keyframe_fades_not_firing.md
 
 ## amcp — AMCP client and protocol (21)
 
@@ -289,7 +291,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1056 OPEN [audio] LTC out on its own channel pair of a multichannel interface that also carries p… → 1056_WO_ltc_on_a_pair_of_a_shared_multichannel_device.md
 - 1058 DONE [audio+engine] LTC out to ALSA re-located ~3×/s (never ran clean); stuck 2 frames behind after… → 1058_WO_ltc_out_relocates_constantly.md
 
-## video-io — DeckLink, NDI, v4l2, virtual camera, recording (34)
+## video-io — DeckLink, NDI, v4l2, virtual camera, recording (36)
 
 - 27 IN PROGRESS [video-io] Streaming Channel and UI Tab → 27_WO_STREAMING_CHANNEL.md
 - 28 DONE [video-io] DeckLink input / output routing → 28_WO_DECKLINK_INPUT_OUTPUT_ROUTING.md
@@ -325,6 +327,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 947 DONE [video-io+godot-client] Record and stream outputs checked end to end; a stream that cannot reach its re… → 947_WO_record_stream_output_checks.md
 - 1012 IN PROGRESS [video-io+audio,devices-config,godot-client] Zoom integration via the Zoom desktop client: its windows on hidden virtual des… → 1012_WO_zoom_desktop_client_windows_as_live_inputs_and_return_feed.md
 - 1030 OPEN [video-io+engine,caspar-build,mapping] An 8K tiled output runs at 19 fps on highascg5867: idle channels read back full… → 1030_WO_8k_tiled_output_runs_at_19fps_idle_channels_cost.md
+- 1062 DONE [video-io] PixelHue layer read ignores the layer's mask → 1062_WO_pixelhue_read_counts_mask.md
+- 1063 IN PROGRESS [video-io+engine] Look layers made from PixelHue layers follow the switcher live while on PGM → 1063_WO_pixelhue_layers_follow_on_pgm.md
 
 ## mapping — Pixel map, screens, multiview, destinations (48)
 

@@ -421,6 +421,7 @@ function main() {
 		appCtx._audioCaptureLifecycle.startAudioCapture()
 		// WO-974: LTC timecode in (reader + timeline chase) / out (generator) — config.ltc, off by default.
 		appCtx._ltcService = require('./src/timecode/ltc-service').createLtcService({ appCtx, log: (l, m) => appCtx.log(l, m) }); appCtx._ltcService.start()
+		appCtx._pixelhueFollow = require('./src/pixelhue/pixelhue-follow').createPixelhueFollow({ ctx: appCtx }); appCtx._pixelhueFollow.start() // WO-1063: PGM layers follow their switcher layer
 
 		const shutdown = Shutdown.createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSubsystem, stopOscSubsystem, wsHandle, httpServer, persistence })
 		process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown)
