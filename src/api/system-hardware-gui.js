@@ -123,7 +123,14 @@ function spawnGuiDetached(action, opts = {}) {
 	}
 
 	const operatorHome = process.env.HOME || '/home/casparcg'
+	// Dock apps need the user session bus: without it Thunar has no gvfs/udisks (eject fell back to plain umount
+	// and "failed" on its 25 s timeout), no xfconf (view settings never loaded) and no trash. WO-780 lines.
+	const uid = typeof process.getuid === 'function' ? process.getuid() : 1000
+	const sessionEnv = fs.existsSync(`/run/user/${uid}/bus`)
+		? { XDG_RUNTIME_DIR: `/run/user/${uid}`, DBUS_SESSION_BUS_ADDRESS: `unix:path=/run/user/${uid}/bus` }
+		: {}
 	const env = {
+		...sessionEnv,
 		...process.env,
 		HOME: operatorHome,
 		USER: process.env.USER || 'casparcg',
@@ -141,7 +148,8 @@ function spawnGuiDetached(action, opts = {}) {
 
 	// WO-1012: Zoom runs in its own user scope, so a node restart does not end the meeting (the unit is KillMode=mixed)
 	const launched = bin
-	if (opts.extraEnv && require('../zoom/zoom-launch-env').isZoomBin(bin)) {
+	// The file manager too: SIGKILLed mid-copy it leaves a USB volume dirty.
+	if (action === 'file-manager' || (opts.extraEnv && require('../zoom/zoom-launch-env').isZoomBin(bin))) {
 		const cmd = require('../zoom/zoom-launch-env').userScopeArgv(bin, args)
 		bin = cmd.bin
 		args = cmd.args
