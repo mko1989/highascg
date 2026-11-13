@@ -239,6 +239,10 @@ async function reconcileLiveSceneFromGatheredXml(self, opts = {}) {
 			const t = String(layer.source?.type || 'file')
 			const val = layer.source?.value != null ? String(layer.source.value) : ''
 			if (t !== 'file' && t !== 'template' && t !== 'media') continue
+			/* WO-1063: a colour source (`#rrggbbaa` — the empty placeholder of a look layer made from a PixelHue layer) is no
+			 * file Caspar could name back; compared as a path it never matched and every server start dropped the look on
+			 * air (box 13.11), which also stopped its layers following the switcher. */
+			if (val.trim().startsWith('#')) continue
 			const actual = fgByLayer[phys] != null ? String(fgByLayer[phys]) : ''
 			if (!pathsMatch(val, actual)) {
 				self.log(

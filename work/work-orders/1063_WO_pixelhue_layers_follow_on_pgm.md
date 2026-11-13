@@ -1,7 +1,7 @@
 # WO-1063 — Look layers made from PixelHue layers follow the switcher live while on PGM
 
 **Area:** video-io, engine
-**Status: IN PROGRESS (13.11 — built; dry run against the box's P80; not yet seen on air)**
+**Status: DONE (13.11 — on air on the box: switcher layer moved 300 px, border followed; survives a server restart)**
 
 Owner, 13.11: *"when there are pixelhue layers used on pgm they should live follow the layers from pixelhue"*
 
@@ -31,6 +31,27 @@ Owner, 13.11: *"when there are pixelhue layers used on pgm they should live foll
 - `tools/smoke/smoke-wo1063-pixelhue-follow.test.js` (6).
 - Dry run on the box (real P80 read, stored narvil "Look 1", fake nudge): L11 → 817×669 at 240,132 (the masked
   Layer 4), L10 → the switcher layer's current 3072×1024; second tick: no nudge.
-- NOT verified: on air (a take of a look with linked layers, then moving the layer on the switcher) — PGM was the
-  owner's during the session. Open points to look at then: the PIP border / edge strip of the layer moving with it,
-  and the first-take jump when the stored rectangle is stale.
+
+## Round 2 (owner 13.11: "masking worked, but the live follow doesnt")
+
+Found on air with "Look 1" on PGM (ch 4):
+
+1. The follower DID nudge (`MIXER 4-111 FILL …` on every move) — but a look layer made from a switcher layer is an
+   empty placeholder (`#00000000`); what is seen is its PIP overlay (border on 4-624, edge strip on 4-620), and the
+   PGM nudge moves only the layer itself. → `src/pixelhue/pixelhue-follow-overlays.js`: after the nudge every overlay
+   of a moved layer is updated in place (`buildPipOverlayUpdateLines`: CG UPDATE + MIXER FILL, never re-added, on the
+   PGM take chain, active bank).
+2. L10's link said `Screen 1 · Layer 3` but its `layerId` 88145923 was by then the switcher's "Layer 1" (3072×1024):
+   the switcher hands layer ids out again. → `linkedLayer()`: the id counts only while that layer still has the link's
+   name, else the one program layer of that screen with that name, else the look layer stays put (seen again later
+   the same day: after a take on the switcher 88145922 was "Layer 1" and Layers 3 / 4 were on PVW only).
+3. `live-scene-reconcile.js` compared the placeholder's colour value as a media path at every server start
+   ("channel 4 layer 10 … mismatch … clearing persisted live look") — the look was dropped from the live state and the
+   follow stopped until a retake. → colour sources are skipped in that compare.
+
+Verified on the box: Look 1 taken to PGM; switcher Layer 4 window moved +300 px through the API → live L11 fill
+0.0755 → 0.1732, `CG 4-624 UPDATE` + `MIXER 4-624 FILL` within one tick, RGBA `PRINT 4` before / after shows the border
+300 px further right with the edge strip of L10 still running; layer moved back. After a server restart the live
+entry of ch 4 is kept and a +100 px move is followed again. Smoke: 9 tests; offline suite 6191 pass.
+
+Left open: the stored look keeps its drop-time rectangle (a take starts there and snaps within 250 ms).

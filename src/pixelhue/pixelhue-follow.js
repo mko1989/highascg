@@ -8,7 +8,8 @@
  * A tick (FOLLOW_MS) looks at every program channel's live look; only when one holds a linked layer is the switcher
  * read (pixelhue-read.js: one request pair, shared with the layer list). A linked layer whose rectangle differs from
  * the switcher layer's shown rectangle (WO-1062: the mask counts) gets the PGM mixer nudge the look editor uses
- * (/api/preview/mixer-nudge target 'pgm': bank-aware, queued behind takes), and the live entry is updated in place.
+ * (/api/preview/mixer-nudge target 'pgm': bank-aware, queued behind takes), the live entry is updated in place and the
+ * layer's PIP overlays are moved with it (pixelhue-follow-overlays.js).
  * The stored look is not touched: its rectangle is where the layer starts on the next take.
  *
  * Not followed: a layer the look DRIVES (Devices ▸ PixelHue "looks drive the switcher" on and the layer's own drive
@@ -20,16 +21,28 @@ const EPS = 2e-4 // ~half a pixel on a 3072-wide canvas: a re-read of an unmoved
 
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d)
 
-/** layerNumber → switcher layerId for the stored look's linked layers that follow. */
+/** layerNumber → { layerId, screenId, name } for the stored look's linked layers that follow. */
 function followLinks(storedScene, driveOn) {
 	const out = new Map()
 	for (const l of Array.isArray(storedScene?.layers) ? storedScene.layers : []) {
 		const link = l?.pixelhue
 		if (!link || typeof link !== 'object' || !Number.isFinite(Number(link.layerId))) continue
 		if (driveOn && link.drive !== false) continue
-		out.set(Number(l.layerNumber), Number(link.layerId))
+		// link.name is "<screen> · <layer>" (pixelhue_match_model.gd choices)
+		out.set(Number(l.layerNumber), { layerId: Number(link.layerId), screenId: link.screenId, name: String(link.name || '').split(' · ').pop().trim() })
 	}
 	return out
+}
+
+/** The switcher layer a link means. Its id is the key — but the switcher hands ids out again as its program changes
+ * (box 13.11: the link said "Layer 3", its id had become "Layer 1" and the look layer went full screen; later the same
+ * id was a third layer). So the id counts only while that layer still has the link's name; else the one program layer
+ * of that screen with that name; else nothing — the look layer stays where it is rather than follow a stranger. */
+function linkedLayer(link, pgmLayers) {
+	const byId = pgmLayers.find((l) => Number(l.layerId) === link.layerId)
+	if (!link.name || (byId && byId.name === link.name)) return byId || null
+	const named = pgmLayers.filter((l) => l.name === link.name && (link.screenId == null || l.screenId === link.screenId))
+	return named.length === 1 ? named[0] : null
 }
 
 const sameFill = (a, b) =>
@@ -38,19 +51,20 @@ const sameFill = (a, b) =>
 /**
  * The live look's layers with every followed layer on its switcher layer's rectangle.
  * @param {object[]} liveLayers the live entry's layer rows
- * @param {Map<number, number>} links followLinks()
+ * @param {Map<number, { layerId: number, screenId?: number, name: string }>} links followLinks()
  * @param {{ screens: object[] }} snap pixelhue-read snapshot
  * @returns {{ layers: object[], moved: object[] }} moved: the rows that changed (what the nudge sends)
  */
 function followedLayers(liveLayers, links, snap) {
-	const byId = new Map()
+	const pgm = []
 	for (const s of snap?.screens || []) {
 		if (s?.enabled === false) continue
-		for (const l of s.layers || []) if (l?.enabled && l.fill && l.scene === 'pgm') byId.set(Number(l.layerId), l.fill)
+		for (const l of s.layers || []) if (l?.enabled && l.fill && l.scene === 'pgm') pgm.push(l)
 	}
 	const moved = []
 	const layers = (liveLayers || []).map((row) => {
-		const fill = byId.get(links.get(Number(row?.layerNumber)))
+		const link = links.get(Number(row?.layerNumber))
+		const fill = link ? linkedLayer(link, pgm)?.fill : null
 		if (!fill || sameFill(row.fill, fill)) return row
 		// the rectangle IS the size, as when the layer was matched (pixelhue_match_model.gd patch_for)
 		const next = { ...row, fill: { x: fill.x, y: fill.y, scaleX: fill.scaleX, scaleY: fill.scaleY }, contentFit: 'stretch', aspectLocked: false }
@@ -61,7 +75,7 @@ function followedLayers(liveLayers, links, snap) {
 }
 
 /**
- * @param {{ ctx: object, deps?: object }} a deps (tests): settings, reader, getMap, getLive, setLive, resolveScene, nudge
+ * @param {{ ctx: object, deps?: object }} a deps (tests): settings, reader, getMap, getLive, setLive, resolveScene, nudge, moveOverlays
  */
 function createPixelhueFollow({ ctx, deps = {} }) {
 	let timer = null
@@ -119,6 +133,8 @@ function createPixelhueFollow({ ctx, deps = {} }) {
 			const now = getLive(w.ch)
 			if (String(now?.sceneId || '') !== String(w.live.sceneId) || now?.updatedAt !== w.live.updatedAt) continue
 			await (deps.setLive || ((c, e) => liveState().setChannel(c, e)))(w.ch, { ...now, scene: { ...now.scene, layers } })
+			const canvas = Number(res.w) > 0 && Number(res.h) > 0 ? { w: Number(res.w), h: Number(res.h) } : null
+			await (deps.moveOverlays || ((a) => require('./pixelhue-follow-overlays').moveOverlaysOnPgm(ctx, a)))({ sceneId: String(w.live.sceneId), channel: w.ch, layers: moved, canvas })
 			stats.nudges++
 			stats.at = Date.now()
 		}

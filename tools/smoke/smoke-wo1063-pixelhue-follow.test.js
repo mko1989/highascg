@@ -17,7 +17,7 @@ const liveEntry = (fill) => ({ sceneId: 's1', updatedAt: 111, scene: { id: 's1',
 const snapOf = (fill, extra = {}) => ({ screens: [{ screenId: 5, enabled: true, layers: [{ layerId: 77, enabled: true, scene: 'pgm', fill, ...extra }, { layerId: 78, enabled: true, scene: 'pvw', fill: FILL_A }] }] })
 
 function rig({ link = { layerId: 77 }, drive = false, switcherFill = FILL_B, host = '10.0.0.7' } = {}) {
-	const state = { live: { 1: liveEntry(FILL_A) }, reads: 0, nudges: [], snap: snapOf(switcherFill) }
+	const state = { live: { 1: liveEntry(FILL_A) }, reads: 0, nudges: [], overlays: [], snap: snapOf(switcherFill) }
 	const follow = createPixelhueFollow({
 		ctx: {},
 		deps: {
@@ -28,6 +28,7 @@ function rig({ link = { layerId: 77 }, drive = false, switcherFill = FILL_B, hos
 			setLive: async (ch, e) => (state.live[ch] = e),
 			resolveScene: () => stored(link),
 			nudge: async (b) => (state.nudges.push(b), { status: 200, body: JSON.stringify({ ok: true }) }),
+			moveOverlays: async (a) => state.overlays.push(a),
 		},
 	})
 	return { state, follow }
@@ -46,6 +47,7 @@ describe('WO-1063 PixelHue follow', () => {
 		assert.deepEqual(n.layers[0].fill, FILL_B)
 		assert.deepEqual(state.live[1].scene.layers[1].fill, FILL_B)
 		assert.equal(state.live[1].updatedAt, 111, 'the take time is kept')
+		assert.deepEqual(state.overlays.map((o) => [o.sceneId, o.channel, o.layers.map((l) => l.layerNumber), o.canvas]), [['s1', 1, [11], { w: 3072, h: 1024 }]], 'its PIP overlays move with it')
 		await follow.tick()
 		assert.equal(state.nudges.length, 1, 'in place now: no second nudge')
 	})
@@ -76,7 +78,7 @@ describe('WO-1063 PixelHue follow', () => {
 		const f2 = createPixelhueFollow({ ctx: {}, deps: {
 			settings: () => ({ host: 'h', drive: false }), reader: () => ({ read: async () => state.snap }),
 			getMap: () => ({ programChannels: [1] }), getLive: (ch) => state.live[ch], setLive: async () => assert.fail('must not overwrite the new take'),
-			resolveScene: () => stored({ layerId: 77 }), nudge: async () => ((state.live[1] = taken), { status: 200, body: '{"ok":true}' }),
+			resolveScene: () => stored({ layerId: 77 }), moveOverlays: async () => 0, nudge: async () => ((state.live[1] = taken), { status: 200, body: '{"ok":true}' }),
 		} })
 		await f2.tick()
 		assert.equal(state.live[1], taken)
@@ -87,5 +89,32 @@ describe('WO-1063 PixelHue follow', () => {
 		const l2 = followLinks(stored({ layerId: 77 }), false)
 		assert.equal(followedLayers(liveEntry(FILL_A).scene.layers, l2, snapOf(FILL_B, { enabled: false })).moved.length, 0)
 		assert.equal(followLinks(stored({ layerId: 'x' }), false).size, 0)
+	})
+	it('a switcher that re-numbered its layers: the layer that still has the link\'s name is followed', () => {
+		const snap = { screens: [{ screenId: 5, enabled: true, layers: [
+			{ layerId: 77, screenId: 5, name: 'Layer 1', enabled: true, scene: 'pgm', fill: { x: 0, y: 0, scaleX: 1, scaleY: 1 } },
+			{ layerId: 76, screenId: 5, name: 'Layer 3', enabled: true, scene: 'pgm', fill: FILL_B }] }] }
+		const links = followLinks(stored({ layerId: 77, screenId: 5, name: 'Screen 1 · Layer 3' }), false)
+		assert.deepEqual(followedLayers(liveEntry(FILL_A).scene.layers, links, snap).moved[0].fill, FILL_B)
+		const same = followLinks(stored({ layerId: 77, screenId: 5, name: 'Screen 1 · Layer 1' }), false)
+		assert.equal(followedLayers(liveEntry(FILL_A).scene.layers, same, snap).moved[0].fill.scaleX, 1, 'id and name agree: the id')
+		const gone = followLinks(stored({ layerId: 77, screenId: 5, name: 'Screen 1 · Renamed' }), false)
+		assert.equal(followedLayers(liveEntry(FILL_A).scene.layers, gone, snap).moved.length, 0, 'the id is another layer now and none has the name: stay put')
+	})
+	it('the startup reconcile keeps a look whose layers are colour placeholders (it dropped them: no follow after a restart)', () => {
+		const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../src/state/live-scene-reconcile.js'), 'utf8')
+		const guard = src.indexOf("if (val.trim().startsWith('#')) continue")
+		assert.ok(guard > 0, 'colour sources are not compared as paths')
+		assert.ok(guard < src.indexOf('if (!pathsMatch(val, actual))'), 'before the path compare')
+	})
+	it('overlay lines: every overlay of a moved layer is updated in place on the active bank', () => {
+		const { overlayFollowLines } = require('../../src/pixelhue/pixelhue-follow-overlays')
+		const layer = { layerNumber: 11, fill: FILL_B, pipOverlays: [{ type: 'border', params: { width: 14, side: 'outside' } }] }
+		const lines = overlayFollowLines({ channel: 4, layers: [layer, { layerNumber: 10, fill: FILL_A }], fills: new Map([[11, FILL_B], [10, FILL_A]]), bank: 'b', appCtx: { config: {} } })
+		assert.equal(lines.filter((l) => /^CG 4-\d+ UPDATE 0 /.test(l)).length, 1)
+		assert.ok(lines.some((l) => /^MIXER 4-\d+ FILL /.test(l)), 'the overlay layer gets its fill')
+		assert.ok(!lines.some((l) => / ADD | CLEAR/.test(l)), 'never re-added: an edge strip keeps running')
+		const a = overlayFollowLines({ channel: 4, layers: [layer], fills: new Map([[11, FILL_B]]), bank: 'a', appCtx: { config: {} } })
+		assert.notEqual(a[0].split(' ')[1], lines[0].split(' ')[1], 'bank B uses its own overlay layer')
 	})
 })

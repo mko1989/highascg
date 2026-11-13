@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-971 live WOs (35 open, 142 in progress, 794 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+971 live WOs (35 open, 141 in progress, 795 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -328,7 +328,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1012 IN PROGRESS [video-io+audio,devices-config,godot-client] Zoom integration via the Zoom desktop client: its windows on hidden virtual des… → 1012_WO_zoom_desktop_client_windows_as_live_inputs_and_return_feed.md
 - 1030 OPEN [video-io+engine,caspar-build,mapping] An 8K tiled output runs at 19 fps on highascg5867: idle channels read back full… → 1030_WO_8k_tiled_output_runs_at_19fps_idle_channels_cost.md
 - 1062 DONE [video-io] PixelHue layer read ignores the layer's mask → 1062_WO_pixelhue_read_counts_mask.md
-- 1063 IN PROGRESS [video-io+engine] Look layers made from PixelHue layers follow the switcher live while on PGM → 1063_WO_pixelhue_layers_follow_on_pgm.md
+- 1063 DONE [video-io+engine] Look layers made from PixelHue layers follow the switcher live while on PGM → 1063_WO_pixelhue_layers_follow_on_pgm.md
 
 ## mapping — Pixel map, screens, multiview, destinations (48)
 
