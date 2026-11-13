@@ -153,18 +153,30 @@ const CountdownEngine = (function () {
 	function applyPositionClass() {
 		if (!dom.root) return;
 		POSITIONS.forEach((p) => dom.root.classList.remove('countdown-pos-' + p));
-		// WO-320A: numeric posX/posY (px, canvas coordinates) override the preset — the content
-		// block's top-left corner anchors at exactly (posX, posY). Empty/non-numeric = preset.
-		const px = Number(config.posX);
-		const py = Number(config.posY);
-		if (Number.isFinite(px) && Number.isFinite(py) && String(config.posX) !== '' && String(config.posY) !== '') {
+		// WO-320A: numeric posX / posY (px, canvas coordinates) place the content block's top-left corner.
+		// WO-1069: each axis by itself — X alone moves it across and keeps the preset's height (and the reverse);
+		// before, one value without the other did nothing. Empty / non-numeric = the preset on that axis.
+		const hasX = String(config.posX ?? '') !== '' && Number.isFinite(Number(config.posX));
+		const hasY = String(config.posY ?? '') !== '' && Number.isFinite(Number(config.posY));
+		const st = dom.root.style;
+		st.padding = st.paddingLeft = st.paddingTop = st.alignItems = st.justifyContent = st.textAlign = '';
+		if (hasX && hasY) {
 			dom.root.classList.add('countdown-pos-top-left');
-			dom.root.style.padding = py + 'px 0 0 ' + px + 'px';
+			st.padding = Number(config.posY) + 'px 0 0 ' + Number(config.posX) + 'px';
 			return;
 		}
-		dom.root.style.padding = '';
 		const pos = POSITIONS.indexOf(config.position) >= 0 ? config.position : 'top-left';
 		dom.root.classList.add('countdown-pos-' + pos);
+		if (hasX) {
+			// the root is a column: align-items is the horizontal axis
+			st.alignItems = 'flex-start';
+			st.textAlign = 'left';
+			st.paddingLeft = Number(config.posX) + 'px';
+		}
+		if (hasY) {
+			st.justifyContent = 'flex-start';
+			st.paddingTop = Number(config.posY) + 'px';
+		}
 	}
 
 	function applyAux(el, text) {

@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-976 live WOs (35 open, 144 in progress, 797 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+977 live WOs (35 open, 145 in progress, 797 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (182)
+## engine — Looks, takes, timeline, playback (183)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -189,6 +189,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1061 DONE [engine+amcp] Timeline opacity keyframes do not fade during playback (fine when scrubbing) → 1061_WO_timeline_keyframe_fades_not_firing.md
 - 1064 DONE [engine+video-io] PIP overlays (border, glow, shadow, edge strip) are thicker top and bottom than… → 1064_WO_pip_overlays_uneven_on_non_canvas_shaped_layers.md
 - 1068 DONE [engine] A look's timeline played on preview (PGM went black) when taken right after a s… → 1068_WO_look_timeline_plays_on_stored_routing_after_restart.md
+- 1069 IN PROGRESS [engine+godot-client] Screen timer cannot be placed freely; settings only show after Save → 1069_WO_screen_timer_position_and_live_settings.md
 
 ## amcp — AMCP client and protocol (21)
 

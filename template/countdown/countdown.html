@@ -11,7 +11,9 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body {
             background: transparent;
-            height: 1080px; width: 1920px;
+            /* WO-1069: the page is the channel's canvas, whatever its size. It was fixed at 1920×1080: on a 3072×1024
+             * screen "center" sat a third of the way across and nothing could be placed right of 1920 px. */
+            height: 100%; width: 100%;
             overflow: hidden;
             position: relative;
             font-family: 'Arial', 'Helvetica Neue', sans-serif;

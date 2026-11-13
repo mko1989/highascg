@@ -155,11 +155,12 @@ describe('WO-381 compact timers dock', () => {
 		// Verified live on the running Caspar (CG INVOKE reported padding "150px 0px 0px 300px"
 		// for posX 300 / posY 150, then back to the preset) — this guards the branch that does it.
 		const engine = read('template/countdown/countdown-engine.js')
-		assert.match(engine, /const px = Number\(config\.posX\)/)
-		assert.match(engine, /Number\.isFinite\(px\) && Number\.isFinite\(py\)/)
-		assert.match(engine, /dom\.root\.style\.padding = py \+ 'px 0 0 ' \+ px \+ 'px'/)
+		// WO-1069 re-wrote the branch per axis (X or Y alone now counts too); the pair still anchors top-left by padding
+		assert.match(engine, /const hasX = String\(config\.posX \?\? ''\) !== '' && Number\.isFinite\(Number\(config\.posX\)\)/)
+		assert.match(engine, /const hasY = String\(config\.posY \?\? ''\) !== '' && Number\.isFinite\(Number\(config\.posY\)\)/)
+		assert.match(engine, /if \(hasX && hasY\) \{\s+dom\.root\.classList\.add\('countdown-pos-top-left'\);\s+st\.padding = Number\(config\.posY\) \+ 'px 0 0 ' \+ Number\(config\.posX\) \+ 'px';/)
 		// and the empty-string case must still fall back to the preset class
-		assert.match(engine, /String\(config\.posX\) !== '' && String\(config\.posY\) !== ''/)
+		assert.match(engine, /dom\.root\.classList\.add\('countdown-pos-' \+ pos\);/)
 	})
 
 	it('the time input is sized to its content, not the row', () => {

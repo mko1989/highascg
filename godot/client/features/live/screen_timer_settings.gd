@@ -1,8 +1,10 @@
 extends RefCounted
 ## WO-806 — the screen-timer settings form (web timer-control-panel-settings-form.js buildTimerSettings), shared by the
 ## screen-timer Inspector page (WO-601, `extended` = font, colours, border too) and the Timers dock's ⚙ (the short form:
-## Duration, Mode, Target, Size, Position, X / Y px — WO-567: "the compact ones should stay as is"). Position and px
-## apply at once, the rest on Save. `apply` takes the config patch and writes it to every screen the timer is on.
+## Duration, Mode, Target, Size, Position, X / Y px — WO-567: "the compact ones should stay as is").
+## WO-1069: how the timer LOOKS applies as it is changed (size, font, colours, border, position, X / Y px — while typing,
+## each axis by itself); what it COUNTS (duration, mode, target) goes on Save, so a running timer is not re-set by a
+## half-typed time. `apply` takes the config patch and writes it to every screen the timer is on.
 
 const T := preload("res://features/live/screen_timer_model.gd")
 const C := preload("res://features/live/countdown_model.gd")
@@ -15,6 +17,21 @@ const COLOURS := [["timerColor", "Color"], ["amberColor", "Amber"], ["redColor",
 ## `g`: a 2-column grid the label / field pairs go into; `box`: where the Save button goes (under the grid).
 static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: bool, apply: Callable) -> void:
 	var w := {}
+	# WO-1069: look changes go out a moment after the last one (a held spin arrow / typing = one request, not thirty)
+	var pending := {}
+	var deb := Timer.new()
+	deb.one_shot = true
+	deb.wait_time = 0.15
+	deb.timeout.connect(func() -> void:
+		if pending.is_empty():
+			return
+		var out := pending.duplicate()
+		pending.clear()
+		apply.call(out))
+	box.add_child(deb)
+	var live := func(patch: Dictionary) -> void:
+		pending.merge(patch, true)
+		deb.start()
 	g.add_child(muted("Duration"))
 	var hms := HBoxContainer.new()
 	var p := C.secs_to_hms(float(cfg.durationSec) if float(cfg.durationSec) > 0 else 300.0)
@@ -40,8 +57,10 @@ static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: b
 	(w.mode as OptionButton).item_selected.connect(func(_i: int) -> void: sync_mode.call())
 	sync_mode.call()
 	w["size"] = number(g, "Size (vw)", 1, 100, float(cfg.timerFontSize))
+	(w.size as SpinBox).value_changed.connect(func(v: float) -> void: live.call({"timerFontSize": clampi(int(v), 1, 100)}))
 	if extended:
 		w["font"] = choice(g, "Font", T.FONTS.map(func(f: Array) -> String: return f[1]), T.FONTS.map(func(f: Array) -> String: return f[0]).find(str(cfg.timerFontFamily)))
+		(w.font as OptionButton).item_selected.connect(func(i: int) -> void: live.call({"timerFontFamily": T.FONTS[maxi(0, i)][0]}))
 		for c in COLOURS:
 			g.add_child(muted(c[1]))
 			var cp := ColorPickerButton.new()
@@ -50,7 +69,10 @@ static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: b
 			cp.color = P.parse_css(str(cfg.get(c[0], T.DEFAULTS[c[0]])))
 			g.add_child(cp)
 			w[c[0]] = cp
+			var key := str(c[0])
+			cp.color_changed.connect(func(col: Color) -> void: live.call({key: P.to_css(col)}))
 		w["border"] = number(g, "Border (px)", 0, 20, float(cfg.timerBorderWidth))
+		(w.border as SpinBox).value_changed.connect(func(v: float) -> void: live.call({"timerBorderWidth": clampi(int(v), 0, 20)}))
 	var pos := choice(g, "Position", T.POSITIONS, maxi(0, T.POSITIONS.find(str(cfg.position))))
 	pos.item_selected.connect(func(i: int) -> void: apply.call({"position": T.POSITIONS[i]}))
 	g.add_child(muted("Position px X / Y"))
@@ -60,7 +82,7 @@ static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: b
 		var le := NumericField.math_line(LineEdit.new(), true, -INF, INF, Callable(), true)  # px values take + - * / ( ) (RULES.md); blank clears (WO-839: blank_ok)
 		le.text = str(cfg.get(k, ""))
 		le.placeholder_text = "%s px" % k.right(1)
-		le.tooltip_text = "X and Y together override the preset — clear both to go back to it"
+		le.tooltip_text = "Pixels from the screen's left / top edge. Either one alone moves that axis; empty = the Position preset on that axis"
 		le.custom_minimum_size.x = 70
 		pxr.add_child(le)
 		px.append(le)
@@ -68,9 +90,13 @@ static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: b
 	for le in px:
 		le.text_submitted.connect(apply_px)
 		le.focus_exited.connect(apply_px)
+		# while typing: a plain number (or cleared) moves the timer at once; a sum in progress waits for Enter
+		le.text_changed.connect(func(txt: String) -> void:
+			if txt.strip_edges() == "" or txt.strip_edges().is_valid_float():
+				live.call({"posX": T.px_value(px[0].text), "posY": T.px_value(px[1].text)}))
 	g.add_child(pxr)
-	var save := button("Save", ("Duration, mode, target, size, font, colours, border" if extended else "Duration, mode, target, size")
-		+ " → every screen this timer is on", func() -> void:
+	var save := button("Save", "Duration, mode and target time → every screen this timer is on (the look applies as you change it)", func() -> void:
+		pending.clear()
 		var out := {"durationSec": C.hms_to_secs(w.h.value, w.m.value, w.s.value), "mode": T.MODES[(w.mode as OptionButton).selected][0],
 			"targetTime": target.text, "position": T.POSITIONS[pos.selected], "posX": T.px_value(px[0].text), "posY": T.px_value(px[1].text),
 			"timerFontSize": clampi(int((w.size as SpinBox).value), 1, 100)}

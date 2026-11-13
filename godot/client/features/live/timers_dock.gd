@@ -256,7 +256,10 @@ func _chip(id: String, idx: int, label: String, vis: bool) -> Control:
 
 
 func _save(t: Dictionary, patch: Dictionary) -> void:
-	for body in M.assign_bodies(t, patch):
+	var bodies := M.assign_bodies(t, patch)
+	if not bodies.is_empty():
+		t["config"] = bodies[0].config  # WO-1069: the next live patch builds on this one (the list is not rebuilt while a field has focus)
+	for body in bodies:
 		await Api.post_json("/api/timers/assign", body)
 	_shape = ""  # show what the server stored
 	refresh()

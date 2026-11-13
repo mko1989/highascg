@@ -147,13 +147,15 @@ func _section(rec: Dictionary) -> Control:
 
 
 ## saveTimerConfigPatch: the merged config, assigned again on every screen the timer is on.
+## WO-1069: no reload() here — it rebuilt the whole form after every field, so the field being typed in next lost its
+## focus and its text (X applied, then Y was wiped while it was typed). The record already holds what was sent; the
+## 5 s poll refreshes the list once no field has focus.
 func _apply(rec: Dictionary, patch: Dictionary) -> void:
 	var cfg: Dictionary = (rec.get("config", {}) as Dictionary).duplicate() if rec.get("config") is Dictionary else {}
 	cfg.merge(patch, true)
 	rec["config"] = cfg
 	for k in (rec.get("screens", {}) as Dictionary).keys():
 		await Api.post_json("/api/timers/assign", {"timerId": rec.timerId, "screenIdx": int(k), "config": cfg})
-	await reload()
 
 
 func _visible(id: String, on: bool, fade: int, opacity := -1.0) -> void:
