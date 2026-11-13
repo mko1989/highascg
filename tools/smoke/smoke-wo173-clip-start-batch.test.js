@@ -104,7 +104,11 @@ function makeEngine() {
 		assert.match(opacityTweenLine, new RegExp(`OPACITY 1 ${expectedFrames}`), `tween duration should be ${expectedFrames} frames for 500ms@25fps`)
 
 		// T173.3.2: exactly one commit on clip start tick
+		// 13.11: the commit follows the transport batch (it used to overtake the DEFER tween it fires), and the
+		// tween's start value precedes the PLAY (no frame at the old opacity)
+		await new Promise((r) => setTimeout(r, 20))
 		assert.ok(commitCalls.length >= 1, `should have ≥1 commit on clip start; got ${commitCalls.length}`)
+		assert.ok(lines.indexOf(opacityInitLine) < lines.indexOf(playLine), 'OPACITY start value is sent before PLAY')
 
 		// T173.3.3: next two ticks send no batches
 		batchCalls.length = 0

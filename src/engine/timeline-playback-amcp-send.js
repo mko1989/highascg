@@ -128,6 +128,7 @@ module.exports = {
 		const playing = this._airTimelineId === id && (this._pbFor(id).playing ?? false)
 		const mixerDirty = new Set()
 		const channelLines = new Map() // T173.4: collect MIXER lines per channel
+		const pendingBatches = new Map() // ch → transport batches whose DEFER lines the commit must follow
 
 		for (let li = 0; li < tl.layers.length; li++) {
 			const layer = tl.layers[li]
@@ -189,6 +190,7 @@ module.exports = {
 							if (result?.hasDeferredLines) {
 								mixerDirty.add(ch)
 								hasDeferredLines = true // T173.2
+							pendingBatches.set(ch, [...(pendingBatches.get(ch) || []), result.sent])
 							}
 						} else if (needsScrubSeek) {
 							/* WO-536: this branch is exclusive — a looping clip never reached the
@@ -209,6 +211,7 @@ module.exports = {
 						if (result?.hasDeferredLines) {
 							mixerDirty.add(ch)
 							hasDeferredLines = true // T173.2
+							pendingBatches.set(ch, [...(pendingBatches.get(ch) || []), result.sent])
 						}
 					} else if (needsScrubSeek) {
 						/* WO-790: paced — one seek per layer in flight, the newest target next (timeline-scrub-gate.js). */
@@ -285,18 +288,24 @@ module.exports = {
 			}
 		}
 
-		// T173.4: send collected lines per channel as batch, then MIXER COMMIT
+		/* T173.4: send collected lines per channel as batch, then MIXER COMMIT. The commit must FOLLOW those lines on
+		 * the wire: a batch goes out a promise turn later (line by line without amcp_batch) while a direct
+		 * mixerCommit is queued at once, so it overtook the DEFER tweens it was meant to fire — a keyframed fade
+		 * stayed parked until some later commit (box 13.11: stills popped in ~4 s late, no fade out). */
 		if (!take) {
 			for (const ch of mixerDirty) {
+				const waits = pendingBatches.get(ch) || []
 				const lines = channelLines.get(ch)
 				if (lines && lines.length > 0) {
-					self.amcp.batchSendChunked(lines, { skipMixerPreCommit: true }).catch(_err => {
+					waits.push(self.amcp.batchSendChunked(lines, { skipMixerPreCommit: true }).catch(_err => {
 						this._logDebug(`batch MIXER ${ch} failed: ${_err.message}`)
-					})
+					}))
 				}
-				self.amcp.mixerCommit(ch).catch(_err => {
+				const commit = () => self.amcp.mixerCommit(ch).catch(_err => {
 					this._logDebug(`MIXER COMMIT ${ch} failed: ${_err.message}`)
 				})
+				if (waits.length) Promise.allSettled(waits).then(commit)
+				else commit()
 			}
 		}
 	},
@@ -389,6 +398,12 @@ module.exports = {
 			}
 		}
 
+		// the tween's instant start value goes BEFORE the PLAY: after it, the new clip showed a frame at the old opacity
+		const segLines = hasOpacityTween
+			? buildDeferredSegmentMixerLines(ch, caspLayer, 'OPACITY', opacitySeg.startVal, opacitySeg.endVal, opacitySeg.dur, opacitySeg.tween)
+			: []
+		if (segLines.length) lines.push(segLines[0])
+
 		// Add transport line (PLAY/LOAD/etc)
 		if (meta.isRoute) {
 			lines.push(`PLAY ${cl} ${meta.srcQ}${afSuffix}`)
@@ -404,8 +419,7 @@ module.exports = {
 		// T173.2: append opacity segment tween if one starts at clip-local 0
 		let hasDeferredLines = false
 		if (hasOpacityTween) {
-			const segLines = buildDeferredSegmentMixerLines(ch, caspLayer, 'OPACITY', opacitySeg.startVal, opacitySeg.endVal, opacitySeg.dur, opacitySeg.tween)
-			lines.push(...segLines)
+			lines.push(...segLines.slice(1))
 			// Mark segment as pre-applied so per-tick scheduler skips it.
 			// Set _lastKfValues to start value so instant mixer check doesn't incorrectly trigger
 			// in _applyClipMixer called right after (force=true at clip start).
@@ -427,7 +441,7 @@ module.exports = {
 		})
 		this._transportAcks?.push(sent) // WO-828 D9
 
-		return { hasDeferredLines }
+		return { hasDeferredLines, sent }
 	},
 
 	_channelsFor(sendTo) {

@@ -7,6 +7,7 @@ const { msToMixerFrames } = require('../../src/engine/timeline-keyframe-mixer')
 function makeEngine() {
 	const batchCalls = []
 	const commitCalls = []
+	let batchesDone = 0
 	const noop = () => Promise.resolve()
 	const self = {
 		config: { screen_count: 1 },
@@ -20,12 +21,13 @@ function makeEngine() {
 			mixerOpacity: noop,
 			mixerVolume: noop,
 			mixerCommit: (ch) => {
-				commitCalls.push({ ch })
+				commitCalls.push({ ch, afterBatches: batchesDone })
 				return Promise.resolve()
 			},
 			batchSendChunked: (lines, options) => {
 				batchCalls.push({ lines: [...(lines || [])], options })
-				return Promise.resolve()
+				// like the real client: the lines reach the wire later than a direct send queued now
+				return new Promise((resolve) => setImmediate(() => (batchesDone++, resolve())))
 			},
 		},
 	}
@@ -106,8 +108,12 @@ function makeEngine() {
 		const deferLines = lines.filter((l) => l.includes('DEFER'))
 		assert.strictEqual(deferLines.length, 3, `should have 3 DEFER lines (one per layer tween)`)
 
-		// Should have one MIXER COMMIT per channel
+		// One MIXER COMMIT per channel, and only AFTER the batch with the DEFER tweens is on the wire: a commit
+		// queued at once overtakes them and the fade never fires (box 13.11, stills on a timeline).
+		assert.strictEqual(commitCalls.length, 0, 'the commit waits for the batch')
+		await new Promise((r) => setTimeout(r, 20))
 		assert.ok(commitCalls.length >= 1, `should have ≥1 commit; got ${commitCalls.length}`)
+		assert.ok(commitCalls.every((c) => c.afterBatches >= 1), 'commit sent after the tween batch')
 
 		eng.stop(tl.id, { skipAmcp: true })
 	}
