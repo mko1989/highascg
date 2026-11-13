@@ -231,7 +231,7 @@ func control_of(target: String) -> Control:
 			return tab.page.show_panel.look_button(n)
 		"xfade", "take", "cut":  # WO-908: only while A/B is on
 			return tab.dj.control(p[0])
-		"dev", "select", "pos", "devpage":  # WO-909: the device knob page, the layer rows · WO-1054: Position, ◀ ▶ Device
+		"dev", "select", "pos", "devpage", "padbank":  # WO-1070: ▲ ▼ pad banks · WO-909: the device knob page, the layer rows · WO-1054: Position, ◀ ▶ Device
 			return apc_view.control_of(target)
 		"clip":  # WO-913: a visual pad is there while it holds a visual
 			return apc_view.surface if clips.has(n + 1) else null
@@ -327,6 +327,8 @@ func _menu(id: int) -> void:
 			pick.clear()
 			_saved()
 			_say("No MIDI mappings — Learn adds one")
+		MidiPanel.MENU_PADS:  # WO-1070
+			preload("res://features/visuals/visuals_midi_library.gd").fill(self)
 		MidiPanel.MENU_LEDS:
 			leds = not leds
 			if cfg_path != "":
@@ -396,7 +398,7 @@ func led_state(target: String) -> int:
 			return Leds.ON if c != null and (c as OptionButton).selected > 0 else Leds.AVAIL
 		"audio":
 			return Leds.ON if c != null and (c as BaseButton).button_pressed else Leds.AVAIL
-		"devpage":  # WO-1054: lit while knobs 1–4 have a page that way
+		"devpage", "padbank":  # WO-1054: lit while knobs 1–4 have a page that way · WO-1070: the pads a bank
 			return Leds.AVAIL if apc_view.can_page(target) else Leds.OFF
 	return Leds.AVAIL
 
@@ -477,7 +479,7 @@ func _load() -> void:
 	if cfg_path == "" or c.load(cfg_path) != OK or not c.has_section_key(SECTION, "map"):
 		map = MidiMap.apc40()
 	else:
-		map = MidiMap.with_new_defaults(MidiMap.without_phantoms(MidiMap.normalize(c.get_value(SECTION, "map"))), ["edit", "clear", "devpage"])  # WO-913, WO-1052, WO-1054
+		map = MidiMap.with_new_defaults(MidiMap.without_phantoms(MidiMap.normalize(c.get_value(SECTION, "map"))), ["edit", "clear", "devpage", "padbank"])  # WO-913, WO-1052, WO-1054, WO-1070
 	leds = cfg_path != "" and c.get_value(SECTION, "leds", false) == true
 	clips.load_from(c)
 

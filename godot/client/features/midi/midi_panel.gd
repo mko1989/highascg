@@ -12,6 +12,7 @@ signal menu_picked(id: int)
 const MENU_APC := 0
 const MENU_CLEAR := 1
 const MENU_LEDS := 3
+const MENU_PADS := 4  # WO-1070
 
 var ctl: Object  ## visuals_midi.gd — asked for the clicked target while Learn / Unmap waits for one
 var learn: Button
@@ -38,12 +39,13 @@ func _init() -> void:
 	more.text = "⋯"
 	more.flat = false
 	more.focus_mode = Control.FOCUS_NONE
-	more.tooltip_text = "More: the APC40 mkII map, clear all, pad lights"
+	more.tooltip_text = "More: the APC40 mkII map, clear all, pad lights, the library on the pads"
 	var pm := more.get_popup()
 	pm.add_item("Load the APC40 mkII map (replaces this mapping)", MENU_APC)
 	pm.add_item("Clear all mappings", MENU_CLEAR)
 	pm.add_separator()
 	pm.add_check_item("APC40 pad lights (switches it to Ableton mode)", MENU_LEDS)
+	pm.add_item("Pads: the whole library, by colour (banks: ▲ / ▼)", MENU_PADS)
 	pm.id_pressed.connect(func(id: int) -> void: menu_picked.emit(id))
 	row.add_child(more)
 	add_child(row)

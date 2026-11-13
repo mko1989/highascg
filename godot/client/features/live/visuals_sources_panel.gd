@@ -85,6 +85,13 @@ func reload() -> void:
 	rebuild()
 
 
+## WO-1070: every row of the library, unfiltered (the pad fill, visuals_midi_library.gd) — read first when it never was.
+func library_rows() -> Array:
+	if not _loaded or _shaders.is_empty():
+		await reload()
+	return Catalog.rows(_shaders, Launcher.games())
+
+
 func _shader_config(id: String) -> Variant:
 	var api: Variant = _api()
 	if api == null:

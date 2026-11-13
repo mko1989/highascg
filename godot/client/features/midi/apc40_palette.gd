@@ -19,8 +19,12 @@ const HEX := [
 ]
 
 
-## The visual's main colour from its thumbnail: the saturation × brightness² weighted mean, brought to full brightness;
-## a grey picture → white.
+## The visual's main colour from its thumbnail — its DOMINANT colour (WO-1070: the weighted mean of a red-and-blue picture
+## is a magenta that is nowhere in it): pixels vote for their hue (BINS around the wheel) with saturation × brightness²,
+## the strongest hue (with its two neighbours) wins and its pixels' mean is brought to full brightness; a grey picture → white.
+const BINS := 24
+
+
 static func main_color(img: Image) -> Color:
 	if img == null or img.is_empty():
 		return Color.WHITE
@@ -29,17 +33,31 @@ static func main_color(img: Image) -> Color:
 		im.decompress()
 	im.convert(Image.FORMAT_RGB8)
 	im.resize(32, 18, Image.INTERPOLATE_BILINEAR)
-	var sum := Vector3.ZERO
+	var sums := []
+	var ws := PackedFloat32Array()
+	ws.resize(BINS)
+	for i in BINS:
+		sums.append(Vector3.ZERO)
 	var w := 0.0
 	for y in im.get_height():
 		for x in im.get_width():
 			var c := im.get_pixel(x, y)
 			var k := c.s * c.v * c.v
-			sum += Vector3(c.r, c.g, c.b) * k
+			var bin := int(c.h * BINS) % BINS
+			sums[bin] += Vector3(c.r, c.g, c.b) * k
+			ws[bin] += k
 			w += k
 	if w < 0.5:  # (of 576 pixels: next to nothing coloured)
 		return Color.WHITE
-	var m := Color(sum.x / w, sum.y / w, sum.z / w)
+	var best := 0
+	var bw := -1.0
+	for i in BINS:
+		var near := ws[i] + ws[(i + 1) % BINS] + ws[(i + BINS - 1) % BINS]
+		if near > bw:
+			bw = near
+			best = i
+	var sum: Vector3 = sums[best] + sums[(best + 1) % BINS] + sums[(best + BINS - 1) % BINS]
+	var m := Color(sum.x / bw, sum.y / bw, sum.z / bw)
 	return Color.from_hsv(m.h, clampf(m.s * 1.3, 0.0, 1.0), 1.0)
 
 
@@ -61,3 +79,17 @@ static func nearest(c: Color) -> int:
 ## A stand-in colour when a visual has no thumbnail (a game, one not rendered yet): a hue of its name.
 static func of_name(name: String) -> Color:
 	return Color.from_hsv(float(hash(name) & 0xFFFF) / 65536.0, 0.85, 1.0)
+
+
+## WO-1070: what a colour is called ("Red" … "Pink", "White" for a grey) — the pad banks' names.
+const HUES := ["Red", "Orange", "Yellow", "Green", "Cyan", "Blue", "Purple", "Pink"]
+const HUE_ENDS := [0.04, 0.11, 0.2, 0.44, 0.55, 0.72, 0.82, 0.96]  # where each name's hue range ends (then Red again)
+
+
+static func hue_name(c: Color) -> String:
+	if c.s < 0.15:
+		return "White"
+	for i in HUE_ENDS.size():
+		if c.h < HUE_ENDS[i]:
+			return HUES[i]
+	return HUES[0]

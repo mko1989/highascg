@@ -10,7 +10,7 @@ extends RefCounted
 
 const ANY := -1
 const RANGES := ["layer", "master", "fade", "param", "xfade", "dev", "pxl", "pos"]  # pos: WO-1054 · dev: WO-909 device knobs · pxl: WO-1050 a PixelHue layer's opacity · continuous targets (a slider; picked up, midi_pickup.gd)
-const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select", "clip", "edit", "clear", "devpage"]  # take / cut / xfade: WO-908 A/B · clip / edit / clear: WO-913 · devpage: WO-1054
+const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select", "clip", "edit", "clear", "devpage", "padbank"]  # padbank: WO-1070 pad banks · take / cut / xfade: WO-908 A/B · clip / edit / clear: WO-913 · devpage: WO-1054
 const CLEAR_NOTE := 62  # WO-1052: Dev on/off — Clear layer
 const PHANTOM_STOP := 92  # the APC40 mk1 Stop, absent on the mkII
 const DEVICE_PREV := 58  # WO-1054: ◀ Device / Device ▶ — page device knobs 1–4
@@ -132,6 +132,8 @@ static func target_label(target: String) -> String:
 			return "Selected layer %s" % POS_LABELS.get(p[1], p[1]) if p.size() > 1 else target
 		"devpage":
 			return "Device knobs 1–4: %s page" % ("previous" if p.size() > 1 and p[1] == "prev" else "next")
+		"padbank":
+			return "Pads: %s bank" % ("previous" if p.size() > 1 and p[1] == "prev" else "next")
 		"pxl":
 			return "PixelHue %s opacity" % pxl_names.get(p[1], "layer " + p[1]) if p.size() > 1 else "PixelHue opacity"
 	return target.capitalize()
@@ -201,6 +203,8 @@ static func apc40() -> Array:
 	m.append({"kind": "note", "ch": ANY, "num": CLEAR_NOTE, "target": "clear"})  # WO-1052: Dev on/off = clear the selected layer
 	m.append({"kind": "note", "ch": ANY, "num": DEVICE_PREV, "target": "devpage:prev"})  # WO-1054: page device knobs 1–4
 	m.append({"kind": "note", "ch": ANY, "num": DEVICE_NEXT, "target": "devpage:next"})
+	m.append({"kind": "note", "ch": ANY, "num": 94, "target": "padbank:prev"})  # WO-1070: ▲ / ▼ = the pads' previous / next bank
+	m.append({"kind": "note", "ch": ANY, "num": 95, "target": "padbank:next"})
 	return m
 
 

@@ -19,7 +19,7 @@ const Layers := preload("res://features/visuals/visuals_layers.gd")
 const Catalog := preload("res://features/visuals/visuals_catalog.gd")
 const Pxl := preload("res://features/visuals/visuals_midi_pxl.gd")
 const FALLBACK := ["param:cam_yaw", "param:cam_pitch", "param:cam_zoom", "param:burst"]
-const HINT := "Controller: what every APC40 control does now, and a virtual one — drag a fader, drag a knob up / down (or the wheel), click a button or pad to press it · right-click anything to Learn it · drop a visual on a pad · ◀ ▶ = edit bank A / B"
+const HINT := "Controller: what every APC40 control does now, and a virtual one — drag a fader, drag a knob up / down (or the wheel), click a button or pad to press it · right-click anything to Learn it · drop a visual on a pad · ▲ ▼ = pad banks · ◀ ▶ = edit bank A / B"
 
 var midi: Node
 var surface: Surface
@@ -28,6 +28,7 @@ var _page_at := -1000
 var dev_page := 0  ## WO-1054: which 4 entries knobs 1–4 hold (0 = the first)
 var _page_sel := -2  # the selection the page index belongs to
 var _pages := 1  # how many pages of 4 the selected layer has
+var _bank_btn := {}  # WO-1070: "prev" / "next" → the hidden Button that "padbank:…" presses
 var _page_btn := {}  # WO-1054: "prev" / "next" → the hidden Button that "devpage:…" presses
 
 
@@ -46,6 +47,11 @@ func _init(m: Node) -> void:
 		b.pressed.connect(turn_page.bind(-1 if d == "prev" else 1))
 		add_child(b)
 		_page_btn[d] = b
+		var pb := Button.new()  # WO-1070: ▲ / ▼ — the pads' previous / next bank
+		pb.visible = false
+		pb.pressed.connect(func() -> void: midi.clips.page(-1 if d == "prev" else 1))
+		add_child(pb)
+		_bank_btn[d] = pb
 
 
 ## WO-1054: knobs 1–4 to the previous (-1) or next (+1) page of 4 (clamped).
@@ -88,6 +94,8 @@ func page() -> Array:
 
 ## WO-1054: is there a page in the direction of "devpage:prev" / "devpage:next"?
 func can_page(target: String) -> bool:
+	if target.begins_with("padbank:"):  # WO-1070
+		return midi.clips.can_page(-1 if target.ends_with("prev") else 1)
 	page()
 	return dev_page > 0 if target.ends_with("prev") else dev_page < _pages - 1
 
@@ -102,6 +110,8 @@ func control_of(target: String) -> Control:
 		return midi.tab.page.place.control(target) if midi.tab.page.place.visible else null
 	if target.begins_with("devpage:"):
 		return _page_btn.get(target.get_slice(":", 1))
+	if target.begins_with("padbank:"):  # WO-1070: there while the pads have a bank that way
+		return _bank_btn.get(target.get_slice(":", 1)) if can_page(target) else null
 	var rows: Array = midi.tab.page.layer_list.rows
 	if target.begins_with("select:") and n >= rows.size() and n < 8:
 		return surface  # WO-1047: an empty track's Sel arms a new layer (visuals_midi_clips.gd new_slot)
@@ -162,6 +172,8 @@ func label(target: String) -> String:
 		"devpage":  # WO-1054: ◀ Device / Device ▶ — "Keys 1/3"
 			page()
 			return ("◀ Keys %d/%d" if target.ends_with("prev") else "Keys %d/%d ▶") % [dev_page + 1, _pages]
+		"padbank":  # WO-1070: ▲ / ▼ — "▲ 2/6"
+			return ("▲ %d/%d" if target.ends_with("prev") else "▼ %d/%d") % [midi.clips.bank + 1, midi.clips.banks.size()]
 	return MidiMap.target_label(target)
 
 
@@ -181,7 +193,9 @@ func info(c: Dictionary) -> Dictionary:
 		line = "%s → %s: press = into the selected layer of the edited bank (drop another visual to replace it)" % [c.name, label(t)]
 	elif t.begins_with("dev:") or t.begins_with("layer:") or t.begins_with("look:"):
 		line += ": " + label(t)
-	if ctl == null:
+	if t.begins_with("padbank:"):  # WO-1070
+		line = "%s → %s · %s" % [c.name, MidiMap.target_label(t), midi.clips.bank_label()]
+	elif ctl == null:
 		line += " (not there now)"
 	elif value >= 0.0:
 		line += " · %d %%" % roundi(value * 100.0)
