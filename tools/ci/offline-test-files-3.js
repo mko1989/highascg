@@ -341,6 +341,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1065-retro-four-gamepads.test.js',
 	'tools/smoke/smoke-wo1066-bluetooth-controllers.test.js',
 	'tools/smoke/smoke-wo1070-apc-pad-banks.test.js',
+	'tools/smoke/smoke-wo1071-live-audio-follows-card.test.js',
 	'tools/smoke/smoke-wo1039-pixelhue-studio-bridge.test.js',
 	'tools/smoke/smoke-wo1044-pgm-edit-push.test.js',
 	'tools/smoke/smoke-wo1045-project-list-load.test.js',

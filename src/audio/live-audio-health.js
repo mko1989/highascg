@@ -2,7 +2,8 @@
 
 const { amcpInfoText } = require('../streaming/caspar-ffmpeg-setup')
 const { listConfiguredLiveAudioSlots, listLiveAudioPlayClipVariants } = require('../config/live-audio-input')
-const { isLiveAudioBridgeEnabled, restartLiveAudioBridge } = require('./live-audio-bridge')
+const { isLiveAudioBridgeEnabled, restartLiveAudioBridge, isLiveAudioBridgeAlive } = require('./live-audio-bridge')
+const { followCards, capturePresent, rememberRunningCard } = require('./live-audio-card-follow')
 
 const DEFAULT_VERIFY_MS = 450
 const DEFAULT_CLEAR_SETTLE_MS = 150
@@ -80,6 +81,9 @@ async function producerComesUp(ctx, ch, layer, verifyMs, graceMs) {
 		await sleep(300)
 	}
 }
+
+/** WO-1071: slot → why its device is not there (said once per reason). */
+const _absent = new Map()
 
 /** slot → the recovery in flight (WO-861 §3: startup routing + meter watchdog raced, killing each other's bridge). */
 const _recovering = new Map()
@@ -171,6 +175,8 @@ async function ensureLiveAudioInputsHealthy(ctx, opts = {}) {
 	if (!slots.length) return { ok: true, skipped: 'no_inputs' }
 
 	const staleMs = opts.staleMs ?? 8000
+	const bridgeOn = isLiveAudioBridgeEnabled(ctx?.config)
+	const moved = new Set(bridgeOn ? followCards(ctx).moved.map((m) => m.slot) : []) // WO-1071: a re-enumerated card
 	const now = Date.now()
 	const snap = ctx.oscState?.getSnapshot?.()
 	const channels = snap?.channels || {}
@@ -193,7 +199,24 @@ async function ensureLiveAudioInputsHealthy(ctx, opts = {}) {
 		// the probe here is for AMCP-log visibility into genuine stale events,
 		// not a gate on the repair decision (playLiveAlsaClipWithRecovery below
 		// already re-probes as its own post-repair confirmation).
-		if (!opts.force && !oscStale) continue
+		// WO-1071: the meters cannot vouch for the capture — the meter null consumer keeps the channel ticking with
+		// silence. A dead bridge (the USB interface dropped off the bus) is repaired too, once there is a device to
+		// open; while there is none it is waited for, said once.
+		const bridgeDead = bridgeOn && !isLiveAudioBridgeAlive(slot.slot)
+		const dev = bridgeOn ? capturePresent(ctx, slot.slot) : { present: true }
+		if (!dev.present) {
+			if (_absent.get(slot.slot) !== dev.why && typeof ctx.log === 'function') {
+				ctx.log('warn', `[live-audio] slot ${slot.slot}: ${dev.why} — waiting for it`)
+			}
+			_absent.set(slot.slot, dev.why)
+			failed.push({ slot: slot.slot, channel: ch, reason: 'device_absent', message: dev.why })
+			continue
+		}
+		const back = _absent.delete(slot.slot)
+		if (!opts.force && !oscStale && !bridgeDead && !back && !moved.has(slot.slot)) continue
+		if ((bridgeDead || back) && !oscStale && typeof ctx.log === 'function') {
+			ctx.log('info', `[live-audio-health] slot ${slot.slot}: capture is not running → restarting it on ch${ch}-${slot.layer}`)
+		}
 
 		if (oscStale && typeof ctx.log === 'function') {
 			ctx.log('info', `[live-audio-health] meters stale on slot ${slot.slot} → probing ch${ch}-${slot.layer}`)
@@ -203,6 +226,7 @@ async function ensureLiveAudioInputsHealthy(ctx, opts = {}) {
 		}
 
 		const res = await playLiveAlsaClipWithRecovery(ctx, slot, { log: true })
+		if (res.ok) rememberRunningCard(ctx, slot.slot)
 		if (res.ok) repaired.push({ slot: slot.slot, channel: ch, clip: res.clip, attempt: res.attempt })
 		else failed.push({ slot: slot.slot, channel: ch, reason: res.reason })
 	}
@@ -210,7 +234,7 @@ async function ensureLiveAudioInputsHealthy(ctx, opts = {}) {
 	if (repaired.length && typeof ctx.log === 'function') {
 		ctx.log('info', `[live-audio] repaired ${repaired.length} input(s)`)
 	}
-	if (failed.length && typeof ctx.log === 'function') {
+	if (failed.some((f) => f.reason !== 'device_absent') && typeof ctx.log === 'function') { // (an absent device was said once)
 		ctx.log('warn', `[live-audio] failed to start: ${JSON.stringify(failed)}`)
 	}
 

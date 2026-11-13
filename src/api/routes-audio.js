@@ -1,7 +1,4 @@
-/**
- * Audio API — device list (no Caspar), volume (AMCP), routing config.
- * @see 06_WO_AUDIO_PLAYOUT.md T4.2
- */
+/** Audio API — device list (no Caspar), volume (AMCP), routing config. @see 06_WO_AUDIO_PLAYOUT.md T4.2 */
 
 'use strict'
 
@@ -479,6 +476,7 @@ async function handlePost(path, body, ctx) {
 		// WO-333b: which slot feeds the shader-FFT tee (0/'' = none). Single-select by design.
 		require('../audio/fft-channel-source').applyFftSourceBody(cs, b) // WO-976: slot tick or picker id (channel:D:pgm)
 		// WO-845 removed slots keep no PGM selection; WO-862 a newly added slot starts with none — see the module.
+		require('../audio/live-audio-card-follow').rememberPicked(cs, b, ctx) // WO-1071: a picked device remembers its card
 		const pruned = require('../audio/live-audio-slot-prune').pruneSlotPgmRoutes(prevCfg.casparServer, cs, b)
 		for (const line of pruned) apiLog(ctx, 'info', `[Audio] live-inputs/config: ${line}`)
 		ctx.config.casparServer = { ...defaults.casparServer, ...cs }

@@ -327,6 +327,12 @@ async function ensureLiveAudioBridge(ctx, slot, opts = {}) {
 	return !!(next?.proc && next.proc.exitCode == null && !next.proc.killed)
 }
 
+/** WO-1071: is slot's capture ffmpeg running? (The watchdog repairs a dead one: the null consumer keeps the meters fresh.) */
+function isLiveAudioBridgeAlive(slot) {
+	const p = _bridges.get(parseInt(String(slot), 10))?.proc
+	return !!(p && p.exitCode == null && p.signalCode == null && !p.killed)
+}
+
 /** Stop + start bridge so the next Caspar PLAY joins at stream origin (IDR + SPS/PPS). */
 async function restartLiveAudioBridge(ctx, slot) {
 	return ensureLiveAudioBridge(ctx, slot, { force: true })
@@ -348,5 +354,6 @@ module.exports = {
 	stopAllLiveAudioBridges,
 	ensureLiveAudioBridge,
 	restartLiveAudioBridge,
+	isLiveAudioBridgeAlive,
 	BRIDGE_WARMUP_MS,
 }
