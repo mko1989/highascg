@@ -76,3 +76,38 @@ test('WO-949: playForTake hydrates too; an id the project does not have is still
 	assert.equal(e2.get('tl_stored') ?? null, null)
 	void logs
 })
+
+test('WO-1068: a look taking a timeline the engine does not hold yet routes it to PROGRAM, not to its stored routing', async () => {
+	const { startSceneTimelineLayer } = require('../../src/engine/timeline-take')
+	const sent = []
+	const amcp = {
+		raw: async (l) => (sent.push(l), { ok: true }),
+		stop: async (ch, L) => (sent.push(`STOP ${ch}-${L}`), { ok: true }),
+		call: async () => ({ ok: true }),
+		mixerFill: async (ch, L) => (sent.push(`MIXER ${ch}-${L} FILL`), { ok: true }),
+		mixerOpacity: async (ch, L, v) => (sent.push(`MIXER ${ch}-${L} OPACITY ${v}`), { ok: true }),
+		mixerVolume: async () => ({ ok: true }),
+		mixerCommit: async () => ({ ok: true }),
+		batchSendChunked: async (lines) => (sent.push(...lines), { ok: true }),
+	}
+	// 2 screens: PGM 1 = ch 1, PRV 1 = ch 2 (the default map)
+	const self = { amcp, config: { screen_count: 1 }, log: () => {} }
+	const eng = new TimelineEngine(self)
+	self.timelineEngine = eng
+	const stored = { ...STORED, sendTo: { preview: true, program: false, screenIdx: 0 } } // saved from the Timeline tab
+	await withProject({ timelines: { timelines: [stored] } }, () =>
+		startSceneTimelineLayer(self, amcp, 1, { layerNumber: 10, source: { type: 'timeline', value: 'tl_stored' } }, { fadeDur: 25, screenIdx: 0, startAtCurrentPosition: false })
+	)
+	await new Promise((r) => setTimeout(r, 30))
+	if (eng._ticker) clearInterval(eng._ticker)
+	try {
+		const st = eng._sendToFor('tl_stored')
+		assert.equal(st.program, true, 'the take claims program')
+		assert.equal(st.preview, false, 'and not preview (WO-559)')
+		const plays = sent.filter((l) => /^(PLAY|LOAD) /.test(l))
+		assert.ok(plays.length > 0 && plays.every((l) => /^(PLAY|LOAD) 1-/.test(l)), `played on the program channel only: ${plays.join(' | ')}`)
+		assert.ok(sent.some((l) => /^MIXER 1-\d+ OPACITY 0 0$/.test(l)), 'the fade-in preset reached the timeline layer (it needs the loaded timeline)')
+	} finally {
+		eng.stop?.('tl_stored', { skipAmcp: true })
+	}
+})

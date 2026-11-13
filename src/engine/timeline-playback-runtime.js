@@ -313,7 +313,9 @@ module.exports = {
 	setSendTo(sendTo, timelineId, opts) {
 		const tid = timelineId ?? this._airTimelineId
 		if (!tid) return
-		const tl = this.timelines.get(tid)
+		/* WO-1068: a timeline the engine does not hold yet (a server just restarted) is loaded first — its routing used
+		 * to be dropped here (`if (tl)`), and the play() that followed loaded it with its STORED routing. */
+		const tl = this.timelines.get(tid) || hydrateFromProject(this, tid)
 		const oldSt = this._sendToFor(tid)
 		const oldCh = this._channelsFor(oldSt)
 		if (tl) tl.sendTo = normalizeTimelineSendTo({ ...oldSt, ...sendTo })

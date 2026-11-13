@@ -219,6 +219,12 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 	const eng = self?.timelineEngine
 	const tlId = layer?.source?.value
 	if (!eng || !tlId) return []
+	/* WO-1068 (box 13.11, "intro timeline didnt fire correctly from its look"): after a server restart the engine holds
+	 * no timeline until a client pushes one (WO-949 loads it at play()). This function read the timeline (its physical
+	 * layers, for the opacity preset) and set its routing BEFORE that load: no preset, the program routing thrown away,
+	 * and play() then loaded the timeline with its stored routing — preview only. The intro played on PRV, the PGM→PRV
+	 * exchange cleared PRV a moment later, and PGM faded to black. Load it first. */
+	eng.ensure?.(tlId)
 	/* WO-549: `restrictToPreview` exists for routes-scene-take.js's pgm/prv preview-exchange call —
 	 * its whole job is putting the PREVIOUS look on the preview bus for operator reference, and it
 	 * must never touch program. Without this, a timeline in that previous look claimed BOTH the
