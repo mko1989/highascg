@@ -37,7 +37,7 @@ test('the route is registered and handled', () => {
 	const root = path.join(__dirname, '..', '..')
 	const router = fs.readFileSync(path.join(root, 'src/api/router.js'), 'utf8')
 	assert.match(router, /routes\.get\('\/api\/audio\/alsa-cards'/)
-	const r = require('../../src/api/routes-audio').handleGet('/api/audio/alsa-cards', { dir: 'capture' }, {})
+	const r = require('../../src/api/routes-alsa-cards').handleAlsaCards({ dir: 'capture' })
 	assert.strictEqual(r.status, 200)
 	assert.strictEqual(JSON.parse(r.body).dir, 'capture')
 })

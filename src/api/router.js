@@ -229,7 +229,7 @@ routes.get('/api/osc', ({ path, ctx }) => routesOsc.handleGet(path, ctx), { requ
 // Audio offline
 routes.get('/api/audio/devices', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false })
 routes.get('/api/audio/portaudio-devices', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false })
-routes.get('/api/audio/alsa-cards', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false }) // WO-1055
+routes.get('/api/audio/alsa-cards', ({ query }) => require('./routes-alsa-cards').handleAlsaCards(query), { requireCaspar: false }) // WO-1055
 routes.get('/api/audio/live-inputs', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false })
 routes.get('/api/audio/fft-source', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false }) // WO-976
 routes.get('/api/audio/alsa-mixer', ({ path, query, ctx }) => routesAudio.handleGet(path, query, ctx), { requireCaspar: false })
