@@ -137,8 +137,8 @@ func _rebuild() -> void:
 	var status := {"decklink": Store.get_value("decklinkInputsStatus"), "audio": Store.get_value("liveAudioInputsStatus"),
 		"v4l2": Store.get_value("v4l2InputsStatus")}
 	var view := rows.map(func(s: Dictionary) -> Array:
-		if s.has("visualsSolo"):  # WO-1051
-			return [s.value, s.text, s.muted, s.solo, null, null]
+		if VSolo.is_child(s):  # WO-1051 / WO-1053 (group rows too)
+			return [s.value, s.text, s.muted, s.get("route"), null, null]
 		return [s.get("value"), s.get("label"), M.meta(s) + Shm.meta_suffix(s), M.slot_message(s, status) + Shm.warning(s),
 			M.thumb_channel(s), s.get("connectorId")])
 	var key := JSON.stringify([view, _highlight])
@@ -150,7 +150,7 @@ func _rebuild() -> void:
 	_thumb_rects.clear()
 	var focus: Control = null
 	for i in rows.size():
-		var row: Control = VSolo.row(rows[i], _visuals()).panel if rows[i].has("visualsSolo") else _row(rows[i], view[i])
+		var row: Control = VSolo.row(rows[i], _visuals()).panel if VSolo.is_child(rows[i]) else _row(rows[i], view[i])
 		_list.add_child(row)
 		if _highlight != "" and str(view[i][5]) == _highlight:
 			focus = row

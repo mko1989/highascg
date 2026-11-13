@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-961 live WOs (34 open, 137 in progress, 790 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+962 live WOs (34 open, 138 in progress, 790 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -413,7 +413,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 - 1024 IN PROGRESS [lighting+godot-client] GDTF fixture models missing in the previs (built-in primitives drawn as boxes;… → 1024_WO_gdtf_models_missing_primitives_and_share_swap.md
 
-## godot-client — Godot client (162)
+## godot-client — Godot client (163)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -577,6 +577,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1051 IN PROGRESS [godot-client+engine] Visuals layers as their own sources: pick a layer in Sources ▸ Live, stack it o… → 1051_WO_visuals_layers_as_sources_live_picks.md
 - 1052 IN PROGRESS [godot-client] APC40 mkII: hardware Sel selected nothing (APC stayed in Generic mode) and Clea… → 1052_WO_apc_mkii_sel_dead_and_phantom_stop.md
 - 1053 IN PROGRESS [godot-client] Visuals route groups (several layers → one source) + picked layers back in the… → 1053_WO_visuals_route_groups_and_preview.md
+- 1054 IN PROGRESS [godot-client] Visuals: pan / tilt (position), size and rotation of the selected layer, on APC… → 1054_WO_visuals_layer_position_on_device_knobs.md
 
 ## web-client — Web client (82)
 

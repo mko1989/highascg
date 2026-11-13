@@ -13,6 +13,8 @@ extends Node
 ## its own transparent composite `solo[n]` (premultiplied, no black back, no base tint) and the layer at that position — a
 ## fading-out one at its old place too — draws there instead of `out`. Re-routing only re-parents the draw rect (WO-1049's
 ## pattern): nothing restarts. A solo composite renders while something draws there, then once more (transparent).
+## WO-1053: composites are per route KEY — `L<n>` (a position on its own, WO-1051) or a group name (several positions in
+## one composite, drawn in stack order): `solo` is keyed by the key, set_solo takes {position: key}.
 
 const Stage := preload("res://features/visuals/visuals_stage.gd")
 const L := preload("res://features/visuals/visuals_layers.gd")
@@ -25,8 +27,8 @@ const SRC := {
 static var _shaders := {}
 
 var out: SubViewport
-var solo := {}  # WO-1051: position (1-based) → its composite SubViewport (transparent)
-var _route_to: Array = []  # WO-1051: the positions whose layer draws into its solo composite (a kept one may be empty)
+var solo := {}  # WO-1051/1053: route key ("L4", "overlay") → its composite SubViewport (transparent)
+var _route_to := {}  # WO-1053: position (1-based) → the key its layer draws into (a kept composite may be empty)
 var slots := []  # the layers on stage, bottom → top: {vp, stage, rect, mat, key, layer, w (fade-in weight), to}
 var leaving := []  # removed or replaced layers fading out, then freed: the same, + `at` (their place in the stack)
 var running := true
@@ -227,11 +229,37 @@ func _slot(l: Dictionary, cfgs: Dictionary) -> Dictionary:
 	return {"vp": vp, "stage": st, "rect": rect, "mat": mat, "key": L.key(l), "layer": l, "w": 1.0, "to": 1.0, "at": 0}
 
 
-## WO-1051: positions `route` draw into their own composites; `keep` composites stay (empty, transparent: a ring draining
-## after its position stopped being solo). Composites outside both are freed. Only draw rects move — nothing restarts.
-func set_solo(route: Array, keep: Array = []) -> void:
-	_route_to = route.duplicate()
-	for n in route + keep:
+## WO-1053: `route` as {position: key}; an Array of positions (WO-1051) gives each its own key `L<n>`.
+static func routes_of(route: Variant) -> Dictionary:
+	if route is Dictionary:
+		return (route as Dictionary).duplicate()
+	var out := {}
+	for n in (route if route is Array else []):
+		out[int(n)] = key_of(n)
+	return out
+
+
+## WO-1053: a route key; a bare position is its own key `L<n>`.
+static func key_of(k: Variant) -> String:
+	return k if k is String else "L%d" % int(k)
+
+
+## WO-1053: the distinct keys of `route` + `keep`, in first-position order.
+static func keys_of(route: Dictionary, keep: Array = []) -> Array:
+	var out := []
+	for k in route.values() + keep.map(func(x: Variant) -> String: return key_of(x)):
+		if not k in out:
+			out.append(k)
+	return out
+
+
+## WO-1051/1053: positions route to their key's composite ({position: key}, or an Array of positions = own keys); `keep`
+## keys keep a composite (empty, transparent: a ring draining after its key stopped being wanted). Composites outside both
+## are freed. Only draw rects move — nothing restarts, also when a layer moves from one key to another.
+func set_solo(route: Variant, keep: Array = []) -> void:
+	_route_to = routes_of(route)
+	var want := keys_of(_route_to, keep)
+	for n in want:
 		if not solo.has(n):
 			var vp := SubViewport.new()
 			vp.disable_3d = true
@@ -242,7 +270,7 @@ func set_solo(route: Array, keep: Array = []) -> void:
 			solo[n] = vp
 	_order()
 	for n in solo.keys():
-		if not n in route and not n in keep:
+		if not n in want:
 			var vp: SubViewport = solo[n]
 			solo.erase(n)
 			remove_child(vp)
@@ -250,14 +278,16 @@ func set_solo(route: Array, keep: Array = []) -> void:
 	_update()
 
 
-## WO-1051: does anything on stage (fading out included) draw into solo position `n`?
-func draws_solo(n: int) -> bool:
-	return solo.has(n) and (slots + leaving).any(func(s: Dictionary) -> bool: return s.rect.get_parent() == solo[n])
+## WO-1051: does anything on stage (fading out included) draw into key `k`'s composite (a position = its own key)?
+func draws_solo(k: Variant) -> bool:
+	var key := key_of(k)
+	return solo.has(key) and (slots + leaving).any(func(s: Dictionary) -> bool: return s.rect.get_parent() == solo[key])
 
 
-## WO-1051: the composite stack position `n` (1-based) draws into: its solo composite while routed there, else `out`.
+## WO-1051/1053: the composite stack position `n` (1-based) draws into: its key's composite while routed, else `out`.
 func _target(n: int) -> SubViewport:
-	return solo[n] if n in _route_to and solo.has(n) else out
+	var key: Variant = _route_to.get(n)
+	return solo[key] if key != null and solo.has(key) else out
 
 
 ## Drawing order: the stack, each fading-out layer back at its old place. Every layer renders on a transparent world; the
@@ -270,7 +300,8 @@ func _order() -> void:
 	gone.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.at < b.at)
 	for s in gone:
 		order.insert(clampi(s.at, 0, order.size()), s)
-	var at := {out: 1}  # the next child index per composite (out: 0 is the black backdrop; a solo composite has none)
+	var at := {out: 1}  # the next child index per composite (out: 0 is the black backdrop; a key composite has none) —
+	# WO-1053: a group's layers land in its composite in stack order
 	for s in order:
 		var i := slots.find(s)
 		var to := _target((i if i >= 0 else int(s.at)) + 1)  # WO-1051: by stack position (a leaving layer: its old one)

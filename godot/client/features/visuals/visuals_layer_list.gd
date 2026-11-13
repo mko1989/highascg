@@ -7,7 +7,7 @@ extends VBoxContainer
 ## anywhere else in the list it is a new layer on top. Clicking a row selects it (Shift-drops on the canvas and
 ## double-clicks in Sources replace the selected layer; the 3D view looks into it).
 ## WO-1051: a muted `L<n>` badge on a layer whose stack position plays as its own ring (Sources ▸ Live, visuals_solo.gd) —
-## why that layer is missing from the canvas.
+## why that layer is missing from the canvas. WO-1053: the badge shows the route key (`L4`, or a group name like `overlay`).
 
 const L := preload("res://features/visuals/visuals_layers.gd")
 const Catalog := preload("res://features/visuals/visuals_catalog.gd")
@@ -21,7 +21,7 @@ signal selected(i: int)
 var layers := []  # bottom → top, as in the slice
 var sel := -1  # the selected layer's index in `layers`
 var rows := []  # by layer index: {panel, name, solo, slider, spin, eye, blend, up, down, del}
-var solo := []  # WO-1051: the 1-based positions playing as their own rings (badged)
+var solo := {}  # WO-1051/1053: 1-based position → its route key ("L4", "overlay"), badged
 var _box: VBoxContainer
 var _empty: Label
 var _note: Label
@@ -69,10 +69,16 @@ func set_note(text: String) -> void:
 	_note.visible = text != ""
 
 
-## WO-1051: the solo positions to badge.
-func set_solo(positions: Array) -> void:
-	if positions != solo:
-		solo = positions.duplicate()
+## WO-1051/1053: the picked positions to badge — {position: key} (an Array of positions = their own `L<n>` keys).
+func set_solo(positions: Variant) -> void:
+	var want := {}
+	if positions is Dictionary:
+		want = (positions as Dictionary).duplicate()
+	else:
+		for n in (positions if positions is Array else []):
+			want[int(n)] = "L%d" % int(n)
+	if want != solo:
+		solo = want
 		_fill()
 
 
@@ -200,7 +206,10 @@ func _fill() -> void:
 		r.name.tooltip_text = "Layer %d — %s%s\nDrop a visual here to replace it · click to select" % [i + 1, L.describe(l, _names),
 			"\n" + str(_errors[i]) if _errors.has(i) else ""]
 		r.name.modulate = Color(1, 1, 1, 1.0 if on else 0.5)
-		r.solo.visible = (i + 1) in solo
+		r.solo.visible = solo.has(i + 1)
+		if r.solo.visible:
+			r.solo.text = str(solo[i + 1])
+			r.solo.tooltip_text = "Plays as Live source Sources ▸ Live ▸ visuals ▸ %s, not in this canvas" % r.solo.text
 		r.blend.set_pressed_no_signal(l.get("blend", "normal") == "add")
 		var pct := roundf(float(l.get("opacity", 1.0)) * 100.0)
 		if r.slider.value != pct:

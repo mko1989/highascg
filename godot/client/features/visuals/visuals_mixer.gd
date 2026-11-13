@@ -10,6 +10,7 @@ extends Node
 ## WO-1051: `solo_out[n]` per solo position — the two decks' `solo[n]` (visuals_deck.gd) mixed with the same crossfader, master
 ## and strobe, kept premultiplied (MIX2, from WO-1049): blackout is transparent there, not black. Made and freed with
 ## set_solo(); visuals_solo.gd publishes each as its own ring.
+## WO-1053: per route KEY (`L<n>` or a group name: visuals_deck.gd set_solo) — one mix and one ring per key.
 
 const Deck := preload("res://features/visuals/visuals_deck.gd")
 const MIX := """shader_type canvas_item;
@@ -56,8 +57,8 @@ var dj := false
 var goal := -1.0  # WO-908: where AUTO is moving `x` (0 or 1); -1 = still
 var _mat: ShaderMaterial
 var _rect: ColorRect
-var solo_out := {}  # WO-1051: solo position → its mixed SubViewport (transparent, premultiplied)
-var _solo_mats := {}  # position → its MIX2 material
+var solo_out := {}  # WO-1051/1053: route key ("L4", "overlay") → its mixed SubViewport (transparent, premultiplied)
+var _solo_mats := {}  # key → its MIX2 material
 static var _mix2: Shader
 
 
@@ -208,12 +209,14 @@ func set_strobe(v: float) -> void:
 	_param("strobe", strobe)
 
 
-## WO-1051: solo positions `route` draw into their own composites on both decks and get `solo_out[n]`; `keep` positions
-## keep an (empty, transparent) composite while their ring drains (visuals_solo.gd). The rest are freed.
-func set_solo(route: Array, keep: Array = []) -> void:
+## WO-1051/1053: `route` ({position: key}, or an Array of positions = own keys) draws into its keys' composites on both
+## decks and each key gets `solo_out[key]`; `keep` keys keep an (empty, transparent) composite while their ring drains
+## (visuals_solo.gd). The rest are freed.
+func set_solo(route: Variant, keep: Array = []) -> void:
 	for d in decks:
 		d.set_solo(route, keep)
-	for n in route + keep:
+	var want: Array = Deck.keys_of(Deck.routes_of(route), keep)
+	for n in want:
 		if solo_out.has(n):
 			continue
 		var vp := SubViewport.new()
@@ -237,7 +240,7 @@ func set_solo(route: Array, keep: Array = []) -> void:
 		solo_out[n] = vp
 		_solo_mats[n] = mat
 	for n in solo_out.keys():
-		if not n in route and not n in keep:
+		if not n in want:
 			var vp: SubViewport = solo_out[n]
 			solo_out.erase(n)
 			_solo_mats.erase(n)

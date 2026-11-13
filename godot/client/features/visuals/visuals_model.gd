@@ -162,8 +162,12 @@ static func slice_of(project: Variant) -> Dictionary:
 	var c := Layers.compat(layers)
 	var out := {"screen": maxi(0, int(_num(o.get("screen")))), "layer": clampi(int(_num(o.get("layer", 1))), 1, 9999),
 		"size": clampi(int(_num(o.get("size"))), 0, SIZE_SCREEN), "ring": o.get("ring") is bool and o.ring}
-	if not solo_of(o.get("solo")).is_empty():  # WO-1051: stored only when used (an older show stays byte-identical)
-		out.solo = solo_of(o.get("solo"))
+	var gs := groups_of(o.get("groups"))  # WO-1053: route groups win over solo; both stored only when used
+	var own := solo_of(o.get("solo")).filter(func(n: int) -> bool: return not _grouped(gs, n))
+	if not own.is_empty():  # WO-1051: stored only when used (an older show stays byte-identical)
+		out.solo = own
+	if not gs.is_empty():
+		out.groups = gs
 	return {"graph": normalize_graph(d.get("graph")), "params": params_of(d.get("params")), "output": out,
 		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0), "layers": layers, "scene": c.scene, "overlay": c.overlay,
 		"shader": c.shader, "game": c.game, "fade": clampf(_num(d.get("fade", 1.0)), 0.0, 10.0),
@@ -186,7 +190,73 @@ static func solo_of(v: Variant) -> Array:
 
 ## WO-1051: the ring of solo position `n` — `visuals-L4` (dev `--visuals-ring=<r>` → `<r>-L4`).
 static func solo_ring(ring: String, n: int) -> String:
-	return "%s-L%d" % [ring, n]
+	return key_ring(ring, own_key(n))
+
+
+## WO-1053: the route key of a position with its own ring ("L4").
+static func own_key(n: int) -> String:
+	return "L%d" % n
+
+
+## WO-1053: the ring of route key `key` — `visuals-L4` (own) or `visuals-overlay` (a group).
+static func key_ring(ring: String, key: String) -> String:
+	return "%s-%s" % [ring, key]
+
+
+## WO-1053: a group name is a slug [a-z0-9-], 1–24 characters, never `L<digits>` (an own key; `l<digits>` too, so no two
+## rings differ only by case).
+static func group_name_ok(v: Variant) -> bool:
+	if not v is String:
+		return false
+	return RegEx.create_from_string("^[a-z0-9-]{1,24}$").search(v) != null \
+		and RegEx.create_from_string("^[lL][0-9]+$").search(v) == null
+
+
+## WO-1053: `output.groups` normalised — {name: positions (solo_of)} for valid names, sorted by name; a position belongs to
+## one group only (the first by name keeps it); empty groups are dropped.
+static func groups_of(v: Variant) -> Dictionary:
+	var src: Dictionary = v if v is Dictionary else {}
+	var names := src.keys().filter(func(k: Variant) -> bool: return group_name_ok(k))
+	names.sort()
+	var out := {}
+	for k in names:
+		var ps := solo_of(src[k]).filter(func(n: int) -> bool: return not _grouped(out, n))
+		if not ps.is_empty():
+			out[k] = ps
+	return out
+
+
+## WO-1053: {position: route key} of every picked position, ascending — `L<n>` for own (solo), the group name for a group
+## member. The ring of a key is key_ring(ring, key). A show with only `solo` maps each to its own key (WO-1051, unchanged).
+static func route_keys(output: Variant) -> Dictionary:
+	var o: Dictionary = output if output is Dictionary else {}
+	var gs := groups_of(o.get("groups"))
+	var by := {}
+	for n in solo_of(o.get("solo")):
+		by[n] = own_key(n)
+	for k in gs:
+		for n in gs[k]:
+			by[n] = k
+	var ns := by.keys()
+	ns.sort()
+	var out := {}
+	for n in ns:
+		out[n] = by[n]
+	return out
+
+
+## WO-1053: the name a new group gets — `overlay` first, then `group-2`, `group-3`, … (the first free one).
+static func new_group_name(groups: Dictionary) -> String:
+	if not groups.has("overlay"):
+		return "overlay"
+	var i := 2
+	while groups.has("group-%d" % i):
+		i += 1
+	return "group-%d" % i
+
+
+static func _grouped(gs: Dictionary, n: int) -> bool:
+	return gs.values().any(func(ps: Array) -> bool: return n in ps)
 
 
 ## WO-890: `slice` (changed in place, and returned) with the layer stack `layers` and the fields derived from it.

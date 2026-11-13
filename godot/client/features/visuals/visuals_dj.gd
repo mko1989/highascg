@@ -281,6 +281,8 @@ func _show() -> void:
 
 
 func _show_x() -> void:
+	if tab.get("solo") != null:
+		tab.solo.previews()  # WO-1053: the PRV bank's / the mix's picked layers over the views
 	if not on or _prv == null:
 		return
 	var m: Node = tab.mixer
