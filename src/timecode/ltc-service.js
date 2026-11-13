@@ -16,6 +16,17 @@ const CHASE_TICK_MS = 40
 const STATUS_BROADCAST_MS = 200
 
 /**
+ * WO-1060 — the playhead LTC out follows: the on-air timeline, and only when the operator chose it (`ltcOut: true` on
+ * the timeline, set from its transport). Any other timeline plays without timecode (null = silent).
+ */
+function ltcOutPlayhead(eng) {
+	const id = eng?._airTimelineId
+	if (!id || eng.get(id)?.ltcOut !== true) return null
+	const pb = eng.getPlayback(id)
+	return pb ? { playing: !!pb.playing, position: pb.position ?? 0 } : null
+}
+
+/**
  * @param {{ appCtx: object, log?: (level: string, msg: string) => void }} deps
  */
 function createLtcService({ appCtx, log = () => {} }) {
@@ -142,13 +153,7 @@ function createLtcService({ appCtx, log = () => {} }) {
 		log('info', `[LTC chase] ${d.action}${ms != null ? ` ${Math.round(ms)} ms` : ''} (${d.reason || ''}) on ${t.id}`)
 	}
 
-	function airPlayhead() {
-		const eng = engine()
-		const id = eng?._airTimelineId
-		if (!id) return null
-		const pb = eng.getPlayback(id)
-		return pb ? { playing: !!pb.playing, position: pb.position ?? 0 } : null
-	}
+	const airPlayhead = () => ltcOutPlayhead(engine())
 
 	function chaseStatus() {
 		const e = chase.error
@@ -227,4 +232,4 @@ function createLtcService({ appCtx, log = () => {} }) {
 	return { start, stop, restart, status, onShutdown: stop }
 }
 
-module.exports = { createLtcService }
+module.exports = { createLtcService, ltcOutPlayhead }

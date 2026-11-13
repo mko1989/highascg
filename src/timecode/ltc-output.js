@@ -3,8 +3,8 @@
 /**
  * WO-974 — LTC generator: libltc encoder helper → ALSA playback (aplay) or a FIFO.
  *
- * source 'timeline': LTC = offset + the on-air timeline's playhead; silence while it is paused/stopped (a
- *   chasing receiver then parks). source 'clock': time of day, always running.
+ * source 'timeline': LTC = offset + the on-air timeline's playhead, for timelines marked `ltcOut` (WO-1060); silence
+ *   while it is paused/stopped or another timeline is on air (a chasing receiver then parks). source 'clock': time of day, always running.
  * The encoder free-runs on the sink's audio clock (back-pressure) and reports the frame it is writing every
  * few frames; a report ≥ 2 frames away from where the playhead (+ lead) says it should be re-locates it, so
  * seeks land within one report and audio-vs-system clock drift never accumulates.

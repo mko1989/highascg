@@ -64,3 +64,6 @@ func test_transport_readout() -> void:  # WO-1059
 	t.eq(err.state, "error")
 	t.ok(str(err.tip).contains("No such device"), "error text in the tooltip")
 	t.eq(LM.readout(_st(false, true, {"libltc": {"ok": false}})).state, "error")
+	var unchosen: Dictionary = LM.readout(_st(false, true, cfg.merged({"output": {"running": true, "tc": "00:01:02:03"}})), false)  # WO-1060
+	t.eq(unchosen.text, "LTC off", "a timeline that was not chosen shows no timecode")
+	t.eq(unchosen.state, "off")

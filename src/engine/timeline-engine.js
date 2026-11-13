@@ -46,6 +46,7 @@ class TimelineEngine extends EventEmitter {
 			flags: Array.isArray(opts?.flags) ? opts.flags : [],
 			// WO-834: 'hold' (default, absent) parks on the last frame at a non-looping end; 'black' STOPs
 			...(opts?.endBehaviour === 'black' ? { endBehaviour: 'black' } : {}),
+			...(opts?.ltcOut === true ? { ltcOut: true } : {}), // WO-1060: this timeline sends LTC while it plays
 			...(opts?.sendTo && typeof opts.sendTo === 'object' ? { sendTo: opts.sendTo } : {}),
 			// WO-837: screen sections the operator added (survive empty); layers carry their own screenIdx
 			...(Array.isArray(opts?.screens) ? { screens: opts.screens } : {}),
