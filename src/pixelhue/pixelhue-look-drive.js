@@ -32,6 +32,17 @@ const PROGRAMMABLE = new Set(['normal', 'aux', 'logo']) // studio programmingLay
 
 const int = (v) => Math.round(Number(v) || 0)
 const sameWindow = (l, w) => l && l.x === w.x && l.y === w.y && l.width === w.width && l.height === w.height
+/** A look's rectangle is what the layer SHOWS; a masked switcher layer is written as its full window (the read gives
+ * `window` + `mask` for those). Same shown size: the window moves with it. Resized: the mask keeps its share of the
+ * window, as the switcher stores it (ratios). */
+function unmasked(shown, cur) {
+	const m = cur?.mask
+	const w = cur?.window
+	if (!m || !w || !(cur.width > 0) || !(cur.height > 0)) return shown
+	const kx = shown.width / cur.width
+	const ky = shown.height / cur.height
+	return { x: shown.x - int(m.left * kx), y: shown.y - int(m.top * ky), width: int(w.width * kx), height: int(w.height * ky) }
+}
 const sameSource = (l, src) => l && Number(l.sourceId) === Number(src.id) && Number(l.sourceType) === Number(src.type)
 
 /**
@@ -67,8 +78,9 @@ function windowsFromLook(scene, snap) {
 			continue
 		}
 		const f = l.fill && typeof l.fill === 'object' ? l.fill : {}
-		const window = { x: int(Number(f.x) * screen.width), y: int(Number(f.y) * screen.height),
+		const shown = { x: int(Number(f.x) * screen.width), y: int(Number(f.y) * screen.height),
 			width: int(Number(f.scaleX) * screen.width), height: int(Number(f.scaleY) * screen.height) }
+		const window = unmasked(shown, cur)
 		if (window.width < SIDE_MIN || window.height < SIDE_MIN || window.width > SIDE_MAX || window.height > SIDE_MAX) {
 			skipped.push(`${name}: ${window.width}×${window.height} is outside the switcher's ${SIDE_MIN}–${SIDE_MAX} px`)
 			continue
@@ -82,7 +94,7 @@ function windowsFromLook(scene, snap) {
 		// a screen cannot show its own PGM / PVW (studio sourcePayload)
 		if (src && [3, 4].includes(Number(src.type)) && Number(src.id) === Number(screen.screenId)) skipped.push(`${name}: a screen cannot show itself`)
 		else if (src && !sameSource(cur, src)) change.source = { id: Number(src.id), type: Number(src.type), ...(src.connectorType != null ? { connectorType: Number(src.connectorType) } : {}) }
-		if (!sameWindow(cur, window) || change.source) change.window = window
+		if (!sameWindow(cur.window || cur, window) || change.source) change.window = window
 		if (change.window || change.source) changes.push(change)
 	}
 	return { changes, skipped }
@@ -120,7 +132,7 @@ async function driveLook(scene, reader, deps = {}) {
 	if (moved.length) await reader.put('/unico/v1/layers/window', moved.map((c) => ({ layerId: c.layerId, window: globalWindow(c) })))
 	const ok = (all, c) => {
 		const l = all.find((x) => x.layerId === c.layerId)
-		return (!c.window || sameWindow(l, c.window)) && (!c.source || sameSource(l, c.source))
+		return (!c.window || sameWindow(l.window || l, c.window)) && (!c.source || sameSource(l, c.source))
 	}
 	let lost = changes
 	for (let attempt = 0; attempt < 3 && lost.length; attempt++) {

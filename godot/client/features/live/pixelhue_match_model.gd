@@ -20,6 +20,8 @@ static func choices(data: Variant) -> Array:
 				continue  # the multiviewer's tiles and the AUX outputs are not pictures on a screen a border goes over
 			var name := str(l.get("name", "")).strip_edges()
 			var src := str(l.get("source", "")).strip_edges()
+			if l.get("mask") is Dictionary:
+				src = "masked" if src == "" else "masked · " + src  # WO-1062: the size is the part the switcher shows
 			out.append({
 				"layerId": l.get("layerId"), "screenId": s.get("screenId"),
 				"name": "%s · %s" % [str(s.get("name", "Screen")), name if name != "" else "layer"],

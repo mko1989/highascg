@@ -83,10 +83,24 @@ async function resolveDevice(host, get) {
 	return { ip: String(dev.ip), port: int(proto?.port) || DEFAULT_API_PORT }
 }
 
-/** One layer as HighAsCG needs it: rectangle in screen pixels (top-left origin), order, visibility, source. */
+/** The enabled mask of a layer as pixels cut off each side of its window (null = none). The switcher keeps a masked
+ * layer's `window` at its full size and only hides the edges ("buttom" is the device's spelling). */
+function maskOf(l, w) {
+	const m = l?.mask
+	if (!m || m.enable !== 1) return null
+	const side = (px, ratio, size) => Math.max(0, int(px) || int((Number(ratio) / 100000) * size))
+	const k = { left: side(m.left, m.leftRatio, w.width), right: side(m.right, m.rightRatio, w.width), top: side(m.top, m.topRatio, w.height), bottom: side(m.buttom, m.buttomRatio, w.height) }
+	if (!(k.left || k.right || k.top || k.bottom) || k.left + k.right >= w.width || k.top + k.bottom >= w.height) return null
+	return k
+}
+
+/** One layer as HighAsCG needs it: the rectangle it SHOWS in screen pixels (top-left origin; a masked layer is its
+ * unmasked part, with the switcher's own full rectangle in `window` and the cut in `mask`), order, visibility, source. */
 function normalizeLayer(l) {
 	const o = l?.layerIdObj || {}
-	const w = l?.window || {}
+	const full = { x: int(l?.window?.x), y: int(l?.window?.y), width: int(l?.window?.width), height: int(l?.window?.height) }
+	const mask = maskOf(l, full)
+	const w = mask ? { x: full.x + mask.left, y: full.y + mask.top, width: full.width - mask.left - mask.right, height: full.height - mask.top - mask.bottom } : full
 	return {
 		layerId: l?.layerId,
 		name: String(l?.general?.name || ''),
@@ -104,6 +118,7 @@ function normalizeLayer(l) {
 		sourceType: l?.source?.general?.sourceType ?? null,
 		sourceId: l?.source?.general?.sourceId ?? null,
 		cutFill: o.type === 256,
+		...(mask ? { mask, window: full } : {}),
 	}
 }
 
@@ -156,7 +171,7 @@ function normalize(screensRes, layersRes) {
 			layers: layers
 				.filter((l) => l.screenId === s?.screenId)
 				.sort((a, b) => a.zorder - b.zorder)
-				.map((l) => withFill({ ...l, x: l.x - ox, y: l.y - oy }, int(win.width), int(win.height))),
+				.map((l) => withFill({ ...l, x: l.x - ox, y: l.y - oy, ...(l.window ? { window: { ...l.window, x: l.window.x - ox, y: l.window.y - oy } } : {}) }, int(win.width), int(win.height))),
 		}
 	})
 }
