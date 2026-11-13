@@ -46,3 +46,24 @@ static func pad_state(device: int) -> Dictionary:
 	if sy < -0.5: on[UP] = true
 	if sy > 0.5: on[DOWN] = true
 	return on
+
+
+const PORTS := 4  # libretro ports the host carries (RetroHost buttons_[4])
+
+
+## WO-1065 — which gamepad plays on which port: `slots[port]` = device id or -1. A pad keeps its port for as long as
+## it stays connected (pulling player 1's cable must not turn player 2 into player 1 mid-game); a new pad takes the
+## lowest free port; a fifth pad waits for one.
+static func assign_ports(slots: Array, connected: Array) -> Array:
+	var out := []
+	for i in PORTS:
+		var d: int = slots[i] if i < slots.size() else -1
+		out.append(d if d in connected else -1)
+	for d in connected:
+		if d in out:
+			continue
+		var free := out.find(-1)
+		if free < 0:
+			break
+		out[free] = d
+	return out

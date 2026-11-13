@@ -3,7 +3,8 @@ extends Control
 ## fills this window (nearest filter) and goes out as the shm ring `--ring` (HshmSink), which the Live tab lists
 ## (WO-744) and Caspar plays (WO-742). The ring is the picture enlarged by a whole factor with sharp pixels (`--scale`,
 ## default the smallest that reaches 720 lines: NES ×3 = 768×720), so Caspar's scaler does not smear 256×240.
-## Keyboard (RetroArch layout) and the first gamepad drive port 1. Sound plays here only: the ring carries no audio.
+## The keyboard (RetroArch layout) is player 1; gamepads are players 1–4 in the order they were connected (WO-1065:
+## a pad keeps its player number while it stays plugged in). Sound plays here only: the ring carries no audio.
 ##   godot --path godot/retro -- --core <x_libretro.so> --game <file> [--ring retro] [--scale N]
 
 const Keys := preload("res://retro_keys.gd")
@@ -19,7 +20,8 @@ var _status := Label.new()
 var _audio: AudioStreamGeneratorPlayback
 var _acc := 0.0
 var _keys_down := {}
-var _pad_down := {}
+var _pad_down := [{}, {}, {}, {}]  # per port: the joypad ids its gamepad holds
+var _pad_ports := [-1, -1, -1, -1]  # per port: the gamepad's device id (Keys.assign_ports)
 
 
 func _ready() -> void:
@@ -139,17 +141,36 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_keys_down[id] = true
 	else:
 		_keys_down.erase(id)
-	host.set_button(0, id, k.pressed or _pad_down.has(id))
+	host.set_button(0, id, k.pressed or _pad_down[0].has(id))
 	get_viewport().set_input_as_handled()
 
 
 func _poll_pad() -> void:
-	var pads := Input.get_connected_joypads()
-	var now: Dictionary = Keys.pad_state(pads[0]) if not pads.is_empty() else {}
-	for id in _pad_down.keys() + now.keys():
-		if _pad_down.has(id) != now.has(id):
-			host.set_button(0, id, now.has(id) or _keys_down.has(id))
-	_pad_down = now
+	var ports := Keys.assign_ports(_pad_ports, Input.get_connected_joypads())
+	if ports != _pad_ports:
+		_pad_ports = ports
+		_show_players()
+	for port in Keys.PORTS:
+		var now: Dictionary = Keys.pad_state(_pad_ports[port]) if _pad_ports[port] >= 0 else {}
+		var was: Dictionary = _pad_down[port]
+		for id in was.keys() + now.keys():
+			if was.has(id) != now.has(id):
+				# the keyboard shares port 1: a key still held keeps its button down
+				host.set_button(port, id, now.has(id) or (port == 0 and _keys_down.has(id)))
+		_pad_down[port] = now
+
+
+## Who is playing, for a few seconds after a pad comes or goes: "P1 · P2 · –  · –".
+func _show_players() -> void:
+	var parts := PackedStringArray()
+	for port in Keys.PORTS:
+		parts.append("P%d" % (port + 1) if _pad_ports[port] >= 0 else "–")
+	_status.text = "Gamepads: " + " · ".join(parts)
+	_status.visible = true
+	var shown := _status.text
+	await get_tree().create_timer(4.0).timeout
+	if _status.text == shown:
+		_status.text = ""
 
 
 func _exit_tree() -> void:
