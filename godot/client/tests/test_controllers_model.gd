@@ -20,6 +20,7 @@ func test_rows() -> void:
 	t.eq(M.row({"connected": true, "paired": true}).actions, [["Disconnect", "disconnect"], ["Forget", "forget"]])
 	t.eq(M.row({"connected": false, "paired": true}).actions, [["Connect", "connect"], ["Forget", "forget"]])
 	t.eq(M.row({"connected": false, "paired": false}).actions, [["Pair", "pair"]], "a new controller: one step")
+	t.eq(M.row({"connected": false, "paired": false, "gamepad": false}).state, "Not a known controller", "listed by Show every device")
 
 
 func test_error_text() -> void:

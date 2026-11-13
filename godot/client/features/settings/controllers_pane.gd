@@ -12,6 +12,7 @@ var _msg: Label
 var _scan: Button
 var _power: Button
 var _list: VBoxContainer
+var _all: CheckBox
 var _busy := false
 var _shown := ""
 
@@ -25,6 +26,13 @@ func _ready() -> void:
 	_scan = Kit.button(r, "Scan for controllers", _start_scan)
 	_power = Kit.button(r, "Turn Bluetooth on", func() -> void: _post("power", {"on": true}, "Turning Bluetooth on…"))
 	_power.visible = false
+	_all = CheckBox.new()
+	_all.text = "Show every Bluetooth device"
+	_all.tooltip_text = "For a controller that does not say it is one: lists every named device in range. Pair only what you know."
+	_all.toggled.connect(func(_on: bool) -> void:
+		_shown = ""
+		refresh())
+	r.add_child(_all)
 	_msg = Kit.note(self, "")
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 6)
@@ -42,7 +50,7 @@ func _ready() -> void:
 
 
 func refresh() -> void:
-	var r: Dictionary = await Api.get_json("/api/bluetooth")
+	var r: Dictionary = await Api.get_json("/api/bluetooth?all=1" if _all.button_pressed else "/api/bluetooth")
 	_render(r.data if r.ok and r.data is Dictionary else null)
 
 
@@ -61,7 +69,7 @@ func _render(d: Variant) -> void:
 	for c in _list.get_children():
 		c.queue_free()
 	if on and devices.is_empty():
-		Kit.note(_list, "No controller yet. Scan, then put the controller in pairing mode.")
+		Kit.note(_list, "No controller yet. Scan, then put the controller in pairing mode. An off-brand pad may need its own button combination (see its manual), or one connection by USB cable first.")
 	for dev in devices:
 		if dev is Dictionary:
 			_add_row(dev)

@@ -23,6 +23,7 @@ function fake(state = {}) {
 		if (args[0] === 'devices') return ok(`Device ${PHONE} 44-22-93-BB-37-42\nDevice D7:6D:29:FD:1B:1C Luna 3\nDevice ${PAD} Wireless Controller\n`)
 		if (args[0] === 'info') {
 			if (args[1] === PAD) return s.gone ? { ok: false, out: `Device ${PAD} not available\n`, err: '' } : ok(info('Wireless Controller', 'input-gaming', s))
+			if (args[1] === PHONE) return ok(`Device ${PHONE} (random)\n\tAlias: 44-22-93-BB-37-42\n\tPaired: no\n\tConnected: no\n`)
 			return ok(info('Luna 3', 'audio-headset'))
 		}
 		if (args[0] === 'pair') return s.pairFails ? { ok: false, out: 'Failed to pair: org.bluez.Error.AuthenticationFailed\n', err: '' } : ((s.paired = true), ok())
@@ -39,7 +40,7 @@ describe('WO-1066 Bluetooth controllers', () => {
 	it('parses bluetoothctl devices / info', () => {
 		assert.deepEqual(parseDevices(`Device ${PAD} Wireless Controller\nnoise\n`), [{ address: PAD, name: 'Wireless Controller' }])
 		const i = parseInfo(info('Wireless Controller', 'input-gaming', { paired: true, connected: true }), { address: PAD, name: '' })
-		assert.deepEqual(i, { address: PAD, name: 'Wireless Controller', paired: true, trusted: false, connected: true, gamepad: true })
+		assert.deepEqual(i, { address: PAD, name: 'Wireless Controller', paired: true, trusted: false, connected: true, gamepad: true, hasClass: false })
 		assert.equal(parseInfo(info('Luna 3', 'audio-headset'), { address: 'X', name: 'Luna 3' }).gamepad, false)
 		assert.equal(parseInfo(info('Pad', 'input-keyboard', { paired: true }), { address: 'X', name: 'Pad' }).gamepad, true, 'a paired input device stays listed')
 	})
@@ -48,7 +49,18 @@ describe('WO-1066 Bluetooth controllers', () => {
 		const st = await pads.status()
 		assert.equal(st.available, true)
 		assert.deepEqual(st.devices.map((d) => d.name), ['Wireless Controller'])
-		assert.ok(!s.calls.includes(`info ${PHONE}`), 'a beacon with no name costs no info call')
+		assert.ok(s.calls.indexOf(`info ${PHONE}`) > s.calls.indexOf(`info ${PAD}`), 'nameless devices are asked last')
+	})
+	it('a controller with no name yet, or an odd name, is known by its device class', () => {
+		const pad = parseInfo('Device X (public)\n\tAlias: 1C-A0-B8-00-00-01\n\tClass: 0x00002508 (9480)\n\tPaired: no\n', { address: '1C:A0:B8:00:00:01', name: '1C-A0-B8-00-00-01' })
+		assert.equal(pad.gamepad, true, 'class 0x2508 = peripheral / gamepad')
+		assert.equal(parseInfo('Device X\n\tName: P4-BT\n\tClass: 0x00002504\n', { address: 'X', name: 'P4-BT' }).gamepad, true, 'joystick')
+		assert.equal(parseInfo('Device X\n\tName: Smart TV\n\tClass: 0x000c0414\n', { address: 'X', name: 'Smart TV' }).gamepad, false)
+		assert.equal(parseInfo('Device X\n\tName: K380\n\tClass: 0x00002540\n', { address: 'X', name: 'K380' }).gamepad, false, 'a keyboard is not a gamepad')
+	})
+	it('?all=1 also lists the other named devices', async () => {
+		const names = (await fake().pads.status({ all: true })).devices.map((d) => d.name)
+		assert.deepEqual(names.sort(), ['Luna 3', 'Wireless Controller'])
 	})
 	it('no bluetoothctl → not available, with what to install', async () => {
 		const st = await fake({ noTool: true }).pads.status()
@@ -80,7 +92,8 @@ describe('WO-1066 Bluetooth controllers', () => {
 	it('routes: GET lists; POST pair / forget; a bad address is 400, a failure 409, an unknown op 404', async () => {
 		const { pads } = fake()
 		const deps = { pads }
-		assert.equal(JSON.parse((await handleGet(deps)).body).devices.length, 1)
+		assert.equal(JSON.parse((await handleGet({}, deps)).body).devices.length, 1)
+		assert.equal(JSON.parse((await handleGet({ all: '1' }, deps)).body).devices.length, 2)
 		assert.equal((await handlePost('/api/bluetooth/pair', JSON.stringify({ address: PAD }), deps)).status, 200)
 		assert.equal((await handlePost('/api/bluetooth/forget', JSON.stringify({ address: PAD }), deps)).status, 200)
 		assert.equal((await handlePost('/api/bluetooth/pair', JSON.stringify({ address: 'nope' }), deps)).status, 400)

@@ -26,7 +26,7 @@ static func row(dev: Dictionary) -> Dictionary:
 		return {"state": "Connected", "actions": [["Disconnect", "disconnect"], ["Forget", "forget"]]}
 	if dev.get("paired") == true:
 		return {"state": "Paired — press its PS / Home button, or Connect", "actions": [["Connect", "connect"], ["Forget", "forget"]]}
-	return {"state": "In pairing mode", "actions": [["Pair", "pair"]]}
+	return {"state": "In pairing mode" if dev.get("gamepad", true) != false else "Not a known controller", "actions": [["Pair", "pair"]]}
 
 
 ## The error of a failed POST (body {error} or the transport's), never empty.

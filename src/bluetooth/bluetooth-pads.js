@@ -43,13 +43,17 @@ function parseInfo(out, base) {
 	const name = field(text, 'Name') || field(text, 'Alias') || base.name
 	const icon = field(text, 'Icon')
 	const paired = yes(text, 'Paired')
+	// device class: major 0x05 = peripheral, minor (bits 2-5) 1 = joystick, 2 = gamepad
+	const cls = parseInt((field(text, 'Class').match(/0x[0-9a-fA-F]+/) || ['0'])[0], 16) || 0
+	const padClass = ((cls >> 8) & 0x1f) === 5 && [1, 2].includes((cls >> 2) & 0xf)
 	return {
 		address: base.address,
 		name,
 		paired,
 		trusted: yes(text, 'Trusted'),
 		connected: yes(text, 'Connected'),
-		gamepad: icon === 'input-gaming' || PAD_NAME_RE.test(name) || (paired && icon.startsWith('input-')),
+		gamepad: icon === 'input-gaming' || padClass || PAD_NAME_RE.test(name) || (paired && icon.startsWith('input-')),
+		hasClass: cls > 0,
 	}
 }
 
@@ -65,7 +69,8 @@ function createBluetoothPads(deps = {}) {
 
 	const scanning = () => !!scan && now() < scan.until
 
-	async function status() {
+	/** @param {{ all?: boolean }} [opts] all: every device the adapter knows that has a name or a device class */
+	async function status(opts = {}) {
 		const show = await exec(['show'])
 		if (show.missing) return { ok: true, available: false, reason: 'bluetoothctl is not installed (sudo apt install bluez)', powered: false, scanning: false, devices: [] }
 		if (!show.ok || !/^Controller\s/m.test(show.out)) {
@@ -74,10 +79,13 @@ function createBluetoothPads(deps = {}) {
 		const powered = yes(show.out, 'Powered')
 		const known = parseDevices((await exec(['devices'])).out)
 		const devices = []
-		// nameless entries are beacons and phones with private addresses: never a controller, and `info` on each is slow
-		for (const d of known.filter((x) => !unnamed(x)).slice(0, 40)) {
+		/* Named devices first: a controller found a moment ago may have no name yet (classic Bluetooth gives the address
+		 * and the device class first, the name later) — its class still says "gamepad", so nameless ones are asked too.
+		 * (An off-brand PS4 pad was missed by a name-only list, box 13.11.) */
+		const ordered = [...known.filter((x) => !unnamed(x)), ...known.filter(unnamed)].slice(0, 60)
+		for (const d of ordered) {
 			const info = parseInfo((await exec(['info', d.address])).out, d)
-			if (info.gamepad) devices.push(info)
+			if (info.gamepad || (opts.all && (info.paired || info.hasClass || !unnamed(info)))) devices.push(info)
 		}
 		devices.sort((a, b) => Number(b.connected) - Number(a.connected) || Number(b.paired) - Number(a.paired) || a.name.localeCompare(b.name))
 		return { ok: true, available: true, powered, scanning: scanning(), devices }
