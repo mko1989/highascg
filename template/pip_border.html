@@ -113,6 +113,18 @@
 	}
 
 	function render() {
+		/* WO-1064: the server scales this page onto the overlay's rectangle (MIXER FILL), so a page pixel is squeezed
+		 * differently across and down unless the rectangle has the canvas's shape. Lay the root out at the rectangle's
+		 * real pixel size and scale it up to the page: the two scales cancel, 1 px here is 1 px on the output. */
+		var lp = state.layerPx
+		if (lp && lp.w > 0 && lp.h > 0) {
+			root.style.right = 'auto'
+			root.style.bottom = 'auto'
+			root.style.width = lp.w + 'px'
+			root.style.height = lp.h + 'px'
+			root.style.transformOrigin = '0 0'
+			root.style.transform = 'scale(' + (window.innerWidth || lp.w) / lp.w + ',' + (window.innerHeight || lp.h) / lp.h + ')'
+		}
 		root.style.setProperty('--layer-o', String(clamp01(state.opacity)))
 		var slices = activeSlices()
 		var key = sliceLayoutKey(slices) + '|' + normalizeSide(state.side) + '|' + state.width + '|' + state.color
@@ -143,6 +155,7 @@
 		if (d.radius != null) state.radius = parseFloat(d.radius) || 0
 		if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
 		if (d.side != null) state.side = normalizeSide(d.side)
+		if (d.layerPx && d.layerPx.w > 0 && d.layerPx.h > 0) state.layerPx = { w: Number(d.layerPx.w), h: Number(d.layerPx.h) }
 		if (d.inner && typeof d.inner === 'object') {
 			state.inner = {
 				l: clamp01(d.inner.l),

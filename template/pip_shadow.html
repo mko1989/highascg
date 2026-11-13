@@ -121,8 +121,67 @@
 		return out.join('|')
 	}
 
+	/* WO-1064 — as pip_glow.html: the server squeezes this page onto the overlay's rectangle by different amounts across
+	 * and down, and a box-shadow's blur cannot be pre-stretched (one radius in device pixels whatever the transform).
+	 * With `layerPx` (the rectangle's real pixel size) the shadow is an SVG drawn pre-stretched: lengths ×kx across and
+	 * ×ky down, the blur with its own deviation per axis. Made once, re-attributed on updates. */
+	var svgEl = null
+	var NS = 'http://www.w3.org/2000/svg'
+
+	function rrect(x, y, w, h, rx, ry) {
+		rx = Math.max(0, Math.min(rx, w / 2)); ry = Math.max(0, Math.min(ry, h / 2))
+		if (!(rx > 0) || !(ry > 0)) return 'M' + x + ' ' + y + 'h' + w + 'v' + h + 'h' + -w + 'z'
+		return 'M' + (x + rx) + ' ' + y + 'h' + (w - 2 * rx) + 'a' + rx + ' ' + ry + ' 0 0 1 ' + rx + ' ' + ry + 'v' + (h - 2 * ry) +
+			'a' + rx + ' ' + ry + ' 0 0 1 ' + -rx + ' ' + ry + 'h' + -(w - 2 * rx) + 'a' + rx + ' ' + ry + ' 0 0 1 ' + -rx + ' ' + -ry +
+			'v' + -(h - 2 * ry) + 'a' + rx + ' ' + ry + ' 0 0 1 ' + rx + ' ' + -ry + 'z'
+	}
+
+	function renderSvg(inn) {
+		var W = window.innerWidth || 1920
+		var H = window.innerHeight || 1080
+		var kx = W / state.layerPx.w
+		var ky = H / state.layerPx.h
+		if (!svgEl || !svgEl.parentNode) {
+			root.innerHTML = '<div class="pip-svg" style="position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none"><svg xmlns="' + NS + '" width="100%" height="100%" style="position:absolute;left:0;top:0;overflow:visible">' +
+				'<defs><filter id="sb" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur/></filter>' +
+				'<mask id="sm" maskUnits="userSpaceOnUse"><path class="keep" fill="#fff" fill-rule="evenodd"/></mask></defs>' +
+				'<g mask="url(#sm)"><path class="shade" fill-rule="evenodd" filter="url(#sb)"/></g></svg></div>'
+			svgEl = root.querySelector('.pip-svg')
+			layoutKey = ''
+		}
+		var x = inn.l * W, y = inn.t * H, w = inn.w * W, h = inn.h * H
+		var r = Math.max(0, state.radius || 0), sp = Number(state.spread) || 0
+		var ox = (Number(state.offsetX) || 0) * kx, oy = (Number(state.offsetY) || 0) * ky
+		var inside = String(state.side || 'outside') === 'inside'
+		var content = rrect(x, y, w, h, r * kx, r * ky)
+		var shade, keep
+		if (inside) {
+			// everything but the content (moved by the offset, shrunk by the spread), blurred, shown inside the content only
+			shade = 'M' + -W + ' ' + -H + 'h' + 3 * W + 'v' + 3 * H + 'h' + -3 * W + 'z' +
+				rrect(x + ox + sp * kx, y + oy + sp * ky, Math.max(0, w - 2 * sp * kx), Math.max(0, h - 2 * sp * ky), Math.max(0, r - sp) * kx, Math.max(0, r - sp) * ky)
+			keep = content
+		} else {
+			// the content moved by the offset and grown by the spread, blurred, shown outside the content only
+			shade = rrect(x + ox - sp * kx, y + oy - sp * ky, Math.max(0, w + 2 * sp * kx), Math.max(0, h + 2 * sp * ky), r > 0 ? Math.max(0, r + sp) * kx : 0, r > 0 ? Math.max(0, r + sp) * ky : 0)
+			keep = 'M0 0h' + W + 'v' + H + 'h' + -W + 'z' + content
+		}
+		var f = svgEl.querySelector('#sb')
+		f.setAttribute('x', -W); f.setAttribute('y', -H); f.setAttribute('width', 3 * W); f.setAttribute('height', 3 * H)
+		var b = Math.max(0, Number(state.blur) || 0)
+		f.firstChild.setAttribute('stdDeviation', (b / 2) * kx + ' ' + (b / 2) * ky) // a box-shadow blur B is a Gaussian of deviation B / 2
+		var m = svgEl.querySelector('#sm')
+		m.setAttribute('x', 0); m.setAttribute('y', 0); m.setAttribute('width', W); m.setAttribute('height', H)
+		svgEl.querySelector('.keep').setAttribute('d', keep)
+		var sh = svgEl.querySelector('.shade')
+		sh.setAttribute('d', shade)
+		sh.style.fill = state.color
+		svgEl.style.opacity = String(clamp01(state.opacity))
+	}
+
 	function render() {
 		var slices = activeSlices()
+		if (state.layerPx && slices.length === 1) return renderSvg(slices[0])
+		svgEl = null
 		var key = sliceLayoutKey(slices)
 		var frames = root.querySelectorAll('.pip-frame')
 		if (key !== layoutKey || frames.length !== slices.length) {
@@ -155,6 +214,7 @@
 		if (d.side != null) state.side = String(d.side)
 		if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
 		state.inner = readInner(d)
+		if (d.layerPx && d.layerPx.w > 0 && d.layerPx.h > 0) state.layerPx = { w: Number(d.layerPx.w), h: Number(d.layerPx.h) }
 		if (Array.isArray(d.slices)) {
 			state.slices = d.slices.map(function (s) {
 				return {

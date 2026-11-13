@@ -37,13 +37,18 @@
 	.pip-frame.side-inside {
 		box-shadow: inset 0 0 var(--i) var(--w) currentColor;
 	}
-	.pip-frame.pulse {
+	.pip-svg {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+	.pip-frame.pulse, .pip-svg.pulse {
 		animation: glow-pulse var(--ps, 2s) ease-in-out infinite alternate;
 	}
-	.pip-frame.cycle {
+	.pip-frame.cycle, .pip-svg.cycle {
 		animation: glow-cycle var(--cs, 3s) ease-in-out infinite alternate;
 	}
-	.pip-frame.pulse.cycle {
+	.pip-frame.pulse.cycle, .pip-svg.pulse.cycle {
 		animation:
 			glow-pulse var(--ps, 2s) ease-in-out infinite alternate,
 			glow-cycle var(--cs, 3s) ease-in-out infinite alternate;
@@ -164,9 +169,83 @@
 		return out.join('|')
 	}
 
+	/* WO-1064 — the server squeezes this page onto the overlay's rectangle (MIXER FILL), across and down by different
+	 * amounts unless the rectangle has the canvas's shape: a box-shadow drawn in page pixels came out wider top and
+	 * bottom than left and right (box 13.11, an 817×669 layer on 3072×1024: 16 px vs 40 px). A CSS transform cannot
+	 * undo it — the browser blurs with ONE radius in device pixels whatever the transform (tried: sides right, top
+	 * 2.5× too soft). So with `layerPx` (the rectangle's real pixel size) the glow is an SVG drawn pre-stretched:
+	 * every length ×kx across and ×ky down, the blur with its own deviation per axis. 1 unit = 1 output pixel.
+	 * The elements are made once and only re-attributed: an update (a followed layer moving) restarts no animation. */
+	var svgEl = null
+	var NS = 'http://www.w3.org/2000/svg'
+
+	function rrect(x, y, w, h, rx, ry) {
+		rx = Math.max(0, Math.min(rx, w / 2)); ry = Math.max(0, Math.min(ry, h / 2))
+		if (!(rx > 0) || !(ry > 0)) return 'M' + x + ' ' + y + 'h' + w + 'v' + h + 'h' + -w + 'z'
+		return 'M' + (x + rx) + ' ' + y + 'h' + (w - 2 * rx) + 'a' + rx + ' ' + ry + ' 0 0 1 ' + rx + ' ' + ry + 'v' + (h - 2 * ry) +
+			'a' + rx + ' ' + ry + ' 0 0 1 ' + -rx + ' ' + ry + 'h' + -(w - 2 * rx) + 'a' + rx + ' ' + ry + ' 0 0 1 ' + -rx + ' ' + -ry +
+			'v' + -(h - 2 * ry) + 'a' + rx + ' ' + ry + ' 0 0 1 ' + rx + ' ' + -ry + 'z'
+	}
+
+	function renderSvg(inn) {
+		var W = window.innerWidth || 1920
+		var H = window.innerHeight || 1080
+		var kx = W / state.layerPx.w
+		var ky = H / state.layerPx.h
+		if (!svgEl || !svgEl.parentNode) {
+			root.innerHTML = '<div class="pip-svg"><svg xmlns="' + NS + '" width="100%" height="100%" style="position:absolute;left:0;top:0;overflow:visible">' +
+				'<defs><filter id="gb" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur/></filter>' +
+				'<mask id="gm" maskUnits="userSpaceOnUse"><path class="keep" fill="#fff" fill-rule="evenodd"/></mask></defs>' +
+				'<g mask="url(#gm)"><path class="glow" fill="currentColor" fill-rule="evenodd" filter="url(#gb)"/></g></svg></div>'
+			svgEl = root.querySelector('.pip-svg')
+			layoutKey = ''
+		}
+		var x = inn.l * W, y = inn.t * H, w = inn.w * W, h = inn.h * H
+		var r = Math.max(0, state.radius || 0), sp = Math.max(0, state.width || 0)
+		var inside = String(state.side || 'outside') === 'inside'
+		var page = 'M0 0h' + W + 'v' + H + 'h' + -W + 'z'
+		var content = rrect(x, y, w, h, r * kx, r * ky)
+		var glow, keep
+		if (inside) {
+			// everything but the content shrunk by the spread, blurred, shown inside the content only
+			glow = 'M' + -W + ' ' + -H + 'h' + 3 * W + 'v' + 3 * H + 'h' + -3 * W + 'z' + rrect(x + sp * kx, y + sp * ky, Math.max(0, w - 2 * sp * kx), Math.max(0, h - 2 * sp * ky), Math.max(0, r - sp) * kx, Math.max(0, r - sp) * ky)
+			keep = content
+		} else {
+			// the content grown by the spread, blurred, shown outside the content only (as a box-shadow is)
+			glow = rrect(x - sp * kx, y - sp * ky, w + 2 * sp * kx, h + 2 * sp * ky, r > 0 ? (r + sp) * kx : 0, r > 0 ? (r + sp) * ky : 0)
+			keep = page + content
+		}
+		var f = svgEl.querySelector('#gb')
+		f.setAttribute('x', -W); f.setAttribute('y', -H); f.setAttribute('width', 3 * W); f.setAttribute('height', 3 * H)
+		// a box-shadow blur radius B is a Gaussian of deviation B / 2
+		f.firstChild.setAttribute('stdDeviation', (state.intensity / 2) * kx + ' ' + (state.intensity / 2) * ky)
+		var m = svgEl.querySelector('#gm')
+		m.setAttribute('x', 0); m.setAttribute('y', 0); m.setAttribute('width', W); m.setAttribute('height', H)
+		svgEl.querySelector('.keep').setAttribute('d', keep)
+		svgEl.querySelector('.glow').setAttribute('d', glow)
+		svgEl.style.color = state.color
+		svgEl.style.setProperty('--c', state.color)
+		svgEl.style.setProperty('--c2', state.color2)
+		svgEl.style.setProperty('--cs', (state.colorCycleSec > 0 ? state.colorCycleSec : 3) + 's')
+		svgEl.style.setProperty('--ps', state.pulseSpeed + 's')
+		svgEl.style.setProperty('--min-o', String(state.minOpacity))
+		svgEl.classList.toggle('pulse', !!(state.pulse && state.pulseSpeed > 0))
+		svgEl.classList.toggle('cycle', !!(state.color2Enabled && state.color2))
+		var mask = ''
+		if (state.segmentation > 0) {
+			var gap = 5
+			var step = 360 / (state.segmentation * 4)
+			mask = 'repeating-conic-gradient(from -' + gap / 2 + 'deg at ' + (x + w / 2) + 'px ' + (y + h / 2) + 'px, transparent 0deg, transparent ' + gap + 'deg, black ' + gap + 'deg, black ' + step + 'deg)'
+		}
+		svgEl.style.maskImage = mask
+		svgEl.style.webkitMaskImage = mask
+	}
+
 	function render() {
 		root.style.setProperty('--layer-o', String(clamp01(state.opacity)))
 		var slices = activeSlices()
+		if (state.layerPx && slices.length === 1) return renderSvg(slices[0])
+		svgEl = null
 		var key = sliceLayoutKey(slices)
 		var frames = root.querySelectorAll('.pip-frame')
 		if (key !== layoutKey || frames.length !== slices.length) {
@@ -204,6 +283,7 @@
 		if (d.segmentation != null) state.segmentation = parseFloat(d.segmentation) || 0
 		if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
 		state.inner = readInner(d)
+		if (d.layerPx && d.layerPx.w > 0 && d.layerPx.h > 0) state.layerPx = { w: Number(d.layerPx.w), h: Number(d.layerPx.h) }
 		if (Array.isArray(d.slices)) {
 			state.slices = d.slices.map(function (s) {
 				return {

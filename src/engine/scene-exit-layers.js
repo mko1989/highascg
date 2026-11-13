@@ -168,6 +168,10 @@ async function clearPhysicalLookLayers(amcp, ch, physicalLayers, self) {
 	for (const L of layers) {
 		const cl = `${ch}-${L}`
 		lines.push(`CG ${cl} CLEAR`, `STOP ${cl}`, `MIXER ${cl} CLEAR`)
+		/* WO-1064: a look layer's PIP overlays sit on overlay slots of their own (bank A layer 10 → 260, bank B
+		 * 110 → 620). Sweeping only the layer left its border / glow on air: a look re-taken on PGM (every
+		 * edit-on-PGM cut) stacked the old glow under the new one (box 13.11). An orphan layer keeps no overlay. */
+		lines.push(...require('./pip-overlay').buildPipOverlayRemoveLines(ch, L, null))
 	}
 	try {
 		await amcp.batchSend(lines)

@@ -353,6 +353,7 @@ function buildPipOverlayCgPayload(overlay, placement) {
 	if (placement && placement.ringInnerPx != null) out.ringInnerPx = placement.ringInnerPx
 	if (placement && placement.ringOuterPx != null) out.ringOuterPx = placement.ringOuterPx
 	if (placement && placement.totalOutsetPx != null) out.totalOutsetPx = placement.totalOutsetPx
+	if (placement && placement.layerPx) out.layerPx = placement.layerPx
 	return JSON.stringify(out)
 }
 
@@ -375,8 +376,10 @@ function computePipOverlayPlacement(
 	const stack = Array.isArray(allOverlays) && allOverlays.length ? allOverlays : [overlay]
 	const oLayer = resolvePipOverlayCasparLayer(contentPhysicalLayer, stackIndex, nextContentLayer)
 
+	// WO-1064: the overlay rectangle's size in channel pixels — the templates draw at that size (1 px = 1 output px)
+	const layerPx = (f) => ({ w: Math.max(1, f.scaleX * Math.max(1, chW)), h: Math.max(1, f.scaleY * Math.max(1, chH)) })
 	if (!isOutsideSide(overlay)) {
-		return { inner: { l: 0, t: 0, w: 1, h: 1 }, mixFill: cf, oLayer }
+		return { inner: { l: 0, t: 0, w: 1, h: 1 }, mixFill: cf, oLayer, layerPx: layerPx(cf) }
 	}
 
 	const bands = computeOutsideStackBands(stack, stackIndex)
@@ -385,6 +388,7 @@ function computePipOverlayPlacement(
 		inner: innerRectInOverlayNorm(cf, overlayFill),
 		mixFill: overlayFill,
 		oLayer,
+		layerPx: layerPx(overlayFill),
 		ringInnerPx: bands.ringInnerPx,
 		ringOuterPx: bands.ringOuterPx,
 		totalOutsetPx: bands.totalOutsetPx,

@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-971 live WOs (35 open, 141 in progress, 795 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+972 live WOs (35 open, 141 in progress, 796 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (180)
+## engine — Looks, takes, timeline, playback (181)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -187,6 +187,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1032 DONE [engine+companion,lighting] Timeline cues: fire on program only, and never drop one → 1032_WO_timeline_cues_program_only_and_dropped_cues.md
 - 1060 IN PROGRESS [engine+godot-client] LTC out only on the timelines the operator chooses → 1060_WO_ltc_out_per_timeline.md
 - 1061 DONE [engine+amcp] Timeline opacity keyframes do not fade during playback (fine when scrubbing) → 1061_WO_timeline_keyframe_fades_not_firing.md
+- 1064 DONE [engine+video-io] PIP overlays (border, glow, shadow, edge strip) are thicker top and bottom than… → 1064_WO_pip_overlays_uneven_on_non_canvas_shaped_layers.md
 
 ## amcp — AMCP client and protocol (21)
 

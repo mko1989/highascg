@@ -158,6 +158,21 @@
 
 		var screenW = window.innerWidth || 1920
 		var screenH = window.innerHeight || 1080
+		/* WO-1064: the server squeezes this page onto the overlay's rectangle (MIXER FILL), across and down by different
+		 * amounts unless the rectangle has the canvas's shape — a strip drawn in page pixels came out thicker top and
+		 * bottom than left and right. With `layerPx` (the rectangle's real pixel size) the root is laid out at that size
+		 * and scaled up to the page: the two scales cancel, 1 px here is 1 output pixel. */
+		var lp = state.layerPx
+		if (lp && lp.w > 0 && lp.h > 0) {
+			root.style.right = 'auto'
+			root.style.bottom = 'auto'
+			root.style.width = lp.w + 'px'
+			root.style.height = lp.h + 'px'
+			root.style.transformOrigin = '0 0'
+			root.style.transform = 'scale(' + screenW / lp.w + ',' + screenH / lp.h + ')'
+			screenW = lp.w
+			screenH = lp.h
+		}
 		var now = nowMs()
 		retimeMotion(now)
 		var distPx = clockDist(now)
@@ -283,6 +298,7 @@
 		if (d.altGlowColor != null) state.altGlowColor = String(d.altGlowColor)
 		if (d.side != null) state.side = normalizeSide(d.side)
 		if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
+		if (d.layerPx && d.layerPx.w > 0 && d.layerPx.h > 0) state.layerPx = { w: Number(d.layerPx.w), h: Number(d.layerPx.h) }
 		if (d.ringInnerPx != null) state.ringInnerPx = Math.max(0, parseFloat(d.ringInnerPx) || 0)
 		if (d.ringOuterPx != null) state.ringOuterPx = Math.max(0, parseFloat(d.ringOuterPx) || 0)
 		state.inner = readInner(d)
