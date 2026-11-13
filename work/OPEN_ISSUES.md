@@ -446,3 +446,4 @@ Previously: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re
 | WO-1063 | Look layers made from PixelHue layers follow the switcher live on PGM | [1063](./work-orders/1063_WO_pixelhue_layers_follow_on_pgm.md) | DONE 13.11 — on air: border follows a moved switcher layer; survives a restart |
 | WO-1064 | PIP overlays uneven (thicker top / bottom) on layers not shaped like the canvas — all four types | [1064](./work-orders/1064_WO_pip_overlays_uneven_on_non_canvas_shaped_layers.md) | DONE 13.11 — measured even on PGM 2 |
 | WO-1065 | Game window: up to four gamepads as players 1–4 | [1065](./work-orders/1065_WO_retro_game_window_four_gamepads.md) | IN PROGRESS 13.11 — built, tested headless; no pad on the box yet |
+| WO-1066 | Pair Bluetooth game controllers from Settings ▸ Controllers | [1066](./work-orders/1066_WO_bluetooth_controllers_in_settings.md) | IN PROGRESS 13.11 — built, API proven; no real controller paired yet |

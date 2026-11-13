@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-582 routes.
+584 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -50,6 +50,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | * | `/api/auth/status` | handler | `src/server/auth.js` |
 | GET | `/api/auth/status` | registry | `src/api/router.js` |
 | * | `/api/autofollow/devices` | handler | `src/autofollow/register.js` |
+| GET | `/api/bluetooth` | registry | `src/api/routes-bluetooth.js` |
+| POST | `/api/bluetooth/*` | registry | `src/api/routes-bluetooth.js` |
 | POST | `/api/caspar-config/apply` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
 | GET | `/api/caspar-config/current` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
 | GET | `/api/caspar-config/dirty` | registry | `src/api/router.js`, `src/api/routes-caspar-config.js` |
@@ -604,6 +606,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-audio-cross-screen.js` | WO-604 — cross-screen audio routing composed on the server (web WO-284 audio-cross-screen-apply.js did the validation + AMCP in the browser): POST /api/audio/cr |
 | `src/api/routes-audio.js` | Audio API — device list (no Caspar), volume (AMCP), routing config. |
 | `src/api/routes-auth.js` |  |
+| `src/api/routes-bluetooth.js` | WO-1066 — Bluetooth game controllers for Settings ▸ Controllers (src/bluetooth/bluetooth-pads.js). |
 | `src/api/routes-caspar-config.js` | Generated CasparCG configuration: preview XML, download, apply on same host (write + RESTART). |
 | `src/api/routes-client-prefs.js` | WO-598 D — operator setup that used to live in ONE client's storage (web localStorage, Godot ui.cfg), kept on the node so every client sees the same thing: GET  |
 | `src/api/routes-cluster-devices.js` | WO-1029 plan 06 S3 — one Devices view for every linked server (cluster-device-view.js): GET /api/cluster/device-view[?fresh=1]  → { generatedAt, self, master, d |

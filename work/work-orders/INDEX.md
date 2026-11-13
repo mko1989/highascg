@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-973 live WOs (35 open, 142 in progress, 796 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+974 live WOs (35 open, 143 in progress, 796 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -421,7 +421,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 - 1024 IN PROGRESS [lighting+godot-client] GDTF fixture models missing in the previs (built-in primitives drawn as boxes;… → 1024_WO_gdtf_models_missing_primitives_and_share_swap.md
 
-## godot-client — Godot client (165)
+## godot-client — Godot client (166)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -588,6 +588,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1054 IN PROGRESS [godot-client] Visuals: pan / tilt (position), size and rotation of the selected layer, on APC… → 1054_WO_visuals_layer_position_on_device_knobs.md
 - 1059 IN PROGRESS [godot-client] Show LTC out in the timeline's control section → 1059_WO_ltc_in_timeline_transport.md
 - 1065 IN PROGRESS [godot-client] Game window: up to four gamepads as players 1–4 → 1065_WO_retro_game_window_four_gamepads.md
+- 1066 IN PROGRESS [godot-client+devices-config] Pair Bluetooth game controllers from Settings → 1066_WO_bluetooth_controllers_in_settings.md
 
 ## web-client — Web client (82)
 

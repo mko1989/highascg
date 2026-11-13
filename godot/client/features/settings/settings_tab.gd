@@ -21,6 +21,7 @@ const NetworkPane := preload("res://features/settings/network_pane.gd")
 const LibraryPane := preload("res://features/settings/library_pane.gd")  # WO-825
 const LockscreenPane := preload("res://features/settings/lockscreen_pane.gd")
 const LtcPane := preload("res://features/settings/ltc_pane.gd")  # WO-974
+const ControllersPane := preload("res://features/settings/controllers_pane.gd")  # WO-1066
 
 signal logs_requested
 
@@ -69,6 +70,7 @@ func _ready() -> void:
 	_pane("Tailscale").add_child(TailscalePane.new())
 	_pane("Live audio").add_child(LiveAudioPane.new())
 	LtcPane.build(_pane("Timecode"))  # WO-974 LTC in / out
+	_pane("Controllers").add_child(ControllersPane.new())  # WO-1066 Bluetooth gamepads
 	_pane("Variables").add_child(VariablesPane.new())
 	_pane("Lockscreen").add_child(LockscreenPane.new())  # WO-838
 	var nuclear := _pane("Nuclear")
