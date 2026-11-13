@@ -24,6 +24,7 @@ func _ready() -> void:
 	if Config.args.has("boot-launcher"):  # WO-934: the start-up prompts alone; run-client.sh starts the GUI after
 		add_child(preload("res://app/boot_launcher.gd").new())
 		return
+	preload("res://app/pad_guard.gd").strip()  # WO-1067: game controllers never move the GUI focus
 	theme = ThemeBuilder.build()
 	get_tree().root.theme = theme  # WO-608 R3: popups / tooltips / dialogs too — Rewir is the only font
 	if theme.default_font != null:

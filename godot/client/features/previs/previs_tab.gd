@@ -264,6 +264,7 @@ func _beams() -> Array:
 
 func _apply_drive() -> void:
 	markers.driving = mode == "camera" and is_visible_in_tree() and track_page.mode in ["markers", "follow", "zones", "detect"]
+	stage.pad_camera = not markers.driving  # WO-1067: one job per stick — the pad moves the marker OR the camera
 	if not markers.driving:
 		markers.release()
 

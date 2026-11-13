@@ -8,6 +8,7 @@ signal model_loaded(meshes: Array)
 
 const FLOOR_LAYER := 1 << 19  # WO-616 T12: the camera overlay culls the floor plane (the real floor is in the picture)
 const Quality := preload("res://features/previs/previs_quality.gd")  # WO-892
+const PadCamera := preload("res://features/previs/pad_camera.gd")  # WO-1067
 const MIN_DIST := 2.0  # the wheel's closest orbit distance (WO-1025: then it dollies on)
 const PRESETS := {"Front": Vector3(0.0, 0.12, 12.0), "Top": Vector3(0.0, 1.45, 14.0), "ISO": Vector3(-0.75, 0.45, 13.0)}
 
@@ -26,6 +27,7 @@ var _buttons := 0  # WO-1025: left (1) + right (2) held together = dolly
 var _fly_tween: Tween
 var sun: DirectionalLight3D
 var floor_mat: StandardMaterial3D
+var pad_camera := true  # WO-1067: a game controller flies the camera (the tab turns it off while the pad drives a marker)
 var walk: Node3D  # WO-741 (detachable): features/previs/xr/xr_walk.gd, only with the client flag -- --xr
 
 
@@ -207,6 +209,35 @@ func dolly(m: float) -> void:
 	if _cam == null:
 		return
 	_target += -_cam.global_transform.basis.z * m
+	_update_camera()
+
+
+## WO-1067: the first game controller flies the orbit camera while the stage is on screen (pad_camera.gd has the layout).
+func _process(dt: float) -> void:
+	if not pad_camera or walk != null or _cam == null or not is_visible_in_tree():
+		return
+	var pads := Input.get_connected_joypads()
+	if pads.is_empty():
+		return
+	var d: int = pads[0]
+	var i := PadCamera.intent({
+		"lx": Input.get_joy_axis(d, JOY_AXIS_LEFT_X), "ly": Input.get_joy_axis(d, JOY_AXIS_LEFT_Y),
+		"rx": Input.get_joy_axis(d, JOY_AXIS_RIGHT_X), "ry": Input.get_joy_axis(d, JOY_AXIS_RIGHT_Y),
+		"lt": Input.get_joy_axis(d, JOY_AXIS_TRIGGER_LEFT), "rt": Input.get_joy_axis(d, JOY_AXIS_TRIGGER_RIGHT),
+		"l1": Input.is_joy_button_pressed(d, JOY_BUTTON_LEFT_SHOULDER), "r1": Input.is_joy_button_pressed(d, JOY_BUTTON_RIGHT_SHOULDER)})
+	if PadCamera.at_rest(i):
+		return
+	if _fly_tween != null and _fly_tween.is_valid():
+		_fly_tween.kill()  # the stick takes over from a preset's fly-to
+	var o := PadCamera.orbit(_yaw, _pitch, _dist, i, dt, MIN_DIST)
+	_yaw = o.yaw
+	_pitch = o.pitch
+	_dist = o.dist
+	var m := PadCamera.move(_dist, i, dt)
+	var b := _cam.global_transform.basis
+	var ahead := Vector3(-b.z.x, 0.0, -b.z.z)  # along the view, kept level: forward does not dive into the floor
+	ahead = ahead.normalized() if ahead.length() > 0.001 else Vector3.ZERO
+	_target += ahead * float(m.forward) + Vector3(b.x.x, 0.0, b.x.z).normalized() * float(m.strafe) + Vector3.UP * float(m.lift)
 	_update_camera()
 
 
