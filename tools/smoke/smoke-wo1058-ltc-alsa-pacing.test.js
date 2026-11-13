@@ -69,11 +69,15 @@ describe('WO-1058: LTC out paced by the sound card', { skip }, () => {
 			const out = createLtcOutput({ cfg: cfg(channels), fps: '25' })
 			out.start()
 			try {
-				await sleep(6000)
+				// a start can need one correction pair (a running re-locate lands late, the next one aims ahead); then none
+				await sleep(3000)
+				const early = out.status().relocates
+				assert.ok(early <= 2, `re-located ${early}× while starting`)
+				await sleep(4000)
 				const s = out.status()
 				assert.equal(s.running, true, 'running')
 				assert.equal(s.starts, 1, `no restarts (${s.error})`)
-				assert.ok(s.relocates <= 1, `re-located ${s.relocates}× in 6 s (was ~3/s before WO-1058)`)
+				assert.equal(s.relocates, early, `kept re-locating once settled: ${s.relocates - early}× in 4 s (was ~3/s)`)
 				assert.match(String(s.tc), /^\d\d:\d\d:\d\d:\d\d$/)
 			} finally {
 				out.stop()
