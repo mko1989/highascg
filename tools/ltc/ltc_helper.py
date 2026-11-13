@@ -22,7 +22,9 @@ import fcntl
 import json
 import os
 import select
+import subprocess
 import sys
+import threading
 import time
 from array import array
 
@@ -159,6 +161,46 @@ def cmd_decode(lib, a):
         out.flush()
 
 
+_emit_lock = threading.Lock()
+
+
+def emit(rec):
+    with _emit_lock:
+        sys.stderr.write(json.dumps(rec) + "\n")
+        sys.stderr.flush()
+
+
+def open_sink(sink_cmd):
+    """Where encoded PCM goes. With --sink-cmd the helper starts the sink itself on a REAL pipe shrunk to 4 KiB, so the
+    sink's audio clock paces the encoder (back-pressure ≈ the sink buffer) and each report is what is about to play.
+    Our own stdout may be a socket (node/libuv spawns stdio as socketpairs): F_SETPIPE_SZ fails there and a socket
+    buffer of ~1 s let the encoder run ahead in bursts (WO-1058). Returns (fd, Popen | None)."""
+    if not sink_cmd:
+        fd = sys.stdout.fileno()
+        try:
+            fcntl.fcntl(fd, F_SETPIPE_SZ, 4096)  # keep the lead small: back-pressure ≈ the sink buffer
+        except OSError:
+            pass  # not a pipe (file / tty / socket)
+        return fd, None
+    r, w = os.pipe()
+    try:
+        fcntl.fcntl(w, F_SETPIPE_SZ, 4096)
+    except OSError:
+        pass
+    sink = subprocess.Popen(json.loads(sink_cmd), stdin=r, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    os.close(r)
+
+    def relay():  # the sink's complaints (e.g. "No such device") become error records
+        for raw in sink.stderr:
+            text = raw.decode("utf-8", "replace").strip()
+            if text:
+                emit({"error": "sink: " + text[:240]})
+
+    sink.relay = threading.Thread(target=relay, daemon=True)
+    sink.relay.start()
+    return w, sink
+
+
 def cmd_encode(lib, a):
     std = standard_for(a.fps)
     enc = lib.ltc_encoder_create(float(a.rate), float(a.fps), std, 0)
@@ -175,11 +217,7 @@ def cmd_encode(lib, a):
     locate(a.start)
     running = not a.stopped
     hold = False  # `hold`: keep sending the current frame (a parked deck), `run` resumes
-    fd_out = sys.stdout.fileno()
-    try:
-        fcntl.fcntl(fd_out, F_SETPIPE_SZ, 4096)  # keep the lead small: back-pressure ≈ the sink buffer
-    except OSError:
-        pass  # not a pipe (file / tty)
+    fd_out, sink = open_sink(a.sink_cmd)
     nch, ch = max(1, a.channels), min(max(1, a.channel), max(1, a.channels)) - 1
     fd_in = sys.stdin.fileno()
     linebuf = b""
@@ -217,7 +255,7 @@ def cmd_encode(lib, a):
                     try:
                         locate(words[1])
                     except ValueError as e:
-                        sys.stderr.write(json.dumps({"error": str(e)}) + "\n")
+                        emit({"error": str(e)})
                 elif words[0] == "run":
                     running, hold = True, False
                 elif words[0] == "hold":
@@ -246,14 +284,19 @@ def cmd_encode(lib, a):
             pcm[ch::nch] = mono
         else:
             pcm = mono
+        at_ms = int(time.time() * 1000)  # BEFORE the write: it blocks up to a frame on the sink (a 2 ch frame > the pipe)
         try:
             write_all(fd_out, pcm.tobytes())
         except BrokenPipeError:
+            if sink is not None:  # the sink died (device gone): its stderr was relayed; exit 4 so the owner restarts us
+                sink.wait()
+                if sink.relay:
+                    sink.relay.join(1.0)
+                sys.exit(4)
             return
         frames += 1
         if a.report and frames % a.report == 0:
-            sys.stderr.write(json.dumps({"out": cur, "running": running, "frames": frames, "at": int(time.time() * 1000)}) + "\n")
-            sys.stderr.flush()
+            emit({"out": cur, "running": running, "frames": frames, "at": at_ms})
 
 
 def main():
@@ -268,6 +311,7 @@ def main():
     p.add_argument("--stopped", action="store_true", help="encode: start silent until `run`")
     p.add_argument("--realtime", action="store_true", help="encode: pace by the system clock (FIFO/file sinks)")
     p.add_argument("--report", type=int, default=25, help="encode: status line every N frames (0 = off)")
+    p.add_argument("--sink-cmd", default="", help="encode: JSON argv of a sink to start on a real 4 KiB pipe (e.g. aplay)")
     a = p.parse_args()
     try:
         lib = load_lib()

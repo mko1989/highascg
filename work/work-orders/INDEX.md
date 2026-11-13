@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-965 live WOs (35 open, 140 in progress, 790 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+967 live WOs (36 open, 139 in progress, 792 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -233,7 +233,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1022 IN PROGRESS [caspar-build+os-iso] Server releases carry the hand-built Caspar (and point at its complete source) → 1022_WO_releases_carry_hand_built_caspar.md
 - 1033 OPEN [caspar-build+video-io,engine] Zero-copy GPU frames in the Caspar build: future work for headroom → 1033_WO_zero_copy_gpu_frames_future_work.md
 
-## audio — Audio routing, devices, meters (52)
+## audio — Audio routing, devices, meters (53)
 
 - 06 DONE [audio] Multi-Channel Audio Playout Architecture (CasparCG on Ubuntu) → 06_WO_AUDIO_PLAYOUT.md
 - 16 DONE [audio] Yamaha DM3 Audio Integration → 16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md
@@ -287,6 +287,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1046 DONE [audio+caspar-build] Audio meters read far too hot: 16-bit scaling of Caspar's int32 peaks + frozen… → 1046_WO_audio_meter_levels_too_hot.md
 - 1055 IN PROGRESS [audio+godot-client] LTC in / out Device: a dropdown of the box's sound cards instead of a text box → 1055_WO_ltc_device_dropdowns.md
 - 1056 OPEN [audio] LTC out on its own channel pair of a multichannel interface that also carries p… → 1056_WO_ltc_on_a_pair_of_a_shared_multichannel_device.md
+- 1058 DONE [audio+engine] LTC out to ALSA re-located ~3×/s (never ran clean); stuck 2 frames behind after… → 1058_WO_ltc_out_relocates_constantly.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (34)
 
@@ -415,7 +416,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 - 1024 IN PROGRESS [lighting+godot-client] GDTF fixture models missing in the previs (built-in primitives drawn as boxes;… → 1024_WO_gdtf_models_missing_primitives_and_share_swap.md
 
-## godot-client — Godot client (163)
+## godot-client — Godot client (164)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -580,6 +581,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1052 IN PROGRESS [godot-client] APC40 mkII: hardware Sel selected nothing (APC stayed in Generic mode) and Clea… → 1052_WO_apc_mkii_sel_dead_and_phantom_stop.md
 - 1053 IN PROGRESS [godot-client] Visuals route groups (several layers → one source) + picked layers back in the… → 1053_WO_visuals_route_groups_and_preview.md
 - 1054 IN PROGRESS [godot-client] Visuals: pan / tilt (position), size and rotation of the selected layer, on APC… → 1054_WO_visuals_layer_position_on_device_knobs.md
+- 1059 OPEN [godot-client] Show LTC out in the timeline's control section → 1059_WO_ltc_in_timeline_transport.md
 
 ## web-client — Web client (82)
 
@@ -690,7 +692,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 734 DONE [companion+web-client] Show timers on the served pages: presentation (OSCPoint via Companion), video i… → 734_WO_show_timers_served_pages.md
 - 791 DONE [companion] Companion: recall look presets to PRV, to PGM, or to PGM with auto take → 791_WO_companion_look_preset_recall.md
 - 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
-- 1057 IN PROGRESS [companion] Companion: timeline transport did nothing (module 1.0.3) → 1057_WO_companion_timeline_transport_dead.md
+- 1057 DONE [companion] Companion: timeline transport did nothing (module 1.0.3) → 1057_WO_companion_timeline_transport_dead.md
 
 ## devices-config — Devices tab, settings, config generation (60)
 

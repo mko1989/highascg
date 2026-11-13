@@ -115,6 +115,8 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 	}
 
 	if (method === 'POST') {
+		// WO-1057: transport by id works right after a server start (Companion), before any GUI pushed its timelines
+		if (action && typeof eng.ensure === 'function') eng.ensure(id)
 		switch (action) {
 			case 'play': {
 				const tl = eng.get(id)

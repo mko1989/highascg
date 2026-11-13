@@ -64,7 +64,8 @@ function spawnDecoder(mode, opts = {}) {
 
 /**
  * @param {{ fps: number, df: boolean }} mode
- * @param {{ channels?: number, channel?: number, volume?: number, start?: string, stopped?: boolean, report?: number, realtime?: boolean }} [opts]
+ * @param {{ channels?: number, channel?: number, volume?: number, start?: string, stopped?: boolean, report?: number, realtime?: boolean, sinkCmd?: string[] }} [opts]
+ *   sinkCmd: argv the helper starts itself on a real 4 KiB pipe (aplay) — see WO-1058 in ltc_helper.py open_sink()
  */
 function spawnEncoder(mode, opts = {}) {
 	const args = ['-I', HELPER, 'encode', '--rate', String(LTC_SAMPLE_RATE), '--fps', fpsArg(mode)]
@@ -73,6 +74,7 @@ function spawnEncoder(mode, opts = {}) {
 	args.push('--start', opts.start || '00:00:00:00', '--report', String(opts.report ?? 5))
 	if (opts.stopped) args.push('--stopped')
 	if (opts.realtime) args.push('--realtime')
+	if (Array.isArray(opts.sinkCmd) && opts.sinkCmd.length) args.push('--sink-cmd', JSON.stringify(opts.sinkCmd))
 	return spawn(python(), args, { stdio: ['pipe', 'pipe', 'pipe'], env: childEnv() })
 }
 

@@ -36,6 +36,8 @@ function hydrateFromProject(eng, id) {
 }
 
 module.exports = {
+	/** WO-1057: the timeline, loaded from the stored project when no client has pushed it yet (fresh server start). */
+	ensure(id) { return this.timelines.get(id) || hydrateFromProject(this, id) }, // prettier-ignore
 	/**
 	 * @param {string} id
 	 * @param {number} [fromMs]

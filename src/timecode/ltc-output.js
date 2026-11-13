@@ -16,6 +16,7 @@ const { fpsMode, msToFrames, framesToTc, formatTc, tcToFrames, parseTc, frameDel
 
 const RESTART_MS = 2000
 const RELOCATE_FRAMES = 2 // off by this much on two reports in a row: drift → re-locate
+const AIM_MAX = 4 // most frames a running re-locate may aim ahead
 const SEEK_FRAMES = 5 // off by this much once: the playhead jumped → re-locate now
 
 function msSinceLocalMidnight(now) {
@@ -52,6 +53,8 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null })
 	let relocates = 0
 	let offReports = 0
 	let starts = 0
+	let aim = 0 // frames a running re-locate aims ahead (learned landing latency)
+	let lastRelocateAt = 0
 
 	/** Frame count LTC should be writing (null = silent); `at` = when the encoder reported. */
 	function targetFrames(at) {
@@ -87,12 +90,20 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null })
 			return
 		}
 		if (reported == null) return
-		const off = Math.abs(frameDelta(tgt, reported, mode))
+		const signed = frameDelta(tgt, reported, mode)
+		const off = Math.abs(signed)
 		offReports = off >= RELOCATE_FRAMES ? offReports + 1 : 0
 		if (off >= SEEK_FRAMES || offReports >= 2) {
+			/* WO-1058: a `locate` sent while running lands a frame or two late (the encoder reads it between frames,
+			 * with frames already queued), so a jump (loop wrap, seek) left the LTC ~2 frames behind and every further
+			 * re-locate repeated the same miss, ~2.5×/s for good. A second miss right after a re-locate is that
+			 * landing latency: aim ahead by it. */
+			const now = Date.now()
+			if (now - lastRelocateAt < 1500 && off < SEEK_FRAMES) aim = Math.max(-AIM_MAX, Math.min(AIM_MAX, aim - signed))
+			lastRelocateAt = now
 			relocates++
 			offReports = 0
-			locate(tgt)
+			locate(tgt + aim)
 		}
 	}
 
@@ -139,27 +150,31 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null })
 			e.stdout.pipe(p.stdin)
 			return p
 		}
-		const args = ['-q', '-D', cfg.device, '-t', 'raw', '-f', 'S16_LE', '-r', String(LTC_SAMPLE_RATE), '-c', String(cfg.channels)]
-		args.push('--buffer-time=60000', '--period-time=10000')
-		const p = spawn('aplay', args, { stdio: ['pipe', 'ignore', 'pipe'] })
-		p.on('error', (err) => scheduleRestart(`aplay: ${err.message}`))
-		p.stdin.on('error', () => {})
-		p.stderr.on('data', (b) => (lastError = String(b).trim().slice(0, 240)))
-		p.on('close', (code) => scheduleRestart(`aplay -D ${cfg.device} exited ${code}${lastError ? `: ${lastError}` : ''}`))
-		e.stdout.pipe(p.stdin)
-		return p
+		return null // alsa: the encoder runs aplay itself (aplayArgs) on a real pipe
+	}
+
+	/* WO-1058: aplay must read the encoder through a REAL pipe the encoder shrinks to 4 KiB, so the sound card paces it.
+	 * node's stdio pipes are UNIX sockets (F_SETPIPE_SZ fails silently) and e.stdout.pipe(aplay.stdin) added node's
+	 * buffers on top: the encoder ran ~1 s ahead in bursts, sync() re-located ~3×/s and the LTC never ran clean. */
+	function aplayArgs() {
+		const args = ['aplay', '-q', '-D', cfg.device, '-t', 'raw', '-f', 'S16_LE', '-r', String(LTC_SAMPLE_RATE), '-c', String(cfg.channels)]
+		return [...args, '--buffer-time=60000', '--period-time=10000']
 	}
 
 	function start() {
 		if (stopped) return
 		starts++
 		const chan = cfg.sink === 'alsa' ? { channels: cfg.channels, channel: cfg.channel } : {}
-		const e = spawnEncoder(mode, { ...chan, volume: cfg.volumeDb, stopped: true, report: 5, realtime: cfg.sink === 'fifo' })
+		const sinkCmd = cfg.sink === 'alsa' ? aplayArgs() : undefined
+		const e = spawnEncoder(mode, { ...chan, volume: cfg.volumeDb, stopped: true, report: 5, realtime: cfg.sink === 'fifo', sinkCmd })
 		enc = e
 		running = false
 		e.on('error', (err) => scheduleRestart(`encoder: ${err.message}`))
 		e.on('close', (code) => {
-			if (enc === e) scheduleRestart(code === 3 ? 'libltc missing (sudo apt install libltc11)' : `encoder exited ${code}`)
+			if (enc !== e) return
+			if (code === 3) scheduleRestart('libltc missing (sudo apt install libltc11)')
+			else if (code === 4) scheduleRestart(`aplay -D ${cfg.device} exited${lastError ? `: ${lastError}` : ''}`)
+			else scheduleRestart(`encoder exited ${code}`)
 		})
 		e.stdin.on('error', () => {})
 		onLines(e.stderr, (line) => {
