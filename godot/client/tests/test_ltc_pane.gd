@@ -44,3 +44,23 @@ func test_device_items() -> void:
 	var gone := LM.device_items(cards, "plughw:CARD=X32,DEV=0")
 	t.eq(gone[-1], ["plughw:CARD=X32,DEV=0", "plughw:CARD=X32,DEV=0 (not connected)"], "a missing card stays listed")
 	t.eq(LM.device_items(cards, "plughw:4,0").size(), 3, "a card-number device is not listed twice")
+
+
+func test_transport_readout() -> void:  # WO-1059
+	t.eq(LM.readout(null).state, "off")
+	var off: Dictionary = LM.readout(_st(false, false))
+	t.eq(off.text, "LTC off")
+	t.eq(off.state, "off")
+	var cfg := {"config": {"input": {"enabled": false}, "output": {"enabled": true, "sink": "alsa", "device": "plughw:CARD=Pro,DEV=0", "source": "timeline"}}}
+	var run: Dictionary = LM.readout(_st(false, true, cfg.merged({"output": {"running": true, "tc": "00:01:02:03"}})))
+	t.eq(run.text, "LTC 00:01:02:03")
+	t.eq(run.state, "run")
+	t.ok(str(run.tip).contains("plughw:CARD=Pro,DEV=0"), "tooltip names the device")
+	var silent: Dictionary = LM.readout(_st(false, true, cfg.merged({"output": {"running": false, "tc": null}})))
+	t.eq(silent.text, "LTC --:--:--:--")
+	t.eq(silent.state, "silent")
+	t.ok(str(silent.tip).contains("timeline is not playing"), "says why it is silent")
+	var err: Dictionary = LM.readout(_st(false, true, cfg.merged({"output": {"running": false, "error": "aplay exited 1: No such device"}})))
+	t.eq(err.state, "error")
+	t.ok(str(err.tip).contains("No such device"), "error text in the tooltip")
+	t.eq(LM.readout(_st(false, true, {"libltc": {"ok": false}})).state, "error")

@@ -11,6 +11,7 @@ signal flag_requested
 const TM := preload("res://features/timeline/timeline_math.gd")
 const N := preload("res://features/timeline/timeline_nav.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const TimelineLtc := preload("res://features/timeline/timeline_ltc.gd")
 
 var tab: Node  # timeline_tab.gd: active(), root(), view
 var pb_last := ""  # timelineId of the latest timeline.playback (the web's state.timeline.playback)
@@ -73,6 +74,8 @@ func _ready() -> void:
 	fol.button_pressed = true
 	fol.toggled.connect(func(on: bool) -> void: tab.view.follow = on)
 	add_child(fol)
+	add_child(VSeparator.new())
+	add_child(TimelineLtc.new())  # WO-1059: LTC out read-out + on / off
 	Ws.on("timeline.tick", _on_tick)
 	Ws.on("timeline.playback", _on_playback)
 

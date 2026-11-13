@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-967 live WOs (36 open, 139 in progress, 792 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+967 live WOs (35 open, 140 in progress, 792 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -581,7 +581,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1052 IN PROGRESS [godot-client] APC40 mkII: hardware Sel selected nothing (APC stayed in Generic mode) and Clea… → 1052_WO_apc_mkii_sel_dead_and_phantom_stop.md
 - 1053 IN PROGRESS [godot-client] Visuals route groups (several layers → one source) + picked layers back in the… → 1053_WO_visuals_route_groups_and_preview.md
 - 1054 IN PROGRESS [godot-client] Visuals: pan / tilt (position), size and rotation of the selected layer, on APC… → 1054_WO_visuals_layer_position_on_device_knobs.md
-- 1059 OPEN [godot-client] Show LTC out in the timeline's control section → 1059_WO_ltc_in_timeline_transport.md
+- 1059 IN PROGRESS [godot-client] Show LTC out in the timeline's control section → 1059_WO_ltc_in_timeline_transport.md
 
 ## web-client — Web client (82)
 

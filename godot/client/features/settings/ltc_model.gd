@@ -79,3 +79,26 @@ static func index_of(items: Array, value: String, cards := []) -> int:
 				if str(items[i][0]) == str(c.get("value", "")):
 					return i
 	return -1
+
+
+## WO-1059 — the LTC out read-out in the timeline transport: {text, state, tip}. state: "off" (output disabled),
+## "silent" (enabled, nothing going out), "run" (timecode going out) or "error" (device / libltc problem).
+static func readout(d: Variant) -> Dictionary:
+	if not (d is Dictionary):
+		return {"text": "LTC —", "state": "off", "tip": "LTC status unavailable"}
+	var cfg: Dictionary = d.get("config", {}) if d.get("config") is Dictionary else {}
+	var oc: Dictionary = cfg.get("output", {}) if cfg.get("output") is Dictionary else {}
+	if oc.get("enabled") != true:
+		return {"text": "LTC off", "state": "off", "tip": "LTC out is off. Click to turn it on."}
+	var where := str(oc.get("device", "")) if str(oc.get("sink", "alsa")) == "alsa" else str(oc.get("path", ""))
+	var lib: Variant = d.get("libltc")
+	if lib is Dictionary and lib.get("ok") != true:
+		return {"text": "LTC error", "state": "error", "tip": "libltc is not installed — %s" % str(lib.get("hint", "sudo apt install libltc11"))}
+	var o: Dictionary = d.get("output", {}) if d.get("output") is Dictionary else {}
+	var tail := "\nClick to turn LTC out off."
+	if o.get("running") == true and o.get("tc") != null:
+		return {"text": "LTC %s" % str(o.tc), "state": "run", "tip": "LTC out → %s%s" % [where, tail]}
+	if o.get("error"):
+		return {"text": "LTC error", "state": "error", "tip": "%s%s" % [str(o.error), tail]}
+	var why := "the timeline is not playing" if str(oc.get("source", "timeline")) == "timeline" else "starting"
+	return {"text": "LTC --:--:--:--", "state": "silent", "tip": "LTC out → %s: silent, %s.%s" % [where, why, tail]}
