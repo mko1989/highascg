@@ -9,6 +9,8 @@ const LayerList := preload("res://features/visuals/visuals_layer_list.gd")
 const FftSource := preload("res://features/visuals/visuals_fft_source.gd")
 const MidiPanel := preload("res://features/midi/midi_panel.gd")
 const PixelHue := preload("res://features/visuals/visuals_pixelhue.gd")
+const Place := preload("res://features/visuals/visuals_position.gd")
+const Layers := preload("res://features/visuals/visuals_layers.gd")
 
 signal params_changed(params: Dictionary)
 signal output_changed(output: Dictionary)
@@ -45,6 +47,7 @@ var _game_note: Label
 var show_panel: Show  # WO-877: looks, fade, master — the tab wires its signals
 var midi_panel: MidiPanel  # WO-900: the MIDI controller block (visuals_midi.gd drives it)
 var pixelhue: PixelHue  # WO-1050: the switcher layers' opacity sliders (MIDI targets "pxl:<layerId>")
+var place: Place  # WO-1054: the selected layer's X / Y / Size / Rotate (MIDI targets "pos:…", APC device knobs 5–8)
 var _burst: Button
 
 
@@ -62,7 +65,9 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 	layer_list = LayerList.new()
 	layer_list.changed.connect(func(ls: Array) -> void: layers_changed.emit(ls))
 	layer_list.dropped.connect(func(p: Dictionary, target: int) -> void: visual_dropped.emit(p, target))
-	layer_list.selected.connect(func(i: int) -> void: layer_selected.emit(i))
+	layer_list.selected.connect(func(i: int) -> void:
+		_show_place()
+		layer_selected.emit(i))
 	add_child(layer_list)
 	_shader_note = Label.new()
 	_shader_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -82,6 +87,9 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 	_game_note.modulate = Color(1, 1, 1, 0.7)
 	_game_box.add_child(_game_note)
 	add_child(_game_box)
+	place = Place.new()  # WO-1054
+	place.edited.connect(_on_place)
+	add_child(place)
 	var burst := Button.new()
 	burst.text = "Burst"
 	burst.tooltip_text = "Fire the scenes' burst now (Flow: link a hit to the Burst parameter to fire it from the audio)"
@@ -205,6 +213,24 @@ func _show_layers() -> void:
 	layer_list.set_layers(ls, _shader_names, _errors)
 	_shader_note.visible = ls.any(func(l: Dictionary) -> bool: return l.scene == "shader")
 	_game_box.visible = ls.any(func(l: Dictionary) -> bool: return l.scene == "game")
+	_show_place()
+
+
+## WO-1054: the Position block shows the selected layer (hidden with none).
+func _show_place() -> void:
+	var ls: Array = _slice.get("layers", [])
+	var i := layer_list.sel
+	place.show_layer(ls[i] if i >= 0 and i < ls.size() else null)
+
+
+## WO-1054: a Position edit → the selected layer at its new place, through the tab's layer edit path (layers_changed).
+func _on_place(p: Dictionary) -> void:
+	var ls: Array = (_slice.get("layers", []) as Array).duplicate(true)
+	var i := layer_list.sel
+	if i < 0 or i >= ls.size():
+		return
+	ls[i] = Layers.placed(ls[i], p)
+	layers_changed.emit(ls)
 
 
 ## WO-876: the Play button's state and the line under it (how to play, or why it cannot).

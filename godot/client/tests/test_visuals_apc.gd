@@ -55,9 +55,10 @@ func test_device_knobs_follow_the_selected_layer() -> void:
 	var midi: Node = tab.midi
 	t.eq(midi.apc_view.label("dev:1"), "Cam yaw", "no shader layer: the camera page")
 	t.eq(midi.control_of("dev:1"), tab.page.control("param:cam_yaw"), "dev:1 drives the camera yaw slider")
-	t.eq(midi.control_of("dev:5"), null, "the fallback page has 4 knobs")
+	t.eq(midi.control_of("dev:5"), null, "no layer selected: knob 5 (WO-1054: X of the selected layer) has nothing to move")
 	midi.handle(T.note(1, 51, 127))
 	t.eq([tab.sel, tab.page.layer_list.sel], [1, 1], "track select 2 → layer 2 selected")
+	t.eq(midi.control_of("dev:5"), tab.page.place.control("pos:x"), "WO-1054: knob 5 = the selected layer's X")
 	var sm: Node = tab.work._modes.shader.control
 	var s := HSlider.new()
 	var card := VBoxContainer.new()

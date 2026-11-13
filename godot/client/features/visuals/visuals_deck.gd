@@ -13,6 +13,7 @@ extends Node
 ## its own transparent composite `solo[n]` (premultiplied, no black back, no base tint) and the layer at that position — a
 ## fading-out one at its old place too — draws there instead of `out`. Re-routing only re-parents the draw rect (WO-1049's
 ## pattern): nothing restarts. A solo composite renders while something draws there, then once more (transparent).
+## WO-1054: each layer's place (x, y, size, rot) moves its draw rect (_place), in place, in any composite.
 ## WO-1053: composites are per route KEY — `L<n>` (a position on its own, WO-1051) or a group name (several positions in
 ## one composite, drawn in stack order): `solo` is keyed by the key, set_solo takes {position: key}.
 
@@ -166,6 +167,7 @@ func resize(size: Vector2i) -> void:
 	for s in slots + leaving:
 		s.vp.size = size
 		s.rect.size = Vector2(size)
+		_place(s)
 
 
 ## Shown (on the canvas, or fading on the mixer) or asleep: only layers that show render.
@@ -357,6 +359,7 @@ func _update() -> void:
 			s.mat.shader = sh
 		s.mat.set_shader_parameter("opacity", a)
 		s.rect.visible = a > 0.0
+		_place(s)
 		var on := running and a > 0.0
 		s.vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if on else SubViewport.UPDATE_DISABLED
 		s.stage.set_process(on)
@@ -365,3 +368,15 @@ func _update() -> void:
 		var used := draws_solo(n)
 		solo[n].render_target_update_mode = SubViewport.UPDATE_ALWAYS if running and used else (
 			SubViewport.UPDATE_ONCE if not used else SubViewport.UPDATE_DISABLED)
+
+
+## WO-1054: the layer's place (visuals_layers.gd PLACE) on its draw rect, in whichever composite it draws into (`out` or a
+## route key's): pivot at the canvas centre, scaled by `size`, rotated by `rot`, offset by (x·W, −y·H). The rect only moves —
+## the layer's own picture is the same, and what it no longer covers shows what is under it (the black back, or transparency).
+func _place(s: Dictionary) -> void:
+	var p := L.place_of(s.layer)
+	var sz := Vector2(_size)
+	s.rect.pivot_offset = sz * 0.5
+	s.rect.position = Vector2(float(p["x"]) * sz.x, -float(p["y"]) * sz.y)
+	s.rect.scale = Vector2.ONE * float(p["size"])
+	s.rect.rotation_degrees = float(p["rot"])

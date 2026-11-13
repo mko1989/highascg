@@ -144,7 +144,7 @@ func test_learn_unmap_and_store() -> void:
 	midi.panel.menu_picked.emit(1)
 	t.eq(midi.map, [], "clear all")
 	midi.panel.menu_picked.emit(0)
-	t.eq(midi.map.size(), 64, "the APC40 map again (WO-913: + ◀ ▶ edit bank, Stop clear)")
+	t.eq(midi.map.size(), 66, "the APC40 map again (WO-913: + ◀ ▶ edit bank, Stop clear; WO-1054: + ◀ ▶ Device)")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(midi.cfg_path))
 	tab.free()
 

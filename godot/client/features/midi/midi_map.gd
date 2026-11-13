@@ -3,15 +3,19 @@ extends RefCounted
 ## target id. A binding is {kind: "cc" | "note", ch: 0..15 or ANY, num: 0..127, target}. Targets are the Visuals' ids
 ## (visuals_midi.gd resolves them to controls): "layer:N" (opacity of layer N, 1 = the bottom one), "mute:N", "master",
 ## "fade", "param:<name>", "look:N", "burst", "tap", "audio" (the beat follows the music again), "blackout", "auto",
-## "pxl:<layerId>" (WO-1050: a PixelHue switcher layer's opacity).
+## "pxl:<layerId>" (WO-1050: a PixelHue switcher layer's opacity), "pos:x|y|size|rot" (WO-1054: the selected layer's place),
+## "devpage:prev|next" (WO-1054: page device knobs 1–4 through a shader's key controls).
 ## The default map is the Akai APC40 mkII's power-on Generic mode (Akai "APC40 Mk2 Communications Protocol" v1.2;
 ## the faders and knobs send absolute 7-bit values there, no init sysex needed).
 
 const ANY := -1
-const RANGES := ["layer", "master", "fade", "param", "xfade", "dev", "pxl"]  # dev: WO-909 device knobs · pxl: WO-1050 a PixelHue layer's opacity · continuous targets (a slider; picked up, midi_pickup.gd)
-const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select", "clip", "edit", "clear"]  # take / cut / xfade: WO-908 A/B · clip / edit / clear: WO-913
+const RANGES := ["layer", "master", "fade", "param", "xfade", "dev", "pxl", "pos"]  # pos: WO-1054 · dev: WO-909 device knobs · pxl: WO-1050 a PixelHue layer's opacity · continuous targets (a slider; picked up, midi_pickup.gd)
+const BUTTONS := ["mute", "look", "burst", "tap", "audio", "blackout", "auto", "take", "cut", "select", "clip", "edit", "clear", "devpage"]  # take / cut / xfade: WO-908 A/B · clip / edit / clear: WO-913 · devpage: WO-1054
 const CLEAR_NOTE := 62  # WO-1052: Dev on/off — Clear layer
 const PHANTOM_STOP := 92  # the APC40 mk1 Stop, absent on the mkII
+const DEVICE_PREV := 58  # WO-1054: ◀ Device / Device ▶ — page device knobs 1–4
+const DEVICE_NEXT := 59
+const POS_LABELS := {"x": "X", "y": "Y", "size": "Size", "rot": "Rotate"}  # WO-1054
 const PARAM_LABELS := {"cam_yaw": "Camera yaw", "cam_pitch": "Camera pitch", "cam_zoom": "Camera zoom"}
 ## WO-1050: "pxl:<layerId>" → the switcher layer's name, as the Visuals' PixelHue block last read it (visuals_pixelhue.gd)
 static var pxl_names := {}
@@ -124,6 +128,10 @@ static func target_label(target: String) -> String:
 			return "Edit bank %s" % ("A" if p.size() > 1 and p[1] == "1" else "B")
 		"clear":
 			return "Clear the selected layer"
+		"pos":
+			return "Selected layer %s" % POS_LABELS.get(p[1], p[1]) if p.size() > 1 else target
+		"devpage":
+			return "Device knobs 1–4: %s page" % ("previous" if p.size() > 1 and p[1] == "prev" else "next")
 		"pxl":
 			return "PixelHue %s opacity" % pxl_names.get(p[1], "layer " + p[1]) if p.size() > 1 else "PixelHue opacity"
 	return target.capitalize()
@@ -159,7 +167,7 @@ static func apc_name(kind: String, ch: int, num: int) -> String:
 		return "%s %d" % [{48: "Arm", 49: "Solo", 50: "Activator", 51: "Select", 52: "Clip stop", 66: "A/B"}[num], track]
 	return {81: "Stop all clips", 99: "Tap tempo", 98: "Shift", 91: "Play", 93: "Record", 102: "Session", 90: "Metronome",
 		100: "Nudge −", 101: "Nudge +", 80: "Master", 87: "Pan", 88: "Sends", 89: "User", 94: "Bank ▲", 95: "Bank ▼",
-		96: "Bank ▶", 97: "Bank ◀", 103: "Bank"}.get(num, "")
+		96: "Bank ▶", 97: "Bank ◀", 103: "Bank", 58: "◀ Device", 59: "Device ▶", 62: "Dev on/off"}.get(num, "")
 
 
 ## The APC40 mkII default map (WO-900 table). Controls that carry no track are bound on ANY channel: the device knobs follow
@@ -191,6 +199,8 @@ static func apc40() -> Array:
 	m.append({"kind": "note", "ch": ANY, "num": 97, "target": "edit:1"})  # WO-913: ◀ / ▶ = edit bank A / B (PGM too)
 	m.append({"kind": "note", "ch": ANY, "num": 96, "target": "edit:2"})
 	m.append({"kind": "note", "ch": ANY, "num": CLEAR_NOTE, "target": "clear"})  # WO-1052: Dev on/off = clear the selected layer
+	m.append({"kind": "note", "ch": ANY, "num": DEVICE_PREV, "target": "devpage:prev"})  # WO-1054: page device knobs 1–4
+	m.append({"kind": "note", "ch": ANY, "num": DEVICE_NEXT, "target": "devpage:next"})
 	return m
 
 
@@ -211,9 +221,12 @@ static func without_phantoms(map: Array) -> Array:
 
 
 ## WO-913: a stored map gains the default bindings of target kinds newer than it (`kinds`) whose control it leaves free.
+## WO-1054: free on every channel — a control Learn bound on its own channel is taken for an ANY default too.
 static func with_new_defaults(map: Array, kinds: Array) -> Array:
 	var out := map.duplicate(true)
 	for d in apc40():
-		if d.target.get_slice(":", 0) in kinds and find(out, d).is_empty() and not out.any(func(b: Dictionary) -> bool: return b.target == d.target):
+		var taken := out.any(func(b: Dictionary) -> bool: return b.kind == d.kind and int(b.num) == int(d.num) and (
+			int(b.ch) == int(d.ch) or int(b.ch) == ANY or int(d.ch) == ANY))
+		if d.target.get_slice(":", 0) in kinds and not taken and not out.any(func(b: Dictionary) -> bool: return b.target == d.target):
 			out.append(d)
 	return out

@@ -16,6 +16,10 @@ const BLENDS := ["normal", "add"]
 const SCENE_IDS := ["rings", "particles", "starfield", "tunnel", "shader", "spectrum", "game"]
 const LABELS := {"rings": "Rings", "particles": "Particles", "starfield": "Starfield", "tunnel": "Tunnel", "shader": "Shader",
 	"spectrum": "Spectrum", "game": "Game"}
+## WO-1054: a layer's place on the canvas, {field: [default, min, max]} — x / y in canvas widths / heights from the centre
+## (y = 1: one height up), size (1 = the full canvas), rot (degrees, clockwise). Stored only when not the default (older
+## shows stay byte-identical); not in key() (a move never restarts the layer); kept when a visual replaces the layer.
+const PLACE := {"x": [0.0, -1.0, 1.0], "y": [0.0, -1.0, 1.0], "size": [1.0, 0.1, 4.0], "rot": [0.0, -180.0, 180.0]}
 
 
 ## One stored layer made safe, or null (no known scene).
@@ -31,7 +35,29 @@ static func layer_of(v: Variant) -> Variant:
 		l.game = str(v.get("game", "")) if v.get("game") is String else ""
 	if v.get("label") is String and str(v.label).strip_edges() != "":
 		l.label = str(v.label).strip_edges().left(60)
+	for f in PLACE:  # WO-1054
+		var n: float = clampf(float(v[f]), PLACE[f][1], PLACE[f][2]) if v.get(f) is float or v.get(f) is int else PLACE[f][0]
+		if not is_equal_approx(n, PLACE[f][0]) and not is_nan(n):
+			l[f] = n
 	return l
+
+
+## WO-1054: a layer's full place {x, y, size, rot}, the defaults where it stores none.
+static func place_of(l: Dictionary) -> Dictionary:
+	var p := {}
+	for f in PLACE:
+		p[f] = float(l[f]) if l.get(f) is float or l.get(f) is int else PLACE[f][0]
+	return p
+
+
+## WO-1054: layer `l` at a new place (`place`: any of x, y, size, rot), made safe — defaults drop out.
+static func placed(l: Dictionary, place: Dictionary) -> Dictionary:
+	var m := l.duplicate(true)
+	for f in PLACE:
+		if place.has(f):
+			m[f] = place[f]
+	var n: Variant = layer_of(m)
+	return n if n != null else l
 
 
 ## A stored list made safe: known scenes only, at most MAX, one game layer (the first).
@@ -83,11 +109,14 @@ static func key(l: Dictionary) -> String:
 
 
 ## A Sources ▸ Visuals payload ({type: "visual", label, scene, shader?, game?}) as a layer; `keep` = the layer it replaces
-## (its opacity, visible and blend stay).
+## (its opacity, visible, blend and — WO-1054 — place stay).
 static func from_payload(payload: Dictionary, keep := {}) -> Dictionary:
 	var l := {"scene": str(payload.get("scene", "")), "label": payload.get("label", ""), "shader": payload.get("shader", ""),
 		"game": payload.get("game", ""), "opacity": keep.get("opacity", 1.0), "visible": keep.get("visible", true),
 		"blend": keep.get("blend", "normal")}
+	for f in PLACE:  # WO-1054: a pad swap keeps the place
+		if keep.has(f):
+			l[f] = keep[f]
 	var n: Variant = layer_of(l)
 	return n if n != null else {}
 
