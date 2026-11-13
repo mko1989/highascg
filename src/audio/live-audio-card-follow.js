@@ -132,4 +132,4 @@ function rememberRunningCard(ctx, slot) {
 	return true
 }
 
-module.exports = { parseCards, readCards, rememberCards, rememberPicked, followCards, capturePresent, rememberRunningCard, cardKey }
+module.exports = { parseCards, rememberCards, rememberPicked, followCards, capturePresent, rememberRunningCard }
