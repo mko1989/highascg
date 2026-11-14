@@ -358,3 +358,23 @@ The room stays life-size; the cars, tracks and everything the game adds shrink. 
   on a blocked cell).
 - If the model has no legs (tables drawn as solid blocks down to the floor), those cells are simply blocked — the
   generator routes around them. Report which it is for the live scene.
+
+### 3.1 Tunnels through tables (owner, 14.11 night: "tables to the ground, this is a perfect place for occasional tunnel")
+
+- A **tunnel** is a stretch of ribbon that passes through a table-like blocked blob of the hall grid: a connected
+  blocked component that is compact (bounding box 0.8–3.5 m each way, not a wall, not the stage side, not touching the
+  hall edge) and has a roof (height field ≥ 0.3 m above the floor over it). Chairs around a table count as part of it
+  when they touch.
+- Track JSON gains `"tunnels": [{ "from": 120, "to": 171 }]` (point index ranges, in driving order; absent = none).
+- **Carving** (validator and client physics MUST agree): for the ACTIVE track, every occupancy cell whose centre is
+  within `width/2 + 1 cell` of the centre line between `from` and `to` is FREE; everything else stays as in `occ`. So
+  inside a tunnel the corridor walls are the remaining blocked cells — a car cannot leave the ribbon there.
+- Rules: level floor (no ramp, deck or drop inside or within 2 widths of a portal); plan radius ≥ 2 × the track's
+  minimum; both portals open onto ≥ 2 widths of free straight; tunnel length 0.6–4 m; no pad, box row, checkpoint,
+  grid slot or start line inside or within 1 width of a portal; a tunnel never crosses another part of the same track.
+- "Occasional": at most 3 tunnels per track; on the live hall at least 2 tracks have one (a medium hall track and a
+  long tour), and at least 3 tracks have none. No suitable blob → no tunnels, never an invalid track.
+- Client look: an arch portal at each end and a dark tube inside (walls + ceiling, height ≈ 0.75 × width, a row of
+  small glowing lights), all game geometry × scale, hiding the table's own faces. The chase camera stays inside the
+  tube (treat the tube ceiling like a deck underside). Spectator / top cameras cannot see a car in a tunnel: its name
+  tag stays visible and the director picks a portal or chase shot. The minimap draws tunnel stretches dashed.

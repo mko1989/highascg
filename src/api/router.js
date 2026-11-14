@@ -201,7 +201,7 @@ routes.get('/api/system/update/*', ({ path, ctx, query }) => routesSystemUpdate.
 routes.get('/api/system/update', ({ path, ctx, query }) => routesSystemUpdate.handleGet(path, ctx, query), { requireCaspar: false })
 routes.post('/api/system/update/apply', ({ path, body, ctx }) => routesSystemUpdate.handlePost(path, body, ctx), { requireCaspar: false })
 
-routes.get('/api/modules', () => routesModules.handle('GET', '/api/modules'), { requireCaspar: false })
+routes.get('/api/modules', () => routesModules.handle('GET', '/api/modules'), { requireCaspar: false }); routesModules.registerPostRoutes(routes) // WO-1076 enable / disable / install / uninstall
 routes.get('/api/about', () => routesAbout.handleGet(), { requireCaspar: false })
 
 // Scene live

@@ -16,6 +16,7 @@ const { readRequestBody } = require('./http-body')
 const { redactUrlForLog } = require('./auth')
 const { LOGIN_PATH, loginPageHtml } = require('./login-page')
 const { serveRcStatic, isRcStaticPath } = require('../game/rc-static')
+const moduleRegistry = require('../module-registry')
 const zlib = require('zlib')
 
 const MIME = {
@@ -329,6 +330,9 @@ function startHttpServer(options) {
 				reqPathForRouting.startsWith('/api/') ||
 				reqPathForRouting === '/api' ||
 				/^\/instance\/[^/]+\/api(\/.*)?$/.test(reqPathForRouting)
+			// WO-1076: a loaded module's own non-API paths (handleStatic / live staticMounts); null when none claims it
+			const search = rawPath.includes('?') ? rawPath.slice(rawPath.indexOf('?')) : ''
+			const moduleStatic = isApi ? null : await moduleRegistry.handleStatic({ method: req.method || 'GET', path: reqPathForRouting, search, req })
 
 
 			if (reqPathForRouting === LOGIN_PATH) {
@@ -343,6 +347,8 @@ function startHttpServer(options) {
 			} else if (isRcStaticPath(reqPathForRouting)) {
 				// WO-1074: the RC car game's browser files (repo game/rc/ + three's build/ and examples/jsm/); `/game/rc` → `/game/rc/` keeps ?spectate=1 / ?host=1
 				result = await serveRcStatic(reqPathForRouting, { method: req.method, query: rawPath.includes('?') ? rawPath.slice(rawPath.indexOf('?')) : '' })
+			} else if (moduleStatic) {
+				result = moduleStatic
 			} else if (isApi) {
 				// Pass path including ?query so router can parse query params consistently.
 				const qIdx = rawPath.indexOf('?')

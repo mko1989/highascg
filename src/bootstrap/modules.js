@@ -11,6 +11,8 @@ const pluginManager = require('../plugins/plugin-manager')
 
 function loadOptionalModules(config, log) {
 	pluginManager.loadEnabledPlugins(config, log)
+	// WO-1076: installed + enabled external modules (repo modules/, ~/.highascg/modules); disabled ones are never required
+	require('../module-host/module-loader').loadEnabledExternalModules(log)
 }
 
 function buildVendorDirs(logger) {

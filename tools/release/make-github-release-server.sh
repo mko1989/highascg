@@ -196,6 +196,14 @@ build_server_archive() {
 		rm -f "$ARCHIVE_PATH"
 		exit 1
 	fi
+	# WO-1076: optional modules (repo modules/<name>/) are separate opt-in packages (tools/release/make-module-tarball.js);
+	# the base release never carries them. modules/ is not in archive_common_server_tar_members; no --exclude=modules here
+	# on purpose (unanchored, it would also drop any node_modules/*/modules/ dir) - this check is the guard instead.
+	if tar -tzf "$ARCHIVE_PATH" | grep -E '^(\./)?modules/' >/dev/null; then
+		echo "ERROR: $ARCHIVE_PATH contains modules/ - optional modules ship as their own tarballs; removing it" >&2
+		rm -f "$ARCHIVE_PATH"
+		exit 1
+	fi
 	archive_common_print_size_hints "$ARCHIVE_PATH"
 }
 

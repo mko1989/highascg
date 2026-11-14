@@ -1,0 +1,9 @@
+{
+	"name": "echo-fixture",
+	"version": "1.2.0",
+	"title": "Echo fixture",
+	"description": "WO-1076 smoke fixture: one of every module hook (route, public path, WS echo, static, boot / shutdown).",
+	"main": "register.js",
+	"requiresCore": ">=2026.1.1",
+	"defaultEnabled": false
+}

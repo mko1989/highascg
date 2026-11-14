@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-592 routes.
+596 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -267,6 +267,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/mixer/*` | registry | `src/api/router.js` |
 | POST | `/api/mixer/*` | registry | `src/api/router.js` |
 | GET | `/api/modules` | registry | `src/api/router.js` |
+| POST | `/api/modules/disable` | registry | `src/api/routes-modules.js` |
+| POST | `/api/modules/enable` | registry | `src/api/routes-modules.js` |
+| POST | `/api/modules/install` | registry | `src/api/routes-modules.js` |
+| POST | `/api/modules/uninstall` | registry | `src/api/routes-modules.js` |
 | POST | `/api/multiview/*` | registry | `src/api/router.js` |
 | POST | `/api/multiview/apply` | handler | `src/api/routes-multiview.js` |
 | POST | `/api/multiview/audio-focus` | handler | `src/api/routes-multiview.js` |
@@ -639,6 +643,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-lighting.js` | WO-837 — lighting consoles (Devices tab) for the timeline `light` flags. |
 | `src/api/routes-lower-thirds.js` | routes-lower-thirds.js — CRUD + playback API for lower-third templates. |
 | `src/api/routes-media.js` | GET thumbnails, local-media probe/waveform, POST media refresh. |
+| `src/api/routes-modules.js` | GET /api/modules — report which optional feature modules are enabled on this server. |
 | `src/api/routes-multiview.js` | POST /api/multiview/apply — layout cells + route layers; single full-screen CG chrome template (multiview_master) draws all borders/labels/timers. |
 | `src/api/routes-network-tailscale.js` |  |
 | `src/api/routes-operator-gui.js` | routes-operator-gui.js — WO-243/255 operator GUI layout endpoints (the compose windows of the operator channel). |
