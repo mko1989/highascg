@@ -8,6 +8,7 @@
  *   POST /api/timers/assign         — assign timer to screen at lowest free slot (980-989 band)
  *   POST /api/timers/unassign       — unassign timer from screen
  *   POST /api/timers/visible        — toggle visibility (MIXER OPACITY 0/1)
+ *   POST /api/timers/bus            — move a timer to the screen's preview (`prv`) or program (`pgm`) channel
  *   POST /api/timers/cmd            — issue command (start|pause|reset) to all assigned screens
  *
  * Self-heal on CG UPDATE failure (403 — producer lost): re-ADD from registry, retry once.
@@ -17,6 +18,7 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const screenTimers = require('../engine/screen-timers')
+const timerClock = require('../engine/screen-timer-clock')
 const { getChannelMap } = require('../config/routing')
 const { notHereFor } = require('./screen-not-here') // WO-1029 plan 07 C1c
 
@@ -37,20 +39,21 @@ function isTimerLayer(layer) {
 }
 
 /**
- * Resolve program channel from screenIdx using routing.
+ * Resolve a screen's program (default) or preview channel using routing.
  * @param {number} screenIdx — 0-based screen index
  * @param {object} ctx
- * @returns {number} program channel number, or null if invalid
+ * @param {'pgm'|'prv'} [bus]
+ * @returns {number} channel number, or null if invalid (a screen without a preview bus has no `prv` channel)
  */
-function resolveChannelFromScreenIdx(screenIdx, ctx) {
+function resolveChannelFromScreenIdx(screenIdx, ctx, bus) {
 	if (!Number.isFinite(screenIdx) || screenIdx < 0) return null
 
 	try {
 		const routeMap = getChannelMap(ctx.config || {}, ctx.switcherOutputBusByChannel)
 		if (!routeMap || !routeMap.programCh) return null
 
-		// programCh is 1-indexed: programCh(1) is the first screen
-		const ch = routeMap.programCh(screenIdx + 1)
+		// programCh / previewCh are 1-indexed: programCh(1) is the first screen
+		const ch = bus === 'prv' ? routeMap.previewCh?.(screenIdx + 1) : routeMap.programCh(screenIdx + 1)
 		return Number.isFinite(ch) ? ch : null
 	} catch {
 		return null
@@ -109,7 +112,7 @@ function handleGet(p, ctx) {
  * @returns {Promise<object | null>}
  */
 async function handlePost(p, body, ctx) {
-	const m = p.match(/^\/api\/timers\/(assign|unassign|visible|cmd)$/)
+	const m = p.match(/^\/api\/timers\/(assign|unassign|visible|bus|cmd)$/)
 	if (!m) return null
 
 	const b = parseBody(body)
@@ -126,6 +129,8 @@ async function handlePost(p, body, ctx) {
 		result = handleUnassign(b, ctx)
 	} else if (cmd === 'visible') {
 		result = handleVisible(b, ctx)
+	} else if (cmd === 'bus') {
+		result = handleBus(b, ctx)
 	} else if (cmd === 'cmd') {
 		result = await handleCmd(b, ctx)
 	} else {
@@ -152,7 +157,9 @@ function handleAssign(body, ctx) {
 		if (!timerId) return { ok: false, error: 'timerId required' }
 		if (!Number.isFinite(screenIdx)) return { ok: false, error: 'screenIdx required' }
 
-		const channel = resolveChannelFromScreenIdx(screenIdx, ctx)
+		// a timer parked on the preview channel is updated there, not re-created on program
+		const on = screenTimers.listScreenTimers().find((r) => r.timerId === timerId)?.screens?.[String(screenIdx)]
+		const channel = resolveChannelFromScreenIdx(screenIdx, ctx, on?.bus === 'prv' ? 'prv' : 'pgm')
 		if (channel === null) return { ok: false, error: `Invalid screenIdx: ${screenIdx}` }
 
 		const { layer, lines } = screenTimers.assignTimerToScreen({
@@ -218,6 +225,32 @@ function handleUnassign(body, ctx) {
 		}
 
 		return { ok: true, timerId, screenIdx }
+	} catch (e) {
+		return { ok: false, error: e?.message || String(e) }
+	}
+}
+
+/**
+ * POST /api/timers/bus — park a timer on the screen's preview channel to prepare it, or send it (back) to program.
+ * @param {{timerId: string, screenIdx: number, bus: 'pgm'|'prv'}} body
+ * @param {object} ctx
+ * @returns {object}
+ */
+function handleBus(body, ctx) {
+	try {
+		const { timerId, screenIdx, bus } = body
+		if (!timerId) return { ok: false, error: 'timerId required' }
+		if (!Number.isFinite(screenIdx)) return { ok: false, error: 'screenIdx required' }
+		if (bus !== 'pgm' && bus !== 'prv') return { ok: false, error: 'bus must be pgm or prv' }
+		const channel = resolveChannelFromScreenIdx(screenIdx, ctx, bus)
+		if (channel === null) return { ok: false, error: bus === 'prv' ? 'This screen has no preview channel' : `Invalid screenIdx: ${screenIdx}` }
+		const { layer, lines } = screenTimers.moveTimerBus({ timerId, screenIdx, bus, channel })
+		if (lines.length > 0 && ctx.amcp && typeof ctx.amcp.batchSendChunked === 'function') {
+			ctx.amcp.batchSendChunked(lines, { skipMixerPreCommit: true }).catch((e) => {
+				if (typeof ctx.log === 'function') ctx.log('warn', `[screen-timers] bus move failed: ${e?.message || e}`)
+			})
+		}
+		return { ok: true, timerId, screenIdx, bus, channel, layer }
 	} catch (e) {
 		return { ok: false, error: e?.message || String(e) }
 	}
@@ -303,24 +336,15 @@ async function handleCmd(body, ctx) {
 			return { ok: false, error: `Invalid cmd: ${cmd}` }
 		}
 
+		const before = screenTimers.listScreenTimers().find((r) => r.timerId === timerId)
+		// Start on a timer that is already running does not restart the record: the template ignores it too, so the
+		// panels jumped back to the full time while the screen kept counting. It re-states the count instead (below).
+		const alreadyRunning = cmd === 'start' && before?.lastCmd === 'start' && timerClock.isDurationMode(before)
 		if (cmd === 'pause') {
-			// FIX-5 (2026-07-15 review, timers finding 3): compute the true frozen remaining
-			// time server-side, BEFORE recording the pause, so both the client mirror display
-			// and a later 'start' resume reflect the actual elapsed-adjusted value instead of
-			// snapping back to the full configured duration.
-			const before = screenTimers.listScreenTimers().find((r) => r.timerId === timerId)
-			const durationSec = Number(before?.config?.durationSec) || 0
-			let remainingSec = durationSec
-			if (before) {
-				const basis = Number.isFinite(before.remainingSec) ? before.remainingSec : durationSec
-				remainingSec =
-					before.lastCmd === 'start' && Number.isFinite(before.cmdAt)
-						? basis - (Date.now() - before.cmdAt) / 1000
-						: basis
-			}
-			screenTimers.recordTimerPause(timerId, remainingSec)
-		} else {
-			// Record the command in the registry
+			// FIX-5 (2026-07-15 review, timers finding 3): the true frozen remaining time is computed server-side,
+			// BEFORE recording the pause, so the client mirror and a later 'start' resume use it.
+			screenTimers.recordTimerPause(timerId, before ? timerClock.remainingNow(before) : 0)
+		} else if (!alreadyRunning) {
 			screenTimers.recordTimerCmd(timerId, cmd)
 		}
 
@@ -331,12 +355,10 @@ async function handleCmd(body, ctx) {
 			return { ok: false, error: `Timer ${timerId} not assigned to any screens` }
 		}
 
-		// Prepare CG UPDATE payload — a 'start' resumes from the server-frozen remainingSec
-		// (set by a prior pause) if present; countdown-engine.js's `doStart()` (FIX-5) honors it
-		// and otherwise falls back to its own local paused state, so this is backward compatible
-		// with any template instance that predates this field.
+		// CG UPDATE payload — a duration 'start' always names the seconds to count from (the paused value, the
+		// full duration, or where a running timer is now), so the screen never starts from its own idea of them.
 		const payload = JSON.stringify(
-			cmd === 'start' && Number.isFinite(record.remainingSec) ? { cmd, remainingSec: record.remainingSec } : { cmd },
+			cmd === 'start' && timerClock.isDurationMode(record) ? { cmd, remainingSec: timerClock.remainingNow(record) } : { cmd },
 		)
 
 		// Send updates to all assigned screens

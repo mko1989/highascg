@@ -2,7 +2,7 @@ extends VBoxContainer
 ## WO-601 — screen-timer inspector (web inspector-screen-timer.js + timer-control-panel-settings-form.js), opened
 ## from a deck column's ⏱. One section per timer on the screen: live readout (250 ms, server clock), Start / Pause /
 ## Reset, Show/Hide (cut), Fade In/Out (25 fr), opacity, the full settings form (position + px apply at once, the
-## rest on Save — to every screen the timer is on), Remove from screen; "+ Add timer". All state is the server's
+## rest on Save — to every screen the timer is on), Send to PRV / PGM (prepare it off air), Remove from screen; "+ Add timer". All state is the server's
 ## (/api/timers/*); the list reloads after every action and every 5 s while no field has focus.
 
 signal closed
@@ -134,6 +134,18 @@ func _section(rec: Dictionary) -> Control:
 	tr.add_child(_btn("Fade In", "", func() -> void: _visible(id, true, T.FADE_FRAMES)))
 	tr.add_child(_btn("Fade Out", "", func() -> void: _visible(id, false, T.FADE_FRAMES)))
 	box.add_child(tr)
+	var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap", {}) is Dictionary else {}
+	var on_prv := T.bus(rec, screen_idx) == "prv"
+	var br := HBoxContainer.new()
+	br.add_child(_muted("On preview — not on air" if on_prv else "On program"))
+	var bb := _btn("Send to PGM" if on_prv else "Send to PRV", "Put the timer on this screen's program output, with its time and look as they are" if on_prv
+			else "Park the timer on this screen's preview to set it up; it leaves program until it is sent back", func() -> void:
+		_post("/api/timers/bus", {"timerId": id, "screenIdx": screen_idx, "bus": "pgm" if on_prv else "prv"}))
+	if not on_prv and not T.has_preview(cm, screen_idx):
+		bb.disabled = true
+		bb.tooltip_text = "This screen has no preview channel"
+	br.add_child(bb)
+	box.add_child(br)
 	var g := GridContainer.new()
 	g.columns = 2
 	box.add_child(g)
@@ -147,7 +159,7 @@ func _section(rec: Dictionary) -> Control:
 		op.tooltip_text = "%d%%" % int(op.value)
 		_visible(id, vis, 0, op.value / 100.0))
 	g.add_child(op)
-	SettingsForm.build(g, box, cfg, true, func(patch: Dictionary) -> void: _apply(rec, patch), _fonts)  # WO-806: shared form, extended
+	SettingsForm.build(g, box, cfg, true, func(patch: Dictionary) -> void: _apply(rec, patch), _fonts, T.canvas(cm, screen_idx))  # WO-806: shared form, extended
 	var rm := _btn("Remove from screen", "CG CLEAR on its layer", func() -> void: _confirm_remove(id))
 	box.add_child(rm)
 	box.add_child(HSeparator.new())

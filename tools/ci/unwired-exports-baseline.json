@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 612,
+	"count": 611,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -183,7 +183,6 @@
 		"client/lib/project-import-flow.js: hideKeepLiveBanner",
 		"client/lib/project-import-flow.js: noteHardwareIncludedInSave",
 		"client/lib/project-import-flow.js: showKeepLiveBanner",
-		"client/lib/project-media-context.js: getProjectMediaContext",
 		"client/lib/project-media-context.js: isMediaInActiveProject",
 		"client/lib/project-media-context.js: setProjectMediaContext",
 		"client/lib/project-media-gather.js: gatherProjectMediaIntoFolder",

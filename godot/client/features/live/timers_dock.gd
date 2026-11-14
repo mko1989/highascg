@@ -178,7 +178,7 @@ func _row(t: Dictionary) -> Control:
 		chips.add_theme_constant_override("h_separation", 6)
 		var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap", {}) is Dictionary else {}
 		for idx in on:
-			chips.add_child(_chip(id, idx, DeckModel.screen_label(cm, idx), M.screen_visible(t, idx)))
+			chips.add_child(_chip(id, idx, DeckModel.screen_label(cm, idx) + (" · PRV" if T.bus(t, idx) == "prv" else ""), M.screen_visible(t, idx)))
 		v.add_child(chips)
 	var form := VBoxContainer.new()
 	var g := GridContainer.new()

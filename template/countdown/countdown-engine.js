@@ -42,6 +42,7 @@ const CountdownEngine = (function () {
 		format: 'auto',          // 'hms' | 'ms' | 'auto'
 		amberThresholdSec: 60,
 		redThresholdSec: 15,
+		overrun: true,           // false → stop at 00:00 instead of counting on below zero (-00:00:01 …)
 		position: 'center',
 		posX: '',              // WO-320A: px X override ('' = use position preset)
 		posY: '',              // WO-320A: px Y override
@@ -139,7 +140,7 @@ const CountdownEngine = (function () {
 		if (state === 'running' && endEpochMs != null) {
 			remainingSec = Math.round((endEpochMs - Date.now()) / 1000);
 		}
-		return remainingSec;
+		return config.overrun === false ? Math.max(0, remainingSec) : remainingSec;
 	}
 
 	function currentColor(totalSec) {
@@ -226,6 +227,10 @@ const CountdownEngine = (function () {
 	 */
 	function doStart(resumeRemainingSec) {
 		if (state === 'running') {
+			// Start on a running timer re-states where the server's count is: the screen follows it, never restarts.
+			if (config.mode === 'duration' && Number.isFinite(resumeRemainingSec)) {
+				endEpochMs = Date.now() + resumeRemainingSec * 1000;
+			}
 			render();
 			return;
 		}
@@ -236,8 +241,9 @@ const CountdownEngine = (function () {
 			// hits zero at the target time regardless of when start was pressed (A169.2).
 			endEpochMs = parseTargetTimeToNextEpoch(config.targetTime);
 		} else {
+			// may be negative: a fresh instance (re-ADD, PGM ↔ PRV move) of a timer that already ran past zero
 			const seed = Number.isFinite(resumeRemainingSec)
-				? Math.max(0, resumeRemainingSec)
+				? resumeRemainingSec
 				: (state === 'paused' ? remainingSec : (Number(config.durationSec) || 0));
 			remainingSec = seed;
 			endEpochMs = Date.now() + seed * 1000;
@@ -279,9 +285,13 @@ const CountdownEngine = (function () {
 		// instruction for `cmd: 'start'`, not a persistent config field — keep it out of `rest`
 		// so it doesn't get merged into `config` and leak into unrelated future updates.
 		const resumeRemainingSec = raw.remainingSec;
+		// `syncRemainingSec`: the server's count at the moment of this update (sent with every restyle / move of a
+		// running timer, and for a paused one on a fresh instance) — the screen is put on it, so it cannot drift
+		// from what the panels show. Transient like remainingSec.
+		const syncRemainingSec = raw.syncRemainingSec;
 		const rest = {};
 		Object.keys(raw).forEach((k) => {
-			if (k !== 'cmd' && k !== 'remainingSec') rest[k] = raw[k];
+			if (k !== 'cmd' && k !== 'remainingSec' && k !== 'syncRemainingSec') rest[k] = raw[k];
 		});
 		const prevMode = config.mode;
 		Object.assign(config, rest);
@@ -298,6 +308,11 @@ const CountdownEngine = (function () {
 			// Reset/Start, which is not how an operator expects "set time" to behave.
 			remainingSec = Math.max(0, Number(config.durationSec) || 0);
 			if (state === 'running') endEpochMs = Date.now() + remainingSec * 1000;
+		}
+		if (!cmd && config.mode === 'duration' && Number.isFinite(syncRemainingSec)) {
+			remainingSec = syncRemainingSec;
+			if (state === 'running') endEpochMs = Date.now() + syncRemainingSec * 1000;
+			else state = 'paused'; // a fresh instance of a paused timer: Start resumes from here
 		}
 		applyPositionClass();
 		if (cmd === 'start') doStart(resumeRemainingSec);

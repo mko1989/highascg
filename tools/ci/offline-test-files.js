@@ -93,6 +93,7 @@ module.exports = [
 	'tools/smoke/smoke-wo601-lower-third-template.test.js',
 	'tools/smoke/smoke-wo601-countdown.test.js',
 	'tools/smoke/smoke-wo601-screen-timer-reassign.test.js',
+	'tools/smoke/smoke-screen-timer-prepare.test.js',
 	'tools/smoke/smoke-wo601-lt-roster-import.test.js',
 	'tools/smoke/smoke-wo601-look-preset-recall.test.js',
 	'tools/smoke/smoke-wo600-multiview-audio-focus.test.js',

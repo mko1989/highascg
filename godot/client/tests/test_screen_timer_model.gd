@@ -54,3 +54,23 @@ func test_font_items_are_the_installed_families() -> void:
 	t.eq(legacy[-1], ["'Verdana', sans-serif", "Verdana (not installed)"], "a stored font that is not installed stays selectable, marked")
 	t.eq(T.font_items([], "").size(), T.FALLBACK_FONTS.size() + 1, "no answer from the server → the box image's list")
 	t.eq(T.font_items(null, "")[0], ["", "Default"], "null → fallback, Default first")
+
+
+## Owner 14.11: stop at 00:00 as an option; a timer parked on the preview channel; sliders across the screen.
+func test_overrun_bus_and_canvas() -> void:
+	var over := {"config": {"mode": "duration", "durationSec": 10}, "lastCmd": "start", "cmdAt": NOW - 75300}
+	t.ok(T.display_time(over, NOW, 0.0) < -65.0, "default: counts on below zero")
+	over.config["overrun"] = false
+	t.eq(T.display_time(over, NOW, 0.0), 0.0, "overrun off: held at 0")
+	t.eq(T.format(T.display_time(over, NOW, 0.0)), "00:00:00", "no minus sign")
+	t.eq(T.display_time({"config": {"mode": "duration", "durationSec": 300, "overrun": false}}, NOW, 0.0), 300.0, "positive values untouched")
+	t.eq(T.DEFAULTS.overrun, true, "new timers keep counting, as before")
+	var rec := {"screens": {"0": {"channel": 3, "layer": 980, "bus": "prv"}, "1": {"channel": 4, "layer": 980}}}
+	t.eq([T.bus(rec, 0), T.bus(rec, 1), T.bus(rec, 5), T.bus({}, 0)], ["prv", "pgm", "pgm", "pgm"], "bus per screen entry")
+	var cm := {"programResolutions": [{"w": 3072, "h": 1024}, null], "previewChannels": [3, null]}
+	t.eq(T.canvas(cm, 0), Vector2i(3072, 1024), "slider range = the screen's canvas")
+	t.eq([T.canvas(cm, 1), T.canvas(cm, 9), T.canvas({}, 0)], [Vector2i.ZERO, Vector2i.ZERO, Vector2i.ZERO], "unknown → no sliders")
+	t.eq([T.has_preview(cm, 0), T.has_preview(cm, 1), T.has_preview({}, 0)], [true, false, false], "PRV only where the screen has one")
+	var form := FileAccess.get_file_as_string("res://features/live/screen_timer_settings.gd")
+	t.ok(form.contains("sl.scrollable = false"), "the wheel never moves a timer")
+	t.ok(FileAccess.get_file_as_string("res://features/live/screen_timer_panel.gd").contains("\"/api/timers/bus\""), "Send to PRV / PGM")

@@ -6,7 +6,7 @@ extends RefCounted
 
 const DEFAULTS := {  # timer-control-panel-display.js DEFAULT_TIMER_CONFIG
 	"mode": "duration", "durationSec": 300, "targetTime": "18:00:00", "format": "auto", "amberThresholdSec": 60,
-	"redThresholdSec": 15, "position": "center", "hideTimer": false, "timerFontSize": 15, "auxFontSize": 5,
+	"redThresholdSec": 15, "overrun": true, "position": "center", "hideTimer": false, "timerFontSize": 15, "auxFontSize": 5,
 	"timerFontFamily": "", "timerColor": "#ffffff", "amberColor": "#ffb300", "redColor": "#ff3b30",
 	"timerBorderWidth": 0, "timerBorderColor": "#000000", "auxColor": "#ffffff", "auxTop": "", "auxMiddle": "", "auxBottom": "",
 }
@@ -33,8 +33,16 @@ static func _or_num(vals: Array) -> float:
 	return 0.0
 
 
-## computeDisplayTime with now_ms on the server clock; local_sod = seconds since local midnight (clock mode).
+## What the screen shows: computeDisplayTime, held at 0 when the timer's "keep counting past zero" is off
+## (config.overrun == false — the template and the server clamp the same way).
 static func display_time(rec: Dictionary, now_ms: float, local_sod: float) -> float:
+	var v := _raw_time(rec, now_ms, local_sod)
+	var cfg: Variant = rec.get("config")
+	return maxf(0.0, v) if cfg is Dictionary and (cfg as Dictionary).get("overrun") == false else v
+
+
+## computeDisplayTime with now_ms on the server clock; local_sod = seconds since local midnight (clock mode).
+static func _raw_time(rec: Dictionary, now_ms: float, local_sod: float) -> float:
 	var cfg: Dictionary = rec.get("config", {}) if rec.get("config") is Dictionary else {}
 	var mode := str(cfg.get("mode", "duration")) if str(cfg.get("mode", "")) != "" else "duration"
 	var remaining := _num(rec.get("remainingSec"))
@@ -79,6 +87,26 @@ static func state(rec: Dictionary, remaining: float) -> String:
 ## Timers assigned to one screen (web: t.screens[String(screenIdx)]).
 static func on_screen(timers: Array, screen_idx: int) -> Array:
 	return timers.filter(func(t: Variant) -> bool: return t is Dictionary and t.get("screens") is Dictionary and (t.screens as Dictionary).has(str(screen_idx)))
+
+
+## Which of the screen's channels the timer is on: "prv" while it is parked on preview to be prepared, else "pgm".
+static func bus(rec: Dictionary, screen_idx: int) -> String:
+	var e: Variant = (rec.get("screens", {}) as Dictionary).get(str(screen_idx)) if rec.get("screens") is Dictionary else null
+	return "prv" if e is Dictionary and str((e as Dictionary).get("bus", "")) == "prv" else "pgm"
+
+
+## The screen's canvas in px (channelMap.programResolutions) — the range of the position sliders; ZERO = unknown.
+static func canvas(channel_map: Dictionary, screen_idx: int) -> Vector2i:
+	var rl: Variant = channel_map.get("programResolutions")
+	if rl is Array and screen_idx >= 0 and screen_idx < (rl as Array).size() and rl[screen_idx] is Dictionary:
+		return Vector2i(int(rl[screen_idx].get("w", 0)), int(rl[screen_idx].get("h", 0)))
+	return Vector2i.ZERO
+
+
+## Whether the screen has a preview channel a timer can be parked on (channelMap.previewChannels[idx] is a number).
+static func has_preview(channel_map: Dictionary, screen_idx: int) -> bool:
+	var pl: Variant = channel_map.get("previewChannels")
+	return pl is Array and screen_idx >= 0 and screen_idx < (pl as Array).size() and (pl[screen_idx] is float or pl[screen_idx] is int)
 
 
 ## The Font choice: [[css value, label] …] — Default, every installed family, and the stored value when it is none of

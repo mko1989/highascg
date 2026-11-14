@@ -17,6 +17,7 @@
 
 const persistence = require('../utils/persistence')
 const { param } = require('../caspar/amcp-utils')
+const clock = require('./screen-timer-clock')
 
 /** Caspar CG template path — see template/countdown/countdown.html. */
 const COUNTDOWN_CG_NAME = '"countdown/countdown"' // slash-containing template names must be quoted in AMCP (cf. scene-template-cg.js tpl)
@@ -67,11 +68,30 @@ function loadRegistry() {
  */
 function _persistRegistry() {
 	if (_registry === null) return
-	const obj = {}
-	for (const [timerId, record] of _registry) {
-		obj[timerId] = record
+	persistence.set('screenTimers', Object.fromEntries(_registry))
+}
+
+/** The record for a timer id, created empty when a command arrives before any assign. */
+function _ensureRecord(timerId) {
+	let record = _registry.get(timerId)
+	if (!record) {
+		record = { timerId, name: '', config: {}, lastCmd: null, cmdAt: null, remainingSec: null, screens: {} }
+		_registry.set(timerId, record)
 	}
-	persistence.set('screenTimers', obj)
+	return record
+}
+
+/**
+ * CG ADD + MIXER OPACITY for one screen entry. The payload carries the record's count (running / paused), so a
+ * fresh template instance — restart, cleared preview channel, PGM ↔ PRV move — shows what the panels show.
+ */
+function _addLines(record, entry) {
+	const payload = { ...record.config, ...clock.resumeFields(record) }
+	const opacity = entry.visible ? (Number.isFinite(entry.opacity) ? entry.opacity : 1) : 0
+	return [
+		`CG ${entry.channel}-${entry.layer} ADD ${CG_SUBLAYER} ${COUNTDOWN_CG_NAME} 1 ${param(JSON.stringify(payload))}`,
+		`MIXER ${entry.channel}-${entry.layer} OPACITY ${opacity}`,
+	]
 }
 
 /**
@@ -137,7 +157,9 @@ function assignTimerToScreen(opts) {
 			}
 
 			const lines = []
-			const cgPayload = { ...record.config }
+			// Every update re-states the record's count (running: start from where it is now; paused: the frozen
+			// value), so a screen that drifted from the record — or lost its producer — is pulled back onto it.
+			const cgPayload = { ...record.config, ...clock.resumeFields(record) }
 			// The template re-anchors a running countdown on ANY payload that carries durationSec — so an unchanged one
 			// stays out, or moving / restyling a timer on air restarts it on screen while the record keeps counting.
 			if (!changingDuration) delete cgPayload.durationSec
@@ -145,18 +167,13 @@ function assignTimerToScreen(opts) {
 
 			_persistRegistry()
 
-			return {
-				layer: existing.layer,
-				lines,
-			}
+			return { layer: existing.layer, lines }
 		}
 	}
 
 	// Allocate a slot
 	const slot = _findLowestFreeSlot(channel)
-	if (slot < 0) {
-		throw new Error(`All slots occupied on channel ${channel}`)
-	}
+	if (slot < 0) throw new Error(`All slots occupied on channel ${channel}`)
 	const layer = 980 + slot
 
 	// Create or update record
@@ -177,26 +194,41 @@ function assignTimerToScreen(opts) {
 	}
 
 	// Add this screen to the record
-	record.screens[String(screenIdx)] = {
-		channel,
-		layer,
-		visible: true,
-	}
-
-	const lines = []
-
-	// CG ADD line with JSON config payload
-	const cgPayload = {
-		...record.config,
-	}
-	lines.push(`CG ${channel}-${layer} ADD ${CG_SUBLAYER} ${COUNTDOWN_CG_NAME} 1 ${param(JSON.stringify(cgPayload))}`)
-
-	// MIXER OPACITY 1 (visible on add)
-	lines.push(`MIXER ${channel}-${layer} OPACITY 1`)
+	record.screens[String(screenIdx)] = { channel, layer, visible: true, ...(opts.bus === 'prv' ? { bus: 'prv' } : {}) }
+	const lines = _addLines(record, record.screens[String(screenIdx)])
 
 	_persistRegistry()
 
 	return { layer, lines }
+}
+
+/**
+ * Move a timer between a screen's program and preview channel ("send to PRV to prepare", owner 14.11): the
+ * producer is cleared on the channel it is on and added on the other one with the same config, count and
+ * visibility. `channel` is the target bus's channel (the route resolves it).
+ *
+ * @param {{timerId: string, screenIdx: number, bus: 'pgm'|'prv', channel: number}} opts
+ * @returns {{ layer: number, lines: string[] }}
+ */
+function moveTimerBus(opts) {
+	const { timerId, screenIdx, bus, channel } = opts || {}
+	if (!timerId) throw new Error('timerId required')
+	if (bus !== 'pgm' && bus !== 'prv') throw new Error('bus must be pgm or prv')
+	if (!Number.isFinite(channel)) throw new Error('channel required')
+	loadRegistry()
+	const entry = _registry.get(timerId)?.screens?.[String(screenIdx)]
+	if (!entry) throw new Error(`Timer ${timerId} is not on screen ${screenIdx}`)
+	if (entry.channel === channel) return { layer: entry.layer, lines: [] }
+	const slot = _findLowestFreeSlot(channel)
+	if (slot < 0) throw new Error(`All slots occupied on channel ${channel}`)
+	const lines = isTimerLayer(entry.layer) ? [`CG ${entry.channel}-${entry.layer} CLEAR`] : []
+	entry.channel = channel
+	entry.layer = 980 + slot
+	if (bus === 'prv') entry.bus = 'prv'
+	else delete entry.bus
+	lines.push(..._addLines(_registry.get(timerId), entry))
+	_persistRegistry()
+	return { layer: entry.layer, lines }
 }
 
 /**
@@ -313,20 +345,7 @@ function recordTimerCmd(timerId, cmd) {
 
 	loadRegistry()
 
-	let record = _registry.get(timerId)
-	if (!record) {
-		// Create minimal record if not exists
-		record = {
-			timerId,
-			name: '',
-			config: {},
-			lastCmd: null,
-			cmdAt: null,
-			remainingSec: null,
-			screens: {},
-		}
-		_registry.set(timerId, record)
-	}
+	const record = _ensureRecord(timerId)
 
 	record.lastCmd = cmd
 	record.cmdAt = Date.now()
@@ -354,19 +373,7 @@ function recordTimerPause(timerId, remainingSec) {
 
 	loadRegistry()
 
-	let record = _registry.get(timerId)
-	if (!record) {
-		record = {
-			timerId,
-			name: '',
-			config: {},
-			lastCmd: null,
-			cmdAt: null,
-			remainingSec: null,
-			screens: {},
-		}
-		_registry.set(timerId, record)
-	}
+	const record = _ensureRecord(timerId)
 
 	record.lastCmd = 'pause'
 	record.cmdAt = Date.now()
@@ -383,12 +390,7 @@ function recordTimerPause(timerId, remainingSec) {
 function listScreenTimers() {
 	loadRegistry()
 
-	const result = []
-	for (const record of _registry.values()) {
-		// Deep copy to prevent external mutations
-		result.push(JSON.parse(JSON.stringify(record)))
-	}
-	return result
+	return [..._registry.values()].map((record) => JSON.parse(JSON.stringify(record))) // deep copy
 }
 
 /**
@@ -419,13 +421,7 @@ function linesForReAdd(channel) {
 			// Filter by channel if specified
 			if (channel !== undefined && screenEntry.channel !== channel) continue
 
-			// CG ADD line with JSON config payload
-			const cgPayload = { ...record.config }
-			lines.push(`CG ${screenEntry.channel}-${screenEntry.layer} ADD ${CG_SUBLAYER} ${COUNTDOWN_CG_NAME} 1 ${param(JSON.stringify(cgPayload))}`)
-
-			// MIXER OPACITY based on visible flag (honoring the stored on-air opacity)
-			const opacity = screenEntry.visible ? (Number.isFinite(screenEntry.opacity) ? screenEntry.opacity : 1) : 0
-			lines.push(`MIXER ${screenEntry.channel}-${screenEntry.layer} OPACITY ${opacity}`)
+			lines.push(..._addLines(record, screenEntry))
 		}
 	}
 
@@ -491,6 +487,7 @@ module.exports = {
 	loadRegistry,
 	assignTimerToScreen,
 	unassignTimer,
+	moveTimerBus,
 	setTimerVisible,
 	recordTimerCmd,
 	recordTimerPause,

@@ -35,6 +35,14 @@ async function clearCasparChannel(amcp, channel, self, opts = {}) {
 	try {
 		await amcp.mixerCommit(ch)
 	} catch (_) {}
+	// A timer parked on a preview channel to be prepared (POST /api/timers/bus) is not part of the look: the
+	// preview's whole-channel CLEAR took it with everything else, so it is put straight back.
+	if (isPreviewCasparChannel(self?.config, ch) && typeof amcp.batchSendChunked === 'function') {
+		try {
+			const lines = require('./screen-timers').linesForReAdd(ch)
+			if (lines.length) await amcp.batchSendChunked(lines, { skipMixerPreCommit: true })
+		} catch (_) {}
+	}
 	if (self && opts.clearMatrix !== false) {
 		try {
 			playbackTracker.clearChannelFromMatrix(self, ch)

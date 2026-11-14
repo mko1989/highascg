@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-585 routes.
+586 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -534,6 +534,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/timeline/*` | registry | `src/api/router.js` |
 | * | `/api/timelines` | handler | `src/api/routes-timeline.js` |
 | POST | `/api/timers/assign` | registry | `src/api/router.js` |
+| POST | `/api/timers/bus` | registry | `src/api/router.js` |
 | POST | `/api/timers/cmd` | registry | `src/api/router.js` |
 | GET | `/api/timers/fonts` | registry | `src/api/router.js`, `src/api/routes-screen-timers.js` |
 | GET | `/api/timers/list` | registry | `src/api/router.js` |

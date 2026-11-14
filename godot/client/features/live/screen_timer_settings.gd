@@ -16,7 +16,8 @@ const COLOURS := [["timerColor", "Color"], ["amberColor", "Amber"], ["redColor",
 
 ## `g`: a 2-column grid the label / field pairs go into; `box`: where the Save button goes (under the grid).
 ## `fonts`: the server's installed families (GET /api/timers/fonts); [] = the box image's own list.
-static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: bool, apply: Callable, fonts: Array = []) -> void:
+## `canvas`: the screen's size in px — given, X and Y each get a slider across it beside the number field (owner 14.11).
+static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: bool, apply: Callable, fonts: Array = [], canvas := Vector2i.ZERO) -> void:
 	var w := {}
 	# WO-1069: look changes go out a moment after the last one (a held spin arrow / typing = one request, not thirty)
 	var pending := {}
@@ -76,19 +77,53 @@ static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: b
 			cp.color_changed.connect(func(col: Color) -> void: live.call({key: P.to_css(col)}))
 		w["border"] = number(g, "Border (px)", 0, 20, float(cfg.timerBorderWidth))
 		(w.border as SpinBox).value_changed.connect(func(v: float) -> void: live.call({"timerBorderWidth": clampi(int(v), 0, 20)}))
+		g.add_child(muted("At zero"))
+		var ov := CheckBox.new()
+		ov.text = "Keep counting (−00:01 …)"
+		ov.tooltip_text = "On: the timer runs on below zero with a minus sign. Off: it stops at 00:00"
+		ov.button_pressed = cfg.get("overrun") != false
+		ov.toggled.connect(func(on: bool) -> void: apply.call({"overrun": on}))
+		g.add_child(ov)
+		w["overrun"] = ov
 	var pos := choice(g, "Position", T.POSITIONS, maxi(0, T.POSITIONS.find(str(cfg.position))))
 	pos.item_selected.connect(func(i: int) -> void: apply.call({"position": T.POSITIONS[i]}))
-	g.add_child(muted("Position px X / Y"))
+	var with_sliders := canvas.x > 0 and canvas.y > 0
 	var pxr := HBoxContainer.new()
+	if not with_sliders:
+		g.add_child(muted("Position px X / Y"))
+		g.add_child(pxr)
 	var px: Array[LineEdit] = []
+	var sliders: Array[HSlider] = []
 	for k in ["posX", "posY"]:
 		var le := NumericField.math_line(LineEdit.new(), true, -INF, INF, Callable(), true)  # px values take + - * / ( ) (RULES.md); blank clears (WO-839: blank_ok)
 		le.text = str(cfg.get(k, ""))
 		le.placeholder_text = "%s px" % k.right(1)
 		le.tooltip_text = "Pixels from the screen's left / top edge. Either one alone moves that axis; empty = the Position preset on that axis"
 		le.custom_minimum_size.x = 70
-		pxr.add_child(le)
 		px.append(le)
+		if not with_sliders:
+			pxr.add_child(le)
+			continue
+		g.add_child(muted("%s px" % k.right(1)))
+		var row := HBoxContainer.new()
+		var sl := HSlider.new()
+		sl.max_value = canvas.x if k == "posX" else canvas.y
+		sl.step = 1
+		sl.allow_greater = true  # a typed value may sit outside the screen
+		sl.allow_lesser = true
+		sl.scrollable = false  # the wheel scrolls the Inspector, it must not move a timer on air
+		sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		sl.custom_minimum_size.x = 120
+		sl.tooltip_text = "Drag to move the timer — 0 to the screen's %s (%d px)" % ["width" if k == "posX" else "height", int(sl.max_value)]
+		sl.set_value_no_signal(le.text.to_float() if le.text.is_valid_float() else 0.0)
+		row.add_child(sl)
+		row.add_child(le)
+		g.add_child(row)
+		sliders.append(sl)
+		sl.value_changed.connect(func(v: float) -> void:
+			le.text = str(int(v))
+			live.call({"posX": T.px_value(px[0].text), "posY": T.px_value(px[1].text)}))
 	var apply_px := func(_t: Variant = null) -> void: apply.call({"posX": T.px_value(px[0].text), "posY": T.px_value(px[1].text)})
 	for le in px:
 		le.text_submitted.connect(apply_px)
@@ -97,7 +132,11 @@ static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: b
 		le.text_changed.connect(func(txt: String) -> void:
 			if txt.strip_edges() == "" or txt.strip_edges().is_valid_float():
 				live.call({"posX": T.px_value(px[0].text), "posY": T.px_value(px[1].text)}))
-	g.add_child(pxr)
+	for i in sliders.size():  # the slider follows a typed number
+		var sl := sliders[i]
+		px[i].text_changed.connect(func(txt: String) -> void:
+			if txt.strip_edges().is_valid_float():
+				sl.set_value_no_signal(txt.to_float()))
 	var save := button("Save", "Duration, mode and target time → every screen this timer is on (the look applies as you change it)", func() -> void:
 		pending.clear()
 		var out := {"durationSec": C.hms_to_secs(w.h.value, w.m.value, w.s.value), "mode": T.MODES[(w.mode as OptionButton).selected][0],
@@ -106,6 +145,7 @@ static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: b
 		if extended:
 			out["timerFontFamily"] = T.font_items(fonts, str(cfg.timerFontFamily))[maxi(0, (w.font as OptionButton).selected)][0]
 			out["timerBorderWidth"] = clampi(int((w.border as SpinBox).value), 0, 20)
+			out["overrun"] = (w.overrun as CheckBox).button_pressed
 			for c in COLOURS:
 				out[c[0]] = P.to_css((w[c[0]] as ColorPickerButton).color)
 		apply.call(out))

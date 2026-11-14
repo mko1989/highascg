@@ -415,6 +415,7 @@ routes.get('/api/timers/fonts', ({ path, ctx }) => routesScreenTimers.handleGet(
 routes.post('/api/timers/assign', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/timers/unassign', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/timers/visible', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
+routes.post('/api/timers/bus', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/timers/cmd', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
 
 // Screen labels (WO-222) — custom screen names, propagated to all render sites
