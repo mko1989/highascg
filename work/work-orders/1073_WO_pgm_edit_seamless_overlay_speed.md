@@ -189,3 +189,22 @@ The same lines are sent on a screen with PRV (previewExchange false).
 
   Next: an A/B on the box's PGM-only screen. Edit the border width and the clip speed of the look on air, watch the
   :6250 OSC frames and a screen capture, and check the AMCP ring for the lines above.
+
+## Box test, 14.11.26 18:02–18:04 (pgm2 = ch 4, PGM-only; after the show, owner allowed restarts)
+
+Server restarted with the change. Edits sent the way the client sends them (WS `scene_deck_sync` with one field
+changed, then `POST /api/scene/preview-push {target:'pgm'}`); AMCP read from `data/amcp-last50.txt`, sampled every 40 ms
+(lines inside a BEGIN…COMMIT batch do not show there, so LOADBG / CG UPDATE are inferred from the reply, not seen).
+
+- **Glow width 35 → 60 → 35 on Look 18 on air:** reply `mode: 'overlay', lines: 4, pipLines: 6`; the ring shows only
+  `MIXER 4-10 FILL / ANCHOR / ROTATION / OPACITY` + `MIXER 4 COMMIT`. No PLAY, STOP or CG CLEAR. (Before: a cut take.)
+- **Speed 1 → 1.5 on "kurtyna" about 9 s after its take:** journal `[edit-on-air] 4-110 L10: resumes at playhead 481 →
+  SEEK 481`; ring `PLAY 4-10` first, then `CG 4-110 CLEAR / STOP 4-110 / MIXER 4-110 CLEAR` — the old layer is cleared
+  after the new one plays.
+- **Speed 1.5 → 0.75:** journal `on air at 1.5x — Caspar reports filter-output time … → the layer's own start`; same
+  PLAY-then-clear order. The clip starts from its beginning, as documented above.
+- Left as found: Look 18 on pgm2, glow width 35, kurtyna speed 0.75 (read back from `/api/state`).
+- NOT seen: the picture itself (an xwd of Caspar's GL window is blank), so "no blink" rests on the AMCP only.
+- Seen on the way, not fixed: a NORMAL cut on this PGM-only screen sends `CG 4-10 CLEAR / STOP 4-10 / MIXER 4-10 CLEAR`
+  before `PLAY 4-110` (journal: play-acked ≈ 180 ms after the take starts) — the look on air is cleared before the new
+  one plays. Needs its own WO.
