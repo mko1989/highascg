@@ -67,7 +67,13 @@ func _ready() -> void:
 	_state.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_state.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	add_child(_state)
-	add_child(preload("res://features/previs/tracking/puppet_row.gd").new())  # WO-978 the test puppet (desk tests)
+	var puppet: Node = preload("res://features/previs/tracking/puppet_row.gd").new()  # WO-978 the test puppet (desk tests)
+	puppet.marker_cb = func() -> Dictionary:  # "Centre on marker": the selected marker, where it is now
+		if driver == null or _def(driver.selected).is_empty():
+			return {}
+		var p: Dictionary = driver.pos(driver.selected)
+		return {"id": driver.selected, "x": p.get("x"), "y": p.get("y"), "z": p.get("z")}
+	add_child(puppet)
 
 
 func set_defs(markers: Array) -> void:

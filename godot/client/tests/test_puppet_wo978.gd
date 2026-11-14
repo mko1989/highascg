@@ -55,5 +55,12 @@ func test_wired() -> void:
 	t.ok(tab.contains("preload(\"res://features/previs/tracking/marker_pins_3d.gd\").new()"), "previs stage gets the pins")
 	var ms := FileAccess.get_file_as_string("res://features/previs/tracking/markers_section.gd")
 	t.ok(ms.contains("preload(\"res://features/previs/tracking/puppet_row.gd\").new()"), "Markers section gets the puppet row")
+	t.ok(ms.contains("puppet.marker_cb = func() -> Dictionary:"), "…and tells it the selected marker")
+	var mb := PM.marker_body({"id": 3, "x": 2.534, "y": 23.2, "z": 2.3})
+	t.ok(mb.centre == "custom" and is_equal_approx(mb.x, 2.53) and is_equal_approx(mb.y, 23.2) and is_equal_approx(mb.z, 4.0),
+		"centre on marker: its spot, head height above it (%s)" % mb)
+	t.ok(is_equal_approx(PM.marker_body({"x": 1, "y": 2}).z, 1.7), "a marker on the floor")
+	t.eq([PM.marker_body({}), PM.marker_body(null), PM.marker_body({"x": "a", "y": 1})], [{}, {}, {}], "no marker → nothing sent")
+	t.eq(PM.stage_body(), {"centre": "stage", "z": 1.7}, "centre on stage")
 	t.ok(FileAccess.get_file_as_string("res://features/previs/tracking/puppet_row.gd").contains("HelpDialog.beside(_on, \"tracking-desk-test\")"),
 		"the row's \"?\" opens the desk test page")

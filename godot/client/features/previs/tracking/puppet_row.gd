@@ -9,6 +9,9 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const HelpDialog := preload("res://app/help_dialog.gd")
 const PATH := "/api/tracking/puppet"
 
+## The Markers section's selected marker: () → {id, name, x, y, z} or {} when none is selected (set by markers_section.gd).
+var marker_cb := Callable()
+var _puppet_id := 1
 var _on: CheckButton
 var _pattern: OptionButton
 var _speed: SpinBox
@@ -37,6 +40,18 @@ func _ready() -> void:
 	_size.tooltip_text = "Circle radius, half the line / square / figure-8 width"
 	_pair(g, "Size", _size)
 	add_child(g)
+	var row := HBoxContainer.new()  # owner 14.11: "a button to center puppet on a selected marker"
+	var on_marker := Button.new()
+	on_marker.text = "Centre on marker"
+	on_marker.tooltip_text = "Walk the path around the marker selected in the list above (where it is now)"
+	on_marker.pressed.connect(_centre_on_marker)
+	row.add_child(on_marker)
+	var on_stage := Button.new()
+	on_stage.text = "Centre on stage"
+	on_stage.tooltip_text = "Back to the centre of the tracking stage"
+	on_stage.pressed.connect(func() -> void: _post(PM.stage_body()))
+	row.add_child(on_stage)
+	add_child(row)
 	_state = Label.new()
 	_state.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_state.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -57,9 +72,23 @@ func _poll() -> void:
 
 
 func _send() -> void:
-	var body := PM.body(_on.button_pressed, PM.PATTERNS[maxi(0, _pattern.selected)], _speed.value, _size.value)
+	_post(PM.body(_on.button_pressed, PM.PATTERNS[maxi(0, _pattern.selected)], _speed.value, _size.value))
+
+
+func _post(body: Dictionary) -> void:
 	var res: Dictionary = await Api.post_json(PATH, body)
 	_adopt(res.data if res.data is Dictionary else null)
+
+
+func _centre_on_marker() -> void:
+	var m: Variant = marker_cb.call() if marker_cb.is_valid() else {}
+	var body := PM.marker_body(m)
+	if body.is_empty():
+		_state.text = "Select a marker in the list above first."
+	elif int((m as Dictionary).get("id", 0)) == _puppet_id:
+		_state.text = "That marker is the puppet itself — select another one."
+	else:
+		_post(body)
 
 
 ## Server state → controls (no signals) + the status line.
@@ -67,6 +96,7 @@ func _adopt(d: Variant) -> void:
 	_state.text = PM.summary(d)
 	if not (d is Dictionary):
 		return
+	_puppet_id = int(d.get("id", 1))
 	_on.set_pressed_no_signal(d.get("enabled") == true)
 	_pattern.select(maxi(0, PM.PATTERNS.find(str(d.get("pattern", "circle")))))
 	if not _speed.get_line_edit().has_focus():

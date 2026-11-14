@@ -4,6 +4,7 @@ extends RefCounted
 ## "puppet"), off at every server start, off by itself after its time limit.
 
 const PATTERNS := ["circle", "figure8", "line", "walk", "hold"]
+const HEAD_M := 1.7  # the puppet's head above the floor it walks on (server DEFAULTS.z)
 const LABELS := ["Circle", "Figure 8", "Line (left ↔ right)", "Walk (square)", "Hold (stand still)"]
 
 
@@ -20,6 +21,19 @@ static func summary(s: Variant) -> String:
 			str(d.get("name", "Puppet")), float(p.get("x", 0.0)), float(p.get("y", 0.0)), ceili(float(d.get("ends_in_s", 0.0)) / 60.0)]
 	var why := ("Off — it switched itself off (time limit). " if d.get("stopped") == "ttl" else "Off. ")
 	return why + "A simulated person for testing the lighting desk; never leave it on at a show."
+
+
+## "Centre on marker": the path's centre = the marker's spot, head height above where the marker is. {} = no marker.
+static func marker_body(m: Variant) -> Dictionary:
+	if not (m is Dictionary) or not ((m as Dictionary).get("x") is float or m.get("x") is int) or not (m.get("y") is float or m.get("y") is int):
+		return {}
+	var z: float = float(m.get("z", 0.0)) if (m.get("z") is float or m.get("z") is int) else 0.0
+	return {"centre": "custom", "x": snappedf(float(m.x), 0.01), "y": snappedf(float(m.y), 0.01), "z": snappedf(z + HEAD_M, 0.01)}
+
+
+## "Centre on stage": back to the tracking stage's centre (the server reads the stage itself).
+static func stage_body() -> Dictionary:
+	return {"centre": "stage", "z": HEAD_M}
 
 
 ## Controls → POST body.
