@@ -12,6 +12,7 @@ const {
 	clearPhysicalLookLayers,
 	clearStaleInactiveBankLookLayers,
 } = require('./scene-exit-layers')
+const { keptLayerSwapLines, vacatedOverlayClearLines } = require('./scene-take-edit-on-air') // WO-1073
 
 /**
  * @param {object} amcp
@@ -46,10 +47,11 @@ async function finalizeTakeBankState(amcp, c) {
 		for (const skipped of skippedVisuallyEqualLayers) {
 			const fromPhys = skipped.physicalLayerNow // old bank, currently active
 			const toPhys = phys(skipped.layerNumber, inactiveBank) // new bank (inactive), target
-			if (fromPhys !== toPhys) {
-				// SWAP <ch>-<from> <ch>-<to> TRANSFORMS (TRANSFORMS preserves mixer state across the swap)
-				const swapCmd = `SWAP ${channel}-${fromPhys} ${channel}-${toPhys} TRANSFORMS`
-				swapLines.push(swapCmd)
+			// WO-1073: an edit-on-air take already swapped it inside its PLAY batch
+			if (fromPhys !== toPhys && !skipped.swappedEarly) {
+				// SWAP <ch>-<from> <ch>-<to> TRANSFORMS (TRANSFORMS preserves mixer state across the swap); WO-1073: its PIP
+				// overlay slots move with it (slot = f(physical layer)) — left behind, the layer's exit never cleared them
+				swapLines.push(...keptLayerSwapLines(channel, skipped, toPhys))
 			}
 		}
 		if (swapLines.length > 0) {
@@ -76,7 +78,7 @@ async function finalizeTakeBankState(amcp, c) {
 			const toPhys = phys(skipped.layerNumber, inactiveBank) // new bank (now active after flip)
 			if (fromPhys !== toPhys) {
 				// Clear mixer state on the old bank layer (now inactive)
-				clearLines.push(`MIXER ${channel}-${fromPhys} CLEAR`)
+				clearLines.push(`MIXER ${channel}-${fromPhys} CLEAR`, ...vacatedOverlayClearLines(channel, skipped))
 			}
 		}
 		if (clearLines.length > 0) {

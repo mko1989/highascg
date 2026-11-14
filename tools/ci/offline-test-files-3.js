@@ -261,6 +261,7 @@ module.exports = [
 	'tools/smoke/smoke-wo976-fft-channel-source.test.js',
 	'tools/smoke/smoke-wo978-puppet-psn.test.js',
 	'tools/smoke/smoke-wo1072-console-match.test.js',
+	'tools/smoke/smoke-wo1073-pgm-edit-seamless.test.js',
 	'tools/smoke/smoke-wo979-linked-roles.test.js',
 	'tools/smoke/smoke-wo979-detect-simulate.test.js',
 	'tools/smoke/smoke-wo981-canonical-json.test.js',

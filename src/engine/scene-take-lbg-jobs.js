@@ -25,6 +25,7 @@ const {
 } = require('./scene-transition')
 const { resolvePlaySeekFramesForSceneLayer, resolvePlayInFramesForSceneLayer } = require('./scene-play-seek')
 const { resolveTakeVolumeForSceneLayer } = require('./live-input-audio-policy')
+const edit = require('./scene-take-edit-on-air') // WO-1073
 
 async function buildTakeJobs(opts) {
 	const {
@@ -44,6 +45,7 @@ async function buildTakeJobs(opts) {
 		framerate,
 		skipLayerVisualEquality = false,
 		keepRelativeLayers = false, // WO-956: PGM takes leave an unchanged "relative" layer playing
+		editOnAir = false, // WO-1073: an edit of the look on air — unchanged layers keep playing, reloads resume
 		outgoingTopIsTimeline = false,
 		restrictTimelineToPreview = false,
 		deferTimelinePlay = false,
@@ -59,6 +61,10 @@ async function buildTakeJobs(opts) {
 
 	for (const layer of incomingSorted) {
 		if (layer.source && layer.source.type === 'timeline') {
+			if (editOnAir && edit.editTimelineStays(currentMap.get(layer.layerNumber), layer, self)) {
+				self.log?.('info', `[buildTakeJobs] layer ${layer.layerNumber} keeps running (edit on air, timeline unchanged)`)
+				continue
+			}
 			const tlId = layer.source.value
 			if (tlId && self.timelineEngine) {
 				const screenIdx = require('./scene-transition').programChannelToScreenIdx(self.config, channel)
@@ -156,7 +162,9 @@ async function buildTakeJobs(opts) {
 		const st = require('./scene-transition')
 		const keep = keepRelativeLayers && st.relativeLayerKeepsPlaying(cur, layer)
 		if (keep && typeof self.log === 'function') self.log('info', `[buildTakeJobs] layer ${layer.layerNumber} keeps playing (relative start, unchanged)`)
-		const diffs = skipLayerVisualEquality && !keep ? { _: 'skipLayerVisualEquality' } : st.layerVisuallyEqual(cur, layer, true)
+		const editKeep = !keep && editOnAir && edit.editLayerKeepsPlaying(cur, layer, self) // WO-1073: same layer, any start rule
+		if (editKeep) self.log?.('info', `[buildTakeJobs] layer ${layer.layerNumber} keeps playing (edit on air, unchanged)`)
+		const diffs = editKeep ? {} : skipLayerVisualEquality && !keep ? { _: 'skipLayerVisualEquality' } : st.layerVisuallyEqual(cur, layer, true)
 		if (Object.keys(diffs).length === 0) {
 			// WO-218: Track visually-equal layers that are being skipped
 			// They may need SWAP/re-stage if the bank flips during this take
@@ -234,7 +242,7 @@ async function buildTakeJobs(opts) {
 		}
 		const loadOpts = { loop: isLoop }
 		if (af) loadOpts.audioFilter = af
-		const seekFrames = resolvePlaySeekFramesForSceneLayer(layer, self, {
+		let seekFrames = resolvePlaySeekFramesForSceneLayer(layer, self, {
 			channel,
 			layerNumber: layer.layerNumber,
 			physicalLayer: pLayer,
@@ -248,6 +256,13 @@ async function buildTakeJobs(opts) {
 		// bare `LOOP SEEK n` made frame n the loop point — each same-clip look switch shaved more off
 		// the loop. IN stays at the trim-in (or 0); SEEK only places the playhead.
 		const inFrames = resolvePlayInFramesForSceneLayer(layer, framerate)
+		if (editOnAir && !startsEmpty) {
+			const fit = (f) => require('./scene-play-seek').fitRelativeSeekToIncomingClip(f, self, layer, framerate)
+			const project = require('./scene-relative-seek-lead').projectRelativeSeekFrames
+			const onAirPhys = phys(Number(layer.layerNumber), activeBank)
+			const resume = edit.editResumeSeekFrames(self, { channel, cur, layer, clip, onAirPhys, fps: framerate, project, fit, inFrames })
+			if (resume != null) seekFrames = resume
+		}
 		if (seekFrames != null) {
 			loadOpts.in = inFrames
 			loadOpts.seek = seekFrames

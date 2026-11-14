@@ -153,7 +153,9 @@ async function handlePreviewPush(body, ctx, deps = {}) {
 		}
 		/* staged look changed between our read and the chain → converge with a full push */
 	}
-	const tr = await takeLook({ sceneId, mainIdx, target: 'preview', forceCut: true })
+	// WO-1073: an edit of the look staged on PRV re-takes only its changed layers (at their playhead); another look → full stage
+	const editOnAir = staged?.scene && String(staged.sceneId || '') === sceneId ? { editOnAir: true } : {}
+	const tr = await takeLook({ sceneId, mainIdx, target: 'preview', forceCut: true, ...editOnAir })
 	const parsed = parseRes(tr)
 	return out(tr?.status || 500, { ...parsed, ok: tr?.status === 200 && parsed.ok !== false, mode: 'take', mainIdx, previewChannel: prvCh })
 }

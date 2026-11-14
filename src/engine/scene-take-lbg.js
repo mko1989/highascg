@@ -41,7 +41,7 @@ const {
 
 /**
  * @param {object} amcp
- * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean, onProgramTransitionStarted?: Function, onProgramPlayCommitted?: Function, skipLayerVisualEquality?: boolean, keepRelativeLayers?: boolean, banklessTake?: boolean }} opts
+ * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean, onProgramTransitionStarted?: Function, onProgramPlayCommitted?: Function, skipLayerVisualEquality?: boolean, keepRelativeLayers?: boolean, editOnAir?: boolean, banklessTake?: boolean }} opts
  */
 async function runSceneTakeLbg(amcp, opts) {
 	// WO-156: every take path (API take, preview stage, sync-push, replication) funnels through
@@ -198,6 +198,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		framerate,
 		skipLayerVisualEquality: !!opts.skipLayerVisualEquality,
 		keepRelativeLayers: !!opts.keepRelativeLayers, // WO-956
+		editOnAir: !!opts.editOnAir, // WO-1073: only the edit paths (routes-scene-take.js checks the look is still on air)
 		restrictTimelineToPreview: !!opts.restrictTimelineToPreview,
 		deferTimelinePlay: !!opts.deferTimelinePlay,
 		holdTemplates: banklessTake, // WO-860: PRV staging (every preview take is bankless)
@@ -347,6 +348,8 @@ async function runSceneTakeLbg(amcp, opts) {
 		}
 	}
 
+	// WO-1073: an edit on a banked PGM moves its kept layers to the new bank in the PLAY batch (no stacking inversion)
+	if (opts.editOnAir && !banklessTake && !isMergeTransition) require('./scene-take-edit-on-air').attachEditSwapsToPlayBatch({ channel, takeJobs, skipped: skippedVisuallyEqualLayers, phys, inactiveBank })
 	const fadeClockRef = { start: fadeClockStart }
 	await runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, {
 		self,

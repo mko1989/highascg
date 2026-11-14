@@ -11,8 +11,13 @@
  *     air it was not on;
  *   - geometry / opacity / crop / effects → the PGM MIXER nudge (/api/preview/mixer-nudge `target: 'pgm'`, bank-aware,
  *     staleness-guarded against the live map), then the live entry is updated in place (its take time kept);
- *   - anything else (clip, loop, trim, audio, PIP, layers added / removed) → a cut take of the look on PGM with PRV left
- *     alone (`previewExchange: false`: no pgm→prv flip-flop of the outgoing look — it is the same look);
+ *   - WO-1073: PIP overlays only → the same nudge + the overlay CG lines on the program channel, on the slots of the
+ *     ACTIVE bank read inside the take chain (routes-scene-preview-pip.js pushPgmPipOverlays) — no clip reloads, and a
+ *     border / glow / shadow of the same type and side is CG UPDATEd in place (no template reload);
+ *   - anything else (clip, loop, trim, speed, audio, layers added / removed) → a cut take of the look on PGM with PRV
+ *     left alone (`previewExchange: false`: no pgm→prv flip-flop of the outgoing look — it is the same look) and
+ *     `editOnAir` (WO-1073): only the changed layers reload, at their current playhead; the take refuses (409) when
+ *     the look left air before its turn in the take chain;
  *   - a look edited down to no sources is refused: blanking a screen is a take, not an edit.
  */
 
@@ -51,7 +56,7 @@ async function pushEditToPgm({ b, ctx, deps, scene, sceneId, map, mainIdx }) {
 	// raw, an untouched clip read as new content and the first edit cut-restarted it ON AIR (found live 12.11)
 	const canon = deps.canonMedia || ((sc) => canonMedia(sc, ctx))
 	const decided = await decidePreviewPush({ ...live, scene: canon(live.scene) }, canon(scene), sceneId)
-	if (decided === 'nudge') {
+	if (decided === 'nudge' || decided === 'overlay') {
 		const nudge = deps.nudge || ((nb) => require('./routes-preview-nudge').handlePreviewMixerNudge(nb, ctx))
 		const res = map.programResolutions?.[mainIdx] || {}
 		const nr = await nudge({
@@ -64,29 +69,29 @@ async function pushEditToPgm({ b, ctx, deps, scene, sceneId, map, mainIdx }) {
 			...(Number(res.w) > 0 && Number(res.h) > 0 ? { composeCanvas: { w: Number(res.w), h: Number(res.h) } } : {}),
 		})
 		const parsed = parseRes(nr)
-		if (nr?.status === 200 && parsed.ok === true) {
+		let pip = null
+		if (nr?.status === 200 && parsed.ok === true && decided === 'overlay') {
+			const canvas = Number(res.w) > 0 && Number(res.h) > 0 ? { w: Number(res.w), h: Number(res.h) } : null
+			const pushPip = deps.pushPip || ((a) => require('./routes-scene-preview-pip').pushPgmPipOverlays(ctx, a))
+			pip = await pushPip({ sceneId, scene, live, pgmCh, canvas })
+		}
+		if (nr?.status === 200 && parsed.ok === true && (pip == null || pip.ok)) {
 			const register = deps.registerLive || (() => registerLive(ctx, scene, map, mainIdx, pgmCh, live))
 			await register()
-			return out(200, { ok: true, mode: 'nudge', target: 'pgm', mainIdx, programChannel: pgmCh, lines: parsed.lines ?? null })
+			return out(200, { ok: true, mode: decided, target: 'pgm', mainIdx, programChannel: pgmCh, lines: parsed.lines ?? null, ...(pip ? { pipLines: pip.lines } : {}) })
 		}
 		/* the look left air between our read and the take chain → never re-take it onto PGM */
-		if (parsed.staged === false) return out(409, { ok: false, mode: 'not_on_air', mainIdx, programChannel: pgmCh, error: 'This look left PGM — edits go to PRV' })
+		if (parsed.staged === false || pip) return out(409, { ok: false, mode: 'not_on_air', mainIdx, programChannel: pgmCh, error: 'This look left PGM — edits go to PRV' })
 	}
 	const takeLook = deps.takeLook || ((tb) => require('./routes-scene-take-look').handleTakeLook(tb, ctx))
-	const tr = await takeLook({ sceneId, mainIdx, target: 'program', forceCut: true, previewExchange: false })
+	const tr = await takeLook({ sceneId, mainIdx, target: 'program', forceCut: true, previewExchange: false, editOnAir: true })
 	const parsed = parseRes(tr)
-	return out(tr?.status || 500, { ...parsed, ok: tr?.status === 200 && parsed.ok !== false, mode: 'take', target: 'pgm', mainIdx, programChannel: pgmCh })
+	const left = tr?.status === 409 && /not_on_air/.test(String(parsed.error || '')) // WO-1073: refused inside the take chain
+	return out(tr?.status || 500, { ...parsed, ok: tr?.status === 200 && parsed.ok !== false, mode: left ? 'not_on_air' : 'take', target: 'pgm', mainIdx, programChannel: pgmCh })
 }
 
-const URL_LIKE = /^(https?|rtsp|rtmp|srt|udp|ndi|alsa|decklink|route|shm):/i
-
-/** One media reference as the comparison sees it: project-relative ids expanded under the active show, NFC, any case. */
-function canonValue(v, slug, config) {
-	const raw = String(v ?? '').normalize('NFC').replace(/\\/g, '/').trim()
-	if (!raw || URL_LIKE.test(raw) || raw.startsWith('#')) return raw
-	const { expandMediaIdToMediaRoot } = require('../media/project-media-root')
-	return String(slug ? expandMediaIdToMediaRoot(raw, slug, config || {}) : raw).toLowerCase()
-}
+/** One media reference as the comparison sees it (moved to the engine for the WO-1073 edit take, same rule). */
+const { canonValue } = require('../engine/scene-take-edit-on-air')
 
 /** `scene` with every layer's source value in canonical form (a copy; only for the content compare). */
 function canonMedia(scene, ctx) {

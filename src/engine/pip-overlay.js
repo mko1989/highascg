@@ -93,6 +93,9 @@ function buildPipOverlayAmcpLines(
 
 /**
  * AMCP lines for every overlay in order (index 0 = bottom of stack).
+ * `opts.outsideInPlace` (WO-1073, edit pushes only — the previous overlays sit on these very slots): an outside overlay
+ * of the same type is CG UPDATEd too (its expanded MIXER FILL is immediate since 6748fed1), not re-ADDed — a CG ADD
+ * of an HTML template always makes a new CEF page (html.cpp registers it non-reusable), so the border blinked per edit.
  */
 function buildPipOverlayAmcpLinesAll(
 	overlays,
@@ -103,6 +106,7 @@ function buildPipOverlayAmcpLinesAll(
 	nextContentLayer,
 	prevSceneLayer,
 	contentRotation = 0,
+	opts = {},
 ) {
 	if (!Array.isArray(overlays) || overlays.length === 0) return []
 
@@ -116,7 +120,7 @@ function buildPipOverlayAmcpLinesAll(
 			cur.type &&
 			String(cur.type) === String(prevPips[i].type) &&
 			utils.effectivePipOverlaySide(cur) === utils.effectivePipOverlaySide(prevPips[i]) &&
-			!utils.isOutsideSide(cur)
+			(opts.outsideInPlace === true || !utils.isOutsideSide(cur))
 		if (canUpdateInPlace) {
 			const chunk = buildPipOverlayUpdateLines(
 				channel,

@@ -55,7 +55,7 @@ describe('WO-1044 PGM edit push', () => {
 		edited.layers[0].source.value = 'CLIP_B'
 		const res = await handlePreviewPush({ sceneId: 'L1', mainIdx: 0, target: 'pgm' }, {}, deps(edited, { sceneId: 'L1', scene: look() }, calls))
 		assert.equal(JSON.parse(res.body).mode, 'take')
-		assert.deepEqual(calls.at(-1), ['take', { sceneId: 'L1', mainIdx: 0, target: 'program', forceCut: true, previewExchange: false }])
+		assert.deepEqual(calls.at(-1), ['take', { sceneId: 'L1', mainIdx: 0, target: 'program', forceCut: true, previewExchange: false, editOnAir: true }]) // WO-1073: unchanged layers keep playing
 	})
 	it('a look that is not on air is never pushed to PGM', async () => {
 		const calls = []

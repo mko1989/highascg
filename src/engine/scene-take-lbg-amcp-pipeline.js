@@ -53,7 +53,7 @@ async function sendPhasedTakePlays(amcp, channel, takeJobs, self, opts = {}) {
 		(job) => {
 			if (!job.playPlan) return []
 			logPlannedCommand(self, 'play', job.layer.layerNumber, job.playPlan)
-			return [serializeClipCommandPlan(job.playPlan)]
+			return [...(job.swapBeforePlay || []), serializeClipCommandPlan(job.playPlan)] // WO-1073: kept layers' bank SWAP
 		},
 		{
 			leadingCommit: true,

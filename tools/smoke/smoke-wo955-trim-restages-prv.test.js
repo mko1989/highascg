@@ -82,6 +82,6 @@ describe('WO-955 trim edits reload PRV', () => {
 			}
 		)
 		assert.equal(JSON.parse(res.body).mode, 'take')
-		assert.deepEqual(calls, [['take', { sceneId: 'L1', mainIdx: 0, target: 'preview', forceCut: true }]])
+		assert.deepEqual(calls, [['take', { sceneId: 'L1', mainIdx: 0, target: 'preview', forceCut: true, editOnAir: true }]]) // WO-1073: the staged look is edited in place
 	})
 })
