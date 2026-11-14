@@ -112,10 +112,10 @@ test('the route previews without writing, applies through the save, refuses a mi
 test('exportCsv writes our positions in the console frame, and parseCsv reads them back', () => {
 	const out = m.exportCsv(patch(), (id) => ({ a: 1, b: 2, c: 11 })[id])
 	assert.strictEqual(out.heads, 3) // the wash has no head number
-	assert.strictEqual(out.csv.split('\r\n')[0], 'Head no,Head name,DMX,X,Y,Z,RotX,RotY,RotZ')
-	assert.strictEqual(out.csv.split('\r\n')[1], '1,"Spot 1",2-001,-4.00,5.70,-9.00,0,0,0')
+	assert.strictEqual(out.csv.split('\r\n')[0], 'Head no,Head name,DMX,X,Y,Z,RotX,RotY,RotZ,')
+	assert.strictEqual(out.csv.split('\r\n')[1], '1,"Spot 1",2-001,-4.00,5.70,-9.00,0,0,0,') // trailing comma: MagicQ eats the line's last character
 	// rotations: pitch → X, −yaw → Y, roll → Z; a floor head is turned 180° about Z; angles wrap into (−180, 180]
-	const rot = (pose) => m.exportCsv([{ id: 'a', name: 'h', universe: 1, address: 1, pose: { x: 0, y: 0, z: 0, ...pose } }], () => 1).csv.split('\r\n')[1].split(',').slice(6).map(Number)
+	const rot = (pose) => m.exportCsv([{ id: 'a', name: 'h', universe: 1, address: 1, pose: { x: 0, y: 0, z: 0, ...pose } }], () => 1).csv.split('\r\n')[1].split(',').slice(6, 9).map(Number)
 	assert.deepStrictEqual(rot({ pitch: -68.82 }), [-68.82, 0, 0])
 	assert.deepStrictEqual(rot({ yaw: -180 }), [0, 180, 0])
 	assert.deepStrictEqual(rot({ hang: 'floor', yaw: -180 }), [0, 180, 180])

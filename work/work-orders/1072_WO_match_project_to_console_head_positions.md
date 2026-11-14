@@ -1,7 +1,7 @@
 # WO-1072 — Match the project to the lighting console's head positions (MagicQ CSV)
 
 **Area:** lighting, tracking-vr, godot-client
-**Status: IN PROGRESS (14.11.26 — matcher live and run on the owner's real MagicQ export; the export direction is built but its import on the desk is untried)**
+**Status: IN PROGRESS (14.11.26 — matcher live and run on the owner's real MagicQ export; export tested against MagicQ PC 1.9.8.3 on a hidden display; not tried on the real desk)**
 
 Owner, 14.11: *"how do i make sure that our 0,0,0 points align from the start"* … *"how can we automate it so highascg
 matches chamsys positions"* … *"yes lets do the import csv matching."*
@@ -55,3 +55,19 @@ matches chamsys positions"* … *"yes lets do the import csv matching."*
 - **Export added:** `exportCsv` + `GET /api/fixtures/console-match/export` + the fold's "Export our positions for the
   console…" — head number, DMX, X / Y / Z (console frame) for MagicQ's Import Heads → "Vis only". Rotations are not
   written. NOT verified: that MagicQ's Vis-only import accepts the file and what it does to rotations.
+
+## 14.11, evening — the export tested against MagicQ PC (owner: "test it against the magicq ran on virtual display")
+
+MagicQ PC 1.9.8.3 on Xvfb :99 with the owner's show (`lastshow.shw` = tamoos-narvil), driven with xdotool; its console
+files were backed up first and put back afterwards, MagicQ and the Xvfb stopped. Patch → View Chans → Import Heads →
+the CSV → "Vis data only", then Patch → View Vis → Vis Heads read from screenshots.
+
+- **Positions:** head 1 −3.95 / 5.73 / −9.10, head 6 −6.02 / 2.95 / −4.06, head 21 2.46 / 6.04 / 10.99, Pixel Line 1001
+  −3.59 / 6.07 / −9.06 — the file's values, two decimals. Patch (DMX, head numbers, names) untouched.
+- **Bug found and fixed:** MagicQ drops the last character of a line's last field — `RotZ` 180 arrived as 18.0 on the
+  floor heads. Every row now ends with a comma (`exportCsv`); the re-import shows Y rot 180.0 / Z rot 180.0 on heads 6–10
+  and X rot −68.8 on the Pixel Lines.
+- **Rotation direction:** head 1 imported with X Rot +45 → in the visualiser's side view its lens end swings towards
+  the upstage wall (−Z). The previs's `Basis.from_euler` pitch does the same (−Y → −Z), so pitch → X Rot keeps its sign.
+- NOT checked: the five heads with two angles (1041–1045: Y 68.82, Z −90) against MagicQ's rotation order; the real
+  desk. MagicQ's own trusses / stage and its 42 heads HighAsCG does not have stay where MagicQ drew them.

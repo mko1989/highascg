@@ -265,7 +265,8 @@ function exportCsv(patch, fidOf = () => 0) {
 		rows.push([head, name, `${u}-${String(f.address).padStart(3, '0')}`, n(f.pose.x), n(f.pose.z), n(-f.pose.y), ...consoleRotation(f.pose)])
 	}
 	rows.sort((a, b) => a[0] - b[0])
-	return { csv: ['Head no,Head name,DMX,X,Y,Z,RotX,RotY,RotZ', ...rows.map((r) => r.join(','))].join('\r\n') + '\r\n', heads: rows.length }
+	// every row ends with a comma: MagicQ 1.9.8 drops the last character of a line's last field (RotZ 180 → 18)
+	return { csv: ['Head no,Head name,DMX,X,Y,Z,RotX,RotY,RotZ,', ...rows.map((r) => r.join(',') + ',')].join('\r\n') + '\r\n', heads: rows.length }
 }
 
 module.exports = { parseCsv, pair, fit, shiftProject, setHeads, dmxOf, exportCsv }
