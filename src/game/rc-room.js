@@ -1,0 +1,363 @@
+'use strict'
+
+/**
+ * WO-1074 — RC car game: the room (pure; clock and timers injected, no I/O). Players join over the game socket
+ * (max 10; spectators do not count), the host drives the phase machine lobby → countdown (5 s) → race → results, the
+ * server referees laps from each client's reported checkpoint / lap (in order, never faster than track.length / 20 m/s)
+ * and relays everyone's car 15 times a second — only while something moved. Physics is the browsers' business.
+ * Costs nothing idle: a 1 Hz housekeeping timer only while sockets are open, the 15 Hz world timer only while cars move.
+ */
+
+const S = require('./rc-sanitize')
+
+const COUNTDOWN_MS = 5000
+const GRACE_MS = 20000
+const SILENT_MS = 10000
+const UNJOINED_MS = 15000
+const WORLD_MS = Math.round(1000 / 15)
+const STATE_HZ = 20
+const IDLE_TICKS = 15 // world timer stops after 1 s without movement
+const MAX_LAPS = 20
+
+/**
+ * @param {{ now?: () => number, timers?: object, send: (conn, msg) => void, close?: (conn, code, reason) => void,
+ *   decorate?: (state) => object, maxPlayers?: number, maxSpectators?: number }} deps
+ */
+function createRcRoom(deps) {
+	const now = deps.now || Date.now
+	const T = deps.timers || { setTimeout, clearTimeout, setInterval, clearInterval }
+	const send = deps.send
+	const close = deps.close || (() => {})
+	const decorate = deps.decorate || ((s) => s)
+	const maxPlayers = deps.maxPlayers || 10
+	const maxSpectators = deps.maxSpectators ?? 20
+	const conns = new Map() // conn → { conn, pid, spectator, joined, opened, last, sTimes[] }
+	const players = new Map() // id → player
+	let nextId = 1
+	let phase = 'lobby'
+	let tracks = []
+	let bounds = null
+	let trackId = null
+	let raceTrack = null
+	let laps = 3
+	let startAt = null
+	let firstFinish = null
+	const timer = { phase: null, house: null, world: null, worldIdle: 0 }
+	let dirty = false
+
+	const connected = () => [...players.values()].filter((p) => p.connected)
+	const spectators = () => [...conns.values()].filter((c) => c.joined && c.spectator).length
+
+	function snapshot() {
+		return {
+			maxPlayers, phase, trackId, laps, startAt: phase === 'countdown' || phase === 'race' ? startAt : null,
+			players: [...players.values()].sort((a, b) => a.id - b.id).map((p) => ({ id: p.id, name: p.name, color: p.color, ready: p.ready,
+				connected: p.connected, slot: p.slot, racing: p.racing })),
+			spectators: spectators(),
+		}
+	}
+	const state = () => decorate(snapshot())
+	const toAll = (msg) => {
+		for (const c of conns.values()) if (c.joined) send(c.conn, msg)
+	}
+	const broadcastState = () => toAll({ t: 'state', state: state() })
+
+	function clearPhaseTimer() {
+		if (timer.phase) T.clearTimeout(timer.phase)
+		timer.phase = null
+	}
+
+	function housekeeping() {
+		const t = now()
+		for (const c of [...conns.values()]) {
+			const p = c.pid != null ? players.get(c.pid) : null
+			if (p && !c.spectator && t - c.last > SILENT_MS) {
+				drop(c, 4408, 'silent')
+				close(c.conn, 4408, 'silent')
+			} else if (!c.joined && t - c.opened > UNJOINED_MS) {
+				conns.delete(c.conn)
+				close(c.conn, 4408, 'no join')
+			}
+		}
+		if (!conns.size && timer.house) {
+			T.clearInterval(timer.house)
+			timer.house = null
+		}
+	}
+
+	function worldTick() {
+		if (!dirty) {
+			if (++timer.worldIdle >= IDLE_TICKS) {
+				T.clearInterval(timer.world)
+				timer.world = null
+			}
+			return
+		}
+		dirty = false
+		timer.worldIdle = 0
+		const cars = []
+		for (const p of players.values()) if (p.connected && p.car) cars.push([p.id, ...p.car])
+		toAll({ t: 'w', ts: now(), cars })
+	}
+
+	function moved() {
+		dirty = true
+		timer.worldIdle = 0
+		if (!timer.world) timer.world = T.setInterval(worldTick, WORLD_MS)
+	}
+
+	function freeSlot() {
+		const used = new Set(connected().map((p) => p.slot))
+		for (let s = 0; s < maxPlayers; s++) if (!used.has(s)) return s
+		return null
+	}
+
+	function join(c, m) {
+		if (c.joined) return send(c.conn, { t: 'welcome', id: c.pid, state: state(), you: you(c) })
+		if (m.spectator === true) {
+			if (spectators() >= maxSpectators) return send(c.conn, { t: 'full' })
+			c.pid = nextId++
+			c.joined = c.spectator = true
+			c.name = S.cleanName(m.name, `Spectator ${c.pid}`)
+			send(c.conn, { t: 'welcome', id: c.pid, state: state(), you: you(c) })
+			return broadcastState()
+		}
+		const slot = freeSlot()
+		if (slot == null || connected().length >= maxPlayers) return send(c.conn, { t: 'full' })
+		const id = nextId++
+		const p = { id, name: S.cleanName(m.name, `Player ${id}`), color: S.cleanColor(m.color, slot), ready: false, connected: true, slot,
+			racing: false, car: null, race: null, conn: c.conn }
+		players.set(id, p)
+		c.pid = id
+		c.joined = true
+		send(c.conn, { t: 'welcome', id, state: state(), you: you(c) })
+		broadcastState()
+	}
+
+	function you(c) {
+		const p = players.get(c.pid)
+		if (c.spectator || !p) return { id: c.pid, name: c.name, color: null, slot: null, spectator: true }
+		return { id: p.id, name: p.name, color: p.color, slot: p.slot, spectator: false }
+	}
+
+	/** A player's socket is gone: lobby → removed; in a race a racer stays listed (disconnected) until the lobby. */
+	function drop(c, _code, _why) {
+		conns.delete(c.conn)
+		const p = c.pid != null ? players.get(c.pid) : null
+		if (p && !c.spectator) {
+			if (phase === 'lobby' || !p.racing) players.delete(p.id)
+			else {
+				p.connected = false
+				p.car = null
+				p.conn = null
+			}
+			if (phase === 'race') checkAllFinished()
+		}
+		if (c.joined) broadcastState()
+	}
+
+	function referee(p, cp, lap) {
+		const r = p.race
+		const k = raceTrack.checkpoints.length
+		if (!r || r.finished || (cp === r.cp && lap === r.lap)) return
+		if (lap === r.lap && cp === r.cp + 1 && cp < k) {
+			r.cp = cp
+			return
+		}
+		if (lap !== r.lap + 1 || cp !== 0 || r.cp !== k - 1) return // out of order: ignored (the server's count stands)
+		const t = now()
+		const ms = t - r.lapStart
+		if (ms < (raceTrack.length / 20) * 1000) return // faster than 20 m/s average: not a lap
+		r.lap = lap
+		r.cp = 0
+		r.lapStart = t
+		r.best = r.best == null ? ms : Math.min(r.best, ms)
+		toAll({ t: 'lap', id: p.id, lap, ms, best: r.best })
+		if (lap >= laps) {
+			r.finished = true
+			r.total = t - startAt
+			if (firstFinish == null) {
+				firstFinish = t
+				clearPhaseTimer()
+				timer.phase = T.setTimeout(finishRace, GRACE_MS)
+			}
+			checkAllFinished()
+		}
+	}
+
+	function carState(c, m) {
+		const p = players.get(c.pid)
+		if (!p || c.spectator) return
+		const v = S.cleanCar(m, bounds, raceTrack ? raceTrack.checkpoints.length : 0, laps)
+		if (!v) return
+		if (phase === 'race' && p.racing && v.cp != null && v.lap != null) referee(p, v.cp, v.lap)
+		const t = now()
+		if (c.sTimes.length >= STATE_HZ && t - c.sTimes[0] < 1000) return // over 20 per second: dropped
+		c.sTimes.push(t)
+		if (c.sTimes.length > STATE_HZ) c.sTimes.shift()
+		const car = [v.x, v.y, v.z, v.yaw, v.v, v.st]
+		if (!p.car || car.some((x, i) => x !== p.car[i])) {
+			p.car = car
+			moved()
+		}
+	}
+
+	function checkAllFinished() {
+		if (phase !== 'race') return
+		const racers = [...players.values()].filter((p) => p.racing && p.connected)
+		if (!racers.length || racers.every((p) => p.race.finished)) finishRace()
+	}
+
+	function order() {
+		const all = [...players.values()].filter((p) => p.racing && p.race)
+		all.sort((a, b) => {
+			const ra = a.race, rb = b.race
+			if (ra.finished !== rb.finished) return ra.finished ? -1 : 1
+			if (ra.finished) return ra.total - rb.total || a.id - b.id
+			return rb.lap - ra.lap || rb.cp - ra.cp || a.id - b.id
+		})
+		return all.map((p) => ({ id: p.id, name: p.name, totalMs: p.race.finished ? p.race.total : null, bestMs: p.race.best, laps: p.race.lap }))
+	}
+
+	function finishRace() {
+		clearPhaseTimer()
+		if (phase !== 'race' && phase !== 'countdown') return
+		phase = 'results'
+		toAll({ t: 'results', order: order(), final: true })
+		broadcastState()
+	}
+
+	function toLobby() {
+		clearPhaseTimer()
+		phase = 'lobby'
+		startAt = null
+		firstFinish = null
+		raceTrack = null
+		for (const p of [...players.values()]) {
+			if (!p.connected) players.delete(p.id)
+			else {
+				p.racing = false
+				p.race = null
+			}
+		}
+	}
+
+	function start() {
+		const track = tracks.find((t) => t.id === trackId)
+		if (!track) return { ok: false, status: 409, error: 'no track' }
+		const racers = connected()
+		if (!racers.length) return { ok: false, status: 409, error: 'no players' }
+		toLobby()
+		raceTrack = track
+		startAt = now() + COUNTDOWN_MS
+		for (const p of players.values()) {
+			p.racing = true
+			p.race = { cp: 0, lap: 0, lapStart: startAt, best: null, total: null, finished: false }
+		}
+		phase = 'countdown'
+		timer.phase = T.setTimeout(() => {
+			timer.phase = null
+			phase = 'race'
+			broadcastState()
+		}, COUNTDOWN_MS)
+		toAll({ t: 'countdown', startAt })
+		broadcastState()
+		return { ok: true }
+	}
+
+	/** Host actions (track / laps / start / stop / kick); enable / disable belong to the service. */
+	function host(action, a = {}) {
+		const idle = phase === 'lobby' || phase === 'results'
+		switch (action) {
+			case 'track': {
+				const id = String(a.trackId ?? a.id ?? '')
+				if (!idle) return { ok: false, status: 409, error: 'a race is running' }
+				if (!tracks.some((t) => t.id === id)) return { ok: false, status: 400, error: 'unknown track' }
+				trackId = id
+				break
+			}
+			case 'laps': {
+				const n = Number(a.laps)
+				if (!idle) return { ok: false, status: 409, error: 'a race is running' }
+				if (!Number.isInteger(n) || n < 1 || n > MAX_LAPS) return { ok: false, status: 400, error: `laps 1–${MAX_LAPS}` }
+				laps = n
+				break
+			}
+			case 'start': {
+				if (!idle) return { ok: false, status: 409, error: 'a race is running' }
+				return start()
+			}
+			case 'stop':
+				toLobby()
+				break
+			case 'kick': {
+				const id = Number(a.id)
+				const c = [...conns.values()].find((x) => x.pid === id)
+				const p = players.get(id)
+				if (!c && !p) return { ok: false, status: 404, error: 'no such player' }
+				if (p) players.delete(id)
+				if (c) {
+					conns.delete(c.conn)
+					close(c.conn, 4409, 'kicked')
+				}
+				if (phase === 'race') checkAllFinished()
+				break
+			}
+			default:
+				return { ok: false, status: 400, error: 'unknown action' }
+		}
+		broadcastState()
+		return { ok: true }
+	}
+
+	return {
+		state,
+		snapshot,
+		/** The baked scene's tracks + bounds; the race in progress keeps its own track. */
+		setScene(scene) {
+			tracks = Array.isArray(scene?.tracks) ? scene.tracks : []
+			bounds = scene?.bounds || null
+			if (!tracks.some((t) => t.id === trackId)) {
+				trackId = tracks[0]?.id ?? null
+				if (conns.size) broadcastState()
+			}
+		},
+		connect(conn) {
+			conns.set(conn, { conn, pid: null, spectator: false, joined: false, opened: now(), last: now(), sTimes: [] })
+			if (!timer.house) timer.house = T.setInterval(housekeeping, 1000)
+		},
+		/** One parsed message (an object) from `conn`. */
+		handle(conn, m) {
+			const c = conns.get(conn)
+			if (!c || !m || typeof m !== 'object') return
+			c.last = now()
+			if (m.t === 'join') return join(c, m)
+			if (m.t === 'ping') return send(conn, { t: 'pong', c: Number.isFinite(m.c) ? m.c : null, s: now() })
+			if (!c.joined) return
+			if (m.t === 's') return carState(c, m)
+			if (m.t === 'ready' && !c.spectator && players.has(c.pid)) {
+				players.get(c.pid).ready = m.ready === true
+				broadcastState()
+			}
+		},
+		disconnect(conn) {
+			const c = conns.get(conn)
+			if (c) drop(c)
+		},
+		host,
+		/** Everything stops (the game is disabled): timers cleared, the room emptied. */
+		dispose() {
+			clearPhaseTimer()
+			for (const k of ['house', 'world']) if (timer[k]) T.clearInterval(timer[k])
+			timer.house = timer.world = null
+			conns.clear()
+			players.clear()
+			toLobby()
+		},
+		/** Diagnostics for the smokes: which timers run. */
+		timers: () => ({ phase: !!timer.phase, house: !!timer.house, world: !!timer.world }),
+		connections: () => conns.size,
+	}
+}
+
+module.exports = { createRcRoom, COUNTDOWN_MS, GRACE_MS, WORLD_MS }

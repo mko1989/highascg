@@ -15,6 +15,7 @@ const { isHeadlessMode } = require('./headless-mode')
 const { readRequestBody } = require('./http-body')
 const { redactUrlForLog } = require('./auth')
 const { LOGIN_PATH, loginPageHtml } = require('./login-page')
+const { serveRcStatic, isRcStaticPath } = require('../game/rc-static')
 const zlib = require('zlib')
 
 const MIME = {
@@ -339,6 +340,9 @@ function startHttpServer(options) {
 			} else if (reqPathForRouting === '/audio' || reqPathForRouting === '/audio/') {
 				// WO-731: the audio operator's sister page (presenter cards, desk, Accept).
 				result = { status: 302, headers: { Location: '/api/tracking/presenters/audio', 'Cache-Control': 'no-store' }, body: '' }
+			} else if (isRcStaticPath(reqPathForRouting)) {
+				// WO-1074: the RC car game's browser files (repo game/rc/ + three's build/ and examples/jsm/); `/game/rc` → `/game/rc/` keeps ?spectate=1 / ?host=1
+				result = await serveRcStatic(reqPathForRouting, { method: req.method, query: rawPath.includes('?') ? rawPath.slice(rawPath.indexOf('?')) : '' })
 			} else if (isApi) {
 				// Pass path including ?query so router can parse query params consistently.
 				const qIdx = rawPath.indexOf('?')

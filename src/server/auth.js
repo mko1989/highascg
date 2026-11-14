@@ -182,6 +182,7 @@ function isPublicApiPath(method, apiPath) {
 	if (m === 'POST' && p === '/api/cluster/call') return true
 	if (m === 'POST' && p === '/api/cluster/media-call') return true // WO-1029: signed like /api/cluster/call — the signature is the auth
 	if (m === 'POST' && p === '/api/cluster/hello') return true // WO-1029: signed by the linked server (cluster-hello.js)
+	if (require('../game/rc-public').isRcPublicPath(m, p)) return true // WO-1074: RC game guests' GETs, exact paths, only while enabled
 	return false
 }
 

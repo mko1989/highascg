@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-588 routes.
+592 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -180,6 +180,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/fixtures/types/*` | registry | `src/api/routes-fixture-types.js` |
 | GET | `/api/fonts` | registry | `src/api/router.js` |
 | POST | `/api/ftb/*` | registry | `src/api/router.js` |
+| POST | `/api/game/rc/host` | registry | `src/api/routes-rc-game.js` |
+| GET | `/api/game/rc/scene` | registry | `src/api/routes-rc-game.js` |
+| GET | `/api/game/rc/scene.glb` | registry | `src/api/routes-rc-game.js` |
+| GET | `/api/game/rc/state` | registry | `src/api/routes-rc-game.js` |
 | GET | `/api/hardware/displays` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | GET | `/api/hardware/modeline-preview` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | * | `/api/health` | handler | `src/cg-studio/routes.js` |
@@ -649,6 +653,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-plugins.js` |  |
 | `src/api/routes-project-files.js` | WO-1009 — the open project's documents (src/media/project-files.js): GET    /api/project-files                 → { slug, files: [{ name, kind: mvr\|model\|pdf\| |
 | `src/api/routes-project-hardware.js` | WO-608 — project hardware reconcile on the node (web lib/project-import-flow.js + project-hardware-apply.js). |
+| `src/api/routes-rc-game.js` | WO-1074 — RC car game (work/notes/rc-game-contract.md). |
 | `src/api/routes-replication-get.js` | WO-1029: this server's device-key fingerprint (public, as GET /api/cluster/identity); '' when it has none. |
 | `src/api/routes-replication-post.js` | optional |
 | `src/api/routes-scene.js` |  |

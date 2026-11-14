@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 611,
+	"count": 610,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -416,7 +416,6 @@
 		"src/engine/timeline-playback-runtime.js: _holdEnd",
 		"src/engine/timeline-take.js: collectTimelinePhysicalLayers",
 		"src/fixtures/beam-offset.js: PIN_DEG",
-		"src/fixtures/calibrate-solve.js: MIN_POINTS",
 		"src/fixtures/gdtf-library-build.js: THUMB_PX",
 		"src/fixtures/gdtf-library-build.js: extractParts",
 		"src/fixtures/gdtf-library.js: indexFile",

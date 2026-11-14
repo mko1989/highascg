@@ -1,0 +1,6 @@
+{
+	"//": "Scope marker (WO-1074) — tells Node.js (the smoke tests) to parse the ES module .js files of the RC game client as ESM, like the browser does. Do not add dependencies here.",
+	"name": "highascg-rc-game",
+	"private": true,
+	"type": "module"
+}

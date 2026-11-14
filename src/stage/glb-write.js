@@ -6,7 +6,8 @@
  * one node per mesh, one PBR material per colour. Pure.
  *
  * @typedef {{ positions: Float32Array, normals?: Float32Array, uvs?: Float32Array, indices: Uint32Array, color?: number[],
- *   material?: string }} Prim  (uvs → TEXCOORD_0; material = the glTF material name, e.g. the WO-612 export's 'screen')
+ *   material?: string, flat?: boolean }} Prim  (uvs → TEXCOORD_0; material = the glTF material name, e.g. the WO-612 export's 'screen';
+ *   flat = positions only, no NORMAL — a viewer shades it flat, WO-1074's phone-sized game scene)
  * @typedef {{ name: string, primitives: Prim[] }} Mesh
  */
 
@@ -76,11 +77,12 @@ function writeGlb(meshes) {
 			}
 			const count = p.positions.length / 3
 			json.accessors.push({ bufferView: view(p.positions, 34962), componentType: 5126, count, type: 'VEC3', min, max })
-			const posAcc = json.accessors.length - 1
-			json.accessors.push({ bufferView: view(p.normals || smoothNormals(p.positions, p.indices), 34962),
-				componentType: 5126, count, type: 'VEC3' })
-			const nAcc = json.accessors.length - 1
-			const attributes = { POSITION: posAcc, NORMAL: nAcc }
+			const attributes = { POSITION: json.accessors.length - 1 }
+			if (!p.flat) {
+				json.accessors.push({ bufferView: view(p.normals || smoothNormals(p.positions, p.indices), 34962),
+					componentType: 5126, count, type: 'VEC3' })
+				attributes.NORMAL = json.accessors.length - 1
+			}
 			if (p.uvs && p.uvs.length === count * 2) {
 				json.accessors.push({ bufferView: view(p.uvs, 34962), componentType: 5126, count, type: 'VEC2' })
 				attributes.TEXCOORD_0 = json.accessors.length - 1
