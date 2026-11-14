@@ -262,6 +262,7 @@ module.exports = [
 	'tools/smoke/smoke-wo978-puppet-psn.test.js',
 	'tools/smoke/smoke-wo1072-console-match.test.js',
 	'tools/smoke/smoke-wo1073-pgm-edit-seamless.test.js',
+	'tools/smoke/smoke-wo1075-pgm-only-cut-no-gap.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-ground.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-items.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-net.test.js',

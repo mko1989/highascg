@@ -31,7 +31,7 @@ const { runSceneTakeLbgAmcpPipeline } = require('./scene-take-lbg-amcp-pipeline'
 const { abortFailedTake } = require('./scene-take-lbg-phase-b-abort')
 const { finalizeTakeBankState } = require('./scene-take-lbg-bank-finalize')
 const { sendExitAndTimelineFadeLines } = require('./scene-take-lbg-exit-fade')
-const { collectOrphanLookLogicalLayers, collectOrphanLookPhysicalLayers, clearPhysicalLookLayers } = require('./scene-exit-layers')
+const { collectOrphanLookLogicalLayers, collectOrphanLookPhysicalLayers, clearPhysicalLookLayers, physicalLookLayerBank } = require('./scene-exit-layers')
 const { remapIntraLookRoutesForTakeChannel, assertSceneHasNoSelfRoutes } = require('./scene-route-deps')
 const {
 	resolveActiveTimelineIdToFadeOut,
@@ -216,6 +216,7 @@ async function runSceneTakeLbg(amcp, opts) {
 	// Clear stale physical layers before LOADBG when we are not doing a bank opacity crossfade.
 	// WO-160b: pgm-only channels run the orphan sweep BEFORE every take regardless of shouldRunBankCrossfade
 	// because their live JSON is less reliable (no staged PRV exchange).
+	let sweepAfterPlay = []
 	const shouldClearOrphans = (!shouldRunBankCrossfade && takeJobs.length > 0) || (opts.pgmOnly && takeJobs.length > 0)
 	if (shouldClearOrphans) {
 		const incomingPhys = takeJobs.map((j) => j.pLayer)
@@ -231,7 +232,13 @@ async function runSceneTakeLbg(amcp, opts) {
 			incomingPhys.push(sk.physicalLayerNow)
 			incomingPhys.push(phys(sk.layerNumber, inactiveBank))
 		}
-		const stalePhys = collectOrphanLookPhysicalLayers(self, channel, incomingPhys)
+		let stalePhys = collectOrphanLookPhysicalLayers(self, channel, incomingPhys)
+		/* WO-1075: a PGM-only take has no currentScene, so the look on air (the active bank) was swept HERE — black
+		 * from this point to the PLAY on every cut (~180 ms on pgm2). On a cut it is swept after the PLAY instead. */
+		if (opts.pgmOnly && fadeDur === 0 && !isMergeTransition && !banklessTake && activeBank !== inactiveBank) {
+			sweepAfterPlay = stalePhys.filter((L) => physicalLookLayerBank(L) === activeBank)
+			stalePhys = stalePhys.filter((L) => !sweepAfterPlay.includes(L))
+		}
 		if (stalePhys.length > 0) {
 			try {
 				await clearPhysicalLookLayers(amcp, channel, stalePhys, self)
@@ -397,6 +404,9 @@ async function runSceneTakeLbg(amcp, opts) {
 		})
 	}
 
+	if (sweepAfterPlay.length > 0) {
+		await clearPhysicalLookLayers(amcp, channel, sweepAfterPlay, self).catch((e) => self.log?.('warn', `[scene-take-lbg] post-play look sweep failed: ${e?.message || e}`))
+	}
 	// WO-196 T196.1: build set of incoming template host layers to avoid clearing them on exit.
 	// This enables continuity: if a template layer carries the same identity on the next look,
 	// we keep it on air without a CG CLEAR.
