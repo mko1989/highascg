@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-586 routes.
+587 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -139,6 +139,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/dmx-monitor` | registry | `src/api/routes-dmx-monitor.js` |
 | POST | `/api/dmx-monitor/poll` | registry | `src/api/routes-dmx-monitor.js` |
 | * | `/api/export` | handler | `src/cg-studio/routes.js` |
+| POST | `/api/fixtures/console-match` | registry | `src/api/routes-console-match.js` |
 | GET | `/api/fixtures/console-selection` | registry | `src/api/routes-console-selection.js` |
 | POST | `/api/fixtures/console-selection` | registry | `src/api/routes-console-selection.js` |
 | POST | `/api/fixtures/console-selection/send` | registry | `src/api/routes-console-selection.js` |
@@ -618,6 +619,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-companion.js` | Companion integration routes (hot-backup control plane + WO-75 preview). |
 | `src/api/routes-compose-preview.js` |  |
 | `src/api/routes-config.js` | POST /api/config/reset — factory reset hook. |
+| `src/api/routes-console-match.js` | WO-1072 — match the project to the lighting console's head positions from its CSV (src/fixtures/console-match.js). |
 | `src/api/routes-console-selection.js` | WO-857 — the lighting console's head selection mirrored into the previs, and the way back. |
 | `src/api/routes-contract.js` | WO-598 C4 — the layer bands both clients need, from the server modules that own them: GET /api/contract/constants → { version, layers } The web client and the G |
 | `src/api/routes-data-project-handlers.js` | WO-329: broadcast the STAMPED project so other clients pick up the new rev. |

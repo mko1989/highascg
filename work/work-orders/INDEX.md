@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-979 live WOs (35 open, 146 in progress, 798 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+980 live WOs (35 open, 147 in progress, 798 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -385,7 +385,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1043 DONE [mapping+engine] PIP edge strip set to "outside" still drew over the inside of the PIP (PixelHue… → 1043_WO_pip_edge_strip_outside_glow_inside_pip.md
 - 1050 IN PROGRESS [mapping+godot-client] APC40 fader → a PixelHue layer's opacity (Learn onto a PixelHue layer) → 1050_WO_apc_fader_drives_pixelhue_layer_opacity.md
 
-## lighting — DMX, Art-Net, sACN, fixtures, consoles (36)
+## lighting — DMX, Art-Net, sACN, fixtures, consoles (37)
 
 - 09 OPEN [lighting+engine] Global per-screen border effects and Art-Net control → 09_WO_Global_Per_Screen_Border_Effects.md
 - 179 DONE [lighting+mapping] Lighting I/O: Art-Net listener off by default, sACN input option, region-averag… → 179_WO_ARTNET_SACN_DEFAULTS_AND_PIXELMAP_SAMPLING.md
@@ -423,6 +423,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1005 DONE [lighting+godot-client] Previs: Pixel Strobe cells lit all the time in 15 Ch (a non-light channel count… → 1005_WO_pixel_strobe_15ch_cells_lit.md
 - 1006 DONE [lighting+godot-client] Previs: GDTF rotations were read transposed; a beam's lens is now its own face… → 1006_WO_gdtf_rotation_transposed_and_beam_lens_faces.md
 - 1024 IN PROGRESS [lighting+godot-client] GDTF fixture models missing in the previs (built-in primitives drawn as boxes;… → 1024_WO_gdtf_models_missing_primitives_and_share_swap.md
+- 1072 IN PROGRESS [lighting+tracking-vr,godot-client] Match the project to the lighting console's head positions (MagicQ CSV) → 1072_WO_match_project_to_console_head_positions.md
 
 ## godot-client — Godot client (168)
 
