@@ -14,7 +14,7 @@
  *       fit(pairs) → { shift, rms, max, yaw_deg, mirrored, worst } · shiftProject(project, shift) (in place)
  *       setHeads(project, pairs) (in place: each paired head takes the console's position)
  *       exportCsv(patch, fidOf) → the other way: our positions as a CSV MagicQ imports with "Vis only" (Patch → View
- *       Chans → Import Heads): head number, DMX (MagicQ universe = Art-Net universe + 1), X / Y / Z in metres.
+ *       Chans → Import Heads): head number, DMX (MagicQ universe = Art-Net universe + 1), X / Y / Z in metres, rotations.
  */
 
 const HEAD = ['head no', 'headno', 'hdno', 'headnum', 'head', 'channel', 'spot', 'fixture id']
@@ -236,7 +236,24 @@ function setHeads(project, pairs) {
 	return n
 }
 
-/** Our patch → the console's CSV (positions only; rotations are left to the console). Heads without a number are skipped. */
+/** Degrees into (−180, 180], two decimals. */
+const wrapDeg = (v) => {
+	const d = ((((Number(v) || 0) + 180) % 360) + 360) % 360 - 180
+	return Math.round((d === -180 ? 180 : d) * 100) / 100
+}
+
+/**
+ * A patch pose's rotation in the console's terms. MagicQ's axes are the previs's own (X across, Y up, Z towards the
+ * audience; a head at 0 / 0 / 0 hangs), so the previs rotation (fixtures_3d_model.gd pose_xform: pitch about X, −yaw
+ * about Y, roll about Z, a floor head turned 180° about Z) carries over angle for angle. The desk's own plot agrees
+ * where it can be read: its floor-standing heads are Z Rot 180°. With TWO angles set, the result also depends on the
+ * order the console applies them in, which is not known.
+ */
+function consoleRotation(pose) {
+	return [wrapDeg(pose?.pitch), wrapDeg(-(Number(pose?.yaw) || 0)), wrapDeg((Number(pose?.roll) || 0) + (pose?.hang === 'floor' ? 180 : 0))]
+}
+
+/** Our patch → the console's CSV (positions + rotations). Heads without a number are skipped. */
 function exportCsv(patch, fidOf = () => 0) {
 	const rows = []
 	for (const f of Array.isArray(patch) ? patch : []) {
@@ -244,10 +261,11 @@ function exportCsv(patch, fidOf = () => 0) {
 		if (!head || !f.pose || f.enabled === false) continue
 		const u = Number(f.universe) + (f.protocol === 'sacn' ? 0 : 1)
 		const n = (v) => (Math.round((Number(v) || 0) * 100) / 100).toFixed(2)
-		rows.push([head, `"${String(f.name || '').replace(/"/g, "'")}"`, `${u}-${String(f.address).padStart(3, '0')}`, n(f.pose.x), n(f.pose.z), n(-f.pose.y)])
+		const name = `"${String(f.name || '').replace(/"/g, "'")}"`
+		rows.push([head, name, `${u}-${String(f.address).padStart(3, '0')}`, n(f.pose.x), n(f.pose.z), n(-f.pose.y), ...consoleRotation(f.pose)])
 	}
 	rows.sort((a, b) => a[0] - b[0])
-	return { csv: ['Head no,Head name,DMX,X,Y,Z', ...rows.map((r) => r.join(','))].join('\r\n') + '\r\n', heads: rows.length }
+	return { csv: ['Head no,Head name,DMX,X,Y,Z,RotX,RotY,RotZ', ...rows.map((r) => r.join(','))].join('\r\n') + '\r\n', heads: rows.length }
 }
 
 module.exports = { parseCsv, pair, fit, shiftProject, setHeads, dmxOf, exportCsv }
