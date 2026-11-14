@@ -4,6 +4,7 @@
  * face where a ramp stops in mid-air), drops (a striped ledge marker, nothing over the step itself, landing chevrons)
  * and faint direction arrows. §2.7 decks and slab ramps (a ramp joining two decks) get no skirts: a slab on pillars
  * with glowing rails (track-decks.js). Vertex-coloured, unlit, a handful of draw calls. Gantry, posts: track-deco.js.
+ * §3.1 tunnels: the tubes through the tables (track-tunnel.js).
  * §3 toy scale: every size below is its scale-1 value × T.scale (k); the polygon offsets keep the layers apart.
  */
 import { leftNormal, pointAt } from './track-math.js'
@@ -11,6 +12,7 @@ import { floorOnlyAt } from './ground.js'
 import { TriBatch, flatMat, freezeGroup, disposeGroup, lin } from './mesh-util.js'
 import { buildTrackDeco } from './track-deco.js'
 import { buildDecks } from './track-decks.js'
+import { buildTunnels } from './track-tunnel.js'
 import * as THREE from 'three'
 
 const ASPHALT = lin('#3a3d45')
@@ -103,6 +105,8 @@ export function buildTrackMesh(T, G = null) {
 	}
 	const arrows = arrowBatch(T).mesh(flatMat(4, { transparent: true, opacity: 0.3, depthWrite: false }))
 	if (arrows) group.add(arrows)
+	const tunnels = buildTunnels(T) // §3.1: the tubes through the tables
+	if (tunnels) group.add(tunnels)
 	const deco = buildTrackDeco(T)
 	group.add(deco)
 	group.userData.lights = deco.userData.lights

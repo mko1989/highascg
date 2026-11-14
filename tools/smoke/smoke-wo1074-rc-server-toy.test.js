@@ -7,7 +7,8 @@
  * long, laps), every track valid and re-measured from its points and the grids' RLE (lib/rc-track-measure.js
  * measureToy: the toy rules in metres, every v2 / §2.7 rule in the unit frame), determinism, the validator's toy
  * rejections (a ribbon by a blocked cell, a deck over one, widths, laps), the bake at scale 0.1 vs 1 (scale, occ, no
- * obstacle boxes, rev), and the live project baked at 0.1 (read-only, when present).
+ * obstacle boxes, rev), and the live project baked at 0.1 (read-only, when present; §3.1: ≥ 2 tracks tunnel through its
+ * tables, a medium hall track and a long tour, ≥ 3 do not).
  */
 
 const test = require('node:test')
@@ -88,8 +89,11 @@ test('§3 toy tracks on a furnished hall (tablecloths to the floor): ≥ 8, the 
 	assert.ok(json.tracks.some((t) => t.points.length > 200), 'a toy track may carry more than 200 points')
 	const again = generateTracks(toyHall())
 	assert.deepEqual(again.tracks, r.tracks, 'deterministic')
-	// the tables are blocks: no point of any track inside one
-	for (const t of json.tracks) for (const p of t.points) assert.ok(!sc.tables.some((q) => p[0] > q[0] && p[0] < q[2] && p[2] > q[1] && p[2] < q[3]), `${t.id} inside a table`)
+	// the tables are blocks: no point of any track inside one — except in a §3.1 tunnel (smoke-wo1074-rc-server-tunnel)
+	for (const t of json.tracks) {
+		const tube = (i) => (t.tunnels || []).some((q) => i >= q.from && i <= q.to)
+		t.points.forEach((p, i) => assert.ok(tube(i) || !sc.tables.some((q) => p[0] > q[0] && p[0] < q[2] && p[2] > q[1] && p[2] < q[3]), `${t.id} inside a table`))
+	}
 })
 
 test('§3 legged tables: a toy track drives under a table top, between the legs', { timeout: 120000 }, () => {
@@ -200,6 +204,11 @@ test('§3 the live project baked at 0.1 (read-only): ≥ 8 toy tracks, the mix, 
 	const back = JSON.parse(text)
 	if (!back.floors.some((f) => f.id === 'stage')) return t.skip('the live scene has no stage')
 	checkSet(back, 'live')
+	// §3.1: tunnels through the live tables — a medium hall track and a long tour, ≥ 3 tracks without
+	const tun = back.tracks.filter((q) => q.tunnels?.length)
+	assert.ok(tun.some((q) => q.length >= 12 && q.length <= 30 && q.floor === 'hall'), `live: a medium hall track with a tunnel (${tun.map((q) => q.id)})`)
+	assert.ok(tun.some((q) => q.length >= 60), 'live: a long tour with a tunnel')
+	assert.ok(back.tracks.length - tun.length >= 3, 'live: ≥ 3 tracks without a tunnel')
 	assert.ok(JSON.stringify(back.occ).length <= 400 * 1024, 'occ ≤ 400 kB')
 	assert.ok(text.length <= 1024 * 1024, `scene JSON ${text.length} bytes`)
 })

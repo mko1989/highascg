@@ -184,12 +184,32 @@ function pickStart(P, Y, busy, sp, width, gridRun = GRID_RUN, opts = {}) {
 }
 
 /**
+ * §3.1: the planned tunnels (meta.tunnels: [{ a, b }] — plan points where the carve starts and ends, on a pinned
+ * straight) → index ranges [{ from, to }] of the resampled plan P (the points nearest a and b), each marked busy with
+ * a width + 2 points either side (no start line or grid there) → [] without tunnels, null when one is not on the plan.
+ */
+function tunnelRanges(P, sp, busy, meta) {
+	const out = []
+	const n = P.length
+	for (const q of meta.tunnels || []) {
+		const near = (p) => P.reduce((b, x, i) => (G.dist(x, p) < G.dist(P[b], p) ? i : b), 0)
+		const from = near(q.a), to = near(q.b)
+		if (G.dist(P[from], q.a) > sp || G.dist(P[to], q.b) > sp || (to - from + n) % n > n / 2) return null
+		const m = Math.ceil(meta.width / sp) + 2
+		for (let i = from - m; i !== to + m + 1; i++) busy[(i + n) % n] = 1
+		out.push({ from, to })
+	}
+	return out
+}
+
+/**
  * Dense plan → track (or null when the plan cannot carry its features). meta: { id, name, floor ('room' | a floor id),
  * y (the floor's y; the hall's for a room track), width, features: { room: { stage, hallY, exits: ['ramp'|'drop'] },
  * kicker: h, tabletop: h, run: which straight carries the kicker / table-top (0 = the longest) } }. §2.7 extras:
  * `kind` (default from the floor: 'room' | 'stage-short' | 'hall'), `levels(P, sp)` → { Y, ramps, drops, decks, busy }
  * in place of the built-in level laying (the whole-room deck tracks, rc-track-sky.js), `gridRun` (m of flat road behind
  * the start line, default 9.2). §3 (toy scale, unit frame): `maxPoints` (default 200) and `maxLength` (default 260).
+ * §3.1: `tunnels` ([{ a, b }], see tunnelRanges) → the track's `tunnels` (decoration keeps clear of them).
  */
 function buildTrack(dense, meta, scene) {
 	if (!dense || !dense.every((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]))) return null
@@ -200,6 +220,8 @@ function buildTrack(dense, meta, scene) {
 	const sp = G.polyLength(P) / n
 	const lv = meta.levels ? meta.levels(P, sp) : levels(P, sp, meta)
 	if (!lv) return null
+	const tun = tunnelRanges(P, sp, lv.busy, meta)
+	if (!tun) return null
 	const st = pickStart(P, lv.Y, lv.busy, sp, meta.width, meta.gridRun, { noStart: lv.noStart, straight: meta.straightGrid })
 	if (st < 0) return null
 	const rot = (i) => (i - st + n) % n
@@ -212,6 +234,10 @@ function buildTrack(dense, meta, scene) {
 	const kind = meta.kind || (meta.floor === 'room' ? 'room' : meta.floor === 'stage' ? 'stage-short' : 'hall')
 	const t = { id: meta.id, name: meta.name, floor: meta.floor, kind, width: meta.width, closed: true, points, length, ramps, drops }
 	if (lv.decks?.length) t.decks = lv.decks.map((d) => ({ from: rot(d.from), to: rot(d.to) }))
+	if (tun.length) {
+		t.tunnels = tun.map((q) => ({ from: rot(q.from), to: rot(q.to) })).sort((a, b) => a.from - b.from)
+		if (t.tunnels.some((q) => q.from >= q.to)) return null // spans the start line
+	}
 	return D.decorate(t, scene)
 }
 

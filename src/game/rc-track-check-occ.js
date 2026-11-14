@@ -9,6 +9,8 @@
  *   - a deck or slab ramp (no skirts, pillars below) has no blocked cell under its footprint (width/2);
  *   - a drop's landing run (to LAND_RUN past `land`) is clear of blocked cells by a full width + 1 cell (v2's landing
  *     rule × scale), cells inside the ledge's own floor rect + 0.3 (unit) not counted.
+ * §3.1: the grids are the active track's CARVED grids (ctx.carved, rc-track-check-tunnel.js); a tunnel segment
+ * (ctx.tunSeg) keeps only its ribbon (width/2) clear — the corridor walls are the cells just outside the carve.
  */
 
 const G = require('./rc-track-geo')
@@ -22,9 +24,10 @@ function checkOcc(track, scene, ctx) {
 	const toy = scene?.toy
 	if (!toy || !Array.isArray(toy.occ) || !toy.occ.length) return null
 	const s = toy.s
-	const { P, Y, n, half, width, book, along } = ctx
+	const { P, Y, n, half, width, book, along, tunSeg, carved } = ctx
 	const floors = (scene.floors || []).filter((f) => toy.occ.some((g) => g.floor === f.id))
-	const grid = (f) => toy.occ.find((g) => g.floor === f.id)
+	const raw = (f) => toy.occ.find((g) => g.floor === f.id)
+	const grid = (f) => carved?.get(raw(f)) || raw(f) // §3.1: the active track's tunnels carved
 	const near = (g, i, j, r) => g.segNear(P[i][0] * s, P[i][1] * s, P[j][0] * s, P[j][1] * s, r)
 	const inBand = (y, f) => y >= f.y - GROUND_TOL && y <= f.y + CAR_TOP
 	for (let i = 0; i < n; i++) {
@@ -33,9 +36,10 @@ function checkOcc(track, scene, ctx) {
 		for (const f of floors) {
 			if (!(inBand(Y[i], f) || inBand(Y[j], f)) || !G.inRect(mx, mz, f.rect)) continue
 			const g = grid(f)
-			const r = half * s + g.cell
+			const tube = !!tunSeg?.[i] // inside a tunnel the corridor walls stand 1 cell out: the ribbon itself is clear
+			const r = half * s + (tube ? 0 : g.cell)
 			const d = near(g, i, j, r)
-			if (d < r) return `toy: a blocked cell of the ${f.id} within width/2 + 1 cell of the road at ${i} (${(d / s).toFixed(2)})`
+			if (d < r) return `toy: a blocked cell of the ${f.id} within width/2${tube ? ' (in a tunnel)' : ' + 1 cell'} of the road at ${i} (${(d / s).toFixed(2)})`
 		}
 		if (book && (book.deckSeg[i] || book.slabSeg[i])) {
 			const gy = floorGround(scene, mx, mz)

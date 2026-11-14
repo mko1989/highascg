@@ -7,7 +7,8 @@
  *   long   — whole-room tours (rc-toy-route.js `tour`): stage, ramp, the hall's far end and back, `laps: 1`;
  *   medium — the v2 room designs (ramp up onto the stage, ramp or drop off it; rc-track-room.js), a figure-eight whose
  *            second diagonal crosses the first on a small bridge (decks 0.16–0.2 m at 0.1), a table weave (a route
- *            through the aisles around a block of tables);
+ *            through the aisles around a block of tables), §3.1 a hall loop through a tunnel under a table (the grand
+ *            tour tunnels too when a table lies near its route);
  *   short  — the v2 shape families at small caps: a stage oval / GP, a hall loop with a kicker in the clear zone.
  * The v2 prefilters (free regions, clearMap) see the occupancy grids as obstacle rects (`planObstacles`: 2 × 2-cell
  * blocks — never smaller than the cells they stand for, so they reject at most what the occupancy rule rejects); the
@@ -163,7 +164,7 @@ function weaveTargets(hall, stage, sizes) {
 
 const TOURS = [
 	{ id: 'room-long-tour', name: 'Grand hall tour', exit: 'ramp', legs: [[0.05, 0.95], [0.15, 0.85]], gridRun: 14,
-		aims: [[1, 1.5], [-1, 1.5]] },
+		aims: [[1, 1.5], [-1, 1.5]], tunnel: true },
 	{ id: 'room-long-leap', name: 'Long way round', exit: 'drop', legs: [[0.1, 0.9], [0.2, 0.8]], gridRun: 14,
 		aims: [[1, 0.3], [0, 1], [-1, 0.3]] },
 ]
@@ -194,6 +195,9 @@ function* toyJobs(scene, s, deps) {
 				if (++woven >= 1) break
 			}
 		}
+		const tun = R.tunnelLoop(ctx, { id: 'hall-tunnel', name: 'Under the tables', width: 4, len: [120, 300] })
+		if (tun) room.push(tun)
+		yield null
 		if (hasStage) {
 			for (const spec of TOURS) {
 				const t = R.tour(ctx, { ...spec, width: 3.5 })

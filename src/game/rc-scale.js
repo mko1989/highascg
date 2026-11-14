@@ -57,7 +57,7 @@ const unitCache = new WeakMap()
 
 /**
  * The unit-frame view of a world scene at scale s (cached per scene object): floors, obstacles, bounds ÷ s, the height
- * field wrapped, and `toy` = { s, occ: [world grids], minWidth, maxWidth, maxPoints } (unit lengths).
+ * field wrapped, and `toy` = { s, occ: [world grids], minWidth, maxWidth, maxPoints (unit lengths), floors, field (world) }.
  */
 function toUnitScene(scene, s) {
 	const hit = unitCache.get(scene)
@@ -70,7 +70,9 @@ function toUnitScene(scene, s) {
 		obstacles: (scene?.obstacles || []).filter((o) => o && Array.isArray(o.min) && Array.isArray(o.max)).map(box),
 		bounds: scene?.bounds ? { min: scene.bounds.min.map(d), max: scene.bounds.max.map(d) } : null,
 		field: unitField(fieldOf(scene), s),
-		toy: { s, occ, minWidth: TOY_WIDTH[0] / s, maxWidth: TOY_WIDTH[1] / s, maxPoints: TOY_MAX_POINTS },
+		// §3.1: the world floors and height field ride along for the tunnel blobs (rc-toy-blobs.js works in metres)
+		toy: { s, occ, minWidth: TOY_WIDTH[0] / s, maxWidth: TOY_WIDTH[1] / s, maxPoints: TOY_MAX_POINTS,
+			floors: (scene?.floors || []).filter((f) => f && Array.isArray(f.rect)), field: fieldOf(scene) },
 	}
 	unitCache.set(scene, { s, unit })
 	return unit

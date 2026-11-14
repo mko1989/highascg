@@ -18,7 +18,7 @@ import { groundOf, moveHorizontal, collideObstacles, collideCars, padUnder, unst
 import { giveBoost, miniBoostFor, spinAngle, driftStage } from './drive-rules.js'
 
 export { PHYS }
-export { createEnv, groundOf, ceilingOf, eyeBlockedOf } from './physics-world.js'
+export { createEnv, groundOf, ceilingOf, eyeBlockedOf, tunnelOf } from './physics-world.js'
 
 /** A fresh car at a pose (y: the pose's, else the argument). */
 export function createCar(pose = {}, y = 0) {

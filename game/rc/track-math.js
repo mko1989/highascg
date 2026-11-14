@@ -35,7 +35,7 @@ const optNum = (v) => (v === null || v === undefined || v === '' || !Number.isFi
 
 /**
  * Contract v2 shape for any server track (v1 or v2): 3D points, grid slots with y (null = take the ribbon's), and
- * `ramps` / `decks` (§2.7) / `drops` / `pads` / `boxes` (missing = none, malformed entries dropped).
+ * `ramps` / `decks` (§2.7) / `tunnels` (§3.1) / `drops` / `pads` / `boxes` (missing = none, malformed entries dropped).
  */
 export function normalizeTrack(track) {
 	const t = track && typeof track === 'object' ? track : {}
@@ -55,6 +55,9 @@ export function normalizeTrack(track) {
 			.map((r) => ({ from: r.from, to: r.to })),
 		decks: objs(t.decks)
 			.filter((r) => idx(r.from) && idx(r.to) && r.from !== r.to)
+			.map((r) => ({ from: r.from, to: r.to })),
+		tunnels: objs(t.tunnels) // §3.1: driving-order ranges, from < to (never across the start line)
+			.filter((r) => idx(r.from) && idx(r.to) && r.from < r.to)
 			.map((r) => ({ from: r.from, to: r.to })),
 		drops: objs(t.drops)
 			.filter((d) => idx(d.at) && idx(d.land) && d.at !== d.land)
@@ -132,6 +135,8 @@ export function prepareTrack(track, scale) {
 		if (N.decks.some((d) => d.to === r.from) && N.decks.some((d) => d.from === r.to))
 			forEachSeg(r.from, r.to, n, closed, (i) => (segSlab[i] = 1))
 	}
+	const segTunnel = new Uint8Array(segCount) // §3.1
+	for (const r of N.tunnels) forEachSeg(r.from, r.to, n, closed, (i) => (segTunnel[i] = 1))
 	for (const d of N.drops) {
 		forEachSeg(d.at, d.land, n, closed, (i) => (segGap[i] = 1))
 		if (d.at < segCount) segStep[d.at] = 1
@@ -171,6 +176,7 @@ export function prepareTrack(track, scale) {
 		segRamp,
 		segDeck,
 		segSlab,
+		segTunnel,
 		segGap,
 		segStep,
 		total,

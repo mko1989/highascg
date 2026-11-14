@@ -180,6 +180,7 @@ module.exports = {
 	circumradius,
 	project,
 	segRectDist,
+	segSegDist,
 	pointRectDist,
 	inRect,
 	rectMinus,

@@ -14,6 +14,7 @@ const { rampIndices } = require('./rc-ground')
 
 const r3 = (v) => Math.round(v * 1000) / 1000
 const BOX_LIFT = 0.5
+const TUN_CLEAR = 1.5 // widths kept clear of a tunnel's portals (the rule: 1)
 
 /** The per-index bookkeeping featureFree needs. */
 function context(t) {
@@ -34,7 +35,10 @@ function context(t) {
 	const Y = t.points.map((p) => p[1])
 	const bridge = t.decks?.length ? bridgePoints(P, Y, n, t.width) : new Uint8Array(n)
 	const air = airPoints(t, P, Y, n) // a drop's flight + as far as a fast car still flies too high for a gate
-	return { P, s, L, n, rampSeg, dropSeg, flight, bridge, air }
+	// §3.1: nothing inside a tunnel or within a width (+ a margin) of its portals
+	const tunWin = (t.tunnels || []).map((q) => [(s[q.from] - TUN_CLEAR * t.width + L) % L, s[q.to] - s[q.from] + 2 * TUN_CLEAR * t.width])
+	const inTunnel = (at) => tunWin.some(([a, w]) => (at - a + L) % L <= w)
+	return { P, s, L, n, rampSeg, dropSeg, flight, bridge, air, inTunnel }
 }
 
 const dirAt = (P, i) => {
@@ -78,7 +82,7 @@ function checkpoints(ctx) {
 	for (let j = 0; j < k; j++) {
 		let i = Math.round((j * n) / k)
 		// never where a car flies over it (a drop) nor on / under a bridge (§2.7) — the first point past it
-		while (i < n && (air[i] || bridge[i])) i++
+		while (i < n && (air[i] || bridge[i] || ctx.inTunnel(ctx.s[i]))) i++
 		if (i >= n || (j + 1 < k && i >= Math.round(((j + 1) * n) / k) - 2)) continue // pushed onto the next one's place
 		if (out.length && (i - out[out.length - 1] < 2 || i < out[out.length - 1])) continue
 		out.push(i)
@@ -95,7 +99,8 @@ function items(t, ctx) {
 	const nPads = Math.min(lim.pads[1], L >= 90 ? Math.max(3, Math.round(L / 30)) : 2)
 	const nRows = Math.min(lim.rows[1], L >= 70 ? Math.max(3, Math.round(L / 35)) : 2)
 	const perRow = t.width >= 3.5 ? 4 : 3
-	const free = (i, m) => featureFree(ctx, s[i]) && featureFree(ctx, (s[i] - m + L) % L) && featureFree(ctx, (s[i] + m) % L)
+	const free = (i, m) => featureFree(ctx, s[i]) && featureFree(ctx, (s[i] - m + L) % L) && featureFree(ctx, (s[i] + m) % L) &&
+		![s[i], s[i] - m, s[i] + m].some((a) => ctx.inTunnel((a + L) % L))
 	const head = P.map((_, i) => {
 		const [dx, dz] = dirAt(P, i)
 		return Math.atan2(dz, dx)

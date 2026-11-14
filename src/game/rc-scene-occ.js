@@ -154,6 +154,45 @@ function segSquare(ax, az, bx, bz, sx, sz, c) {
 	return Math.min(pr(ax, az), pr(bx, bz), ps(sx, sz), ps(x1, sz), ps(x1, z1), ps(sx, z1))
 }
 
+/**
+ * §3.1 tunnel carve (game/rc/occ.js `carveCells` is the same rule, line for line): the indices of every cell of grid
+ * g whose CENTRE lies within r (world m) of the polyline `line` ([[x, z]], world) — blocked or not, ascending.
+ */
+function carveCells(g, line, r) {
+	const { x0, z0, cell, w, h } = g
+	const mark = new Uint8Array(w * h)
+	const r2 = r * r
+	for (let s = 0; s + 1 < line.length; s++) {
+		const ax = line[s][0], az = line[s][1], bx = line[s + 1][0], bz = line[s + 1][1]
+		const dx = bx - ax, dz = bz - az
+		const l2 = dx * dx + dz * dz
+		const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - r - x0) / cell) - 1), i1 = Math.min(w - 1, Math.floor((Math.max(ax, bx) + r - x0) / cell) + 1)
+		const k0 = Math.max(0, Math.floor((Math.min(az, bz) - r - z0) / cell) - 1), k1 = Math.min(h - 1, Math.floor((Math.max(az, bz) + r - z0) / cell) + 1)
+		for (let k = k0; k <= k1; k++) {
+			const pz = z0 + (k + 0.5) * cell
+			for (let i = i0; i <= i1; i++) {
+				const px = x0 + (i + 0.5) * cell
+				let t = l2 > 0 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0
+				t = t < 0 ? 0 : t > 1 ? 1 : t
+				const ex = ax + t * dx - px, ez = az + t * dz - pz
+				if (ex * ex + ez * ez <= r2) mark[k * w + i] = 1
+			}
+		}
+	}
+	const out = []
+	for (let q = 0; q < mark.length; q++) if (mark[q]) out.push(q)
+	return out
+}
+
+/** A copy of grid g with the cells `free` (indices) freed — the active track's carved grid. */
+function carved(g, free) {
+	const bits = g.bits.slice()
+	for (const q of free) bits[q] = 0
+	const c = wrap({ floor: g.floor, y: g.y, x0: g.x0, z0: g.z0, cell: g.cell, w: g.w, h: g.h, bits })
+	if (Number.isFinite(g.lo)) (c.lo = g.lo), (c.hi = g.hi)
+	return c
+}
+
 /** 0/1 cells → run lengths alternating free, blocked, … (starts with free). */
 function encodeRle(bits) {
 	const out = []
@@ -242,4 +281,4 @@ function distanceTransform(bits, w, h, cell) {
 	return res
 }
 
-module.exports = { createOcc, fromJSON, occOf, encodeRle, segSquare, distanceTransform }
+module.exports = { createOcc, fromJSON, occOf, encodeRle, segSquare, distanceTransform, carveCells, carved }

@@ -10,7 +10,8 @@
 import { createGround, groundAt, blockedAt, railClamp, ceilingAt } from './ground.js'
 import { nearestHinted, yawFromDir } from './track-math.js'
 import { physFor, validScale } from './scale.js'
-import { prepareOcc, occNearest, occPointBlocked } from './occ.js'
+import { prepareOcc, occNearest, occPointBlocked, carveTracks } from './occ.js'
+import { tubesOf, tubeAt } from './tunnel.js'
 
 /**
  * The static environment of a race.
@@ -41,8 +42,9 @@ export function createEnv(T, floors = [], obstacles = [], opts = {}) {
 		: []
 	const ground = createGround(fl, T, s)
 	ground.boxes = boxes // the deck pillars stand clear of them (track-decks.js)
-	ground.occ = prepareOcc(opts.occ)
-	return { T, ground, boxes, pads, s, P }
+	/* §3.1: the active track's tunnels carved out (copies — the decoded scene grids are shared between tracks) */
+	ground.occ = carveTracks(prepareOcc(opts.occ), T, s)
+	return { T, ground, boxes, pads, s, P, tubes: tubesOf(T) }
 }
 
 /** Ground under (x, z) for a car at height y (a deck more than REACH above it is overhead); no y: every surface. */
@@ -50,9 +52,19 @@ export function groundOf(env, x, z, y = Infinity) {
 	return groundAt(env.ground, x, z, y)
 }
 
-/** Underside of a deck overhead a car at height y (a bridge), or Infinity — the chase camera stays under it. */
+/**
+ * Underside of a deck overhead a car at height y (a bridge) or of a §3.1 tunnel's ceiling (inside its span), or
+ * Infinity — the chase camera stays under it.
+ */
 export function ceilingOf(env, x, z, y) {
-	return env?.ground ? ceilingAt(env.ground, x, z, y) : Infinity
+	const c = env?.ground ? ceilingAt(env.ground, x, z, y) : Infinity
+	const t = env?.tubes?.length ? tubeAt(env.tubes, x, z, y) : null
+	return t ? Math.min(c, t.top) : c
+}
+
+/** §3.1: the tunnel a car at (x, y, z) is in → { tube, d, t, top } or null (the director's portal shot). */
+export function tunnelOf(env, x, z, y) {
+	return env?.tubes?.length ? tubeAt(env.tubes, x, z, y) : null
 }
 
 /** Blocked for a car at height y: the centre or the point RADIUS ahead along the motion has no / too high ground. */

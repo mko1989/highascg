@@ -16,9 +16,10 @@ import { createInput } from './input.js'
 import { createAudio } from './audio.js'
 import { createScreens } from './screens.js'
 import { prepareTrack, gridPose, respawnPose } from './track-math.js'
-import { createEnv, createStepper, placeCar, ceilingOf, eyeBlockedOf } from './physics.js'
+import { createEnv, createStepper, placeCar, ceilingOf, eyeBlockedOf, tunnelOf } from './physics.js'
 import { sceneScale } from './scale.js'
 import { prepareOcc } from './occ.js'
+import { cutSegments } from './tunnel.js'
 import { RaceTracker } from './standings.js'
 import { Director } from './cameras.js'
 import { RcNet, wsUrlFor } from './net.js'
@@ -244,6 +245,8 @@ export function setTrack(G, trackId) {
 	G.env = createEnv(T, G.scene?.floors || [], G.scene?.obstacles || [], { scale: T.scale, occ: G.occ })
 	G.director.ceilAt = (x, z, y) => ceilingOf(G.env, x, z, y)
 	G.director.blockedAt = (x, z, y) => eyeBlockedOf(G.env, x, z, y)
+	G.director.tunnelAt = (x, z, y) => tunnelOf(G.env, x, z, y)
+	G.world.setTunnelCut?.(cutSegments(G.env.tubes)) // §3.1: the table's own faces vanish where a tube runs through
 	G.trackGroup = buildTrackMesh(T, G.env.ground)
 	G.world.scene.add(G.trackGroup)
 	if (G.props) {

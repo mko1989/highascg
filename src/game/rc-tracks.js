@@ -22,7 +22,7 @@ const { skyJobs } = require('./rc-track-sky')
 const { toyJobs } = require('./rc-toy-tracks')
 const { sceneScale } = require('./rc-scale')
 
-const GENERATOR_VERSION = 5 // part of the scene rev: bump when the tracks change for the same scene
+const GENERATOR_VERSION = 6 // part of the scene rev: bump when the tracks change for the same scene
 const EDGE = 0.25 // extra margin between the road edge and the floor edge
 const DEFAULT_ARENA = { w: 30, d: 20 }
 const KICKER_H = 0.45

@@ -2,7 +2,7 @@
  * 2D top-down drawing of a track (minimap, lobby preview, host track list) — canvas 2D, X right, −Z (upstage) up.
  * v2: parts above the lowest floor (stage crossings) in a second colour, drawn on top so an overpass reads; ramps
  * amber; each drop's ledge gets a small orange tick. §2.7: elevated decks in a third colour (cyan); the raised parts are
- * drawn in height order, so the upper ribbon of a bridge lies over the lower one.
+ * drawn in height order, so the upper ribbon of a bridge lies over the lower one. §3.1: tunnel stretches dashed.
  * §3 toy scale: margins, tick widths and the height bands are × T.scale; a 2500-point track is drawn once into the
  * minimap's cached layer (per frame only the dots).
  */
@@ -18,6 +18,39 @@ export function fitTransform(T, w, h, margin = 8) {
 	const cx = (b.minX + b.maxX) / 2
 	const cz = (b.minZ + b.maxZ) / 2
 	return { s, map: (x, z) => [w / 2 + (x - cx) * s, h / 2 + (z - cz) * s] }
+}
+
+/** §3.1: each tunnel stretch drawn dashed (the solid ribbon there erased first, the background put back). */
+function drawTunnels(ctx, T, tf, opts) {
+	for (const q of T.tunnels || []) {
+		const xy = T.pts.slice(q.from, q.to + 1).map((p) => tf.map(p[0], p[1]))
+		let px = 0
+		for (let i = 1; i < xy.length; i++) px += Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1])
+		const line = () => {
+			ctx.beginPath()
+			xy.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)))
+		}
+		const wide = Math.max(3, T.width * tf.s + 3) + 2
+		ctx.save()
+		ctx.lineCap = 'butt'
+		ctx.globalCompositeOperation = 'destination-out'
+		line()
+		ctx.lineWidth = wide
+		ctx.stroke()
+		ctx.globalCompositeOperation = 'source-over'
+		if (opts.bg) {
+			line()
+			ctx.strokeStyle = opts.bg
+			ctx.stroke()
+		}
+		const dash = Math.max(2, px / 7)
+		ctx.setLineDash?.([dash, dash])
+		line()
+		ctx.strokeStyle = opts.edge || 'rgba(255,255,255,0.85)'
+		ctx.lineWidth = Math.max(2, T.width * tf.s)
+		ctx.stroke()
+		ctx.restore()
+	}
 }
 
 /** Draw the track ribbon + start line. Returns the transform. */
@@ -48,6 +81,7 @@ export function drawTrack(ctx, T, w, h, opts = {}) {
 	ctx.lineWidth = Math.max(2, T.width * tf.s)
 	ctx.stroke()
 	drawRaised(ctx, T, tf, opts)
+	drawTunnels(ctx, T, tf, opts)
 	const i0 = T.checkpoints[0]
 	const p0 = T.pts[i0]
 	const t0 = T.tangents[i0]

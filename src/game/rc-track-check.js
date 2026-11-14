@@ -11,6 +11,7 @@ const { GROUND_TOL, WALL_STEP, ground, floorGround, rampIndices, obstacleHits } 
 const { checkDeco, GRID_SLOTS } = require('./rc-track-check-deco')
 const DK = require('./rc-track-check-deck')
 const { checkOcc } = require('./rc-track-check-occ')
+const TN = require('./rc-track-check-tunnel')
 const SC = require('./rc-scale')
 
 const CAR_HEIGHT = 0.6 // the scene's obstacle boxes cover a floor's car slab (floor.y … + 0.6)
@@ -42,14 +43,15 @@ function span(a, b, n) {
  * Is `track` drivable on `scene` ({ floors, obstacles })? → { ok, errors[] }. `opts.maxCrossings` defaults to 1 for a
  * figure-eight (id contains "eight") and 0 otherwise. §3 toy scale: a scene with `scale` < 1 (or opts.scale) is judged
  * in the unit frame (rc-scale.js: every length ÷ scale, so each rule holds with its lengths × scale) plus the toy rules
- * (`scene.toy` of the unit scene: ≤ 2500 points, width 0.30–0.45 m, the occupancy grids — rc-track-check-occ.js).
+ * (`scene.toy` of the unit scene: ≤ 2500 points, width 0.30–0.45 m, the occupancy grids — rc-track-check-occ.js) and
+ * §3.1 tunnels (rc-track-check-tunnel.js; `opts.world`: the world track, so the carve uses its exact points).
  */
 function validateTrack(track, scene, opts = {}) {
 	const errors = []
 	const fail = (m) => (errors.push(m), { ok: false, errors })
 	if (!track || typeof track !== 'object') return fail('no track')
 	const scl = SC.sceneScale(scene, opts)
-	if (scl !== 1 && !scene?.toy) return validateTrack(SC.scaleTrack(track, 1 / scl), SC.toUnitScene(scene, scl), { ...opts, scale: 1 })
+	if (scl !== 1 && !scene?.toy) return validateTrack(SC.scaleTrack(track, 1 / scl), SC.toUnitScene(scene, scl), { ...opts, scale: 1, world: track })
 	const toy = scene?.toy || null
 	if (typeof track.id !== 'string' || !track.id) return fail('no id')
 	if (track.laps != null && !(Number.isInteger(track.laps) && track.laps >= 1 && track.laps <= 20)) return fail(`laps ${track.laps} (1–20)`)
@@ -242,7 +244,12 @@ function validateTrack(track, scene, opts = {}) {
 		for (let i = 0; i < n; i++) if (!rampPt[i] && !flight[i] && Math.abs(Y[i] - own.y) > GROUND_TOL) return fail(`point ${i} is off the ${own.id} floor`)
 	}
 
-	const occErr = checkOcc(track, scene, { P, Y, n, half, width, book, along })
+	// §3.1 tunnels: their rules, then the occupancy grids with the active track's corridors carved
+	const tb = TN.tunnelBook(track, n)
+	if (tb.error) return fail(tb.error)
+	const tun = tb.list.length ? TN.checkTunnels(track, scene, { P, Y, n, s, L, half, width, along, rampPt, dropSeg, book, tb, world: opts.world }) : null
+	if (tun?.error) return fail(tun.error)
+	const occErr = checkOcc(track, scene, { P, Y, n, half, width, book, along, tunSeg: tb.seg, carved: tun?.grids })
 	if (occErr) return fail(occErr)
 	const deckErr = DK.checkDecks(track, scene, { P, Y, n, half, width, rampSeg, lip, landAt, book }) ||
 		DK.checkpointsOffBridges(track, P, Y, n, width) || DK.checkpointsLanded(track, P, Y, n) || (track.kind === 'room-long' ? DK.checkLong(track, scene, P, Y, L) : null)

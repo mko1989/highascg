@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 609,
+	"count": 608,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -450,7 +450,6 @@
 		"src/media/usb-drives-discovery.js: isRemovableBlockNode",
 		"src/media/usb-drives.js: decodeDriveId",
 		"src/osc/osc-state-timing.js: SANE_MAX_SECONDS",
-		"src/plugins/plugin-manager.js: isValidModuleName",
 		"src/plugins/plugin-manager.js: isValidPluginId",
 		"src/plugins/plugin-manager.js: normalizeStore",
 		"src/preview/compose-preview-activity.js: fileHasActiveRemaining",

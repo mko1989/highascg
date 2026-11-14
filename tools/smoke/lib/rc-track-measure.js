@@ -13,7 +13,8 @@
  *   furnishedHall(opts) — a live-like 27 × 61 m hall with a stage and rows of 0.75 m tables, its height field built.
  *   §3 toy scale: measureToy(t, scene, label) — the toy rules from the grids' RLE (decoded here: decodeRle, occRule)
  *     plus every rule above in the unit frame (lengths ÷ scale, own wrappers); toyHall(opts) — furnishedHall at 0.1,
- *     built from triangles like the bake (opts.legs: legged tables a toy drives under).
+ *     built from triangles like the bake (opts.legs: legged tables a toy drives under). §3.1 tunnels: occRule carves
+ *     the active track's corridors and holds tunnel segments to width/2; measureToy runs rc-tunnel-measure.js.
  */
 
 const assert = require('node:assert/strict')
@@ -251,13 +252,16 @@ function segSquareDist(a, b, sx, sz, c) {
  */
 function occRule(t, scene, tag) {
 	const s = scene.scale, P = t.points, n = P.length, half = t.width / 2
-	const deck = new Uint8Array(n)
+	const deck = new Uint8Array(n), tube = new Uint8Array(n)
 	for (const d of t.decks || []) for (const i of span(d.from, d.to, n).slice(0, -1)) deck[i] = 1
+	for (const q of t.tunnels || []) tube.fill(1, q.from, q.to) // §3.1: inside, the ribbon itself keeps clear
+	const carves = t.tunnels?.length ? require('./rc-tunnel-measure').tunnelCarves(t, scene) : new Map()
 	let margin = Infinity
 	for (const g of scene.occ) {
 		const f = scene.floors.find((q) => q.id === g.floor)
 		assert.ok(f && Math.abs(f.y - g.y) < 1e-9, `${tag}: grid ${g.floor} on its floor`)
 		const bits = decodeRle(g)
+		for (const c of carves.get(g.floor) || []) bits[c] = 0
 		const band = (y) => y >= f.y - 0.02 * s - 1e-9 && y <= f.y + 0.5 * s + 1e-9
 		const inside = (p) => p[0] >= f.rect[0] && p[0] <= f.rect[2] && p[2] >= f.rect[1] && p[2] <= f.rect[3]
 		for (let i = 0; i < n; i++) {
@@ -265,7 +269,7 @@ function occRule(t, scene, tag) {
 			const onBand = (band(p[1]) || band(q[1])) && inside([(p[0] + q[0]) / 2, 0, (p[2] + q[2]) / 2])
 			const over = deck[i] && Gr.floorGround(scene, (p[0] + q[0]) / 2, (p[2] + q[2]) / 2) === f.y
 			if (!onBand && !over) continue
-			const r = onBand ? half + g.cell : half
+			const r = onBand && !tube[i] ? half + g.cell : half
 			const a = [p[0], p[2]], b = [q[0], q[2]]
 			const i0 = Math.max(0, Math.floor((Math.min(a[0], b[0]) - r - g.x0) / g.cell)), i1 = Math.min(g.w - 1, Math.floor((Math.max(a[0], b[0]) + r - g.x0) / g.cell))
 			const k0 = Math.max(0, Math.floor((Math.min(a[1], b[1]) - r - g.z0) / g.cell)), k1 = Math.min(g.h - 1, Math.floor((Math.max(a[1], b[1]) + r - g.z0) / g.cell))
@@ -309,6 +313,7 @@ function measureToy(t, scene, label) {
 	assert.ok(Number.isInteger(t.laps) && t.laps >= 1 && t.laps <= 20, `${tag}: laps ${t.laps}`)
 	for (let i = 0; i < t.points.length; i++) assert.ok(plan(t.points[i], t.points[(i + 1) % t.points.length]) <= 0.5 * t.width + 1e-9, `${tag}: spacing at ${i}`)
 	const margin = occRule(t, scene, tag)
+	if (t.tunnels) require('./rc-tunnel-measure').measureTunnels(t, scene, tag)
 	measure(unitTrack(t, s), unitScene(scene, s), label)
 	return margin
 }
@@ -355,4 +360,4 @@ function toyHall(opts = {}) {
 	return { scale: s, floors: [hall, stage], obstacles: [], bounds: { min: [-12.6, 0, -11.9], max: [14.4, 3.6, 49.6] }, field, occ, tables }
 }
 
-module.exports = { measure, span, plan, furnishedHall, measureToy, occRule, decodeRle, toyHall, boxTris }
+module.exports = { measure, span, plan, furnishedHall, measureToy, occRule, decodeRle, segSquareDist, toyHall, boxTris }

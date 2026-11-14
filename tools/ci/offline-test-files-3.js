@@ -265,6 +265,8 @@ module.exports = [
 	'tools/smoke/smoke-wo1075-pgm-only-cut-no-gap.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-ground.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-toy.test.js',
+	'tools/smoke/smoke-wo1074-rc-server-tunnel.test.js',
+	'tools/smoke/smoke-wo1074-rc-client-tunnel.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-occ.test.js',
 	'tools/smoke/smoke-wo1074-rc-server-toy.test.js',
 	'tools/smoke/smoke-wo1074-rc-server-toy-room.test.js',

@@ -3,9 +3,11 @@
  * - chase: behind and above the car, looking ahead of it (further ahead and wider at speed / boost);
  * - top: high above the car, looking straight down (north = −Z up on screen);
  * - Director (spectator): follows the leader, cuts every few seconds to an overview, another car or a trackside shot,
- *   and jumps on the action — a car in the air or hit by an item gets the camera (notify()).
+ *   and jumps on the action — a car in the air or hit by an item gets the camera (notify()). §3.1: a car in a tunnel
+ *   (tunnelAt) is watched from the tunnel's exit portal, or by the chase camera (which stays under the tube's ceiling).
  */
 import { pointAt } from './track-math.js'
+import { portalShot } from './tunnel.js'
 
 export const FOV = 62
 export const FOV_BOOST = 74
@@ -114,6 +116,8 @@ export class Director {
 		this.ceilAt = null
 		/** §3: (x, z, y) → the chase eye stands in a blocked occupancy cell (physics eyeBlockedOf) */
 		this.blockedAt = null
+		/** §3.1: (x, z, y) → the tunnel a car is in ({ tube }, physics tunnelOf) or null */
+		this.tunnelAt = null
 		this.shot = 'overview'
 		this.carId = null
 		this.until = 0
@@ -195,7 +199,13 @@ export class Director {
 		const c = this.carId !== null ? carOf(this.carId) : null
 		const s = T.scale ?? 1
 		let want
-		if (this.shot === 'overview' || !c) want = overviewTarget(T)
+		/* §3.1: a car in a tunnel is hidden from overview / trackside angles — look in from the exit portal instead
+		   (its name tag stays visible through the table: car-model.js nameTag draws without a depth test) */
+		const lead = c || (order.length ? carOf(order[0]) : null)
+		const tn =
+			lead && this.tunnelAt && this.shot !== 'leader' && this.shot !== 'car' ? this.tunnelAt(lead.x, lead.z, lead.y) : null
+		if (tn) want = { eye: portalShot(tn.tube, s).eye, target: [lead.x, lead.y + 0.2 * s, lead.z] }
+		else if (this.shot === 'overview' || !c) want = overviewTarget(T)
 		else if ((this.shot === 'trackside' || this.shot === 'action') && this.side)
 			want = { eye: this.side, target: [c.x, c.y + 0.2 * s, c.z] }
 		else {

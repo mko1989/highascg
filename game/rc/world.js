@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { applyCut, setCut } from './tunnel-cut.js'
 
 const BG = 0x151a26
 
@@ -50,6 +51,7 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 			camera.far = world.quality === 'low' ? 160 : 400
 			camera.updateProjectionMatrix()
 			if (world.model) cheapMaterials(world.model, world.quality === 'low')
+			applyCut(world.model) // §3.1 (the "low" Lambert copies too)
 			world.resize()
 		},
 		resize() {
@@ -83,6 +85,10 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 			camera.fov = fov
 			camera.updateProjectionMatrix()
 		},
+		/** §3.1: the active track's tunnel volumes (tunnel.js cutSegments) — the scene's faces inside vanish. */
+		setTunnelCut(list) {
+			setCut(list)
+		},
 		/** Remove the previous scene content and load a new one. */
 		async loadScene(info, onProgress) {
 			clearGroup(statics)
@@ -95,6 +101,7 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 					freeze(world.model)
 					statics.add(world.model)
 					cheapMaterials(world.model, world.quality === 'low')
+					applyCut(world.model)
 					return { ok: true }
 				} catch (e) {
 					addArena(statics, info)

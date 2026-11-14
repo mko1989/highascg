@@ -7,7 +7,8 @@
  *  - roomTrack(): hall → ramp up onto the stage (13°) → across the stage → off the stage edge (a drop) → round the hall;
  *  - ovalTrack(): plain flat oval (v2 3D points); ovalTrackV1(): the same as a v1 track ([x, z] + track.y);
  *  - eightTrack(): flat figure-eight; straightTrack(): open strip heading −Z;
- *  - deckTracks(): §2.7 — the server generator's room-long tracks over the synthetic furnished hall (decks, bridges).
+ *  - deckTracks(): §2.7 — the server generator's room-long tracks over the synthetic furnished hall (decks, bridges);
+ *  - tunnelWorld(): §3.1 — the server's tunnel loop through a table of the synthetic toy hall (scene JSON + track).
  */
 
 const path = require('node:path')
@@ -317,6 +318,30 @@ function deckTracks() {
 	return deckCache
 }
 
+/**
+ * §3.1 a tunnel track: the server's tunnel loop (src/game/rc-toy-route.js tunnelLoop) through a tablecloth table of the
+ * synthetic toy hall (rc-track-measure.js toyHall), in world metres → { sc (server scene, live grids), json (the
+ * scene as the client gets it: scale, floors, occ RLE, heights, tracks: [track]), track }. Generator geometry, like decks.
+ */
+let tunnelCache = null
+function tunnelWorld() {
+	if (tunnelCache) return tunnelCache
+	const SC = require('../../../src/game/rc-scale')
+	const TP = require('../../../src/game/rc-toy-plan')
+	const R = require('../../../src/game/rc-toy-route')
+	const sc = require('./rc-track-measure').toyHall()
+	const U = SC.toUnitScene(sc, sc.scale)
+	const hall = U.floors.find((f) => f.id === 'hall')
+	const stage = U.floors.find((f) => f.id === 'stage')
+	const g = U.toy.occ.find((q) => q.floor === 'hall')
+	const pg = TP.planGrid(hall, g, sc.scale, { walls: [stage.rect] })
+	const t = R.tunnelLoop({ U, hall, stage, pg, oc: g.cell / sc.scale }, { id: 'hall-tunnel', name: 'Under the tables', width: 4, len: [120, 300] })
+	const track = SC.scaleTrack({ ...t, laps: 3 }, sc.scale, SC.roundTo(sc.scale))
+	const json = JSON.parse(JSON.stringify({ scale: sc.scale, floors: sc.floors, obstacles: [], bounds: sc.bounds, heights: sc.field.toJSON(), occ: sc.occ.map((o) => o.toJSON()), tracks: [track] }))
+	tunnelCache = { sc, json, track: json.tracks[0] }
+	return tunnelCache
+}
+
 /** Fake browser environment for RcNet (game/rc/net.js module passed in): fake WebSocket + manual clock. */
 function fakeNetEnv(NET) {
 	const env = { t: 0, timers: [], sockets: [], messages: [], statuses: [] }
@@ -391,6 +416,7 @@ module.exports = {
 	eightTrack,
 	straightTrack,
 	deckTracks,
+	tunnelWorld,
 	botInput,
 	scaleTrack,
 	scaleFloors,
