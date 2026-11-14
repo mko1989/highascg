@@ -220,3 +220,13 @@ describe('WO-670 P1 real ffmpeg round-trip', { skip: !hasFfmpeg && 'ffmpeg not i
 		assert.deepEqual([jpeg.readUInt16BE(sof + 5), jpeg.readUInt16BE(sof + 7)], [36, 64], 'never upscaled to 160')
 	})
 })
+
+it('WO-1074: the worker waits for its ffmpeg children before exiting (no zombie per feed session)', () => {
+	const src = require('fs').readFileSync(require('path').join(__dirname, '../../src/system/video-feed-worker.js'), 'utf8')
+	const stop = src.slice(src.indexOf("m.type === 'stop'"), src.indexOf("m.type !== 'set'"))
+	assert.match(stop, /enc\.close\(\)/)
+	assert.match(stop, /p\.once\('exit'/)
+	assert.doesNotMatch(stop, /encoders\.clear\(\)\s*\n\s*return process\.exit\(0\)/)
+	const enc = require('fs').readFileSync(require('path').join(__dirname, '../../src/system/video-feed-encoder.js'), 'utf8')
+	assert.match(enc, /return kill\(\)/)
+})

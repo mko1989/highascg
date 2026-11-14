@@ -110,8 +110,9 @@ function createEncoder(o) {
 	let timer = null
 	let closed = false
 
+	/** @returns the killed ffmpeg (so a caller about to exit can wait for it to be reaped), or null */
 	function kill() {
-		if (!proc) return
+		if (!proc) return null
 		const p = proc
 		proc = null
 		size = ''
@@ -123,6 +124,7 @@ function createEncoder(o) {
 		try {
 			p.kill('SIGKILL')
 		} catch {}
+		return p
 	}
 
 	function start(w, h) {
@@ -183,7 +185,7 @@ function createEncoder(o) {
 			closed = true
 			if (timer) stop(timer)
 			timer = null
-			kill()
+			return kill()
 		},
 		get params() {
 			return params

@@ -17,9 +17,18 @@ function log(level, msg) {
 
 parentPort.on('message', (m) => {
 	if (m && m.type === 'stop') {
-		for (const enc of encoders.values()) enc.close()
+		/* WO-1074: exiting straight after the SIGKILL left one zombie ffmpeg under node per feed session — wait until
+		 * each child is reaped (bounded) before the thread goes away */
+		const procs = [...encoders.values()]
+			.map((enc) => enc.close())
+			.filter((p) => p && p.exitCode == null && p.signalCode == null)
 		encoders.clear()
-		return process.exit(0)
+		let left = procs.length
+		const done = () => process.exit(0)
+		if (!left) return done()
+		for (const p of procs) p.once('exit', () => --left === 0 && done())
+		setTimeout(done, 1500)
+		return
 	}
 	if (!m || m.type !== 'set') return
 	const wanted = new Map((Array.isArray(m.surfaces) ? m.surfaces : []).map((s) => [s.role, s]))
