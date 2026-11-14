@@ -1,98 +1,132 @@
 /* global window, performance */
 /**
- * Per-frame work of the RC game (WO-1074): fixed-step physics for the own car, snapshot-interpolated remote cars,
- * lap tracking, cameras (chase / top, spectator director), throttled HUD updates, sound, and the own-state send.
+ * Per-frame work of the RC game (WO-1074): fixed-step physics for the own car (+ items, start launch, hits),
+ * snapshot-interpolated remote cars with their `fx` effects, lap tracking, cameras (chase with an FOV kick / top,
+ * spectator director), props and item effects, throttled HUD updates, sound, and the own-state send.
  */
-import { stepCar, forwardSpeed } from './physics.js'
+import { stepCar, forwardSpeed, frameYaw, groundOf, ceilingOf } from './physics.js'
+import { fxFlags, driftStage, FX } from './drive-rules.js'
 import { stateMsg } from './protocol.js'
-import { chaseTarget, topTarget, smoothCam, overviewTarget } from './cameras.js'
+import { chaseTarget, topTarget, smoothCam, overviewTarget, fovFor, FOV } from './cameras.js'
 import { lerpAngle } from './interp.js'
 import { fmtTime } from './lap-logic.js'
 import { safeColor } from './dom.js'
+import { setGantryLights } from './track-deco.js'
+import { ownCarItems, launchTick, drainEvents, updateCatchup } from './item-play.js'
 
 const HUD_EVERY_MS = 100
 const BOARD_EVERY_MS = 300
+const REMOTE_SPIN_RATE = 10.5 // rad/s — remote spin-outs are drawn locally from the SPIN flag
+const START_HINT = 'Gas just before GREEN = boost start · too early = stall'
 
 export function startLoop(G) {
 	let last = performance.now()
 	let hudAt = 0
 	let boardAt = 0
 	let cam = null
+	let fov = FOV
 	let lastCdSec = null
-	const prev = { x: 0, z: 0, yaw: 0 }
-	let input = { throttle: 0, brake: 0, steer: 0, hand: false }
+	const prev = { x: 0, y: 0, z: 0, yaw: 0 }
 
 	function frame(now) {
 		window.requestAnimationFrame(frame)
 		const dt = Math.min(0.1, Math.max(0, (now - last) / 1000))
 		last = now
+		const t = now / 1000
+		G.animT = t
 		const sNow = G.net ? G.net.serverNow() : now
 
-		/* ---- remote cars ---- */
-		const others = []
-		for (const r of G.remotes.values()) {
-			const pose = r.buf.render(sNow, now)
-			if (!pose) continue
-			r.model.group.visible = true
-			r.model.update(pose, pose.v, pose.st, dt)
-			G.race.move(r.id, pose.x, pose.z, sNow, !r.seen)
-			r.seen = true
-			r.pose = pose
-			others.push(pose)
-		}
+		const others = remoteCars(G, sNow, now, dt, t)
 
 		/* ---- own car ---- */
 		let pose = null
 		let v = 0
 		if (G.car && G.T) {
-			input = G.input.read()
+			const input = G.input.read()
 			const frozen = G.phase === 'countdown' && (G.startAt == null || sNow < G.startAt)
+			launchTick(G, input.throttle, sNow, frozen)
+			let useLeft = input.use
 			const alpha = G.stepper.advance(dt, (h) => {
 				prev.x = G.car.x
+				prev.y = G.car.y
 				prev.z = G.car.z
 				prev.yaw = G.car.yaw
 				if (frozen) return
 				stepCar(G.car, input, G.env, others, h)
-				const ev = G.race.move(G.meId, G.car.x, G.car.z, sNow)
+				ownCarItems(G, { ...input, use: useLeft }, sNow)
+				useLeft = false
+				const ev = G.race.move(G.meId, G.car.x, G.car.z, sNow, false, G.car.y)
 				if (ev?.type === 'lap' && G.phase === 'race') G.audio.beep(988, 160)
 			})
-			v = forwardSpeed(G.car)
+			drainEvents(G)
+			const car = G.car
+			v = forwardSpeed(car)
 			pose = {
-				x: prev.x + (G.car.x - prev.x) * alpha,
-				y: G.car.y,
-				z: prev.z + (G.car.z - prev.z) * alpha,
-				yaw: lerpAngle(prev.yaw, G.car.yaw, alpha),
+				x: prev.x + (car.x - prev.x) * alpha,
+				y: prev.y + (car.y - prev.y) * alpha,
+				z: prev.z + (car.z - prev.z) * alpha,
+				yaw: lerpAngle(prev.yaw, car.yaw, alpha),
 			}
-			G.myModel.update(pose, v, G.car.st, dt)
+			const fx = fxFlags(car)
+			G.myModel.update(pose, v, car.st, dt, {
+				fx,
+				stage: car.drift ? driftStage(car.driftT) : 0,
+				squash: car.squash,
+				groundY: groundOf(G.env, pose.x, pose.z, pose.y),
+				blink: car.immune > 0 && car.spin <= 0 && Math.floor(now / 90) % 2 === 0,
+			})
 			const rc = G.race.cars.get(G.meId)
-			G.net?.sendState(stateMsg(G.car, v, rc ? rc.lap.cp : 0, rc ? Math.min(rc.lap.lap, G.state?.laps || 99) : 0))
+			/* others see the travel heading while spinning (they draw the spin from the flag) */
+			const sent = car.spin > 0 ? { ...car, yaw: frameYaw(car) } : car
+			G.net?.sendState(stateMsg(sent, v, rc ? rc.lap.cp : 0, rc ? Math.min(rc.lap.lap, G.state?.laps || 99) : 0, fx))
 			G.audio.engine(v, input.throttle)
+			G.hud.x.speedLines(car.boost > 0 ? 0.85 : Math.max(0, (Math.abs(v) - 11) / 8) * 0.5)
+			G.hud.x.item(G.items, now)
 		}
+
+		/* ---- props + item effects ---- */
+		G.props?.update(t, (id) => G.items.boxTaken(id, sNow), dt)
+		G.fxView?.sync(G.items, G.T, sNow, t)
+		G.fxView?.update(dt)
 
 		/* ---- camera ---- */
 		if (G.T) {
 			let want
 			if (G.spectator) {
-				want = G.director.update(now / 1000, dt, G.T, G.race.order(), (id) => G.remotes.get(id)?.pose || null)
+				want = G.director.update(t, dt, G.T, G.race.order(), (id) => G.remotes.get(id)?.pose || null)
 				cam = want
 			} else {
-				if (pose) want = G.camMode === 'top' ? topTarget(pose, 7 + Math.abs(v) * 0.3) : chaseTarget(pose, v)
-				else want = overviewTarget(G.T)
+				if (pose) {
+					const look = { ...pose, yaw: frameYaw(G.car) }
+					want =
+						G.camMode === 'top'
+							? topTarget(pose, 7 + Math.abs(v) * 0.3)
+							: chaseTarget(look, v, (x, z, y) => ceilingOf(G.env, x, z, y))
+				} else want = overviewTarget(G.T)
 				cam = smoothCam(cam, want, dt, G.camMode === 'top' ? 4 : 7)
+				const fWant = G.camMode === 'chase' && G.car ? fovFor(v, G.car.boost > 0) : FOV
+				fov += (fWant - fov) * (1 - Math.exp(-6 * dt))
+				G.world.setFov(fov)
 			}
 			G.world.setCamera(cam)
 		}
 
-		/* ---- countdown lights ---- */
+		/* ---- countdown lights (HUD + gantry) ---- */
 		if (G.startAt != null && (G.phase === 'countdown' || G.phase === 'race')) {
 			const remain = G.startAt - sNow
 			G.hud.countdown(remain)
+			setGantryLights(G.trackGroup, remain)
+			G.hud.x.hint(!G.spectator && remain > 0 ? START_HINT : '')
 			const sec = remain > 0 ? Math.ceil(remain / 1000) : 0
 			if (sec !== lastCdSec && remain > -500) {
 				if (sec <= 5) G.audio.beep(sec ? 523 : 1046, sec ? 120 : 400)
 				lastCdSec = sec
 			}
-		} else G.hud.countdown(null)
+		} else {
+			G.hud.countdown(null)
+			setGantryLights(G.trackGroup, null)
+			G.hud.x.hint('')
+		}
 
 		/* ---- HUD (throttled) ---- */
 		if (now - hudAt > HUD_EVERY_MS) {
@@ -104,9 +138,36 @@ export function startLoop(G) {
 			updateBoard(G)
 		}
 
+		G.fx?.update(dt) // §2.6 beams / pools / glows and the wall pictures
 		G.world.render()
 	}
 	window.requestAnimationFrame(frame)
+}
+
+/** Remote cars: interpolated poses, their effects, lap tracking, director cues. Returns the poses for collisions. */
+function remoteCars(G, sNow, now, dt, t) {
+	const others = []
+	for (const r of G.remotes.values()) {
+		const pose = r.buf.render(sNow, now)
+		if (!pose) continue
+		const fx = pose.fx | 0
+		if (fx & FX.AIR && !(r.fx & FX.AIR)) G.director.notify?.('jump', r.id, t)
+		if (fx & FX.SPIN && !(r.fx & FX.SPIN)) G.director.notify?.('hit', r.id, t)
+		r.spinAdd = fx & FX.SPIN ? r.spinAdd + dt * REMOTE_SPIN_RATE : 0
+		r.fx = fx
+		r.model.group.visible = true
+		r.model.update(pose, pose.v, pose.st, dt, {
+			fx,
+			stage: 0, // remote cars: the first spark colour (the charge stage is not on the wire)
+			groundY: G.env ? groundOf(G.env, pose.x, pose.z, pose.y) : null,
+			yawAdd: r.spinAdd,
+		})
+		G.race.move(r.id, pose.x, pose.z, sNow, !r.seen, pose.y)
+		r.seen = true
+		r.pose = pose
+		others.push(pose)
+	}
+	return others
 }
 
 function phaseLabel(G) {
@@ -117,7 +178,7 @@ function phaseLabel(G) {
 		}
 		return G.phase === 'results' ? 'Race over' : ''
 	}
-	if (G.phase === 'lobby') return G.car ? 'Free roam · waiting for the start' : ''
+	if (G.phase === 'lobby') return G.car ? 'Free roam · try the items · waiting for the start' : ''
 	if (G.phase === 'results') return 'Race over'
 	return ''
 }
@@ -129,13 +190,16 @@ function updateHud(G, sNow, v) {
 	const done = rc ? G.race.lapsOf(G.meId) : 0
 	const started = G.startAt != null && sNow >= G.startAt
 	const lapStart = rc?.lap.lapStart
+	const total = (G.state?.players || []).length || G.race.cars.size
+	const pos = racing ? G.race.positionOf(G.meId) : 0
+	updateCatchup(G, pos, total)
 	const dots = []
 	for (const r of G.remotes.values()) if (r.pose) dots.push({ x: r.pose.x, z: r.pose.z, color: safeColor(r.color) })
 	if (G.car) dots.push({ x: G.car.x, z: G.car.z, color: safeColor(G.me?.color), me: true })
 	G.hud.update({
 		racing,
-		pos: racing ? G.race.positionOf(G.meId) : 0,
-		total: (G.state?.players || []).length || G.race.cars.size,
+		pos,
+		total,
 		lap: Math.min(done, laps - 1),
 		laps,
 		curMs: racing && started && lapStart != null && done < laps ? sNow - lapStart : null,

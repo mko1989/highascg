@@ -1,5 +1,8 @@
 /**
  * 2D top-down drawing of a track (minimap, lobby preview, host track list) — canvas 2D, X right, −Z (upstage) up.
+ * v2: parts above the lowest floor (stage crossings) in a second colour, drawn on top so an overpass reads; ramps
+ * amber; each drop's ledge gets a small orange tick. §2.7: elevated decks in a third colour (cyan); the raised parts are
+ * drawn in height order, so the upper ribbon of a bridge lies over the lower one.
  */
 import { prepareTrack } from './track-math.js'
 
@@ -42,6 +45,7 @@ export function drawTrack(ctx, T, w, h, opts = {}) {
 	ctx.strokeStyle = opts.road || '#34373f'
 	ctx.lineWidth = Math.max(2, T.width * tf.s)
 	ctx.stroke()
+	drawRaised(ctx, T, tf, opts)
 	const i0 = T.checkpoints[0]
 	const p0 = T.pts[i0]
 	const t0 = T.tangents[i0]
@@ -55,6 +59,67 @@ export function drawTrack(ctx, T, w, h, opts = {}) {
 	ctx.lineCap = 'butt'
 	ctx.stroke()
 	return tf
+}
+
+export const RAISED_COLOR = '#7a5cff'
+export const RAMP_COLOR = '#e0a21a'
+export const DECK_COLOR = '#2fd4ff'
+
+/** Kind of segment i for the 2D map: '' (base road), 'ramp', 'deck' or 'up' (a raised floor: the stage). */
+export function segKind(T, i) {
+	if (T.segStep?.[i]) return ''
+	if (T.segRamp?.[i]) return 'ramp'
+	if (T.segDeck?.[i]) return 'deck'
+	return Math.min(T.ys[i], T.ys[(i + 1) % T.n]) > T.box.minY + 0.3 ? 'up' : ''
+}
+
+/** Raised (stage-level), deck and ramp segments over the base ribbon, lowest first; then drop ticks. */
+function drawRaised(ctx, T, tf, opts) {
+	const segs = T.closed ? T.n : T.n - 1
+	const bands = new Map() // height band (10 cm) → segment indices: each band's edges, then its fills
+	for (let i = 0; i < segs; i++) {
+		if (!segKind(T, i)) continue
+		const key = Math.round(Math.min(T.ys[i], T.ys[(i + 1) % T.n]) * 10)
+		if (!bands.has(key)) bands.set(key, [])
+		bands.get(key).push(i)
+	}
+	for (const key of [...bands.keys()].sort((a, b) => a - b)) {
+		for (const pass of ['edge', 'fill']) {
+			for (const i of bands.get(key)) {
+				const k = segKind(T, i)
+				const a = T.pts[i]
+				const b = T.pts[(i + 1) % T.n]
+				const [ax, ay] = tf.map(a[0], a[1])
+				const [bx, by] = tf.map(b[0], b[1])
+				ctx.beginPath()
+				ctx.moveTo(ax, ay)
+				ctx.lineTo(bx, by)
+				ctx.lineCap = 'round'
+				if (pass === 'edge') {
+					ctx.strokeStyle = opts.edge || 'rgba(255,255,255,0.85)'
+					ctx.lineWidth = Math.max(3, T.width * tf.s + 3)
+				} else {
+					ctx.strokeStyle = k === 'ramp' ? RAMP_COLOR : k === 'deck' ? DECK_COLOR : RAISED_COLOR
+					ctx.lineWidth = Math.max(2, T.width * tf.s)
+				}
+				ctx.stroke()
+			}
+		}
+	}
+	for (const d of T.drops || []) {
+		const p = T.pts[d.at]
+		const t = T.tangents[d.at]
+		if (!p || !t) continue
+		const [ax, ay] = tf.map(p[0] - t[1] * T.half * 1.3, p[1] + t[0] * T.half * 1.3)
+		const [bx, by] = tf.map(p[0] + t[1] * T.half * 1.3, p[1] - t[0] * T.half * 1.3)
+		ctx.beginPath()
+		ctx.moveTo(ax, ay)
+		ctx.lineTo(bx, by)
+		ctx.strokeStyle = '#ffc81a'
+		ctx.lineWidth = Math.max(2, 0.3 * tf.s)
+		ctx.lineCap = 'butt'
+		ctx.stroke()
+	}
 }
 
 /** Small static preview of a raw contract Track into a canvas element. */

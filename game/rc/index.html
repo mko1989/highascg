@@ -14,6 +14,8 @@
 		<title>Stage Sprint RC</title>
 		<link rel="stylesheet" href="/game/rc/rc.css" />
 		<link rel="stylesheet" href="/game/rc/rc-ui.css" />
+		<link rel="stylesheet" href="/game/rc/rc-touch.css" />
+		<link rel="stylesheet" href="/game/rc/rc-hud.css" />
 		<!-- The only inline script: the import map (data, not code). Everything else is an external module. -->
 		<script type="importmap">
 			{
@@ -33,11 +35,11 @@
 				<div class="stick-track"><div id="knob" class="knob"></div></div>
 				<span class="stick-label">steer</span>
 			</div>
-			<div class="pedals">
-				<div id="brake" class="pedal brake">
-					<span>brake<br />reverse</span>
-				</div>
-				<div id="gas" class="pedal gas"><span>gas</span></div>
+			<div class="cluster">
+				<div id="t-item" class="tbtn item"><span>item</span></div>
+				<div id="t-drift" class="tbtn drift"><span>drift</span></div>
+				<div id="t-brake" class="tbtn brake"><span>brake</span></div>
+				<div id="t-gas" class="tbtn gas"><span>go</span></div>
 			</div>
 		</div>
 		<div id="lobby" hidden></div>

@@ -1,0 +1,204 @@
+/* Stage Sprint RC (WO-1074 v2) — arcade HUD: big ordinal position, item slot + roulette, lap banner, start hint,
+ * comic pop words, speed lines, confetti. Procedural CSS only (gradients, no images). */
+.hud-bigpos {
+	position: absolute;
+	left: calc(14px + var(--sl));
+	top: calc(6px + var(--st));
+	font-weight: 900;
+	line-height: 1;
+	font-style: italic;
+	letter-spacing: -0.02em;
+	text-shadow:
+		0 3px 0 rgba(0, 0, 0, 0.55),
+		0 0 12px rgba(0, 0, 0, 0.6);
+}
+.pos-num {
+	font-size: 64px;
+}
+.pos-suf {
+	font-size: 28px;
+	vertical-align: top;
+	margin-left: 2px;
+}
+.pos-of {
+	font-size: 20px;
+	color: var(--dim);
+	margin-left: 6px;
+}
+.hud-bigpos.lead .pos-num,
+.hud-bigpos.lead .pos-suf {
+	color: #ffd23a;
+}
+.hud-tl {
+	top: calc(76px + var(--st));
+}
+.hud-slot {
+	position: absolute;
+	left: calc(14px + var(--sl));
+	top: calc(110px + var(--st));
+	text-align: center;
+}
+.slot-box {
+	width: 70px;
+	height: 70px;
+	border-radius: 16px;
+	border: 3px solid rgba(255, 255, 255, 0.35);
+	background: rgba(10, 12, 18, 0.6);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.slot-icon {
+	width: 58px;
+	height: 58px;
+}
+.hud-slot.full .slot-box {
+	border-color: #ffd23a;
+	box-shadow: 0 0 16px rgba(255, 210, 58, 0.6);
+}
+.hud-slot.rolling .slot-box {
+	border-color: #3ee6ff;
+	animation: rc-shake 0.12s linear infinite;
+}
+.slot-name {
+	font-size: 13px;
+	font-weight: 700;
+	margin-top: 3px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+@keyframes rc-shake {
+	50% {
+		transform: translateY(-2px) rotate(-3deg);
+	}
+}
+.hud-banner {
+	position: absolute;
+	left: 50%;
+	top: 20%;
+	transform: translate(-50%, -50%) scale(0.6);
+	font-size: 54px;
+	font-weight: 900;
+	font-style: italic;
+	white-space: nowrap;
+	opacity: 0;
+	transition:
+		opacity 0.2s,
+		transform 0.25s cubic-bezier(0.2, 1.6, 0.4, 1);
+	text-shadow:
+		0 4px 0 rgba(0, 0, 0, 0.6),
+		0 0 18px rgba(0, 0, 0, 0.6);
+}
+.hud-banner.show {
+	opacity: 1;
+	transform: translate(-50%, -50%) scale(1);
+}
+.hud-banner.final {
+	color: #ff3b8b;
+}
+.hud-banner.good {
+	color: #40e68c;
+}
+.hud-banner.bad {
+	color: var(--bad);
+}
+.hud-hint {
+	position: absolute;
+	left: 50%;
+	top: calc(40% + 92px);
+	transform: translateX(-50%);
+	font-size: 16px;
+	font-weight: 700;
+	white-space: nowrap;
+	padding: 6px 12px;
+	border-radius: 10px;
+	background: rgba(10, 12, 18, 0.7);
+}
+.hud-pop {
+	position: absolute;
+	left: 50%;
+	top: 42%;
+	transform: translate(-50%, -50%) rotate(-8deg) scale(0);
+	font-size: 72px;
+	font-weight: 900;
+	color: #ffd23a;
+	-webkit-text-stroke: 3px #1b1020;
+	text-shadow: 0 5px 0 #1b1020;
+	opacity: 0;
+}
+.hud-pop.show {
+	animation: rc-pop 0.9s ease-out forwards;
+}
+@keyframes rc-pop {
+	0% {
+		opacity: 1;
+		transform: translate(-50%, -50%) rotate(-8deg) scale(0.2);
+	}
+	25% {
+		opacity: 1;
+		transform: translate(-50%, -50%) rotate(-8deg) scale(1.15);
+	}
+	70% {
+		opacity: 1;
+		transform: translate(-50%, -50%) rotate(-6deg) scale(1);
+	}
+	100% {
+		opacity: 0;
+		transform: translate(-50%, -50%) rotate(-6deg) scale(1.05);
+	}
+}
+.speed-lines {
+	position: absolute;
+	inset: -6%;
+	opacity: 0;
+	pointer-events: none;
+	background: repeating-conic-gradient(
+		from 0deg at 50% 46%,
+		rgba(255, 255, 255, 0) 0deg 5deg,
+		rgba(255, 255, 255, 0.22) 5deg 5.6deg,
+		rgba(255, 255, 255, 0) 5.6deg 9deg
+	);
+	-webkit-mask-image: radial-gradient(ellipse at 50% 46%, transparent 38%, #000 75%);
+	mask-image: radial-gradient(ellipse at 50% 46%, transparent 38%, #000 75%);
+}
+.confetti {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 5;
+}
+#hud.spectator .hud-bigpos {
+	display: none;
+}
+#hud.spectator .hud-tl {
+	top: calc(10px + var(--st));
+}
+@media (max-height: 420px) {
+	.pos-num {
+		font-size: 48px;
+	}
+	.hud-tl {
+		top: calc(58px + var(--st));
+	}
+	.hud-slot {
+		top: calc(84px + var(--st));
+	}
+	.slot-box {
+		width: 58px;
+		height: 58px;
+	}
+	.slot-icon {
+		width: 48px;
+		height: 48px;
+	}
+	.hud-banner {
+		font-size: 40px;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.hud-slot.rolling .slot-box {
+		animation: none;
+	}
+}

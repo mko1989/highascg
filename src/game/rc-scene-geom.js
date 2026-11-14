@@ -13,6 +13,7 @@ const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
 const OBSTACLE_EPS = 0.05 // a surface this close above a floor is part of the floor (a mat, a cable ramp)
 const MAX_OBSTACLES = 300
 const DEFAULT_HALL = { w: 30, d: 20 }
+const DEFAULT_HALL_MARGIN = 18 // no geometry: the hall reaches this far around the stage (room for ramps up onto it)
 
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 
@@ -155,30 +156,44 @@ function stageFloor(grid) {
 }
 
 /**
- * The hall: the lowest large horizontal surface (parts ≤ 0.2 m thick, ≥ 4 m² each, ≥ 20 m² together at one level);
- * its rect = the bbox of those surfaces ∩ the scene's footprint. None → y 0 and the footprint (no geometry → 30 × 20 m
- * around the stage or the origin).
+ * The hall: the visible floor — the HIGHEST level of large horizontal surfaces below the stage (parts ≤ 0.2 m thick,
+ * ≥ 4 m² each, ≥ 20 m² together within 5 cm) whose area is at least half the largest such level's (a venue model can
+ * carry a sub-floor under its finished floor: Narvil's grey floor at 0 under the hotel floor at 0.82). y = the top of
+ * the level's highest surface (a dance floor 2 cm proud of the hall floor is still the floor, and the ribbon drawn on it
+ * stays visible); rect = the bbox of the level's surfaces ∩ the scene's footprint. None → y 0 and the footprint (no
+ * geometry → the stage + 18 m all round (at least 30 × 20 m), or 30 × 20 m around the origin).
  */
 function hallFloor(boxes, footprint, stage) {
 	const flat = boxes.filter((b) => b.max[1] - b.min[1] <= 0.2 && (b.max[0] - b.min[0]) * (b.max[2] - b.min[2]) >= 4 &&
 		(!stage || b.max[1] < stage.y - 0.3))
-	flat.sort((a, b) => a.max[1] - b.max[1])
+	const areaOf = (b) => (b.max[0] - b.min[0]) * (b.max[2] - b.min[2])
+	flat.sort((a, b) => a.max[1] - b.max[1] || areaOf(b) - areaOf(a))
+	const levels = []
 	for (const f of flat) {
-		const level = flat.filter((g) => Math.abs(g.max[1] - f.max[1]) <= 0.1)
-		const area = level.reduce((s, g) => s + (g.max[0] - g.min[0]) * (g.max[2] - g.min[2]), 0)
-		if (area < 20) continue
+		const at = levels.find((l) => Math.abs(l.y0 - f.max[1]) <= OBSTACLE_EPS)
+		if (at) at.items.push(f)
+		else levels.push({ y0: f.max[1], items: [f] })
+	}
+	for (const l of levels) {
+		l.area = l.items.reduce((s, g) => s + areaOf(g), 0)
+		l.y = Math.max(...l.items.map((g) => g.max[1]))
+	}
+	const ok = levels.filter((l) => l.area >= 20)
+	const biggest = ok.reduce((m, l) => Math.max(m, l.area), 0)
+	for (const l of ok.filter((x) => x.area >= biggest / 2).reverse()) {
 		const r = [Infinity, Infinity, -Infinity, -Infinity]
-		for (const g of level) {
+		for (const g of l.items) {
 			r[0] = Math.min(r[0], g.min[0]); r[1] = Math.min(r[1], g.min[2])
 			r[2] = Math.max(r[2], g.max[0]); r[3] = Math.max(r[3], g.max[2])
 		}
 		const fp = footprint || r
 		const rect = [Math.max(r[0], fp[0]), Math.max(r[1], fp[1]), Math.min(r[2], fp[2]), Math.min(r[3], fp[3])]
-		if (rect[2] - rect[0] >= 4 && rect[3] - rect[1] >= 4) return { id: 'hall', y: round3(f.max[1]), rect: rect.map(round3) }
+		if (rect[2] - rect[0] >= 4 && rect[3] - rect[1] >= 4) return { id: 'hall', y: round3(l.y), rect: rect.map(round3) }
 	}
 	if (footprint && footprint[2] - footprint[0] >= 4 && footprint[3] - footprint[1] >= 4) return { id: 'hall', y: 0, rect: footprint.map(round3) }
 	const cx = stage ? (stage.rect[0] + stage.rect[2]) / 2 : 0, cz = stage ? (stage.rect[1] + stage.rect[3]) / 2 : 0
-	const { w, d } = DEFAULT_HALL
+	const w = Math.max(DEFAULT_HALL.w, stage ? stage.rect[2] - stage.rect[0] + 2 * DEFAULT_HALL_MARGIN : 0)
+	const d = Math.max(DEFAULT_HALL.d, stage ? stage.rect[3] - stage.rect[1] + 2 * DEFAULT_HALL_MARGIN : 0)
 	return { id: 'hall', y: 0, rect: [cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2].map(round3) }
 }
 
@@ -220,23 +235,43 @@ function slabGrid(floor, cell) {
 			if (max[1] <= lo || min[1] >= hi) return
 			for (let x = min[0]; x <= max[0] + 1e-9; x += cell / 2) for (let z = min[2]; z <= max[2] + 1e-9; z += cell / 2) mark(x, z)
 		},
-		rects() {
+		/**
+		 * Free every cell overlapping `rect` grown by `pad` (a higher floor standing on this one: its side is a wall in
+		 * the ground model, not an obstacle — a ramp's top must reach its edge).
+		 */
+		clear(rect, pad = 0) {
+			const i0 = Math.max(0, Math.floor((rect[0] - pad - x0) / cell)), i1 = Math.min(nx - 1, Math.ceil((rect[2] + pad - x0) / cell) - 1)
+			const k0 = Math.max(0, Math.floor((rect[1] - pad - z0) / cell)), k1 = Math.min(nz - 1, Math.ceil((rect[3] + pad - z0) / cell) - 1)
+			for (let k = k0; k <= k1; k++) occ.fill(0, k * nx + i0, k * nx + i1 + 1)
+		},
+		/**
+		 * Occupied cells merged into rects. `close` > 0 first fills free gaps narrower than 2 × close cells between
+		 * occupied ones (a morphological closing: chairs around a banquet table become one block, a 2 m aisle stays);
+		 * `f` > 1 then reads the grid at f × f cells (a coarse cell is taken when any of its cells is).
+		 */
+		rects(f = 1, close = 0) {
+			const src = close > 0 ? closed(occ, nx, nz, close) : occ
+			const cx = Math.ceil(nx / f), cz = Math.ceil(nz / f), c = cell * f
+			const occAt = (i, k) => {
+				for (let kk = k * f; kk < Math.min(nz, (k + 1) * f); kk++) for (let ii = i * f; ii < Math.min(nx, (i + 1) * f); ii++) if (src[kk * nx + ii]) return true
+				return false
+			}
 			const out = []
 			let open = new Map() // "i0,i1" → rect index (run continuing from the row above)
-			for (let k = 0; k < nz; k++) {
+			for (let k = 0; k < cz; k++) {
 				const next = new Map()
 				let i = 0
-				while (i < nx) {
-					if (!occ[k * nx + i]) {
+				while (i < cx) {
+					if (!occAt(i, k)) {
 						i++
 						continue
 					}
 					const s = i
-					while (i < nx && occ[k * nx + i]) i++
+					while (i < cx && occAt(i, k)) i++
 					const key = `${s},${i}`
 					const at = open.get(key)
-					if (at != null) out[at][3] = z0 + (k + 1) * cell
-					else out.push([x0 + s * cell, z0 + k * cell, x0 + i * cell, z0 + (k + 1) * cell])
+					if (at != null) out[at][3] = z0 + (k + 1) * c
+					else out.push([x0 + s * c, z0 + k * c, x0 + i * c, z0 + (k + 1) * c])
 					next.set(key, at != null ? at : out.length - 1)
 				}
 				open = next
@@ -244,6 +279,39 @@ function slabGrid(floor, cell) {
 			return out
 		},
 	}
+}
+
+/** Morphological closing of a 0/1 grid with a (2r+1)² square (separable max, then min; outside counts as occupied for
+ * the min so nothing erodes at the border). */
+function closed(occ, nx, nz, r) {
+	const pass = (src, isMax) => {
+		const a = new Uint8Array(nx * nz), b = new Uint8Array(nx * nz)
+		const out = () => (isMax ? 0 : 1)
+		for (let k = 0; k < nz; k++) {
+			for (let i = 0; i < nx; i++) {
+				let v = isMax ? 0 : 1
+				for (let d = -r; d <= r; d++) {
+					const ii = i + d
+					const x = ii < 0 || ii >= nx ? out() : src[k * nx + ii]
+					v = isMax ? v | x : v & x
+				}
+				a[k * nx + i] = v
+			}
+		}
+		for (let k = 0; k < nz; k++) {
+			for (let i = 0; i < nx; i++) {
+				let v = isMax ? 0 : 1
+				for (let d = -r; d <= r; d++) {
+					const kk = k + d
+					const x = kk < 0 || kk >= nz ? out() : a[kk * nx + i]
+					v = isMax ? v | x : v & x
+				}
+				b[k * nx + i] = v
+			}
+		}
+		return b
+	}
+	return pass(pass(occ, true), false)
 }
 
 /** Merge rects that overlap or touch (within eps) until stable. */
@@ -265,18 +333,39 @@ function mergeRects(rects, eps) {
 	return cur
 }
 
-/** Per-floor rects → obstacle boxes (≤ MAX_OBSTACLES: rects are merged with a growing gap until they fit). */
+/**
+ * Per-floor grids → obstacle boxes (≤ MAX_OBSTACLES). Too many → the grids are read coarser (2×, 4×, 8× the cell: a
+ * ballroom full of banquet tables stays tables with aisles between them), and only past that are rects merged with a
+ * growing gap.
+ */
 function obstaclesFrom(perFloor) {
-	let eps = 0
-	for (;;) {
+	const emit = (lists) => {
 		const out = []
-		for (const { floor, rects } of perFloor) {
-			for (const r of eps > 0 ? mergeRects(rects, eps) : rects) {
+		perFloor.forEach(({ floor }, i) => {
+			for (const r of lists[i]) {
 				out.push({ min: [round3(r[0]), round3(floor.y), round3(r[1])], max: [round3(r[2]), round3(floor.y + CAR_HEIGHT), round3(r[3])] })
 			}
-		}
+		})
+		return out
+	}
+	// per floor a ladder of ever fewer rects: as is, gaps < 1 m closed, then read 2×, 4×, 8× coarser
+	const LADDER = [[1, 0], [1, 2], [2, 2], [4, 2], [8, 2]]
+	const step = perFloor.map(() => 0)
+	const lists = perFloor.map((p) => (p.grid ? p.grid.rects(1) : p.rects))
+	for (;;) {
+		if (lists.reduce((s, l) => s + l.length, 0) <= MAX_OBSTACLES) return emit(lists)
+		// the floor with the most rects (that can still be simplified) goes one rung down
+		let k = -1
+		perFloor.forEach((p, i) => {
+			if (p.grid && step[i] < LADDER.length - 1 && (k < 0 || lists[i].length > lists[k].length)) k = i
+		})
+		if (k < 0) break
+		step[k]++
+		lists[k] = perFloor[k].grid.rects(...LADDER[step[k]])
+	}
+	for (let eps = 0.01; ; eps *= 2) {
+		const out = emit(lists.map((l) => mergeRects(l, eps)))
 		if (out.length <= MAX_OBSTACLES || eps > 50) return out.slice(0, MAX_OBSTACLES)
-		eps = eps ? eps * 2 : 0.01
 	}
 }
 

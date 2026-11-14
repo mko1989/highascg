@@ -1,25 +1,46 @@
 /**
- * Camera maths (WO-1074) — pure: returns eye / target points, the renderer applies them.
- * - chase: behind and above the car, looking ahead of it (further ahead at speed), exponentially smoothed;
+ * Camera maths (WO-1074) — pure: returns eye / target points (+ a field-of-view kick), the renderer applies them.
+ * - chase: behind and above the car, looking ahead of it (further ahead and wider at speed / boost);
  * - top: high above the car, looking straight down (north = −Z up on screen);
- * - Director (spectator): follows the leader, cuts every few seconds to an overview, another car or a trackside shot.
+ * - Director (spectator): follows the leader, cuts every few seconds to an overview, another car or a trackside shot,
+ *   and jumps on the action — a car in the air or hit by an item gets the camera (notify()).
  */
 import { pointAt } from './track-math.js'
+
+export const FOV = 62
+export const FOV_BOOST = 74
 
 function damp(cur, target, rate, dt) {
 	const k = 1 - Math.exp(-rate * dt)
 	return cur + (target - cur) * k
 }
 
-/** Ideal chase pose for a car. */
-export function chaseTarget(car, speed = 0) {
+/** The chase eye keeps this far under a deck overhead (§2.7: driving under a bridge). */
+export const CEIL_GAP = 0.15
+
+/**
+ * Ideal chase pose for a car ({x, y, z, yaw}; yaw = the direction to look along, e.g. the travel heading).
+ * ceilAt(x, z, y) (optional, physics ceilingOf): the underside of a deck overhead — the eye stays CEIL_GAP under it,
+ * checked above the car and above the eye (a car under a bridge never gets a camera inside the slab).
+ */
+export function chaseTarget(car, speed = 0, ceilAt = null) {
 	const fx = -Math.sin(car.yaw)
 	const fz = -Math.cos(car.yaw)
-	const back = 1.25 + Math.min(Math.abs(speed), 12) * 0.05
-	const ahead = 0.8 + Math.max(0, speed) * 0.12
+	const sp = Math.min(Math.abs(speed), 24)
+	const back = 2.1 + sp * 0.05
+	const ahead = 1.6 + Math.max(0, speed) * 0.14
+	const ex = car.x - fx * back
+	const ez = car.z - fz * back
+	let ey = car.y + 0.95 + sp * 0.02
+	let eyeMax = Infinity
+	if (ceilAt) {
+		eyeMax = Math.max(car.y + 0.35, Math.min(ceilAt(car.x, car.z, car.y), ceilAt(ex, ez, car.y)) - CEIL_GAP)
+		ey = Math.min(ey, eyeMax)
+	}
 	return {
-		eye: [car.x - fx * back, car.y + 0.55 + Math.abs(speed) * 0.015, car.z - fz * back],
-		target: [car.x + fx * ahead, car.y + 0.12, car.z + fz * ahead],
+		eye: [ex, ey, ez],
+		target: [car.x + fx * ahead, car.y + 0.3, car.z + fz * ahead],
+		eyeMax, // smoothCam never lifts the eye above it (no lag into the slab)
 	}
 }
 
@@ -27,15 +48,20 @@ export function topTarget(car, height = 9) {
 	return { eye: [car.x, car.y + height, car.z + 0.01], target: [car.x, car.y, car.z] }
 }
 
-/** Smoothly move `cur` ({eye,target}) towards `want`; snaps when far (respawn / first frame). */
+/** Field of view for a speed: 62° up to the normal top, widening to 74° at boost speed. */
+export function fovFor(speed, boosting = false) {
+	const k = Math.max(0, Math.min(1, (Math.abs(speed) - 12) / 6))
+	return FOV + (FOV_BOOST - FOV) * Math.max(k, boosting ? 0.6 : 0)
+}
+
+/** Smoothly move `cur` ({eye,target}) towards `want`; snaps when far (respawn / first frame); never above want.eyeMax. */
 export function smoothCam(cur, want, dt, rate = 6) {
-	if (!cur || Math.hypot(cur.eye[0] - want.eye[0], cur.eye[2] - want.eye[2]) > 8) {
+	if (!cur || Math.hypot(cur.eye[0] - want.eye[0], cur.eye[1] - want.eye[1], cur.eye[2] - want.eye[2]) > 10) {
 		return { eye: [...want.eye], target: [...want.target] }
 	}
-	return {
-		eye: cur.eye.map((v, i) => damp(v, want.eye[i], rate, dt)),
-		target: cur.target.map((v, i) => damp(v, want.target[i], rate * 1.6, dt)),
-	}
+	const eye = cur.eye.map((v, i) => damp(v, want.eye[i], i === 1 ? rate * 0.8 : rate, dt))
+	if (Number.isFinite(want.eyeMax)) eye[1] = Math.min(eye[1], want.eyeMax)
+	return { eye, target: cur.target.map((v, i) => damp(v, want.target[i], rate * 1.6, dt)) }
 }
 
 /** Small deterministic PRNG (mulberry32) so the director is testable. */
@@ -55,20 +81,45 @@ export function overviewTarget(T) {
 	const b = T.box
 	const cx = (b.minX + b.maxX) / 2
 	const cz = (b.minZ + b.maxZ) / 2
+	const y = Number.isFinite(b.minY) ? b.minY : T.y || 0
 	const span = Math.max(b.maxX - b.minX, b.maxZ - b.minZ, 6)
-	return { eye: [cx, T.y + span * 0.75, cz + span * 0.75], target: [cx, T.y, cz] }
+	return { eye: [cx, y + span * 0.6, cz + span * 0.7], target: [cx, y, cz] }
 }
 
-export const SHOTS = ['leader', 'overview', 'car', 'trackside']
+export const SHOTS = ['leader', 'overview', 'car', 'trackside', 'action']
 
 export class Director {
 	constructor(seed = 7) {
 		this.rand = rng(seed)
+		/** §2.7: (x, z, y) → the deck underside overhead (physics ceilingOf); set by the game once the env exists */
+		this.ceilAt = null
 		this.shot = 'overview'
 		this.carId = null
 		this.until = 0
 		this.side = null
 		this.cur = null
+		this.cutAt = -Infinity
+		this.hot = null
+	}
+
+	/** Something worth watching: kind 'jump' | 'hit' | 'pulse' for car `id` at time t (s). Hits beat jumps. */
+	notify(kind, id, t) {
+		if (id === null || id === undefined) return
+		const prio = kind === 'jump' ? 1 : 2
+		if (this.hot && t - this.hot.t < 1 && this.hot.prio > prio) return
+		this.hot = { kind, id, t, prio }
+	}
+
+	_sideOf(T, c, ahead = 5) {
+		const fx = -Math.sin(c.yaw)
+		const fz = -Math.cos(c.yaw)
+		const off = T.half + 2
+		const side = [c.x + fx * ahead + fz * off, c.y + 1.3, c.z + fz * ahead - fx * off]
+		if (!Number.isFinite(side[0])) {
+			const near = pointAt(T, 0)
+			return [near.x, near.y + 1.5, near.z]
+		}
+		return side
 	}
 
 	/**
@@ -78,6 +129,15 @@ export class Director {
 	 * @param {(id: any) => ({x:number,y:number,z:number,yaw:number,v:number}|null)} carOf
 	 */
 	pick(t, T, order, carOf) {
+		const h = this.hot
+		if (h && t - h.t < 1.2 && t - this.cutAt >= 1.5 && carOf(h.id) && !(this.shot === 'action' && this.carId === h.id)) {
+			this.hot = null
+			this.shot = 'action'
+			this.carId = h.id
+			this.side = h.kind === 'jump' ? this._sideOf(T, carOf(h.id), 4) : null
+			this.until = t + 3
+			return
+		}
 		if (t < this.until && (this.shot === 'overview' || carOf(this.carId))) return
 		const r = this.rand()
 		const ids = order.filter((id) => carOf(id))
@@ -89,20 +149,14 @@ export class Director {
 		if (r < 0.45) {
 			this.shot = 'leader'
 			this.carId = ids[0]
-		} else if (r < 0.62) this.shot = 'overview'
-		else if (r < 0.82) {
+		} else if (r < 0.6) this.shot = 'overview'
+		else if (r < 0.8) {
 			this.shot = 'car'
 			this.carId = ids[Math.floor(this.rand() * ids.length)]
 		} else {
 			this.shot = 'trackside'
 			this.carId = ids[Math.floor(this.rand() * Math.min(3, ids.length))]
-			const c = carOf(this.carId)
-			/* a fixed point a few metres ahead of the car, beside the track */
-			const near = pointAt(T, 0)
-			const fx = -Math.sin(c.yaw)
-			const fz = -Math.cos(c.yaw)
-			this.side = [c.x + fx * 5 + fz * (T.half + 1.2), T.y + 0.9, c.z + fz * 5 - fx * (T.half + 1.2)]
-			if (!Number.isFinite(this.side[0])) this.side = [near.x, T.y + 1, near.z]
+			this.side = this._sideOf(T, carOf(this.carId))
 		}
 		this.until = t + 4 + this.rand() * 3
 	}
@@ -111,16 +165,18 @@ export class Director {
 	update(t, dt, T, order, carOf) {
 		this.pick(t, T, order, carOf)
 		if (this.shot === 'leader' && order.length && carOf(order[0])) this.carId = order[0]
-		const c = this.carId != null ? carOf(this.carId) : null
+		const c = this.carId !== null ? carOf(this.carId) : null
 		let want
 		if (this.shot === 'overview' || !c) want = overviewTarget(T)
-		else if (this.shot === 'trackside') want = { eye: this.side, target: [c.x, c.y + 0.1, c.z] }
+		else if ((this.shot === 'trackside' || this.shot === 'action') && this.side)
+			want = { eye: this.side, target: [c.x, c.y + 0.2, c.z] }
 		else {
-			want = chaseTarget(c, c.v)
-			/* a bit higher and further back than the player's chase cam: a TV angle */
-			want.eye[1] += 0.5
+			want = chaseTarget(c, c.v, this.ceilAt)
+			/* a bit higher and further back than the player's chase cam: a TV angle (still under a deck overhead) */
+			want.eye[1] = Math.min(want.eye[1] + (this.shot === 'action' ? 0.2 : 0.6), want.eyeMax)
 		}
 		const cut = this._lastShot !== this.shot || this._lastId !== this.carId
+		if (cut) this.cutAt = t
 		this._lastShot = this.shot
 		this._lastId = this.carId
 		this.cur = cut ? { eye: [...want.eye], target: [...want.target] } : smoothCam(this.cur, want, dt, 4)

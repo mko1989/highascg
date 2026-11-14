@@ -1,4 +1,4 @@
-/* Stage Sprint RC (WO-1074) — base layout, HUD, touch controls. No external fonts or assets. */
+/* Stage Sprint RC (WO-1074) — base layout and HUD (touch controls: rc-touch.css, v2 HUD: rc-hud.css). No external fonts or assets. */
 :root {
 	--bg: #151a26;
 	--panel: rgba(16, 20, 30, 0.88);
@@ -215,7 +215,7 @@ button {
 .hud-countdown {
 	position: absolute;
 	left: 50%;
-	top: 28%;
+	top: 40%; /* below the 3D start gantry and the banners, above the car */
 	transform: translate(-50%, -50%);
 	text-align: center;
 }
@@ -327,101 +327,6 @@ button {
 	font-size: max(18px, 3.4vmin);
 }
 
-/* ---------- touch controls (phones / tablets only) ---------- */
-#touch {
-	display: none;
-}
-@media (pointer: coarse) {
-	body.mode-player #touch {
-		display: block;
-	}
-	.hud-speed {
-		bottom: calc(10px + var(--sb));
-		width: 26vw;
-	}
-}
-.stick {
-	position: fixed;
-	left: 0;
-	bottom: 0;
-	width: 44vw;
-	height: 58vh;
-	z-index: 3;
-	touch-action: none;
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	justify-content: flex-end;
-	padding: 0 0 calc(22px + var(--sb)) calc(22px + var(--sl));
-}
-.stick-track {
-	position: relative;
-	width: 200px;
-	height: 60px;
-	border-radius: 30px;
-	background: rgba(255, 255, 255, 0.1);
-	border: 2px solid rgba(255, 255, 255, 0.25);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-.knob {
-	width: 56px;
-	height: 56px;
-	border-radius: 50%;
-	background: rgba(255, 255, 255, 0.85);
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-.stick.active .stick-track {
-	border-color: var(--accent);
-}
-.stick-label,
-.pedal span {
-	font-size: 13px;
-	color: var(--dim);
-	text-align: center;
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
-}
-.stick-label {
-	width: 200px;
-	margin-top: 4px;
-}
-.pedals {
-	position: fixed;
-	right: calc(16px + var(--sr));
-	bottom: calc(16px + var(--sb));
-	display: flex;
-	align-items: flex-end;
-	gap: 14px;
-	z-index: 3;
-}
-.pedal {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	border-radius: 18px;
-	border: 2px solid rgba(255, 255, 255, 0.25);
-	background: rgba(255, 255, 255, 0.08);
-	touch-action: none;
-}
-.pedal.gas {
-	width: 104px;
-	height: 150px;
-}
-.pedal.brake {
-	width: 86px;
-	height: 100px;
-}
-.pedal.active {
-	background: rgba(255, 122, 26, 0.35);
-	border-color: var(--accent);
-}
-.pedal.brake.active {
-	background: rgba(255, 90, 74, 0.35);
-	border-color: var(--bad);
-}
-
 /* ---------- portrait phone: ask to rotate ---------- */
 #rotate {
 	display: none;
@@ -469,11 +374,5 @@ button {
 	.hud-map {
 		width: 140px;
 		height: 101px;
-	}
-	.stick {
-		height: 64vh;
-	}
-	.pedal.gas {
-		height: 120px;
 	}
 }

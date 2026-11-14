@@ -6,13 +6,13 @@
 import { nearestOnTrack, progressOf } from './track-math.js'
 import { createLapState, lapStep, resetLaps } from './lap-logic.js'
 
-/** Longest plausible move between two samples (12 m/s cap × a slow 100 ms frame ≈ 1.2 m). */
-export const MAX_STEP_M = 2
+/** Longest plausible move between two samples (24 m/s cap × a slow 150 ms frame ≈ 3.6 m). */
+export const MAX_STEP_M = 4
 
 export class RaceTracker {
 	constructor(T) {
 		this.T = T
-		/** @type {Map<any, { lap: object, x: number, z: number, seg: number, progress: number, serverLap: number, finishedMs: number|null }>} */
+		/** @type {Map<any, { lap: object, x: number, y: number|null, z: number, seg: number, progress: number, serverLap: number, finishedMs: number|null }>} */
 		this.cars = new Map()
 		this.startMs = null
 	}
@@ -36,26 +36,41 @@ export class RaceTracker {
 	_get(id) {
 		let c = this.cars.get(id)
 		if (!c) {
-			c = { lap: createLapState(this.startMs), x: NaN, z: NaN, seg: -1, progress: 0, serverLap: 0, finishedMs: null }
+			c = {
+				lap: createLapState(this.startMs),
+				x: NaN,
+				y: null,
+				z: NaN,
+				seg: -1,
+				progress: 0,
+				serverLap: 0,
+				finishedMs: null,
+			}
 			this.cars.set(id, c)
 		}
 		return c
 	}
 
-	/** A car's new position. `teleport` (respawn, first sight) skips the gate test. Returns the lap event or null. */
-	move(id, x, z, nowMs, teleport = false) {
+	/**
+	 * A car's new position (y optional: height-aware gates and nearest point). `teleport` (respawn, first sight) skips
+	 * the gate test. Returns the lap event or null.
+	 */
+	move(id, x, z, nowMs, teleport = false, y = null) {
 		const T = this.T
 		const c = this._get(id)
 		let ev = null
 		/* a jump of more than MAX_STEP_M (respawn, grid placement, snapshot snap) is never a gate crossing */
 		const jumped = !Number.isFinite(c.x) || Math.hypot(x - c.x, z - c.z) > MAX_STEP_M
-		if (T && !teleport && !jumped) ev = lapStep(T, c.lap, c.x, c.z, x, z, nowMs)
+		const hasY = Number.isFinite(y) && y !== null
+		if (T && !teleport && !jumped) ev = lapStep(T, c.lap, c.x, c.z, x, z, nowMs, hasY ? c.y : null, hasY ? y : null)
 		c.x = x
 		c.z = z
+		c.y = hasY ? y : null
 		if (T) {
-			const near = nearestOnTrack(T, x, z, c.seg)
+			const yy = hasY ? y : null
+			const near = nearestOnTrack(T, x, z, c.seg, 6, yy)
 			/* a wrong-branch hint (big jump) → rescan the whole track */
-			const n2 = near.dist > T.half + 2 ? nearestOnTrack(T, x, z) : near
+			const n2 = near.score > T.half + 2 ? nearestOnTrack(T, x, z, -1, 6, yy) : near
 			c.seg = n2.seg
 			c.progress = progressOf(T, this.lapsOf(id), c.lap.cp, n2.s)
 		}

@@ -18,13 +18,28 @@ mode shows "The game is not running" and re-checks every few seconds.
 
 ## Controls
 
-- **Keyboard:** arrows or WASD drive and steer, Space = handbrake (slide), R = back to the last checkpoint,
-  C = chase / top camera, M = sound.
-- **Touch (landscape):** left thumb = steering slider (drag sideways from where you touch), right thumb = gas and
-  brake / reverse pedals (you can slide between them). Buttons top right: camera, back to checkpoint, tilt steering
-  (phones, asks for motion permission on iOS), sound, quality (LQ / HQ).
-- **Gamepad:** left stick or d-pad steers, RT / A = gas, LT / X = brake / reverse, B = handbrake, Y = back to
-  checkpoint, RB = camera.
+- **Keyboard:** arrows or WASD drive and steer (S / Down = brake, then reverse), Shift or Space = drift (hop),
+  E or Ctrl = use the item, R = back to the last checkpoint, C = chase / top camera, M = sound.
+- **Touch (landscape):** left thumb = steering slider (drag sideways from where you touch). Right thumb = a 2 × 2
+  cluster: **GO** (big, bottom right), **BRAKE**, **DRIFT** and **ITEM** — slide the thumb between them; DRIFT and ITEM
+  keep the gas on. Every finger is tracked on its own (multi-touch). Buttons top right: camera, back to checkpoint,
+  tilt steering (phones; asks for motion permission on iOS), sound, quality (LQ / HQ).
+- **Gamepad:** left stick or d-pad left / right steers, RT or d-pad up = gas, LT or d-pad down = brake / reverse,
+  LB / RB = drift, A / B / X = item, Y = back to checkpoint, Back / View = camera.
+
+## Racing (v2)
+
+- **Tracks run through the whole room:** hall floor, up a **ramp** onto the stage, off a **drop** back down. Ramps are
+  solid wedges (yellow / black edges); a drop has a hazard-striped ledge and cyan landing chevrons. Where the ground
+  steps up more than 0.3 m it is a wall; where it steps down you fly. The minimap shows raised parts in violet and ramps
+  in amber.
+- **Drift:** hold drift while steering — a hop, then sparks: white → cyan → magenta. Let go for a mini-boost (the longer
+  the drift, the stronger). Orange chevron pads give a boost.
+- **Start:** gas just before the lights go green = boost start; too early = stall.
+- **Items:** drive through a floating gem box → the slot rolls → use it. **Turbo** (speed burst), **Slick** (a violet
+  puddle left behind: whoever drives over it spins), **Rocket** (flies ahead along the track, hits the first car),
+  **Pulse** (a ring that spins out cars close to you), **Shield** (blocks one hit). Cars further back get a small
+  catch-up bonus.
 
 ## Showing the spectator view on a screen
 
@@ -35,8 +50,15 @@ as its background (not transparent) with large text.
 
 ## Files
 
-Pure, node-tested modules: `physics.js` (60 Hz arcade bicycle model; steer + = left), `track-math.js`,
-`lap-logic.js`, `interp.js` (snapshot buffer + server clock), `protocol.js`, `net.js` (WebSocket with reconnect),
-`standings.js`, `cameras.js`. Browser modules: `main.js` (mode switch), `game.js` + `loop.js` (session and frame loop),
-`world.js`, `track-mesh.js`, `car-model.js`, `input.js`, `hud.js`, `lobby.js`, `host.js`, `screens.js`, `audio.js`,
-`trackdraw.js`, `dom.js`. Tests: `tools/smoke/smoke-wo1074-rc-client*.test.js`.
+Pure, node-tested modules (no three.js / DOM): `physics.js` + `physics-world.js` + `phys-const.js` (60 Hz arcade model,
+gravity, air, walls; steer + = left), `ground.js` (floors + the one ramp rule), `drive-rules.js` (drift stages, boosts,
+start launch, spin-out, catch-up, `fx` flags), `track-math.js` (3D tracks; v1 2D tracks are converted), `lap-logic.js`,
+`standings.js`, `interp.js` (snapshot buffer + server clock), `protocol.js`, `net.js` (WebSocket with reconnect),
+`cameras.js`, `items.js` (boxes, roulette, held item, hazards, hit tests), `rocket.js` (the shared rocket path),
+`item-play.js` (item / launch / event glue).
+Browser modules: `main.js` (mode switch), `game.js` + `session.js` + `loop.js` (session, messages, frame loop),
+`world.js`, `track-mesh.js` + `track-deco.js` + `mesh-util.js` (ribbon, ramps, ledges, gantry), `props.js` (pads,
+item boxes), `fx-view.js` (hazards, one-shots), `car-model.js` + `car-fx.js`, `input.js`, `hud.js` + `hud-extra.js` +
+`icons.js`, `lobby.js`, `host.js`, `screens.js`, `audio.js`, `trackdraw.js`, `dom.js`.
+Styles: `rc.css`, `rc-ui.css`, `rc-hud.css`, `rc-touch.css`. Everything is procedural (no images, no external URLs).
+Tests: `tools/smoke/smoke-wo1074-rc-client*.test.js` (fixtures in `tools/smoke/lib/rc-client-fixtures.js`).

@@ -1,34 +1,101 @@
 /**
- * Track maths for the RC game (WO-1074) — pure, no DOM, no three.js (node-testable).
+ * Track maths for the RC game (WO-1074, contract v2 §2.1) — pure, no DOM, no three.js (node-testable).
  *
- * Frame: metres, X = stage left, Z = towards the audience, Y up. A track is the contract's `Track`
- * ({ points: [[x, z], …], width, y, closed, checkpoints: [point indices], grid }).
- * `prepareTrack()` adds segment tables once; every other function takes the prepared track.
+ * Frame: metres, X = stage left, Z = towards the audience, Y up. A v2 track has a 3D centre line
+ * `points: [[x, y, z], …]` (y = driving surface height) plus `ramps`, `drops`, `pads`, `boxes`. v1 tracks
+ * (`[[x, z], …]` + `track.y`) are converted on load by `normalizeTrack()`.
+ *
+ * `prepareTrack()` adds segment tables once; every other function takes the prepared track. The prepared track keeps
+ * `pts` as PLAN points [x, z] (what every 2D consumer wants) and the heights in `ys`.
+ * Ribbon parts that overlap in plan (a ramp beside / above another part, a ledge above its landing) are told apart by
+ * height: pass the car's y to `nearestOnTrack()` / `gateCrossing()`.
  */
 
 /** Gate half-length beyond the asphalt edge — a car cutting the corner slightly off the surface still counts. */
 export const GATE_MARGIN = 1.5
 /** A crossing counts only if the motion is within ~60° of the track direction at the gate. */
 const GATE_MIN_ALIGN = 0.5
+/** A gate counts for a car between GATE_BELOW under and GATE_ABOVE over the centre line there (airborne landings). */
+export const GATE_BELOW = 1.0
+export const GATE_ABOVE = 1.3
+/** Nearest-point search: vertical slack before the height difference starts to count, and its weight per metre. */
+export const Y_SLACK = 0.6
+const Y_WEIGHT = 4
+
+const num = (v, d = 0) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : d)
+const optNum = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))
 
 /**
- * @param {object} track contract Track
- * @returns {object} prepared track (the original fields plus tables)
+ * Contract v2 shape for any server track (v1 or v2): 3D points, grid slots with y (null = take the ribbon's), and
+ * `ramps` / `decks` (§2.7) / `drops` / `pads` / `boxes` (missing = none, malformed entries dropped).
+ */
+export function normalizeTrack(track) {
+	const t = track && typeof track === 'object' ? track : {}
+	const baseY = num(t.y)
+	const points = (Array.isArray(t.points) ? t.points : [])
+		.filter((p) => Array.isArray(p) && p.length >= 2)
+		.map((p) => (p.length >= 3 ? [num(p[0]), num(p[1]), num(p[2])] : [num(p[0]), baseY, num(p[1])]))
+	const n = points.length
+	const idx = (v) => Number.isInteger(v) && v >= 0 && v < n
+	const objs = (a) => (Array.isArray(a) ? a.filter((o) => o && typeof o === 'object') : [])
+	return {
+		...t,
+		points,
+		grid: objs(t.grid).map((g) => ({ x: num(g.x), y: optNum(g.y), z: num(g.z), yaw: num(g.yaw) })),
+		ramps: objs(t.ramps)
+			.filter((r) => idx(r.from) && idx(r.to) && r.from !== r.to)
+			.map((r) => ({ from: r.from, to: r.to })),
+		decks: objs(t.decks)
+			.filter((r) => idx(r.from) && idx(r.to) && r.from !== r.to)
+			.map((r) => ({ from: r.from, to: r.to })),
+		drops: objs(t.drops)
+			.filter((d) => idx(d.at) && idx(d.land) && d.at !== d.land)
+			.map((d) => ({ at: d.at, land: d.land })),
+		pads: objs(t.pads)
+			.filter((p) => Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.z)))
+			.map((p) => ({ x: num(p.x), y: optNum(p.y), z: num(p.z), yaw: num(p.yaw) })),
+		boxes: objs(t.boxes)
+			.filter((b) => b.id != null && Number.isFinite(Number(b.x)) && Number.isFinite(Number(b.z)))
+			.map((b) => ({ id: b.id, x: num(b.x), y: optNum(b.y), z: num(b.z) })),
+	}
+}
+
+/** Point indices i..j (forward, wrapping on closed tracks), segment indices i..j−1. */
+function forEachSeg(from, to, n, closed, fn) {
+	if (to > from) for (let i = from; i < to; i++) fn(i)
+	else if (closed) for (let i = from; i !== to; i = (i + 1) % n) fn(i)
+}
+
+/**
+ * @param {object} track contract Track (v1 or v2)
+ * @returns {object} prepared track (the normalized fields plus tables)
  */
 export function prepareTrack(track) {
-	const pts = (track.points || []).map((p) => [Number(p[0]) || 0, Number(p[1]) || 0])
+	const N = normalizeTrack(track)
+	const pts = N.points.map((p) => [p[0], p[2]])
+	const ys = N.points.map((p) => p[1])
 	const n = pts.length
-	const closed = track.closed !== false
+	const closed = N.closed !== false
 	const segCount = closed ? n : Math.max(0, n - 1)
 	const segs = []
 	let s = 0
 	for (let i = 0; i < segCount; i++) {
-		const a = pts[i]
-		const b = pts[(i + 1) % n]
-		const dx = b[0] - a[0]
-		const dz = b[1] - a[1]
+		const j = (i + 1) % n
+		const dx = pts[j][0] - pts[i][0]
+		const dz = pts[j][1] - pts[i][1]
 		const len = Math.hypot(dx, dz) || 1e-9
-		segs.push({ ax: a[0], az: a[1], dx, dz, len, ux: dx / len, uz: dz / len, s0: s })
+		segs.push({
+			ax: pts[i][0],
+			az: pts[i][1],
+			ay: ys[i],
+			dx,
+			dz,
+			dy: ys[j] - ys[i],
+			len,
+			ux: dx / len,
+			uz: dz / len,
+			s0: s,
+		})
 		s += len
 	}
 	const total = s || 1e-9
@@ -42,48 +109,102 @@ export function prepareTrack(track) {
 		return l > 1e-6 ? [tx / l, tz / l] : [sOut.ux, sOut.uz]
 	})
 	const cumS = pts.map((_, i) => (i < segs.length ? segs[i].s0 : total))
-	const width = Number(track.width) > 0 ? Number(track.width) : 2
-	let checkpoints = Array.isArray(track.checkpoints) ? track.checkpoints.filter((i) => i >= 0 && i < n) : []
+	/* per-segment kinds: ramp (built wedge), gap (between a ledge and its landing), step (the ledge itself) */
+	const segRamp = new Uint8Array(segCount)
+	const segGap = new Uint8Array(segCount)
+	const segStep = new Uint8Array(segCount)
+	for (const r of N.ramps) forEachSeg(r.from, r.to, n, closed, (i) => (segRamp[i] = 1))
+	/* §2.7: deck segments, and slab ramps (a ramp joining two decks: on pillars, no skirts) */
+	const segDeck = new Uint8Array(segCount)
+	const segSlab = new Uint8Array(segCount)
+	for (const d of N.decks) forEachSeg(d.from, d.to, n, closed, (i) => (segDeck[i] = 1))
+	for (const r of N.ramps) {
+		if (N.decks.some((d) => d.to === r.from) && N.decks.some((d) => d.from === r.to))
+			forEachSeg(r.from, r.to, n, closed, (i) => (segSlab[i] = 1))
+	}
+	for (const d of N.drops) {
+		forEachSeg(d.at, d.land, n, closed, (i) => (segGap[i] = 1))
+		if (d.at < segCount) segStep[d.at] = 1
+	}
+	segs.forEach((g, i) => {
+		if (Math.abs(g.dy) > 0.5 && Math.abs(g.dy) > g.len * 0.7) segStep[i] = 1 // a cliff in the centre line
+	})
+	const width = Number(N.width) > 0 ? Number(N.width) : 3
+	let checkpoints = Array.isArray(N.checkpoints)
+		? N.checkpoints.filter((i) => Number.isInteger(i) && i >= 0 && i < n)
+		: []
 	if (!checkpoints.length) checkpoints = [0]
-	const minX = Math.min(...pts.map((p) => p[0]))
-	const maxX = Math.max(...pts.map((p) => p[0]))
-	const minZ = Math.min(...pts.map((p) => p[1]))
-	const maxZ = Math.max(...pts.map((p) => p[1]))
-	return {
-		...track,
-		y: Number(track.y) || 0,
+	const box = {
+		minX: Math.min(...pts.map((p) => p[0])),
+		maxX: Math.max(...pts.map((p) => p[0])),
+		minZ: Math.min(...pts.map((p) => p[1])),
+		maxZ: Math.max(...pts.map((p) => p[1])),
+		minY: Math.min(...ys),
+		maxY: Math.max(...ys),
+	}
+	const T = {
+		...N,
+		y: ys[checkpoints[0]] ?? 0, // height of the start line (v1 consumers)
 		width,
 		half: width / 2,
 		closed,
 		pts,
+		ys,
 		n,
 		segs,
+		segRamp,
+		segDeck,
+		segSlab,
+		segGap,
+		segStep,
 		total,
 		tangents,
 		cumS,
 		checkpoints,
 		cpS: checkpoints.map((i) => cumS[i]),
-		box: { minX, maxX, minZ, maxZ },
-		grid: Array.isArray(track.grid) ? track.grid : [],
+		box,
 	}
+	/* pads / boxes / grid without a y sit on the ribbon */
+	const yAt = (x, z) => nearestOnTrack(T, x, z).py
+	T.pads = N.pads.map((p) => ({ ...p, y: p.y ?? yAt(p.x, p.z) }))
+	T.boxes = N.boxes.map((b) => ({ ...b, y: b.y ?? yAt(b.x, b.z) + 0.5 }))
+	T.grid = N.grid
+	return T
+}
+
+/** Vertical mismatch (m) of a car at height y against segment i at parameter t (0 inside the slack). */
+function vMiss(T, i, t, y) {
+	const g = T.segs[i]
+	const py = g.ay + g.dy * t
+	let d
+	if (T.segGap[i]) {
+		/* between a ledge and its landing: anywhere from just under the lower end up to the higher end */
+		const lo = Math.min(g.ay, g.ay + g.dy) - 0.3
+		const hi = Math.max(g.ay, g.ay + g.dy)
+		d = y < lo ? lo - y : y > hi ? y - hi : 0
+	} else d = Math.abs(y - py)
+	return Math.max(0, d - Y_SLACK)
 }
 
 /**
- * Closest point on the centre line.
+ * Closest point on the centre line (3D-aware when `y` is given: plan distance + a penalty for height mismatch, so a car
+ * in the hall is matched to the hall part, not to the stage part right above it in plan).
  * @param {object} T prepared track
  * @param {number} x
  * @param {number} z
  * @param {number} [hint] segment to search around (−1 = whole track)
  * @param {number} [win] segments either side of the hint
- * @returns {{ seg: number, t: number, px: number, pz: number, dist: number, s: number, side: number }}
+ * @param {number|null} [y] car height (null = plan only)
+ * @returns {{ seg: number, t: number, px: number, py: number, pz: number, dist: number, vmiss: number, score: number, s: number, side: number }}
  */
-export function nearestOnTrack(T, x, z, hint = -1, win = 6) {
+export function nearestOnTrack(T, x, z, hint = -1, win = 6, y = null) {
 	const m = T.segs.length
-	let best = { seg: 0, t: 0, px: x, pz: z, dist: Infinity, s: 0, side: 0 }
+	let best = { seg: 0, t: 0, px: x, py: T.ys?.[0] ?? 0, pz: z, dist: Infinity, vmiss: 0, score: Infinity, s: 0, side: 0 }
 	if (!m) return best
 	const scanAll = !(hint >= 0) || win * 2 + 1 >= m
 	const count = scanAll ? m : win * 2 + 1
 	const start = scanAll ? 0 : hint - win
+	const hasY = y !== null && y !== undefined && Number.isFinite(y)
 	for (let k = 0; k < count; k++) {
 		let i = start + k
 		if (!scanAll) {
@@ -96,13 +217,25 @@ export function nearestOnTrack(T, x, z, hint = -1, win = 6) {
 		const px = g.ax + g.dx * t
 		const pz = g.az + g.dz * t
 		const d = Math.hypot(x - px, z - pz)
-		if (d < best.dist) {
-			/* side: + = left of the driving direction (direction (ux,uz), left normal (uz,−ux)… see leftNormal) */
+		const vm = hasY ? vMiss(T, i, t, y) : 0
+		const score = d + vm * Y_WEIGHT
+		if (score < best.score) {
+			/* side: + = left of the driving direction (left normal of (ux, uz) is (uz, −ux), see leftNormal) */
 			const side = Math.sign((x - px) * g.uz - (z - pz) * g.ux) || 0
-			best = { seg: i, t, px, pz, dist: d, s: g.s0 + g.len * t, side }
+			best = { seg: i, t, px, py: g.ay + g.dy * t, pz, dist: d, vmiss: vm, score, s: g.s0 + g.len * t, side }
 		}
 	}
 	return best
+}
+
+/** Nearest with a hint, falling back to a whole-track scan when the windowed answer is poor. */
+export function nearestHinted(T, x, z, hint, y = null) {
+	const a = nearestOnTrack(T, x, z, hint, 8, y)
+	if (hint >= 0 && a.score > T.half + 1.5) {
+		const b = nearestOnTrack(T, x, z, -1, 6, y)
+		if (b.score < a.score) return b
+	}
+	return a
 }
 
 /** Left-hand normal of a direction (driving along (ux, uz), the left side is (uz, −ux) in this Y-up frame). */
@@ -110,16 +243,17 @@ export function leftNormal(ux, uz) {
 	return [uz, -ux]
 }
 
-/** True when (x, z) is on the asphalt (within width/2 of the centre line). */
-export function isOnTrack(T, x, z, hint = -1) {
-	return nearestOnTrack(T, x, z, hint).dist <= T.half
+/** True when (x, z[, y]) is on the ribbon (within width/2 of the centre line, at its height when y is given). */
+export function isOnTrack(T, x, z, hint = -1, y = null) {
+	const n = nearestOnTrack(T, x, z, hint, 6, y)
+	return n.dist <= T.half && n.vmiss === 0
 }
 
-/** Point + direction at arc length s (wraps on closed tracks). */
+/** Point (with height) + plan direction at arc length s (wraps on closed tracks). */
 export function pointAt(T, s) {
 	const m = T.segs.length
-	if (!m) return { x: 0, z: 0, ux: 0, uz: -1, seg: 0 }
-	let ss = T.closed ? ((s % T.total) + T.total) % T.total : Math.max(0, Math.min(T.total, s))
+	if (!m) return { x: 0, y: 0, z: 0, ux: 0, uz: -1, seg: 0 }
+	const ss = T.closed ? ((s % T.total) + T.total) % T.total : Math.max(0, Math.min(T.total, s))
 	let lo = 0
 	let hi = m - 1
 	while (lo < hi) {
@@ -129,7 +263,7 @@ export function pointAt(T, s) {
 	}
 	const g = T.segs[lo]
 	const t = Math.max(0, Math.min(1, (ss - g.s0) / g.len))
-	return { x: g.ax + g.dx * t, z: g.az + g.dz * t, ux: g.ux, uz: g.uz, seg: lo }
+	return { x: g.ax + g.dx * t, y: g.ay + g.dy * t, z: g.az + g.dz * t, ux: g.ux, uz: g.uz, seg: lo }
 }
 
 /** Yaw (contract convention: yaw 0 faces −Z, forward = (−sin yaw, −cos yaw)) that faces along direction (ux, uz). */
@@ -138,21 +272,22 @@ export function yawFromDir(ux, uz) {
 }
 
 /**
- * Gate of checkpoint k: centre, track direction and half-length.
- * @returns {{ x: number, z: number, tx: number, tz: number, halfLen: number }}
+ * Gate of checkpoint k: centre (with height), track direction and half-length.
+ * @returns {{ x: number, y: number, z: number, tx: number, tz: number, halfLen: number }}
  */
 export function gateOf(T, k) {
 	const idx = T.checkpoints[k]
 	const p = T.pts[idx]
 	const tg = T.tangents[idx]
-	return { x: p[0], z: p[1], tx: tg[0], tz: tg[1], halfLen: T.half + GATE_MARGIN }
+	return { x: p[0], y: T.ys[idx], z: p[1], tx: tg[0], tz: tg[1], halfLen: T.half + GATE_MARGIN }
 }
 
 /**
- * Did the move A → B cross checkpoint k's gate?
+ * Did the move A → B cross checkpoint k's gate? With heights (ay, by) a crossing far above / below the gate (the stage
+ * part of the track over a hall gate) does not count.
  * @returns {number} +1 forward (driving direction), −1 backwards, 0 no crossing
  */
-export function gateCrossing(T, k, ax, az, bx, bz) {
+export function gateCrossing(T, k, ax, az, bx, bz, ay = null, by = null) {
 	const g = gateOf(T, k)
 	const da = (ax - g.x) * g.tx + (az - g.z) * g.tz
 	const db = (bx - g.x) * g.tx + (bz - g.z) * g.tz
@@ -165,6 +300,10 @@ export function gateCrossing(T, k, ax, az, bx, bz) {
 	const cz = az + (bz - az) * u
 	const lateral = Math.abs((cx - g.x) * -g.tz + (cz - g.z) * g.tx)
 	if (lateral > g.halfLen) return 0
+	if (Number.isFinite(ay) && Number.isFinite(by) && ay !== null && by !== null) {
+		const cy = ay + (by - ay) * u
+		if (cy < g.y - GATE_BELOW || cy > g.y + GATE_ABOVE) return 0
+	}
 	const len = Math.hypot(bx - ax, bz - az)
 	if (len < 1e-9) return 0
 	const align = (db - da) / len
@@ -173,26 +312,29 @@ export function gateCrossing(T, k, ax, az, bx, bz) {
 	return dir
 }
 
-/** Respawn pose at checkpoint k: on the centre line, facing along the track. */
+/** Respawn pose at checkpoint k: on the centre line, at its height, facing along the track. */
 export function respawnPose(T, k) {
 	const g = gateOf(T, Math.max(0, Math.min(T.checkpoints.length - 1, k | 0)))
-	return { x: g.x, z: g.z, yaw: yawFromDir(g.tx, g.tz) }
+	return { x: g.x, y: g.y, z: g.z, yaw: yawFromDir(g.tx, g.tz) }
 }
 
 /** Grid slot pose (falls back to staggered slots behind the start line when the track has no grid). */
 export function gridPose(T, slot) {
 	const i = Math.max(0, slot | 0)
 	const g = T.grid[i % Math.max(1, T.grid.length)]
-	if (g && T.grid.length) return { x: Number(g.x) || 0, z: Number(g.z) || 0, yaw: Number(g.yaw) || 0 }
-	const start = gateOf(T, 0)
-	const back = 1.2 + Math.floor(i / 2) * 0.9
-	const lat = (i % 2 ? -1 : 1) * Math.min(T.half * 0.5, 0.5)
-	const [lx, lz] = leftNormal(start.tx, start.tz)
-	return {
-		x: start.x - start.tx * back + lx * lat,
-		z: start.z - start.tz * back + lz * lat,
-		yaw: yawFromDir(start.tx, start.tz),
+	if (g && T.grid.length) {
+		const x = Number(g.x) || 0
+		const z = Number(g.z) || 0
+		const y = Number.isFinite(g.y) && g.y !== null ? g.y : nearestOnTrack(T, x, z).py
+		return { x, y, z, yaw: Number(g.yaw) || 0 }
 	}
+	const start = gateOf(T, 0)
+	const back = 1.4 + Math.floor(i / 2) * 1.1
+	const lat = (i % 2 ? -1 : 1) * Math.min(T.half * 0.5, 0.9)
+	const [lx, lz] = leftNormal(start.tx, start.tz)
+	const x = start.x - start.tx * back + lx * lat
+	const z = start.z - start.tz * back + lz * lat
+	return { x, y: nearestOnTrack(T, x, z, -1, 6, start.y).py, z, yaw: yawFromDir(start.tx, start.tz) }
 }
 
 /**

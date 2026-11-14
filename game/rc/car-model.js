@@ -1,11 +1,15 @@
 /* global document */
 /**
  * Procedural RC buggy (WO-1074): chassis, body shell and rear wing in the player's colour, four wheels (the front
- * pair steers, all spin), an antenna with a coloured tip, a blob shadow and an optional name tag. No external model.
- * Size ≈ 0.45 × 0.25 m (the contract's car). Forward = −Z, like the physics.
+ * pair steers, all spin), an antenna with a coloured tip, a blob shadow (stays on the ground while airborne) and an
+ * optional name tag. No external model. Built as the 0.45 × 0.25 m buggy and drawn at VIS_SCALE (1.4×, readable on a
+ * phone; the physics circle is PHYS.RADIUS). Forward = −Z, like the physics. v2 effects: car-fx.js.
  */
 import * as THREE from 'three'
 import { maxSteerAngle } from './physics.js'
+import { attachCarFx } from './car-fx.js'
+
+export const VIS_SCALE = 1.4
 
 const WHEEL_R = 0.055
 let shared = null
@@ -78,6 +82,7 @@ function nameTag(name, color) {
 export function createCarModel({ color = '#ff4d3d', name = '', tag = false, tagScale = 0.05 } = {}) {
 	const p = sharedParts()
 	const group = new THREE.Group()
+	group.scale.setScalar(VIS_SCALE)
 	const body = new THREE.Group()
 	group.add(body)
 	const paint = new THREE.MeshLambertMaterial({ color: new THREE.Color(color) })
@@ -146,22 +151,34 @@ export function createCarModel({ color = '#ff4d3d', name = '', tag = false, tagS
 		}
 		if (!on) return
 		tagSprite = nameTag(nm, color)
-		tagSprite.scale.set(scale * 4, scale, 1)
+		tagSprite.scale.set((scale * 4) / VIS_SCALE, scale / VIS_SCALE, 1)
 		tagSprite.position.y = 0.55
 		group.add(tagSprite)
 	}
 	if (tag) setTag(true)
 
+	const fx = attachCarFx(group)
 	let spinAngle = 0
+	let clock = 0
 	/**
 	 * @param {{x:number,y:number,z:number,yaw:number}} s pose
 	 * @param {number} v forward speed m/s
 	 * @param {number} st steering −1…1 (+ = left)
 	 * @param {number} dt seconds
+	 * @param {{ fx?: number, stage?: number, squash?: number, groundY?: number|null, blink?: boolean, yawAdd?: number }} [e]
 	 */
-	function update(s, v, st, dt) {
+	function update(s, v, st, dt, e = {}) {
+		clock += dt
 		group.position.set(s.x, s.y, s.z)
-		group.rotation.y = s.yaw
+		group.rotation.y = s.yaw + (e.yawAdd || 0)
+		group.visible = !e.blink
+		const q = Math.max(0, Math.min(1, e.squash || 0))
+		body.scale.set(1 + 0.25 * q, 1 - 0.38 * q, 1 + 0.25 * q)
+		/* the shadow stays on the ground under an airborne car, smaller the higher it flies */
+		const above = e.groundY != null && Number.isFinite(e.groundY) ? Math.max(0, s.y - e.groundY) : 0
+		shadow.position.y = 0.006 - above / VIS_SCALE
+		shadow.scale.setScalar(Math.max(0.4, 1 - above * 0.35))
+		fx.update({ fx: e.fx || 0, stage: e.stage || 0 }, dt, clock)
 		spinAngle -= (v * dt) / WHEEL_R
 		const steerAngle = st * maxSteerAngle(v) * 1.4
 		for (const w of wheels) {
@@ -174,6 +191,7 @@ export function createCarModel({ color = '#ff4d3d', name = '', tag = false, tagS
 
 	function dispose() {
 		setTag(false)
+		fx.dispose()
 		paint.dispose()
 	}
 	return { group, update, setTag, dispose }

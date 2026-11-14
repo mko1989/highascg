@@ -9,10 +9,11 @@
 
 const MAX_MESSAGE_BYTES = 2048
 const MAX_NAME = 16
-const MAX_SPEED = 12
+const MAX_SPEED = 24 // v2: hard cap (boosting tops out at 18)
 const BOUNDS_SLACK = 5
 const PALETTE = ['#ff5533', '#33aaff', '#ffcc22', '#44dd66', '#cc55ff', '#ff66aa', '#22dddd', '#ff9933', '#aaaaaa', '#88ff22']
-const TYPES = new Set(['join', 'ready', 's', 'ping'])
+const TYPES = new Set(['join', 'ready', 's', 'ping', 'box', 'use', 'hit', 'video']) // video: §2.6 wall pictures on / off
+const FX_BITS = 31 // 1 boosting, 2 drifting, 4 spinning, 8 shielded, 16 airborne
 
 /** A display name, or `fallback`. */
 function cleanName(v, fallback) {
@@ -32,7 +33,7 @@ const r3 = (v) => Math.round(v * 1000) / 1000
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 /**
- * A `s` message → { x, y, z, yaw, v, st, cp, lap } or null (malformed, or outside bounds + 5 m). cp / lap are null when
+ * A `s` message → { x, y, z, yaw, v, st, cp, lap, fx } or null (malformed, or outside bounds + 5 m). cp / lap are null when
  * absent or out of range (the position still counts).
  */
 function cleanCar(m, bounds, checkpoints, laps) {
@@ -50,6 +51,7 @@ function cleanCar(m, bounds, checkpoints, laps) {
 		v: r3(fin(m.v) ? clamp(m.v, -MAX_SPEED, MAX_SPEED) : 0), st: r3(fin(m.st) ? clamp(m.st, -1, 1) : 0),
 		cp: checkpoints > 0 && okInt(m.cp, checkpoints - 1) ? m.cp : null,
 		lap: okInt(m.lap, laps) ? m.lap : null,
+		fx: okInt(m.fx, FX_BITS) ? m.fx : 0,
 	}
 }
 

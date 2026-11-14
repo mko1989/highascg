@@ -14,6 +14,8 @@ export const BACKOFF_MS = [500, 1000, 2000, 4000, 8000]
 export const WS_PATH = '/api/game/rc/ws'
 /** Close codes: 4403 = game disabled (contract); 4409 = kicked by the host (server rc-room.js, not in the contract text). */
 export const OFF_CODE = 4403
+/** Minimum spacing of item events (the server allows ≤ 10 box / ≤ 5 use per second). */
+export const EVENT_GAP_MS = { box: 110, use: 210 }
 export const KICK_CODE = 4409
 
 /** ws(s)://host/api/game/rc/ws for a page location. */
@@ -25,7 +27,8 @@ export function wsUrlFor(loc) {
 export class RcNet {
 	/**
 	 * @param {{ url: string, WebSocket: any, now: () => number, setTimeout: Function, clearTimeout: Function,
-	 *   setInterval: Function, clearInterval: Function, onMessage?: (m: object) => void, onStatus?: (s: string) => void }} env
+	 *   setInterval: Function, clearInterval: Function, onMessage?: (m: object) => void, onStatus?: (s: string) => void,
+	 *   onBinary?: (data: ArrayBuffer | Blob) => void }} env
 	 */
 	constructor(env) {
 		this.env = env
@@ -75,6 +78,7 @@ export class RcNet {
 			this._scheduleRetry()
 			return
 		}
+		ws.binaryType = 'arraybuffer' // §2.6 wall pictures (onBinary also takes a Blob)
 		this.ws = ws
 		ws.onopen = () => {
 			this._set('open')
@@ -83,7 +87,8 @@ export class RcNet {
 			this._sendPing()
 			this._ping = this.env.setInterval(() => this._sendPing(), 500)
 		}
-		ws.onmessage = (ev) => this._onMessage(ev.data)
+		/* binary = a wall picture `[u8 n][role][JPEG]` → onBinary; never through decode (which would String() it) */
+		ws.onmessage = (ev) => (typeof ev.data === 'string' ? this._onMessage(ev.data) : this.env.onBinary?.(ev.data))
 		ws.onerror = () => {}
 		ws.onclose = (ev) => {
 			this._clearTimers()
@@ -149,6 +154,21 @@ export class RcNet {
 
 	setReady(ready) {
 		return this._sendRaw(readyMsg(ready))
+	}
+
+	/**
+	 * Item events (`box`, `use`, `hit`): sent at once when joined, but never faster than the server's limits
+	 * (≤ 10 `box` and ≤ 5 `use` per second per player). Returns false when dropped.
+	 */
+	sendEvent(msg) {
+		if (this.status !== 'joined' || !msg) return false
+		const gap = EVENT_GAP_MS[msg.t] || 0
+		const now = this.env.now()
+		this._evAt = this._evAt || {}
+		if (gap && now - (this._evAt[msg.t] ?? -Infinity) < gap) return false
+		if (!this._sendRaw(msg)) return false
+		this._evAt[msg.t] = now
+		return true
 	}
 
 	/** Throttled own-state send. @param {object} msg from stateMsg() */

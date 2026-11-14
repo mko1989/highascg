@@ -22,7 +22,7 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 	camera.position.set(0, 8, 12)
 	camera.lookAt(0, 0, 0)
 
-	const hemi = new THREE.HemisphereLight(0xe8eeff, 0x40382c, 2.2)
+	const hemi = new THREE.HemisphereLight(0xeef2ff, 0x4a4234, 2.6)
 	scene.add(hemi)
 	const sun = new THREE.DirectionalLight(0xffffff, 1.8)
 	sun.position.set(-8, 20, 10)
@@ -64,6 +64,12 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 		setCamera(pose) {
 			camera.position.set(pose.eye[0], pose.eye[1], pose.eye[2])
 			camera.lookAt(pose.target[0], pose.target[1], pose.target[2])
+		},
+		/** Field of view in degrees (v2: kicks wider while boosting). */
+		setFov(fov) {
+			if (Math.abs(camera.fov - fov) < 0.05) return
+			camera.fov = fov
+			camera.updateProjectionMatrix()
 		},
 		/** Remove the previous scene content and load a new one. */
 		async loadScene(info, onProgress) {

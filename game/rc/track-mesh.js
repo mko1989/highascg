@@ -1,191 +1,182 @@
 /**
- * Track drawing (WO-1074): asphalt ribbon, red/white kerbs, white edge lines, a chequered start/finish line with a
- * small arch, faint direction chevrons and subtle checkpoint posts — all flat vertex-coloured geometry on the track's
- * floor plane (track.y), a handful of draw calls.
+ * Track drawing (WO-1074 v2): the asphalt ribbon following the centre line's height through the whole room, kerbs and
+ * edge lines, ramps as solid wedges (side skirts down to the floor below, bright yellow / black edge markings, an end
+ * face where a ramp stops in mid-air), drops (a striped ledge marker, nothing over the step itself, landing chevrons)
+ * and faint direction arrows. §2.7 decks and slab ramps (a ramp joining two decks) get no skirts: a slab on pillars
+ * with glowing rails (track-decks.js). Vertex-coloured, unlit, a handful of draw calls. Gantry, posts: track-deco.js.
  */
+import { leftNormal, pointAt } from './track-math.js'
+import { floorOnlyAt } from './ground.js'
+import { TriBatch, flatMat, freezeGroup, disposeGroup, lin } from './mesh-util.js'
+import { buildTrackDeco } from './track-deco.js'
+import { buildDecks } from './track-decks.js'
 import * as THREE from 'three'
-import { leftNormal, pointAt, gateOf } from './track-math.js'
 
-const ASPHALT = [0.03, 0.032, 0.038] // linear (vertex colours are linear; ≈ #303236 on screen)
-const KERB_A = [0.7, 0.02, 0.015]
-const KERB_B = [0.85, 0.85, 0.85]
-const LINE = [0.8, 0.8, 0.78]
+const ASPHALT = lin('#3a3d45')
+const ASPHALT_UP = lin('#454a57') // ramps: a touch lighter so the slope reads
+const KERB_A = lin('#e0301e')
+const KERB_B = lin('#f2f2f2')
+const HAZ_A = lin('#ffc81a')
+const HAZ_B = lin('#17181c')
+const LINE = lin('#e6e6e0')
+const SKIRT = lin('#2b2f3a')
+const SKIRT_EDGE = lin('#ffc81a')
+const CHEVRON = lin('#3ee6ff')
+const LIFT = 0.012 // road above the floor it lies on (plus polygon offset)
+const KERB_W = 0.2
+const LINE_W = 0.06
 
-/** Collects coloured triangles (non-indexed) into one BufferGeometry. */
-class TriBatch {
-	constructor() {
-		this.pos = []
-		this.col = []
-	}
-	tri(a, b, c, rgb) {
-		this.pos.push(...a, ...b, ...c)
-		for (let i = 0; i < 3; i++) this.col.push(...rgb)
-	}
-	quad(a, b, c, d, rgb) {
-		this.tri(a, b, c, rgb)
-		this.tri(a, c, d, rgb)
-	}
-	geometry() {
-		const g = new THREE.BufferGeometry()
-		g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3))
-		g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3))
-		g.computeBoundingSphere()
-		return g
-	}
-}
-
-/** Offset point i of the centre line sideways by `off` (+ = left) at height y. */
-function sidePoint(T, i, off, y) {
+/** Offset point i sideways by `off` (+ = left) at the centre-line height + dy. */
+export function sidePoint(T, i, off, dy = 0) {
 	const [tx, tz] = T.tangents[i]
 	const [lx, lz] = leftNormal(tx, tz)
 	const p = T.pts[i]
-	return [p[0] + lx * off, y, p[1] + lz * off]
+	return [p[0] + lx * off, T.ys[i] + dy, p[1] + lz * off]
 }
 
-function flatMat(polygonOffset) {
-	return new THREE.MeshBasicMaterial({
-		vertexColors: true,
-		side: THREE.DoubleSide,
-		polygonOffset: true,
-		polygonOffsetFactor: -polygonOffset,
-		polygonOffsetUnits: -polygonOffset * 4,
-	})
+/** Floor height under a plan point (the floor below a ramp / a ledge), without the ramps themselves. */
+function floorUnder(G, T, x, z) {
+	const y = G ? floorOnlyAt(G, x, z) : null
+	return y === null ? T.box.minY : y
 }
 
-/** Build the track group for a prepared track. */
-export function buildTrackMesh(T) {
+/** Build the track group for a prepared track. @param {object} [G] ground (ground.js) for the ramp skirts */
+export function buildTrackMesh(T, G = null) {
 	const group = new THREE.Group()
 	group.name = 'track-' + (T.id || '')
-	const y = T.y
 	const n = T.n
 	const segs = T.closed ? n : n - 1
 	const half = T.half
 
-	/* asphalt (slightly lit look via MeshLambert would need normals — flat colour is fine and cheaper) */
 	const road = new TriBatch()
 	const kerbs = new TriBatch()
 	const lines = new TriBatch()
-	const kerbW = 0.16
-	const lineW = 0.05
+	const skirts = new TriBatch()
 	let sAcc = 0
 	for (let i = 0; i < segs; i++) {
 		const j = (i + 1) % n
-		road.quad(
-			sidePoint(T, i, half, y + 0.004),
-			sidePoint(T, j, half, y + 0.004),
-			sidePoint(T, j, -half, y + 0.004),
-			sidePoint(T, i, -half, y + 0.004),
-			ASPHALT
-		)
-		const band = Math.floor(sAcc / 0.5) % 2 ? KERB_A : KERB_B
-		sAcc += T.segs[i].len
+		const len = T.segs[i].len
+		if (T.segStep[i]) {
+			sAcc += len
+			continue // the ledge: nothing drawn over the step itself
+		}
+		const ramp = !!T.segRamp[i]
+		const P = (k, off, dy) => sidePoint(T, k, off, dy)
+		road.quad(P(i, half, LIFT), P(j, half, LIFT), P(j, -half, LIFT), P(i, -half, LIFT), ramp ? ASPHALT_UP : ASPHALT)
+		const band = Math.floor(sAcc / 0.6) % 2
+		sAcc += len
 		for (const sgn of [1, -1]) {
 			const o0 = sgn * half
-			const o1 = sgn * (half + kerbW)
-			kerbs.quad(
-				sidePoint(T, i, o0, y + 0.006),
-				sidePoint(T, j, o0, y + 0.006),
-				sidePoint(T, j, o1, y + 0.006),
-				sidePoint(T, i, o1, y + 0.006),
-				band
-			)
-			const l0 = sgn * (half - 0.08)
-			const l1 = sgn * (half - 0.08 - lineW)
-			lines.quad(
-				sidePoint(T, i, l0, y + 0.008),
-				sidePoint(T, j, l0, y + 0.008),
-				sidePoint(T, j, l1, y + 0.008),
-				sidePoint(T, i, l1, y + 0.008),
-				LINE
-			)
+			const o1 = sgn * (half + KERB_W)
+			const col = ramp ? (band ? HAZ_A : HAZ_B) : band ? KERB_A : KERB_B
+			kerbs.quad(P(i, o0, LIFT + 0.004), P(j, o0, LIFT + 0.004), P(j, o1, LIFT + 0.004), P(i, o1, LIFT + 0.004), col)
+			const l0 = sgn * (half - 0.1)
+			const l1 = sgn * (half - 0.1 - LINE_W)
+			lines.quad(P(i, l0, LIFT + 0.006), P(j, l0, LIFT + 0.006), P(j, l1, LIFT + 0.006), P(i, l1, LIFT + 0.006), LINE)
 		}
+		if (ramp && G && !T.segSlab?.[i]) rampSkirts(skirts, T, G, i, j)
 	}
-	group.add(new THREE.Mesh(road.geometry(), flatMat(1)))
-	group.add(new THREE.Mesh(kerbs.geometry(), flatMat(2)))
-	group.add(new THREE.Mesh(lines.geometry(), flatMat(3)))
+	if (G) for (const r of T.ramps) if (!(T.decks || []).some((d) => d.from === r.to)) rampEndFace(skirts, T, G, r.to)
+	const rails = new TriBatch()
+	if (T.decks?.length) buildDecks(T, G, { slab: skirts, rails }, sidePoint, KERB_W)
+	for (const d of T.drops) ledgeMarker(lines, T, d.at)
+	for (const d of T.drops) landingChevrons(kerbs, T, d.land)
 
-	/* direction chevrons every ~5 m (skipping the start area) */
-	const arrows = new TriBatch()
-	const step = 5
-	for (let s = 3; s < T.total - 2; s += step) {
-		const p = pointAt(T, s)
-		const [lx, lz] = leftNormal(p.ux, p.uz)
-		const tip = [p.x + p.ux * 0.35, y + 0.01, p.z + p.uz * 0.35]
-		const wing = half * 0.55
-		const back = 0.25
-		const thick = 0.18
-		const lA = [p.x + lx * wing - p.ux * back, y + 0.01, p.z + lz * wing - p.uz * back]
-		const rA = [p.x - lx * wing - p.ux * back, y + 0.01, p.z - lz * wing - p.uz * back]
-		const tipIn = [tip[0] - p.ux * thick, y + 0.01, tip[2] - p.uz * thick]
-		const lIn = [lA[0] - p.ux * thick, y + 0.01, lA[2] - p.uz * thick]
-		const rIn = [rA[0] - p.ux * thick, y + 0.01, rA[2] - p.uz * thick]
-		arrows.quad(lA, tip, tipIn, lIn, [1, 1, 1])
-		arrows.quad(tip, rA, rIn, tipIn, [1, 1, 1])
+	for (const [b, off] of [
+		[road, 1],
+		[skirts, 0],
+		[rails, 0],
+		[kerbs, 2],
+		[lines, 3],
+	]) {
+		const m = b.mesh(flatMat(off))
+		if (m) group.add(m)
 	}
-	const arrowMat = flatMat(4)
-	arrowMat.transparent = true
-	arrowMat.opacity = 0.22
-	arrowMat.depthWrite = false
-	group.add(new THREE.Mesh(arrows.geometry(), arrowMat))
+	const arrows = arrowBatch(T).mesh(flatMat(4, { transparent: true, opacity: 0.3, depthWrite: false }))
+	if (arrows) group.add(arrows)
+	const deco = buildTrackDeco(T)
+	group.add(deco)
+	group.userData.lights = deco.userData.lights
+	return freezeGroup(group)
+}
 
-	/* start / finish: two rows of checks across the road + an arch */
-	const g0 = gateOf(T, 0)
-	const [lx, lz] = leftNormal(g0.tx, g0.tz)
-	const checks = new TriBatch()
-	const cols = Math.max(4, Math.round(T.width / 0.2))
-	const cw = T.width / cols
-	const rowD = 0.14
-	for (let r = 0; r < 2; r++) {
-		for (let c = 0; c < cols; c++) {
-			const o0 = -half + c * cw
-			const o1 = o0 + cw
-			const a0 = (r - 1) * rowD
-			const a1 = a0 + rowD
-			const P = (o, a) => [g0.x + lx * o + g0.tx * a, y + 0.012, g0.z + lz * o + g0.tz * a]
-			checks.quad(P(o0, a0), P(o1, a0), P(o1, a1), P(o0, a1), (r + c) % 2 ? [0.004, 0.004, 0.004] : [0.9, 0.9, 0.9])
-		}
-	}
-	group.add(new THREE.Mesh(checks.geometry(), flatMat(5)))
-
-	const postMat = new THREE.MeshLambertMaterial({ color: 0xdddddd })
-	const archH = 1.1
-	const postGeo = new THREE.CylinderGeometry(0.035, 0.035, archH, 8)
+/** Ramp side walls: from the kerb's outer edge straight down to the floor below (a solid wedge). */
+function rampSkirts(b, T, G, i, j) {
+	const o = T.half + KERB_W
 	for (const sgn of [1, -1]) {
-		const post = new THREE.Mesh(postGeo, postMat)
-		post.position.set(g0.x + lx * sgn * (half + 0.25), y + archH / 2, g0.z + lz * sgn * (half + 0.25))
-		group.add(post)
+		const a = sidePoint(T, i, sgn * o, LIFT)
+		const c = sidePoint(T, j, sgn * o, LIFT)
+		const fa = floorUnder(G, T, a[0], a[2])
+		const fc = floorUnder(G, T, c[0], c[2])
+		if (a[1] - fa < 0.03 && c[1] - fc < 0.03) continue
+		b.quad(a, c, [c[0], fc, c[2]], [a[0], fa, a[2]], SKIRT)
+		/* a bright band along the top edge (never below the floor) */
+		const e = 0.07
+		b.quad(a, c, [c[0], Math.max(fc, c[1] - e), c[2]], [a[0], Math.max(fa, a[1] - e), a[2]], SKIRT_EDGE)
 	}
-	const bar = new THREE.Mesh(
-		new THREE.BoxGeometry(T.width + 0.6, 0.16, 0.05),
-		new THREE.MeshLambertMaterial({ color: 0xff7a1a })
-	)
-	bar.position.set(g0.x, y + archH, g0.z)
-	bar.rotation.y = Math.atan2(-g0.tx, -g0.tz)
-	group.add(bar)
+}
 
-	/* checkpoint posts (subtle, knee-high, both sides) */
-	const cpGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.35, 6)
-	const cpMat = new THREE.MeshLambertMaterial({ color: 0x55c6ff, transparent: true, opacity: 0.6 })
-	for (let k = 1; k < T.checkpoints.length; k++) {
-		const g = gateOf(T, k)
-		const [nx, nz] = leftNormal(g.tx, g.tz)
-		for (const sgn of [1, -1]) {
-			const p = new THREE.Mesh(cpGeo, cpMat)
-			p.position.set(g.x + nx * sgn * (half + 0.3), y + 0.175, g.z + nz * sgn * (half + 0.3))
-			group.add(p)
+/** A ramp that ends above the floor ahead (a kicker): its vertical end face. */
+function rampEndFace(b, T, G, k) {
+	if (k < 0 || k >= T.n) return
+	const o = T.half + KERB_W
+	const L = sidePoint(T, k, o, LIFT)
+	const R = sidePoint(T, k, -o, LIFT)
+	const [tx, tz] = T.tangents[k]
+	const ahead = floorUnder(G, T, T.pts[k][0] + tx * 0.3, T.pts[k][1] + tz * 0.3)
+	if (T.ys[k] - ahead < 0.1) return
+	b.quad(L, R, [R[0], ahead, R[2]], [L[0], ahead, L[2]], SKIRT)
+	b.quad(L, R, [R[0], R[1] - 0.07, R[2]], [L[0], L[1] - 0.07, L[2]], SKIRT_EDGE)
+}
+
+/** Yellow / black blocks across the road just before the ledge. */
+function ledgeMarker(b, T, at) {
+	if (at < 0 || at >= T.n) return
+	const s1 = T.cumS[at]
+	const cols = Math.max(6, Math.round(T.width / 0.35))
+	for (let r = 0; r < 2; r++) {
+		const p0 = pointAt(T, s1 - 0.5 * (r + 1))
+		const p1 = pointAt(T, s1 - 0.5 * r - 0.02)
+		const n0 = leftNormal(p0.ux, p0.uz)
+		const n1 = leftNormal(p1.ux, p1.uz)
+		for (let c = 0; c < cols; c++) {
+			const o0 = -T.half + (c * T.width) / cols
+			const o1 = o0 + T.width / cols
+			const Q = (p, nrm, o) => [p.x + nrm[0] * o, p.y + LIFT + 0.008, p.z + nrm[1] * o]
+			b.quad(Q(p0, n0, o0), Q(p0, n0, o1), Q(p1, n1, o1), Q(p1, n1, o0), (r + c) % 2 ? HAZ_A : HAZ_B)
 		}
 	}
-	group.traverse((o) => {
-		o.matrixAutoUpdate = false
-		o.updateMatrix()
-	})
-	return group
 }
 
-export function disposeGroup(g) {
-	g?.traverse((o) => {
-		o.geometry?.dispose?.()
-		const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []
-		for (const m of mats) m.dispose?.()
-	})
+/** Three bright chevrons on the landing zone, pointing on. */
+function landingChevrons(b, T, land) {
+	if (land < 0 || land >= T.n) return
+	for (let k = 0; k < 3; k++) {
+		const p = pointAt(T, T.cumS[land] + 0.4 + k * 0.9)
+		chevron(b, p, T.half * 0.7, 0.32, 0.22, LIFT + 0.01, CHEVRON)
+	}
 }
+
+function chevron(b, p, wing, back, thick, dy, col) {
+	const [lx, lz] = leftNormal(p.ux, p.uz)
+	const y = p.y + dy
+	const tip = [p.x + p.ux * 0.35, y, p.z + p.uz * 0.35]
+	const lA = [p.x + lx * wing - p.ux * back, y, p.z + lz * wing - p.uz * back]
+	const rA = [p.x - lx * wing - p.ux * back, y, p.z - lz * wing - p.uz * back]
+	const inward = (q) => [q[0] - p.ux * thick, y, q[2] - p.uz * thick]
+	b.quad(lA, tip, inward(tip), inward(lA), col)
+	b.quad(tip, rA, inward(rA), inward(tip), col)
+}
+
+/** Faint direction arrows every ~5 m (not over steps, ramps or the start). */
+function arrowBatch(T) {
+	const b = new TriBatch()
+	for (let s = 3; s < T.total - 2; s += 5) {
+		const p = pointAt(T, s)
+		if (T.segStep[p.seg] || T.segRamp[p.seg]) continue
+		chevron(b, p, T.half * 0.55, 0.25, 0.18, LIFT + 0.01, [1, 1, 1])
+	}
+	return b
+}
+
+export { disposeGroup }

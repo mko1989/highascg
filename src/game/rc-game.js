@@ -4,6 +4,8 @@
  * WO-1074 — RC car game service: enabled flag (memory only, off after a restart), the room, the game sockets and the
  * baked scene. Disabled it holds nothing (no room, no timers, no sockets); disabling closes every game socket with 4403.
  * The game never puts anything on a screen: no Caspar, no looks, no layers — it serves a web page, an API and a socket.
+ * §2.6 (rc-lights.js, rc-video.js): the live lighting state and the LED wall pictures inside the game world, each with a
+ * host switch (`lights` / `wall`); both idle (no timer, no feed client, no lease) while disabled or nobody is connected.
  */
 
 const WebSocket = require('ws')
@@ -11,6 +13,8 @@ const { createRcRoom } = require('./rc-room')
 const { createSceneBaker } = require('./rc-scene')
 const { parseMessage } = require('./rc-sanitize')
 const { setRcGameEnabled } = require('./rc-public')
+const { createRcLights, rcLightsDeps, withLiveScene } = require('./rc-lights')
+const { createRcVideo, rcVideoDeps } = require('./rc-video')
 
 const MAX_PLAYERS = 10
 const MAX_SPECTATORS = 20
@@ -20,7 +24,9 @@ const MAX_BUFFERED = 256 * 1024
 
 /**
  * @param {{ port?: () => number, lanIps?: () => string[], log?: Function, now?: () => number, timers?: object,
- *   baker?: object, bakerDeps?: object }} deps
+ *   baker?: object, bakerDeps?: object, ctx?: object, lightsDeps?: object, videoDeps?: object }} deps
+ *   ctx: the app context (production lights / video deps); lightsDeps / videoDeps: smokes inject fakes instead
+ *   (lightsDeps without `send` — the game's own sender is used). Without ctx and fakes: no lights, no pictures.
  */
 function createRcGame(deps = {}) {
 	const log = deps.log || (() => {})
@@ -41,7 +47,6 @@ function createRcGame(deps = {}) {
 	// venue network first: 100.64/10 (VPN / carrier NAT) addresses are no use to a guest's phone, so they go last
 	const cgnat = (ip) => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip)
 	const joinUrls = () => [...lanIps()].sort((a, b) => cgnat(a) - cgnat(b)).map((ip) => `http://${ip}:${port()}/game/rc/`)
-	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev })
 
 	function sendTo(ws, m) {
 		if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > MAX_BUFFERED) return
@@ -52,11 +57,20 @@ function createRcGame(deps = {}) {
 		}
 	}
 
+	// §2.6: creating them costs nothing — no timer, no feed client, no lease until a socket attaches / asks
+	const videoDeps = deps.videoDeps || (deps.ctx ? rcVideoDeps(deps.ctx, { log }) : null)
+	const lightsDeps = deps.lightsDeps || (deps.ctx ? rcLightsDeps(deps.ctx, { send: sendTo, log }) : null)
+	const lights = lightsDeps ? createRcLights({ log, ...lightsDeps, send: sendTo }) : null
+	const video = videoDeps ? createRcVideo({ log, ...videoDeps }) : null
+	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev,
+		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false })
+
 	/** Bake (or reuse) the current scene and hand its tracks to the room. Errors are logged, not thrown. */
 	function refreshScene() {
 		return baker.get().then((out) => {
 			lastRev = out.rev
 			if (room) room.setScene(out.json)
+			video?.refresh() // walls may have moved / changed source
 			return out
 		})
 	}
@@ -95,6 +109,8 @@ function createRcGame(deps = {}) {
 			}
 		}
 		sockets.clear()
+		lights?.stop()
+		video?.stop() // closes the feed client (its worker stops if nobody else watches) and releases the lease
 		room.dispose()
 		room = null
 		log('info', '[rc-game] disabled')
@@ -107,6 +123,10 @@ function createRcGame(deps = {}) {
 		else if (action === 'disable') disable()
 		else if (!room) return { status: 409, body: { ok: false, error: 'the game is not enabled', state: state() } }
 		else {
+			if (action === 'lights' || action === 'wall') {
+				if (typeof a.on !== 'boolean') return { status: 400, body: { ok: false, error: '`on` must be true or false', state: state() } }
+				;(action === 'lights' ? lights : video)?.setOn(a.on)
+			}
 			const r = room.host(action, a)
 			if (!r.ok) return { status: r.status || 400, body: { ok: false, error: r.error, state: state() } }
 		}
@@ -129,6 +149,7 @@ function createRcGame(deps = {}) {
 		if (sockets.size >= MAX_SOCKETS) return ws.close(1013, 'full')
 		sockets.add(ws)
 		room.connect(ws)
+		lights?.attach(ws) // sends lxfull now (while on); the 10 Hz timer runs while ≥ 1 socket is attached
 		let tokens = MSG_RATE
 		let at = now()
 		let bad = 0
@@ -143,11 +164,17 @@ function createRcGame(deps = {}) {
 				if (++bad > 20) ws.close(1008, 'invalid')
 				return
 			}
+			if (m.t === 'video') {
+				if (room) video?.subscribe(ws, m.on === true) // never re-subscribe a socket the disable is closing
+				return
+			}
 			if (room) room.handle(ws, m)
 		})
 		ws.on('close', () => {
 			sockets.delete(ws)
 			if (room) room.disconnect(ws)
+			lights?.detach(ws)
+			video?.detach(ws)
 		})
 	}
 
@@ -159,10 +186,16 @@ function createRcGame(deps = {}) {
 		state,
 		/** The baked scene (enabled only; the caller checks). */
 		scene: () => refreshScene(),
+		/** The baked scene + the live `lights` / `screens` (spliced into the cached text; the bake and its rev stay as they are). */
+		sceneWithLive: () =>
+			refreshScene().then((out) => ({ ...out,
+				text: withLiveScene(out.text, { lights: lights ? lights.list() : [], screens: videoDeps ? videoDeps.screens() : [] }) })),
 		attach,
 		socketCount: () => sockets.size,
 		room: () => room,
 		baker,
+		/** §2.6 smokes / probes. */
+		live: () => ({ lights, video }),
 		MAX_SOCKETS,
 	}
 }
@@ -178,6 +211,7 @@ function useRcGame(game) {
 function getRcGame(ctx) {
 	if (!_game) {
 		_game = createRcGame({
+			ctx,
 			port: () => Number(ctx?.config?.server?.httpPort) || 4200,
 			log: (level, msg) => (typeof ctx?.log === 'function' ? ctx.log(level, msg) : undefined),
 		})

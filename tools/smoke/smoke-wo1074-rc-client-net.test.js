@@ -8,11 +8,9 @@
 
 const { describe, it, before } = require('node:test')
 const assert = require('node:assert/strict')
-const path = require('node:path')
-const { pathToFileURL } = require('node:url')
+const F = require('./lib/rc-client-fixtures.js')
 
-const RC = path.join(__dirname, '..', '..', 'game', 'rc')
-const load = (f) => import(pathToFileURL(path.join(RC, f)).href)
+const load = F.load
 
 let PR, IN, NET, ST, CAM, TM, PH
 
@@ -26,14 +24,8 @@ before(async () => {
 	PH = await load('physics.js')
 })
 
-function ovalTrack(a = 8, b = 5, n = 120) {
-	const points = []
-	for (let i = 0; i < n; i++) {
-		const t = (i / n) * Math.PI * 2
-		points.push([a * Math.cos(t), b * Math.sin(t)])
-	}
-	return { id: 'oval', name: 'Oval', floor: 'stage', y: 1.42, width: 2.2, closed: true, points, checkpoints: [0, 30, 60, 90], grid: [] }
-}
+/* a v1 track (2D points + track.y) on purpose: the client still accepts them during the server transition */
+const ovalTrack = () => F.ovalTrackV1()
 
 describe('WO-1074 protocol (contract shapes)', () => {
 	it('client → server messages carry exactly the contract keys', () => {
@@ -42,9 +34,10 @@ describe('WO-1074 protocol (contract shapes)', () => {
 		assert.deepEqual(Object.keys(PR.joinMsg('x', '#000000', true)), ['t', 'name', 'color', 'spectator'])
 		assert.deepEqual(PR.readyMsg(true), { t: 'ready', ready: true })
 		assert.deepEqual(PR.pingMsg(123), { t: 'ping', c: 123 })
-		const s = PR.stateMsg({ x: 1.23456, y: 1.42, z: -3.0001, yaw: 1.2, st: 0.3 }, 4.1234, 2, 1)
-		assert.deepEqual(s, { t: 's', p: [1.235, 1.42, -3], yaw: 1.2, v: 4.12, st: 0.3, cp: 2, lap: 1 })
-		assert.deepEqual(Object.keys(s), ['t', 'p', 'yaw', 'v', 'st', 'cp', 'lap'])
+		const s = PR.stateMsg({ x: 1.23456, y: 1.42, z: -3.0001, yaw: 1.2, st: 0.3 }, 4.1234, 2, 1, 3)
+		assert.deepEqual(s, { t: 's', p: [1.235, 1.42, -3], yaw: 1.2, v: 4.12, st: 0.3, cp: 2, lap: 1, fx: 3 })
+		assert.deepEqual(Object.keys(s), ['t', 'p', 'yaw', 'v', 'st', 'cp', 'lap', 'fx'], 'v2: + fx')
+		assert.equal(PR.stateMsg({ x: 0, y: 0, z: 0, yaw: 0, st: 0 }, 0, 0, 0).fx, 0)
 		assert.equal(PR.encode(PR.readyMsg(false)), '{"t":"ready","ready":false}')
 	})
 
@@ -59,26 +52,92 @@ describe('WO-1074 protocol (contract shapes)', () => {
 	})
 
 	it('decodes every server message of the contract', () => {
-		const state = { enabled: true, maxPlayers: 10, phase: 'lobby', trackId: 'stage-oval', laps: 3, players: [], joinUrls: [], sceneRev: 'r' }
-		const w = PR.decode(JSON.stringify({ t: 'welcome', id: 3, state, you: { id: 3, name: 'Ola', color: '#ff5533', slot: 2 } }))
+		const state = {
+			enabled: true,
+			maxPlayers: 10,
+			phase: 'lobby',
+			trackId: 'stage-oval',
+			laps: 3,
+			players: [],
+			joinUrls: [],
+			sceneRev: 'r',
+		}
+		const w = PR.decode(
+			JSON.stringify({ t: 'welcome', id: 3, state, you: { id: 3, name: 'Ola', color: '#ff5533', slot: 2 } })
+		)
 		assert.equal(w.t, 'welcome')
 		assert.equal(w.you.slot, 2)
 		assert.deepEqual(PR.decode('{"t":"full"}'), { t: 'full' })
 		assert.deepEqual(PR.decode('{"t":"off"}'), { t: 'off' })
 		assert.equal(PR.decode(JSON.stringify({ t: 'state', state })).state.trackId, 'stage-oval')
-		const ws = PR.decode(JSON.stringify({ t: 'w', ts: 1000, cars: [[3, 1, 1.42, -2, 0.5, 4.1, 0.3], [4, 'bad'], [5, 0, 0, 0, 0, 0]] }))
-		assert.deepEqual(ws, { t: 'w', ts: 1000, cars: [{ id: 3, x: 1, y: 1.42, z: -2, yaw: 0.5, v: 4.1, st: 0.3 }] })
+		const ws = PR.decode(
+			JSON.stringify({
+				t: 'w',
+				ts: 1000,
+				cars: [
+					[3, 1, 1.42, -2, 0.5, 4.1, 0.3, 19],
+					[6, 1, 0, 1, 0, 0, 0],
+					[4, 'bad'],
+					[5, 0, 0, 0, 0, 0],
+				],
+			})
+		)
+		assert.deepEqual(
+			ws,
+			{
+				t: 'w',
+				ts: 1000,
+				cars: [
+					{ id: 3, x: 1, y: 1.42, z: -2, yaw: 0.5, v: 4.1, st: 0.3, fx: 19 },
+					{ id: 6, x: 1, y: 0, z: 1, yaw: 0, v: 0, st: 0, fx: 0 },
+				],
+			},
+			'v2 tuples carry fx; v1 tuples → fx 0'
+		)
 		assert.equal(PR.decode('{"t":"countdown","startAt":5000}').startAt, 5000)
 		assert.equal(PR.decode('{"t":"lap","id":3,"lap":1,"ms":23456,"best":23456}').best, 23456)
-		const res = PR.decode(JSON.stringify({ t: 'results', order: [{ id: 3, name: 'Ola', totalMs: 71234, bestMs: 23011, laps: 3 }], final: true }))
+		const res = PR.decode(
+			JSON.stringify({
+				t: 'results',
+				order: [{ id: 3, name: 'Ola', totalMs: 71234, bestMs: 23011, laps: 3 }],
+				final: true,
+			})
+		)
 		assert.equal(res.order[0].totalMs, 71234)
 		assert.equal(PR.decode('{"t":"pong","c":123,"s":99999}').s, 99999)
 	})
 
 	it('rejects garbage', () => {
-		for (const bad of ['', 'nope', '[]', '{"t":"zz"}', '{"t":"w","ts":"x","cars":[]}', '{"t":"countdown"}', '{"t":"welcome","id":1}', 'null']) {
+		for (const bad of [
+			'',
+			'nope',
+			'[]',
+			'{"t":"zz"}',
+			'{"t":"w","ts":"x","cars":[]}',
+			'{"t":"countdown"}',
+			'{"t":"welcome","id":1}',
+			'null',
+		]) {
 			assert.equal(PR.decode(bad), null, bad)
 		}
+	})
+
+	it('§2.6: lx / lxfull pass decode unchanged; without an `f` list they are dropped', () => {
+		const full = {
+			t: 'lxfull',
+			ts: 5,
+			on: true,
+			rev: 'abc',
+			lights: [{ i: 0, id: 'f0', name: 'Head', p: [0, 5.5, -4], kind: 'spot' }],
+			f: [[0, 0, -1, 0, 1, 1, 1, 0.5, 20]],
+		}
+		assert.deepEqual(PR.decode(JSON.stringify(full)), full)
+		const dark = { t: 'lxfull', ts: 6, on: false, rev: 'abc', f: [] }
+		assert.deepEqual(PR.decode(JSON.stringify(dark)), dark)
+		const lx = { t: 'lx', ts: 7, f: [[0, 1, 0, 0, 1, 0, 0, 1, 12]] }
+		assert.deepEqual(PR.decode(JSON.stringify(lx)), lx)
+		for (const bad of ['{"t":"lx","ts":1}', '{"t":"lxfull","f":{}}', '{"t":"lx","f":"x"}'])
+			assert.equal(PR.decode(bad), null, bad)
 	})
 })
 
@@ -149,66 +208,7 @@ describe('WO-1074 snapshot interpolation + clock', () => {
 	})
 })
 
-/** Fake browser environment for RcNet. */
-function fakeEnv() {
-	const env = { t: 0, timers: [], sockets: [], messages: [], statuses: [] }
-	class FakeWS {
-		constructor(url) {
-			this.url = url
-			this.readyState = 0
-			this.sent = []
-			env.sockets.push(this)
-		}
-		send(s) {
-			this.sent.push(JSON.parse(s))
-		}
-		close() {
-			this.readyState = 3
-		}
-		open() {
-			this.readyState = 1
-			this.onopen?.()
-		}
-		recv(obj) {
-			this.onmessage?.({ data: JSON.stringify(obj) })
-		}
-		drop(code = 1006) {
-			this.readyState = 3
-			this.onclose?.({ code })
-		}
-	}
-	let id = 0
-	const add = (f, ms, every) => {
-		env.timers.push({ id: ++id, at: env.t + ms, f, every })
-		return id
-	}
-	const clear = (tid) => (env.timers = env.timers.filter((x) => x.id !== tid))
-	env.advance = (ms) => {
-		const end = env.t + ms
-		for (;;) {
-			env.timers.sort((a, b) => a.at - b.at)
-			const next = env.timers[0]
-			if (!next || next.at > end) break
-			env.t = next.at
-			if (next.every) next.at += next.every
-			else env.timers.shift()
-			next.f()
-		}
-		env.t = end
-	}
-	env.net = new NET.RcNet({
-		url: 'ws://box:4200/api/game/rc/ws',
-		WebSocket: FakeWS,
-		now: () => env.t,
-		setTimeout: (f, ms) => add(f, ms, 0),
-		clearTimeout: clear,
-		setInterval: (f, ms) => add(f, ms, ms),
-		clearInterval: clear,
-		onMessage: (m) => env.messages.push(m),
-		onStatus: (s) => env.statuses.push(s),
-	})
-	return env
-}
+const fakeEnv = () => F.fakeNetEnv(NET)
 
 describe('WO-1074 RcNet (fake WebSocket)', () => {
 	const state = { enabled: true, phase: 'lobby', players: [] }
@@ -304,6 +304,30 @@ describe('WO-1074 RcNet (fake WebSocket)', () => {
 		}
 	})
 
+	it('§2.6: binary frames (wall pictures) go to onBinary as ArrayBuffer / Blob, never to decode / onMessage', () => {
+		const e = fakeEnv()
+		const bins = []
+		e.net.env.onBinary = (d) => bins.push(d)
+		e.net.connect('A', '#000000')
+		const ws = e.sockets[0]
+		assert.equal(ws.binaryType, 'arraybuffer')
+		ws.open()
+		const frame = new Uint8Array([4, 112, 103, 109, 49, 0xff, 0xd8, 0xff, 0xd9]).buffer // [u8 n][pgm1][JPEG]
+		const blob = new Blob([new Uint8Array(frame)])
+		ws.onmessage({ data: frame })
+		ws.onmessage({ data: blob })
+		assert.equal(bins.length, 2)
+		assert.equal(bins[0], frame)
+		assert.equal(bins[1], blob)
+		assert.equal(e.messages.length, 0, 'not decoded')
+		ws.recv({ t: 'lx', ts: 1, f: [] })
+		assert.deepEqual(e.messages, [{ t: 'lx', ts: 1, f: [] }])
+		assert.equal(bins.length, 2, 'JSON never reaches onBinary')
+		delete e.net.env.onBinary // no stage fx: a picture is dropped, not decoded
+		ws.onmessage({ data: frame })
+		assert.equal(e.messages.length, 1)
+	})
+
 	it('spectators join with spectator: true', () => {
 		const e = fakeEnv()
 		e.net.connect('Spectator', '#ffffff', true)
@@ -331,7 +355,8 @@ describe('WO-1074 standings + director', () => {
 		/* a teleport-sized jump across gates (respawn, grid placement, snapshot snap) never counts */
 		const j = new ST.RaceTracker(T)
 		j.move('t', at(T.cpS[1] - 0.3).x, at(T.cpS[1] - 0.3).z, 0, true)
-		assert.equal(j.move('t', at(T.cpS[1] + 2.5).x, at(T.cpS[1] + 2.5).z, 1), null)
+		assert.ok(ST.MAX_STEP_M >= (24 * 150) / 1000, 'v2: a 24 m/s car over a slow 150 ms frame is not a teleport')
+		assert.equal(j.move('t', at(T.cpS[1] + 4.8).x, at(T.cpS[1] + 4.8).z, 1), null)
 		assert.equal(j.cars.get('t').lap.cp, 0)
 		assert.equal(j.move('t', at(T.cpS[2] - 0.1).x, at(T.cpS[2] - 0.1).z, 2), null)
 		r.finish('mid', 60000)
@@ -342,11 +367,11 @@ describe('WO-1074 standings + director', () => {
 
 	it('a simple bot drives a whole lap of the oval through the physics and the race tracker', () => {
 		const T = TM.prepareTrack(ovalTrack())
-		const env = PH.createEnv(T, [-12, -9, 12, 9], [])
-		const car = PH.createCar(TM.gridPose(T, 0), T.y)
+		const env = PH.createEnv(T, [{ id: 'stage', y: 1.42, rect: [-12, -9, 12, 9] }], [])
+		const car = PH.createCar(TM.gridPose(T, 0))
 		const r = new ST.RaceTracker(T)
 		r.reset(0)
-		r.move('me', car.x, car.z, 0, true)
+		r.move('me', car.x, car.z, 0, true, car.y)
 		let laps = 0
 		let off = 0
 		let hint = -1
@@ -361,7 +386,7 @@ describe('WO-1074 standings + director', () => {
 			const v = PH.forwardSpeed(car)
 			PH.stepCar(car, { throttle: v < 5.5 ? 1 : 0, brake: v > 7 ? 1 : 0, steer: Math.max(-1, Math.min(1, err * 3)) }, env)
 			if (!car.onTrack) off++
-			const ev = r.move('me', car.x, car.z, (i * 1000) / 60)
+			const ev = r.move('me', car.x, car.z, (i * 1000) / 60, false, car.y)
 			if (ev?.type === 'lap') laps = ev.lap
 		}
 		assert.equal(laps, 1, 'completed a lap')

@@ -5,7 +5,9 @@
  * hidden layers / objects and layer colours are applied the way the previs applies them; floors, obstacles and tracks
  * come out of the geometry; the merged GLB is flat (no NORMAL) and within budget, the budget ladder drops fixtures first,
  * then simplifies, then drops the smallest objects; the baker caches on disk and shares one in-flight bake; no scene →
- * the default hall.
+ * the default hall. v2: the stage is a floor the room tracks drive onto (cleared from the hall's obstacle grid, not a
+ * box), a stage with no MVR hall gets a hall of stage + 18 m all round, and the rev hashes the generator version.
+ * §2.7: the bake's height field (rc-scene-height.js) — bins, queries, the stage cleared, the JSON `heights` round trip.
  */
 
 const test = require('node:test')
@@ -18,6 +20,7 @@ const G = require('../../src/game/rc-scene-geom')
 const M = require('../../src/game/rc-scene-mesh')
 const { bakeScene, createSceneBaker, sceneInputs, revOf } = require('../../src/game/rc-scene')
 const { validateTrack } = require('../../src/game/rc-tracks')
+const H = require('../../src/game/rc-scene-height')
 
 /** A unit cube centred on the origin, subdivided `n` times per face (more triangles for the budget test). */
 function cubeGlb(n = 1) {
@@ -117,10 +120,20 @@ test('bakeScene: floors, obstacles, valid tracks, a flat GLB within budget; the 
 	assert.ok(at(-10, 12) && at(14, 12), 'truss legs are hall obstacles')
 	assert.ok(at(2, 20), 'the moved leg is an obstacle where it was moved to')
 	assert.ok(!at(7, 15) && !at(-3, 15), 'hidden object / layer are not obstacles')
-	assert.ok(at(2, -4), 'the elevated stage blocks the hall')
+	assert.ok(!at(2, -4) && !at(-1.9, -6.9), 'v2: the stage is a floor (room tracks drive up onto it), not a hall obstacle')
+	assert.ok(json.obstacles.some((o) => o.min[0] <= 2 && o.max[0] >= 2 && o.min[2] <= -7.9 && o.max[2] >= -7.9 && o.min[1] <= stage.y + 0.02),
+		'the LED wall standing behind the stage is an obstacle at stage level')
 	assert.ok(json.obstacles.length <= 300)
 	assert.ok(json.tracks.length >= 4, json.tracks.map((t) => t.id).join())
+	assert.ok(json.tracks.filter((t) => t.floor === 'room').length >= 3, 'room tracks: hall → ramp → stage → hall')
+	assert.ok(json.tracks.every((t) => t.points.every((p) => p.length === 3)))
 	for (const t of json.tracks) assert.ok(validateTrack(t, json).ok, `${t.id}: ${validateTrack(t, json).errors}`)
+	// §2.7: the height field rides along in the JSON (the truss legs stand in it; the stage body is cleared)
+	const F = H.fromJSON(json.heights)
+	assert.ok(F && F.nx * F.nz * 4 === Buffer.from(json.heights.data, 'base64').length)
+	assert.ok(F.bandHit(-10, 12, 0.3, 0.2, 2) && F.bandHit(14, 12, 0.3, 0.2, 2), 'truss legs in the field')
+	assert.ok(F.bandHit(2, 10, 0.3, 5.5, 6.5) && !F.bandHit(2, 10, 0.3, 0.1, 5.5), 'the light the GLB draws hangs at 6 m')
+	assert.ok(!F.bandHit(8, 10, 1, 0.1, 7) && !F.bandHit(2, -4, 1, 0.1, stage.y), 'open floor; the stage is cleared below its top')
 	assert.equal(json.dropped.venueGlb, 'ignored')
 	assert.equal(json.dropped.fixtures, 0)
 	assert.equal(json.glb, '/api/game/rc/scene.glb?rev=r1')
@@ -133,6 +146,29 @@ test('bakeScene: floors, obstacles, valid tracks, a flat GLB within budget; the 
 	const tris = prims.reduce((s, p) => s + gj.accessors[p.indices].count / 3, 0)
 	assert.equal(tris, json.stats.triangles)
 	assert.ok(glb.length <= 8 * 1024 * 1024 && tris <= 400000)
+})
+
+test('§2.7 height field: triangles and boxes mark 0.25 m bins per 0.5 m cell; band / top / bottom queries; JSON round trip', () => {
+	const f = H.createHeightField([0, 0, 10, 10], 1)
+	assert.equal(f.mask.length, f.nx * f.nz)
+	f.tri(2, 1.8, 2, 4, 1.8, 2, 2, 1.8, 4) // a flat triangle 0.8 m above the floor (a table top)
+	f.box([7, 4, 7], [8, 4.3, 8]) // a truss 3 m up
+	f.box([0, 1, 0], [10, 1.03, 10]) // the floor itself never counts (base = floor + 0.05)
+	assert.ok(f.bandHit(2.5, 2.5, 0.1, 1.7, 1.9) && !f.bandHit(2.5, 2.5, 0.1, 2.1, 3.5), 'the table top (its 0.25 m bin), nothing above it')
+	assert.ok(f.bandHit(7.5, 7.5, 0, 3.9, 4.1) && !f.bandHit(7.5, 7.5, 0, 1.1, 3.75), 'the truss, a clear band under it (to its bin)')
+	assert.ok(f.bandHit(6, 7.5, 1, 3.9, 4.1) && !f.bandHit(5, 7.5, 1, 3.9, 4.1), 'the radius reaches the neighbour cells')
+	assert.ok(f.topBelow(2.5, 2.5, 3) >= 1.8 && f.topBelow(2.5, 2.5, 3) <= 1.8 + 0.25, "the top of the table's bin")
+	assert.equal(f.topBelow(5, 5, 3), 1, 'nothing below: the floor')
+	assert.ok(Math.abs(f.bottomAbove(7.5, 7.5, 2) - 3.8) < 0.26 && f.bottomAbove(5, 5, 2) === Infinity)
+	f.box([0, 12, 0], [1, 13, 1])
+	assert.ok(f.bandHit(0.5, 0.5, 0, 9.5, 20), 'above 8 m: the ceiling bit')
+	f.clearBelow([7, 7, 8, 8], 5)
+	assert.ok(!f.bandHit(7.5, 7.5, 0, 3.9, 4.4), 'a floor clears what lies below its top')
+	const j = JSON.parse(JSON.stringify({ heights: f.toJSON() }))
+	const g = H.fieldOf(j)
+	assert.ok(g && H.fieldOf(j) === g, 'decoded once, cached')
+	assert.deepEqual([...g.mask], [...f.mask])
+	assert.equal(H.fromJSON({ ...j.heights, data: 'AAAA' }), null, 'a malformed field is ignored')
 })
 
 test('budget ladder: fixtures first, then a coarser cell, then the smallest objects', async () => {
@@ -186,6 +222,8 @@ test('baker: one shared bake, disk cache under cacheDir, a second baker reads th
 		// a changed input → a new rev; no MVR id → none-…
 		assert.notEqual(revOf(sceneInputs({ previs: { mvr: { ...cfg, hidden_layers: [] } } }), [2, 1]), revOf(sceneInputs(project), [2, 1]))
 		assert.match(revOf(sceneInputs(null), null), /^none-[0-9a-f]{10}$/)
+		const src = fs.readFileSync(path.join(__dirname, '../../src/game/rc-scene.js'), 'utf8')
+		assert.match(src, /update\(JSON\.stringify\(\[BAKE_VERSION, GENERATOR_VERSION, /, 'the rev hashes the bake and generator versions')
 	} finally {
 		fs.rmSync(dir, { recursive: true, force: true })
 	}
@@ -202,9 +240,12 @@ test('no scene at all → a 30 × 20 m hall with tracks; no stage → hall only'
 	for (const t of json.tracks) assert.ok(validateTrack(t, json).ok)
 	assert.ok(json.stats.triangles > 0 && glb.length > 0, 'the floor slab is drawn')
 	assert.equal(json.dropped.venueGlb, null)
-	// a stage only (tracking grid, no MVR): stage deck + hall around it
+	// a stage only (tracking grid, no MVR): stage deck + a hall of stage + 18 m all round; a 10 × 8 m deck holds no
+	// stage-only lap with pads and boxes (< 20 m, 12 m of it start-line clearance), so the stage is driven by room tracks
 	const s = await bakeScene(sceneInputs({ previs: { tracking: { grid: { width: 10, depth: 8, z_offset: 1 } } } }), 'none-y', { mvrStore: fakeStore(null, {}) })
 	assert.deepEqual(s.json.floors.map((f) => f.id).sort(), ['hall', 'stage'])
-	assert.ok(s.json.tracks.some((t) => t.floor === 'stage'))
+	assert.deepEqual(s.json.floors.find((f) => f.id === 'hall').rect, [-23, -22, 23, 22])
+	assert.ok(s.json.tracks.filter((t) => t.floor === 'room').length >= 3, s.json.tracks.map((t) => t.id).join())
+	assert.ok(s.json.tracks.some((t) => t.floor === 'hall'))
 	for (const t of s.json.tracks) assert.ok(validateTrack(t, s.json).ok)
 })

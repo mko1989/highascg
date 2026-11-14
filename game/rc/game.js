@@ -1,25 +1,29 @@
-/* global window, WebSocket, performance, setTimeout */
+/* global window, document, WebSocket, performance, setTimeout */
 /**
  * Player + spectator session of the RC game (WO-1074): waits until the game is enabled, loads the scene (GLB in the
  * background with a loading bar), joins over the WebSocket and follows the server's phases
- * (lobby → countdown → race → results). The per-frame work lives in loop.js.
+ * (lobby → countdown → race → results). Messages: session.js (+ item-play.js); per-frame work: loop.js.
  */
-import { $, apiGet, isPhone, storeGet, storeSet, sessGet, sessSet, COLORS, safeColor } from './dom.js'
+import * as THREE from 'three'
+import { $, apiGet, isPhone, storeGet, storeSet, sessGet, sessSet } from './dom.js'
 import { createWorld } from './world.js'
 import { buildTrackMesh, disposeGroup } from './track-mesh.js'
-import { createCarModel } from './car-model.js'
+import { createProps } from './props.js'
+import { createFxView } from './fx-view.js'
 import { createHud, toolButton } from './hud.js'
 import { createLobby } from './lobby.js'
 import { createInput } from './input.js'
 import { createAudio } from './audio.js'
 import { createScreens } from './screens.js'
 import { prepareTrack, gridPose, respawnPose } from './track-math.js'
-import { createCar, createEnv, createStepper, placeCar } from './physics.js'
+import { createEnv, createStepper, placeCar, ceilingOf } from './physics.js'
 import { RaceTracker } from './standings.js'
-import { SnapshotBuffer } from './interp.js'
 import { Director } from './cameras.js'
 import { RcNet, wsUrlFor } from './net.js'
+import { ItemState } from './items.js'
+import { onMessage, mySlot } from './session.js'
 import { startLoop } from './loop.js'
+import { createStageFx } from './stage-fx.js'
 
 const STATE_POLL_MS = 4000
 
@@ -52,7 +56,13 @@ export async function startGame({ spectator = false } = {}) {
 		stepper: createStepper(),
 		audio: createAudio(),
 		joinInfo: null,
+		items: new ItemState(),
+		props: null,
+		fxView: null,
+		fx: null, // §2.6 stage-fx.js
+		launch: null,
 	}
+	G.ctl = { setTrack: (id) => setTrack(G, id), toGrid: () => toGrid(G), gameOff: () => gameOff(G) }
 
 	/* ---------- wait for the game to be enabled ---------- */
 	const st = await waitEnabled(screens)
@@ -61,6 +71,11 @@ export async function startGame({ spectator = false } = {}) {
 	/* ---------- world ---------- */
 	const quality = storeGet('quality', phone ? 'low' : 'high') === 'low' ? 'low' : 'high'
 	G.world = createWorld($('#view'), { phone, quality })
+	G.fxView = createFxView(G.world.scene)
+	/* §2.6 live lights + wall pictures: before the scene loads (lxfull arrives as soon as the socket opens) */
+	G.fx = createStageFx({ THREE, scene: G.world.scene, quality, send: (m) => G.net?._sendRaw(m) ?? false })
+	document.addEventListener('visibilitychange', () => G.fx?.setEnabled(!document.hidden)) // hidden tab: no pictures
+	window.addEventListener('pagehide', () => G.fx?.dispose())
 	window.addEventListener('resize', () => G.world.resize())
 	window.addEventListener('orientationchange', () => setTimeout(() => G.world.resize(), 250))
 
@@ -81,19 +96,19 @@ export async function startGame({ spectator = false } = {}) {
 	const qBtn = toolButton(quality === 'low' ? 'LQ' : 'HQ', 'Quality low / high', (el) => {
 		const q = G.world.quality === 'low' ? 'high' : 'low'
 		G.world.setQuality(q)
+		G.fx?.setQuality(q)
 		storeSet('quality', q)
 		el.textContent = q === 'low' ? 'LQ' : 'HQ'
 	})
 	if (!spectator) toolbar.push(qBtn) // the spectator page (maybe on a wall) shows no buttons at all
-	G.hud = createHud($('#hud'), { spectator, toolbar })
+	G.hud = createHud($('#hud'), { spectator, toolbar, itemButton: spectator ? null : $('#t-item') })
 	G.muteBtn = toolbar.find((b) => b.el.title.startsWith('Sound'))?.el || null
 
 	if (!spectator) {
 		G.input = createInput({
 			stickEl: $('#stick'),
 			knobEl: $('#knob'),
-			gasEl: $('#gas'),
-			brakeEl: $('#brake'),
+			zones: { gas: $('#t-gas'), brake: $('#t-brake'), drift: $('#t-drift'), item: $('#t-item') },
 			onRespawn: () => respawn(G),
 			onCamera: () => (G.camMode = G.camMode === 'chase' ? 'top' : 'chase'),
 			onMute: () => toggleMute(G, G.muteBtn),
@@ -123,6 +138,7 @@ export async function startGame({ spectator = false } = {}) {
 		clearInterval: (id) => window.clearInterval(id),
 		onMessage: (m) => onMessage(G, m),
 		onStatus: (s) => onStatus(G, s),
+		onBinary: (d) => G.fx?.onBinary(d),
 	})
 	if (spectator) G.net.connect('Spectator', '#ffffff', true)
 	else {
@@ -165,6 +181,7 @@ async function loadScene(G) {
 	}
 	G.screens.hide()
 	G.scene = r.data
+	G.fx?.load(G.scene)
 	G.tracks = new Map()
 	for (const t of G.scene.tracks || []) if (t?.id && t.points?.length > 2) G.tracks.set(t.id, prepareTrack(t))
 	if (!G.tracks.size) G.tracks.set('arena', prepareTrack(fallbackTrack(G.scene)))
@@ -185,7 +202,7 @@ async function loadScene(G) {
 	return true
 }
 
-/** A small oval when the scene has no usable track (the server should always send two). */
+/** A small flat oval on the first floor when the scene has no usable track (the server should always send some). */
 function fallbackTrack(scene) {
 	const f = (scene?.floors || [])[0] || { id: 'hall', y: 0, rect: [-15, -10, 15, 10] }
 	const cx = (f.rect[0] + f.rect[2]) / 2
@@ -195,26 +212,18 @@ function fallbackTrack(scene) {
 	const points = []
 	for (let i = 0; i < 80; i++) {
 		const t = (-i / 80) * Math.PI * 2
-		points.push([cx + a * Math.cos(t), cz + b * Math.sin(t)])
+		points.push([cx + a * Math.cos(t), Number(f.y) || 0, cz + b * Math.sin(t)])
 	}
 	return {
 		id: 'arena',
 		name: 'Arena',
 		floor: f.id,
-		y: f.y,
-		width: 2,
+		width: 2.5,
 		closed: true,
 		points,
 		checkpoints: [0, 20, 40, 60],
 		grid: [],
 	}
-}
-
-function floorRect(G, T) {
-	const f = (G.scene?.floors || []).find((x) => x.id === T.floor)
-	if (f && Array.isArray(f.rect)) return f.rect
-	const b = T.box
-	return [b.minX - T.half - 3, b.minZ - T.half - 3, b.maxX + T.half + 3, b.maxZ + T.half + 3]
 }
 
 export function setTrack(G, trackId) {
@@ -225,30 +234,34 @@ export function setTrack(G, trackId) {
 		G.world.scene.remove(G.trackGroup)
 		disposeGroup(G.trackGroup)
 	}
-	G.trackGroup = buildTrackMesh(T)
+	/* the ground model: every floor of the room + this track's ramps (physics + ramp skirts) */
+	G.env = createEnv(T, G.scene?.floors || [], G.scene?.obstacles || [])
+	G.director.ceilAt = (x, z, y) => ceilingOf(G.env, x, z, y)
+	G.trackGroup = buildTrackMesh(T, G.env.ground)
 	G.world.scene.add(G.trackGroup)
-	G.env = createEnv(T, floorRect(G, T), G.scene?.obstacles || [])
+	if (G.props) {
+		G.world.scene.remove(G.props.group)
+		G.props.dispose()
+	}
+	G.props = createProps(T)
+	G.world.scene.add(G.props.group)
 	G.race.setTrack(T)
 	G.hud.setTrack(T)
 	if (G.car) toGrid(G)
 }
 
-function mySlot(G) {
-	return Number.isFinite(G.me?.slot) ? G.me.slot : 0
-}
-
 export function toGrid(G) {
 	if (!G.car || !G.T) return
-	placeCar(G.car, gridPose(G.T, mySlot(G)), G.T.y)
-	G.race.move(G.meId, G.car.x, G.car.z, null, true)
+	placeCar(G.car, gridPose(G.T, mySlot(G)))
+	G.race.move(G.meId, G.car.x, G.car.z, null, true, G.car.y)
 }
 
 export function respawn(G) {
 	if (!G.car || !G.T || G.spectator) return
 	if (G.phase === 'countdown') return
 	const c = G.race.cars.get(G.meId)
-	placeCar(G.car, respawnPose(G.T, c ? c.lap.cp : 0), G.T.y)
-	G.race.move(G.meId, G.car.x, G.car.z, null, true)
+	placeCar(G.car, respawnPose(G.T, c ? c.lap.cp : 0))
+	G.race.move(G.meId, G.car.x, G.car.z, null, true, G.car.y)
 }
 
 function toggleMute(G, el) {
@@ -304,154 +317,4 @@ function onStatus(G, s) {
 		])
 	} else if (s === 'closed') G.hud.setStatus('Reconnecting…')
 	else if (s === 'joined') G.hud.setStatus('')
-}
-
-function ensureMyCar(G) {
-	if (G.spectator || G.car || !G.T) return
-	G.car = createCar(gridPose(G.T, mySlot(G)), G.T.y)
-	G.myModel = createCarModel({ color: safeColor(G.me?.color, COLORS[0]) })
-	G.world.scene.add(G.myModel.group)
-	G.race.move(G.meId, G.car.x, G.car.z, null, true)
-}
-
-function syncRemotes(G, players) {
-	const ids = new Set(players.map((p) => p.id))
-	for (const [id, r] of G.remotes) {
-		if (!ids.has(id) || id === G.meId) {
-			G.world.scene.remove(r.model.group)
-			r.model.dispose()
-			G.remotes.delete(id)
-			G.race.remove(id)
-		}
-	}
-	for (const p of players) {
-		if (p.id === G.meId) continue
-		const r = G.remotes.get(p.id)
-		if (r && (r.name !== p.name || r.color !== p.color)) {
-			G.world.scene.remove(r.model.group)
-			r.model.dispose()
-			G.remotes.delete(p.id)
-		}
-		if (!G.remotes.has(p.id)) {
-			const model = createCarModel({
-				color: safeColor(p.color),
-				name: p.name,
-				tag: true,
-				tagScale: G.spectator ? 0.07 : 0.05,
-			})
-			model.group.visible = false
-			G.world.scene.add(model.group)
-			G.remotes.set(p.id, {
-				id: p.id,
-				name: p.name,
-				color: p.color,
-				buf: new SnapshotBuffer(),
-				model,
-				pose: null,
-				seen: false,
-			})
-		}
-	}
-}
-
-function applyState(G, state) {
-	if (!state) return
-	if (state.enabled === false) {
-		gameOff(G)
-		return
-	}
-	const prevPhase = G.phase
-	G.state = state
-	G.phase = state.phase || 'lobby'
-	if (G.scene?.rev && state.sceneRev && state.sceneRev !== G.scene.rev && sessGet('reloadedFor') !== state.sceneRev) {
-		/* a new stage: reload (the join is remembered for this tab); at most once per rev */
-		sessSet('reloadedFor', state.sceneRev)
-		window.location.reload()
-		return
-	}
-	setTrack(G, state.trackId)
-	syncRemotes(G, state.players || [])
-	/* joined during a countdown / race (missed the `countdown` message): the server's state carries startAt */
-	if (G.startAt == null && Number.isFinite(state.startAt) && (G.phase === 'countdown' || G.phase === 'race')) {
-		G.startAt = state.startAt
-		G.race.reset(state.startAt)
-	}
-	const meP = (state.players || []).find((p) => p.id === G.meId)
-	if (meP && G.me) G.me = { ...G.me, name: meP.name, color: meP.color }
-	ensureMyCar(G)
-	if (G.phase === 'lobby') {
-		if (prevPhase !== 'lobby') {
-			G.results = null
-			G.hud.results(null)
-			G.startAt = null
-			G.lobby?.resetReady()
-			toGrid(G)
-		}
-		G.lobby?.showLobby(state, G.meId, G.T, { reveal: prevPhase !== 'lobby' })
-	} else {
-		G.lobby?.hide()
-		if (G.phase === 'countdown' && prevPhase !== 'countdown') toGrid(G)
-	}
-	if (G.phase !== 'results' && G.results) {
-		G.results = null
-		G.hud.results(null)
-	}
-}
-
-function onMessage(G, m) {
-	switch (m.t) {
-		case 'welcome':
-			if (G.meId != null && G.meId !== m.id) G.race.remove(G.meId) // rejoined under a new id
-			G.meId = m.id
-			G.me = m.you || { id: m.id }
-			if (G.myModel && G.me.color) {
-				G.world.scene.remove(G.myModel.group)
-				G.myModel.dispose()
-				G.myModel = createCarModel({ color: safeColor(G.me.color) })
-				G.world.scene.add(G.myModel.group)
-			}
-			applyState(G, m.state)
-			break
-		case 'state':
-			applyState(G, m.state)
-			break
-		case 'countdown':
-			G.startAt = m.startAt
-			G.phase = 'countdown'
-			G.lobby?.hide()
-			G.results = null
-			G.hud.results(null)
-			G.bests.clear()
-			toGrid(G)
-			G.race.reset(m.startAt)
-			break
-		case 'w':
-			for (const c of m.cars) {
-				if (c.id === G.meId) continue
-				G.remotes.get(c.id)?.buf.push(m.ts, c)
-			}
-			break
-		case 'lap':
-			G.race.serverLap(m.id, m.lap)
-			if (m.best != null) G.bests.set(m.id, m.best)
-			if (m.id === G.meId && m.ms != null)
-				G.hud.toast(`Lap ${m.lap}: ${(m.ms / 1000).toFixed(2)} s${m.best === m.ms ? ' · best!' : ''}`)
-			break
-		case 'results':
-			G.results = m.order
-			G.resultsFinal = m.final !== false
-			for (const r of m.order) if (r.totalMs != null) G.race.finish(r.id, r.totalMs)
-			showResults(G)
-			break
-	}
-}
-
-export function showResults(G) {
-	if (!G.results) return
-	const byId = new Map((G.state?.players || []).map((p) => [p.id, p]))
-	const rows = G.results.map((r) => ({ ...r, color: byId.get(r.id)?.color, me: r.id === G.meId }))
-	G.hud.results(
-		rows,
-		G.resultsFinal ? 'Final results — the host starts the next race' : 'Waiting for the other drivers…'
-	)
 }

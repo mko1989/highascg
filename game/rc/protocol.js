@@ -1,7 +1,7 @@
 /**
- * Wire format of the RC game WebSocket (WO-1074, work/notes/rc-game-contract.md) — pure.
+ * Wire format of the RC game WebSocket (WO-1074, work/notes/rc-game-contract.md, v2 §2.4) — pure.
  * Builders return plain objects with EXACTLY the contract's keys; `encode` turns them into the JSON text frame.
- * `decode` validates server frames and returns null for anything unknown or malformed.
+ * `decode` validates server frames and returns null for anything unknown or malformed (unknown types are ignored).
  */
 
 export const MAX_NAME = 16
@@ -40,8 +40,8 @@ export function readyMsg(ready) {
 	return { t: 'ready', ready: !!ready }
 }
 
-/** Own car state → `s`. */
-export function stateMsg(car, v, cp, lap) {
+/** Own car state → `s` (v2: + `fx` bit flags, see drive-rules.js FX). */
+export function stateMsg(car, v, cp, lap, fx = 0) {
 	return {
 		t: 's',
 		p: [r(car.x, 3), r(car.y, 3), r(car.z, 3)],
@@ -50,8 +50,33 @@ export function stateMsg(car, v, cp, lap) {
 		st: r(car.st, 2),
 		cp: cp | 0,
 		lap: lap | 0,
+		fx: fx | 0,
 	}
 }
+
+/** I drove through box `id`. */
+export function boxMsg(id) {
+	return { t: 'box', id }
+}
+
+/** I used my held item at p = [x, y, z] facing yaw. */
+export function useMsg(item, p, yaw) {
+	return { t: 'use', item: String(item), p: [r(p[0], 3), r(p[1], 3), r(p[2], 3)], yaw: r(yaw, 3) }
+}
+
+/** Hazard `hid` hit me. */
+export function hitHazMsg(hid) {
+	return { t: 'hit', hid }
+}
+
+/** Player `by`'s one-shot `item` (pulse) hit me. */
+export function hitByMsg(by, item) {
+	return { t: 'hit', by, item: String(item) }
+}
+
+export const ITEM_KINDS = ['turbo', 'slick', 'rocket', 'pulse', 'shield']
+export const HAZ_KINDS = ['slick', 'rocket']
+export const FX_KINDS = ['pulse', 'turbo', 'shield', 'spin']
 
 export function pingMsg(c) {
 	return { t: 'ping', c }
@@ -63,12 +88,36 @@ export function encode(msg) {
 
 const num = (v) => typeof v === 'number' && Number.isFinite(v)
 
-/** One `w` car tuple [id, x, y, z, yaw, v, st] → object, or null. */
+const vec3 = (p) => Array.isArray(p) && p.length >= 3 && num(p[0]) && num(p[1]) && num(p[2])
+
+/** One `w` car tuple [id, x, y, z, yaw, v, st, fx] → object, or null (v1 tuples without fx → fx 0). */
 export function decodeCar(tuple) {
 	if (!Array.isArray(tuple) || tuple.length < 7) return null
-	const [id, x, y, z, yaw, v, st] = tuple
+	const [id, x, y, z, yaw, v, st, fx] = tuple
 	if (![x, y, z, yaw, v, st].every(num) || id == null) return null
-	return { id, x, y, z, yaw, v, st }
+	return { id, x, y, z, yaw, v, st, fx: num(fx) ? fx | 0 : 0 }
+}
+
+/** A `haz` (also inside welcome / state `hazards`) → normalized object, or null. */
+export function decodeHaz(m) {
+	if (!m || typeof m !== 'object' || m.hid == null || !HAZ_KINDS.includes(m.kind) || !vec3(m.p) || !num(m.ts))
+		return null
+	return {
+		t: 'haz',
+		hid: m.hid,
+		kind: m.kind,
+		by: m.by ?? null,
+		p: [m.p[0], m.p[1], m.p[2]],
+		yaw: num(m.yaw) ? m.yaw : 0,
+		ts: m.ts,
+		until: num(m.until) ? m.until : null,
+	}
+}
+
+/** `boxes: [[id, until]]` → [[id, until]] (malformed rows dropped). */
+export function decodeBoxes(list) {
+	if (!Array.isArray(list)) return []
+	return list.filter((b) => Array.isArray(b) && b.length >= 2 && b[0] != null && num(b[1])).map((b) => [b[0], b[1]])
 }
 
 /**
@@ -103,6 +152,20 @@ export function decode(text) {
 			return Array.isArray(m.order) ? m : null
 		case 'pong':
 			return num(m.s) ? m : null
+		case 'box':
+			return m.id != null && num(m.until) ? { t: 'box', id: m.id, by: m.by ?? null, until: m.until } : null
+		case 'item':
+			return ITEM_KINDS.includes(m.item) ? { t: 'item', item: m.item } : null
+		case 'haz':
+			return decodeHaz(m)
+		case 'hazgone':
+			return m.hid != null ? { t: 'hazgone', hid: m.hid, hit: m.hit ?? null } : null
+		case 'fx':
+			if (m.id == null || !FX_KINDS.includes(m.k)) return null
+			return { t: 'fx', id: m.id, k: m.k, p: vec3(m.p) ? [m.p[0], m.p[1], m.p[2]] : null, ts: num(m.ts) ? m.ts : null }
+		case 'lx':
+		case 'lxfull':
+			return Array.isArray(m.f) ? m : null // §2.6 live lights (stage-fx.js validates the entries)
 		default:
 			return null
 	}

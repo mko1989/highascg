@@ -3,12 +3,14 @@
 /**
  * WO-1074 — RC car game: the room (pure; clock and timers injected, no I/O). Players join over the game socket
  * (max 10; spectators do not count), the host drives the phase machine lobby → countdown (5 s) → race → results, the
- * server referees laps from each client's reported checkpoint / lap (in order, never faster than track.length / 20 m/s)
- * and relays everyone's car 15 times a second — only while something moved. Physics is the browsers' business.
+ * server referees laps from each client's reported checkpoint / lap (in order, never faster than track.length / 24 m/s)
+ * and relays everyone's car 15 times a second — only while something moved. Physics is the browsers' business. Items
+ * (v2: boxes, held items, hazards, effects) live in rc-room-items.js, in the lobby's free roam and in a race.
  * Costs nothing idle: a 1 Hz housekeeping timer only while sockets are open, the 15 Hz world timer only while cars move.
  */
 
 const S = require('./rc-sanitize')
+const { createRoomItems } = require('./rc-room-items')
 
 const COUNTDOWN_MS = 5000
 const GRACE_MS = 20000
@@ -21,7 +23,7 @@ const MAX_LAPS = 20
 
 /**
  * @param {{ now?: () => number, timers?: object, send: (conn, msg) => void, close?: (conn, code, reason) => void,
- *   decorate?: (state) => object, maxPlayers?: number, maxSpectators?: number }} deps
+ *   decorate?: (state) => object, maxPlayers?: number, maxSpectators?: number, rng?: () => number }} deps
  */
 function createRcRoom(deps) {
 	const now = deps.now || Date.now
@@ -44,6 +46,16 @@ function createRcRoom(deps) {
 	let firstFinish = null
 	const timer = { phase: null, house: null, world: null, worldIdle: 0 }
 	let dirty = false
+	const items = createRoomItems({
+		now, timers: T, rng: deps.rng, toAll: (msg) => toAll(msg),
+		toPlayer: (pid, msg) => {
+			const p = players.get(pid)
+			if (p?.conn) send(p.conn, msg)
+		},
+		position, carOf: (pid) => players.get(pid)?.car || null, isPlayer: (pid) => players.has(pid),
+	})
+	/** Items follow the race's track, or the selected one in the lobby. */
+	const syncItems = () => items.setTrack(raceTrack || tracks.find((t) => t.id === trackId) || null, bounds)
 
 	const connected = () => [...players.values()].filter((p) => p.connected)
 	const spectators = () => [...conns.values()].filter((c) => c.joined && c.spectator).length
@@ -54,6 +66,7 @@ function createRcRoom(deps) {
 			players: [...players.values()].sort((a, b) => a.id - b.id).map((p) => ({ id: p.id, name: p.name, color: p.color, ready: p.ready,
 				connected: p.connected, slot: p.slot, racing: p.racing })),
 			spectators: spectators(),
+			...items.snapshot(),
 		}
 	}
 	const state = () => decorate(snapshot())
@@ -145,6 +158,7 @@ function createRcRoom(deps) {
 		conns.delete(c.conn)
 		const p = c.pid != null ? players.get(c.pid) : null
 		if (p && !c.spectator) {
+			items.forget(p.id)
 			if (phase === 'lobby' || !p.racing) players.delete(p.id)
 			else {
 				p.connected = false
@@ -167,7 +181,7 @@ function createRcRoom(deps) {
 		if (lap !== r.lap + 1 || cp !== 0 || r.cp !== k - 1) return // out of order: ignored (the server's count stands)
 		const t = now()
 		const ms = t - r.lapStart
-		if (ms < (raceTrack.length / 20) * 1000) return // faster than 20 m/s average: not a lap
+		if (ms < (raceTrack.length / 24) * 1000) return // faster than 24 m/s average (the hard cap): not a lap
 		r.lap = lap
 		r.cp = 0
 		r.lapStart = t
@@ -195,7 +209,7 @@ function createRcRoom(deps) {
 		if (c.sTimes.length >= STATE_HZ && t - c.sTimes[0] < 1000) return // over 20 per second: dropped
 		c.sTimes.push(t)
 		if (c.sTimes.length > STATE_HZ) c.sTimes.shift()
-		const car = [v.x, v.y, v.z, v.yaw, v.v, v.st]
+		const car = [v.x, v.y, v.z, v.yaw, v.v, v.st, v.fx]
 		if (!p.car || car.some((x, i) => x !== p.car[i])) {
 			p.car = car
 			moved()
@@ -219,10 +233,19 @@ function createRcRoom(deps) {
 		return all.map((p) => ({ id: p.id, name: p.name, totalMs: p.race.finished ? p.race.total : null, bestMs: p.race.best, laps: p.race.lap }))
 	}
 
+	/** Race position of a player for the item roll: 0 leading … 1 last; null outside a race. */
+	function position(pid) {
+		if (phase !== 'race') return null
+		const ids = order().map((o) => o.id)
+		const i = ids.indexOf(pid)
+		return i < 0 ? null : ids.length > 1 ? i / (ids.length - 1) : 0
+	}
+
 	function finishRace() {
 		clearPhaseTimer()
 		if (phase !== 'race' && phase !== 'countdown') return
 		phase = 'results'
+		items.clear()
 		toAll({ t: 'results', order: order(), final: true })
 		broadcastState()
 	}
@@ -233,6 +256,8 @@ function createRcRoom(deps) {
 		startAt = null
 		firstFinish = null
 		raceTrack = null
+		items.clear()
+		syncItems()
 		for (const p of [...players.values()]) {
 			if (!p.connected) players.delete(p.id)
 			else {
@@ -249,6 +274,8 @@ function createRcRoom(deps) {
 		if (!racers.length) return { ok: false, status: 409, error: 'no players' }
 		toLobby()
 		raceTrack = track
+		syncItems()
+		items.clear()
 		startAt = now() + COUNTDOWN_MS
 		for (const p of players.values()) {
 			p.racing = true
@@ -265,7 +292,7 @@ function createRcRoom(deps) {
 		return { ok: true }
 	}
 
-	/** Host actions (track / laps / start / stop / kick); enable / disable belong to the service. */
+	/** Host actions (track / laps / start / stop / kick; lights / wall only broadcast); enable / disable belong to the service. */
 	function host(action, a = {}) {
 		const idle = phase === 'lobby' || phase === 'results'
 		switch (action) {
@@ -274,6 +301,7 @@ function createRcRoom(deps) {
 				if (!idle) return { ok: false, status: 409, error: 'a race is running' }
 				if (!tracks.some((t) => t.id === id)) return { ok: false, status: 400, error: 'unknown track' }
 				trackId = id
+				syncItems()
 				break
 			}
 			case 'laps': {
@@ -295,7 +323,7 @@ function createRcRoom(deps) {
 				const c = [...conns.values()].find((x) => x.pid === id)
 				const p = players.get(id)
 				if (!c && !p) return { ok: false, status: 404, error: 'no such player' }
-				if (p) players.delete(id)
+				if (p) players.delete(id), items.forget(id)
 				if (c) {
 					conns.delete(c.conn)
 					close(c.conn, 4409, 'kicked')
@@ -303,6 +331,9 @@ function createRcRoom(deps) {
 				if (phase === 'race') checkAllFinished()
 				break
 			}
+			case 'lights':
+			case 'wall':
+				break // §2.6 switches: flipped by the service (rc-game.js); only the state broadcast happens here
 			default:
 				return { ok: false, status: 400, error: 'unknown action' }
 		}
@@ -319,8 +350,9 @@ function createRcRoom(deps) {
 			bounds = scene?.bounds || null
 			if (!tracks.some((t) => t.id === trackId)) {
 				trackId = tracks[0]?.id ?? null
+				syncItems()
 				if (conns.size) broadcastState()
-			}
+			} else syncItems()
 		},
 		connect(conn) {
 			conns.set(conn, { conn, pid: null, spectator: false, joined: false, opened: now(), last: now(), sTimes: [] })
@@ -335,6 +367,9 @@ function createRcRoom(deps) {
 			if (m.t === 'ping') return send(conn, { t: 'pong', c: Number.isFinite(m.c) ? m.c : null, s: now() })
 			if (!c.joined) return
 			if (m.t === 's') return carState(c, m)
+			if ((m.t === 'box' || m.t === 'use' || m.t === 'hit') && !c.spectator && players.has(c.pid) && (phase === 'lobby' || phase === 'race')) {
+				return items.handle(c.pid, m)
+			}
 			if (m.t === 'ready' && !c.spectator && players.has(c.pid)) {
 				players.get(c.pid).ready = m.ready === true
 				broadcastState()
@@ -353,6 +388,7 @@ function createRcRoom(deps) {
 			conns.clear()
 			players.clear()
 			toLobby()
+			items.clear()
 		},
 		/** Diagnostics for the smokes: which timers run. */
 		timers: () => ({ phase: !!timer.phase, house: !!timer.house, world: !!timer.world }),

@@ -1,23 +1,24 @@
 /* global setTimeout, clearTimeout */
 /**
- * HUD of the RC game (WO-1074): position, lap, lap times, speed bar, minimap, countdown lights, connection dot,
- * results table and (spectator) a big leaderboard. DOM only; text via textContent.
+ * HUD of the RC game (WO-1074): lap, lap times, speed bar, minimap, countdown lights, connection dot, results table
+ * and (spectator) a big leaderboard; v2 arcade pieces (big ordinal position, lap banner, item slot, start hint, speed
+ * lines, pop words, confetti) live in hud-extra.js and are reachable as `hud.x`. DOM only; text via textContent.
  */
 import { h, setText, show, safeColor } from './dom.js'
 import { fmtTime } from './lap-logic.js'
 import { Minimap } from './trackdraw.js'
 import { PHYS } from './physics.js'
+import { createHudExtra } from './hud-extra.js'
 
-export function createHud(root, { spectator = false, toolbar = [] } = {}) {
+export function createHud(root, { spectator = false, toolbar = [], itemButton = null } = {}) {
 	root.textContent = ''
 	root.classList.toggle('spectator', spectator)
 
-	const posBig = h('div.hud-pos')
 	const lapEl = h('div.hud-lap')
 	const curEl = h('div.hud-time')
 	const bestEl = h('div.hud-best')
 	const statusEl = h('div.hud-status')
-	const tl = h('div.hud-tl', posBig, lapEl)
+	const tl = h('div.hud-tl', lapEl)
 	const tc = h('div.hud-tc', curEl, bestEl, statusEl)
 	const mapCanvas = h('canvas.hud-map', { width: spectator ? 360 : 180, height: spectator ? 260 : 130 })
 	const conn = h('div.hud-conn', { title: 'Connection' })
@@ -54,24 +55,21 @@ export function createHud(root, { spectator = false, toolbar = [] } = {}) {
 	show(speed, !spectator)
 
 	const minimap = new Minimap(mapCanvas)
+	const x = createHudExtra(root, { spectator, itemButton })
 	let toastTimer = null
 
 	return {
+		x,
 		setTrack(T) {
 			minimap.setTrack(T)
 		},
 		/** @param {object} s */
 		update(s) {
-			if (s.racing) {
-				setText(posBig, s.pos && s.total ? `${s.pos}/${s.total}` : '–')
-				setText(lapEl, `Lap ${Math.min(s.lap + 1, s.laps)}/${s.laps}`)
-			} else {
-				setText(posBig, '')
-				setText(lapEl, s.phaseLabel || '')
-			}
+			x.position(s.racing ? s.pos : 0, s.total)
+			setText(lapEl, s.racing ? `Lap ${Math.min(s.lap + 1, s.laps)}/${s.laps}` : s.phaseLabel || '')
 			setText(curEl, s.racing && s.curMs != null ? fmtTime(s.curMs) : '')
 			setText(bestEl, s.bestMs != null ? `Best ${fmtTime(s.bestMs)}` : '')
-			const pct = Math.min(1, Math.abs(s.speed || 0) / PHYS.TOP_ON)
+			const pct = Math.min(1, Math.abs(s.speed || 0) / PHYS.TOP_BOOST)
 			speedFill.style.transform = `scaleX(${pct.toFixed(3)})`
 			speedFill.classList.toggle('off', !s.onTrack)
 			setText(speedNum, `${(Math.abs(s.speed || 0) * 3.6).toFixed(0)} km/h`)
@@ -128,8 +126,10 @@ export function createHud(root, { spectator = false, toolbar = [] } = {}) {
 		results(rows, note = '') {
 			if (!rows) {
 				show(results, false)
+				x.confetti(false)
 				return
 			}
+			const wasShown = !results.hidden
 			resultsBody.textContent = ''
 			rows.forEach((r, i) => {
 				const sw = h('span.swatch')
@@ -147,6 +147,7 @@ export function createHud(root, { spectator = false, toolbar = [] } = {}) {
 			})
 			setText(resultsNote, note)
 			show(results, true)
+			if (!wasShown) x.confetti(true)
 		},
 	}
 }

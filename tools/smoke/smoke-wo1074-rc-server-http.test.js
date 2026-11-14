@@ -271,28 +271,28 @@ test('game socket end to end: join, full, spectator, relay, countdown, laps, res
 	assert.equal((await host({ action: 'track', trackId: track.id })).status, 409, 'no track change during a race')
 	clock.advance(COUNTDOWN_MS)
 	assert.equal(game.state().phase, 'race')
-	const [x, z] = track.points[0]
+	const [x, y, z] = track.points[0] // v2: [x, y, z]
 	const sync = () => Promise.all([A.sync(), B.sync(), spec.sync()])
 	// relay: A's car reaches B and the spectator in the world snapshot
 	const nB = B.msgs.length
-	A.send({ t: 's', p: [x, track.y, z], yaw: 0.5, v: 2, st: -0.25, cp: 0, lap: 0 })
+	A.send({ t: 's', p: [x, y, z], yaw: 0.5, v: 2, st: -0.25, cp: 0, lap: 0 })
 	await sync()
 	clock.advance(70)
 	const w = await B.next((m) => m.t === 'w' && m.cars.some((c) => c[0] === A.welcome.id), nB)
-	const car = w.cars.find((c) => c[0] === A.welcome.id) // [id, x, y, z, yaw, v, st]
+	const car = w.cars.find((c) => c[0] === A.welcome.id) // [id, x, y, z, yaw, v, st, fx]
 	assert.deepEqual([car[1], car[3], car[6]], [Math.round(x * 1000) / 1000, Math.round(z * 1000) / 1000, -0.25])
 	await spec.next((m) => m.t === 'w', 0)
-	// laps: checkpoints in order, never faster than length / 20 m/s
+	// laps: checkpoints in order, never faster than length / 24 m/s
 	const K = track.checkpoints.length
-	const minLap = (track.length / 20) * 1000
+	const minLap = (track.length / 24) * 1000
 	const lap = async (c) => {
 		for (let cp = 1; cp < K; cp++) {
 			clock.advance(200)
-			c.send({ t: 's', p: [x, track.y, z], yaw: 0, v: 3, st: 0, cp, lap: 0 })
+			c.send({ t: 's', p: [x, y, z], yaw: 0, v: 3, st: 0, cp, lap: 0 })
 			await sync()
 		}
 		clock.advance(minLap)
-		c.send({ t: 's', p: [x, track.y, z], yaw: 0, v: 3, st: 0, cp: 0, lap: 1 })
+		c.send({ t: 's', p: [x, y, z], yaw: 0, v: 3, st: 0, cp: 0, lap: 1 })
 		await sync()
 	}
 	await lap(A)
@@ -337,15 +337,39 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 	const files = [...fs.readdirSync(path.join(ROOT, 'src/game')).map((f) => `src/game/${f}`), 'src/api/routes-rc-game.js']
 	assert.ok(files.length >= 10)
 	const allowed = /^(\.\/rc-[a-z-]+|\.\/response|\.\.\/game\/rc-game|\.\.\/stage\/(mvr-store|glb-write)|\.\.\/engine\/project-scenes|\.\.\/utils\/lan-ipv4|\.\.\/server\/(auth|security-headers)|\.\.\/repo-paths|ws|crypto|fs|os|path|zlib)$/
+	/* §2.6 — per FILE, exactly these extra modules: the previs pose maths (gdtf-ik), the GDTF cache (gdtf-store) and the
+	   patch normaliser (follow-patch) for the lights — all read-only; node's EventEmitter (the in-process feed client's
+	   shape), the cached channel map + INFO CONFIG rasters (pixel-map-service.liveChannelMap: config and cached text,
+	   no AMCP) and the video-surface manager for the pictures. That manager's role lease is the ONE way the game reaches
+	   Caspar: it adds a read-only SHM consumer (the same lease the Godot camera view and the feed use) — so rc-video.js
+	   may call only `resolveRoleChannel` and `getVideoSurfaceManager(ctx).lease`, and no file here holds an AMCP verb. */
+	const extra = {
+		'src/game/rc-lights-fk.js': ['../fixtures/gdtf-ik'],
+		'src/game/rc-lights.js': ['../fixtures/gdtf-store', '../fixtures/follow-patch'],
+		'src/game/rc-video.js': ['events', '../fixtures/pixel-map-service', '../system/video-surfaces'],
+	}
+	const use = {
+		'../fixtures/pixel-map-service': /^\.liveChannelMap\(ctx\)/,
+		'../system/video-surfaces': /^(\.resolveRoleChannel\(role, map\)|\.getVideoSurfaceManager\(ctx\)\.lease\(id, roles\))/,
+	}
+	const seen = new Set()
 	for (const f of files) {
 		const src = fs.readFileSync(path.join(ROOT, f), 'utf8')
 		const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '')
-		for (const m of code.matchAll(/require\(\s*'([^']+)'\s*\)/g)) assert.match(m[1], allowed, `${f} requires ${m[1]}`)
+		for (const m of code.matchAll(/require\(\s*'([^']+)'\s*\)/g)) {
+			if (allowed.test(m[1])) continue
+			assert.ok((extra[f] || []).includes(m[1]), `${f} requires ${m[1]}`)
+			seen.add(`${f} ${m[1]}`)
+			if (use[m[1]]) assert.match(code.slice(m.index + m[0].length), use[m[1]], `${f}: only the listed call on ${m[1]}`)
+		}
 		// the route registry's `requireCaspar: false` (these routes work with Caspar down) is the one allowed mention
 		assert.doesNotMatch(code.replace(/requireCaspar: false/g, ''), /amcp|caspar|scene[-_]?take|sceneTake|takeLook|\blooks?\b|\bchannels?\b|playout|LOADBG|MIXER|\bCG ADD|\bPLAY\s/i, f)
+		// AMCP verbs with a channel number / template, and Caspar's SHM consumer, are never spelled out in the game
+		assert.doesNotMatch(code, /\bSHM\b|\b(ADD|REMOVE|LOAD|CLEAR|CALL|SWAP|STOP|RESUME|PAUSE)\s+(\d|\$\{)/, f)
 		// ("layer" is allowed: in src/game it only ever means an MVR layer — hidden_layers / layer_colors; the require
 		// allow-list above is what keeps Caspar, AMCP, looks and channel code out)
 	}
+	assert.deepEqual([...seen].sort(), Object.entries(extra).flatMap(([f, ms]) => ms.map((m) => `${f} ${m}`)).sort(), 'no stale extra')
 	const route = fs.readFileSync(path.join(ROOT, 'src/api/routes-rc-game.js'), 'utf8')
 	assert.deepEqual([...route.matchAll(/routes\.(get|post)\('([^']+)'/g)].map((m) => m[2]),
 		['/api/game/rc/state', '/api/game/rc/scene', '/api/game/rc/scene.glb', '/api/game/rc/host'], 'no route that shows the game on a wall')

@@ -4,8 +4,8 @@
  * WO-1074 — RC car game (work/notes/rc-game-contract.md). The game never puts anything on a screen: these routes read
  * the project / MVR store and drive the in-memory room, nothing else.
  *   GET  /api/game/rc/state       → { enabled: false } | the room state (+ joinUrls, sceneRev)   (public)
- *   POST /api/game/rc/host        { action: enable | disable | track | start | stop | laps | kick, … } (normal auth)
- *   GET  /api/game/rc/scene       → the baked scene JSON (403 while disabled; waits for a running bake)
+ *   POST /api/game/rc/host        { action: enable | disable | track | start | stop | laps | kick | lights | wall, … } (normal auth)
+ *   GET  /api/game/rc/scene       → the baked scene JSON + live `lights` / `screens` (403 while disabled; waits for a bake)
  *   GET  /api/game/rc/scene.glb   → the merged scene GLB (gzip when accepted; immutable when ?rev= is current)
  * Public while enabled: state, scene, scene.glb (src/game/rc-public.js); the socket lives in src/game/rc-ws.js.
  */
@@ -18,7 +18,7 @@ const off = () => reply(403, { ok: false, error: 'The game is not running', enab
 
 async function sceneJson(game) {
 	if (!game.isEnabled()) return off()
-	const out = await game.scene()
+	const out = await (game.sceneWithLive ? game.sceneWithLive() : game.scene()) // + the live lights / screens (§2.6)
 	return { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' }, body: out.text }
 }
 

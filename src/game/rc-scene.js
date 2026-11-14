@@ -16,9 +16,10 @@ const path = require('path')
 const zlib = require('zlib')
 const G = require('./rc-scene-geom')
 const M = require('./rc-scene-mesh')
-const { generateTracksAsync } = require('./rc-tracks')
+const H = require('./rc-scene-height')
+const { generateTracksAsync, GENERATOR_VERSION } = require('./rc-tracks')
 
-const BAKE_VERSION = 1 // bump when the bake's output changes for the same input
+const BAKE_VERSION = 3 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights)
 const REV_MEMO_MS = 2000
 const KEEP_CACHED = 6
 const BOX = 'game:box'
@@ -38,7 +39,7 @@ function sceneInputs(project) {
 /** The revision: scene id + a hash of everything that changes the bake. */
 function revOf(inp, recStat) {
 	const c = inp.cfg
-	const h = crypto.createHash('sha1').update(JSON.stringify([BAKE_VERSION, inp.id, recStat, c.place, c.hidden_layers, c.hidden_objects,
+	const h = crypto.createHash('sha1').update(JSON.stringify([BAKE_VERSION, GENERATOR_VERSION, inp.id, recStat, c.place, c.hidden_layers, c.hidden_objects,
 		c.layer_colors, c.moved, inp.grid, inp.stageObjects, M.MAX_TRIS, M.MAX_BYTES]))
 	return `${inp.id || 'none'}-${h.digest('hex').slice(0, 10)}`
 }
@@ -89,28 +90,34 @@ async function bakeScene(inp, rev, deps = {}) {
 	const plan = await M.planBudget(parts, templates, pause)
 	const grids = floors.map((f) => ({ floor: f, grid: G.slabGrid(f, Math.max(0.25, Math.max(f.rect[2] - f.rect[0], f.rect[3] - f.rect[1]) / 400)) }))
 	const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
+	// §2.7: the height field (what stands under / hangs over an elevated deck) is filled in the same pass
+	const field = H.createHeightField(hall.rect, hall.y)
 	const onTri = (...v) => {
 		for (let k = 0; k < 9; k++) {
 			if (v[k] < lo[k % 3]) lo[k % 3] = v[k]
 			if (v[k] > hi[k % 3]) hi[k % 3] = v[k]
 		}
 		for (const g of grids) g.grid.tri(...v)
+		field.tri(...v)
 	}
 	const inst = await M.instanceParts(parts, templates, plan, onTri, pause)
-	if (stage && stage.y > hall.y + 0.05) grids[0].grid.box([stage.rect[0], hall.y, stage.rect[1]], [stage.rect[2], stage.y, stage.rect[3]])
-	const obstacles = G.obstaclesFrom(grids.map((g) => ({ floor: g.floor, rects: g.grid.rects() })))
+	// (parts the GLB leaves out — fixtures, dropped small objects — are not drawn, so a deck may pass through them)
+	// the stage seen from the hall is a wall of the ground model (and its ramps' destination), not an obstacle
+	if (stage && stage.y > hall.y + 0.05) grids[0].grid.clear(stage.rect, 0.02)
+	if (stage && stage.y > hall.y) field.clearBelow(stage.rect, stage.y)
+	const obstacles = G.obstaclesFrom(grids.map((g) => ({ floor: g.floor, grid: g.grid })))
 	for (const f of floors) {
 		lo[0] = Math.min(lo[0], f.rect[0]); lo[1] = Math.min(lo[1], f.y); lo[2] = Math.min(lo[2], f.rect[1])
 		hi[0] = Math.max(hi[0], f.rect[2]); hi[1] = Math.max(hi[1], f.y + 3); hi[2] = Math.max(hi[2], f.rect[3])
 	}
 	const r3 = (v) => Math.round(v * 1000) / 1000
-	const gen = await generateTracksAsync({ floors, obstacles, bounds: { min: lo, max: hi } }, pause)
+	const gen = await generateTracksAsync({ floors, obstacles, bounds: { min: lo, max: hi }, field }, pause)
 	const arena = gen.floors.find((f) => f.id === 'arena')
 	if (arena) inst.primitives.push(...arenaSlab(arena))
 	const glb = M.sceneGlb(inst.primitives)
 	const json = {
 		rev, name: rec?.name || inp.name || inp.projectName || 'Empty arena', glb: `/api/game/rc/scene.glb?rev=${rev}`,
-		bounds: { min: gen.bounds.min.map(r3), max: gen.bounds.max.map(r3) }, floors: gen.floors, obstacles, tracks: gen.tracks,
+		bounds: { min: gen.bounds.min.map(r3), max: gen.bounds.max.map(r3) }, floors: gen.floors, obstacles, heights: field.toJSON(), tracks: gen.tracks,
 		dropped: { fixtures: plan.dropped.fixtures, objects: plan.dropped.objects, simplifiedCellM: plan.dropped.cell,
 			meshesFailed: failed.length, venueGlb: inp.cfg.venue_glb ? 'ignored' : null },
 		stats: { triangles: inst.tris + (arena ? 2 : 0), bytes: glb.length, parts: plan.keep.filter(Boolean).length, bakeMs: Date.now() - t0 },

@@ -1,18 +1,24 @@
 /* global window, document, navigator, DeviceOrientationEvent */
 /**
- * Controls (WO-1074): keyboard (arrows / WASD, space = handbrake, R = respawn, C = camera), touch (left thumb steering
- * slider with a knob, right thumb gas + brake/reverse pedals, multi-touch via Pointer Events), Gamepad API, and an
- * optional tilt-to-steer (DeviceOrientation, with the iOS permission prompt). All merge into one input object:
- * { throttle 0…1, brake 0…1, steer −1…1 (+ = LEFT), hand }.
+ * Controls (WO-1074 v2): keyboard, touch (Pointer Events, multi-touch), Gamepad API and optional tilt — merged into
+ * one input per frame: { throttle 0…1, brake 0…1, steer −1…1 (+ = LEFT), drift, use (true once per press) }.
+ *  - keyboard: arrows / WASD, Shift or Space = drift, S / Down = brake / reverse, E or Ctrl = item, R respawn,
+ *    C camera, M sound;
+ *  - touch: left thumb steers (slider anywhere in the left zone); right thumb plays a 2 × 2 cluster — big GO bottom
+ *    right, BRAKE left of it, DRIFT above GO, ITEM above BRAKE. A finger may slide between the zones; DRIFT and ITEM
+ *    also hold the gas (one thumb drives, drifts and fires); ITEM fires when the finger enters it;
+ *  - gamepad: left stick / d-pad steer, RT gas, LT brake, LB / RB drift, A / B / X item, Y respawn, Back camera.
  */
 
 const STICK_RANGE_PX = 70
 const DEADZONE = 0.12
+const ZONE_SLOP_PX = 10
 
-export function createInput({ stickEl, knobEl, gasEl, brakeEl, onRespawn, onCamera, onMute }) {
+export function createInput({ stickEl, knobEl, zones = {}, onRespawn, onCamera, onMute }) {
 	const keys = new Set()
-	const touch = { steer: 0, gas: false, brake: false }
+	const touch = { steer: 0, gas: false, brake: false, drift: false }
 	const tilt = { on: false, steer: 0, zero: null }
+	let usePresses = 0
 	const listeners = []
 	const on = (target, ev, fn, opts) => {
 		target.addEventListener(ev, fn, opts)
@@ -20,7 +26,22 @@ export function createInput({ stickEl, knobEl, gasEl, brakeEl, onRespawn, onCame
 	}
 
 	/* ---------- keyboard ---------- */
-	const GAME_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'])
+	const GAME_KEYS = new Set([
+		'ArrowUp',
+		'ArrowDown',
+		'ArrowLeft',
+		'ArrowRight',
+		'Space',
+		'KeyW',
+		'KeyA',
+		'KeyS',
+		'KeyD',
+		'KeyE',
+		'ShiftLeft',
+		'ShiftRight',
+		'ControlLeft',
+		'ControlRight',
+	])
 	on(window, 'keydown', (e) => {
 		if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return
 		if (GAME_KEYS.has(e.code)) e.preventDefault()
@@ -29,6 +50,7 @@ export function createInput({ stickEl, knobEl, gasEl, brakeEl, onRespawn, onCame
 		if (e.code === 'KeyR') onRespawn?.()
 		else if (e.code === 'KeyC') onCamera?.()
 		else if (e.code === 'KeyM') onMute?.()
+		else if (e.code === 'KeyE' || e.code === 'ControlLeft' || e.code === 'ControlRight') usePresses++
 	})
 	on(window, 'keyup', (e) => keys.delete(e.code))
 	on(window, 'blur', () => keys.clear())
@@ -50,9 +72,8 @@ export function createInput({ stickEl, knobEl, gasEl, brakeEl, onRespawn, onCame
 		})
 		on(stickEl, 'pointermove', (e) => {
 			if (e.pointerId !== stickPointer) return
-			const dx = (e.clientX - stickX0) / STICK_RANGE_PX
 			/* drag right = steer right = negative */
-			touch.steer = -Math.max(-1, Math.min(1, dx))
+			touch.steer = -Math.max(-1, Math.min(1, (e.clientX - stickX0) / STICK_RANGE_PX))
 			setKnob(touch.steer)
 		})
 		const end = (e) => {
@@ -67,41 +88,52 @@ export function createInput({ stickEl, knobEl, gasEl, brakeEl, onRespawn, onCame
 		on(stickEl, 'lostpointercapture', end)
 	}
 
-	/* ---------- pedals (each pointer may slide between gas and brake) ---------- */
-	const pedalPointers = new Map() // pointerId → 'gas' | 'brake' | null
-	const pedalAt = (x, y) => {
-		for (const [name, el] of [
-			['gas', gasEl],
-			['brake', brakeEl],
-		]) {
-			const r = el?.getBoundingClientRect()
-			if (r && x >= r.left - 12 && x <= r.right + 12 && y >= r.top - 12 && y <= r.bottom + 12) return name
+	/* ---------- right-thumb cluster (each pointer may slide between the zones) ---------- */
+	const ZONES = ['gas', 'brake', 'drift', 'item'].filter((z) => zones[z])
+	const zonePointers = new Map() // pointerId → zone name | null
+	const zoneAt = (x, y) => {
+		for (const name of ZONES) {
+			const r = zones[name].getBoundingClientRect()
+			if (
+				x >= r.left - ZONE_SLOP_PX &&
+				x <= r.right + ZONE_SLOP_PX &&
+				y >= r.top - ZONE_SLOP_PX &&
+				y <= r.bottom + ZONE_SLOP_PX
+			)
+				return name
 		}
 		return null
 	}
-	const syncPedals = () => {
-		const vals = [...pedalPointers.values()]
-		touch.gas = vals.includes('gas')
+	const syncZones = () => {
+		const vals = [...zonePointers.values()]
 		touch.brake = vals.includes('brake')
-		gasEl?.classList.toggle('active', touch.gas)
-		brakeEl?.classList.toggle('active', touch.brake)
+		touch.drift = vals.includes('drift')
+		/* drift and item keep the gas down: one thumb rolls from GO onto them without lifting */
+		touch.gas = vals.includes('gas') || touch.drift || vals.includes('item')
+		for (const name of ZONES) zones[name].classList.toggle('active', vals.includes(name))
+		zones.gas?.classList.toggle('held', touch.gas)
 	}
-	for (const el of [gasEl, brakeEl]) {
-		if (!el) continue
+	const setZone = (id, z) => {
+		const was = zonePointers.get(id)
+		zonePointers.set(id, z)
+		if (z === 'item' && was !== 'item') usePresses++
+		syncZones()
+	}
+	for (const name of ZONES) {
+		const el = zones[name]
 		on(el, 'pointerdown', (e) => {
 			e.preventDefault()
 			el.setPointerCapture?.(e.pointerId)
-			pedalPointers.set(e.pointerId, pedalAt(e.clientX, e.clientY) || (el === gasEl ? 'gas' : 'brake'))
-			syncPedals()
+			setZone(e.pointerId, zoneAt(e.clientX, e.clientY) || name)
 		})
 		on(el, 'pointermove', (e) => {
-			if (!pedalPointers.has(e.pointerId)) return
-			pedalPointers.set(e.pointerId, pedalAt(e.clientX, e.clientY))
-			syncPedals()
+			if (!zonePointers.has(e.pointerId)) return
+			const z = zoneAt(e.clientX, e.clientY)
+			if (z !== zonePointers.get(e.pointerId)) setZone(e.pointerId, z)
 		})
 		const end = (e) => {
-			if (!pedalPointers.delete(e.pointerId)) return
-			syncPedals()
+			if (!zonePointers.delete(e.pointerId)) return
+			syncZones()
 		}
 		on(el, 'pointerup', end)
 		on(el, 'pointercancel', end)
@@ -118,8 +150,7 @@ export function createInput({ stickEl, knobEl, gasEl, brakeEl, onRespawn, onCame
 		if (e.beta == null) return
 		const angle = window.screen?.orientation?.angle ?? window.orientation ?? 90
 		if (tilt.zero == null) tilt.zero = e.beta
-		/* landscape: the device's beta axis is the steering-wheel axis; raising the left end (top on the left at 90°)
-		 * gives positive beta = a right turn = negative steer */
+		/* landscape: beta is the steering-wheel axis; raising the left end at 90° = a right turn = negative steer */
 		const sign = angle === 90 ? -1 : 1
 		tilt.steer = Math.max(-1, Math.min(1, (sign * (e.beta - tilt.zero)) / 22))
 	}
@@ -145,9 +176,13 @@ export function createInput({ stickEl, knobEl, gasEl, brakeEl, onRespawn, onCame
 		return true
 	}
 
-	/* ---------- gamepad ---------- */
-	let padRespawnHeld = false
-	let padCamHeld = false
+	/* ---------- gamepad (standard mapping) ---------- */
+	const held = { resp: false, cam: false, use: false }
+	const edge = (name, now) => {
+		const fire = now && !held[name]
+		held[name] = now
+		return fire
+	}
 	function readPad() {
 		const pads = navigator.getGamepads ? navigator.getGamepads() : []
 		for (const gp of pads || []) {
@@ -155,38 +190,41 @@ export function createInput({ stickEl, knobEl, gasEl, brakeEl, onRespawn, onCame
 			const ax = gp.axes[0] || 0
 			const b = (i) => gp.buttons[i] || { value: 0, pressed: false }
 			const steer = Math.abs(ax) > DEADZONE ? -ax : b(14).pressed ? 1 : b(15).pressed ? -1 : 0
-			const gas = Math.max(b(7).value, b(0).pressed ? 1 : 0, b(12).pressed ? 1 : 0)
-			const brk = Math.max(b(6).value, b(2).pressed ? 1 : 0, b(13).pressed ? 1 : 0)
-			const resp = b(3).pressed
-			if (resp && !padRespawnHeld) onRespawn?.()
-			padRespawnHeld = resp
-			const cam = b(5).pressed
-			if (cam && !padCamHeld) onCamera?.()
-			padCamHeld = cam
-			return { steer, gas, brk, hand: b(1).pressed }
+			if (edge('resp', b(3).pressed)) onRespawn?.()
+			if (edge('cam', b(8).pressed)) onCamera?.()
+			if (edge('use', b(0).pressed || b(1).pressed || b(2).pressed)) usePresses++
+			return {
+				steer,
+				gas: Math.max(b(7).value, b(12).pressed ? 1 : 0),
+				brk: Math.max(b(6).value, b(13).pressed ? 1 : 0),
+				drift: b(4).pressed || b(5).pressed,
+			}
 		}
 		return null
 	}
 
-	/** Merged controls for this frame. */
+	/** Merged controls for this frame (`use` is true once per press). */
 	function read() {
 		const k = (a, b) => keys.has(a) || keys.has(b)
 		let steer = (k('ArrowLeft', 'KeyA') ? 1 : 0) - (k('ArrowRight', 'KeyD') ? 1 : 0)
 		let throttle = k('ArrowUp', 'KeyW') ? 1 : 0
 		let brake = k('ArrowDown', 'KeyS') ? 1 : 0
-		let hand = keys.has('Space')
+		let drift = keys.has('Space') || k('ShiftLeft', 'ShiftRight')
 		if (touch.steer) steer = touch.steer
 		if (tilt.on && !touch.steer) steer = tilt.steer
 		if (touch.gas) throttle = 1
 		if (touch.brake) brake = 1
+		drift = drift || touch.drift
 		const pad = readPad()
 		if (pad) {
 			if (pad.steer) steer = pad.steer
 			throttle = Math.max(throttle, pad.gas)
 			brake = Math.max(brake, pad.brk)
-			hand = hand || pad.hand
+			drift = drift || pad.drift
 		}
-		return { throttle, brake, steer, hand }
+		const use = usePresses > 0
+		usePresses = 0
+		return { throttle, brake, steer, drift, use }
 	}
 
 	function destroy() {

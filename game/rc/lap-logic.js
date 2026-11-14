@@ -5,6 +5,7 @@
  * A race starts at cp 0 / lap 0 (the start line counts as passed, whichever side of it the grid is). Only the NEXT
  * checkpoint, crossed in the driving direction, advances; crossing checkpoint 0 after the last one completes a lap.
  * Driving backwards over a gate, or crossing gates out of order (e.g. on a figure-eight's other branch), never counts.
+ * v2: with the car's heights (ay, by) a crossing well above / below the gate (stage part over a hall gate) never counts.
  */
 import { gateCrossing } from './track-math.js'
 
@@ -19,14 +20,14 @@ export function resetLaps(st, startMs = null) {
 }
 
 /**
- * Feed one movement A → B.
+ * Feed one movement A → B (optional heights ay → by).
  * @returns {null | { type: 'cp', cp: number } | { type: 'lap', lap: number, ms: number|null }}
  */
-export function lapStep(T, st, ax, az, bx, bz, nowMs) {
+export function lapStep(T, st, ax, az, bx, bz, nowMs, ay = null, by = null) {
 	const n = T.checkpoints.length
 	if (!n) return null
 	const next = (st.cp + 1) % n
-	if (gateCrossing(T, next, ax, az, bx, bz) !== 1) return null
+	if (gateCrossing(T, next, ax, az, bx, bz, ay, by) !== 1) return null
 	if (next !== 0) {
 		st.cp = next
 		return { type: 'cp', cp: next }

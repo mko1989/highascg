@@ -1,0 +1,134 @@
+/* Stage Sprint RC (WO-1074 v2) — touch controls (phones / tablets only): left thumb steers, right thumb plays a
+ * 2 × 2 cluster (ITEM · DRIFT over BRAKE · GO); GO is the big one bottom right, a thumb rolls between them. */
+#touch {
+	display: none;
+}
+@media (pointer: coarse) {
+	body.mode-player #touch {
+		display: block;
+	}
+	.hud-speed {
+		bottom: calc(10px + var(--sb));
+		width: 26vw;
+	}
+}
+.stick {
+	position: fixed;
+	left: 0;
+	bottom: 0;
+	width: 44vw;
+	height: 58vh;
+	z-index: 3;
+	touch-action: none;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: flex-end;
+	padding: 0 0 calc(22px + var(--sb)) calc(22px + var(--sl));
+}
+.stick-track {
+	position: relative;
+	width: 200px;
+	height: 60px;
+	border-radius: 30px;
+	background: rgba(255, 255, 255, 0.1);
+	border: 2px solid rgba(255, 255, 255, 0.25);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.knob {
+	width: 56px;
+	height: 56px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.85);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.stick.active .stick-track {
+	border-color: var(--accent);
+}
+.stick-label,
+.tbtn span {
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--dim);
+	text-align: center;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+.stick-label {
+	width: 200px;
+	margin-top: 4px;
+}
+.cluster {
+	position: fixed;
+	right: calc(14px + var(--sr));
+	bottom: calc(14px + var(--sb));
+	display: grid;
+	grid-template-columns: 84px 118px;
+	grid-template-rows: 78px 124px;
+	gap: 10px;
+	z-index: 3;
+}
+.tbtn {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	border-radius: 20px;
+	border: 2px solid rgba(255, 255, 255, 0.25);
+	background: rgba(255, 255, 255, 0.08);
+	touch-action: none;
+}
+.tbtn.gas {
+	border-radius: 26px;
+	border-color: rgba(79, 210, 122, 0.6);
+}
+.tbtn.gas span {
+	font-size: 22px;
+	color: var(--text);
+}
+.tbtn.gas.held,
+.tbtn.gas.active {
+	background: rgba(79, 210, 122, 0.35);
+	border-color: var(--good);
+}
+.tbtn.brake.active {
+	background: rgba(255, 90, 74, 0.35);
+	border-color: var(--bad);
+}
+.tbtn.drift {
+	border-color: rgba(62, 230, 255, 0.55);
+}
+.tbtn.drift.active {
+	background: rgba(62, 230, 255, 0.3);
+	border-color: #3ee6ff;
+}
+.tbtn.item {
+	border-color: rgba(255, 210, 58, 0.45);
+}
+.tbtn.item.full {
+	border-color: #ffd23a;
+	box-shadow: 0 0 14px rgba(255, 210, 58, 0.55);
+}
+.tbtn.item.active {
+	background: rgba(255, 210, 58, 0.3);
+}
+.tbtn-icon {
+	width: 40px;
+	height: 40px;
+}
+.tbtn.item:not(.full) .tbtn-icon {
+	display: none;
+}
+@media (max-height: 420px) {
+	.stick {
+		height: 64vh;
+	}
+	.cluster {
+		grid-template-columns: 74px 104px;
+		grid-template-rows: 66px 106px;
+		gap: 8px;
+	}
+}

@@ -1,7 +1,8 @@
 /* global setInterval */
 /**
  * Host panel (`?host=1`, WO-1074): enable / disable the game, pick the track (top-down previews), laps, start / stop,
- * kick, and the join address shown very large. It only calls /api/game/rc/state, /scene and /host — the game never
+ * kick, the join address shown very large, and the two §2.6 switches for what the guests see INSIDE the game world
+ * (the live lights, the LED wall pictures). It only calls /api/game/rc/state, /scene and /host — the game never
  * puts anything on a screen; showing the spectator page somewhere is the operator's own, separate decision.
  */
 import { h, setText, show, apiGet, apiHost, safeColor } from './dom.js'
@@ -30,6 +31,9 @@ export function startHost(root) {
 	const joinBox = h('div.join-box')
 	const tracksEl = h('div.host-tracks')
 	const playersEl = h('ul.host-players')
+	/* §2.6: what the guests' game world shows — nothing here reaches a real output */
+	const lightsBox = h('input', { type: 'checkbox' })
+	const wallBox = h('input', { type: 'checkbox' })
 
 	root.append(
 		h('header.host-head', h('h1', { text: 'Stage Sprint RC — host' }), stateEl),
@@ -46,6 +50,13 @@ export function startHost(root) {
 		),
 		h('section.host-sec', h('h2', { text: 'Track' }), tracksEl),
 		h('section.host-sec', h('h2', { text: 'Players' }), playersEl),
+		h(
+			'section.host-sec',
+			h('h2', { text: 'In the game world' }),
+			h('label.host-switch', lightsBox, ' Live lights in the game'),
+			h('label.host-switch', wallBox, ' LED wall pictures in the game'),
+			h('p.hint', { text: 'What every guest sees inside their own game. Off = dark rig / blank walls in the game.' })
+		),
 		h(
 			'section.host-sec',
 			h('p.hint', {
@@ -85,6 +96,12 @@ export function startHost(root) {
 		const laps = Math.max(1, Math.min(20, (state?.laps || 3) + d))
 		act({ action: 'laps', laps })
 	}
+	lightsBox.addEventListener('change', () =>
+		act({ action: 'lights', on: lightsBox.checked }, `Live lights in the game ${lightsBox.checked ? 'on' : 'off'}.`)
+	)
+	wallBox.addEventListener('change', () =>
+		act({ action: 'wall', on: wallBox.checked }, `LED wall pictures in the game ${wallBox.checked ? 'on' : 'off'}.`)
+	)
 	lapsDown.addEventListener('click', () => setLaps(-1))
 	lapsUp.addEventListener('click', () => setLaps(1))
 
@@ -105,7 +122,7 @@ export function startHost(root) {
 				{ type: 'button' },
 				cv,
 				h('span', { text: t.name || t.id }),
-				h('small', { text: `${Math.round(t.length || 0)} m · ${t.floor || ''}` })
+				h('small', { text: trackInfo(t) })
 			)
 			b.classList.toggle('on', t.id === state.trackId)
 			b.addEventListener('click', () => act({ action: 'track', trackId: t.id }, `Track: ${t.name || t.id}`))
@@ -155,6 +172,9 @@ export function startHost(root) {
 		startBtn.disabled = !on || state.phase !== 'lobby' || !(state.players || []).length
 		stopBtn.disabled = !on || state.phase === 'lobby'
 		setText(lapsVal, `${state.laps || 3} laps`)
+		lightsBox.checked = on && state.lights === true
+		wallBox.checked = on && state.wall === true
+		lightsBox.disabled = wallBox.disabled = !on
 		const urls = on ? state.joinUrls || [] : []
 		const joinKey = urls.join('|')
 		if (joinKey !== lastJoinKey) {
@@ -192,4 +212,16 @@ export function startHost(root) {
 
 	refresh()
 	setInterval(refresh, 2000)
+}
+
+/** "86 m · 2 ramps · 1 drop" (v2) or "24 m · stage" (v1). */
+function trackInfo(t) {
+	const parts = [`${Math.round(t.length || 0)} m`]
+	const n = (a) => (Array.isArray(a) ? a.length : 0)
+	const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`
+	if (n(t.ramps)) parts.push(plural(n(t.ramps), 'ramp'))
+	if (n(t.drops)) parts.push(plural(n(t.drops), 'drop'))
+	if (n(t.pads)) parts.push(plural(n(t.pads), 'pad'))
+	if (parts.length === 1 && t.floor) parts.push(String(t.floor))
+	return parts.join(' · ')
 }

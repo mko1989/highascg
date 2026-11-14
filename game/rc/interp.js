@@ -8,7 +8,7 @@
 
 export const INTERP_DELAY = 100
 export const MAX_EXTRAP = 200
-export const SNAP_DIST = 3
+export const SNAP_DIST = 4.5
 
 function lerp(a, b, t) {
 	return a + (b - a) * t
@@ -29,7 +29,7 @@ export class SnapshotBuffer {
 		this.maxExtrap = o.maxExtrap ?? MAX_EXTRAP
 		this.snapDist = o.snapDist ?? SNAP_DIST
 		this.max = o.max ?? 40
-		/** @type {{ ts: number, x: number, y: number, z: number, yaw: number, v: number, st: number }[]} */
+		/** @type {{ ts: number, x: number, y: number, z: number, yaw: number, v: number, st: number, fx: number }[]} */
 		this.snaps = []
 		this.out = null
 		this.lastOutAt = null
@@ -39,7 +39,7 @@ export class SnapshotBuffer {
 	push(ts, s) {
 		const last = this.snaps[this.snaps.length - 1]
 		if (last && ts <= last.ts) return false
-		this.snaps.push({ ts, x: s.x, y: s.y, z: s.z, yaw: s.yaw, v: s.v || 0, st: s.st || 0 })
+		this.snaps.push({ ts, x: s.x, y: s.y, z: s.z, yaw: s.yaw, v: s.v || 0, st: s.st || 0, fx: s.fx | 0 })
 		if (this.snaps.length > this.max) this.snaps.shift()
 		return true
 	}
@@ -73,6 +73,7 @@ export class SnapshotBuffer {
 			yaw: lerpAngle(a.yaw, b.yaw, t),
 			v: lerp(a.v, b.v, t),
 			st: lerp(a.st, b.st, t),
+			fx: t < 0.5 ? a.fx : b.fx,
 			extrap: false,
 		}
 	}
@@ -89,7 +90,10 @@ export class SnapshotBuffer {
 			vx = -Math.sin(last.yaw) * last.v
 			vz = -Math.cos(last.yaw) * last.v
 		}
-		return { ...last, ts: last.ts + ahead * 1000, x: last.x + vx * ahead, z: last.z + vz * ahead, extrap: true }
+		/* airborne (fx 16): keep falling / rising with the last vertical speed */
+		let y = last.y
+		if (prev && dts > 0.02 && dts < 0.5 && last.fx & 16) y = last.y + ((last.y - prev.y) / dts) * ahead
+		return { ...last, ts: last.ts + ahead * 1000, x: last.x + vx * ahead, y, z: last.z + vz * ahead, extrap: true }
 	}
 
 	/**

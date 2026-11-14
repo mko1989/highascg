@@ -130,9 +130,12 @@ function createVideoFeed(deps = {}) {
 		})
 	}
 
-	/** `relayFrom`: a linked server's relay (feed-relay-auth.js verified it) — its own tier, its roles leased here. */
-	function addClient(ws, query = {}, { relayFrom = null } = {}) {
-		const c = { roles: new Set(), params: feedParams(query), tier: relayFrom ? RELAY_TIER : '' }
+	/**
+	 * `relayFrom`: a linked server's relay (feed-relay-auth.js verified it) — its own tier, its roles leased here.
+	 * `tier: 'game'`: the RC game's in-process client (src/game/rc-video.js) — its own small encode (`<role>~game`).
+	 */
+	function addClient(ws, query = {}, { relayFrom = null, tier = '' } = {}) {
+		const c = { roles: new Set(), params: feedParams(query), tier: relayFrom ? RELAY_TIER : tier === 'game' ? 'game' : '' }
 		clients.set(ws, c)
 		let leaseTimer = null
 		const leaseId = relayFrom ? `relay-${relayFrom.fp}-${Math.random().toString(36).slice(2, 8)}` : ''

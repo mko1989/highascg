@@ -7,7 +7,9 @@
  *  - every module import resolves (three from /vendor/three/ → node_modules/three);
  *  - owner rule (14.11): the game never puts anything on a screen by itself — the client calls no URL outside
  *    /api/game/rc/ and /vendor/three/ (no AMCP, no looks, no other API), and the host panel offers no "send to screen";
- *  - every file stays under the 500-line limit.
+ *  - every file stays under the 500-line limit;
+ *  - v2: the pure modules (physics, ground, items, rocket …) stay DOM- and three-free; the touch cluster (GO, BRAKE,
+ *    DRIFT, ITEM) exists; user text is never parsed as HTML.
  */
 
 const { describe, it } = require('node:test')
@@ -23,14 +25,46 @@ const jsFiles = files.filter((f) => f.endsWith('.js'))
 const html = read('index.html')
 const { buildContentSecurityPolicy } = require(path.join(REPO, 'src', 'server', 'security-headers.js'))
 
+/* modules that run in node (smokes): never three.js, never the DOM */
+const PURE = [
+	'physics.js',
+	'phys-const.js',
+	'physics-world.js',
+	'ground.js',
+	'drive-rules.js',
+	'track-math.js',
+	'lap-logic.js',
+	'interp.js',
+	'protocol.js',
+	'net.js',
+	'standings.js',
+	'cameras.js',
+	'items.js',
+	'rocket.js',
+	'item-play.js',
+]
+
 function directive(csp, name) {
-	const d = csp.split(';').map((s) => s.trim()).find((s) => s.startsWith(name + ' '))
+	const d = csp
+		.split(';')
+		.map((s) => s.trim())
+		.find((s) => s.startsWith(name + ' '))
 	return d ? d.split(/\s+/).slice(1) : null
 }
 
 describe('WO-1074 game/rc static checks', () => {
 	it('has the expected files', () => {
-		for (const f of ['index.html', 'main.js', 'game.js', 'host.js', 'physics.js', 'track-math.js', 'net.js', 'README.md', 'rc.css']) {
+		for (const f of [
+			'index.html',
+			'main.js',
+			'game.js',
+			'host.js',
+			'physics.js',
+			'track-math.js',
+			'net.js',
+			'README.md',
+			'rc.css',
+		]) {
 			assert.ok(files.includes(f), f)
 		}
 	})
@@ -47,7 +81,8 @@ describe('WO-1074 game/rc static checks', () => {
 		assert.match(html, /<script type="module" src="\/game\/rc\/main\.js"><\/script>/)
 		const vp = /<meta\s+name="viewport"\s+content="([^"]+)"/.exec(html)
 		assert.ok(vp, 'viewport meta')
-		for (const part of ['width=device-width', 'initial-scale=1', 'user-scalable=no', 'viewport-fit=cover']) assert.ok(vp[1].includes(part), part)
+		for (const part of ['width=device-width', 'initial-scale=1', 'user-scalable=no', 'viewport-fit=cover'])
+			assert.ok(vp[1].includes(part), part)
 	})
 
 	it('complies with the server UI CSP: the import map is the only inline script, no inline handlers', () => {
@@ -58,8 +93,14 @@ describe('WO-1074 game/rc static checks', () => {
 		assert.match(inline[0][1], /type="importmap"/)
 		const scriptSrc = directive(csp, 'script-src')
 		assert.ok(scriptSrc.includes("'self'"))
-		assert.ok(scriptSrc.includes("'unsafe-inline'"), 'the inline import map needs unsafe-inline (the main UI relies on it too)')
-		assert.ok(directive(csp, 'connect-src').some((s) => s === "'self'" || s === 'ws:'), 'WebSocket to the box allowed')
+		assert.ok(
+			scriptSrc.includes("'unsafe-inline'"),
+			'the inline import map needs unsafe-inline (the main UI relies on it too)'
+		)
+		assert.ok(
+			directive(csp, 'connect-src').some((s) => s === "'self'" || s === 'ws:'),
+			'WebSocket to the box allowed'
+		)
 		for (const f of files.filter((x) => /\.(html|js)$/.test(x))) {
 			const src = read(f)
 			assert.doesNotMatch(src, /\son[a-z]+\s*=\s*["']/i, `${f}: no inline on…= handler attributes`)
@@ -82,7 +123,9 @@ describe('WO-1074 game/rc static checks', () => {
 	it('every module import resolves', () => {
 		for (const f of jsFiles) {
 			const src = read(f)
-			for (const m of src.matchAll(/(?:^|\n)\s*(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+			for (const m of src.matchAll(
+				/(?:^|\n)\s*(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g
+			)) {
 				const spec = m[1] || m[2]
 				if (spec === 'three') continue
 				if (spec.startsWith('three/addons/')) {
@@ -95,7 +138,7 @@ describe('WO-1074 game/rc static checks', () => {
 			}
 		}
 		/* pure modules never import three or touch the DOM (they run in node) */
-		for (const f of ['physics.js', 'track-math.js', 'lap-logic.js', 'interp.js', 'protocol.js', 'net.js', 'standings.js', 'cameras.js']) {
+		for (const f of PURE) {
 			const src = read(f)
 			assert.doesNotMatch(src, /from\s+['"]three/, f)
 			assert.doesNotMatch(src, /\b(document|window|localStorage)\./, f)
@@ -121,14 +164,37 @@ describe('WO-1074 game/rc static checks', () => {
 		for (const f of jsFiles) {
 			const src = read(f)
 			for (const m of src.matchAll(/\bfetch\(\s*([^,)]+)/g)) assert.match(m[1], /^API \+/, `${f}: fetch(${m[1]})`)
-			for (const m of src.matchAll(/new\s+([\w.]*WebSocket)\(\s*([^)]*)\)/g)) assert.equal(m[2], 'this.env.url', `${f}: WebSocket(${m[2]})`)
+			for (const m of src.matchAll(/new\s+([\w.]*WebSocket)\(\s*([^)]*)\)/g))
+				assert.equal(m[2], 'this.env.url', `${f}: WebSocket(${m[2]})`)
 		}
 		assert.match(read('dom.js'), /export const API = '\/api\/game\/rc'/)
 		assert.match(read('net.js'), /export const WS_PATH = '\/api\/game\/rc\/ws'/)
 		/* the host panel offers no screen / wall / output control */
 		const host = read('host.js')
-		assert.doesNotMatch(host, /action:\s*'(?!enable'|disable'|track'|start'|stop'|laps'|kick')/, 'only the contract host actions')
+		assert.doesNotMatch(
+			host,
+			/action:\s*'(?!enable'|disable'|track'|start'|stop'|laps'|kick'|lights'|wall')/,
+			'only the contract host actions'
+		)
+		/* §2.6: `lights` / `wall` only switch what the guests' game world shows — labelled so, and posted as booleans */
+		assert.deepEqual(
+			[...host.matchAll(/action:\s*'(lights|wall)', on: (\w+)\.checked/g)].map((m) => m[1]),
+			['lights', 'wall']
+		)
+		for (const label of ['Live lights in the game', 'LED wall pictures in the game'])
+			assert.ok(host.includes(label), label)
 		assert.doesNotMatch(host, /send to|show on (the )?(wall|screen)|take|on air|look/i, 'no "show on a screen" control')
+	})
+
+	it('v2: pure modules exist, the touch cluster is in the page, user text never goes through HTML parsing', () => {
+		for (const f of PURE) assert.ok(files.includes(f), f)
+		for (const id of ['t-gas', 't-brake', 't-drift', 't-item', 'stick', 'knob'])
+			assert.match(html, new RegExp(`id="${id}"`), id)
+		for (const f of jsFiles) assert.doesNotMatch(read(f), /innerHTML|outerHTML|insertAdjacentHTML|document\.write/, f)
+		/* the keyboard map of the contract */
+		const input = read('input.js')
+		for (const code of ['Space', 'ShiftLeft', 'KeyE', 'ControlLeft', 'KeyR', 'KeyC', 'KeyM', 'ArrowDown', 'KeyS'])
+			assert.ok(input.includes(`'${code}'`), code)
 	})
 
 	it('every file stays under 500 lines', () => {
