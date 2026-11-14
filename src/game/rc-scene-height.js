@@ -16,19 +16,24 @@
  *   - `toJSON()` / `fromJSON()` — the compact form the scene JSON carries (`heights`), so `validateTrack` can check
  *     deck clearances from a cached scene too.
  * Memory: 4 bytes per cell (a 27 × 61 m hall: ≈ 7 k cells, 28 kB).
+ * §3 toy scale: opts { cell, bin, eps } (the bake passes 0.5, 0.25, 0.05 × scale) and opts.deflate: `toJSON()` then
+ * carries the mask deflated (`enc: 'deflate'`) — a 5 cm field over the hall is mostly empty and packs ~50×.
  */
 
 const CELL = 0.5
 const BIN = 0.25
 const BINS = 32
 const FLOOR_EPS = 0.05
+const zlib = require('zlib')
 
 /** An empty field over `rect` ([minX, minZ, maxX, maxZ]) whose floor is at `floorY`. */
 function createHeightField(rect, floorY, opts = {}) {
 	const cell = opts.cell || CELL
-	const x0 = rect[0] - 1, z0 = rect[1] - 1
-	const nx = Math.max(1, Math.ceil((rect[2] - rect[0] + 2) / cell)), nz = Math.max(1, Math.ceil((rect[3] - rect[1] + 2) / cell))
-	return wrap({ cell, bin: BIN, x0, z0, nx, nz, floor: floorY, base: floorY + FLOOR_EPS, mask: new Uint32Array(nx * nz) })
+	const pad = opts.cell ? Math.max(cell * 2, 0.1) : 1
+	const x0 = rect[0] - pad, z0 = rect[1] - pad
+	const nx = Math.max(1, Math.ceil((rect[2] - rect[0] + 2 * pad) / cell)), nz = Math.max(1, Math.ceil((rect[3] - rect[1] + 2 * pad) / cell))
+	return wrap({ cell, bin: opts.bin || BIN, x0, z0, nx, nz, floor: floorY, base: floorY + (opts.eps ?? FLOOR_EPS), mask: new Uint32Array(nx * nz),
+		deflate: !!opts.deflate, eps: opts.eps ?? FLOOR_EPS })
 }
 
 function wrap(F) {
@@ -77,7 +82,7 @@ function wrap(F) {
 		},
 		/** Clear every bin below `y` (+ a bin) in the cells overlapping `rect` (a higher floor's body). */
 		clearBelow(rect, y) {
-			const keep = ~bandBits(-Infinity, y + FLOOR_EPS) >>> 0
+			const keep = ~bandBits(-Infinity, y + F.eps) >>> 0
 			const i0 = Math.max(0, Math.floor((rect[0] - x0) / cell)), i1 = Math.min(nx - 1, Math.floor((rect[2] - x0) / cell))
 			const k0 = Math.max(0, Math.floor((rect[1] - z0) / cell)), k1 = Math.min(nz - 1, Math.floor((rect[3] - z0) / cell))
 			for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) mask[k * nx + i] &= keep
@@ -110,7 +115,9 @@ function wrap(F) {
 			return Infinity
 		},
 		toJSON() {
-			return { cell, bin, bins: BINS, origin: [x0, z0], nx, nz, floor: F.floor, base, data: Buffer.from(mask.buffer, mask.byteOffset, mask.byteLength).toString('base64') }
+			const raw = Buffer.from(mask.buffer, mask.byteOffset, mask.byteLength)
+			if (F.deflate) return { cell, bin, bins: BINS, origin: [x0, z0], nx, nz, floor: F.floor, base, enc: 'deflate', data: zlib.deflateRawSync(raw, { level: 9 }).toString('base64') }
+			return { cell, bin, bins: BINS, origin: [x0, z0], nx, nz, floor: F.floor, base, data: raw.toString('base64') }
 		},
 		mask,
 	}
@@ -121,12 +128,19 @@ function fromJSON(h) {
 	if (!h || typeof h !== 'object') return null
 	if (h.__field) return h.__field
 	const ok = [h.cell, h.bin, h.nx, h.nz, h.floor, h.base].every(Number.isFinite) && Array.isArray(h.origin) && typeof h.data === 'string'
-	if (!ok || h.bins !== BINS || h.bin !== BIN) return null
-	const buf = Buffer.from(h.data, 'base64')
+	if (!ok || h.bins !== BINS || !(h.bin > 0) || !(h.cell > 0) || (h.enc != null && h.enc !== 'deflate')) return null
+	let buf = Buffer.from(h.data, 'base64')
+	if (h.enc === 'deflate') {
+		try {
+			buf = zlib.inflateRawSync(buf, { maxOutputLength: h.nx * h.nz * 4 + 1 })
+		} catch {
+			return null
+		}
+	}
 	if (buf.length !== h.nx * h.nz * 4) return null
 	const mask = new Uint32Array(h.nx * h.nz)
 	for (let i = 0; i < mask.length; i++) mask[i] = buf.readUInt32LE(i * 4)
-	const f = wrap({ cell: h.cell, bin: h.bin, x0: h.origin[0], z0: h.origin[1], nx: h.nx, nz: h.nz, floor: h.floor, base: h.base, mask })
+	const f = wrap({ cell: h.cell, bin: h.bin, x0: h.origin[0], z0: h.origin[1], nx: h.nx, nz: h.nz, floor: h.floor, base: h.base, mask, eps: h.base - h.floor })
 	Object.defineProperty(h, '__field', { value: f, enumerable: false })
 	return f
 }

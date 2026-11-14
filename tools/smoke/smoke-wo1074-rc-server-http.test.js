@@ -67,7 +67,8 @@ test.before(async () => {
 	await new Promise((r) => server.once('listening', r))
 	port = server.address().port
 	game = createRcGame({ now: clock.now, timers: clock.timers, port: () => port, lanIps: () => ['192.0.2.7'],
-		bakerDeps: { loadProject: () => ({ name: 'Smoke hall', previs: {} }), mvrStore: { get: () => null, mesh: async () => null }, cacheDir: path.join(TMP, 'cache') } })
+		// scale 1: the v2 sizes this end-to-end run measures laps against (the toy scale is smoke-wo1074-rc-server-toy*)
+		bakerDeps: { loadProject: () => ({ name: 'Smoke hall', previs: {} }), mvrStore: { get: () => null, mesh: async () => null }, cacheDir: path.join(TMP, 'cache'), scale: 1 } })
 	useRcGame(game)
 	ws = attachWebSocketServer(server, ctx, { log: () => {} })
 	rcWs = attachRcGameWs(server, ctx, { game })

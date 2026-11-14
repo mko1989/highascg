@@ -17,9 +17,11 @@ const zlib = require('zlib')
 const G = require('./rc-scene-geom')
 const M = require('./rc-scene-mesh')
 const H = require('./rc-scene-height')
+const O = require('./rc-scene-occ')
+const { RC_SCALE, sceneScale } = require('./rc-scale')
 const { generateTracksAsync, GENERATOR_VERSION } = require('./rc-tracks')
 
-const BAKE_VERSION = 3 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights)
+const BAKE_VERSION = 4 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights; 4: §3 scale + occ)
 const REV_MEMO_MS = 2000
 const KEEP_CACHED = 6
 const BOX = 'game:box'
@@ -36,11 +38,11 @@ function sceneInputs(project) {
 		stageObjects: Array.isArray(pv.stage?.objects) ? pv.stage.objects : [], projectName: String(project?.name || '') }
 }
 
-/** The revision: scene id + a hash of everything that changes the bake. */
-function revOf(inp, recStat) {
+/** The revision: scene id + a hash of everything that changes the bake (§3: the scale too). */
+function revOf(inp, recStat, scale = 1) {
 	const c = inp.cfg
 	const h = crypto.createHash('sha1').update(JSON.stringify([BAKE_VERSION, GENERATOR_VERSION, inp.id, recStat, c.place, c.hidden_layers, c.hidden_objects,
-		c.layer_colors, c.moved, inp.grid, inp.stageObjects, M.MAX_TRIS, M.MAX_BYTES]))
+		c.layer_colors, c.moved, inp.grid, inp.stageObjects, M.MAX_TRIS, M.MAX_BYTES, scale]))
 	return `${inp.id || 'none'}-${h.digest('hex').slice(0, 10)}`
 }
 
@@ -48,11 +50,15 @@ const boxPart = (min, max, color, name) => ({ key: BOX, name, color, fixture: fa
 	xf: [max[0] - min[0], 0, 0, 0, max[1] - min[1], 0, 0, 0, max[2] - min[2], (min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2] })
 
 /**
- * The bake itself (exported for the smokes and the timing probe). deps: { mvrStore: { get, mesh }, pause }.
- * → { json, glb }.
+ * The bake itself (exported for the smokes and the timing probe). deps: { mvrStore: { get, mesh }, pause, scale }.
+ * → { json, glb }. deps.scale (§3, default 1 = the v2 bake): below 1 the scene carries `scale`, one occupancy grid per
+ * floor (`occ`: the band floor … + 0.6 × scale at 0.3 × scale cells), a finer deflated height field and no obstacle
+ * boxes (the grids replace them), and the tracks are the toy set (rc-toy-tracks.js).
  */
 async function bakeScene(inp, rev, deps = {}) {
 	const t0 = Date.now()
+	const scale = sceneScale(null, { scale: deps.scale })
+	const toy = scale !== 1
 	const pause = deps.pause || nextTick
 	const store = deps.mvrStore || require('../stage/mvr-store')
 	const rec = inp.id ? store.get(inp.id) : null
@@ -88,22 +94,24 @@ async function bakeScene(inp, rev, deps = {}) {
 		if (stage && stage.y > hall.y + 0.05) parts.push(boxPart([stage.rect[0], hall.y, stage.rect[1]], [stage.rect[2], stage.y, stage.rect[3]], [0.05, 0.05, 0.06, 1], 'stage deck'))
 	}
 	const plan = await M.planBudget(parts, templates, pause)
-	const grids = floors.map((f) => ({ floor: f, grid: G.slabGrid(f, Math.max(0.25, Math.max(f.rect[2] - f.rect[0], f.rect[3] - f.rect[1]) / 400)) }))
+	const grids = toy ? [] : floors.map((f) => ({ floor: f, grid: G.slabGrid(f, Math.max(0.25, Math.max(f.rect[2] - f.rect[0], f.rect[3] - f.rect[1]) / 400)) }))
+	const occ = toy ? floors.map((f) => O.createOcc(f, { cell: 0.3 * scale, lo: 0.05 * scale, hi: 0.6 * scale })) : []
 	const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
 	// §2.7: the height field (what stands under / hangs over an elevated deck) is filled in the same pass
-	const field = H.createHeightField(hall.rect, hall.y)
+	const field = H.createHeightField(hall.rect, hall.y, toy ? { cell: 0.5 * scale, bin: 0.25 * scale, eps: 0.05 * scale, deflate: true } : {})
 	const onTri = (...v) => {
 		for (let k = 0; k < 9; k++) {
 			if (v[k] < lo[k % 3]) lo[k % 3] = v[k]
 			if (v[k] > hi[k % 3]) hi[k % 3] = v[k]
 		}
 		for (const g of grids) g.grid.tri(...v)
+		for (const g of occ) g.tri(...v)
 		field.tri(...v)
 	}
 	const inst = await M.instanceParts(parts, templates, plan, onTri, pause)
 	// (parts the GLB leaves out — fixtures, dropped small objects — are not drawn, so a deck may pass through them)
 	// the stage seen from the hall is a wall of the ground model (and its ramps' destination), not an obstacle
-	if (stage && stage.y > hall.y + 0.05) grids[0].grid.clear(stage.rect, 0.02)
+	if (stage && stage.y > hall.y + 0.05) for (const g of [grids[0]?.grid, occ[0]]) if (g) g.clear(stage.rect, 0.02)
 	if (stage && stage.y > hall.y) field.clearBelow(stage.rect, stage.y)
 	const obstacles = G.obstaclesFrom(grids.map((g) => ({ floor: g.floor, grid: g.grid })))
 	for (const f of floors) {
@@ -111,13 +119,15 @@ async function bakeScene(inp, rev, deps = {}) {
 		hi[0] = Math.max(hi[0], f.rect[2]); hi[1] = Math.max(hi[1], f.y + 3); hi[2] = Math.max(hi[2], f.rect[3])
 	}
 	const r3 = (v) => Math.round(v * 1000) / 1000
-	const gen = await generateTracksAsync({ floors, obstacles, bounds: { min: lo, max: hi }, field }, pause)
+	const gen = await generateTracksAsync({ floors, obstacles, bounds: { min: lo, max: hi }, field, ...(toy ? { scale, occ } : {}) }, pause)
 	const arena = gen.floors.find((f) => f.id === 'arena')
 	if (arena) inst.primitives.push(...arenaSlab(arena))
 	const glb = M.sceneGlb(inst.primitives)
 	const json = {
 		rev, name: rec?.name || inp.name || inp.projectName || 'Empty arena', glb: `/api/game/rc/scene.glb?rev=${rev}`,
-		bounds: { min: gen.bounds.min.map(r3), max: gen.bounds.max.map(r3) }, floors: gen.floors, obstacles, heights: field.toJSON(), tracks: gen.tracks,
+		...(toy ? { scale } : {}),
+		bounds: { min: gen.bounds.min.map(r3), max: gen.bounds.max.map(r3) }, floors: gen.floors, obstacles, heights: field.toJSON(),
+		...(toy ? { occ: occ.map((g) => g.toJSON()) } : {}), tracks: gen.tracks,
 		dropped: { fixtures: plan.dropped.fixtures, objects: plan.dropped.objects, simplifiedCellM: plan.dropped.cell,
 			meshesFailed: failed.length, venueGlb: inp.cfg.venue_glb ? 'ignored' : null },
 		stats: { triangles: inst.tris + (arena ? 2 : 0), bytes: glb.length, parts: plan.keep.filter(Boolean).length, bakeMs: Date.now() - t0 },
@@ -131,7 +141,7 @@ function arenaSlab(a) {
 }
 
 /**
- * The scene service. deps: { loadProject, mvrStore, cacheDir, log, now, pause }.
+ * The scene service. deps: { loadProject, mvrStore, cacheDir, log, now, pause, scale (default RC_SCALE) }.
  * → { rev(), get() → Promise<{ rev, json, text, glb, gz }>, peek() }
  */
 function createSceneBaker(deps = {}) {
@@ -140,6 +150,7 @@ function createSceneBaker(deps = {}) {
 	const cacheDir = deps.cacheDir || defaultCacheDir()
 	const now = deps.now || Date.now
 	const log = deps.log || (() => {})
+	const scale = deps.scale ?? RC_SCALE // §3: the live game is toy scale
 	let memo = null // { at, inp, rev }
 	let ready = null // the last finished bake
 	const inflight = new Map()
@@ -165,7 +176,7 @@ function createSceneBaker(deps = {}) {
 			}
 		}
 		if (st === 'gone') inp.id = ''
-		memo = { at: now(), inp, rev: revOf(inp, st) }
+		memo = { at: now(), inp, rev: revOf(inp, st, scale) }
 		return memo
 	}
 
@@ -204,7 +215,7 @@ function createSceneBaker(deps = {}) {
 	async function build(inp, rev) {
 		const disk = await fromDisk(rev)
 		if (disk) return disk
-		const { json, glb } = await bakeScene(inp, rev, { mvrStore: store, pause: deps.pause })
+		const { json, glb } = await bakeScene(inp, rev, { mvrStore: store, pause: deps.pause, scale })
 		const gz = await new Promise((res) => zlib.gzip(glb, { level: 6 }, (e, b) => res(e ? null : b)))
 		const out = { rev, json, text: JSON.stringify(json), glb, gz }
 		log('info', `[rc-game] scene ${rev} baked in ${json.stats.bakeMs} ms: ${json.stats.triangles} triangles, ${glb.length} bytes, ` +

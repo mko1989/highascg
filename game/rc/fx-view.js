@@ -2,6 +2,7 @@
  * Item effects in the world (WO-1074 v2): slick puddles (violet goo with a sheen), rockets (posed every frame from the
  * shared closed-form path, rocket.js), and one-shots — the pulse "POW" ring (comic burst word + expanding ring of the
  * 7 m radius), turbo burst, shield pop and spin-out stars. Procedural geometry and canvas sprites only.
+ * §3 toy scale: setScale(s) — every object, radius, lift and word sprite × s (built at scale 1, drawn scaled).
  */
 import * as THREE from 'three'
 import { canvasTexture } from './mesh-util.js'
@@ -94,6 +95,7 @@ export function createFxView(scene) {
 	/** hid → { kind, obj } */
 	const hazObjs = new Map()
 	const shots = []
+	let S = 1
 
 	function hazObject(h) {
 		if (h.kind === 'slick') {
@@ -103,12 +105,14 @@ export function createFxView(scene) {
 			sheen.position.set(-0.25, 0.004, -0.2)
 			sheen.scale.set(1.4, 1, 0.6)
 			g.add(goo, sheen)
-			g.position.set(h.p[0], h.p[1] + 0.025, h.p[2])
+			g.position.set(h.p[0], h.p[1] + 0.025 * S, h.p[2])
 			g.rotation.y = h.yaw || 0
 			g.renderOrder = 3
 			return g
 		}
-		return rocketModel(mats)
+		const r = rocketModel(mats)
+		r.scale.setScalar(S)
+		return r
 	}
 
 	function ringShot(p, color, maxR, life, word) {
@@ -120,19 +124,23 @@ export function createFxView(scene) {
 			side: THREE.DoubleSide,
 		})
 		const ring = new THREE.Mesh(ringGeo, mat)
-		ring.position.set(p[0], p[1] + 0.15, p[2])
+		ring.position.set(p[0], p[1] + 0.15 * S, p[2])
 		root.add(ring)
 		let spr = null
 		if (word) {
 			spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: words[word], transparent: true, depthTest: false }))
-			spr.position.set(p[0], p[1] + 1.1, p[2])
+			spr.position.set(p[0], p[1] + 1.1 * S, p[2])
 			spr.renderOrder = 12
 			root.add(spr)
 		}
-		shots.push({ ring, spr, mat, age: 0, life, maxR })
+		shots.push({ ring, spr, mat, age: 0, life, maxR: maxR * S, k: S })
 	}
 
 	return {
+		/** §3: the toy scale of everything drawn from now on (call before the first hazard / one-shot). */
+		setScale(s) {
+			S = s > 0 ? s : 1
+		},
 		/** Draw every hazard of the item state at server time sNow (rockets posed from their path). */
 		sync(items, T, sNow, t) {
 			for (const [hid, o] of hazObjs) {
@@ -151,7 +159,7 @@ export function createFxView(scene) {
 				}
 				if (h.kind === 'slick') {
 					const age = Math.max(0, (sNow - h.ts) / 1000)
-					o.scale.setScalar(Math.min(1, 0.3 + age * 3))
+					o.scale.setScalar(Math.min(1, 0.3 + age * 3) * S)
 					continue
 				}
 				const r = T ? items.rocketOf(T, h, sNow) : null
@@ -179,12 +187,12 @@ export function createFxView(scene) {
 				const s = shots[i]
 				s.age += dt
 				const k = Math.min(1, s.age / s.life)
-				const r = Math.max(0.01, s.maxR * (1 - (1 - k) * (1 - k)))
+				const r = Math.max(0.01 * s.k, s.maxR * (1 - (1 - k) * (1 - k)))
 				s.ring.scale.set(r, 1, r)
 				s.mat.opacity = 0.9 * (1 - k)
 				if (s.spr) {
 					const pop = k < 0.25 ? k / 0.25 : 1
-					s.spr.scale.set(2.2 * pop, 1.1 * pop, 1)
+					s.spr.scale.set(2.2 * pop * s.k, 1.1 * pop * s.k, 1)
 					s.spr.material.opacity = k < 0.7 ? 1 : (1 - k) / 0.3
 				}
 				if (k >= 1) {

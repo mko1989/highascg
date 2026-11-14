@@ -16,7 +16,9 @@ import { createInput } from './input.js'
 import { createAudio } from './audio.js'
 import { createScreens } from './screens.js'
 import { prepareTrack, gridPose, respawnPose } from './track-math.js'
-import { createEnv, createStepper, placeCar, ceilingOf } from './physics.js'
+import { createEnv, createStepper, placeCar, ceilingOf, eyeBlockedOf } from './physics.js'
+import { sceneScale } from './scale.js'
+import { prepareOcc } from './occ.js'
 import { RaceTracker } from './standings.js'
 import { Director } from './cameras.js'
 import { RcNet, wsUrlFor } from './net.js'
@@ -182,9 +184,13 @@ async function loadScene(G) {
 	G.screens.hide()
 	G.scene = r.data
 	G.fx?.load(G.scene)
+	/* §3 toy scale: the scene's one `scale` (scale.js) goes into every prepared track; the occupancy grids decode once */
+	G.s = sceneScale(G.scene)
+	G.occ = prepareOcc(G.scene.occ)
+	G.fxView?.setScale?.(G.s)
 	G.tracks = new Map()
-	for (const t of G.scene.tracks || []) if (t?.id && t.points?.length > 2) G.tracks.set(t.id, prepareTrack(t))
-	if (!G.tracks.size) G.tracks.set('arena', prepareTrack(fallbackTrack(G.scene)))
+	for (const t of G.scene.tracks || []) if (t?.id && t.points?.length > 2) G.tracks.set(t.id, prepareTrack(t, G.s))
+	if (!G.tracks.size) G.tracks.set('arena', prepareTrack(fallbackTrack(G.scene, G.s), G.s))
 	setTrack(G, G.state?.trackId)
 	G.screens.loading(0, 'Loading the stage…')
 	G.world
@@ -203,12 +209,12 @@ async function loadScene(G) {
 }
 
 /** A small flat oval on the first floor when the scene has no usable track (the server should always send some). */
-function fallbackTrack(scene) {
+function fallbackTrack(scene, s = 1) {
 	const f = (scene?.floors || [])[0] || { id: 'hall', y: 0, rect: [-15, -10, 15, 10] }
 	const cx = (f.rect[0] + f.rect[2]) / 2
 	const cz = (f.rect[1] + f.rect[3]) / 2
-	const a = Math.min(8, (f.rect[2] - f.rect[0]) / 2 - 2)
-	const b = Math.min(5, (f.rect[3] - f.rect[1]) / 2 - 2)
+	const a = Math.min(8 * s, (f.rect[2] - f.rect[0]) / 2 - 2 * s)
+	const b = Math.min(5 * s, (f.rect[3] - f.rect[1]) / 2 - 2 * s)
 	const points = []
 	for (let i = 0; i < 80; i++) {
 		const t = (-i / 80) * Math.PI * 2
@@ -218,7 +224,7 @@ function fallbackTrack(scene) {
 		id: 'arena',
 		name: 'Arena',
 		floor: f.id,
-		width: 2.5,
+		width: 2.5 * s,
 		closed: true,
 		points,
 		checkpoints: [0, 20, 40, 60],
@@ -235,8 +241,9 @@ export function setTrack(G, trackId) {
 		disposeGroup(G.trackGroup)
 	}
 	/* the ground model: every floor of the room + this track's ramps (physics + ramp skirts) */
-	G.env = createEnv(T, G.scene?.floors || [], G.scene?.obstacles || [])
+	G.env = createEnv(T, G.scene?.floors || [], G.scene?.obstacles || [], { scale: T.scale, occ: G.occ })
 	G.director.ceilAt = (x, z, y) => ceilingOf(G.env, x, z, y)
+	G.director.blockedAt = (x, z, y) => eyeBlockedOf(G.env, x, z, y)
 	G.trackGroup = buildTrackMesh(T, G.env.ground)
 	G.world.scene.add(G.trackGroup)
 	if (G.props) {

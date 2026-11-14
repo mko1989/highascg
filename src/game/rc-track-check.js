@@ -10,6 +10,8 @@ const G = require('./rc-track-geo')
 const { GROUND_TOL, WALL_STEP, ground, floorGround, rampIndices, obstacleHits } = require('./rc-ground')
 const { checkDeco, GRID_SLOTS } = require('./rc-track-check-deco')
 const DK = require('./rc-track-check-deck')
+const { checkOcc } = require('./rc-track-check-occ')
+const SC = require('./rc-scale')
 
 const CAR_HEIGHT = 0.6 // the scene's obstacle boxes cover a floor's car slab (floor.y … + 0.6)
 const MIN_POINTS = 60
@@ -38,15 +40,22 @@ function span(a, b, n) {
 
 /**
  * Is `track` drivable on `scene` ({ floors, obstacles })? → { ok, errors[] }. `opts.maxCrossings` defaults to 1 for a
- * figure-eight (id contains "eight") and 0 otherwise.
+ * figure-eight (id contains "eight") and 0 otherwise. §3 toy scale: a scene with `scale` < 1 (or opts.scale) is judged
+ * in the unit frame (rc-scale.js: every length ÷ scale, so each rule holds with its lengths × scale) plus the toy rules
+ * (`scene.toy` of the unit scene: ≤ 2500 points, width 0.30–0.45 m, the occupancy grids — rc-track-check-occ.js).
  */
 function validateTrack(track, scene, opts = {}) {
 	const errors = []
 	const fail = (m) => (errors.push(m), { ok: false, errors })
 	if (!track || typeof track !== 'object') return fail('no track')
+	const scl = SC.sceneScale(scene, opts)
+	if (scl !== 1 && !scene?.toy) return validateTrack(SC.scaleTrack(track, 1 / scl), SC.toUnitScene(scene, scl), { ...opts, scale: 1 })
+	const toy = scene?.toy || null
 	if (typeof track.id !== 'string' || !track.id) return fail('no id')
+	if (track.laps != null && !(Number.isInteger(track.laps) && track.laps >= 1 && track.laps <= 20)) return fail(`laps ${track.laps} (1–20)`)
 	const pts = track.points
-	if (!Array.isArray(pts) || pts.length < MIN_POINTS || pts.length > MAX_POINTS) return fail(`points: ${pts?.length} (60–200)`)
+	const maxPts = toy ? toy.maxPoints : MAX_POINTS
+	if (!Array.isArray(pts) || pts.length < MIN_POINTS || pts.length > maxPts) return fail(`points: ${pts?.length} (60–${maxPts})`)
 	if (!pts.every((p) => Array.isArray(p) && p.length === 3 && p.every(finite))) return fail('points must be finite [x, y, z]')
 	if (track.closed !== true) return fail('not closed')
 	const n = pts.length
@@ -61,6 +70,7 @@ function validateTrack(track, scene, opts = {}) {
 	if (track.kind != null && !DK.KINDS.includes(track.kind)) return fail(`kind "${track.kind}" (${DK.KINDS.join(' | ')})`)
 	const minW = track.floor === 'room' || track.floor === 'stage' ? MIN_WIDTH : MIN_HALL_WIDTH
 	if (!finite(width) || width < minW - 1e-9 || width > MAX_WIDTH) return fail(`width ${width} (${minW}–${MAX_WIDTH} for "${track.floor}")`)
+	if (toy && (width < toy.minWidth - 1e-6 || width > toy.maxWidth + 1e-6)) return fail(`toy: width ${(width * toy.s).toFixed(3)} m (${SC.TOY_WIDTH.join('–')})`)
 	const { s, total: L } = G.arcLengths(P)
 	if (!finite(track.length) || Math.abs(track.length - L) > Math.max(0.05, L * 0.01)) return fail(`length ${track.length} ≠ ${L.toFixed(2)} (plan)`)
 	const mean = L / n
@@ -232,6 +242,8 @@ function validateTrack(track, scene, opts = {}) {
 		for (let i = 0; i < n; i++) if (!rampPt[i] && !flight[i] && Math.abs(Y[i] - own.y) > GROUND_TOL) return fail(`point ${i} is off the ${own.id} floor`)
 	}
 
+	const occErr = checkOcc(track, scene, { P, Y, n, half, width, book, along })
+	if (occErr) return fail(occErr)
 	const deckErr = DK.checkDecks(track, scene, { P, Y, n, half, width, rampSeg, lip, landAt, book }) ||
 		DK.checkpointsOffBridges(track, P, Y, n, width) || DK.checkpointsLanded(track, P, Y, n) || (track.kind === 'room-long' ? DK.checkLong(track, scene, P, Y, L) : null)
 	if (deckErr) return fail(deckErr)

@@ -18,7 +18,8 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 	renderer.setClearColor(BG, 1)
 	const scene = new THREE.Scene()
 	scene.background = new THREE.Color(BG)
-	const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 400)
+	const camera = new THREE.PerspectiveCamera(62, 1, NEAR, 400)
+	let nearScale = 1
 	camera.position.set(0, 8, 12)
 	camera.lookAt(0, 0, 0)
 
@@ -61,9 +62,20 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 		render() {
 			renderer.render(scene, camera)
 		},
+		/** §3 toy scale: the near plane may come down to NEAR · s (a 6 cm car seen from a few cm never clips). */
+		setNear(s) {
+			nearScale = s > 0 ? Math.min(1, s) : 1
+		},
 		setCamera(pose) {
 			camera.position.set(pose.eye[0], pose.eye[1], pose.eye[2])
 			camera.lookAt(pose.target[0], pose.target[1], pose.target[2])
+			/* close shots get the toy near plane, far ones (overview) keep v2's — depth precision for the room */
+			const d = Math.hypot(pose.eye[0] - pose.target[0], pose.eye[1] - pose.target[1], pose.eye[2] - pose.target[2])
+			const near = Math.max(NEAR * nearScale, Math.min(NEAR, d * 0.025))
+			if (Math.abs(camera.near - near) > camera.near * 0.1) {
+				camera.near = near
+				camera.updateProjectionMatrix()
+			}
 		},
 		/** Field of view in degrees (v2: kicks wider while boosting). */
 		setFov(fov) {
@@ -153,6 +165,9 @@ function clearGroup(g) {
 	}
 }
 
+/** v2 near plane (m); × the toy scale for close shots (setNear / setCamera). */
+const NEAR = 0.05
+
 /** A big dark ground under everything so the world never floats in the void. */
 function addGround(g, info) {
 	const b = info?.bounds
@@ -161,7 +176,14 @@ function addGround(g, info) {
 	const y = hall ? Number(hall.y) || 0 : Math.max(minY, 0)
 	const geo = new THREE.PlaneGeometry(400, 400)
 	geo.rotateX(-Math.PI / 2)
-	const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x23272f }))
+	/* pushed back in depth too: with the toy near plane the 3 cm gap to the hall floor must never z-fight */
+	const mat = new THREE.MeshLambertMaterial({
+		color: 0x23272f,
+		polygonOffset: true,
+		polygonOffsetFactor: 2,
+		polygonOffsetUnits: 8,
+	})
+	const mesh = new THREE.Mesh(geo, mat)
 	mesh.position.y = y - 0.03
 	mesh.matrixAutoUpdate = false
 	mesh.updateMatrix()

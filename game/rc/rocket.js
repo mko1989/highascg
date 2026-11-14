@@ -11,6 +11,7 @@
  *     So it follows the centre line's height everywhere: up / down ramps, and over a drop it follows the line's step
  *     down (the line's own segment from the ledge to the next point).
  *  4. It lives while t ≤ 5 s and serverMs < `until` (when given); on an open track it ends at either end of the line.
+ *  §3 toy scale: the speed and the hover height are × T.scale (26 · s m/s, 0.35 · s m); times stay.
  *     After that it is gone (null) — the server's `hazgone` removes it for good.
  */
 import { nearestOnTrack, pointAt, leftNormal, yawFromDir } from './track-math.js'
@@ -43,15 +44,16 @@ export function rocketPose(T, haz, serverMs, path = null) {
 	if (ms > ROCKET_LIFE_MS) return null
 	if (Number.isFinite(haz.until) && haz.until !== null && serverMs >= haz.until) return null
 	const t = ms / 1000
-	const s = P.s0 + P.dir * ROCKET_SPEED * t
+	const k = T.scale ?? 1
+	const s = P.s0 + P.dir * ROCKET_SPEED * k * t
 	if (!T.closed && (s < 0 || s > T.total)) return null
 	const c = pointAt(T, s)
-	const k = Math.max(0, 1 - t / ROCKET_BLEND_S)
+	const fade = Math.max(0, 1 - t / ROCKET_BLEND_S)
 	const [lx, lz] = leftNormal(c.ux, c.uz)
 	return {
-		x: c.x + lx * P.lat * k,
-		y: c.y + P.up * k + ROCKET_HOVER,
-		z: c.z + lz * P.lat * k,
+		x: c.x + lx * P.lat * fade,
+		y: c.y + P.up * fade + ROCKET_HOVER * k,
+		z: c.z + lz * P.lat * fade,
 		yaw: yawFromDir(c.ux * P.dir, c.uz * P.dir),
 		t,
 	}

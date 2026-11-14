@@ -14,7 +14,14 @@
  * square END_TOL (5 cm) past the end point. Rails (`railClamp`): a car on a deck or a slab ramp (its y within
  * RAIL_BELOW under / RAIL_ABOVE over the surface, inside the ribbon, not past a square end) stays within
  * half-width − its radius of the centre line; crossing that edge bounces it back like a wall.
+ *
+ * §3 toy scale: the constants below are the scale-1 values; createGround(floors, T, scale) stores them × scale on the
+ * ground object (G.eps, G.stepUp, G.reach, G.endTol, G.slab, G.railBelow, G.railAbove) and every function reads those.
+ * Long ramps / decks (2500-point tracks) get a segment grid (seg-grid.js) for their nearest-point queries.
+ * §3 occupancy grids (occ.js) ride along as G.occ (the car-height band of each floor).
  */
+import { buildSegGrid, forSegsNear } from './seg-grid.js'
+import { validScale } from './scale.js'
 
 /** A car is grounded when its y ≤ ground + GROUND_EPS. */
 export const GROUND_EPS = 0.02
@@ -56,7 +63,7 @@ export function floorY(floors, x, z) {
  * One ramp of a prepared track as plan segments with heights: points ramp.from … ramp.to (forward, wrapping on closed
  * tracks), plus a plan bounding box grown by the half-width for a quick reject.
  */
-export function prepareRamp(T, ramp, slab = false) {
+export function prepareRamp(T, ramp, slab = false, sc = T?.scale ?? 1) {
 	const idx = []
 	const n = T.n
 	if (ramp.to > ramp.from) for (let i = ramp.from; i <= ramp.to; i++) idx.push(i)
@@ -74,20 +81,31 @@ export function prepareRamp(T, ramp, slab = false) {
 		const dx = T.pts[b][0] - ax
 		const dz = T.pts[b][1] - az
 		const len2 = dx * dx + dz * dz || 1e-12
-		segs.push({ ax, az, ay: T.ys[a], dx, dz, dy: T.ys[b] - T.ys[a], len2, tol: END_TOL / Math.sqrt(len2) })
+		segs.push({ ax, az, ay: T.ys[a], dx, dz, dy: T.ys[b] - T.ys[a], len2, tol: (END_TOL * sc) / Math.sqrt(len2) })
 	}
-	const xs = idx.map((i) => T.pts[i][0])
-	const zs = idx.map((i) => T.pts[i][1])
 	const h = T.half
+	const bbox = [Infinity, Infinity, -Infinity, -Infinity]
+	for (const i of idx) {
+		bbox[0] = Math.min(bbox[0], T.pts[i][0] - h)
+		bbox[1] = Math.min(bbox[1], T.pts[i][1] - h)
+		bbox[2] = Math.max(bbox[2], T.pts[i][0] + h)
+		bbox[3] = Math.max(bbox[3], T.pts[i][1] + h)
+	}
 	return {
 		from: ramp.from,
 		to: ramp.to,
 		segs,
 		slab,
 		half: h,
-		bbox: [Math.min(...xs) - h, Math.min(...zs) - h, Math.max(...xs) + h, Math.max(...zs) + h],
+		bbox,
+		/* a long ramp / deck: its nearest point comes from a segment grid (only segments within reach are read) */
+		grid: segs.length > RAMP_GRID_SEGS ? buildSegGrid(segs, h) : null,
+		reach: 0.1 * sc, // extra search radius beyond half-width + pad (rails test half + 0.05 · scale)
 	}
 }
+
+/** Ramps / decks longer than this many segments get a segment grid. */
+export const RAMP_GRID_SEGS = 48
 
 /**
  * THE ramp surface rule (the one function to reconcile with the server's validator):
@@ -108,8 +126,9 @@ export function nearestOn(R, x, z, pad = 0) {
 	const b = R.bbox
 	if (x < b[0] - pad || x > b[2] + pad || z < b[1] - pad || z > b[3] + pad) return null
 	let best = null
+	let bestK = -1
 	const last = R.segs.length - 1
-	for (let k = 0; k <= last; k++) {
+	const visit = (k) => {
 		const g = R.segs[k]
 		const raw = ((x - g.ax) * g.dx + (z - g.az) * g.dz) / g.len2
 		const t = raw < 0 ? 0 : raw > 1 ? 1 : raw
@@ -117,10 +136,19 @@ export function nearestOn(R, x, z, pad = 0) {
 		const pz = g.az + g.dz * t
 		const d = Math.hypot(x - px, z - pz)
 		/* nearest to an open end, past it: off the (square-ended) footprint */
-		if (!best || d < best.d)
+		if (!best || d < best.d || (d === best.d && k < bestK)) {
+			bestK = k
 			best = { d, y: g.ay + g.dy * t, px, pz, beyond: (k === 0 && raw < -g.tol) || (k === last && raw > 1 + g.tol) }
+		}
 	}
-	return best
+	if (!R.grid) {
+		for (let k = 0; k <= last; k++) visit(k)
+		return best
+	}
+	/* the full scan's answer whenever it lies within the search radius; beyond it nothing counts anyway (rampSurfaceY
+	 * wants d ≤ half, railClamp d ≤ half + 0.05 · scale) → "far" */
+	forSegsNear(R.grid, x, z, R.half + pad + R.reach, visit)
+	return best || { d: Infinity, y: 0, px: x, pz: z, beyond: true }
 }
 
 /** Is ramp r of T a slab ramp (both its ends join a deck)? */
@@ -134,11 +162,25 @@ export function isSlabRamp(T, r) {
  * @param {object[]} floors scene floors ({ id, y, rect })
  * @param {object|null} T prepared track
  */
-export function createGround(floors, T) {
+export function createGround(floors, T, scale) {
+	const k = validScale(scale ?? T?.scale)
 	const fl = prepareFloors(floors)
-	const ramps = T ? (T.ramps || []).map((r) => prepareRamp(T, r, isSlabRamp(T, r))).filter((r) => r.segs.length) : []
-	const decks = T ? (T.decks || []).map((d) => prepareRamp(T, d, true)).filter((r) => r.segs.length) : []
-	return { floors: fl, ramps: [...ramps, ...decks], rails: [...ramps.filter((r) => r.slab), ...decks] }
+	const ramps = T ? (T.ramps || []).map((r) => prepareRamp(T, r, isSlabRamp(T, r), k)).filter((r) => r.segs.length) : []
+	const decks = T ? (T.decks || []).map((d) => prepareRamp(T, d, true, k)).filter((r) => r.segs.length) : []
+	return {
+		floors: fl,
+		ramps: [...ramps, ...decks],
+		rails: [...ramps.filter((r) => r.slab), ...decks],
+		scale: k,
+		eps: GROUND_EPS * k,
+		stepUp: STEP_UP * k,
+		reach: REACH * k,
+		endTol: END_TOL * k,
+		slab: DECK_SLAB * k,
+		railBelow: RAIL_BELOW * k,
+		railAbove: RAIL_ABOVE * k,
+		occ: null,
+	}
 }
 
 /**
@@ -148,7 +190,7 @@ export function createGround(floors, T) {
 export function groundAt(G, x, z, y = Infinity) {
 	const f = floorY(G.floors, x, z)
 	if (f === null) return null
-	const top = y + REACH
+	const top = y + (G.reach ?? REACH)
 	let g = f
 	for (const R of G.ramps) {
 		const r = rampSurfaceY(R, x, z)
@@ -163,10 +205,18 @@ export function groundAt(G, x, z, y = Infinity) {
  * → null (free) or { x, z, nx, nz } (the clamped position and the inward normal to bounce off).
  */
 export function railClamp(G, ox, oz, x, z, y, radius) {
+	const k = G.scale ?? 1
 	for (const R of G.rails || []) {
 		const a = nearestOn(R, ox, oz)
-		if (!a || a.beyond || a.d > R.half + 0.05 || y < a.y - RAIL_BELOW || y > a.y + RAIL_ABOVE) continue
-		const b = nearestOn(R, x, z, 2)
+		if (
+			!a ||
+			a.beyond ||
+			a.d > R.half + 0.05 * k ||
+			y < a.y - (G.railBelow ?? RAIL_BELOW) ||
+			y > a.y + (G.railAbove ?? RAIL_ABOVE)
+		)
+			continue
+		const b = nearestOn(R, x, z, 2 * k)
 		const lim = R.half - radius
 		if (!b || b.beyond || b.d <= lim) continue
 		const ux = (x - b.px) / b.d
@@ -179,9 +229,11 @@ export function railClamp(G, ox, oz, x, z, y, radius) {
 /** Underside of the lowest deck / slab ramp overhead a car at height y at (x, z) (a bridge), or Infinity. */
 export function ceilingAt(G, x, z, y) {
 	let c = Infinity
+	const reach = G.reach ?? REACH
+	const slab = G.slab ?? DECK_SLAB
 	for (const R of G.rails || []) {
 		const r = rampSurfaceY(R, x, z)
-		if (r !== null && r > y + REACH && r - DECK_SLAB < c) c = r - DECK_SLAB
+		if (r !== null && r > y + reach && r - slab < c) c = r - slab
 	}
 	return c
 }
@@ -194,5 +246,5 @@ export function floorOnlyAt(G, x, z) {
 /** A horizontal move into (x, z) is blocked for a car at height y: no ground there, or ground > y + STEP_UP. */
 export function blockedAt(G, x, z, y) {
 	const g = groundAt(G, x, z, y)
-	return g === null || g > y + STEP_UP
+	return g === null || g > y + (G.stepUp ?? STEP_UP)
 }

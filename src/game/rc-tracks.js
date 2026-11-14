@@ -19,8 +19,10 @@ const PL = require('./rc-track-plan')
 const { freeRegions } = require('./rc-track-space')
 const { roomJobs, RS, RH } = require('./rc-track-room')
 const { skyJobs } = require('./rc-track-sky')
+const { toyJobs } = require('./rc-toy-tracks')
+const { sceneScale } = require('./rc-scale')
 
-const GENERATOR_VERSION = 4 // part of the scene rev: bump when the tracks change for the same scene
+const GENERATOR_VERSION = 5 // part of the scene rev: bump when the tracks change for the same scene
 const EDGE = 0.25 // extra margin between the road edge and the floor edge
 const DEFAULT_ARENA = { w: 30, d: 20 }
 const KICKER_H = 0.45
@@ -52,10 +54,10 @@ function naming(floor, family, features) {
 }
 
 /** Candidate placements: the region at shrinking sizes, centred then shifted, long axis first along the long side. */
-function* placements(avail, family) {
+function* placements(avail, family, caps = null) {
 	const aw = avail[2] - avail[0], ad = avail[3] - avail[1]
 	if (aw <= 0 || ad <= 0) return
-	const cap = family === 'loop' ? 60 : 34
+	const cap = caps?.[family] ?? (family === 'loop' ? 60 : 34)
 	for (const s of [1, 0.8, 0.6]) {
 		for (const turned of [false, true]) {
 			const W = turned ? ad : aw, D = turned ? aw : ad
@@ -87,18 +89,21 @@ function* ringPlans(scene, floor, width) {
 	}
 }
 
-/** One family on one floor → generator of null between tries, the track last (or nothing). `taken`: ids in use. */
-function* searchFamily(scene, floor, fam, taken) {
+/**
+ * One family on one floor → generator of null between tries, the track last (or nothing). `taken`: ids in use.
+ * opts (§3 toy scale, unit frame): { widths: [allowed], caps: { family: max size }, meta: extra buildTrack meta }.
+ */
+function* searchFamily(scene, floor, fam, taken, opts = {}) {
 	const [family, variants] = fam
 	const stageLike = floor.id === 'stage'
 	const rMin = stageLike ? RS : RH
 	const short = Math.min(floor.rect[2] - floor.rect[0], floor.rect[3] - floor.rect[1])
-	const widths = (stageLike ? STAGE_WIDTHS : HALL_WIDTHS).filter((w) => w <= short / 1.6)
+	const widths = (opts.widths || (stageLike ? STAGE_WIDTHS : HALL_WIDTHS)).filter((w) => w <= short / 1.6)
 	for (const features of variants) {
 		const { id, name } = naming(floor, family, features)
 		if (taken.has(id)) continue
 		for (const width of widths) {
-			const meta = { id, name, floor: floor.id, y: floor.y, width, features }
+			const meta = { id, name, floor: floor.id, y: floor.y, width, features, ...opts.meta }
 			const ok = (dense) => {
 				const t = dense && buildTrack(dense, meta, scene)
 				return t && validateTrack(t, scene).ok ? t : null
@@ -117,7 +122,7 @@ function* searchFamily(scene, floor, fam, taken) {
 			if (avail[2] > avail[0] && avail[3] > avail[1] && !regions.some((r) => r.every((v, i) => Math.abs(v - avail[i]) < 1e-6))) regions.push(avail)
 			for (const region of regions) {
 				for (const shapeVariant of family === 'gp' ? [0, 1, 2] : [0]) {
-					for (const at of placements(region, family)) {
+					for (const at of placements(region, family, opts.caps)) {
 						const shape = PL.shapeOf(family, at.w, at.d, shapeVariant, rMin)
 						const t = shape && ok(PL.place(shape, at))
 						if (t) return yield t
@@ -129,8 +134,13 @@ function* searchFamily(scene, floor, fam, taken) {
 	}
 }
 
-/** Generator over the whole scene: yields null between tries and { done, tracks, floors, bounds } last. */
-function* trackJobs(scene) {
+/**
+ * Generator over the whole scene: yields null between tries and { done, tracks, floors, bounds } last. A scene (or
+ * opts.scale) at a toy scale (§3, < 1) gets the toy track set (rc-toy-tracks.js) instead.
+ */
+function* trackJobs(scene, opts = {}) {
+	const scale = sceneScale(scene, opts)
+	if (scale !== 1) return yield* toyJobs(scene, scale, { searchFamily })
 	const floors = (scene?.floors || []).filter((f) => f && Array.isArray(f.rect))
 	const tracks = []
 	const sc = { floors: [...floors], obstacles: scene?.obstacles || [], bounds: scene?.bounds, field: scene?.field || null }
@@ -179,16 +189,16 @@ function* trackJobs(scene) {
 	yield { done: true, tracks, floors, bounds }
 }
 
-/** Tracks for `scene` ({ floors, obstacles, bounds }) → { tracks, floors (+ an arena when needed), bounds }. */
-function generateTracks(scene) {
-	for (const r of trackJobs(scene)) if (r && r.done) return r
+/** Tracks for `scene` ({ floors, obstacles, bounds[, scale, occ, field] }) → { tracks, floors (+ an arena when needed), bounds }. */
+function generateTracks(scene, opts = {}) {
+	for (const r of trackJobs(scene, opts)) if (r && r.done) return r
 	return { tracks: [], floors: [], bounds: null }
 }
 
 /** Same as generateTracks, awaiting `pause()` every `every` tries (the bake keeps the event loop free). */
-async function generateTracksAsync(scene, pause, every = 4) {
+async function generateTracksAsync(scene, pause, every = 4, opts = {}) {
 	let k = 0
-	for (const r of trackJobs(scene)) {
+	for (const r of trackJobs(scene, opts)) {
 		if (r && r.done) return r
 		if (++k % every === 0) await pause()
 	}

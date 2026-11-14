@@ -222,28 +222,82 @@ const BIG_FLOORS = [{ id: 'hall', y: 0, rect: [-500, -500, 500, 500] }]
 
 /**
  * Bot: aims at the centre line LOOK m ahead, full throttle on straights, slows for tight corners.
- * Returns { input, near } for this step.
+ * Returns { input, near } for this step. §3: every distance and speed × the track's toy scale (T.scale).
  */
 function botInput(TM, PH, T, car, hint) {
+	const k = T.scale ?? 1
 	const n = TM.nearestHinted(T, car.x, car.z, hint, car.y)
 	const v = PH.forwardSpeed(car)
-	const look = 2 + Math.max(0, v) * 0.18
+	const look = (2 + Math.max(0, v / k) * 0.18) * k
 	const tgt = TM.pointAt(T, n.s + look)
 	const want = Math.atan2(-(tgt.x - car.x), -(tgt.z - car.z))
 	let err = want - car.yaw
 	while (err > Math.PI) err -= 2 * Math.PI
 	while (err < -Math.PI) err += 2 * Math.PI
 	/* curvature ahead: heading change over the next 6 m */
-	const a = TM.pointAt(T, n.s + 1)
-	const b = TM.pointAt(T, n.s + 7)
+	const a = TM.pointAt(T, n.s + 1 * k)
+	const b = TM.pointAt(T, n.s + 7 * k)
 	let turn = Math.atan2(b.ux, b.uz) - Math.atan2(a.ux, a.uz)
 	while (turn > Math.PI) turn -= 2 * Math.PI
 	while (turn < -Math.PI) turn += 2 * Math.PI
-	const vWant = Math.abs(turn) > 0.9 ? 7 : Math.abs(turn) > 0.5 ? 9 : 13
+	const vWant = (Math.abs(turn) > 0.9 ? 7 : Math.abs(turn) > 0.5 ? 9 : 13) * k
 	return {
 		near: n,
-		input: { throttle: v < vWant ? 1 : 0, brake: v > vWant + 1.5 ? 1 : 0, steer: Math.max(-1, Math.min(1, err * 2.5)) },
+		input: {
+			throttle: v < vWant ? 1 : 0,
+			brake: v > vWant + 1.5 * k ? 1 : 0,
+			steer: Math.max(-1, Math.min(1, err * 2.5)),
+		},
 	}
+}
+
+/* ---------------- §3 toy scale: a whole fixture world × k about a point ---------------- */
+const scaleP = (p, k, o) => p.map((v, i) => o[i] + (v - o[i]) * k)
+
+/** A contract track × k about o = [x, y, z] (points, width, length, pads, boxes, grid, and the v1 `y`). */
+function scaleTrack(t, k, o = [0, 0, 0]) {
+	const out = { ...t, points: t.points.map((p) => (p.length === 2 ? scaleP(p, k, [o[0], o[2]]) : scaleP(p, k, o))) }
+	if (t.width != null) out.width = t.width * k
+	if (t.length != null) out.length = t.length * k
+	if (t.y != null) out.y = o[1] + (t.y - o[1]) * k
+	const pt = (q) => ({ ...q, x: o[0] + (q.x - o[0]) * k, y: o[1] + (q.y - o[1]) * k, z: o[2] + (q.z - o[2]) * k })
+	if (t.pads) out.pads = t.pads.map(pt)
+	if (t.boxes) out.boxes = t.boxes.map(pt)
+	if (t.grid) out.grid = t.grid.map(pt)
+	return out
+}
+
+/** Floors × k about o (y and the plan rect). */
+function scaleFloors(floors, k, o = [0, 0, 0]) {
+	return floors.map((f) => ({
+		...f,
+		y: o[1] + (f.y - o[1]) * k,
+		rect: [0, 1, 2, 3].map((i) => o[i % 2 ? 2 : 0] + (f.rect[i] - o[i % 2 ? 2 : 0]) * k),
+	}))
+}
+
+/** Obstacle boxes ({min, max}) × k about o. */
+function scaleObstacles(obs, k, o = [0, 0, 0]) {
+	return (obs || []).map((b) => ({ ...b, min: scaleP(b.min, k, o), max: scaleP(b.max, k, o) }))
+}
+
+/** Occupancy grid (contract §3) from a list of blocked cells [i, j] → { floor, y, x0, z0, cell, w, h, rle }. */
+function occGrid({ floor = 'hall', y = 0, x0, z0, cell, w, h, blocked }) {
+	const bits = new Uint8Array(w * h)
+	for (const [i, j] of blocked) bits[j * w + i] = 1
+	const rle = []
+	let cur = 0
+	let run = 0
+	for (let c = 0; c < bits.length; c++) {
+		if (bits[c] === cur) run++
+		else {
+			rle.push(run)
+			cur = bits[c]
+			run = 1
+		}
+	}
+	rle.push(run)
+	return { floor, y, x0, z0, cell, w, h, rle }
 }
 
 /**
@@ -338,4 +392,8 @@ module.exports = {
 	straightTrack,
 	deckTracks,
 	botInput,
+	scaleTrack,
+	scaleFloors,
+	scaleObstacles,
+	occGrid,
 }

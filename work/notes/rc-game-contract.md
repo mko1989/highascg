@@ -307,3 +307,54 @@ The live hall floor (y 0.839) is full of banquet tables (277 obstacles), so v2's
   allowed when the two ribbons are ≥ 1.2 m apart in height at the crossing.
 - Pads and boxes are allowed on decks (not on ramps). Drops off a deck end are allowed onto clear floor or stage as in
   2.1. `validateTrack` covers all of this; the client draws decks and applies rails.
+
+## 3. Toy scale (owner, 14.11 night: "The cars and tracks should be at least 10x smaller. I'm talking like toys in the room.")
+
+The room stays life-size; the cars, tracks and everything the game adds shrink. One number carries it:
+
+- Scene JSON gains **`"scale": 0.1`** (server constant `RC_SCALE` in `src/game/rc-scale.js`; the live value is 0.1).
+  A client that gets no `scale` uses 1 (the v2 sizes) — existing fixtures and smokes at scale 1 stay valid.
+- **Everything with a length scales by `scale`, times and angles do not.** That is: every PHYS length, speed and
+  acceleration incl. gravity, STICK, RADIUS, CAR_GAP, CAR_H, PROBE, pad size, unstick step, TURN_R; ground-model
+  tolerances (0.02, 0.3 wall step, END_TOL, rail heights and the gate window −1.0/+1.3); car, item, pad, box, gantry,
+  rail, kerb, pillar, fx and shadow sizes; camera distances, heights, near plane and the director's framing; item
+  ranges and speeds (rocket, pulse radius, slick size); server sanity limits (speed cap, teleport distance, box/pad
+  pick-up radius). Yaw rates, steer rates, durations, lap counts, fps stay. So a car at scale 0.1 drives exactly as the
+  v2 car does, seen from a chase camera ten times closer: top speed 1.3 m/s, hard cap 2.4 m/s, car ≈ 6 × 3.5 cm,
+  gravity 2 m/s².
+- The HUD shows speed ÷ scale (the "toy km/h" reads like v2).
+- Wire: positions and velocities must keep ≥ 3 significant digits at this scale (round to 1 mm / 1 mm/s or finer;
+  check every rounding in protocol.js / rc-sanitize.js / rc-room.js).
+
+### Tracks at toy scale
+- Width 0.30–0.45 m. Turn radius ≥ 0.3 m on the floor, ≥ 0.18 m on the stage. All v2 / §2.7 rules hold with their
+  lengths × scale (ramp slope stays ≤ 18°, kink ≤ 6°).
+- The hall is now a landscape: cars drive **under** tables and chairs, between their legs, along walls, around truss
+  bases, up a ramp onto the stage (0.58 m above the hall floor here = a long ramp at 18°) and off its edge.
+- At least 8 tracks, deterministic per `rev`, a mix:
+  - 2–3 short (4–10 m, on the stage or one corner of the hall),
+  - 3–4 medium (12–30 m: e.g. under a table row and back, around the stage front, stage + hall with ramp and drop,
+    one with a small bridge on decks 0.1–0.4 m high),
+  - 1–2 long tours (≥ 60 m) that visit both ends of the hall and the stage; they carry `"laps": 1` as a suggested lap
+    count (host default when picked), others `"laps": 3`.
+- `points` spacing ≈ 0.5 × width or finer on curves; a track may have up to 2500 points. The client must not assume
+  ≤ 200 (minimap, mesh, nearest-point search need to stay fast — use the existing segment grid / windowed search).
+
+### Obstacles at toy height
+- What blocks a toy is only what crosses the band **floor … floor + 0.06 m** (CAR_H × scale + margin): legs, bases,
+  walls, the stage side, risers. A table top is a roof, not an obstacle. Boxes cannot describe hundreds of thin legs,
+  so the scene gains an occupancy grid per floor and `obstacles` becomes a coarse summary (may be empty):
+  ```json
+  "occ": [{ "floor": "hall", "y": 0.839, "x0": -13.5, "z0": -2.0, "cell": 0.03, "w": 904, "h": 2054,
+            "rle": [120, 3, 899, 2, …] }]
+  ```
+  Row-major, z rows from `z0`, x from `x0`; `rle` = run lengths alternating FREE, BLOCKED, FREE … (starts with free,
+  a leading 0 when the first cell is blocked); cell (i, j) covers x0 + i·cell … +cell, z0 + j·cell … +cell.
+  Blocked = a drawn triangle crosses that cell inside the band, dilated by nothing (the client adds the car radius).
+- Collision (client physics, and the validator for track clearance): a car whose y is within [floor.y − 0.02·s,
+  floor.y + CAR_H·s] collides with blocked cells of that floor's grid like a wall (normal from the grid gradient /
+  nearest free direction; same restitution and scrape as a wall). Cars on a ramp or deck above the band ignore it.
+- A track's ribbon keeps ≥ width/2 + 1 cell clear of blocked cells (except under its own decks' pillars: none allowed
+  on a blocked cell).
+- If the model has no legs (tables drawn as solid blocks down to the floor), those cells are simply blocked — the
+  generator routes around them. Report which it is for the live scene.

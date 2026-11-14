@@ -3,13 +3,15 @@
  * v2: parts above the lowest floor (stage crossings) in a second colour, drawn on top so an overpass reads; ramps
  * amber; each drop's ledge gets a small orange tick. §2.7: elevated decks in a third colour (cyan); the raised parts are
  * drawn in height order, so the upper ribbon of a bridge lies over the lower one.
+ * §3 toy scale: margins, tick widths and the height bands are × T.scale; a 2500-point track is drawn once into the
+ * minimap's cached layer (per frame only the dots).
  */
 import { prepareTrack } from './track-math.js'
 
 /** Transform fitting a prepared track into w × h with a margin. */
 export function fitTransform(T, w, h, margin = 8) {
 	const b = T.box
-	const pad = T.half + 0.3
+	const pad = T.half + 0.3 * (T.scale ?? 1)
 	const sx = (w - margin * 2) / Math.max(0.1, b.maxX - b.minX + pad * 2)
 	const sz = (h - margin * 2) / Math.max(0.1, b.maxZ - b.minZ + pad * 2)
 	const s = Math.min(sx, sz)
@@ -55,7 +57,7 @@ export function drawTrack(ctx, T, w, h, opts = {}) {
 	ctx.moveTo(ax, ay)
 	ctx.lineTo(bx, by)
 	ctx.strokeStyle = '#ff7a1a'
-	ctx.lineWidth = Math.max(2, 0.25 * tf.s)
+	ctx.lineWidth = Math.max(2, 0.25 * (T.scale ?? 1) * tf.s)
 	ctx.lineCap = 'butt'
 	ctx.stroke()
 	return tf
@@ -70,23 +72,24 @@ export function segKind(T, i) {
 	if (T.segStep?.[i]) return ''
 	if (T.segRamp?.[i]) return 'ramp'
 	if (T.segDeck?.[i]) return 'deck'
-	return Math.min(T.ys[i], T.ys[(i + 1) % T.n]) > T.box.minY + 0.3 ? 'up' : ''
+	return Math.min(T.ys[i], T.ys[(i + 1) % T.n]) > T.box.minY + 0.3 * (T.scale ?? 1) ? 'up' : ''
 }
 
 /** Raised (stage-level), deck and ramp segments over the base ribbon, lowest first; then drop ticks. */
 function drawRaised(ctx, T, tf, opts) {
 	const segs = T.closed ? T.n : T.n - 1
-	const bands = new Map() // height band (10 cm) → segment indices: each band's edges, then its fills
+	const bands = new Map() // height band (10 cm · scale) → segment indices: each band's edges, then its fills
+	const k = T.scale ?? 1
 	for (let i = 0; i < segs; i++) {
 		if (!segKind(T, i)) continue
-		const key = Math.round(Math.min(T.ys[i], T.ys[(i + 1) % T.n]) * 10)
+		const key = Math.round((Math.min(T.ys[i], T.ys[(i + 1) % T.n]) * 10) / k)
 		if (!bands.has(key)) bands.set(key, [])
 		bands.get(key).push(i)
 	}
 	for (const key of [...bands.keys()].sort((a, b) => a - b)) {
 		for (const pass of ['edge', 'fill']) {
 			for (const i of bands.get(key)) {
-				const k = segKind(T, i)
+				const kind = segKind(T, i)
 				const a = T.pts[i]
 				const b = T.pts[(i + 1) % T.n]
 				const [ax, ay] = tf.map(a[0], a[1])
@@ -99,7 +102,7 @@ function drawRaised(ctx, T, tf, opts) {
 					ctx.strokeStyle = opts.edge || 'rgba(255,255,255,0.85)'
 					ctx.lineWidth = Math.max(3, T.width * tf.s + 3)
 				} else {
-					ctx.strokeStyle = k === 'ramp' ? RAMP_COLOR : k === 'deck' ? DECK_COLOR : RAISED_COLOR
+					ctx.strokeStyle = kind === 'ramp' ? RAMP_COLOR : kind === 'deck' ? DECK_COLOR : RAISED_COLOR
 					ctx.lineWidth = Math.max(2, T.width * tf.s)
 				}
 				ctx.stroke()
@@ -116,17 +119,17 @@ function drawRaised(ctx, T, tf, opts) {
 		ctx.moveTo(ax, ay)
 		ctx.lineTo(bx, by)
 		ctx.strokeStyle = '#ffc81a'
-		ctx.lineWidth = Math.max(2, 0.3 * tf.s)
+		ctx.lineWidth = Math.max(2, 0.3 * k * tf.s)
 		ctx.lineCap = 'butt'
 		ctx.stroke()
 	}
 }
 
-/** Small static preview of a raw contract Track into a canvas element. */
-export function previewTrack(canvas, track) {
+/** Small static preview of a raw contract Track into a canvas element (scale: the scene's §3 toy scale). */
+export function previewTrack(canvas, track, scale) {
 	const ctx = canvas.getContext('2d')
 	if (!ctx || !track?.points?.length) return
-	drawTrack(ctx, prepareTrack(track), canvas.width, canvas.height, { margin: 6 })
+	drawTrack(ctx, prepareTrack(track, scale), canvas.width, canvas.height, { margin: 6 })
 }
 
 /** Minimap that caches the track layer and draws car dots on top each frame. */

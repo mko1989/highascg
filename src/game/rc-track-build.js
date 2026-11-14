@@ -189,13 +189,13 @@ function pickStart(P, Y, busy, sp, width, gridRun = GRID_RUN, opts = {}) {
  * kicker: h, tabletop: h, run: which straight carries the kicker / table-top (0 = the longest) } }. §2.7 extras:
  * `kind` (default from the floor: 'room' | 'stage-short' | 'hall'), `levels(P, sp)` → { Y, ramps, drops, decks, busy }
  * in place of the built-in level laying (the whole-room deck tracks, rc-track-sky.js), `gridRun` (m of flat road behind
- * the start line, default 9.2).
+ * the start line, default 9.2). §3 (toy scale, unit frame): `maxPoints` (default 200) and `maxLength` (default 260).
  */
 function buildTrack(dense, meta, scene) {
 	if (!dense || !dense.every((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]))) return null
 	const L0 = G.polyLength(dense)
-	if (!(L0 >= 20 && L0 <= 260)) return null
-	const n = Math.max(60, Math.min(200, Math.round(L0 / SPACING)))
+	if (!(L0 >= 20 && L0 <= (meta.maxLength || 260))) return null
+	const n = Math.max(60, Math.min(meta.maxPoints || 200, Math.round(L0 / SPACING)))
 	let P = G.resampleClosed(dense, n)
 	const sp = G.polyLength(P) / n
 	const lv = meta.levels ? meta.levels(P, sp) : levels(P, sp, meta)

@@ -7,6 +7,8 @@
  * → server `box` {by: me} starts the roulette → server `item` names the result → the slot shows it 1 s after the
  * roulette started → Use sends `use` and applies turbo / shield locally at once (slick / rocket / pulse come back from
  * the server as `haz` / `fx` for everyone, the user included).
+ * §3 toy scale: every reach / size below is its scale-1 value × the track's scale (T.scale, or `s` where no track is
+ * passed); times stay.
  */
 import { boxMsg, useMsg, hitHazMsg, hitByMsg, decodeHaz, decodeBoxes, ITEM_KINDS } from './protocol.js'
 import { rocketPath, rocketPose } from './rocket.js'
@@ -117,12 +119,13 @@ export class ItemState {
 		if (!T || this.held || this.rollStart !== null) return null
 		/* one claim in flight at a time: the server answers it (box + item) within a round trip */
 		for (const at of this.pending.values()) if (now - at < PENDING_MS) return null
+		const k = T.scale ?? 1
 		let best = null
-		let bestD = BOX_R
+		let bestD = BOX_R * k
 		for (const b of T.boxes || []) {
 			if (this.boxTaken(b.id, now)) continue
 			const d = Math.hypot(car.x - b.x, car.z - b.z)
-			if (d > bestD || Math.abs(car.y + 0.25 - b.y) > 1.2) continue
+			if (d > bestD || Math.abs(car.y + 0.25 * k - b.y) > 1.2 * k) continue
 			best = b
 			bestD = d
 		}
@@ -131,17 +134,17 @@ export class ItemState {
 		return boxMsg(best.id)
 	}
 
-	/** Use the held item → { msg, item } (the slot empties), or null. */
-	use(car) {
+	/** Use the held item → { msg, item } (the slot empties), or null. s: the toy scale. */
+	use(car, s = 1) {
 		const item = this.held
 		if (!item || this.rollStart !== null) return null
 		this.held = null
 		const fx = -Math.sin(car.yaw)
 		const fz = -Math.cos(car.yaw)
 		let p = [car.x, car.y, car.z]
-		if (item === 'slick') p = [car.x - fx * SLICK_BACK, car.y, car.z - fz * SLICK_BACK]
-		else if (item === 'rocket') p = [car.x + fx * ROCKET_AHEAD, car.y, car.z + fz * ROCKET_AHEAD]
-		return { msg: useMsg(item, p, car.yaw), item }
+		if (item === 'slick') p = [car.x - fx * SLICK_BACK * s, car.y, car.z - fz * SLICK_BACK * s]
+		else if (item === 'rocket') p = [car.x + fx * ROCKET_AHEAD * s, car.y, car.z + fz * ROCKET_AHEAD * s]
+		return { msg: useMsg(item, p, car.yaw, s), item }
 	}
 
 	/** Rocket pose with the launch path cached per hazard (and per track). */
@@ -161,6 +164,7 @@ export class ItemState {
 	 */
 	hazardHit(T, car, meId, now) {
 		if (car.spin > 0 || car.immune > 0) return null
+		const k = T?.scale ?? 1
 		for (const h of this.hazards.values()) {
 			if (this.hitSent.has(h.hid)) continue
 			if (h.until !== null && now >= h.until) continue
@@ -168,11 +172,12 @@ export class ItemState {
 			let hit = false
 			if (h.kind === 'slick') {
 				if (mine && now - h.ts < OWN_SLICK_SAFE_MS) continue
-				hit = car.grounded && Math.hypot(car.x - h.p[0], car.z - h.p[2]) <= SLICK_R && Math.abs(car.y - h.p[1]) <= 0.6
+				hit =
+					car.grounded && Math.hypot(car.x - h.p[0], car.z - h.p[2]) <= SLICK_R * k && Math.abs(car.y - h.p[1]) <= 0.6 * k
 			} else if (h.kind === 'rocket') {
 				if (mine && now - h.ts < ROCKET_SAFE_MS) continue
 				const r = T ? this.rocketOf(T, h, now) : null
-				hit = !!r && Math.hypot(car.x - r.x, car.y + 0.2 - r.y, car.z - r.z) <= ROCKET_R
+				hit = !!r && Math.hypot(car.x - r.x, car.y + 0.2 * k - r.y, car.z - r.z) <= ROCKET_R * k
 			}
 			if (hit) {
 				this.hitSent.add(h.hid)
@@ -182,10 +187,10 @@ export class ItemState {
 		return null
 	}
 
-	/** Pulse `fx` from player `fx.id` at fx.p: true when my car is within PULSE_R (never the user's own pulse). */
-	pulseHits(fx, car, meId) {
+	/** Pulse `fx` from player `fx.id` at fx.p: true when my car is within PULSE_R · s (never the user's own pulse). */
+	pulseHits(fx, car, meId, s = 1) {
 		if (!fx.p || fx.id === meId || car.spin > 0 || car.immune > 0) return false
-		return Math.hypot(car.x - fx.p[0], car.y - fx.p[1], car.z - fx.p[2]) <= PULSE_R
+		return Math.hypot(car.x - fx.p[0], car.y - fx.p[1], car.z - fx.p[2]) <= PULSE_R * s
 	}
 }
 

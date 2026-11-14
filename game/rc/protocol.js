@@ -4,6 +4,8 @@
  * `decode` validates server frames and returns null for anything unknown or malformed (unknown types are ignored).
  */
 
+import { wireDecimals } from './scale.js'
+
 export const MAX_NAME = 16
 export const SEND_INTERVAL_MS = 60 // ≈ 16.7 Hz, safely under the server's 20 Hz drop limit
 export const KEEPALIVE_MS = 1000 // a parked car still reports once a second (server drops silent players after 10 s)
@@ -40,13 +42,16 @@ export function readyMsg(ready) {
 	return { t: 'ready', ready: !!ready }
 }
 
-/** Own car state → `s` (v2: + `fx` bit flags, see drive-rules.js FX). */
-export function stateMsg(car, v, cp, lap, fx = 0) {
+/**
+ * Own car state → `s` (v2: + `fx` bit flags, see drive-rules.js FX). §3: positions to 1 mm, the speed to ≥ 3 significant
+ * digits at the toy scale `s` (1 cm/s at scale 1, 1 mm/s at 0.1 — scale.js wireDecimals).
+ */
+export function stateMsg(car, v, cp, lap, fx = 0, s = 1) {
 	return {
 		t: 's',
 		p: [r(car.x, 3), r(car.y, 3), r(car.z, 3)],
 		yaw: r(car.yaw, 3),
-		v: r(v, 2),
+		v: r(v, wireDecimals(2, s)),
 		st: r(car.st, 2),
 		cp: cp | 0,
 		lap: lap | 0,
@@ -59,9 +64,10 @@ export function boxMsg(id) {
 	return { t: 'box', id }
 }
 
-/** I used my held item at p = [x, y, z] facing yaw. */
-export function useMsg(item, p, yaw) {
-	return { t: 'use', item: String(item), p: [r(p[0], 3), r(p[1], 3), r(p[2], 3)], yaw: r(yaw, 3) }
+/** I used my held item at p = [x, y, z] facing yaw (1 mm; finer below scale 0.1). */
+export function useMsg(item, p, yaw, s = 1) {
+	const d = wireDecimals(3, s * 10)
+	return { t: 'use', item: String(item), p: [r(p[0], d), r(p[1], d), r(p[2], d)], yaw: r(yaw, 3) }
 }
 
 /** Hazard `hid` hit me. */

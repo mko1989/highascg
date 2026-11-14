@@ -43,7 +43,7 @@ export function onItemMessage(G, m, sNow) {
 			G.fxView?.oneShot?.(m.k, m.p)
 			if (m.k === 'pulse') {
 				G.director?.notify?.('pulse', m.id, G.animT ?? 0)
-				if (G.car && !G.spectator && it.pulseHits(m, G.car, G.meId)) {
+				if (G.car && !G.spectator && it.pulseHits(m, G.car, G.meId, G.T?.scale ?? 1)) {
 					const r = spinOut(G.car)
 					if (r === 'spin') {
 						G.net?.sendEvent(hitByMsg(m.id, 'pulse'))
@@ -68,7 +68,7 @@ export function ownCarItems(G, input, sNow) {
 	const claim = it.pickup(G.T, car, sNow)
 	if (claim && !G.net?.sendEvent(claim)) it.pending.delete(claim.id)
 	if (input.use && it.held && !it.rolling && G.net?.status === 'joined') {
-		const u = it.use(car)
+		const u = it.use(car, G.T.scale ?? 1)
 		if (u && G.net.sendEvent(u.msg)) {
 			applyOwnUse(car, u.item)
 			G.audio?.sfx?.(u.item === 'turbo' ? 'boost' : 'item')

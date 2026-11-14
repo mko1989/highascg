@@ -55,7 +55,13 @@ gravity, air, walls; steer + = left), `ground.js` (floors + the one ramp rule), 
 start launch, spin-out, catch-up, `fx` flags), `track-math.js` (3D tracks; v1 2D tracks are converted), `lap-logic.js`,
 `standings.js`, `interp.js` (snapshot buffer + server clock), `protocol.js`, `net.js` (WebSocket with reconnect),
 `cameras.js`, `items.js` (boxes, roulette, held item, hazards, hit tests), `rocket.js` (the shared rocket path),
-`item-play.js` (item / launch / event glue).
+`item-play.js` (item / launch / event glue), `scale.js` (§3 toy scale: the scene's one `scale` → scaled PHYS, wire
+precision), `occ.js` (§3 occupancy grids: RLE decode, disc-vs-cells), `seg-grid.js` (segment grid for long tracks).
+
+§3 toy scale: the room stays life-size, everything the game adds is drawn and driven at `scene.scale` (live 0.1; missing
+= 1 = the v2 sizes). `prepareTrack(track, scale)` stores it as `T.scale`, `createEnv(T, floors, obstacles, { scale, occ })`
+as `env.s` / `env.P` (= `physFor(s)`). Only `sceneScale()` reads the scene field (game.js once per scene → `G.s` for
+the car models and item effects; host.js for its previews); everything else takes `T.scale` / `env.s`.
 Browser modules: `main.js` (mode switch), `game.js` + `session.js` + `loop.js` (session, messages, frame loop),
 `world.js`, `track-mesh.js` + `track-deco.js` + `mesh-util.js` (ribbon, ramps, ledges, gantry), `props.js` (pads,
 item boxes), `fx-view.js` (hazards, one-shots), `car-model.js` + `car-fx.js`, `input.js`, `hud.js` + `hud-extra.js` +

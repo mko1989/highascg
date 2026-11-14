@@ -1,5 +1,7 @@
 /**
  * Numbers of the RC car physics (WO-1074, contract v2 §2.2) — pure. Speeds in m/s, times in s, angles in rad.
+ * These are the v2 (scale 1) sizes; §3 toy scale: scale.js physFor(s) multiplies every length / speed /
+ * acceleration (its PHYS_LENGTHS list) — physics code reads the env's `P`, never a bare literal length.
  */
 export const PHYS = Object.freeze({
 	DT: 1 / 60,
@@ -33,6 +35,7 @@ export const PHYS = Object.freeze({
 	SLIP_RATE: 7,
 	TURN_DRIFT: 3.7,
 	HOP_V: 2.4,
+	HOP_MIN_V: 4, // a drift press hops only above this speed
 	DRIFT_T1: 0.7,
 	DRIFT_T2: 1.6,
 	MINI_1: 0.6,
@@ -52,18 +55,28 @@ export const PHYS = Object.freeze({
 	/* 3D */
 	GRAVITY: 20,
 	STICK: 0.04, // a grounded car follows ground up to this far below its ballistic path (no micro-hops)
+	VY_MAX: 12, // vertical speed while following the ground
+	LAND_V: 7, // landing speed of a full squash
+	SPIN_DECEL: 6, // while spinning out
+	CREEP_V: 0.3, // below this the brake / gas switch between braking and reversing
 	RESTITUTION: 0.4,
 	SCRAPE: 0.92, // tangential speed kept on a wall hit
 	/* body */
 	RADIUS: 0.3, // collision circle (car drawn ≈ 0.63 × 0.35 m — the 0.45 m buggy at 1.4×, readable on a phone)
 	CAR_GAP: 0.62, // centre distance where two cars touch
 	CAR_H: 0.5, // obstacles collide when [min.y, max.y] overlaps [y, y + CAR_H]
+	CAR_DY: 0.4, // two cars further apart in height never touch
+	BUMP_KICK: 1.4, // m/s, once per car-to-car contact
 	PROBE: 0.45, // wall-normal probe radius
+	STEP_OUT: 0.05, // a car found inside a wall steps out this far
 	/* pads (size is ours: the contract gives only the centre and yaw) */
 	PAD_LEN: 2.2,
 	PAD_HALF_W: 1.2,
+	PAD_DY: 0.5, // a pad counts for a car within this height of it
 	/* auto-unstick: throttle held, slower than UNSTICK_V for UNSTICK_T → nudged back towards the ribbon */
 	UNSTICK_T: 1.5,
 	UNSTICK_V: 1.0,
 	UNSTICK_STEP: 1.2,
+	UNSTICK_NEAR: 0.3, // closer to the ribbon than this: nudged along it instead
+	UNSTICK_FWD: 0.8,
 })

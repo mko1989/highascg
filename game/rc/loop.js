@@ -4,7 +4,7 @@
  * snapshot-interpolated remote cars with their `fx` effects, lap tracking, cameras (chase with an FOV kick / top,
  * spectator director), props and item effects, throttled HUD updates, sound, and the own-state send.
  */
-import { stepCar, forwardSpeed, frameYaw, groundOf, ceilingOf } from './physics.js'
+import { stepCar, forwardSpeed, frameYaw, groundOf, ceilingOf, eyeBlockedOf } from './physics.js'
 import { fxFlags, driftStage, FX } from './drive-rules.js'
 import { stateMsg } from './protocol.js'
 import { chaseTarget, topTarget, smoothCam, overviewTarget, fovFor, FOV } from './cameras.js'
@@ -35,6 +35,8 @@ export function startLoop(G) {
 		const t = now / 1000
 		G.animT = t
 		const sNow = G.net ? G.net.serverNow() : now
+		const s = G.T?.scale ?? 1 // §3 toy scale (scale.js)
+		G.world.setNear?.(s)
 
 		const others = remoteCars(G, sNow, now, dt, t)
 
@@ -78,9 +80,10 @@ export function startLoop(G) {
 			const rc = G.race.cars.get(G.meId)
 			/* others see the travel heading while spinning (they draw the spin from the flag) */
 			const sent = car.spin > 0 ? { ...car, yaw: frameYaw(car) } : car
-			G.net?.sendState(stateMsg(sent, v, rc ? rc.lap.cp : 0, rc ? Math.min(rc.lap.lap, G.state?.laps || 99) : 0, fx))
-			G.audio.engine(v, input.throttle)
-			G.hud.x.speedLines(car.boost > 0 ? 0.85 : Math.max(0, (Math.abs(v) - 11) / 8) * 0.5)
+			const lap = rc ? Math.min(rc.lap.lap, G.state?.laps || 99) : 0
+			G.net?.sendState(stateMsg(sent, v, rc ? rc.lap.cp : 0, lap, fx, s))
+			G.audio.engine(v / s, input.throttle) // §3: pitch, lines and the HUD read the toy speed as v2's
+			G.hud.x.speedLines(car.boost > 0 ? 0.85 : Math.max(0, (Math.abs(v / s) - 11) / 8) * 0.5)
 			G.hud.x.item(G.items, now)
 		}
 
@@ -100,11 +103,20 @@ export function startLoop(G) {
 					const look = { ...pose, yaw: frameYaw(G.car) }
 					want =
 						G.camMode === 'top'
-							? topTarget(pose, 7 + Math.abs(v) * 0.3)
-							: chaseTarget(look, v, (x, z, y) => ceilingOf(G.env, x, z, y))
+							? topTarget(pose, (7 + Math.abs(v / s) * 0.3) * s, s)
+							: chaseTarget(
+									look,
+									v,
+									(x, z, y) => ceilingOf(G.env, x, z, y),
+									s,
+									(x, z, y) => eyeBlockedOf(G.env, x, z, y)
+								)
 				} else want = overviewTarget(G.T)
-				cam = smoothCam(cam, want, dt, G.camMode === 'top' ? 4 : 7)
-				const fWant = G.camMode === 'chase' && G.car ? fovFor(v, G.car.boost > 0) : FOV
+				cam = smoothCam(cam, want, dt, G.camMode === 'top' ? 4 : 7, 10 * s)
+				/* §3: an eased eye that lags into a table leg / wall cell jumps to the pulled-in pose instead */
+				if (pose && G.camMode !== 'top' && eyeBlockedOf(G.env, cam.eye[0], cam.eye[2], pose.y))
+					cam = smoothCam(null, want, dt)
+				const fWant = G.camMode === 'chase' && G.car ? fovFor(v, G.car.boost > 0, s) : FOV
 				fov += (fWant - fov) * (1 - Math.exp(-6 * dt))
 				G.world.setFov(fov)
 			}
@@ -204,7 +216,7 @@ function updateHud(G, sNow, v) {
 		laps,
 		curMs: racing && started && lapStart != null && done < laps ? sNow - lapStart : null,
 		bestMs: G.spectator ? null : (G.bests.get(G.meId) ?? rc?.lap.bestMs ?? null),
-		speed: v,
+		speed: v / (G.T?.scale ?? 1), // §3: the HUD shows the toy speed as v2's km/h
 		onTrack: G.car ? G.car.onTrack : true,
 		phaseLabel: phaseLabel(G),
 		dots,

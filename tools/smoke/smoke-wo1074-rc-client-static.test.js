@@ -42,6 +42,9 @@ const PURE = [
 	'items.js',
 	'rocket.js',
 	'item-play.js',
+	'scale.js', // §3 toy scale
+	'occ.js',
+	'seg-grid.js',
 ]
 
 function directive(csp, name) {

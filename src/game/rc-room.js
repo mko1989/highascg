@@ -3,13 +3,15 @@
 /**
  * WO-1074 — RC car game: the room (pure; clock and timers injected, no I/O). Players join over the game socket
  * (max 10; spectators do not count), the host drives the phase machine lobby → countdown (5 s) → race → results, the
- * server referees laps from each client's reported checkpoint / lap (in order, never faster than track.length / 24 m/s)
+ * server referees laps from each client's reported checkpoint / lap (in order, never faster than track.length / 24 m/s;
+ * §3: 24 × the scene's scale — the host's lap count follows a picked track's suggested `laps`)
  * and relays everyone's car 15 times a second — only while something moved. Physics is the browsers' business. Items
  * (v2: boxes, held items, hazards, effects) live in rc-room-items.js, in the lobby's free roam and in a race.
  * Costs nothing idle: a 1 Hz housekeeping timer only while sockets are open, the 15 Hz world timer only while cars move.
  */
 
 const S = require('./rc-sanitize')
+const { sceneScale } = require('./rc-scale')
 const { createRoomItems } = require('./rc-room-items')
 
 const COUNTDOWN_MS = 5000
@@ -39,6 +41,7 @@ function createRcRoom(deps) {
 	let phase = 'lobby'
 	let tracks = []
 	let bounds = null
+	let scale = 1 // §3: the scene's scale (speed cap, lap minimum, item reach)
 	let trackId = null
 	let raceTrack = null
 	let laps = 3
@@ -55,7 +58,10 @@ function createRcRoom(deps) {
 		position, carOf: (pid) => players.get(pid)?.car || null, isPlayer: (pid) => players.has(pid),
 	})
 	/** Items follow the race's track, or the selected one in the lobby. */
-	const syncItems = () => items.setTrack(raceTrack || tracks.find((t) => t.id === trackId) || null, bounds)
+	const syncItems = () => items.setTrack(raceTrack || tracks.find((t) => t.id === trackId) || null, bounds, scale)
+	const suggestLaps = (t) => {
+		if (Number.isInteger(t?.laps) && t.laps >= 1 && t.laps <= MAX_LAPS) laps = t.laps // §3: a track's suggested lap count
+	}
 
 	const connected = () => [...players.values()].filter((p) => p.connected)
 	const spectators = () => [...conns.values()].filter((c) => c.joined && c.spectator).length
@@ -181,7 +187,7 @@ function createRcRoom(deps) {
 		if (lap !== r.lap + 1 || cp !== 0 || r.cp !== k - 1) return // out of order: ignored (the server's count stands)
 		const t = now()
 		const ms = t - r.lapStart
-		if (ms < (raceTrack.length / 24) * 1000) return // faster than 24 m/s average (the hard cap): not a lap
+		if (ms < (raceTrack.length / (S.MAX_SPEED * scale)) * 1000) return // faster than the hard cap (24 m/s × scale) on average: not a lap
 		r.lap = lap
 		r.cp = 0
 		r.lapStart = t
@@ -202,7 +208,7 @@ function createRcRoom(deps) {
 	function carState(c, m) {
 		const p = players.get(c.pid)
 		if (!p || c.spectator) return
-		const v = S.cleanCar(m, bounds, raceTrack ? raceTrack.checkpoints.length : 0, laps)
+		const v = S.cleanCar(m, bounds, raceTrack ? raceTrack.checkpoints.length : 0, laps, scale)
 		if (!v) return
 		if (phase === 'race' && p.racing && v.cp != null && v.lap != null) referee(p, v.cp, v.lap)
 		const t = now()
@@ -301,6 +307,7 @@ function createRcRoom(deps) {
 				if (!idle) return { ok: false, status: 409, error: 'a race is running' }
 				if (!tracks.some((t) => t.id === id)) return { ok: false, status: 400, error: 'unknown track' }
 				trackId = id
+				suggestLaps(tracks.find((t) => t.id === id))
 				syncItems()
 				break
 			}
@@ -348,8 +355,10 @@ function createRcRoom(deps) {
 		setScene(scene) {
 			tracks = Array.isArray(scene?.tracks) ? scene.tracks : []
 			bounds = scene?.bounds || null
+			scale = sceneScale(scene)
 			if (!tracks.some((t) => t.id === trackId)) {
 				trackId = tracks[0]?.id ?? null
+				suggestLaps(tracks[0])
 				syncItems()
 				if (conns.size) broadcastState()
 			} else syncItems()

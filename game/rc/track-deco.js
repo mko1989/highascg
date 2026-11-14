@@ -1,6 +1,7 @@
 /**
  * Track decoration (WO-1074 v2): the start gantry (two towers, a chequered banner, five start lights that follow the
  * countdown — see setGantryLights) over a chequered start line, and small checkpoint posts at the gate heights.
+ * §3 toy scale: every size and offset × T.scale (k) — a toy gantry over a toy line.
  */
 import * as THREE from 'three'
 import { leftNormal, gateOf } from './track-math.js'
@@ -35,21 +36,23 @@ export function buildTrackDeco(T) {
 	const [lx, lz] = leftNormal(g0.tx, g0.tz)
 	const y = g0.y
 	const half = T.half
+	const k = T.scale ?? 1
+	const H = GANTRY_H * k
 
 	/* chequered start line */
 	const checks = new TriBatch()
-	const cols = Math.max(4, Math.round(T.width / 0.25))
+	const cols = Math.max(4, Math.round(T.width / (0.25 * k)))
 	const cw = T.width / cols
 	for (let r = 0; r < 2; r++) {
 		for (let c = 0; c < cols; c++) {
 			const o0 = -half + c * cw
-			const a0 = (r - 1) * 0.18
-			const P = (o, a) => [g0.x + lx * o + g0.tx * a, y + 0.03, g0.z + lz * o + g0.tz * a]
+			const a0 = (r - 1) * 0.18 * k
+			const P = (o, a) => [g0.x + lx * o + g0.tx * a, y + 0.03 * k, g0.z + lz * o + g0.tz * a]
 			checks.quad(
 				P(o0, a0),
 				P(o0 + cw, a0),
-				P(o0 + cw, a0 + 0.18),
-				P(o0, a0 + 0.18),
+				P(o0 + cw, a0 + 0.18 * k),
+				P(o0, a0 + 0.18 * k),
 				(r + c) % 2 ? lin('#111317') : lin('#f4f4f4')
 			)
 		}
@@ -60,51 +63,52 @@ export function buildTrackDeco(T) {
 	const yaw = Math.atan2(-g0.tx, -g0.tz)
 	const towerMat = new THREE.MeshLambertMaterial({ color: 0x2a2e38 })
 	const trimMat = new THREE.MeshLambertMaterial({ color: 0xff7a1a })
-	const towerGeo = new THREE.BoxGeometry(0.22, GANTRY_H, 0.22)
-	const span = T.width + 1.0
+	const towerGeo = new THREE.BoxGeometry(0.22 * k, H, 0.22 * k)
+	const span = T.width + 1.0 * k
 	for (const sgn of [1, -1]) {
 		const t = new THREE.Mesh(towerGeo, towerMat)
-		t.position.set(g0.x + lx * sgn * (span / 2), y + GANTRY_H / 2, g0.z + lz * sgn * (span / 2))
+		t.position.set(g0.x + lx * sgn * (span / 2), y + H / 2, g0.z + lz * sgn * (span / 2))
 		t.rotation.y = yaw
 		group.add(t)
-		const cap = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.3), trimMat)
-		cap.position.set(t.position.x, y + GANTRY_H + 0.04, t.position.z)
+		const cap = new THREE.Mesh(new THREE.BoxGeometry(0.3 * k, 0.08 * k, 0.3 * k), trimMat)
+		cap.position.set(t.position.x, y + H + 0.04 * k, t.position.z)
 		group.add(cap)
 	}
 	const beam = new THREE.Mesh(
-		new THREE.BoxGeometry(span + 0.22, 0.42, 0.12),
+		new THREE.BoxGeometry(span + 0.22 * k, 0.42 * k, 0.12 * k),
 		new THREE.MeshBasicMaterial({ map: bannerTexture() })
 	)
-	beam.position.set(g0.x, y + GANTRY_H - 0.25, g0.z)
+	beam.position.set(g0.x, y + H - 0.25 * k, g0.z)
 	beam.rotation.y = yaw
 	group.add(beam)
 	/* five start lights under the banner, facing the grid (behind the line = +tangent… the grid is before it) */
 	const lights = []
-	const lightGeo = new THREE.CircleGeometry(0.09, 18)
-	for (let k = 0; k < 5; k++) {
+	const lightGeo = new THREE.CircleGeometry(0.09 * k, 18)
+	for (let q = 0; q < 5; q++) {
 		const m = new THREE.MeshBasicMaterial({ color: 0x2a2a2e, side: THREE.DoubleSide })
 		const l = new THREE.Mesh(lightGeo, m)
-		const o = (2 - k) * 0.28 // lamp 0 on the driver's left: fills left → right like the HUD lights
-		l.position.set(g0.x + lx * o - g0.tx * 0.07, y + GANTRY_H - 0.62, g0.z + lz * o - g0.tz * 0.07)
+		const o = (2 - q) * 0.28 * k // lamp 0 on the driver's left: fills left → right like the HUD lights
+		l.position.set(g0.x + lx * o - g0.tx * 0.07 * k, y + H - 0.62 * k, g0.z + lz * o - g0.tz * 0.07 * k)
 		l.rotation.y = yaw
 		group.add(l)
 		lights.push(m)
 	}
-	const board = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.3, 0.06), towerMat)
-	board.position.set(g0.x - g0.tx * 0.01, y + GANTRY_H - 0.62, g0.z - g0.tz * 0.01)
+	const board = new THREE.Mesh(new THREE.BoxGeometry(1.55 * k, 0.3 * k, 0.06 * k), towerMat)
+	board.position.set(g0.x - g0.tx * 0.01 * k, y + H - 0.62 * k, g0.z - g0.tz * 0.01 * k)
 	board.rotation.y = yaw
 	group.add(board)
 	group.userData.lights = lights
 
 	/* checkpoint posts (knee-high, both sides, at the gate height) */
-	const cpGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.4, 6)
+	const cpGeo = new THREE.CylinderGeometry(0.03 * k, 0.03 * k, 0.4 * k, 6)
 	const cpMat = new THREE.MeshLambertMaterial({ color: 0x55c6ff, transparent: true, opacity: 0.7 })
-	for (let k = 1; k < T.checkpoints.length; k++) {
-		const g = gateOf(T, k)
+	for (let c = 1; c < T.checkpoints.length; c++) {
+		const g = gateOf(T, c)
 		const [nx, nz] = leftNormal(g.tx, g.tz)
+		const off = half + 0.35 * k
 		for (const sgn of [1, -1]) {
 			const p = new THREE.Mesh(cpGeo, cpMat)
-			p.position.set(g.x + nx * sgn * (half + 0.35), g.y + 0.2, g.z + nz * sgn * (half + 0.35))
+			p.position.set(g.x + nx * sgn * off, g.y + 0.2 * k, g.z + nz * sgn * off)
 			group.add(p)
 		}
 	}

@@ -122,7 +122,7 @@ function positions(lo, hi) {
 }
 
 /** One design → generator of null (between tries) and finally the track (or nothing). */
-function* searchDesign(d, scene, hall, stage, seen) {
+function* searchDesign(d, scene, hall, stage, seen, opts = {}) {
 	const h = stage.y - hall.y
 	const k = rampSteps(h, SP)
 	const legRamp = (k + 3) * SP, legDrop = Math.ceil(3.3 / SP) * SP + 1.5
@@ -131,7 +131,7 @@ function* searchDesign(d, scene, hall, stage, seen) {
 		.map((f) => ({ f, hr: PL.rectIn(f, hall.rect), sr: PL.rectIn(f, stage.rect) }))
 		.sort((p, q) => q.hr[3] - p.hr[3] || 0)
 	let tries = 0
-	for (const width of WIDTHS) {
+	for (const width of opts.widths || WIDTHS) {
 		const half = width / 2
 		const map = clearMap(scene, half)
 		for (const { f, hr, sr } of frames) {
@@ -146,7 +146,7 @@ function* searchDesign(d, scene, hall, stage, seen) {
 				if (!precheck(local, f, ctx)) continue
 				const dense = local.map((p) => f.toWorld(p))
 				const t = buildTrack(dense, { id: `room-${d.key}`, name: d.name, floor: 'room', y: hall.y, width,
-					features: { room: { stage, hallY: hall.y, exits: d.exits } } }, scene)
+					features: { room: { stage, hallY: hall.y, exits: d.exits } }, ...opts.meta }, scene)
 				const sig = t && JSON.stringify([t.points.map((q) => q.map((v) => Math.round(v * 10))), t.ramps, t.drops])
 				if (t && !seen.has(sig) && validateTrack(t, scene).ok) return seen.add(sig), yield t
 				yield null
@@ -156,15 +156,18 @@ function* searchDesign(d, scene, hall, stage, seen) {
 	}
 }
 
-/** Room designs for a scene with a stage standing above its hall → generator (null between tries, tracks as found). */
-function* roomJobs(scene) {
+/**
+ * Room designs for a scene with a stage standing above its hall → generator (null between tries, tracks as found).
+ * opts (§3 toy scale, unit frame): { widths, meta: extra buildTrack meta, designs: keys to try }.
+ */
+function* roomJobs(scene, opts = {}) {
 	const floors = scene.floors || []
 	const hall = floors.find((f) => f.id === 'hall'), stage = floors.find((f) => f.id === 'stage')
 	if (!hall || !stage || stage.y < hall.y + 0.35) return
 	const r = stage.rect, H = hall.rect
 	if (r[0] < H[0] || r[1] < H[1] || r[2] > H[2] || r[3] > H[3]) return
 	const seen = new Set() // a design that comes out the same as an earlier one (a small stage) keeps searching
-	for (const d of DESIGNS) yield* searchDesign(d, scene, hall, stage, seen)
+	for (const d of DESIGNS) if (!opts.designs || opts.designs.includes(d.key)) yield* searchDesign(d, scene, hall, stage, seen, opts)
 }
 
 module.exports = { roomJobs, RS, RH }

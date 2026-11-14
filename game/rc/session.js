@@ -8,7 +8,7 @@ import { safeColor, sessGet, sessSet, COLORS } from './dom.js'
 import { createCarModel } from './car-model.js'
 import { gridPose } from './track-math.js'
 import { createCar } from './physics.js'
-import { SnapshotBuffer } from './interp.js'
+import { SnapshotBuffer, SNAP_DIST } from './interp.js'
 import { onItemMessage } from './item-play.js'
 
 function mySlot(G) {
@@ -20,7 +20,7 @@ export { mySlot }
 export function ensureMyCar(G) {
 	if (G.spectator || G.car || !G.T) return
 	G.car = createCar(gridPose(G.T, mySlot(G)))
-	G.myModel = createCarModel({ color: safeColor(G.me?.color, COLORS[0]) })
+	G.myModel = createCarModel({ color: safeColor(G.me?.color, COLORS[0]), scale: G.s ?? 1 })
 	G.world.scene.add(G.myModel.group)
 	G.race.move(G.meId, G.car.x, G.car.z, null, true, G.car.y)
 }
@@ -49,6 +49,7 @@ function syncRemotes(G, players) {
 				name: p.name,
 				tag: true,
 				tagScale: G.spectator ? 0.07 : 0.05,
+				scale: G.s ?? 1,
 			})
 			model.group.visible = false
 			G.world.scene.add(model.group)
@@ -56,7 +57,7 @@ function syncRemotes(G, players) {
 				id: p.id,
 				name: p.name,
 				color: p.color,
-				buf: new SnapshotBuffer(),
+				buf: new SnapshotBuffer({ snapDist: SNAP_DIST * (G.s ?? 1) }), // §3 × toy scale
 				model,
 				pose: null,
 				seen: false,
@@ -124,7 +125,7 @@ export function onMessage(G, m) {
 			if (G.myModel && G.me.color) {
 				G.world.scene.remove(G.myModel.group)
 				G.myModel.dispose()
-				G.myModel = createCarModel({ color: safeColor(G.me.color) })
+				G.myModel = createCarModel({ color: safeColor(G.me.color), scale: G.s ?? 1 })
 				G.world.scene.add(G.myModel.group)
 			}
 			applyState(G, m.state)

@@ -11,6 +11,9 @@
  *     height, no checkpoint on or under a bridge nor where a car at the speed cap flies over it past a drop, and a
  *     room-long track's length / coverage / stage visit / straight grid.
  *   furnishedHall(opts) — a live-like 27 × 61 m hall with a stage and rows of 0.75 m tables, its height field built.
+ *   §3 toy scale: measureToy(t, scene, label) — the toy rules from the grids' RLE (decoded here: decodeRle, occRule)
+ *     plus every rule above in the unit frame (lengths ÷ scale, own wrappers); toyHall(opts) — furnishedHall at 0.1,
+ *     built from triangles like the bake (opts.legs: legged tables a toy drives under).
  */
 
 const assert = require('node:assert/strict')
@@ -205,4 +208,151 @@ function furnishedHall(opts = {}) {
 	return { floors: [hall, stage], obstacles, bounds: { min: [-12.6, 0, -11.9], max: [14.4, 8, 49.6] }, field, heights: field.toJSON() }
 }
 
-module.exports = { measure, span, plan, furnishedHall }
+// ---- §3 toy scale --------------------------------------------------------------------------------------------------
+
+/** A grid's RLE (free, blocked, free … from the first cell) → Uint8Array (1 = blocked); throws on a bad sum. */
+function decodeRle(g) {
+	const bits = new Uint8Array(g.w * g.h)
+	let at = 0
+	g.rle.forEach((len, k) => {
+		assert.ok(Number.isInteger(len) && len >= 0, `rle run ${k}`)
+		if (k % 2) bits.fill(1, at, at + len)
+		at += len
+	})
+	assert.equal(at, g.w * g.h, `${g.floor}: the RLE covers w × h`)
+	return bits
+}
+
+/** Exact plan distance between segment a→b and the square [sx, sx + c] × [sz, sz + c]. */
+function segSquareDist(a, b, sx, sz, c) {
+	const inSq = (p) => p[0] >= sx && p[0] <= sx + c && p[1] >= sz && p[1] <= sz + c
+	if (inSq(a) || inSq(b)) return 0
+	const C = [[sx, sz], [sx + c, sz], [sx + c, sz + c], [sx, sz + c]]
+	const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]))
+	for (let k = 0; k < 4; k++) {
+		const p = C[k], q = C[(k + 1) % 4]
+		if (o(a, b, p) * o(a, b, q) <= 0 && o(p, q, a) * o(p, q, b) <= 0) return 0
+	}
+	const ps = (p, u, v) => {
+		const dx = v[0] - u[0], dz = v[1] - u[1], l2 = dx * dx + dz * dz
+		const t = l2 ? Math.max(0, Math.min(1, ((p[0] - u[0]) * dx + (p[1] - u[1]) * dz) / l2)) : 0
+		return Math.hypot(p[0] - u[0] - t * dx, p[1] - u[1] - t * dz)
+	}
+	let d = Infinity
+	for (const p of C) d = Math.min(d, ps(p, a, b))
+	for (const p of [a, b]) for (let k = 0; k < 4; k++) d = Math.min(d, ps(p, C[k], C[(k + 1) % 4]))
+	return d
+}
+
+/**
+ * Contract §3 "Obstacles at toy height", measured from the RLE: every road segment in a floor's car band (an end at
+ * floor.y − 0.02·s … + 0.5·s, its middle over the floor) keeps its centre line ≥ width/2 + 1 cell from every
+ * blocked cell of that floor; a deck has no blocked cell within width/2 under it. → the smallest margin seen (m).
+ */
+function occRule(t, scene, tag) {
+	const s = scene.scale, P = t.points, n = P.length, half = t.width / 2
+	const deck = new Uint8Array(n)
+	for (const d of t.decks || []) for (const i of span(d.from, d.to, n).slice(0, -1)) deck[i] = 1
+	let margin = Infinity
+	for (const g of scene.occ) {
+		const f = scene.floors.find((q) => q.id === g.floor)
+		assert.ok(f && Math.abs(f.y - g.y) < 1e-9, `${tag}: grid ${g.floor} on its floor`)
+		const bits = decodeRle(g)
+		const band = (y) => y >= f.y - 0.02 * s - 1e-9 && y <= f.y + 0.5 * s + 1e-9
+		const inside = (p) => p[0] >= f.rect[0] && p[0] <= f.rect[2] && p[2] >= f.rect[1] && p[2] <= f.rect[3]
+		for (let i = 0; i < n; i++) {
+			const p = P[i], q = P[(i + 1) % n]
+			const onBand = (band(p[1]) || band(q[1])) && inside([(p[0] + q[0]) / 2, 0, (p[2] + q[2]) / 2])
+			const over = deck[i] && Gr.floorGround(scene, (p[0] + q[0]) / 2, (p[2] + q[2]) / 2) === f.y
+			if (!onBand && !over) continue
+			const r = onBand ? half + g.cell : half
+			const a = [p[0], p[2]], b = [q[0], q[2]]
+			const i0 = Math.max(0, Math.floor((Math.min(a[0], b[0]) - r - g.x0) / g.cell)), i1 = Math.min(g.w - 1, Math.floor((Math.max(a[0], b[0]) + r - g.x0) / g.cell))
+			const k0 = Math.max(0, Math.floor((Math.min(a[1], b[1]) - r - g.z0) / g.cell)), k1 = Math.min(g.h - 1, Math.floor((Math.max(a[1], b[1]) + r - g.z0) / g.cell))
+			for (let k = k0; k <= k1; k++) {
+				for (let c = i0; c <= i1; c++) {
+					if (!bits[k * g.w + c]) continue
+					const d = segSquareDist(a, b, g.x0 + c * g.cell, g.z0 + k * g.cell, g.cell)
+					assert.ok(d >= r - 1e-9, `${tag}: segment ${i} ${d.toFixed(4)} m from a blocked cell of the ${g.floor} (needs ${r.toFixed(3)})`)
+					margin = Math.min(margin, d - r)
+				}
+			}
+		}
+	}
+	return margin
+}
+
+/** A unit-frame copy (every length ÷ s) of a world scene, its height field queried through a wrapper of its own. */
+function unitScene(scene, s) {
+	const d = (v) => v / s
+	const F = fieldOf(scene)
+	const field = F && {
+		bandHit: (x, z, h, lo, hi) => F.bandHit(x * s, z * s, h * s, lo * s, hi * s),
+		topBelow: (x, z, y) => F.topBelow(x * s, z * s, y * s) / s,
+		bottomAbove: (x, z, y) => F.bottomAbove(x * s, z * s, y * s) / s,
+	}
+	return { floors: scene.floors.map((f) => ({ ...f, y: d(f.y), rect: f.rect.map(d) })), obstacles: (scene.obstacles || []).map((o) => ({ min: o.min.map(d), max: o.max.map(d) })),
+		bounds: scene.bounds && { min: scene.bounds.min.map(d), max: scene.bounds.max.map(d) }, field }
+}
+
+const unitTrack = (t, s) => {
+	const xyz = (o) => ({ ...o, x: o.x / s, y: o.y / s, z: o.z / s })
+	return { ...t, points: t.points.map((p) => p.map((v) => v / s)), width: t.width / s, length: t.length / s, grid: t.grid.map(xyz), pads: t.pads.map(xyz), boxes: t.boxes.map(xyz) }
+}
+
+/** §3: a toy track re-measured — its own toy rules in metres, then every v2 / §2.7 rule in the unit frame. → margin (m). */
+function measureToy(t, scene, label) {
+	const s = scene.scale, tag = `${label} ${t.id}`
+	assert.ok(s > 0 && s < 1, `${tag}: a toy scene`)
+	assert.ok(t.width >= 0.3 - 1e-9 && t.width <= 0.45 + 1e-9, `${tag}: width ${t.width} m (0.30–0.45)`)
+	assert.ok(t.points.length >= 60 && t.points.length <= 2500, `${tag}: ${t.points.length} points`)
+	assert.ok(Number.isInteger(t.laps) && t.laps >= 1 && t.laps <= 20, `${tag}: laps ${t.laps}`)
+	for (let i = 0; i < t.points.length; i++) assert.ok(plan(t.points[i], t.points[(i + 1) % t.points.length]) <= 0.5 * t.width + 1e-9, `${tag}: spacing at ${i}`)
+	const margin = occRule(t, scene, tag)
+	measure(unitTrack(t, s), unitScene(scene, s), label)
+	return margin
+}
+
+/** The 12 triangles of a box → cb(x0, y0, z0, x1, … z2) per triangle. */
+function boxTris(min, max, cb) {
+	const [x0, y0, z0] = min, [x1, y1, z1] = max
+	const v = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]]
+	const F = [[0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 4, 5], [0, 5, 1], [3, 2, 6], [3, 6, 7], [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2]]
+	for (const [a, b, c] of F) cb(...v[a], ...v[b], ...v[c])
+}
+
+/**
+ * furnishedHall at toy scale 0.1, built as the bake builds it (triangles → occupancy grids per floor + the toy height
+ * field): opts.legs — the tables are a 3 cm top at 0.72 m on four 5 cm legs (a toy drives under them), else solid
+ * blocks to the floor (tablecloths). → { scale, floors, obstacles: [], bounds, field, occ (live grids), tables }.
+ */
+function toyHall(opts = {}) {
+	const { createOcc } = require('../../../src/game/rc-scene-occ')
+	const s = 0.1
+	const hall = { id: 'hall', y: 0, rect: [-12.6, -11.9, 14.4, 49.6] }
+	const stage = { id: 'stage', y: 0.58, rect: [-7.3, -9.1, 10.7, 0.86] }
+	const boxes = [], tables = []
+	for (let x = -9.5; x <= 12; x += 3.2) {
+		for (let z = 13; z <= 47; z += 3.2) {
+			tables.push([x - 0.8, z - 0.8, x + 0.8, z + 0.8])
+			if (!opts.legs) boxes.push({ min: [x - 0.8, 0, z - 0.8], max: [x + 0.8, 0.75, z + 0.8] })
+			else {
+				boxes.push({ min: [x - 0.8, 0.72, z - 0.8], max: [x + 0.8, 0.75, z + 0.8] })
+				for (const dx of [-0.75, 0.7]) for (const dz of [-0.75, 0.7]) boxes.push({ min: [x + dx, 0, z + dz], max: [x + dx + 0.05, 0.72, z + dz + 0.05] })
+			}
+		}
+	}
+	for (let x = -6.5; x <= 9.5; x += 2.5) boxes.push({ min: [x - 0.5, 0.58, -8.8], max: [x + 0.5, 2.2, -6.5] }) // backline
+	boxes.push({ min: [-12.6, 0, 49.4], max: [14.4, 3, 49.6] }) // the far wall
+	const field = createHeightField(hall.rect, hall.y, { cell: 0.5 * s, bin: 0.25 * s, eps: 0.05 * s, deflate: true })
+	const occ = [hall, stage].map((f) => createOcc(f, { cell: 0.3 * s, lo: 0.05 * s, hi: 0.6 * s }))
+	for (const b of boxes) boxTris(b.min, b.max, (...v) => {
+		for (const g of occ) g.tri(...v)
+		field.tri(...v)
+	})
+	occ[0].clear(stage.rect, 0.02)
+	field.clearBelow(stage.rect, stage.y)
+	return { scale: s, floors: [hall, stage], obstacles: [], bounds: { min: [-12.6, 0, -11.9], max: [14.4, 3.6, 49.6] }, field, occ, tables }
+}
+
+module.exports = { measure, span, plan, furnishedHall, measureToy, occRule, decodeRle, toyHall, boxTris }

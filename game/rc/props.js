@@ -1,10 +1,11 @@
 /**
  * Animated track props (WO-1074 v2): boost pads (glowing plates with chevrons that scroll forward) and item boxes —
  * our own look: a spinning, bobbing faceted prism-gem in a soft halo, hidden while taken and popping back in when it
- * returns. One shared texture per kind, so every pad animates with one offset.
+ * returns. One shared texture per kind, so every pad animates with one offset. §3: sizes × T.scale (pads from
+ * physFor(T.scale), the gems through their holder's scale).
  */
 import * as THREE from 'three'
-import { PHYS } from './phys-const.js'
+import { physFor } from './scale.js'
 import { canvasTexture } from './mesh-util.js'
 
 function padTexture() {
@@ -71,17 +72,19 @@ export function createProps(T) {
 		side: THREE.DoubleSide,
 	})
 	const rimMat = new THREE.MeshBasicMaterial({ color: 0xffa21f })
+	const k = T.scale ?? 1
+	const PHYS = physFor(k)
 	for (const p of T.pads || []) {
 		const hw = Math.min(PHYS.PAD_HALF_W, T.half)
 		const geo = new THREE.PlaneGeometry(hw * 2, PHYS.PAD_LEN)
 		geo.rotateX(-Math.PI / 2)
 		const m = new THREE.Mesh(geo, padMat)
-		m.position.set(p.x, p.y + 0.035, p.z)
+		m.position.set(p.x, p.y + 0.035 * k, p.z)
 		m.rotation.y = p.yaw
 		m.renderOrder = 2
 		group.add(m)
 		for (const sgn of [1, -1]) {
-			const rim = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.04, PHYS.PAD_LEN), rimMat)
+			const rim = new THREE.Mesh(new THREE.BoxGeometry(0.07 * k, 0.04 * k, PHYS.PAD_LEN), rimMat)
 			rim.position.set(sgn * hw, 0, 0)
 			m.add(rim)
 		}
@@ -113,10 +116,10 @@ export function createProps(T) {
 				const want = isTaken(b.id) ? 0 : 1
 				/* pop in quickly with an overshoot, vanish at once */
 				b.shown = want ? Math.min(1, b.shown + dt * 3.5) : 0
-				const k = b.shown
-				const s = k <= 0 ? 0 : k < 1 ? 1.15 * Math.sin((k * Math.PI) / 2) + 0.1 * (1 - k) : 1
-				b.holder.visible = k > 0
-				b.holder.scale.setScalar(Math.max(0.001, s))
+				const f = b.shown
+				const s = f <= 0 ? 0 : f < 1 ? 1.15 * Math.sin((f * Math.PI) / 2) + 0.1 * (1 - f) : 1
+				b.holder.visible = f > 0
+				b.holder.scale.setScalar(Math.max(0.001, s) * f * k) // §3: the gem, its core, halo and bob × toy scale
 				b.gem.rotation.y = t * 2.2 + b.phase
 				b.gem.rotation.z = Math.sin(t * 1.3 + b.phase) * 0.25
 				b.gem.position.y = Math.sin(t * 2.6 + b.phase) * 0.08

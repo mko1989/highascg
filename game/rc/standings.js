@@ -6,7 +6,7 @@
 import { nearestOnTrack, progressOf } from './track-math.js'
 import { createLapState, lapStep, resetLaps } from './lap-logic.js'
 
-/** Longest plausible move between two samples (24 m/s cap × a slow 150 ms frame ≈ 3.6 m). */
+/** Longest plausible move between two samples (24 m/s cap × a slow 150 ms frame ≈ 3.6 m) — × T.scale (§3). */
 export const MAX_STEP_M = 4
 
 export class RaceTracker {
@@ -60,7 +60,8 @@ export class RaceTracker {
 		const c = this._get(id)
 		let ev = null
 		/* a jump of more than MAX_STEP_M (respawn, grid placement, snapshot snap) is never a gate crossing */
-		const jumped = !Number.isFinite(c.x) || Math.hypot(x - c.x, z - c.z) > MAX_STEP_M
+		const k = T?.scale ?? 1
+		const jumped = !Number.isFinite(c.x) || Math.hypot(x - c.x, z - c.z) > MAX_STEP_M * k
 		const hasY = Number.isFinite(y) && y !== null
 		if (T && !teleport && !jumped) ev = lapStep(T, c.lap, c.x, c.z, x, z, nowMs, hasY ? c.y : null, hasY ? y : null)
 		c.x = x
@@ -70,7 +71,7 @@ export class RaceTracker {
 			const yy = hasY ? y : null
 			const near = nearestOnTrack(T, x, z, c.seg, 6, yy)
 			/* a wrong-branch hint (big jump) → rescan the whole track */
-			const n2 = near.score > T.half + 2 ? nearestOnTrack(T, x, z, -1, 6, yy) : near
+			const n2 = near.score > T.half + 2 * k ? nearestOnTrack(T, x, z, -1, 6, yy) : near
 			c.seg = n2.seg
 			c.progress = progressOf(T, this.lapsOf(id), c.lap.cp, n2.s)
 		}

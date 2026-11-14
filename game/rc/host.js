@@ -7,6 +7,7 @@
  */
 import { h, setText, show, apiGet, apiHost, safeColor } from './dom.js'
 import { previewTrack } from './trackdraw.js'
+import { sceneScale } from './scale.js'
 
 /**
  * HOOK: draw a join code for `url` into `el`. No QR library is installed (and the venue may be offline), so this just
@@ -68,6 +69,7 @@ export function startHost(root) {
 
 	let state = null
 	let sceneRev = null
+	let scale = 1 // §3 the scene's toy scale (previews)
 	let tracks = []
 	let busy = false
 
@@ -125,10 +127,18 @@ export function startHost(root) {
 				h('small', { text: trackInfo(t) })
 			)
 			b.classList.toggle('on', t.id === state.trackId)
-			b.addEventListener('click', () => act({ action: 'track', trackId: t.id }, `Track: ${t.name || t.id}`))
+			b.addEventListener('click', () => pickTrack(t))
 			tracksEl.append(b)
-			previewTrack(cv, t)
+			previewTrack(cv, t, scale)
 		}
+	}
+
+	/** §3: a track's `laps` hint (long tours: 1) becomes the lap count when it is picked; + / − still change it. */
+	async function pickTrack(t) {
+		await act({ action: 'track', trackId: t.id }, `Track: ${t.name || t.id}`)
+		const want = lapsHint(t)
+		if (want && state?.trackId === t.id && state.laps !== want)
+			await act({ action: 'laps', laps: want }, `Track: ${t.name || t.id} · ${want} ${want === 1 ? 'lap' : 'laps'}`)
 	}
 
 	function paintPlayers() {
@@ -191,6 +201,7 @@ export function startHost(root) {
 			const s = await apiGet('/scene')
 			if (s.ok && s.data) {
 				sceneRev = s.data.rev ?? state.sceneRev
+				scale = sceneScale(s.data)
 				tracks = Array.isArray(s.data.tracks) ? s.data.tracks : []
 			}
 		}
@@ -214,14 +225,23 @@ export function startHost(root) {
 	setInterval(refresh, 2000)
 }
 
-/** "86 m · 2 ramps · 1 drop" (v2) or "24 m · stage" (v1). */
+/** The track's suggested lap count (1…20) or null. */
+function lapsHint(t) {
+	const n = Number(t?.laps)
+	return Number.isInteger(n) && n >= 1 && n <= 20 ? n : null
+}
+
+/** "86 m · 2 ramps · 1 drop" (v2), "24 m · stage" (v1); §3 toy tracks: "8.6 m · …", "+ 1 lap" for a laps hint. */
 function trackInfo(t) {
-	const parts = [`${Math.round(t.length || 0)} m`]
+	const len = Number(t.length) || 0
+	const parts = [`${len > 0 && len < 10 ? len.toFixed(1) : Math.round(len)} m`]
 	const n = (a) => (Array.isArray(a) ? a.length : 0)
 	const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`
 	if (n(t.ramps)) parts.push(plural(n(t.ramps), 'ramp'))
 	if (n(t.drops)) parts.push(plural(n(t.drops), 'drop'))
 	if (n(t.pads)) parts.push(plural(n(t.pads), 'pad'))
 	if (parts.length === 1 && t.floor) parts.push(String(t.floor))
+	const laps = lapsHint(t)
+	if (laps) parts.push(`${laps} ${laps === 1 ? 'lap' : 'laps'}`)
 	return parts.join(' · ')
 }

@@ -37,8 +37,9 @@ function parts() {
 
 /**
  * @param {THREE.Group} group the car model group (model-local units: the 0.45 m buggy)
+ * @param {number} [k] the group's toy scale (§3): point sizes are in world units, so they shrink with it by hand
  */
-export function attachCarFx(group) {
+export function attachCarFx(group, k = 1) {
 	const p = parts()
 	const flames = new THREE.Group()
 	for (const sx of [-0.045, 0.045]) {
@@ -72,7 +73,7 @@ export function attachCarFx(group) {
 	sparkGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
 	const sparkMat = new THREE.PointsMaterial({
 		color: STAGE_COLORS[0],
-		size: 0.05,
+		size: 0.05 * k,
 		transparent: true,
 		depthWrite: false,
 		blending: THREE.AdditiveBlending,
@@ -105,7 +106,7 @@ export function attachCarFx(group) {
 			/* sparks from both rear wheels while drifting on the ground */
 			const drifting = !!(fx & FX.DRIFT) && !(fx & FX.AIR)
 			sparkMat.color.setHex(STAGE_COLORS[Math.max(0, Math.min(2, s.stage | 0))])
-			sparkMat.size = s.stage >= 1 ? 0.07 : 0.045
+			sparkMat.size = (s.stage >= 1 ? 0.07 : 0.045) * k
 			if (drifting) emitAcc += dt * (s.stage >= 1 ? 160 : 90)
 			while (emitAcc >= 1) {
 				emitAcc -= 1

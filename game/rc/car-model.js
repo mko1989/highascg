@@ -4,6 +4,7 @@
  * pair steers, all spin), an antenna with a coloured tip, a blob shadow (stays on the ground while airborne) and an
  * optional name tag. No external model. Built as the 0.45 × 0.25 m buggy and drawn at VIS_SCALE (1.4×, readable on a
  * phone; the physics circle is PHYS.RADIUS). Forward = −Z, like the physics. v2 effects: car-fx.js.
+ * §3 toy scale: the whole group is drawn at VIS_SCALE · scale; wheel spin, steer, roll and the shadow read v / scale.
  */
 import * as THREE from 'three'
 import { maxSteerAngle } from './physics.js'
@@ -76,13 +77,14 @@ function nameTag(name, color) {
 }
 
 /**
- * @param {{ color: string, name?: string, tag?: boolean, tagScale?: number }} o
+ * @param {{ color: string, name?: string, tag?: boolean, tagScale?: number, scale?: number }} o
  * @returns {{ group: THREE.Group, update: Function, setTag: Function, dispose: Function }}
  */
-export function createCarModel({ color = '#ff4d3d', name = '', tag = false, tagScale = 0.05 } = {}) {
+export function createCarModel({ color = '#ff4d3d', name = '', tag = false, tagScale = 0.05, scale = 1 } = {}) {
 	const p = sharedParts()
+	const k = scale > 0 ? scale : 1
 	const group = new THREE.Group()
-	group.scale.setScalar(VIS_SCALE)
+	group.scale.setScalar(VIS_SCALE * k)
 	const body = new THREE.Group()
 	group.add(body)
 	const paint = new THREE.MeshLambertMaterial({ color: new THREE.Color(color) })
@@ -151,13 +153,13 @@ export function createCarModel({ color = '#ff4d3d', name = '', tag = false, tagS
 		}
 		if (!on) return
 		tagSprite = nameTag(nm, color)
-		tagSprite.scale.set((scale * 4) / VIS_SCALE, scale / VIS_SCALE, 1)
+		tagSprite.scale.set((scale * 4) / (VIS_SCALE * k), scale / (VIS_SCALE * k), 1) // screen-sized (no attenuation)
 		tagSprite.position.y = 0.55
 		group.add(tagSprite)
 	}
 	if (tag) setTag(true)
 
-	const fx = attachCarFx(group)
+	const fx = attachCarFx(group, k)
 	let spinAngle = 0
 	let clock = 0
 	/**
@@ -176,17 +178,17 @@ export function createCarModel({ color = '#ff4d3d', name = '', tag = false, tagS
 		body.scale.set(1 + 0.25 * q, 1 - 0.38 * q, 1 + 0.25 * q)
 		/* the shadow stays on the ground under an airborne car, smaller the higher it flies */
 		const above = e.groundY != null && Number.isFinite(e.groundY) ? Math.max(0, s.y - e.groundY) : 0
-		shadow.position.y = 0.006 - above / VIS_SCALE
-		shadow.scale.setScalar(Math.max(0.4, 1 - above * 0.35))
+		shadow.position.y = 0.006 - above / (VIS_SCALE * k)
+		shadow.scale.setScalar(Math.max(0.4, 1 - (above / k) * 0.35))
 		fx.update({ fx: e.fx || 0, stage: e.stage || 0 }, dt, clock)
-		spinAngle -= (v * dt) / WHEEL_R
-		const steerAngle = st * maxSteerAngle(v) * 1.4
+		spinAngle -= ((v / k) * dt) / WHEEL_R
+		const steerAngle = st * maxSteerAngle(v, k) * 1.4
 		for (const w of wheels) {
 			w.spin.rotation.x = spinAngle
 			if (w.front) w.pivot.rotation.y = steerAngle
 		}
 		/* a little body roll / squat for life */
-		body.rotation.z = -st * Math.min(1, Math.abs(v) / 9) * 0.06
+		body.rotation.z = -st * Math.min(1, Math.abs(v / k) / 9) * 0.06
 	}
 
 	function dispose() {

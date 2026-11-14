@@ -9,9 +9,15 @@
  * `pts` as PLAN points [x, z] (what every 2D consumer wants) and the heights in `ys`.
  * Ribbon parts that overlap in plan (a ramp beside / above another part, a ledge above its landing) are told apart by
  * height: pass the car's y to `nearestOnTrack()` / `gateCrossing()`.
+ * §3 toy scale: `prepareTrack(track, scale)` stores `T.scale`; every length tolerance here (gate window, height slack,
+ * cliff, grid fallback) is its scale-1 value × T.scale. Tracks of up to 2500 points: whole-track nearest searches go
+ * through a plan segment grid (seg-grid.js, same answer as the full scan).
  */
+import { buildSegGrid, ringSearch } from './seg-grid.js'
+import { validScale } from './scale.js'
 
-/** Gate half-length beyond the asphalt edge — a car cutting the corner slightly off the surface still counts. */
+/** Gate half-length beyond the asphalt edge — a car cutting the corner slightly off the surface still counts.
+ * (These are the scale-1 values; a prepared track applies them × T.scale.) */
 export const GATE_MARGIN = 1.5
 /** A crossing counts only if the motion is within ~60° of the track direction at the gate. */
 const GATE_MIN_ALIGN = 0.5
@@ -21,6 +27,8 @@ export const GATE_ABOVE = 1.3
 /** Nearest-point search: vertical slack before the height difference starts to count, and its weight per metre. */
 export const Y_SLACK = 0.6
 const Y_WEIGHT = 4
+/** Whole-track searches use the segment grid from this many segments on (below it the plain scan is as fast). */
+export const GRID_MIN_SEGS = 160
 
 const num = (v, d = 0) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : d)
 const optNum = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))
@@ -68,9 +76,11 @@ function forEachSeg(from, to, n, closed, fn) {
 
 /**
  * @param {object} track contract Track (v1 or v2)
+ * @param {number} [scale] §3 toy scale (the scene's `scale`; default: the track's own `scale` field, else 1)
  * @returns {object} prepared track (the normalized fields plus tables)
  */
-export function prepareTrack(track) {
+export function prepareTrack(track, scale) {
+	const k = validScale(scale ?? track?.scale)
 	const N = normalizeTrack(track)
 	const pts = N.points.map((p) => [p[0], p[2]])
 	const ys = N.points.map((p) => p[1])
@@ -127,23 +137,29 @@ export function prepareTrack(track) {
 		if (d.at < segCount) segStep[d.at] = 1
 	}
 	segs.forEach((g, i) => {
-		if (Math.abs(g.dy) > 0.5 && Math.abs(g.dy) > g.len * 0.7) segStep[i] = 1 // a cliff in the centre line
+		if (Math.abs(g.dy) > 0.5 * k && Math.abs(g.dy) > g.len * 0.7) segStep[i] = 1 // a cliff in the centre line
 	})
-	const width = Number(N.width) > 0 ? Number(N.width) : 3
+	const width = Number(N.width) > 0 ? Number(N.width) : 3 * k
 	let checkpoints = Array.isArray(N.checkpoints)
 		? N.checkpoints.filter((i) => Number.isInteger(i) && i >= 0 && i < n)
 		: []
 	if (!checkpoints.length) checkpoints = [0]
-	const box = {
-		minX: Math.min(...pts.map((p) => p[0])),
-		maxX: Math.max(...pts.map((p) => p[0])),
-		minZ: Math.min(...pts.map((p) => p[1])),
-		maxZ: Math.max(...pts.map((p) => p[1])),
-		minY: Math.min(...ys),
-		maxY: Math.max(...ys),
-	}
+	const box = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity, minY: Infinity, maxY: -Infinity }
+	pts.forEach((p, i) => {
+		box.minX = Math.min(box.minX, p[0])
+		box.maxX = Math.max(box.maxX, p[0])
+		box.minZ = Math.min(box.minZ, p[1])
+		box.maxZ = Math.max(box.maxZ, p[1])
+		box.minY = Math.min(box.minY, ys[i])
+		box.maxY = Math.max(box.maxY, ys[i])
+	})
 	const T = {
 		...N,
+		scale: k,
+		gateMargin: GATE_MARGIN * k,
+		gateBelow: GATE_BELOW * k,
+		gateAbove: GATE_ABOVE * k,
+		ySlack: Y_SLACK * k,
 		y: ys[checkpoints[0]] ?? 0, // height of the start line (v1 consumers)
 		width,
 		half: width / 2,
@@ -163,11 +179,13 @@ export function prepareTrack(track) {
 		checkpoints,
 		cpS: checkpoints.map((i) => cumS[i]),
 		box,
+		/* plan segment grid for whole-track searches (long §3 tracks); null on short tracks */
+		sgrid: segCount >= GRID_MIN_SEGS ? buildSegGrid(segs, width) : null,
 	}
 	/* pads / boxes / grid without a y sit on the ribbon */
 	const yAt = (x, z) => nearestOnTrack(T, x, z).py
 	T.pads = N.pads.map((p) => ({ ...p, y: p.y ?? yAt(p.x, p.z) }))
-	T.boxes = N.boxes.map((b) => ({ ...b, y: b.y ?? yAt(b.x, b.z) + 0.5 }))
+	T.boxes = N.boxes.map((b) => ({ ...b, y: b.y ?? yAt(b.x, b.z) + 0.5 * k }))
 	T.grid = N.grid
 	return T
 }
@@ -179,11 +197,11 @@ function vMiss(T, i, t, y) {
 	let d
 	if (T.segGap[i]) {
 		/* between a ledge and its landing: anywhere from just under the lower end up to the higher end */
-		const lo = Math.min(g.ay, g.ay + g.dy) - 0.3
+		const lo = Math.min(g.ay, g.ay + g.dy) - 0.3 * (T.scale ?? 1)
 		const hi = Math.max(g.ay, g.ay + g.dy)
 		d = y < lo ? lo - y : y > hi ? y - hi : 0
 	} else d = Math.abs(y - py)
-	return Math.max(0, d - Y_SLACK)
+	return Math.max(0, d - (T.ySlack ?? Y_SLACK))
 }
 
 /**
@@ -205,12 +223,8 @@ export function nearestOnTrack(T, x, z, hint = -1, win = 6, y = null) {
 	const count = scanAll ? m : win * 2 + 1
 	const start = scanAll ? 0 : hint - win
 	const hasY = y !== null && y !== undefined && Number.isFinite(y)
-	for (let k = 0; k < count; k++) {
-		let i = start + k
-		if (!scanAll) {
-			if (T.closed) i = ((i % m) + m) % m
-			else if (i < 0 || i >= m) continue
-		}
+	const grid = scanAll && T.sgrid
+	const visit = (i) => {
 		const g = T.segs[i]
 		let t = ((x - g.ax) * g.dx + (z - g.az) * g.dz) / (g.len * g.len)
 		t = t < 0 ? 0 : t > 1 ? 1 : t
@@ -219,11 +233,24 @@ export function nearestOnTrack(T, x, z, hint = -1, win = 6, y = null) {
 		const d = Math.hypot(x - px, z - pz)
 		const vm = hasY ? vMiss(T, i, t, y) : 0
 		const score = d + vm * Y_WEIGHT
-		if (score < best.score) {
+		if (score < best.score || (grid && score === best.score && i < best.seg)) {
 			/* side: + = left of the driving direction (left normal of (ux, uz) is (uz, −ux), see leftNormal) */
 			const side = Math.sign((x - px) * g.uz - (z - pz) * g.ux) || 0
 			best = { seg: i, t, px, py: g.ay + g.dy * t, pz, dist: d, vmiss: vm, score, s: g.s0 + g.len * t, side }
 		}
+	}
+	/* whole track: the segment grid gives the full scan's answer without reading every segment */
+	if (grid) {
+		ringSearch(grid, x, z, visit, () => best.score)
+		return best
+	}
+	for (let k = 0; k < count; k++) {
+		let i = start + k
+		if (!scanAll) {
+			if (T.closed) i = ((i % m) + m) % m
+			else if (i < 0 || i >= m) continue
+		}
+		visit(i)
 	}
 	return best
 }
@@ -231,7 +258,7 @@ export function nearestOnTrack(T, x, z, hint = -1, win = 6, y = null) {
 /** Nearest with a hint, falling back to a whole-track scan when the windowed answer is poor. */
 export function nearestHinted(T, x, z, hint, y = null) {
 	const a = nearestOnTrack(T, x, z, hint, 8, y)
-	if (hint >= 0 && a.score > T.half + 1.5) {
+	if (hint >= 0 && a.score > T.half + 1.5 * (T.scale ?? 1)) {
 		const b = nearestOnTrack(T, x, z, -1, 6, y)
 		if (b.score < a.score) return b
 	}
@@ -279,7 +306,7 @@ export function gateOf(T, k) {
 	const idx = T.checkpoints[k]
 	const p = T.pts[idx]
 	const tg = T.tangents[idx]
-	return { x: p[0], y: T.ys[idx], z: p[1], tx: tg[0], tz: tg[1], halfLen: T.half + GATE_MARGIN }
+	return { x: p[0], y: T.ys[idx], z: p[1], tx: tg[0], tz: tg[1], halfLen: T.half + (T.gateMargin ?? GATE_MARGIN) }
 }
 
 /**
@@ -302,7 +329,7 @@ export function gateCrossing(T, k, ax, az, bx, bz, ay = null, by = null) {
 	if (lateral > g.halfLen) return 0
 	if (Number.isFinite(ay) && Number.isFinite(by) && ay !== null && by !== null) {
 		const cy = ay + (by - ay) * u
-		if (cy < g.y - GATE_BELOW || cy > g.y + GATE_ABOVE) return 0
+		if (cy < g.y - (T.gateBelow ?? GATE_BELOW) || cy > g.y + (T.gateAbove ?? GATE_ABOVE)) return 0
 	}
 	const len = Math.hypot(bx - ax, bz - az)
 	if (len < 1e-9) return 0
@@ -329,8 +356,9 @@ export function gridPose(T, slot) {
 		return { x, y, z, yaw: Number(g.yaw) || 0 }
 	}
 	const start = gateOf(T, 0)
-	const back = 1.4 + Math.floor(i / 2) * 1.1
-	const lat = (i % 2 ? -1 : 1) * Math.min(T.half * 0.5, 0.9)
+	const k = T.scale ?? 1
+	const back = (1.4 + Math.floor(i / 2) * 1.1) * k
+	const lat = (i % 2 ? -1 : 1) * Math.min(T.half * 0.5, 0.9 * k)
 	const [lx, lz] = leftNormal(start.tx, start.tz)
 	const x = start.x - start.tx * back + lx * lat
 	const z = start.z - start.tz * back + lz * lat

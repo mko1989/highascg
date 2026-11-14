@@ -106,3 +106,40 @@ kart less simulator"; the game world should show the lights and the LED wall con
 - Walls fed by a channel of the linked peer box show no picture.
 - Cosmetic: join URL shown twice on the spectator lobby; results table over the lap toast; free-roam hint over the
   gantry; gantry text is "STAGE SPRINT" on every track; distant walls speckle (no mipmaps).
+
+## Toy scale (14.11.26 night) — "The cars and tracks should be at least 10x smaller. I'm talking like toys in the room."
+
+### Investigation
+
+- Every size in v2 was a literal (PHYS, generator, referee, cameras); the room model is life-size.
+- In the live model the round tables have cloths down to the floor and the chairs are solid: in the toy height band
+  (floor … +0.06 m) they are solid footprints, no legs. Cars route through the aisles. (A synthetic hall with legged
+  tables proves the under-table path.)
+- 300 boxes cannot describe that at 3 cm detail → occupancy grid per floor.
+
+### What was done
+
+- Contract §3. One number: scene JSON `scale` (server `RC_SCALE` = 0.1 in `src/game/rc-scale.js`); the client derives
+  everything from it in `game/rc/scale.js` (`physFor`): lengths, speeds, accelerations incl. gravity × scale; times
+  and angles unchanged. No `scale` → 1, the v2 sizes (old fixtures stay valid).
+- Server: occupancy grids `occ` (RLE, 3 cm cells; `rc-scene-occ.js`, `rc-track-check-occ.js`), toy track planner
+  (`rc-toy-{plan,route,tracks}.js`), referee limits × scale, track `laps` hint. GENERATOR_VERSION 5, BAKE_VERSION 4.
+- Client: scaled physics, models, fx, cameras (near plane follows the shot), grid collision (`occ.js`), segment grid
+  for 2500-point tracks (`seg-grid.js`), HUD speed ÷ scale, host follows a track's `laps`.
+
+### Verified (offline only — show on, server NOT restarted, live server still runs full-size v2)
+
+- Offline suite 6446 tests, 6438 pass, 0 fail (wo1074 smokes incl. 4 new toy files); all gates clean.
+- Live project baked at 0.1 from the project files: 10 tracks — 8.8–28 m short/medium (stage oval, stage GP, table
+  weave, toy bridge on a 0.18 m deck, ramp onto the stage and drop off it) and two 131–135 m tours of the whole hall
+  (1 lap). Bake 5.9 s, scene JSON 400 kB (123 kB gzipped), occ 138 kB.
+- Bot with the real client physics and the live occupancy grid laps all 10 tracks: 7–24 s per lap on the short and
+  medium ones, ≈ 105 s on the tours; no wall hits.
+- Headless Chrome against a mock serving that bake: toy car and track among life-size tables (screenshots in the
+  session scratchpad).
+
+### Open
+
+- Not run against the real server (referee at toy scale, bake inside the service), a real GPU or a phone.
+- Cameras can still pass through room objects taller than the toy band (table tops, chairs seen from the top camera).
+- The second tour (drop exit) does not build on the synthetic solid hall; cause not found (it builds on the live hall).

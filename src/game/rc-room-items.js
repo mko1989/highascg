@@ -6,8 +6,9 @@
  * `use` → a hazard (`slick` puddle 25 s, `rocket` ≤ 5 s) or a one-shot effect (`turbo`, `shield`, `pulse`), `hit` →
  * the hazard is gone + a `spin` effect for everyone. Hazards expire on the injected clock (one timer, only while a
  * hazard exists), at most 40 live (the oldest is dropped). Rate limits per player: ≤ 5 `use`, ≤ 10 `box`, ≤ 5 `hit`
- * per second; a claim / use must be near the player's own last reported car (8 m / 4 m). Nothing here is scored; it
- * works the same in the lobby (free roam) and in a race.
+ * per second; a claim / use must be near the player's own last reported car (8 m / 4 m; §3: × the scene's scale, so
+ * 0.8 m / 0.4 m at 0.1 — set with the track). Nothing here is scored; it works the same in the lobby (free roam) and
+ * in a race.
  */
 
 const ITEMS = ['turbo', 'slick', 'rocket', 'pulse', 'shield']
@@ -64,6 +65,7 @@ function createRoomItems(deps) {
 	const rng = deps.rng || Math.random
 	let track = null
 	let bounds = null
+	let scale = 1 // §3: the scene's scale (reach limits × scale)
 	let boxIds = new Map() // id → { x, z }
 	const taken = new Map() // box id → until
 	const hazards = new Map() // hid → haz (insertion order = age)
@@ -108,7 +110,7 @@ function createRoomItems(deps) {
 		if ((taken.get(m.id) || 0) > t) return // someone was first
 		const car = deps.carOf(pid)
 		const b = boxIds.get(m.id)
-		if (!car || Math.hypot(car[0] - b.x, car[2] - b.z) > BOX_REACH) return
+		if (!car || Math.hypot(car[0] - b.x, car[2] - b.z) > BOX_REACH * scale) return
 		const until = t + BOX_RESPAWN_MS
 		taken.set(m.id, until)
 		deps.toAll({ t: 'box', id: m.id, by: pid, until })
@@ -123,7 +125,7 @@ function createRoomItems(deps) {
 		if (typeof m.item !== 'string' || held.get(pid) !== m.item || limited(pid, 'use')) return
 		const p = cleanPoint(m.p, bounds)
 		const car = deps.carOf(pid)
-		if (!p || !fin(m.yaw) || !car || Math.hypot(car[0] - p[0], car[2] - p[2]) > USE_REACH) return
+		if (!p || !fin(m.yaw) || !car || Math.hypot(car[0] - p[0], car[2] - p[2]) > USE_REACH * scale) return
 		held.delete(pid)
 		const ts = now()
 		const yaw = r3(m.yaw)
@@ -169,11 +171,12 @@ function createRoomItems(deps) {
 	}
 
 	return {
-		/** The track items live on (the selected one in the lobby, the race's during a race) + the scene bounds. */
-		setTrack(t, b) {
+		/** The track items live on (the selected one in the lobby, the race's during a race) + the scene bounds and scale. */
+		setTrack(t, b, sc = 1) {
 			const same = t === track
 			track = t || null
 			bounds = b || null
+			scale = typeof sc === 'number' && sc > 0 && sc <= 1 ? sc : 1
 			if (same) return
 			boxIds = new Map((track?.boxes || []).map((x) => [x.id, { x: x.x, z: x.z }]))
 			clear()
@@ -201,4 +204,4 @@ function createRoomItems(deps) {
 	}
 }
 
-module.exports = { createRoomItems, rollItem, weights, cleanPoint, ITEMS, BOX_RESPAWN_MS, HAZARD_MS, MAX_HAZARDS, RATE }
+module.exports = { createRoomItems, rollItem, weights, cleanPoint, ITEMS, BOX_RESPAWN_MS, HAZARD_MS, MAX_HAZARDS, RATE, BOX_REACH, USE_REACH }
