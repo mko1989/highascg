@@ -44,3 +44,24 @@ test('running timer: same-duration save keeps its anchor; a new duration re-anch
 		Date.now = realNow
 	}
 })
+
+test('the CG UPDATE carries durationSec only when it changed (the template re-anchors on it); a patch is merged', () => {
+	const st = reset()
+	st.assignTimerToScreen({ timerId: 't3', name: 'T', config: { mode: 'duration', durationSec: 300, timerFontFamily: "'Ubuntu'" }, screenIdx: 0, channel: 1 })
+	const payload = (r) => JSON.parse(r.lines[0].replace(/^.*UPDATE 0 "?/, '').replace(/"$/, '').replace(/\\"/g, '"'))
+	const moved = payload(st.assignTimerToScreen({ timerId: 't3', config: { posX: 40 }, screenIdx: 0, channel: 1 }))
+	assert.equal(moved.posX, 40)
+	assert.equal(moved.timerFontFamily, "'Ubuntu'", 'a patch keeps the rest of the stored config')
+	assert.ok(!('durationSec' in moved), 'moving a timer must not restart it on screen')
+	assert.equal(record(st, 't3').config.durationSec, 300)
+	const same = payload(st.assignTimerToScreen({ timerId: 't3', config: { durationSec: 300, posY: 5 }, screenIdx: 0, channel: 1 }))
+	assert.ok(!('durationSec' in same), 'an unchanged duration stays out too')
+	assert.equal(payload(st.assignTimerToScreen({ timerId: 't3', config: { durationSec: 90 }, screenIdx: 0, channel: 1 })).durationSec, 90)
+})
+
+test('GET /api/timers/fonts lists installed families: first name of each fc-list line, unique, sorted', () => {
+	const { installedFonts, handleGet } = require('../../src/api/routes-screen-timers')
+	assert.deepEqual(installedFonts({ run: () => 'Nimbus Sans,Nimbus Sans L\nDejaVu Serif\nNimbus Sans\n\n' }), ['DejaVu Serif', 'Nimbus Sans'])
+	assert.deepEqual(installedFonts({ run: () => { throw new Error('no fontconfig') } }), [])
+	assert.equal(JSON.parse(handleGet('/api/timers/fonts', {}).body).ok, true)
+})

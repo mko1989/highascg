@@ -17,6 +17,7 @@ static func prompt_rename(deck: Node, scene_id: String) -> void:
 		if str(s.get("id", "")) == scene_id:
 			edit.text = str(s.get("name", ""))
 	dlg.add_child(edit)
+	dlg.register_text_enter(edit)  # Enter in the field = OK
 	dlg.confirmed.connect(func() -> void:
 		deck.rename_look(scene_id, edit.text)
 		dlg.queue_free())

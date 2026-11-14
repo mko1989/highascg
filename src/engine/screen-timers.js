@@ -138,7 +138,9 @@ function assignTimerToScreen(opts) {
 
 			const lines = []
 			const cgPayload = { ...record.config }
-			// CG UPDATE with new config JSON payload
+			// The template re-anchors a running countdown on ANY payload that carries durationSec — so an unchanged one
+			// stays out, or moving / restyling a timer on air restarts it on screen while the record keeps counting.
+			if (!changingDuration) delete cgPayload.durationSec
 			lines.push(`CG ${channel}-${existing.layer} UPDATE ${CG_SUBLAYER} ${param(JSON.stringify(cgPayload))}`)
 
 			_persistRegistry()

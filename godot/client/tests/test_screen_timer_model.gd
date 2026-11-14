@@ -45,3 +45,12 @@ func test_screen_filter_px_name() -> void:
 	t.eq(T.px_value("120.6"), 121, "rounded")
 	t.eq(T.new_name("Main", 0), "Timer Main", "first")
 	t.eq(T.new_name("Main", 1), "Timer Main #2", "second")
+
+
+func test_font_items_are_the_installed_families() -> void:
+	var items := T.font_items(["Ubuntu", "DejaVu Serif"], "'Ubuntu'")
+	t.eq(items, [["", "Default"], ["'Ubuntu'", "Ubuntu"], ["'DejaVu Serif'", "DejaVu Serif"]], "Default + installed, css value quoted")
+	var legacy := T.font_items(["Ubuntu"], "'Verdana', sans-serif")
+	t.eq(legacy[-1], ["'Verdana', sans-serif", "Verdana (not installed)"], "a stored font that is not installed stays selectable, marked")
+	t.eq(T.font_items([], "").size(), T.FALLBACK_FONTS.size() + 1, "no answer from the server → the box image's list")
+	t.eq(T.font_items(null, "")[0], ["", "Default"], "null → fallback, Default first")

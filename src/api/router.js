@@ -411,6 +411,7 @@ routes.post('/api/playlist/edit/pick', ({ body, ctx }) => routesPlaylistEdit.han
 
 // Screen timers (WO-210) — panel-owned timer assignments, persistent across restarts
 routes.get('/api/timers/list', ({ path, ctx }) => routesScreenTimers.handleGet(path, ctx), { requireCaspar: false })
+routes.get('/api/timers/fonts', ({ path, ctx }) => routesScreenTimers.handleGet(path, ctx), { requireCaspar: false })
 routes.post('/api/timers/assign', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/timers/unassign', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
 routes.post('/api/timers/visible', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })

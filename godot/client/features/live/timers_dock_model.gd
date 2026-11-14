@@ -115,6 +115,5 @@ static func visible_body(timer_id: String, screen_idx: int, on: bool) -> Diction
 
 ## saveTimerConfigPatch: the merged config, once per assigned screen (each needs its own CG UPDATE).
 static func assign_bodies(timer: Dictionary, patch: Dictionary) -> Array:
-	var cfg: Dictionary = (timer.get("config", {}) as Dictionary).duplicate() if timer.get("config") is Dictionary else {}
-	cfg.merge(patch, true)
-	return screens(timer).map(func(i: int) -> Dictionary: return {"timerId": str(timer.timerId), "screenIdx": i, "config": cfg})
+	# only the changed fields: the server merges them (a whole config from this row's copy put stale values back)
+	return screens(timer).map(func(i: int) -> Dictionary: return {"timerId": str(timer.timerId), "screenIdx": i, "config": patch})

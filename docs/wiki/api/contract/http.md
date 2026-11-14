@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-584 routes.
+585 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -535,6 +535,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | * | `/api/timelines` | handler | `src/api/routes-timeline.js` |
 | POST | `/api/timers/assign` | registry | `src/api/router.js` |
 | POST | `/api/timers/cmd` | registry | `src/api/router.js` |
+| GET | `/api/timers/fonts` | registry | `src/api/router.js`, `src/api/routes-screen-timers.js` |
 | GET | `/api/timers/list` | registry | `src/api/router.js` |
 | POST | `/api/timers/unassign` | registry | `src/api/router.js` |
 | POST | `/api/timers/visible` | registry | `src/api/router.js` |
@@ -647,6 +648,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-replication-get.js` | WO-1029: this server's device-key fingerprint (public, as GET /api/cluster/identity); '' when it has none. |
 | `src/api/routes-replication-post.js` | optional |
 | `src/api/routes-scene.js` |  |
+| `src/api/routes-screen-timers.js` | routes-screen-timers.js — Panel-owned screen timer control API (WO-210). |
 | `src/api/routes-server-duties.js` | WO-723 — this server's duties, resolved from its config and the linked servers (src/cluster/server-duties.js), and the "which server sends / receives" choice (s |
 | `src/api/routes-settings.js` | Settings API Router. |
 | `src/api/routes-shader-live.js` | WO-606 — Shader Live endpoints (the node owns the working copy; client/components/shader-live-editor.js did all of this in the browser): GET  /api/shader-live   |

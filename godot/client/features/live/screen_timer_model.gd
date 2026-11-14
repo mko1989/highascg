@@ -12,9 +12,10 @@ const DEFAULTS := {  # timer-control-panel-display.js DEFAULT_TIMER_CONFIG
 }
 const MODES := [["duration", "Duration"], ["clock", "Clock"]]
 const POSITIONS := ["center", "top-left", "top-right", "bottom-left", "bottom-right"]
-const FONTS := [["", "Default (Arial)"], ["'Arial', 'Helvetica Neue', sans-serif", "Arial"], ["'Helvetica Neue', Helvetica, sans-serif", "Helvetica Neue"],
-	["'Verdana', sans-serif", "Verdana"], ["'Trebuchet MS', sans-serif", "Trebuchet MS"], ["'Georgia', serif", "Georgia"],
-	["'Times New Roman', serif", "Times New Roman"], ["'Courier New', monospace", "Courier New"], ["'Impact', sans-serif", "Impact"]]
+## Families the box image ships — used until GET /api/timers/fonts answers (what is really installed on the server).
+## The web's list (Verdana, Georgia, Impact …) is not installed on the box: Caspar drew most of them as the default.
+const FALLBACK_FONTS := ["DejaVu Sans", "DejaVu Sans Mono", "DejaVu Serif", "Nimbus Roman", "Nimbus Sans", "Nimbus Sans Narrow",
+	"Ubuntu", "Ubuntu Mono", "URW Bookman", "URW Gothic"]
 const FADE_FRAMES := 25
 const TICK_MS := 250
 
@@ -78,6 +79,24 @@ static func state(rec: Dictionary, remaining: float) -> String:
 ## Timers assigned to one screen (web: t.screens[String(screenIdx)]).
 static func on_screen(timers: Array, screen_idx: int) -> Array:
 	return timers.filter(func(t: Variant) -> bool: return t is Dictionary and t.get("screens") is Dictionary and (t.screens as Dictionary).has(str(screen_idx)))
+
+
+## The Font choice: [[css value, label] …] — Default, every installed family, and the stored value when it is none of
+## those (kept and marked, never silently swapped for another font).
+static func font_items(installed: Variant, current: String) -> Array:
+	var fams: Array = installed if installed is Array and not (installed as Array).is_empty() else FALLBACK_FONTS
+	var out := [["", "Default"]]
+	for f in fams:
+		if str(f).strip_edges() != "" and not str(f).contains("'"):
+			out.append(["'%s'" % str(f).strip_edges(), str(f).strip_edges()])
+	if current != "" and out.all(func(it: Array) -> bool: return it[0] != current):
+		out.append([current, "%s (not installed)" % font_first(current)])
+	return out
+
+
+## "'Verdana', sans-serif" → "Verdana".
+static func font_first(css: String) -> String:
+	return css.split(",")[0].strip_edges().trim_prefix("'").trim_suffix("'").trim_prefix("\"").trim_suffix("\"")
 
 
 ## Pixel override field → stored value: blank = "" (back to the preset), else rounded int.

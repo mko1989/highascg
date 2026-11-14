@@ -4,6 +4,7 @@
  * Endpoints (all under /api/timers):
  *
  *   GET  /api/timers/list           — enumerate assigned timers + runtime state
+ *   GET  /api/timers/fonts          — font families installed on this machine (what the template can render)
  *   POST /api/timers/assign         — assign timer to screen at lowest free slot (980-989 band)
  *   POST /api/timers/unassign       — unassign timer from screen
  *   POST /api/timers/visible        — toggle visibility (MIXER OPACITY 0/1)
@@ -56,6 +57,28 @@ function resolveChannelFromScreenIdx(screenIdx, ctx) {
 	}
 }
 
+let _fonts = { at: 0, list: [] }
+/**
+ * Font families installed on THIS machine (fontconfig) — the timer template is rendered here by Caspar's CEF, so a
+ * family that is not installed silently falls back to the default sans ("most fonts come back to Arial", owner 14.11).
+ * Cached 60 s: a font installed while the server runs shows up without a restart.
+ * @returns {string[]}
+ */
+function installedFonts(deps = {}) {
+	const now = Date.now()
+	if (!deps.run && now - _fonts.at < 60000) return _fonts.list
+	let out = ''
+	try {
+		out = (deps.run || ((cmd, args) => require('child_process').execFileSync(cmd, args, { encoding: 'utf8', timeout: 5000 })))('fc-list', [':', 'family'])
+	} catch {
+		out = ''
+	}
+	// a line may hold aliases ("Nimbus Sans,Nimbus Sans L") — the first is the family name
+	const list = [...new Set(String(out).split('\n').map((l) => l.split(',')[0].trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+	if (!deps.run) _fonts = { at: now, list }
+	return list
+}
+
 /**
  * GET handler — enumerate timers.
  * @param {string} p
@@ -63,6 +86,7 @@ function resolveChannelFromScreenIdx(screenIdx, ctx) {
  * @returns {object | null}
  */
 function handleGet(p, ctx) {
+	if (p === '/api/timers/fonts') return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, fonts: installedFonts() }) }
 	if (p !== '/api/timers/list') return null
 
 	const timers = screenTimers.listScreenTimers()
@@ -402,4 +426,4 @@ async function handleCmd(body, ctx) {
 	}
 }
 
-module.exports = { handleGet, handlePost }
+module.exports = { handleGet, handlePost, installedFonts }

@@ -15,7 +15,8 @@ const COLOURS := [["timerColor", "Color"], ["amberColor", "Amber"], ["redColor",
 
 
 ## `g`: a 2-column grid the label / field pairs go into; `box`: where the Save button goes (under the grid).
-static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: bool, apply: Callable) -> void:
+## `fonts`: the server's installed families (GET /api/timers/fonts); [] = the box image's own list.
+static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: bool, apply: Callable, fonts: Array = []) -> void:
 	var w := {}
 	# WO-1069: look changes go out a moment after the last one (a held spin arrow / typing = one request, not thirty)
 	var pending := {}
@@ -59,8 +60,10 @@ static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: b
 	w["size"] = number(g, "Size (vw)", 1, 100, float(cfg.timerFontSize))
 	(w.size as SpinBox).value_changed.connect(func(v: float) -> void: live.call({"timerFontSize": clampi(int(v), 1, 100)}))
 	if extended:
-		w["font"] = choice(g, "Font", T.FONTS.map(func(f: Array) -> String: return f[1]), T.FONTS.map(func(f: Array) -> String: return f[0]).find(str(cfg.timerFontFamily)))
-		(w.font as OptionButton).item_selected.connect(func(i: int) -> void: live.call({"timerFontFamily": T.FONTS[maxi(0, i)][0]}))
+		var font_items := T.font_items(fonts, str(cfg.timerFontFamily))
+		w["font"] = choice(g, "Font", font_items.map(func(f: Array) -> String: return f[1]), font_items.map(func(f: Array) -> String: return f[0]).find(str(cfg.timerFontFamily)))
+		(w.font as OptionButton).tooltip_text = "Fonts installed on the server — the timer is drawn there"
+		(w.font as OptionButton).item_selected.connect(func(i: int) -> void: live.call({"timerFontFamily": font_items[maxi(0, i)][0]}))
 		for c in COLOURS:
 			g.add_child(muted(c[1]))
 			var cp := ColorPickerButton.new()
@@ -101,7 +104,7 @@ static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: b
 			"targetTime": target.text, "position": T.POSITIONS[pos.selected], "posX": T.px_value(px[0].text), "posY": T.px_value(px[1].text),
 			"timerFontSize": clampi(int((w.size as SpinBox).value), 1, 100)}
 		if extended:
-			out["timerFontFamily"] = T.FONTS[maxi(0, (w.font as OptionButton).selected)][0]
+			out["timerFontFamily"] = T.font_items(fonts, str(cfg.timerFontFamily))[maxi(0, (w.font as OptionButton).selected)][0]
 			out["timerBorderWidth"] = clampi(int((w.border as SpinBox).value), 0, 20)
 			for c in COLOURS:
 				out[c[0]] = P.to_css((w[c[0]] as ColorPickerButton).color)

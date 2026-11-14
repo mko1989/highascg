@@ -258,7 +258,9 @@ func _chip(id: String, idx: int, label: String, vis: bool) -> Control:
 func _save(t: Dictionary, patch: Dictionary) -> void:
 	var bodies := M.assign_bodies(t, patch)
 	if not bodies.is_empty():
-		t["config"] = bodies[0].config  # WO-1069: the next live patch builds on this one (the list is not rebuilt while a field has focus)
+		var cfg: Dictionary = (t.get("config", {}) as Dictionary).duplicate() if t.get("config") is Dictionary else {}
+		cfg.merge(patch, true)
+		t["config"] = cfg  # this row's copy follows what was sent (the list is not rebuilt while a field has focus)
 	for body in bodies:
 		await Api.post_json("/api/timers/assign", body)
 	_shape = ""  # show what the server stored

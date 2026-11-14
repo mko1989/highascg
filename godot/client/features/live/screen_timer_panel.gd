@@ -15,6 +15,7 @@ const Icons := preload("res://app/ui_icons.gd")
 var screen_idx := 0
 var screen_label := ""
 var _records: Array = []
+var _fonts: Array = []  # families installed on the server (GET /api/timers/fonts)
 var _offset_ms := 0.0  # server clock − local clock
 var _title: Label
 var _list: VBoxContainer
@@ -45,7 +46,10 @@ func _ready() -> void:
 	add_child(add)
 	_tick = _timer(T.TICK_MS / 1000.0, _update_readouts)
 	_poll = _timer(5.0, func() -> void:
-		if visible and get_viewport().gui_get_focus_owner() == null:
+		# not while a field of THIS page has focus (it would be rebuilt under the cursor). Focus elsewhere used to block
+		# it too, so the page almost never refreshed and showed settings changed from the Timers dock late.
+		var f := get_viewport().gui_get_focus_owner()
+		if visible and (f == null or not is_ancestor_of(f)):
 			reload())
 
 
@@ -67,6 +71,10 @@ func open(idx: int, label: String) -> void:
 
 
 func reload() -> void:
+	if _fonts.is_empty():
+		var fr: Dictionary = await Api.get_json("/api/timers/fonts")
+		if fr.get("ok", false) and fr.get("data") is Dictionary and fr.data.get("fonts") is Array:
+			_fonts = fr.data.fonts
 	var res: Dictionary = await Api.get_json("/api/timers/list")
 	for c in _list.get_children():
 		c.queue_free()
@@ -139,14 +147,16 @@ func _section(rec: Dictionary) -> Control:
 		op.tooltip_text = "%d%%" % int(op.value)
 		_visible(id, vis, 0, op.value / 100.0))
 	g.add_child(op)
-	SettingsForm.build(g, box, cfg, true, func(patch: Dictionary) -> void: _apply(rec, patch))  # WO-806: shared form, extended
+	SettingsForm.build(g, box, cfg, true, func(patch: Dictionary) -> void: _apply(rec, patch), _fonts)  # WO-806: shared form, extended
 	var rm := _btn("Remove from screen", "CG CLEAR on its layer", func() -> void: _confirm_remove(id))
 	box.add_child(rm)
 	box.add_child(HSeparator.new())
 	return box
 
 
-## saveTimerConfigPatch: the merged config, assigned again on every screen the timer is on.
+## Only the changed fields go out — the server merges them into the timer's config. The whole config used to be sent
+## from this page's copy, which is older than the server's whenever the Timers dock (or another client) changed the
+## timer in between: a move here then put the old font / time / colours back.
 ## WO-1069: no reload() here — it rebuilt the whole form after every field, so the field being typed in next lost its
 ## focus and its text (X applied, then Y was wiped while it was typed). The record already holds what was sent; the
 ## 5 s poll refreshes the list once no field has focus.
@@ -155,7 +165,7 @@ func _apply(rec: Dictionary, patch: Dictionary) -> void:
 	cfg.merge(patch, true)
 	rec["config"] = cfg
 	for k in (rec.get("screens", {}) as Dictionary).keys():
-		await Api.post_json("/api/timers/assign", {"timerId": rec.timerId, "screenIdx": int(k), "config": cfg})
+		await Api.post_json("/api/timers/assign", {"timerId": rec.timerId, "screenIdx": int(k), "config": patch})
 
 
 func _visible(id: String, on: bool, fade: int, opacity := -1.0) -> void:
