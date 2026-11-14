@@ -7,7 +7,9 @@
  * chamsys".
  *
  * Patterns walk a closed path at a constant `speed` (m/s along the path), in the hub frame (metres, X stage left,
- * Y upstage, Z up), centred on (x, y) at height z:
+ * Y upstage, Z up), centred on (x, y) at height z. Owner 14.11: "it renders in the middle of the scene instead of the
+ * middle of the stage" — the centre is the TRACKING STAGE's (project.previs.tracking.grid: x_offset / y_offset, head
+ * height z above its floor z_offset) unless a POST names x or y (`centre: "custom"`; `centre: "stage"` goes back):
  *   hold     stands still at (x, y)
  *   circle   radius `size`, counter-clockwise seen from above (stage left first, then upstage)
  *   figure8  a figure of eight `size` wide each side of the centre (x ± size, y ± size/2)
@@ -20,14 +22,14 @@
  * nothing persisted), it switches itself off after `ttl_min` minutes, it is named "Puppet" on the desk, and it refuses
  * to take over a marker id that another source keeps live. Stopping removes its marker from the hub.
  *
- * HTTP (routed by register.js): GET /api/tracking/puppet → status · POST /api/tracking/puppet {enabled?, pattern?, x?,
- * y?, z?, size?, speed?, id?, name?, hz?, ttl_min?} → merged config, start / stop, status.
+ * HTTP (routed by register.js): GET /api/tracking/puppet → status · POST /api/tracking/puppet {enabled?, pattern?,
+ * centre?, x?, y?, z?, size?, speed?, id?, name?, hz?, ttl_min?} → merged config, start / stop, status.
  */
 
 const { JSON_HEADERS, parseBodyStrict } = require('../api/response')
 
 const PATTERNS = ['hold', 'circle', 'figure8', 'line', 'walk']
-const DEFAULTS = { pattern: 'circle', x: 0, y: 2, z: 1.7, size: 2, speed: 1, id: 1, name: 'Puppet', hz: 50, ttl_min: 120 }
+const DEFAULTS = { pattern: 'circle', centre: 'stage', x: 0, y: 2, z: 1.7, size: 2, speed: 1, id: 1, name: 'Puppet', hz: 50, ttl_min: 120 }
 const LIMITS = { x: [-50, 50], y: [-50, 50], z: [0, 5], size: [0.1, 20], speed: [0.05, 5], hz: [30, 60], ttl_min: [1, 720] }
 const SEGMENTS = 720 // path polyline resolution (arc-length table)
 const PATH = '/api/tracking/puppet'
@@ -39,6 +41,9 @@ const round = (v) => Math.round(v * 1e4) / 1e4
 function normalizeConfig(src = {}, prev = DEFAULTS) {
 	const out = { ...DEFAULTS, ...prev }
 	if (PATTERNS.includes(src.pattern)) out.pattern = src.pattern
+	// naming a centre point takes it off the stage centre; `centre` itself says which one is wanted
+	if ((src.x != null && src.x !== '') || (src.y != null && src.y !== '')) out.centre = 'custom'
+	if (src.centre === 'stage' || src.centre === 'custom') out.centre = src.centre
 	for (const k of Object.keys(LIMITS)) {
 		const v = Number(src[k])
 		if (src[k] != null && src[k] !== '' && Number.isFinite(v)) out[k] = round(clamp(v, LIMITS[k]))
@@ -105,10 +110,11 @@ function sampleAt(cfg, path, s) {
 }
 
 /**
- * @param {{ hub: import('./marker-hub').MarkerHub, now?: () => number, timers?: { setInterval: Function, clearInterval: Function },
+ * `stage`: () => the tracking stage grid ({ x_offset, y_offset, z_offset, … }) or null when there is none.
+ * @param {{ hub: import('./marker-hub').MarkerHub, stage?: () => object|null, now?: () => number, timers?: { setInterval: Function, clearInterval: Function },
  *           log?: Function, onWrite?: Function }} deps
  */
-function createPuppet({ hub, now = Date.now, timers = { setInterval, clearInterval }, log = () => {}, onWrite = () => {} }) {
+function createPuppet({ hub, stage = () => null, now = Date.now, timers = { setInterval, clearInterval }, log = () => {}, onWrite = () => {} }) {
 	let cfg = { ...DEFAULTS }
 	let path = buildPath(cfg.pattern, cfg.size)
 	let timer = null
@@ -117,7 +123,25 @@ function createPuppet({ hub, now = Date.now, timers = { setInterval, clearInterv
 	let startedAt = 0
 	let ticks = 0
 	let stopReason = null
-	let pos = sampleAt(cfg, path, 0)
+	let at = { ...cfg } // cfg with the centre it really walks around
+	let pos = sampleAt(at, path, 0)
+
+	/** Where the path is centred: the tracking stage (head height above its floor), or the configured point. */
+	function place() {
+		at = { ...cfg }
+		if (cfg.centre !== 'stage') return
+		let g = null
+		try {
+			g = stage()
+		} catch {
+			g = null
+		}
+		const n = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+		if (!g || n(g.x_offset) == null || n(g.y_offset) == null) return
+		at.x = round(g.x_offset)
+		at.y = round(g.y_offset)
+		at.z = round((n(g.z_offset) || 0) + cfg.z)
+	}
 
 	const live = () => timer !== null
 
@@ -136,7 +160,8 @@ function createPuppet({ hub, now = Date.now, timers = { setInterval, clearInterv
 		s += (cfg.speed * Math.max(0, t - last)) / 1000
 		if (path.length > 0) s %= path.length
 		last = t
-		pos = sampleAt(cfg, path, s)
+		if (ticks % (cfg.hz * 2) === 0) place() // the stage may be moved while it walks
+		pos = sampleAt(at, path, s)
 		write()
 	}
 
@@ -152,7 +177,8 @@ function createPuppet({ hub, now = Date.now, timers = { setInterval, clearInterv
 		if (timer) timers.clearInterval(timer)
 		startedAt = last = now()
 		stopReason = null
-		pos = sampleAt(cfg, path, s)
+		place()
+		pos = sampleAt(at, path, s)
 		write()
 		timer = timers.setInterval(tick, Math.round(1000 / cfg.hz))
 		timer?.unref?.()
@@ -182,6 +208,7 @@ function createPuppet({ hub, now = Date.now, timers = { setInterval, clearInterv
 			path = buildPath(cfg.pattern, cfg.size)
 			s = 0
 		}
+		place()
 		if (want && live() && timer) {
 			timers.clearInterval(timer) // new rate / config: same lap position
 			timer = timers.setInterval(tick, Math.round(1000 / cfg.hz))
@@ -193,7 +220,7 @@ function createPuppet({ hub, now = Date.now, timers = { setInterval, clearInterv
 
 	function status() {
 		const t = now()
-		return { enabled: live(), ...cfg, patterns: PATTERNS, lap_m: round(path.length), position: pos, writes: ticks,
+		return { enabled: live(), ...cfg, x: at.x, y: at.y, z: at.z, head_m: cfg.z, patterns: PATTERNS, lap_m: round(path.length), position: pos, writes: ticks,
 			started_at: live() ? new Date(startedAt).toISOString() : null,
 			ends_in_s: live() ? Math.max(0, Math.round((startedAt + cfg.ttl_min * 60000 - t) / 1000)) : null,
 			stopped: live() ? null : stopReason }

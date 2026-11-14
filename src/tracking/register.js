@@ -79,7 +79,7 @@ const PRESENTERS_EVENT = 'tracking:presenters'
 const PRESENTERS_MS = 500
 
 const hub = new MarkerHub()
-const puppet = require('./puppet').createPuppet({ hub, log: (lvl, msg) => _ctx?.log?.(lvl, msg), onWrite: () => _writes++ }) // WO-978, off at boot
+const puppet = require('./puppet').createPuppet({ hub, stage: () => require('../engine/project-scenes').loadFullProject()?.previs?.tracking?.grid ?? null, log: (lvl, msg) => _ctx?.log?.(lvl, msg), onWrite: () => _writes++ }) // WO-978, off at boot
 let _timer = null
 let _ctx = null
 let _sent = { rev: -1, stale: '', at: 0 }

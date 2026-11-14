@@ -10,7 +10,8 @@ Where: **Previs → Camera → Markers**, at the bottom: **Test puppet**.
 - **Path**: Circle, Figure 8, Line (stage right ↔ stage left), Walk (a square from downstage right), or Hold.
 - **Speed** is in metres per second along the path. **Size** is the circle radius, or half the width of the other
   paths.
-- It walks around the stage centre at head height (1.7 m). The 3D previs shows it as a **magenta** pole tagged
+- It walks around the centre of the **tracking stage** (Previs → Camera → Tracking stage; **Fit to selection** on
+  the stage deck sets it), at head height: 1.7 m above that stage's floor. The 3D previs shows it as a **magenta** pole tagged
   "test puppet". Other markers are cyan.
 - It is **off at every server start** and **switches itself off after two hours**. It never takes over a marker
   that a real source (detection, a presenter) is driving.

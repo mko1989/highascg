@@ -163,3 +163,27 @@ test('project helper: PSN on keeps group / name, off restores exactly the previo
 	assert.deepStrictEqual(withOutput({ output: on }, undefined), {}, 'never null (Godot reads a Dictionary)')
 	assert.deepStrictEqual(withOutput({ output: on }, { enabled: false }), { output: { enabled: false } })
 })
+
+test('centre: the tracking stage (grid offsets, head height above its floor), not the scene origin; x / y override', () => {
+	let grid = { width: 18, depth: 10, x_offset: 2.53, y_offset: 23.24, z_offset: 2.3 }
+	const { hub, p, step } = rig({ stage: () => grid })
+	assert.ok(p.configure({ enabled: true, pattern: 'hold' }).ok)
+	let m = hub.list()[0]
+	assert.deepStrictEqual([m.x, m.y, m.z], [2.53, 23.24, 4], 'stage centre, 1.7 m above the 2.3 m deck')
+	assert.deepStrictEqual([p.status().x, p.status().y, p.status().centre, p.status().head_m], [2.53, 23.24, 'stage', 1.7])
+	grid = { ...grid, x_offset: -1 } // the stage is moved while it walks: followed within a couple of seconds
+	for (let i = 0; i < 150; i++) step(20)
+	assert.strictEqual(hub.list()[0].x, -1)
+	p.configure({ x: 5, y: 6 })
+	step(20)
+	m = hub.list()[0]
+	assert.deepStrictEqual([m.x, m.y, m.z, p.status().centre], [5, 6, 1.7, 'custom'], 'a named point wins')
+	p.configure({ centre: 'stage' })
+	step(20)
+	assert.strictEqual(hub.list()[0].y, 23.24)
+	const bare = rig() // no project / no grid: the configured point, as before
+	bare.p.configure({ enabled: true, pattern: 'hold' })
+	assert.deepStrictEqual([bare.hub.list()[0].x, bare.hub.list()[0].y], [DEFAULTS.x, DEFAULTS.y])
+	const reg = fs.readFileSync(path.join(ROOT, 'src/tracking/register.js'), 'utf8')
+	assert.match(reg, /createPuppet\(\{ hub, stage: \(\) => require\('\.\.\/engine\/project-scenes'\)\.loadFullProject\(\)\?\.previs\?\.tracking\?\.grid/)
+})
