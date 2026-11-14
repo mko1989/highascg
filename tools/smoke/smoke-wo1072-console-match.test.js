@@ -108,3 +108,12 @@ test('the route previews without writing, applies through the save, refuses a mi
 	const router = fs.readFileSync(path.join(__dirname, '../../src/api/router.js'), 'utf8')
 	assert.match(router, /routes-console-match'\)\.register\(routes\)/)
 })
+
+test('exportCsv writes our positions in the console frame, and parseCsv reads them back', () => {
+	const out = m.exportCsv(patch(), (id) => ({ a: 1, b: 2, c: 11 })[id])
+	assert.strictEqual(out.heads, 3) // the wash has no head number
+	assert.strictEqual(out.csv.split('\r\n')[1], '1,"Spot 1",2-001,-4.00,5.70,-9.00')
+	const pr = m.pair(m.parseCsv(out.csv).rows, patch())
+	assert.strictEqual(pr.pairs.length, 3)
+	assert.deepStrictEqual(m.fit(pr.pairs).shift, { x: 0, y: 0, z: 0 })
+})

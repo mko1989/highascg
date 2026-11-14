@@ -8,6 +8,7 @@
  *   No `apply`: a preview, nothing is written. 'shift': the whole project (scene placement, fixtures, tracking stage,
  *   cameras + their calibration points, PTZ, stage objects, marks) moves by fit.shift. 'heads': the shift, then every
  *   paired head takes the console's own position. A mirrored plan is never applied (a move cannot fix it).
+ *   GET /api/fixtures/console-match/export → { ok, heads, csv }: our positions as a CSV for MagicQ's "Vis only" import.
  *   The write goes through the autosave handler, so the clients reload it as a remote sync.
  */
 
@@ -58,6 +59,12 @@ function register(routes) {
 			fidOf: (id) => fids.get(id) || 0,
 			save: (project) => require('./routes-data').handleProject('/api/project/autosave', JSON.stringify({ project }), ctx),
 		})
+	}, { requireCaspar: false })
+
+	routes.get('/api/fixtures/console-match/export', () => {
+		const fids = require('../fixtures/console-fid-map').createFidResolver().map().byId
+		const project = require('../engine/project-scenes').loadFullProject()
+		return reply(200, { ok: true, ...match.exportCsv(project?.fixtures?.patch, (id) => fids.get(id) || 0) })
 	}, { requireCaspar: false })
 }
 

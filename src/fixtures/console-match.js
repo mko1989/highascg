@@ -13,6 +13,8 @@
  * Pure: parseCsv(text) → { rows, columns, problems } · pair(rows, patch, fidOf) → { pairs, by, unmatched }
  *       fit(pairs) → { shift, rms, max, yaw_deg, mirrored, worst } · shiftProject(project, shift) (in place)
  *       setHeads(project, pairs) (in place: each paired head takes the console's position)
+ *       exportCsv(patch, fidOf) → the other way: our positions as a CSV MagicQ imports with "Vis only" (Patch → View
+ *       Chans → Import Heads): head number, DMX (MagicQ universe = Art-Net universe + 1), X / Y / Z in metres.
  */
 
 const HEAD = ['head no', 'headno', 'hdno', 'headnum', 'head', 'channel', 'spot', 'fixture id']
@@ -234,4 +236,18 @@ function setHeads(project, pairs) {
 	return n
 }
 
-module.exports = { parseCsv, pair, fit, shiftProject, setHeads, dmxOf }
+/** Our patch → the console's CSV (positions only; rotations are left to the console). Heads without a number are skipped. */
+function exportCsv(patch, fidOf = () => 0) {
+	const rows = []
+	for (const f of Array.isArray(patch) ? patch : []) {
+		const head = Number(fidOf(f?.id)) || Number(f?.fid) || 0
+		if (!head || !f.pose || f.enabled === false) continue
+		const u = Number(f.universe) + (f.protocol === 'sacn' ? 0 : 1)
+		const n = (v) => (Math.round((Number(v) || 0) * 100) / 100).toFixed(2)
+		rows.push([head, `"${String(f.name || '').replace(/"/g, "'")}"`, `${u}-${String(f.address).padStart(3, '0')}`, n(f.pose.x), n(f.pose.z), n(-f.pose.y)])
+	}
+	rows.sort((a, b) => a[0] - b[0])
+	return { csv: ['Head no,Head name,DMX,X,Y,Z', ...rows.map((r) => r.join(','))].join('\r\n') + '\r\n', heads: rows.length }
+}
+
+module.exports = { parseCsv, pair, fit, shiftProject, setHeads, dmxOf, exportCsv }

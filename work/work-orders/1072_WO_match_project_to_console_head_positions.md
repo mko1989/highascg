@@ -1,7 +1,7 @@
 # WO-1072 — Match the project to the lighting console's head positions (MagicQ CSV)
 
 **Area:** lighting, tracking-vr, godot-client
-**Status: IN PROGRESS (14.11.26 — built, offline suite + Godot tests green; not run against a real console file, not clicked in the GUI, server not restarted)**
+**Status: IN PROGRESS (14.11.26 — matcher live and run on the owner's real MagicQ export; the export direction is built but its import on the desk is untried)**
 
 Owner, 14.11: *"how do i make sure that our 0,0,0 points align from the start"* … *"how can we automate it so highascg
 matches chamsys positions"* … *"yes lets do the import csv matching."*
@@ -42,3 +42,16 @@ matches chamsys positions"* … *"yes lets do the import csv matching."*
 - NOT verified: a real MagicQ export (the owner's first file was a PDF print, the box has no PDF text tool); the
   fold in the running client; the route on the running server (needs a node restart). Hub markers held by an
   operator pin are runtime state and do not move with the project.
+
+## 14.11, later — the real desk data, and the other direction
+
+- **The owner's MagicQ exports** (`~/Documents/…tamoos-narvil-Positions.csv`, `…Truss_and_Pipes.csv`): the preview on the
+  running server paired 90 of 90 heads by DMX address (universe offset +1) and reported an average leftover of 14.4 m,
+  48.5 m at worst, plan turned 35.8°. The desk's positions are MagicQ's plot: heads spread evenly along 22 m trusses
+  at Z 3 / 9 / 15 …, heads 1–14 all on "TRUSS 1" at one height. Not the rig. Nothing was applied.
+- **The 14.11 hand move was undone** (inverse shift through the same code; poses equal the pre-move backup to 1e-14).
+- **Patch addresses taken from the desk** (`tamoos-narvil_PATCH.csv`, by head number): 18 heads re-addressed
+  (Quantum 6–14, Pixel Strobe 708–712, Pixel Line 1042–1045); 90 of 90 now equal, no overlaps (`/api/tracking/follow`).
+- **Export added:** `exportCsv` + `GET /api/fixtures/console-match/export` + the fold's "Export our positions for the
+  console…" — head number, DMX, X / Y / Z (console frame) for MagicQ's Import Heads → "Vis only". Rotations are not
+  written. NOT verified: that MagicQ's Vis-only import accepts the file and what it does to rotations.

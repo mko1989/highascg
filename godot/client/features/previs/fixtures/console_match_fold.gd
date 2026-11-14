@@ -37,6 +37,11 @@ func _ready() -> void:
 	_heads.pressed.connect(func() -> void: _send("heads"))
 	row.add_child(_heads)
 	add_child(row)
+	var out := Button.new()
+	out.text = "Export our positions for the console…"
+	out.tooltip_text = "Saves a CSV of this project's head positions. MagicQ: Patch → View Chans → Import Heads → Vis only puts its heads there; patch and programming stay."
+	out.pressed.connect(_export)
+	add_child(out)
 	_enable(false)
 
 
@@ -55,6 +60,18 @@ func _pick() -> void:
 		_enable(false)
 		return
 	await _send("")
+
+
+func _export() -> void:
+	var res: Dictionary = await Api.get_json("/api/fixtures/console-match/export")
+	if not res.get("ok", false):
+		_status.text = str(res.get("error", "The server did not answer."))
+		return
+	var path: String = await FilePick.save_path(self, "Save the positions CSV", "highascg-positions.csv", ["*.csv ; CSV"])
+	if path == "":
+		return
+	var err: String = FilePick.write_bytes(path, str(res.get("csv", "")).to_utf8_buffer())
+	_status.text = err if err != "" else "%d head positions saved to %s. On the console: Patch → View Chans → Import Heads → Vis only." % [int(res.get("heads", 0)), path]
 
 
 func _send(apply: String) -> void:
