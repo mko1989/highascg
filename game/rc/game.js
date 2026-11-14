@@ -66,7 +66,9 @@ export async function startGame({ spectator = false } = {}) {
 
 	const toolbar = []
 	if (!spectator) {
-		toolbar.push(toolButton('🎥', 'Camera: chase / top (C)', () => (G.camMode = G.camMode === 'chase' ? 'top' : 'chase')))
+		toolbar.push(
+			toolButton('CAM', 'Camera: chase / top (C)', () => (G.camMode = G.camMode === 'chase' ? 'top' : 'chase'))
+		)
 		toolbar.push(toolButton('↺', 'Back to the last checkpoint (R)', () => respawn(G)))
 		const tiltBtn = toolButton('📱', 'Tilt to steer', async (el) => {
 			const ok = await G.input.setTilt(!G.input.tiltOn)
@@ -74,7 +76,7 @@ export async function startGame({ spectator = false } = {}) {
 			if (!ok && !G.input.tiltOn) G.hud.toast('Tilt steering is not available on this device')
 		})
 		if (phone && typeof window.DeviceOrientationEvent !== 'undefined') toolbar.push(tiltBtn)
-		toolbar.push(toolButton('🔇', 'Sound on / off (M)', (el) => toggleMute(G, el)))
+		toolbar.push(toolButton('SND', 'Sound on / off (M)', (el) => toggleMute(G, el)))
 	}
 	const qBtn = toolButton(quality === 'low' ? 'LQ' : 'HQ', 'Quality low / high', (el) => {
 		const q = G.world.quality === 'low' ? 'high' : 'low'
@@ -251,7 +253,7 @@ export function respawn(G) {
 
 function toggleMute(G, el) {
 	G.audio.setMuted(!G.audio.muted)
-	if (el) el.textContent = G.audio.muted ? '🔇' : '🔊'
+	if (el) el.textContent = G.audio.muted ? 'SND' : 'SND ON'
 }
 
 function join(G, name, color) {

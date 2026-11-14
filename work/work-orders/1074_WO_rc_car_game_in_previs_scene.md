@@ -40,3 +40,14 @@ view or scoreboard to the led wall in the room."*
   exports, lint, format, `--no-http` clean.
 - Live-project bake in a throwaway process: 382 001 triangles, 7.2 MB (3.0 MB gzipped), ~2.1 s; 6 tracks (stage oval
   27 m, stage slalom 23 m, hall loop 120 m, hall slalom 91 m, hall GP 93 m, hall figure-eight 124 m).
+- **On the box, 14.11 19:13–19:20** (server restarted with the game, game enabled through the host API):
+  - `/game/rc/`, `/vendor/three/…` 200; scene bake on the live server 3.4 s (382 001 triangles, 7.2 MB, 3.0 MB gzipped
+    on the wire), cached in `~/.highascg/cache/rc-game/`.
+  - A real browser (headless Chrome 150 with software GL, driven over the DevTools protocol): the player page loaded the
+    scene and the stage oval, joined as "Tester" (server state shows the player in slot 0), the host API picked a track
+    and started; the page showed the countdown lights, the race started, holding the throttle took the car to 8.85 m/s
+    (stage oval) and 9.0 m/s (hall GP, 83 world snapshots relayed to a second, spectator socket). No page errors or
+    console warnings. Screenshots looked at: lobby, countdown, in-race view, host panel.
+  - NOT done: a phone or touch input, more than one real player, a full lap by a human, frame rate on real hardware
+    (software GL gave 12 fps, which says nothing about a phone), sound, the spectator page beyond its first frame.
+- After the test: join addresses list the venue network before VPN addresses; two toolbar buttons no longer use emoji.

@@ -38,7 +38,9 @@ function createRcGame(deps = {}) {
 		if (!s) text.set(m, (s = JSON.stringify(m)))
 		return s
 	}
-	const joinUrls = () => lanIps().map((ip) => `http://${ip}:${port()}/game/rc/`)
+	// venue network first: 100.64/10 (VPN / carrier NAT) addresses are no use to a guest's phone, so they go last
+	const cgnat = (ip) => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip)
+	const joinUrls = () => [...lanIps()].sort((a, b) => cgnat(a) - cgnat(b)).map((ip) => `http://${ip}:${port()}/game/rc/`)
 	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev })
 
 	function sendTo(ws, m) {
