@@ -8,7 +8,8 @@
  * host switch (`lights` / `wall`); both idle (no timer, no feed client, no lease) while disabled or nobody is connected.
  */
 
-const WebSocket = require('ws')
+const { core } = require('./host')
+const WebSocket = core('ws')
 const { createRcRoom } = require('./rc-room')
 const { createSceneBaker } = require('./rc-scene')
 const { parseMessage } = require('./rc-sanitize')
@@ -32,7 +33,7 @@ function createRcGame(deps = {}) {
 	const log = deps.log || (() => {})
 	const now = deps.now || Date.now
 	const port = deps.port || (() => 4200)
-	const lanIps = deps.lanIps || (() => require('../utils/lan-ipv4').getLanIPv4Addresses())
+	const lanIps = deps.lanIps || (() => core('src/utils/lan-ipv4').getLanIPv4Addresses())
 	const baker = deps.baker || createSceneBaker({ log, ...(deps.bakerDeps || {}) })
 	let room = null
 	const sockets = new Set()

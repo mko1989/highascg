@@ -312,7 +312,6 @@ function main() {
 		const wsHandle = attachWebSocketServer(httpServer, appCtx, { log: m => logger.info(m), stateBroadcastIntervalMs: wsBroadcastMs })
 		appCtx._getWsLogLineStats = typeof wsHandle.getLogLineStats === 'function' ? () => wsHandle.getLogLineStats() : null
 		appCtx._videoFeed = require('./src/system/video-feed').attachVideoFeed(httpServer, appCtx, { log: m => logger.info(m) }) // WO-670 P1: JPEG pictures for remote clients
-		require('./src/game/rc-ws').attachRcGameWs(httpServer, appCtx) // WO-1074: the RC car game socket (idle until the host enables the game)
 		moduleRegistry.setHttpServer(httpServer, appCtx) // WO-1076: modules' onHttpServer hooks (their WS paths) attach now / on enable
 		require('./src/api/routes-cluster').startIfLinked(appCtx) // WO-670 P3b: failover runs without a client
 

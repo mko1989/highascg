@@ -9,13 +9,13 @@
  * module (which mounts all of /vendor/three/) is loaded — the game page imports three.module.js and GLTFLoader.js.
  */
 
+const { core, coreRoot } = require('./host')
 const fs = require('fs')
 const path = require('path')
-const { REPO_ROOT } = require('../repo-paths')
-const { mergeSecurityHeaders } = require('../server/security-headers')
+const { mergeSecurityHeaders } = core('src/server/security-headers')
 
 const PREFIX = '/game/rc'
-const THREE = path.join(REPO_ROOT, 'node_modules', 'three')
+const THREE = path.join(coreRoot(), 'node_modules', 'three')
 /** URL prefix → directory: the only parts of three the game page loads. */
 const VENDOR = [
 	['/vendor/three/build/', path.join(THREE, 'build')],
@@ -58,7 +58,7 @@ async function serveRcStatic(reqPath, opts = {}) {
 	const method = String(opts.method || 'GET').toUpperCase()
 	if (method !== 'GET' && method !== 'HEAD') return { status: 405, headers: { Allow: 'GET, HEAD', 'Content-Type': 'text/plain; charset=utf-8' }, body: 'Method not allowed' }
 	const vendor = vendorOf(reqPath)
-	const root = path.resolve(vendor ? vendor[1] : opts.root || path.join(REPO_ROOT, 'game', 'rc'))
+	const root = path.resolve(vendor ? vendor[1] : opts.root || path.join(__dirname, '..', 'client'))
 	if (reqPath === PREFIX) return { status: 302, headers: { Location: `${PREFIX}/${opts.query || ''}`, 'Cache-Control': 'no-store' }, body: '' }
 	let rel
 	try {

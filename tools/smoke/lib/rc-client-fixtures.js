@@ -14,7 +14,7 @@
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 
-const RC = path.join(__dirname, '..', '..', '..', 'game', 'rc')
+const RC = path.join(__dirname, '..', '..', '..', 'modules', 'rc-game', 'client')
 const load = (f) => import(pathToFileURL(path.join(RC, f)).href)
 
 /* ---------------- the synthetic room ---------------- */
@@ -302,14 +302,14 @@ function occGrid({ floor = 'hall', y = 0, x0, z0, cell, w, h, blocked }) {
 }
 
 /**
- * §2.7 deck tracks: the real server generator (src/game/rc-tracks.js) run once over the furnished hall of
+ * §2.7 deck tracks: the real server generator (modules/rc-game/server/rc-tracks.js) run once over the furnished hall of
  * tools/smoke/lib/rc-track-measure.js — { floors, obstacles, over (an over-and-under with a bridge), sky (a long deck
  * loop) }. The one place the client smokes use a server-generated track: decks and bridges are generator geometry.
  */
 let deckCache = null
 function deckTracks() {
 	if (deckCache) return deckCache
-	const { generateTracks } = require('../../../src/game/rc-tracks')
+	const { generateTracks } = require('../../../modules/rc-game/server/rc-tracks')
 	const { furnishedHall } = require('./rc-track-measure')
 	const sc = furnishedHall()
 	const r = generateTracks(sc)
@@ -319,16 +319,16 @@ function deckTracks() {
 }
 
 /**
- * §3.1 a tunnel track: the server's tunnel loop (src/game/rc-toy-route.js tunnelLoop) through a tablecloth table of the
+ * §3.1 a tunnel track: the server's tunnel loop (modules/rc-game/server/rc-toy-route.js tunnelLoop) through a tablecloth table of the
  * synthetic toy hall (rc-track-measure.js toyHall), in world metres → { sc (server scene, live grids), json (the
  * scene as the client gets it: scale, floors, occ RLE, heights, tracks: [track]), track }. Generator geometry, like decks.
  */
 let tunnelCache = null
 function tunnelWorld() {
 	if (tunnelCache) return tunnelCache
-	const SC = require('../../../src/game/rc-scale')
-	const TP = require('../../../src/game/rc-toy-plan')
-	const R = require('../../../src/game/rc-toy-route')
+	const SC = require('../../../modules/rc-game/server/rc-scale')
+	const TP = require('../../../modules/rc-game/server/rc-toy-plan')
+	const R = require('../../../modules/rc-game/server/rc-toy-route')
 	const sc = require('./rc-track-measure').toyHall()
 	const U = SC.toUnitScene(sc, sc.scale)
 	const hall = U.floors.find((f) => f.id === 'hall')
@@ -342,7 +342,7 @@ function tunnelWorld() {
 	return tunnelCache
 }
 
-/** Fake browser environment for RcNet (game/rc/net.js module passed in): fake WebSocket + manual clock. */
+/** Fake browser environment for RcNet (modules/rc-game/client/net.js module passed in): fake WebSocket + manual clock. */
 function fakeNetEnv(NET) {
 	const env = { t: 0, timers: [], sockets: [], messages: [], statuses: [] }
 	class FakeWS {

@@ -9,6 +9,7 @@
  * bake waits for it. Never touches Caspar: reads the project and the MVR store only.
  */
 
+const { core } = require('./host')
 const crypto = require('crypto')
 const fs = require('fs')
 const os = require('os')
@@ -60,7 +61,7 @@ async function bakeScene(inp, rev, deps = {}) {
 	const scale = sceneScale(null, { scale: deps.scale })
 	const toy = scale !== 1
 	const pause = deps.pause || nextTick
-	const store = deps.mvrStore || require('../stage/mvr-store')
+	const store = deps.mvrStore || core('src/stage/mvr-store')
 	const rec = inp.id ? store.get(inp.id) : null
 	const templates = new Map([[BOX, M.boxTemplate()]])
 	const parts = rec?.scene ? G.visibleParts(rec.scene, inp.cfg) : []
@@ -145,8 +146,8 @@ function arenaSlab(a) {
  * → { rev(), get() → Promise<{ rev, json, text, glb, gz }>, peek() }
  */
 function createSceneBaker(deps = {}) {
-	const loadProject = deps.loadProject || (() => require('../engine/project-scenes').loadFullProject())
-	const store = deps.mvrStore || require('../stage/mvr-store')
+	const loadProject = deps.loadProject || (() => core('src/engine/project-scenes').loadFullProject())
+	const store = deps.mvrStore || core('src/stage/mvr-store')
 	const cacheDir = deps.cacheDir || defaultCacheDir()
 	const now = deps.now || Date.now
 	const log = deps.log || (() => {})

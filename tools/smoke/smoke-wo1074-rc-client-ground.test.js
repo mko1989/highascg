@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 v2 — RC client: the ground model (game/rc/ground.js, contract §2.1 "Ground model"), 3D track maths and the
+ * WO-1074 v2 — RC client: the ground model (modules/rc-game/client/ground.js, contract §2.1 "Ground model"), 3D track maths and the
  * 3D physics on a synthetic room track (hall + stage + a ramp up + a drop off the stage edge, built in
  * tools/smoke/lib/rc-client-fixtures.js): ground(x, z) everywhere, up the ramp onto the stage, off the ledge (lands on
  * the hall, never tunnels, never NaN), the stage side is a wall from below, obstacles only where heights overlap,

@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 §3.1 — tunnels through tables on the server (src/game/rc-toy-blobs.js, rc-toy-tunnel.js, rc-toy-route.js
+ * WO-1074 §3.1 — tunnels through tables on the server (modules/rc-game/server/rc-toy-blobs.js, rc-toy-tunnel.js, rc-toy-route.js
  * `tunnelLoop` / tunnel tours, rc-track-check-tunnel.js, rc-scene-occ.js `carveCells`): the tunnel-able blobs of the
  * synthetic tablecloth hall (every table, nothing else; none with legged tables), the generated tunnel tracks (a medium
  * hall loop and the grand tour) valid on the JSON scene and re-measured independently (lib/rc-tunnel-measure.js:
@@ -12,9 +12,9 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { generateTracks, validateTrack } = require('../../src/game/rc-tracks')
-const O = require('../../src/game/rc-scene-occ')
-const B = require('../../src/game/rc-toy-blobs')
+const { generateTracks, validateTrack } = require('../../modules/rc-game/server/rc-tracks')
+const O = require('../../modules/rc-game/server/rc-scene-occ')
+const B = require('../../modules/rc-game/server/rc-toy-blobs')
 const { measureToy, toyHall } = require('./lib/rc-track-measure')
 const TM = require('./lib/rc-tunnel-measure')
 

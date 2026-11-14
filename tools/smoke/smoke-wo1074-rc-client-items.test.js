@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 v2 — RC client items (game/rc/items.js, rocket.js, protocol.js §2.4, net.js sendEvent): the exact message
+ * WO-1074 v2 — RC client items (modules/rc-game/client/items.js, rocket.js, protocol.js §2.4, net.js sendEvent): the exact message
  * shapes, the box → roulette → held → use flow against a fake socket, the closed-form rocket path (two clients with
  * different frame timing agree at every server time; it follows the centre line's height up a ramp and down a drop and
  * ends at 5 s), the slick / rocket / pulse own-car hit tests, turbo / shield / spin-out.

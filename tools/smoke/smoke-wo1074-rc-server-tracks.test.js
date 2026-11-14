@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 v2 — RC game tracks (src/game/rc-tracks.js, rc-track-check*.js, rc-ground.js; contract §2.1): 3D tracks
+ * WO-1074 v2 — RC game tracks (modules/rc-game/server/rc-tracks.js, rc-track-check*.js, rc-ground.js; contract §2.1): 3D tracks
  * generated on synthetic scenes (hall + stage, stage only, tiny floor, many obstacles, no scene, the default hall around
  * a stage) and on the live project's scene (read-only, when present). Every emitted track passes validateTrack, the
  * generation is deterministic, at least two tracks always exist, a hall + stage gives ≥ 3 room tracks (hall → ramp →
@@ -16,8 +16,8 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { generateTracks, validateTrack, GENERATOR_VERSION } = require('../../src/game/rc-tracks')
-const Gr = require('../../src/game/rc-ground')
+const { generateTracks, validateTrack, GENERATOR_VERSION } = require('../../modules/rc-game/server/rc-tracks')
+const Gr = require('../../modules/rc-game/server/rc-ground')
 const { measure, span, plan, furnishedHall } = require('./lib/rc-track-measure')
 
 /** Generate, validate, measure, check determinism. */
@@ -78,7 +78,7 @@ test('stage only, tiny floor (→ arena), many obstacles, no stage (→ a bridge
 	const arena = full.floors.find((f) => f.id === 'arena')
 	assert.ok(arena && (arena.rect[0] >= 20 || arena.rect[2] <= -20))
 	// a scene with only a stage: the default hall (stage + 18 m all round) leaves room for room tracks
-	const { hallFloor } = require('../../src/game/rc-scene-geom')
+	const { hallFloor } = require('../../modules/rc-game/server/rc-scene-geom')
 	const st = { id: 'stage', y: 1, rect: [-6, -8, 6, -2] }
 	const r = check({ floors: [hallFloor([], null, st), st], obstacles: [], bounds: null }, 'default hall', 4)
 	assert.ok(r.tracks.filter((t) => t.floor === 'room').length >= 3)
@@ -274,7 +274,7 @@ function liveInputs() {
 	const fs = require('fs')
 	const path = require('path')
 	const { LIVE_PROJECTS_DIR } = require('../../src/engine/projects-root')
-	const { sceneInputs } = require('../../src/game/rc-scene')
+	const { sceneInputs } = require('../../modules/rc-game/server/rc-scene')
 	let best = null
 	for (const f of fs.existsSync(LIVE_PROJECTS_DIR) ? fs.readdirSync(LIVE_PROJECTS_DIR) : []) {
 		if (!/^[\w-]+\.json$/.test(f)) continue
@@ -306,7 +306,7 @@ test('the live project scene (read-only): room + hall tracks, every one valid an
 		}
 	}
 	const mvrStore = { get: (id) => withLive(() => store.get(id)), mesh: (id, key) => withLive(() => store.mesh(id, key)) }
-	const { bakeScene } = require('../../src/game/rc-scene')
+	const { bakeScene } = require('../../modules/rc-game/server/rc-scene')
 	const { json, glb } = await bakeScene(live.inp, 'smoke', { mvrStore })
 	assert.ok(json.tracks.length >= 2, json.tracks.map((x) => x.id).join())
 	for (const tr of json.tracks) {

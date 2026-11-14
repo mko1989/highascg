@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 §2.6 — RC game: live lights (src/game/rc-lights-fk.js, src/game/rc-lights.js). The beam direction must be the
+ * WO-1074 §2.6 — RC game: live lights (modules/rc-game/server/rc-lights-fk.js, src/game/rc-lights.js). The beam direction must be the
  * previs's (fixtures_3d.gd: pose_xform, axis_basis, beam along the Beam node's −Y): checked at rest, against hand-made
  * rotations, and end to end against the follow engine's own aiming — gdtf-ik.js aims a head at a point, the DMX it would
  * send is decoded by gdtf-visual.js (what visual() serves), and the direction computed from those axes must point at
@@ -13,8 +13,8 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 
-const { fk, headFrame, lightOf, kindOf } = require('../../src/game/rc-lights-fk')
-const { createRcLights, withLiveScene, MAX_LIGHTS } = require('../../src/game/rc-lights')
+const { fk, headFrame, lightOf, kindOf } = require('../../modules/rc-game/server/rc-lights-fk')
+const { createRcLights, withLiveScene, MAX_LIGHTS } = require('../../modules/rc-game/server/rc-lights')
 const { aimFixture, chainOf, toPhys, fileAxis, axisFn } = require('../../src/fixtures/gdtf-ik')
 
 const close = (a, b, eps = 1e-6) => a.every((v, k) => Math.abs(v - b[k]) < eps)

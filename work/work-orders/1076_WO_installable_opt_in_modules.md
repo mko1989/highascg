@@ -201,3 +201,23 @@ after the next restart, with no module installed nothing changes); the RC game a
   verifier assertion) so ISOs stay base-only. Not edited here (ISO tooling out of scope).
 - CI publishing of module tarballs to GitHub releases (script exists, not wired).
 - Optional: answer unclaimed upgrades on a disabled module's WS path with 404 instead of leaving them hanging.
+
+## The RC game moved into `modules/rc-game` (15.11.26)
+
+- Done as the step list above: `src/game` → `modules/rc-game/server`, `game/rc` → `modules/rc-game/client`, the routes
+  file into `server/`; `module.json` (no `defaultEnabled` → opt-in), `register.js`, `server/host.js` (`core(id)`:
+  `host.requireCore` when loaded as a module, the checkout's `src/` when a smoke requires a server file directly).
+- Core lines deleted: the `attachRcGameWs` line in index.js, the `routes-rc-game` call in src/api/router.js, the
+  `rc-public` line in src/server/auth.js, the `rc-static` import and branch in src/server/http-server.js.
+- CI tools now cover `modules/`: check-max-file-lines roots, check-unwired-exports (server half as export root, all of
+  `modules/` as reference root), eslint server globs, gen-api-contract (the `/api/game/rc/*` rows stay in the docs).
+- ISO: the five exclude lines are in `tools/eggs/live-usb/penguins-eggs-exclude-highascg-embed-server.list`.
+- **Verified (offline):** `tools/smoke/smoke-wo1076-rc-game-module.test.js` 3/3 on a real HTTP server —
+  the core (src/, index.js) names nothing of the game; module present but not enabled → state/host 404, no page, no
+  socket, nothing in the require cache; enable → public state `{enabled:false}`, page, `main.js`, three, socket `off`;
+  disable → all gone, cache purged; `make-module-tarball rc-game` (97 entries) installed from the tarball into a modules
+  dir outside the repo with the sidecar sha256 checked → the installed copy runs the same; uninstall removes it.
+  All 192 wo1074 smokes pass against the new paths (two HTTP smokes register the module's own `register.js`); the
+  never-on-a-screen pin now also requires every core file to be reached through `core()` (mutation-checked both ways).
+- **Not verified:** the running server (not restarted, show on). After the next restart the game is OFF on this box
+  until `POST /api/modules/enable {"name":"rc-game"}`.

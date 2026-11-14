@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 §3 toy scale — RC client (work/notes/rc-game-contract.md §3): the scene's one `scale` (game/rc/scale.js)
+ * WO-1074 §3 toy scale — RC client (work/notes/rc-game-contract.md §3): the scene's one `scale` (modules/rc-game/client/scale.js)
  * shrinks every length, speed and acceleration; times, rates and angles stay. Proven by driving the same bot over the
  * same fixture worlds (tools/smoke/lib/rc-client-fixtures.js: the room track with ramp / stage / drop / pad, a flat
  * oval, the server generator's over-and-under bridge and long deck loop) at scale 1 and shrunk:

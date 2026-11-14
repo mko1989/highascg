@@ -26,6 +26,7 @@
  * 15 s after the last lease), renewed every 5 s, released when the last subscriber leaves or the host switches walls off.
  */
 
+const { core } = require('./host')
 const { EventEmitter } = require('events')
 
 const ROLE_RE = /^[A-Za-z0-9_-]{1,32}$/
@@ -270,8 +271,8 @@ function createRcVideo(deps) {
  */
 function rcVideoDeps(ctx, { log } = {}) {
 	const rasterOf = (role) => {
-		const map = require('../fixtures/pixel-map-service').liveChannelMap(ctx)
-		const ch = require('../system/video-surfaces').resolveRoleChannel(role, map)
+		const map = core('src/fixtures/pixel-map-service').liveChannelMap(ctx)
+		const ch = core('src/system/video-surfaces').resolveRoleChannel(role, map)
 		const r = ch ? map?.channelResolutionsByChannel?.[String(ch)] : null
 		return r && r.w > 0 && r.h > 0 ? { w: r.w, h: r.h } : null
 	}
@@ -280,7 +281,7 @@ function rcVideoDeps(ctx, { log } = {}) {
 		if (Date.now() - memo.at < 2000) return memo.list
 		let list
 		try {
-			const project = require('../engine/project-scenes').loadFullProject()
+			const project = core('src/engine/project-scenes').loadFullProject()
 			list = screensFrom(project?.previs?.stage?.objects, rasterOf)
 		} catch {
 			list = []
@@ -291,7 +292,7 @@ function rcVideoDeps(ctx, { log } = {}) {
 	return {
 		screens,
 		feed: () => ctx?._videoFeed?.feed || null,
-		lease: (id, roles) => require('../system/video-surfaces').getVideoSurfaceManager(ctx).lease(id, roles),
+		lease: (id, roles) => core('src/system/video-surfaces').getVideoSurfaceManager(ctx).lease(id, roles),
 		roles: () => screens().map((s) => s.role),
 		log: log || ((level, msg) => (typeof ctx?.log === 'function' ? ctx.log(level, msg) : undefined)),
 	}

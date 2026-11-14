@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 §2.6 — RC game: LED wall pictures (src/game/rc-video.js). `screensFrom` must place the picture where the
+ * WO-1074 §2.6 — RC game: LED wall pictures (modules/rc-game/server/rc-video.js). `screensFrom` must place the picture where the
  * previs draws it (stage_builder.gd: position = bottom-centre, strip y 0…h facing +Z, Godot YXZ rotation; uv_rect =
  * source.rect / raster). The fan-out runs against the REAL video feed (src/system/video-feed.js createVideoFeed) with a
  * stand-in worker: one feed client for all game sockets in the feed's own `game` tier (480 px / 8 fps, encoded apart
@@ -13,7 +13,7 @@ const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 const { EventEmitter } = require('node:events')
 
-const { screensFrom, createRcVideo, LEASE_ID, MAX_VIDEO_BUFFERED, PARAMS } = require('../../src/game/rc-video')
+const { screensFrom, createRcVideo, LEASE_ID, MAX_VIDEO_BUFFERED, PARAMS } = require('../../modules/rc-game/server/rc-video')
 const { createVideoFeed, frameMessage } = require('../../src/system/video-feed')
 
 const near = (a, b, eps = 1e-4) => a.every((v, k) => Math.abs(v - b[k]) < eps)

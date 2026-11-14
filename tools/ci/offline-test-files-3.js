@@ -372,4 +372,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1055-alsa-cards.test.js',
 	'tools/smoke/smoke-wo1076-modules-runtime.test.js',
 	'tools/smoke/smoke-wo1076-modules-install.test.js',
+	'tools/smoke/smoke-wo1076-rc-game-module.test.js',
 ]

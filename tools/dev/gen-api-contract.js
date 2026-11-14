@@ -52,7 +52,7 @@ function enclosingMethod(src, idx) {
 }
 
 function scan() {
-	const files = [...walk(path.join(ROOT, 'src')), path.join(ROOT, 'index.js')].sort() // index.js: boot-time broadcasts (log_line, timeline.playback)
+	const files = [...walk(path.join(ROOT, 'src')), ...(fs.existsSync(path.join(ROOT, 'modules')) ? walk(path.join(ROOT, 'modules')) : []), path.join(ROOT, 'index.js')].sort() // index.js: boot-time broadcasts (log_line, timeline.playback)
 	const http = new Map()
 	const ws = new Map()
 	const blurbs = new Map()

@@ -23,12 +23,16 @@ process.env.HIGHASCG_API_TOKEN_FILE = path.join(TMP, 'api-token') // never the b
 const auth = require('../../src/server/auth')
 const { routeRequest } = require('../../src/api/router')
 const { startHttpServer } = require('../../src/server/http-server')
+/* WO-1076: the game is an opt-in module — its routes, public paths and static files reach the server only through the
+ * module registry, registered here from the module's own register.js (the WS path is attached below with this test's game) */
+const moduleRegistry = require('../../src/module-registry')
+const rcModule = require('../../modules/rc-game/register')({ requireCore: (id) => require(id.startsWith('src/') ? require('path').join(__dirname, '..', '..', id) : id), coreRoot: require('path').join(__dirname, '..', '..') })
 const { attachWebSocketServer } = require('../../src/server/ws-server')
-const { createRcGame, useRcGame } = require('../../src/game/rc-game')
-const { attachRcGameWs, isGamePath, WS_PATH } = require('../../src/game/rc-ws')
-const { isRcGameEnabled, setRcGameEnabled } = require('../../src/game/rc-public')
-const { serveRcStatic } = require('../../src/game/rc-static')
-const { COUNTDOWN_MS } = require('../../src/game/rc-room')
+const { createRcGame, useRcGame } = require('../../modules/rc-game/server/rc-game')
+const { attachRcGameWs, isGamePath, WS_PATH } = require('../../modules/rc-game/server/rc-ws')
+const { isRcGameEnabled, setRcGameEnabled } = require('../../modules/rc-game/server/rc-public')
+const { serveRcStatic } = require('../../modules/rc-game/server/rc-static')
+const { COUNTDOWN_MS } = require('../../modules/rc-game/server/rc-room')
 
 const ROOT = path.join(__dirname, '..', '..')
 const PW = 'wo1074-shared-password'
@@ -63,6 +67,7 @@ const clock = {
 
 let server, port, ws, rcWs, game
 test.before(async () => {
+	moduleRegistry.register(rcModule)
 	server = startHttpServer({ port: 0, bindAddress: '127.0.0.1', webDir: TMP, routeApi: (m, p, b, req) => routeRequest(m, p, b, ctx, req), log: () => {} })
 	await new Promise((r) => server.once('listening', r))
 	port = server.address().port
@@ -75,6 +80,7 @@ test.before(async () => {
 })
 
 test.after(() => {
+	moduleRegistry.unregister('rc-game')
 	game?.disable()
 	useRcGame(null)
 	setRcGameEnabled(false)
@@ -334,10 +340,14 @@ test('bad frames: over 2 KB closes the socket, invalid JSON is dropped and count
 	assert.equal((await host({ action: 'disable' })).status, 200)
 })
 
-test('the game never puts anything on a screen: no AMCP, scene-take, look or channel code in src/game/ or the route', () => {
-	const files = [...fs.readdirSync(path.join(ROOT, 'src/game')).map((f) => `src/game/${f}`), 'src/api/routes-rc-game.js']
+test('the game never puts anything on a screen: no AMCP, scene-take, look or channel code in the module server folder', () => {
+	const DIR = 'modules/rc-game/server'
+	const files = fs.readdirSync(path.join(ROOT, DIR)).map((f) => `${DIR}/${f}`)
 	assert.ok(files.length >= 10)
-	const allowed = /^(\.\/rc-[a-z-]+|\.\/response|\.\.\/game\/rc-game|\.\.\/stage\/(mvr-store|glb-write)|\.\.\/engine\/project-scenes|\.\.\/utils\/lan-ipv4|\.\.\/server\/(auth|security-headers)|\.\.\/repo-paths|ws|crypto|fs|os|path|zlib)$/
+	/* WO-1076: core files and core packages are reached through host.js `core('src/…' | 'ws')`; plain require() is for the
+	   module's own files and node built-ins only */
+	const ownOnly = /^(\.\/rc-[a-z-]+|\.\/host|crypto|fs|os|path|zlib)$/
+	const allowed = /^(src\/api\/response|src\/stage\/(mvr-store|glb-write)|src\/engine\/project-scenes|src\/utils\/lan-ipv4|src\/server\/(auth|security-headers)|ws)$/
 	/* §2.6 — per FILE, exactly these extra modules: the previs pose maths (gdtf-ik), the GDTF cache (gdtf-store) and the
 	   patch normaliser (follow-patch) for the lights — all read-only; node's EventEmitter (the in-process feed client's
 	   shape), the cached channel map + INFO CONFIG rasters (pixel-map-service.liveChannelMap: config and cached text,
@@ -345,19 +355,26 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 	   Caspar: it adds a read-only SHM consumer (the same lease the Godot camera view and the feed use) — so rc-video.js
 	   may call only `resolveRoleChannel` and `getVideoSurfaceManager(ctx).lease`, and no file here holds an AMCP verb. */
 	const extra = {
-		'src/game/rc-lights-fk.js': ['../fixtures/gdtf-ik'],
-		'src/game/rc-lights.js': ['../fixtures/gdtf-store', '../fixtures/follow-patch'],
-		'src/game/rc-video.js': ['events', '../fixtures/pixel-map-service', '../system/video-surfaces'],
+		[`${DIR}/rc-lights-fk.js`]: ['src/fixtures/gdtf-ik'],
+		[`${DIR}/rc-lights.js`]: ['src/fixtures/gdtf-store', 'src/fixtures/follow-patch'],
+		[`${DIR}/rc-video.js`]: ['events', 'src/fixtures/pixel-map-service', 'src/system/video-surfaces'],
 	}
 	const use = {
-		'../fixtures/pixel-map-service': /^\.liveChannelMap\(ctx\)/,
-		'../system/video-surfaces': /^(\.resolveRoleChannel\(role, map\)|\.getVideoSurfaceManager\(ctx\)\.lease\(id, roles\))/,
+		'src/fixtures/pixel-map-service': /^\.liveChannelMap\(ctx\)/,
+		'src/system/video-surfaces': /^(\.resolveRoleChannel\(role, map\)|\.getVideoSurfaceManager\(ctx\)\.lease\(id, roles\))/,
 	}
 	const seen = new Set()
 	for (const f of files) {
 		const src = fs.readFileSync(path.join(ROOT, f), 'utf8')
 		const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '')
-		for (const m of code.matchAll(/require\(\s*'([^']+)'\s*\)/g)) {
+		for (const m of code.matchAll(/\b(require|core)\(\s*'([^']+)'\s*\)/g)) {
+			if (m[1] === 'require' && (ownOnly.test(m[2]) || (m[2] === 'events' && f.endsWith('rc-video.js')))) {
+				if (m[2] === 'events') seen.add(`${f} events`)
+				continue
+			}
+			if (f.endsWith('/host.js')) continue // the one file that holds the fallback require(id)
+			assert.equal(m[1], 'core', `${f}: ${m[2]} must go through core()`)
+			m[1] = m[2]
 			if (allowed.test(m[1])) continue
 			assert.ok((extra[f] || []).includes(m[1]), `${f} requires ${m[1]}`)
 			seen.add(`${f} ${m[1]}`)
@@ -367,11 +384,11 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 		assert.doesNotMatch(code.replace(/requireCaspar: false/g, ''), /amcp|caspar|scene[-_]?take|sceneTake|takeLook|\blooks?\b|\bchannels?\b|playout|LOADBG|MIXER|\bCG ADD|\bPLAY\s/i, f)
 		// AMCP verbs with a channel number / template, and Caspar's SHM consumer, are never spelled out in the game
 		assert.doesNotMatch(code, /\bSHM\b|\b(ADD|REMOVE|LOAD|CLEAR|CALL|SWAP|STOP|RESUME|PAUSE)\s+(\d|\$\{)/, f)
-		// ("layer" is allowed: in src/game it only ever means an MVR layer — hidden_layers / layer_colors; the require
+		// ("layer" is allowed: in the game it only ever means an MVR layer — hidden_layers / layer_colors; the require
 		// allow-list above is what keeps Caspar, AMCP, looks and channel code out)
 	}
 	assert.deepEqual([...seen].sort(), Object.entries(extra).flatMap(([f, ms]) => ms.map((m) => `${f} ${m}`)).sort(), 'no stale extra')
-	const route = fs.readFileSync(path.join(ROOT, 'src/api/routes-rc-game.js'), 'utf8')
+	const route = fs.readFileSync(path.join(ROOT, DIR, 'routes-rc-game.js'), 'utf8')
 	assert.deepEqual([...route.matchAll(/routes\.(get|post)\('([^']+)'/g)].map((m) => m[2]),
 		['/api/game/rc/state', '/api/game/rc/scene', '/api/game/rc/scene.glb', '/api/game/rc/host'], 'no route that shows the game on a wall')
 })

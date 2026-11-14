@@ -19,7 +19,8 @@
  *                                  weighted by intensity, max intensity, widest zoom, intensity-weighted mean direction)
  */
 
-const { poseXf } = require('../fixtures/gdtf-ik')
+const { core } = require('./host')
+const { poseXf } = core('src/fixtures/gdtf-ik')
 
 const RAD = Math.PI / 180
 const CELL_BEAMS = 4 // fixtures_3d_model.gd CELL_BEAMS: more beams than this and no Pan / Tilt = a bar / panel of cells

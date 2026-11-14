@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 §3.1 — tunnels through tables in the RC client (game/rc/occ.js carveCells / carveTracks, tunnel.js,
+ * WO-1074 §3.1 — tunnels through tables in the RC client (modules/rc-game/client/occ.js carveCells / carveTracks, tunnel.js,
  * physics-world.js createEnv / ceilingOf / tunnelOf, cameras.js chase + Director, track-tunnel.js, tunnel-cut.js,
  * trackdraw.js) on the server's tunnel loop through a tablecloth table of the synthetic toy hall
  * (lib/rc-client-fixtures.js tunnelWorld): the client's carve is the server's cell for cell (rc-scene-occ.js), the
@@ -14,7 +14,7 @@
 const { describe, it, before } = require('node:test')
 const assert = require('node:assert/strict')
 const F = require('./lib/rc-client-fixtures.js')
-const SO = require('../../src/game/rc-scene-occ')
+const SO = require('../../modules/rc-game/server/rc-scene-occ')
 
 let P, TM, ST, CAM, OCC, TUN, MESH, CUT, DRAW, THREE, W
 

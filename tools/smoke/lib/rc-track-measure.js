@@ -18,11 +18,11 @@
  */
 
 const assert = require('node:assert/strict')
-const Gr = require('../../../src/game/rc-ground')
-const { createHeightField, fieldOf } = require('../../../src/game/rc-scene-height')
-const { GRID_SLOTS, MIN_WIDTH, MIN_HALL_WIDTH, RADIUS_RAMP } = require('../../../src/game/rc-track-check')
-const { START_CLEAR, BOX_LIFT, limitsFor } = require('../../../src/game/rc-track-check-deco')
-const DK = require('../../../src/game/rc-track-check-deck')
+const Gr = require('../../../modules/rc-game/server/rc-ground')
+const { createHeightField, fieldOf } = require('../../../modules/rc-game/server/rc-scene-height')
+const { GRID_SLOTS, MIN_WIDTH, MIN_HALL_WIDTH, RADIUS_RAMP } = require('../../../modules/rc-game/server/rc-track-check')
+const { START_CLEAR, BOX_LIFT, limitsFor } = require('../../../modules/rc-game/server/rc-track-check-deco')
+const DK = require('../../../modules/rc-game/server/rc-track-check-deck')
 
 const DEG = Math.PI / 180
 const plan = (a, b) => Math.hypot(b[0] - a[0], b[2] - a[2])
@@ -126,7 +126,7 @@ function measure(t, scene, label) {
 	}
 	assert.equal(new Set(t.boxes.map((b) => b.id)).size, t.boxes.length)
 	// every checkpoint counts for a car at the 24 m/s cap off a drop's lip (client gravity 20 m/s²): over it ≤ the
-	// gate's 1.3 m (game/rc/track-math.js GATE_ABOVE), or it has already landed (a gate on the ground)
+	// gate's 1.3 m (modules/rc-game/client/track-math.js GATE_ABOVE), or it has already landed (a gate on the ground)
 	for (const d of t.drops) {
 		for (const c of t.checkpoints) {
 			const k = (c - d.at + n) % n
@@ -332,7 +332,7 @@ function boxTris(min, max, cb) {
  * blocks to the floor (tablecloths). → { scale, floors, obstacles: [], bounds, field, occ (live grids), tables }.
  */
 function toyHall(opts = {}) {
-	const { createOcc } = require('../../../src/game/rc-scene-occ')
+	const { createOcc } = require('../../../modules/rc-game/server/rc-scene-occ')
 	const s = 0.1
 	const hall = { id: 'hall', y: 0, rect: [-12.6, -11.9, 14.4, 49.6] }
 	const stage = { id: 'stage', y: 0.58, rect: [-7.3, -9.1, 10.7, 0.86] }

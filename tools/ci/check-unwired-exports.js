@@ -37,10 +37,10 @@ const path = require('path')
 const REPO_ROOT = path.join(__dirname, '../..')
 
 /** Where exports are GATED (an orphan here fails the build). */
-const EXPORT_ROOTS = ['client/components', 'client/lib', 'src']
+const EXPORT_ROOTS = ['client/components', 'client/lib', 'src', 'modules/rc-game/server'] // modules: server halves only (browser ES modules export for each other and for smokes)
 /** Where references are LOOKED FOR (everything that can reasonably call into the above). */
 // WO-836: + test/ (its unit tests are real consumers) and the root index.js (the boot entry that requires src/)
-const REFERENCE_ROOTS = ['client', 'src', 'tools', 'template', 'scripts', 'test', 'index.js']
+const REFERENCE_ROOTS = ['client', 'src', 'modules', 'tools', 'template', 'scripts', 'test', 'index.js']
 
 const SKIP_DIR = /(^|\/)(node_modules|dist|dist-web|vendor|assets|fonts|\.git|coverage)(\/|$)/
 const CODE_EXT = /\.(js|cjs|mjs|jsx|ts|html)$/

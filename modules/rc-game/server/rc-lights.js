@@ -19,6 +19,7 @@
  * Never touches Caspar, DMX output or the patch: read-only on the follow service.
  */
 
+const { core } = require('./host')
 const crypto = require('crypto')
 const { lightOf, headFrame } = require('./rc-lights-fk')
 
@@ -197,14 +198,14 @@ function createRcLights(deps) {
  * and every light stays dark.
  */
 function rcLightsDeps(ctx, { send, log } = {}) {
-	const store = require('../fixtures/gdtf-store')
+	const store = core('src/fixtures/gdtf-store')
 	let fallback = { at: 0, list: null }
 	const fromProject = () => {
 		if (Date.now() - fallback.at < 2000) return fallback.list
 		let list
 		try {
-			const project = require('../engine/project-scenes').loadFullProject()
-			list = require('../fixtures/follow-patch').normalizePatch(project?.fixtures).fixtures
+			const project = core('src/engine/project-scenes').loadFullProject()
+			list = core('src/fixtures/follow-patch').normalizePatch(project?.fixtures).fixtures
 		} catch {
 			list = []
 		}

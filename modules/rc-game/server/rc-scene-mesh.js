@@ -7,7 +7,8 @@
  * Budget order: weld only → drop fixtures → coarser clustering (1 → 8 cm) → drop the smallest objects.
  */
 
-const { readGlb, writeGlb } = require('../stage/glb-write')
+const { core } = require('./host')
+const { readGlb, writeGlb } = core('src/stage/glb-write')
 const { apply, boxUnder, compose, scaleOf } = require('./rc-scene-geom')
 
 const MAX_TRIS = 400000

@@ -441,3 +441,9 @@ home/casparcg/highascg/config/*.tmp
 # (systemd/ssh.service.d-05-host-keys.conf.example, installed by prepare-eggs-clone-with-exfat.sh) runs
 # `ssh-keygen -A`, which creates only the missing keys, before sshd starts.
 etc/ssh/ssh_host_*
+# WO-1076: optional modules are opt-in packages, never part of a base ISO
+home/casparcg/highascg/modules
+home/casparcg/highascg/modules/*
+home/casparcg/.highascg/modules
+home/casparcg/.highascg/modules/*
+home/casparcg/.highascg/modules.json

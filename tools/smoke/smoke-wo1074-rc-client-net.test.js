@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 — RC car game, browser client: netcode pure modules (game/rc/protocol.js, interp.js, net.js with a fake
+ * WO-1074 — RC car game, browser client: netcode pure modules (modules/rc-game/client/protocol.js, interp.js, net.js with a fake
  * WebSocket, standings.js, cameras.js) and a physics + lap integration (a simple bot drives a full lap).
  * Message shapes are the ones in work/notes/rc-game-contract.md.
  */

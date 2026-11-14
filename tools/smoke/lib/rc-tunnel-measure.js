@@ -10,7 +10,7 @@
  */
 
 const assert = require('node:assert/strict')
-const { fieldOf } = require('../../../src/game/rc-scene-height')
+const { fieldOf } = require('../../../modules/rc-game/server/rc-scene-height')
 const { decodeRle, segSquareDist } = require('./rc-track-measure')
 
 const plan = (a, b) => Math.hypot(b[0] - a[0], b[2] - a[2])

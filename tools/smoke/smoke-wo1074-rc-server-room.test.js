@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 — the RC game room (src/game/rc-room.js) on a fake clock: join / full / spectators, sanitised names and
+ * WO-1074 — the RC game room (modules/rc-game/server/rc-room.js) on a fake clock: join / full / spectators, sanitised names and
  * colours, slots, ready, the phase machine (start → countdown 5 s → race → laps → results, stop → lobby), lap
  * refereeing (checkpoints in order, never faster than length / 24 m/s), the 20 Hz input cap, the 15 Hz world snapshot
  * only while something moves (v2: cars carry fx flags, speed capped at 24), the silent-player drop, kick, no timers at
@@ -11,9 +11,9 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { createRcRoom, COUNTDOWN_MS, GRACE_MS, WORLD_MS } = require('../../src/game/rc-room')
-const S = require('../../src/game/rc-sanitize')
-const I = require('../../src/game/rc-room-items')
+const { createRcRoom, COUNTDOWN_MS, GRACE_MS, WORLD_MS } = require('../../modules/rc-game/server/rc-room')
+const S = require('../../modules/rc-game/server/rc-sanitize')
+const I = require('../../modules/rc-game/server/rc-room-items')
 
 function fakeClock() {
 	let t = 1000000

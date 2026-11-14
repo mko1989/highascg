@@ -143,3 +143,12 @@ kart less simulator"; the game world should show the lights and the LED wall con
 - Not run against the real server (referee at toy scale, bake inside the service), a real GPU or a phone.
 - Cameras can still pass through room objects taller than the toy band (table tops, chairs seen from the top camera).
 - The second tour (drop exit) does not build on the synthetic solid hall; cause not found (it builds on the live hall).
+
+## Tunnels and the move into a module (15.11.26)
+
+- Tunnels through tables (contract §3.1): `rc-toy-blobs.js`, `rc-toy-tunnel.js`, `rc-track-check-tunnel.js`, client
+  `tunnel.js`, `track-tunnel.js`, `tunnel-cut.js`. Live hall: 11 tracks, `hall-tunnel` (22 m) and the long tour each
+  with one 2.8–2.9 m tunnel; 96 of 221 blobs are tunnel-able. Bot laps all 11, 0 wall hits. Open: the live tunnels
+  clip the chair ring and the table edge instead of the middle of a table; both use the same table.
+- The game now lives in `modules/rc-game/` as an opt-in module — see WO-1076. All paths in the sections above are the
+  old ones (`src/game` = `modules/rc-game/server`, `game/rc` = `modules/rc-game/client`).

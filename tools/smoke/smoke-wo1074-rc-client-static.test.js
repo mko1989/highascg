@@ -18,7 +18,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const REPO = path.join(__dirname, '..', '..')
-const RC = path.join(REPO, 'game', 'rc')
+const RC = path.join(REPO, 'modules', 'rc-game', 'client')
 const read = (f) => fs.readFileSync(path.join(RC, f), 'utf8')
 const files = fs.readdirSync(RC).filter((f) => fs.statSync(path.join(RC, f)).isFile())
 const jsFiles = files.filter((f) => f.endsWith('.js'))

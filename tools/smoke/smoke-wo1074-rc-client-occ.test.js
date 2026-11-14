@@ -1,8 +1,8 @@
 'use strict'
 
 /**
- * WO-1074 §3 toy scale — RC client: the occupancy grids of the scene (game/rc/occ.js: "Obstacles at toy height") and
- * tracks of up to 2500 points (game/rc/seg-grid.js). Contract work/notes/rc-game-contract.md §3:
+ * WO-1074 §3 toy scale — RC client: the occupancy grids of the scene (modules/rc-game/client/occ.js: "Obstacles at toy height") and
+ * tracks of up to 2500 points (modules/rc-game/client/seg-grid.js). Contract work/notes/rc-game-contract.md §3:
  *  - `occ` RLE (free, blocked, free …; a leading 0 when the first cell is blocked) decodes once; malformed grids drop;
  *  - a car within [floor.y − 0.02·s, floor.y + CAR_H·s] collides with blocked cells like a wall (the client adds the
  *    car radius): bounces off a table-leg cell, passes between two legs wider than the car, never tunnels through a

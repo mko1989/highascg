@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 — RC game scene builder (src/game/rc-scene*.js) on a small synthetic MVR scene: placement, moved objects,
+ * WO-1074 — RC game scene builder (modules/rc-game/server/rc-scene*.js) on a small synthetic MVR scene: placement, moved objects,
  * hidden layers / objects and layer colours are applied the way the previs applies them; floors, obstacles and tracks
  * come out of the geometry; the merged GLB is flat (no NORMAL) and within budget, the budget ladder drops fixtures first,
  * then simplifies, then drops the smallest objects; the baker caches on disk and shares one in-flight bake; no scene →
@@ -16,11 +16,11 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { writeGlb, readGlb } = require('../../src/stage/glb-write')
-const G = require('../../src/game/rc-scene-geom')
-const M = require('../../src/game/rc-scene-mesh')
-const { bakeScene, createSceneBaker, sceneInputs, revOf } = require('../../src/game/rc-scene')
-const { validateTrack } = require('../../src/game/rc-tracks')
-const H = require('../../src/game/rc-scene-height')
+const G = require('../../modules/rc-game/server/rc-scene-geom')
+const M = require('../../modules/rc-game/server/rc-scene-mesh')
+const { bakeScene, createSceneBaker, sceneInputs, revOf } = require('../../modules/rc-game/server/rc-scene')
+const { validateTrack } = require('../../modules/rc-game/server/rc-tracks')
+const H = require('../../modules/rc-game/server/rc-scene-height')
 
 /** A unit cube centred on the origin, subdivided `n` times per face (more triangles for the budget test). */
 function cubeGlb(n = 1) {
@@ -222,7 +222,7 @@ test('baker: one shared bake, disk cache under cacheDir, a second baker reads th
 		// a changed input → a new rev; no MVR id → none-…
 		assert.notEqual(revOf(sceneInputs({ previs: { mvr: { ...cfg, hidden_layers: [] } } }), [2, 1]), revOf(sceneInputs(project), [2, 1]))
 		assert.match(revOf(sceneInputs(null), null), /^none-[0-9a-f]{10}$/)
-		const src = fs.readFileSync(path.join(__dirname, '../../src/game/rc-scene.js'), 'utf8')
+		const src = fs.readFileSync(path.join(__dirname, '../../modules/rc-game/server/rc-scene.js'), 'utf8')
 		assert.match(src, /update\(JSON\.stringify\(\[BAKE_VERSION, GENERATOR_VERSION, /, 'the rev hashes the bake and generator versions')
 	} finally {
 		fs.rmSync(dir, { recursive: true, force: true })

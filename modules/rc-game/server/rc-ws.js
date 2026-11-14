@@ -7,7 +7,8 @@
  * close with 4403. Frames are capped at 2 KB (ws closes bigger ones with 1009); caps and rate limits in rc-game.js.
  */
 
-const WebSocket = require('ws')
+const { core } = require('./host')
+const WebSocket = core('ws')
 const { MAX_MESSAGE_BYTES } = require('./rc-sanitize')
 
 const WS_PATH = '/api/game/rc/ws'
@@ -26,7 +27,7 @@ function attachRcGameWs(httpServer, ctx, opts = {}) {
 	const wss = new WebSocket.Server({ noServer: true, maxPayload: MAX_MESSAGE_BYTES, perMessageDeflate: false })
 	const onUpgrade = (req, socket, head) => {
 		if (!isGamePath(req.url)) return
-		const { isOriginAllowed } = require('../server/auth')
+		const { isOriginAllowed } = core('src/server/auth')
 		if (!isOriginAllowed(req, ctx?.config)) {
 			socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
 			return socket.destroy()

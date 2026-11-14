@@ -10,8 +10,9 @@
  * Public while enabled: state, scene, scene.glb (src/game/rc-public.js); the socket lives in src/game/rc-ws.js.
  */
 
-const { JSON_HEADERS, jsonBody, parseBodyStrict } = require('./response')
-const { getRcGame } = require('../game/rc-game')
+const { core } = require('./host')
+const { JSON_HEADERS, jsonBody, parseBodyStrict } = core('src/api/response')
+const { getRcGame } = require('./rc-game')
 
 const reply = (status, o) => ({ status, headers: { ...JSON_HEADERS, 'Cache-Control': 'no-store' }, body: jsonBody(o) })
 const off = () => reply(403, { ok: false, error: 'The game is not running', enabled: false })

@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 §2.6 — RC game browser client: the live stage effects (game/rc/stage-fx*.js). The pure maths (beam length to
+ * WO-1074 §2.6 — RC game browser client: the live stage effects (modules/rc-game/client/stage-fx*.js). The pure maths (beam length to
  * the first floor below, pool ellipse, smoothing, the binary frame header, the LED wall strip = godot stage_objects.gd
  * column_edges) and the three.js side headless in node (no WebGL): instance matrices for lit / dark lights, the
  * `video` requests the module sends, a picture decoded through a stand-in createImageBitmap onto its role's texture.
@@ -12,7 +12,7 @@ const assert = require('node:assert/strict')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 
-const RC = path.join(__dirname, '..', '..', 'game', 'rc')
+const RC = path.join(__dirname, '..', '..', 'modules', 'rc-game', 'client')
 const load = (f) => import(pathToFileURL(path.join(RC, f)).href)
 
 let M, FX, THREE

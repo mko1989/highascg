@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 §3 — toy scale on the server (src/game/rc-scale.js, rc-scene-occ.js, rc-toy-*.js, rc-track-check-occ.js,
+ * WO-1074 §3 — toy scale on the server (modules/rc-game/server/rc-scale.js, rc-scene-occ.js, rc-toy-*.js, rc-track-check-occ.js,
  * the bake at scale 0.1): the occupancy grid (band, RLE format, JSON round trip), the toy track set on a live-like
  * furnished hall with tablecloth tables and with legged tables (a toy drives under them), the §3 mix (short / medium /
  * long, laps), every track valid and re-measured from its points and the grids' RLE (lib/rc-track-measure.js
@@ -13,10 +13,10 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { generateTracks, validateTrack } = require('../../src/game/rc-tracks')
-const O = require('../../src/game/rc-scene-occ')
-const SC = require('../../src/game/rc-scale')
-const { bakeScene, sceneInputs, revOf } = require('../../src/game/rc-scene')
+const { generateTracks, validateTrack } = require('../../modules/rc-game/server/rc-tracks')
+const O = require('../../modules/rc-game/server/rc-scene-occ')
+const SC = require('../../modules/rc-game/server/rc-scale')
+const { bakeScene, sceneInputs, revOf } = require('../../modules/rc-game/server/rc-scene')
 const { measureToy, decodeRle, toyHall, boxTris } = require('./lib/rc-track-measure')
 
 /** A scene as the client gets it: JSON text (grids → RLE, field → heights). */

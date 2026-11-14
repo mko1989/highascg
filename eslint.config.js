@@ -49,7 +49,16 @@ const PREVIS_PARKED = {
 	},
 }
 
-const SERVER_FILES = ['src/**/*.js', 'tools/**/*.js', 'scripts/**/*.js', 'test/**/*.js', 'client/**/*.cjs', 'index.js']
+const SERVER_FILES = [
+	'src/**/*.js',
+	'modules/*/register.js',
+	'modules/*/server/**/*.js',
+	'tools/**/*.js',
+	'scripts/**/*.js',
+	'test/**/*.js',
+	'client/**/*.cjs',
+	'index.js',
+]
 
 const SERVER_MODULE_FILES = ['tools/**/*.mjs', 'scripts/**/*.mjs']
 

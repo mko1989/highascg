@@ -26,11 +26,15 @@ process.env.HIGHASCG_API_TOKEN_FILE = path.join(TMP, 'api-token') // never the b
 const auth = require('../../src/server/auth')
 const { routeRequest } = require('../../src/api/router')
 const { startHttpServer } = require('../../src/server/http-server')
-const { createRcGame, useRcGame } = require('../../src/game/rc-game')
-const { attachRcGameWs, WS_PATH } = require('../../src/game/rc-ws')
-const { setRcGameEnabled } = require('../../src/game/rc-public')
+/* WO-1076: the game is an opt-in module — its routes, public paths and static files reach the server only through the
+ * module registry, registered here from the module's own register.js (the WS path is attached below with this test's game) */
+const moduleRegistry = require('../../src/module-registry')
+const rcModule = require('../../modules/rc-game/register')({ requireCore: (id) => require(id.startsWith('src/') ? require('path').join(__dirname, '..', '..', id) : id), coreRoot: require('path').join(__dirname, '..', '..') })
+const { createRcGame, useRcGame } = require('../../modules/rc-game/server/rc-game')
+const { attachRcGameWs, WS_PATH } = require('../../modules/rc-game/server/rc-ws')
+const { setRcGameEnabled } = require('../../modules/rc-game/server/rc-public')
 const { frameMessage } = require('../../src/system/video-feed')
-const { LEASE_ID, PARAMS } = require('../../src/game/rc-video')
+const { LEASE_ID, PARAMS } = require('../../modules/rc-game/server/rc-video')
 
 const PW = 'wo1074-live-password'
 const BEARER = { Authorization: `Bearer ${PW}` }
@@ -95,6 +99,7 @@ const lastLease = () => leases.at(-1)
 
 let server, port, rcWs, game
 test.before(async () => {
+	moduleRegistry.register(rcModule)
 	server = startHttpServer({ port: 0, bindAddress: '127.0.0.1', webDir: TMP, routeApi: (m, p, b, req) => routeRequest(m, p, b, ctx, req), log: () => {} })
 	await new Promise((r) => server.once('listening', r))
 	port = server.address().port
@@ -105,6 +110,7 @@ test.before(async () => {
 })
 
 test.after(() => {
+	moduleRegistry.unregister('rc-game')
 	game?.disable()
 	useRcGame(null)
 	setRcGameEnabled(false)

@@ -1,5 +1,9 @@
 # RC car game in the previs scene — contract between the server and the browser client (WO-1074)
 
+> **Paths (WO-1076, 15.11):** the game is the opt-in module `modules/rc-game/` — where this note says `src/game/…` read
+> `modules/rc-game/server/…`, `src/api/routes-rc-game.js` is `modules/rc-game/server/routes-rc-game.js`, `game/rc/…` is
+> `modules/rc-game/client/…`. URLs are unchanged. The core holds no game code; the module registers through `register.js`.
+
 Owner, 14.11.26: "Implement the rc cars game. Generate some different tracks in the 3d scene. 10 players max is
 enough." A browser game (laptops and phones) hosted on the box; players race RC cars inside the show's 3D scene.
 

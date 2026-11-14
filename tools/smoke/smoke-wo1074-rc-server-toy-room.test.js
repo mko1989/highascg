@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 §3 — the referee at toy scale (src/game/rc-room.js, rc-sanitize.js, rc-room-items.js): the scene's `scale`
+ * WO-1074 §3 — the referee at toy scale (modules/rc-game/server/rc-room.js, rc-sanitize.js, rc-room-items.js): the scene's `scale`
  * scales the speed cap (24 m/s × scale), the lap minimum (length / (24 × scale)) and the item reach (box 8 m, use 4 m,
  * × scale); a scene without `scale` keeps the v2 limits; the host's lap count follows a picked track's `laps` (on a host
  * 'track' and on the scene's auto-pick), a track without `laps` leaves it alone.
@@ -9,9 +9,9 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { createRcRoom, COUNTDOWN_MS } = require('../../src/game/rc-room')
-const S = require('../../src/game/rc-sanitize')
-const I = require('../../src/game/rc-room-items')
+const { createRcRoom, COUNTDOWN_MS } = require('../../modules/rc-game/server/rc-room')
+const S = require('../../modules/rc-game/server/rc-sanitize')
+const I = require('../../modules/rc-game/server/rc-room-items')
 
 function fakeClock() {
 	let t = 1000000

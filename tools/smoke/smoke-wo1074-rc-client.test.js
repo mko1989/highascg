@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-1074 — RC car game, browser client: the pure modules (game/rc/physics.js, drive-rules.js, track-math.js,
+ * WO-1074 — RC car game, browser client: the pure modules (modules/rc-game/client/physics.js, drive-rules.js, track-math.js,
  * lap-logic.js). Contract v2 §2.2 (work/notes/rc-game-contract.md): 13 m/s on the ribbon, 7 off it, 18 boosting, hard
  * cap 24, 0 → top ≈ 1.6 s; drift hop + two charge stages (0.7 s / 1.6 s) → mini-boost 0.6 s / 1.3 s; pads 1.0 s; start
  * boost within the last 0.35 s, earlier = 1 s stall; spin-out 1.2 s, speed × 0.3, then 2 s immunity; catch-up 0…8 %

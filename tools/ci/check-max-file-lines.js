@@ -6,7 +6,7 @@ const path = require('path')
 
 const repoRoot = path.resolve(__dirname, '../..')
 const MAX = parseInt(process.env.HIGHASCG_MAX_FILE_LINES || '500', 10)
-const ROOTS = ['client', 'src', 'scripts', 'tools', 'template', 'godot', 'caspar']
+const ROOTS = ['client', 'src', 'modules', 'scripts', 'tools', 'template', 'godot', 'caspar']
 /* WO-599: GDScript + the C++ of the shm consumer / hshm GDExtension follow the same 500-line rule. */
 const EXT = new Set(['.js', '.css', '.html', '.sh', '.gd', '.cpp', '.h'])
 const SKIP_DIRS = new Set([
