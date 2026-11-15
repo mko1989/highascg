@@ -1,0 +1,370 @@
+/* Stage Salad (WO-1089) — the in-game HUD: score, clock, the presenter-safe pill, leaders, the vegetable tray with its
+   reload ring, power and arc meters, banners, the count-down, the how-to hint. On top of the kit's rc.css #hud. */
+.salad-score {
+	font-size: 38px;
+	font-weight: 800;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+.salad-sub {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--accent);
+	margin-top: 2px;
+}
+.salad-sub:empty {
+	display: none;
+}
+.salad-teams {
+	display: flex;
+	gap: 6px;
+	margin-top: 6px;
+}
+.salad-team {
+	padding: 2px 8px;
+	border-radius: 8px;
+	color: #111;
+	font-weight: 700;
+	font-size: 14px;
+	text-shadow: none;
+	opacity: 0.75;
+}
+.salad-team.mine {
+	opacity: 1;
+	outline: 2px solid #fff;
+}
+.salad-clock {
+	font-size: 26px;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.04em;
+}
+.salad-safe {
+	margin-top: 6px;
+	padding: 6px 14px;
+	border-radius: 999px;
+	background: var(--splat);
+	color: #fff;
+	font-weight: 800;
+	font-size: 17px;
+	text-shadow: none;
+}
+#hud.paused .salad-tray,
+#hud.paused .salad-side {
+	opacity: 0.4;
+}
+
+/* ---------- leaders ---------- */
+.salad-leaders {
+	list-style: none;
+	margin: 0;
+	padding: 6px 8px;
+	min-width: 170px;
+	border-radius: 10px;
+	background: rgba(16, 22, 18, 0.55);
+	font-size: 14px;
+	font-variant-numeric: tabular-nums;
+}
+.salad-leaders li {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 1px 0;
+}
+.salad-leaders li.me {
+	color: var(--leaf);
+	font-weight: 700;
+}
+.lb-pos {
+	width: 1.4em;
+	color: var(--dim);
+	text-align: right;
+}
+.lb-name {
+	flex: 1;
+	max-width: 120px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.lb-score {
+	font-weight: 700;
+}
+
+/* ---------- vegetable tray ---------- */
+.salad-tray {
+	position: absolute;
+	left: 50%;
+	bottom: calc(10px + var(--sb));
+	transform: translateX(-50%);
+	display: flex;
+	gap: 6px;
+	pointer-events: auto;
+}
+.veg-btn {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	width: 66px;
+	padding: 6px 2px 4px;
+	border-radius: 14px;
+	border: 2px solid var(--line);
+	background: rgba(16, 22, 18, 0.72);
+	color: var(--text);
+	font: inherit;
+	cursor: pointer;
+	touch-action: manipulation;
+}
+.veg-btn.sel {
+	border-color: var(--accent);
+	background: rgba(242, 193, 78, 0.18);
+}
+.veg-key {
+	position: absolute;
+	left: 6px;
+	top: 3px;
+	font-size: 11px;
+	color: var(--dim);
+}
+.veg-ico {
+	--reload: 0;
+	position: relative;
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	background: radial-gradient(circle at 36% 34%, rgba(255, 255, 255, 0.55), transparent 42%), var(--veg);
+	box-shadow: inset -3px -4px 0 rgba(0, 0, 0, 0.22);
+}
+.veg-ico::after {
+	/* the reload ring: a dark wedge that shrinks clockwise as the slingshot reloads */
+	content: '';
+	position: absolute;
+	inset: -4px;
+	border-radius: 50%;
+	background: conic-gradient(rgba(10, 14, 12, 0.72) calc(var(--reload) * 360deg), transparent 0);
+}
+.veg-ico.v-potato {
+	border-radius: 46% 54% 50% 48% / 56% 44% 58% 42%;
+}
+.veg-ico.v-carrot {
+	width: 14px;
+	border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+	clip-path: polygon(0 0, 100% 0, 50% 100%);
+	height: 32px;
+}
+.veg-ico.v-cabbage {
+	width: 34px;
+	height: 34px;
+	box-shadow:
+		inset -4px -4px 0 rgba(0, 0, 0, 0.2),
+		inset 5px 3px 0 rgba(200, 240, 160, 0.35);
+}
+.veg-ico.v-onion {
+	border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+}
+.veg-ico.v-peas {
+	width: 30px;
+	background:
+		radial-gradient(circle at 25% 35%, var(--veg) 22%, transparent 24%),
+		radial-gradient(circle at 70% 30%, var(--veg) 22%, transparent 24%),
+		radial-gradient(circle at 50% 72%, var(--veg) 22%, transparent 24%);
+	box-shadow: none;
+}
+.veg-name {
+	font-size: 11px;
+	white-space: nowrap;
+}
+.salad-tray.loading .veg-btn.sel .veg-ico {
+	filter: saturate(0.5);
+}
+.salad-tray.blocked .veg-btn {
+	opacity: 0.55;
+}
+
+/* ---------- power + arc ---------- */
+.salad-side {
+	position: absolute;
+	right: calc(14px + var(--sr));
+	bottom: calc(96px + var(--sb));
+	display: flex;
+	gap: 10px;
+	align-items: flex-end;
+}
+.salad-power {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	opacity: 0.55;
+}
+.salad-power.on {
+	opacity: 1;
+}
+.pow-bar {
+	width: 16px;
+	height: 140px;
+	border-radius: 8px;
+	border: 2px solid var(--line);
+	background: rgba(16, 22, 18, 0.6);
+	overflow: hidden;
+	display: flex;
+	align-items: flex-end;
+}
+.pow-fill {
+	width: 100%;
+	height: 100%;
+	transform-origin: bottom;
+	transform: scaleY(0);
+	background: linear-gradient(to top, var(--leaf), var(--accent) 60%, var(--splat));
+}
+.pow-num {
+	min-height: 18px;
+	font-size: 13px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+.salad-pitch {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	pointer-events: auto;
+}
+.pitch-lbl {
+	font-size: 12px;
+	color: var(--dim);
+}
+.pitch-track {
+	position: relative;
+	width: 30px;
+	height: 120px;
+	border-radius: 15px;
+	border: 2px solid var(--line);
+	background: rgba(16, 22, 18, 0.6);
+	touch-action: none;
+	cursor: ns-resize;
+}
+.pitch-knob {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 22px;
+	height: 22px;
+	margin: -11px 0 0 -11px;
+	border-radius: 50%;
+	background: var(--accent);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.pitch-num {
+	min-height: 18px;
+	font-size: 13px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+/* ---------- banners, count-down, hint ---------- */
+.salad-banner {
+	position: absolute;
+	left: 50%;
+	top: 26%;
+	transform: translate(-50%, -50%) scale(0.6);
+	opacity: 0;
+	font-size: 44px;
+	font-weight: 900;
+	letter-spacing: 0.02em;
+	white-space: nowrap;
+	transition:
+		opacity 0.18s,
+		transform 0.22s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.salad-banner.show {
+	opacity: 1;
+	transform: translate(-50%, -50%) scale(1);
+}
+.salad-banner.splat {
+	color: var(--accent);
+	text-shadow:
+		0 3px 0 #7a3b12,
+		0 4px 10px rgba(0, 0, 0, 0.6);
+}
+.salad-banner.miss {
+	color: #cfe8ff;
+}
+.salad-banner.info {
+	color: var(--text);
+	font-size: 32px;
+}
+.salad-big {
+	position: absolute;
+	left: 50%;
+	top: 45%;
+	transform: translate(-50%, -50%);
+	font-size: 120px;
+	font-weight: 900;
+	color: var(--accent);
+	text-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+}
+.salad-hint {
+	position: absolute;
+	left: 50%;
+	bottom: calc(100px + var(--sb));
+	transform: translateX(-50%);
+	max-width: min(560px, calc(100vw - 220px));
+	padding: 8px 14px;
+	border-radius: 12px;
+	background: rgba(16, 22, 18, 0.7);
+	font-size: 15px;
+	text-align: center;
+}
+#hud.spectator .salad-tl .salad-score {
+	font-size: 28px;
+}
+
+/* ---------- small phones (landscape) ---------- */
+@media (max-height: 420px) {
+	.salad-score {
+		font-size: 28px;
+	}
+	.salad-clock {
+		font-size: 20px;
+	}
+	.veg-btn {
+		width: 50px;
+		padding: 4px 1px 2px;
+	}
+	.veg-name {
+		display: none;
+	}
+	.veg-ico {
+		width: 24px;
+		height: 24px;
+	}
+	.pow-bar {
+		height: 96px;
+	}
+	.pitch-track {
+		height: 84px;
+	}
+	.salad-side {
+		bottom: calc(64px + var(--sb));
+	}
+	.salad-banner {
+		font-size: 30px;
+	}
+	.salad-big {
+		font-size: 80px;
+	}
+	.salad-hint {
+		bottom: calc(64px + var(--sb));
+		font-size: 13px;
+	}
+	.salad-leaders {
+		min-width: 130px;
+		font-size: 12px;
+	}
+	.salad-leaders li:nth-child(n + 4) {
+		display: none;
+	}
+}

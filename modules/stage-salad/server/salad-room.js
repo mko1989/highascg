@@ -201,6 +201,7 @@ function createSaladRoom(deps) {
 			c.joined = c.spectator = true
 			c.name = K.cleanName(m.name, `Spectator ${c.pid}`)
 			send(c.conn, { t: 'welcome', id: c.pid, you: you(c), state: state() })
+			lastW = '' // the newcomer needs the avatars even when nothing moves
 			ensureTick()
 			return broadcastState()
 		}
@@ -219,6 +220,7 @@ function createSaladRoom(deps) {
 		bots.sync()
 		send(c.conn, { t: 'welcome', id: p.id, you: you(c), state: state() })
 		send(c.conn, { t: 'me', ready: p.readyAt, streak: p.streak, score: p.score })
+		lastW = '' // the newcomer needs the avatars even when nothing moves
 		broadcastState()
 	}
 

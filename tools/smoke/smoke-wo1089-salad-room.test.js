@@ -205,3 +205,18 @@ test('housekeeping: silent players and never-joined sockets are closed; host inp
 	assert.equal(chatty.closed, 4409)
 	R.room.dispose()
 })
+
+test('a newcomer gets the avatars at once, even when nothing moves', () => {
+	const R = makeRoom()
+	R.room.ingestTracking(snapOf([{ ...PUPPET, x: 11, y: -3 }]))
+	const a = R.join('First')
+	R.clk.advance(3000) // the puppet has settled: no more `w`
+	const quiet = R.of(a, 'w').length
+	R.clk.advance(1000)
+	assert.equal(R.of(a, 'w').length, quiet, 'nothing moved, nothing sent')
+	const b = R.join('Late')
+	const s = R.join('Eyes', { spectator: true })
+	R.clk.advance(100)
+	for (const c of [b, s]) assert.ok(R.of(c, 'w').some((m) => m.av.some((x) => x[0] === PUPPET.id)), `${c.name} sees the puppet`)
+	R.room.dispose()
+})

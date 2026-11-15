@@ -1,0 +1,203 @@
+/* Stage Salad (WO-1089) — page colours, lobby, board, host panel. On top of the RC kit's rc.css / rc-ui.css. No fonts or assets. */
+:root {
+	--bg: #17201a;
+	--panel: rgba(20, 28, 22, 0.9);
+	--accent: #f2c14e;
+	--leaf: #8fd14f;
+	--splat: #ff6b4a;
+}
+body.mode-player #view,
+body.mode-spectate #view {
+	cursor: grab;
+}
+body.mode-player #view:active {
+	cursor: grabbing;
+}
+.panel h1 {
+	letter-spacing: 0.01em;
+}
+.panel.join h1::after {
+	content: '';
+	display: inline-block;
+	width: 0.6em;
+	height: 0.6em;
+	margin-left: 0.35em;
+	border-radius: 50% 50% 46% 54%;
+	background: radial-gradient(circle at 35% 35%, #ff8a70, #e2392b 60%);
+	box-shadow: 0.42em -0.05em 0 -0.12em var(--leaf);
+	vertical-align: 0.05em;
+}
+.salad-howto h2,
+.panel.lobby h2 {
+	margin: 0 0 6px;
+	font-size: 18px;
+}
+.salad-howto .hint {
+	margin: 0 0 8px;
+}
+.salad-lobby-info .track-name {
+	color: var(--accent);
+}
+button.big.go {
+	background: var(--leaf);
+	color: #10200a;
+}
+
+/* ---------- the board (results / Tab / spectators) ---------- */
+.salad-board {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	max-width: min(640px, calc(100vw - 24px));
+	max-height: calc(100% - 140px);
+	overflow: auto;
+	pointer-events: auto;
+	z-index: 3;
+}
+#hud.spectator .salad-board {
+	left: auto;
+	right: calc(14px + var(--sr));
+	top: auto;
+	bottom: calc(14px + var(--sb));
+	transform: none;
+	max-width: 420px;
+	opacity: 0.94;
+}
+.board-card {
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-left: 6px solid var(--leaf);
+	border-radius: 14px;
+	padding: 14px 18px 12px;
+	text-shadow: none;
+}
+.salad-board.final .board-card {
+	border-left-color: var(--accent);
+}
+.board-title {
+	margin: 0;
+	font-size: 22px;
+}
+.board-sub {
+	margin: 2px 0 8px;
+	color: var(--accent);
+	font-weight: 700;
+	font-size: 18px;
+}
+.board-sub:empty {
+	display: none;
+}
+.board-teams {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+.board-teams:empty {
+	display: none;
+}
+.team-total {
+	flex: 1;
+	display: flex;
+	justify-content: space-between;
+	padding: 6px 10px;
+	border: 2px solid var(--line);
+	border-radius: 10px;
+	font-weight: 700;
+}
+.board-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-variant-numeric: tabular-nums;
+}
+.board-table th {
+	text-align: left;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--dim);
+	padding: 2px 6px;
+	border-bottom: 1px solid var(--line);
+}
+.board-table td {
+	padding: 4px 6px;
+	white-space: nowrap;
+}
+.board-table td:nth-child(2) {
+	max-width: 180px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.board-table td.score {
+	font-weight: 800;
+	text-align: right;
+}
+.board-table tr.me td {
+	background: rgba(143, 209, 79, 0.16);
+}
+.board-table tr.offline td {
+	opacity: 0.5;
+}
+.board-table .swatch {
+	margin-right: 6px;
+}
+.board-note {
+	margin: 8px 0 0;
+	color: var(--dim);
+	font-size: 14px;
+}
+.board-note:empty {
+	display: none;
+}
+
+/* ---------- host ---------- */
+.salad-safe-sec {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.salad-safe-btn {
+	width: 100%;
+	min-height: 76px;
+	font-size: 26px;
+	font-weight: 800;
+	border-radius: 16px;
+	border: 3px solid var(--accent);
+	background: rgba(242, 193, 78, 0.14);
+	color: var(--text);
+	cursor: pointer;
+}
+.salad-safe-btn.on {
+	background: var(--splat);
+	border-color: #ffd0c4;
+	color: #fff;
+	animation: salad-pulse 1.4s ease-in-out infinite;
+}
+.salad-safe-btn:disabled {
+	opacity: 0.45;
+	cursor: default;
+	animation: none;
+}
+@keyframes salad-pulse {
+	50% {
+		box-shadow: 0 0 0 8px rgba(255, 107, 74, 0.25);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.salad-safe-btn.on {
+		animation: none;
+	}
+}
+.salad-safe-note {
+	margin: 0;
+}
+.salad-targets {
+	margin-top: 6px;
+}
+button.mode.on {
+	background: rgba(143, 209, 79, 0.22);
+	border-color: var(--leaf);
+	color: var(--text);
+}
+button:disabled {
+	opacity: 0.5;
+}
