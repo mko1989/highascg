@@ -149,6 +149,20 @@ humans a reason to meet (with a 7 u sight, an empty arena is otherwise a lot of 
   a 0.4 mm lift z-fighting in the overview): now warm yellow, thicker edge and ring, lifted 1.2 mm; the banquet frame
   shows it clearly with a bot standing in it.
 
+## Follow-ups (15.11.26, after WO-1082's 3 cm occ band)
+
+- **Bots froze for good in a cell off the passable mask.** `smoke-wo1081-sk-server-bots` failed at HEAD after
+  1605062a ("bot 5 walked 13 u", 5 shots in the simulated minute). Not a threshold: traced per bot, 3 of 4 bots stood
+  still from second 10–20 on with `path null`; each stood on a clear point (`clearAt` true) whose CELL is off the mask
+  (`passable` wants a soldier to fit at the cell centre), and `sk-grid findPath` refuses a start cell off the mask —
+  so every re-plan failed. The look-ahead (`walkable`, exact clearance) can end a step in such a cell next to any
+  block; the reshaped default-hall arena just made it common. Fix (`sk-bots.js pathFrom`): off the mask, the path
+  starts at the nearest passable cell centre within 3 cells the bot can walk to straight. The smoke passes unchanged
+  (shots 35, kills 4; seeds 3–7: every bot walks 245–367 u a minute). New `smoke-wo1083-sk-bot-unstick.test.js`: a
+  bot put on 12 such points next to a block walks on and never into it — fails without the fix ("walked 0.0 u").
+- `check-unwired-exports`: `sk-bot-aim.js` (`REACQUIRE_MS`, `angDiff`, `turnTowards`, `canSee`) and `sk-view.js`
+  (`inFrame`) are internal helpers — no longer exported.
+
 ## Open / notes
 
 - Not verified on real phones or by the owner playing; the bot level buttons and the Spotlight button were exercised

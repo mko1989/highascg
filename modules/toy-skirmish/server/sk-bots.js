@@ -117,7 +117,7 @@ function createBots(X, combat, hooks) {
 		const keep = ai.goal && Math.hypot(ai.goal[0] - p.pos[0], ai.goal[1] - p.pos[1]) > VISIT_U * u() ? [ai.goal] : []
 		const goals = it ? [[it.x, it.z], ...keep, ...roam(p)] : [...keep, ...roam(p)]
 		for (const g of goals) {
-			const path = G.findPath(X.grid, X.mask, p.pos[0], p.pos[1], g[0], g[1])
+			const path = pathFrom(p, g)
 			if (path && path.length > 1) {
 				ai.goal = it && g[0] === it.x && g[1] === it.z ? null : g
 				ai.path = path
@@ -136,10 +136,38 @@ function createBots(X, combat, hooks) {
 		const a = X.rng() * Math.PI * 2, r = sp.r * 0.5 * X.rng()
 		const goals = inside ? [] : [[sp.x + Math.cos(a) * r, sp.z + Math.sin(a) * r], [sp.x, sp.z]]
 		for (const g of goals) {
-			const path = G.findPath(X.grid, X.mask, p.pos[0], p.pos[1], g[0], g[1])
+			const path = pathFrom(p, g)
 			if (path && path.length > 1) return Object.assign(ai, { goal: null, path, i: 0 })
 		}
 		Object.assign(ai, { goal: null, path: null })
+	}
+
+	/**
+	 * A* from where the bot stands. The look-ahead walks to any point with exact clearance, so a bot can stop in a cell
+	 * whose centre a soldier does not fit (off the passable mask) — findPath refuses such a start, and the bot stood
+	 * there for good (WO-1083 follow-up, seen once the 3 cm occ band reshaped the arenas). Then the path starts at the
+	 * nearest passable cell centre within 3 cells that it can walk to straight.
+	 */
+	function pathFrom(p, g) {
+		const gr = X.grid
+		let [ax, az] = p.pos
+		const q = G.cellIndex(gr, ax, az)
+		if (q < 0 || !X.mask[q]) {
+			const i = Math.floor((ax - gr.x0) / gr.cell), k = Math.floor((az - gr.z0) / gr.cell)
+			let best = null, bd = Infinity
+			for (let dk = -3; dk <= 3; dk++) {
+				for (let di = -3; di <= 3; di++) {
+					const ii = i + di, kk = k + dk
+					if (ii < 0 || kk < 0 || ii >= gr.w || kk >= gr.h || !X.mask[kk * gr.w + ii]) continue
+					const cx = gr.x0 + (ii + 0.5) * gr.cell, cz = gr.z0 + (kk + 0.5) * gr.cell
+					const d = Math.hypot(cx - ax, cz - az)
+					if (d < bd && walkable(ax, az, cx, cz)) (best = [cx, cz]), (bd = d)
+				}
+			}
+			if (!best) return null
+			;[ax, az] = best
+		}
+		return G.findPath(gr, X.mask, ax, az, g[0], g[1])
 	}
 
 	/** A straight walk the soldier's circle never touches a solid cell on (exact clearance every quarter cell). */
