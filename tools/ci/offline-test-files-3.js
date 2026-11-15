@@ -398,6 +398,13 @@ module.exports = [
 	'tools/smoke/smoke-wo1076-modules-runtime.test.js',
 	'tools/smoke/smoke-wo1076-modules-install.test.js',
 	'tools/smoke/smoke-wo1076-rc-game-module.test.js',
+	'tools/smoke/smoke-wo1089-salad-module.test.js', // WO-1089 Stage Salad (opt-in module; vegetables at the presenter's avatar)
+	'tools/smoke/smoke-wo1089-salad-flight.test.js',
+	'tools/smoke/smoke-wo1089-salad-hits.test.js',
+	'tools/smoke/smoke-wo1089-salad-room.test.js',
+	'tools/smoke/smoke-wo1089-salad-bots.test.js',
+	'tools/smoke/smoke-wo1089-salad-presenters.test.js',
+	'tools/smoke/smoke-wo1089-salad-twin.test.js',
 	'tools/smoke/smoke-wo1088-keeping-up-model.test.js',
 	'tools/smoke/smoke-wo1088-keeping-up-checks.test.js',
 	'tools/smoke/smoke-wo1088-keeping-up-service.test.js',

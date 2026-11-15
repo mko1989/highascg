@@ -1,0 +1,6 @@
+{
+	"//": "Scope marker (WO-1089) — tells Node.js (the server and the smoke tests) to parse the ES module .js files of the Stage Salad client as ESM, like the browser does. Do not add dependencies here.",
+	"name": "highascg-stage-salad",
+	"private": true,
+	"type": "module"
+}
