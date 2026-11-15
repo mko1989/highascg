@@ -58,6 +58,11 @@ func _ready() -> void:
 		c.save(UI_CFG))
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _load_cams())
 	_load_cams()
+	if Config.args.has("probe-avatar"):  # dev: --probe-avatar=<dir> (WO-1087 avatar_probe.gd)
+		var pr: Node = preload("res://features/previs/tracking/avatar_probe.gd").new()
+		pr.dir = str(Config.args["probe-avatar"])
+		pr.cards = self
+		add_child(pr)
 	if Config.args.has("probe-cutouts"):  # dev: --probe-cutouts=<dir>[:dummies|:avatars] (WO-665 / 666 / 1086)
 		_probe(str(Config.args["probe-cutouts"]))
 
@@ -96,6 +101,7 @@ func set_detections(snap: Variant) -> void:
 	if style == "avatars":
 		avatars.show_cards(M.cards(snap, _cams) + M.puppet_cards(snap), Time.get_ticks_msec() / 1000.0)  # WO-1087 test people
 		return
+	avatars.show_cards(M.puppet_cards(snap), Time.get_ticks_msec() / 1000.0)  # WO-1087: no picture to cut out or paint
 	var seen := {}
 	for c in M.cards(snap, _cams, _pick, Time.get_ticks_msec() / 1000.0):  # WO-701 sticky camera
 		if style == "dummies" and c.views.is_empty():

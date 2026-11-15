@@ -1,15 +1,17 @@
 extends Node3D
-## WO-1086 — one tracked person as a "pebble person": our own toy-like avatar, about 4½ heads tall, from Godot primitive
+## WO-1086 — one tracked person as a "pebble person": our own toy-like avatar, about three heads tall, from Godot primitive
 ## meshes (no assets): a big round head in skin tone with dot eyes, a small smile and blush dots (the same drawing for
 ## everyone — never the person's face), a hair cap (short), plus a fall down the back (long), none (bald); a rounded
 ## capsule body and stubby arms in the top colour with round hands; short legs in the bottom colour, darker shoes.
 ## Built in a unit frame (feet at y = 0, top of the hair ≈ UNIT_TOP, front +Z, the person's left +X) and scaled to the
-## person's height. Matte colours with a little self-light, so they read in a dark venue. No camera texture is bound.
+## person's height. One flat-colour shader (person_avatar.gdshader: matte, a little self-light, a light response that
+## saturates so spots never blow the clothes out to white). No camera texture is bound.
 ##
 ## person_avatars.gd feeds set_target() per tracking snapshot (10–15 Hz); step() eases everything per frame (_process),
 ## so a jittery box never makes a jittery figure.
 
 const AV := preload("res://features/previs/tracking/person_avatar_model.gd")
+const SHADER := preload("res://features/previs/tracking/person_avatar.gdshader")
 
 const UNIT_TOP := 1.02
 const HIP_Y := 0.32
@@ -21,13 +23,15 @@ const SIZE_RATE := 3.0
 const YAW_RATE := 5.0
 const COLOUR_RATE := 2.5  # a new look fades in over about a second
 const LIMB_RATE := 9.0
-const SELF_LIGHT := 0.35  # emission as a share of the colour
+const SELF_LIGHT := 0.3  # emission as a share of the colour
+const LEAD_MAX := 0.15  # s — between snapshots a walking figure keeps going at its speed (no 15 Hz surge-and-stall)
+const SMILE := {"y": 0.79, "r": 0.036, "tube": 0.0085, "from": 3.578, "to": 5.847}  # 205° … 335°
 const VEL_WINDOW := 0.6  # s — speed is measured over this baseline, so box jitter never reads as walking
 
 static var _shared := {}  # unit meshes + the face materials, built once
 
-var mats := {}  # top, bottom, skin, hair, shoes, blush → StandardMaterial3D (this avatar's own)
-var hair_short: MeshInstance3D
+var mats := {}  # top, bottom, skin, hair, shoes, blush → ShaderMaterial (person_avatar.gdshader, this avatar's own)
+var hair_short: Node3D  # the cap + the back of the head (short and long hair)
 var hair_long: MeshInstance3D
 var limbs := {}  # arm_l / arm_r / leg_l / leg_r → pivot Node3D (the limb hangs down −Y from it)
 var _body := Node3D.new()  # bobs while walking
@@ -42,20 +46,16 @@ var _phase := 0.0
 var _clock := 0.0
 var _last_t := NAN
 var _placed := false
+var _since := 0.0  # s since the last tracking update (the walk lead)
 var tag: Label3D  # WO-1087: the floating "TEST puppet n" over a test person (null for a real one)
 
 
 func _init() -> void:
 	add_child(_body)
 	for k in ["top", "bottom", "skin", "hair", "shoes", "blush"]:
-		var m := StandardMaterial3D.new()
-		m.roughness = 0.85
-		m.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT_WRAP
-		m.emission_enabled = true
-		m.emission_energy_multiplier = SELF_LIGHT
-		m.rim_enabled = true
-		m.rim = 0.25
-		m.rim_tint = 0.6
+		var m := ShaderMaterial.new()
+		m.shader = SHADER
+		m.set_shader_parameter("self_light", SELF_LIGHT)
 		mats[k] = m
 	_build()
 	_apply_colours(AV.look(null), 1.0)
@@ -66,17 +66,22 @@ func _build() -> void:
 	for side in [1.0, -1.0]:
 		var leg := _pivot("leg_l" if side > 0 else "leg_r", Vector3(0.065 * side, HIP_Y, 0.0))
 		_part(leg, s.leg, mats.bottom, Vector3(0, -0.15, 0))
-		_part(leg, s.ball, mats.shoes, Vector3(0, -0.295, 0.025), Vector3(0.075, 0.045, 0.11))
+		_part(leg, s.ball, mats.shoes, Vector3(0, -HIP_Y + 0.045, 0.025), Vector3(0.075, 0.045, 0.11))  # soles at y 0
 		var arm := _pivot("arm_l" if side > 0 else "arm_r", Vector3(SHOULDER.x * side, SHOULDER.y, 0.0))
 		_part(arm, s.arm, mats.top, Vector3(0, -0.11, 0))
 		_part(arm, s.ball, mats.skin, Vector3(0, -0.245, 0), Vector3.ONE * 0.05)
-		_part(_body, s.ball, s.eye, Vector3(0.06 * side, 0.835, 0.162), Vector3(0.024, 0.03, 0.012))
+		_part(_body, s.ball, s.eye, Vector3(0.058 * side, 0.83, 0.161), Vector3(0.019, 0.025, 0.011))
+		_part(_body, s.ball, s.glint, Vector3(0.058 * side + 0.007, 0.838, 0.171), Vector3.ONE * 0.0055)
 		_part(_body, s.ball, mats.blush, Vector3(0.1 * side, 0.775, 0.137), Vector3(0.028, 0.017, 0.009))
 	_part(_body, s.torso, mats.top, Vector3(0, 0.48, 0), Vector3(1, 1, 0.8))
 	_part(_body, s.ball, mats.skin, Vector3(0, HEAD_Y, 0), Vector3.ONE * HEAD_R)
-	var smile := _part(_body, s.smile, s.mouth, Vector3(0, 0.79, 0.165))
-	smile.rotation = Vector3(PI / 2.0, 0, 0)  # the ring faces front; its upper half sinks into the head: a smile
-	hair_short = _part(_body, s.ball, mats.hair, Vector3(0, 0.86, -0.02), Vector3(0.185, 0.16, 0.185))
+	_part(_body, s.smile, s.mouth, Vector3.ZERO)  # an arc on the face surface (built in this frame), round ends
+	for a in [SMILE.from, SMILE.to]:
+		_part(_body, s.ball, s.mouth, smile_point(a), Vector3.ONE * SMILE.tube)
+	hair_short = Node3D.new()
+	_body.add_child(hair_short)
+	_part(hair_short, s.ball, mats.hair, Vector3(0, 0.86, -0.02), Vector3(0.185, 0.16, 0.185))
+	_part(hair_short, s.ball, mats.hair, Vector3(0, 0.8, -0.045), Vector3(0.18, 0.13, 0.16))  # the back of the head
 	hair_long = _part(_body, s.long, mats.hair, Vector3(0, 0.72, -0.075), Vector3(1.6, 1, 0.65))
 
 
@@ -87,21 +92,58 @@ static func _meshes() -> Dictionary:
 	var ball := SphereMesh.new()  # radius 1: scaled per part
 	ball.radius = 1.0
 	ball.height = 2.0
-	ball.radial_segments = 24
-	ball.rings = 12
+	ball.radial_segments = 32
+	ball.rings = 16
 	var eye := StandardMaterial3D.new()
 	eye.albedo_color = Color(0.11, 0.10, 0.14)
 	eye.roughness = 0.3
+	var glint := StandardMaterial3D.new()  # the catch-light in each eye
+	glint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glint.albedo_color = Color(1, 1, 1)
 	var mouth := StandardMaterial3D.new()
-	mouth.albedo_color = Color(0.45, 0.17, 0.2)
-	var smile := TorusMesh.new()
-	smile.inner_radius = 0.024
-	smile.outer_radius = 0.04
-	smile.rings = 24
-	smile.ring_segments = 8
-	_shared = {"ball": ball, "eye": eye, "mouth": mouth, "smile": smile, "leg": _capsule(0.058, 0.30),
+	mouth.albedo_color = Color(0.42, 0.14, 0.17)
+	mouth.roughness = 0.6
+	_shared = {"ball": ball, "eye": eye, "glint": glint, "mouth": mouth, "smile": _smile_mesh(), "leg": _capsule(0.058, 0.30),
 		"arm": _capsule(0.042, 0.24), "torso": _capsule(0.13, 0.36), "long": _capsule(0.12, 0.34)}
 	return _shared
+
+
+## A point of the smile's centre line (unit frame): on the arc around (0, SMILE.y) at angle `a`, laid on the face.
+static func smile_point(a: float) -> Vector3:
+	var x: float = SMILE.r * cos(a)
+	var y: float = SMILE.y + SMILE.r * sin(a)
+	var dy: float = y - HEAD_Y
+	return Vector3(x, y, sqrt(maxf(HEAD_R * HEAD_R - x * x - dy * dy, 0.0)) + 0.002)
+
+
+## The smile: a thin tube along the lower arc (SMILE.from … to, both below the centre: the ends turn up).
+static func _smile_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := 16
+	var ring := 8
+	var rings := []
+	for i in n + 1:
+		var a: float = lerpf(SMILE.from, SMILE.to, float(i) / n)
+		var c := smile_point(a)
+		var t := (smile_point(a + 0.01) - smile_point(a - 0.01)).normalized()
+		var u := t.cross(Vector3.BACK).normalized()
+		var v := t.cross(u).normalized()
+		var pts := []
+		for j in ring:
+			var ang := TAU * j / ring
+			pts.append(c + (u * cos(ang) + v * sin(ang)) * SMILE.tube)
+		rings.append(pts)
+	for i in n:
+		for j in ring:
+			var a0: Vector3 = rings[i][j]
+			var a1: Vector3 = rings[i][(j + 1) % ring]
+			var b0: Vector3 = rings[i + 1][j]
+			var b1: Vector3 = rings[i + 1][(j + 1) % ring]
+			for p in [a0, b0, a1, a1, b0, b1]:
+				st.add_vertex(p)
+	st.generate_normals()
+	return st.commit()
 
 
 static func _capsule(r: float, h: float) -> CapsuleMesh:
@@ -137,6 +179,7 @@ func _part(parent: Node3D, mesh: Mesh, mat: Material, at: Vector3, size := Vecto
 func set_target(feet: Vector3, height: float, look: Dictionary, joints: Variant, t: float) -> void:
 	if is_nan(_last_t) or t - _last_t > 0.02:
 		_last_t = t
+		_since = 0.0
 		_hist.append([t, feet])
 		while _hist.size() > 2 and t - float(_hist[1][0]) >= VEL_WINDOW:
 			_hist.pop_front()
@@ -162,7 +205,11 @@ func step(dt: float) -> void:
 	if _target.is_empty():
 		return
 	_clock += dt
-	_pos = _pos.lerp(_target.pos, AV.blend(dt, POS_RATE))
+	_since += dt
+	var lead := Vector3.ZERO
+	if _vel.length() >= AV.WALK_MIN:  # walking: aim where they are now, not where the last snapshot saw them
+		lead = Vector3(_vel.x, 0.0, -_vel.y) * minf(_since, LEAD_MAX)
+	_pos = _pos.lerp(_target.pos + lead, AV.blend(dt, POS_RATE))
 	_height = lerpf(_height, float(_target.height), AV.blend(dt, SIZE_RATE))
 	_yaw = lerp_angle(_yaw, float(_target.yaw), AV.blend(dt, YAW_RATE))
 	_apply_colours(_target.look, AV.blend(dt, COLOUR_RATE))
@@ -195,9 +242,7 @@ func _apply_colours(look: Dictionary, k: float) -> void:
 	for key in want:
 		var c: Color = (want[key] as Color) if k >= 1.0 or not _colours.has(key) else (_colours[key] as Color).lerp(want[key], k)
 		_colours[key] = c
-		var m: StandardMaterial3D = mats[key]
-		m.albedo_color = c
-		m.emission = c
+		(mats[key] as ShaderMaterial).set_shader_parameter("albedo", c)
 
 
 ## WO-1087: a floating label over the head ("" hides it) — a test puppet person says it is one.

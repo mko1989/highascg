@@ -114,12 +114,16 @@ func test_avatar_has_no_camera_texture_and_wears_the_look() -> void:
 	t.ok(mats.size() >= 14, "built from parts (%d)" % mats.size())
 	var clean := true
 	for m in mats:
-		if not (m is StandardMaterial3D) or (m as StandardMaterial3D).albedo_texture != null or (m as StandardMaterial3D).emission_texture != null:
+		if m is StandardMaterial3D:
+			clean = clean and (m as StandardMaterial3D).albedo_texture == null and (m as StandardMaterial3D).emission_texture == null
+		elif m is ShaderMaterial:  # WO-1087: the avatar's own flat-colour shader — it has no texture input at all
+			clean = clean and (m as ShaderMaterial).shader == Avatar.SHADER and not (m as ShaderMaterial).shader.code.contains("sampler")
+		else:
 			clean = false
-	t.ok(clean, "only plain colour materials: no shader, no texture, no camera picture")
+	t.ok(clean, "only plain colour materials: no texture, no camera picture")
 	a.set_target(Vector3(1, 0, -2), 1.6, AV.look(LOOK), null, 10.0)
 	var s := a.shown()
-	t.ok(_close(s.colours.top, Color8(200, 40, 44)) and _close(a.mats.top.albedo_color, Color8(200, 40, 44)), "first sight: the look at once")
+	t.ok(_close(s.colours.top, Color8(200, 40, 44)) and _close(a.mats.top.get_shader_parameter("albedo"), Color8(200, 40, 44)), "first sight: the look at once")
 	t.ok(absf(a.transform.basis.get_scale().y - 1.6 / Avatar.UNIT_TOP) < 1e-4 and a.position.distance_to(Vector3(1, 0, -2)) < 1e-5, "at the feet, scaled to 1.6 m")
 	t.eq([a.hair_short.visible, a.hair_long.visible], [true, true], "long hair: cap + fall")
 	a.set_target(Vector3(1, 0, -2), 1.6, AV.look({"top": [236, 236, 232], "hair_len": "bald"}), null, 10.1)
@@ -161,22 +165,56 @@ func test_avatar_smooths_jitter_and_turns_to_walk() -> void:
 	a.free()
 
 
-func test_smile_shows_its_lower_half_only() -> void:
+## The world box of every visible mesh of a (not in tree) avatar.
+func _bounds(a: Node3D) -> AABB:
+	var box := AABB()
+	var first := true
+	var stack := [[a, a.transform]]
+	while not stack.is_empty():
+		var it: Array = stack.pop_back()
+		for ch in (it[0] as Node).get_children():
+			if not (ch is Node3D) or not (ch as Node3D).visible:
+				continue
+			var xf: Transform3D = (it[1] as Transform3D) * (ch as Node3D).transform
+			if ch is MeshInstance3D:
+				var b: AABB = xf * (ch as MeshInstance3D).mesh.get_aabb()
+				box = b if first else box.merge(b)
+				first = false
+			stack.append([ch, xf])
+	return box
+
+
+func test_standing_soles_on_the_floor_hair_at_the_height() -> void:
+	for h in [1.55, 1.75, 1.95]:
+		var a := Avatar.new()
+		a.set_target(Vector3(2, 0.639, -1), h, AV.look({"hair_len": "short"}), null, 0.0)
+		var box := _bounds(a)
+		t.ok(absf(box.position.y - 0.639) < 0.002, "%.2f m: soles on the stage top (%.4f)" % [h, box.position.y])
+		t.ok(absf(box.end.y - 0.639 - h) < 0.002, "%.2f m: top of the hair = the height (%.4f)" % [h, box.end.y - 0.639])
+		a.free()
+
+
+func test_smile_is_a_lower_arc_on_the_face() -> void:
 	var a := Avatar.new()
 	var smile: MeshInstance3D = null
 	for ch in a.get_child(0).get_children():
-		if ch is MeshInstance3D and (ch as MeshInstance3D).mesh is TorusMesh:
+		if ch is MeshInstance3D and (ch as MeshInstance3D).mesh is ArrayMesh:
 			smile = ch
-	t.ok(smile != null, "the smile is a ring")
-	var tm: TorusMesh = smile.mesh
-	var ring := (tm.inner_radius + tm.outer_radius) / 2.0
-	var tube := (tm.outer_radius - tm.inner_radius) / 2.0
+	t.ok(smile != null, "the smile is its own arc mesh")
+	var centre := Vector3(0, Avatar.SMILE.y, 0)
 	var head := Vector3(0, Avatar.HEAD_Y, 0)
-	var front := func(y_off: float) -> float:  # how far the ring's front pokes out of the head at that point
-		var p := smile.position + Vector3(0, y_off, tube)
-		return p.distance_to(head) - Avatar.HEAD_R
-	t.ok(front.call(-ring) > 0.003, "the lower arc shows (%.4f)" % front.call(-ring))
-	t.ok(front.call(ring) < 0.0, "the upper arc is inside the head (%.4f)" % front.call(ring))
+	var below := true
+	var on_face := true
+	for k in 11:
+		var p := Avatar.smile_point(lerpf(Avatar.SMILE.from, Avatar.SMILE.to, k / 10.0))
+		below = below and p.y < centre.y
+		on_face = on_face and absf(p.distance_to(head) - Avatar.HEAD_R) < 0.004 and p.z > 0.15
+	t.ok(below, "every point of it is below the arc centre: the ends turn up, a smile (never an O)")
+	t.ok(on_face, "laid on the front of the head")
+	var mid := Avatar.smile_point((Avatar.SMILE.from + Avatar.SMILE.to) / 2.0)
+	var end := Avatar.smile_point(Avatar.SMILE.from)
+	t.ok(mid.y < end.y - 0.02, "the middle hangs lower than the corners (%.3f vs %.3f)" % [mid.y, end.y])
+	t.ok((smile.mesh as ArrayMesh).get_aabb().size.x < 0.09, "a small mouth (about a quarter of the head) (%.3f wide)" % (smile.mesh as ArrayMesh).get_aabb().size.x)
 	a.free()
 
 

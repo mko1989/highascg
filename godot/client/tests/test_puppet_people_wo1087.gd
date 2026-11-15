@@ -7,6 +7,7 @@ const M := preload("res://features/previs/tracking/person_cards_model.gd")
 const Avatars := preload("res://features/previs/tracking/person_avatars.gd")
 const PM := preload("res://features/previs/tracking/puppet_model.gd")
 const C := preload("res://features/previs/tracking/camera_model.gd")
+const Cards := preload("res://features/previs/tracking/person_cards.gd")
 var t
 
 const LOOK := {"top": [120, 32, 44], "bottom": [40, 90, 190], "skin": [247, 224, 206], "hair": [236, 224, 190], "hair_len": "long", "locked": true}
@@ -49,6 +50,18 @@ func test_avatar_layer_draws_and_labels_the_puppet() -> void:
 	layer.show_cards([], 0.1 + Avatars.HOLD_S + 0.01)
 	t.eq(layer.count(), 0, "stopped: gone after the hold")
 	layer.free()
+
+
+func test_puppet_shows_in_every_people_mode_but_off() -> void:
+	for style in ["cards", "dummies", "avatars"]:  # no picture to cut out or paint: an avatar in cut-outs/dummies too
+		var pc: Node3D = Cards.new()  # off-tree: no _ready (Config / Store / ui.cfg)
+		pc.style = style
+		pc._on = true
+		pc.set_detections(_snap())
+		t.eq(pc.avatars.count(), 1, "%s: the puppet as an avatar" % style)
+		pc._clear()
+		t.eq(pc.avatars.count(), 0, "%s: a style switch clears it" % style)
+		pc.free()
 
 
 func test_row_summary() -> void:
