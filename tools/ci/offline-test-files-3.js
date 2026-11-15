@@ -302,6 +302,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1074-rc-server-scene.test.js',
 	'tools/smoke/smoke-wo1074-rc-server-tracks.test.js',
 	'tools/smoke/smoke-wo1082-rc-venue-glb.test.js',
+	'tools/smoke/smoke-wo1082-rc-bots.test.js',
 	'tools/smoke/smoke-wo979-linked-roles.test.js',
 	'tools/smoke/smoke-wo979-detect-simulate.test.js',
 	'tools/smoke/smoke-wo981-canonical-json.test.js',

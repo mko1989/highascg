@@ -24,7 +24,7 @@ Angles in radians. A car's `yaw` is the rotation about +Y; yaw 0 faces −Z (thr
 | Host panel (enable, pick track, start / stop, shows the join address) | `/game/rc/?host=1` | client |
 | three.js | `/vendor/three/…` (already mounted from node_modules/three; check `vendorDirs` in src/server) | server |
 | Game state | `GET /api/game/rc/state` | server |
-| Host actions | `POST /api/game/rc/host` `{ action: 'enable'|'disable'|'track'|'start'|'stop'|'laps'|'kick'|'lights'|'wall', … }` (`lights` / `wall`: §2.6) | server |
+| Host actions | `POST /api/game/rc/host` `{ action: 'enable'|'disable'|'track'|'start'|'stop'|'laps'|'kick'|'lights'|'wall'|'bots', … }` (`lights` / `wall`: §2.6; `bots`: below) | server |
 | Scene description | `GET /api/game/rc/scene` | server |
 | Scene mesh (one merged GLB) | `GET /api/game/rc/scene.glb` | server |
 | Realtime | WebSocket `/api/game/rc/ws` | server |
@@ -48,6 +48,14 @@ public.
   "joinUrls": ["http://192.168.1.17:4200/game/rc/"], "sceneRev": "405f970d98a2-7" }
 ```
 `phase`: `lobby` | `countdown` | `race` | `results`.
+
+**Bots (WO-1082).** Host `{ action: 'bots', count: 0…9, level?: 'easy'|'normal'|'hard' }` (lobby / results only; 409
+during a race; 400 out of range) fills empty seats with server bots: virtual players run by `server/rc-room-bots.js`
+with the client's own physics / items / lap code (`client/bot-brain.js`). They join, send `s` / `box` / `use` / `hit`
+like a browser and are refereed the same way; a full room takes no more. State: each bot's player entry has
+`"bot": true` (set from the server's own virtual socket — a client cannot claim it), and the state carries
+`"bots": n, "botLevel": "normal"`. A new level redraws the field. A bot-only race is allowed (attract mode for the
+spectator page). The 30 Hz bot timer runs only while bots exist.
 
 ## `GET /api/game/rc/scene`
 
@@ -367,8 +375,9 @@ The room stays life-size; the cars, tracks and everything the game adds shrink. 
   Row-major, z rows from `z0`, x from `x0`; `rle` = run lengths alternating FREE, BLOCKED, FREE … (starts with free,
   a leading 0 when the first cell is blocked); cell (i, j) covers x0 + i·cell … +cell, z0 + j·cell … +cell.
   Blocked = a drawn triangle crosses that cell inside the band, dilated by nothing (the client adds the car radius).
-  **Flat decor (WO-1082):** a triangle whose top is at most `FLAT_DECOR` (0.3) × scale (3 cm live) above the floor
-  never blocks — carpets, rugs, floor graphics and floor tiles are driven over, not around; a 10 cm step still blocks.
+  **Flat decor (WO-1082):** the band starts at `FLAT_DECOR` (0.3) × scale above the floor (3 cm live; it was 5 mm) and
+  a triangle whose top stays below that is skipped — carpets, rugs, floor graphics, skirting feet are driven over, not
+  around (v2's ground rule: a step ≤ 0.3 u is driven over); a 10 cm step, a leg, a wall still block.
 - Collision (client physics, and the validator for track clearance): a car whose y is within [floor.y − 0.02·s,
   floor.y + CAR_H·s] collides with blocked cells of that floor's grid like a wall (normal from the grid gradient /
   nearest free direction; same restitution and scrape as a wall). Cars on a ramp or deck above the band ignore it.

@@ -1,6 +1,6 @@
-/* global setInterval */
+/* global setInterval, document */
 /**
- * Host panel (`?host=1`, WO-1074): enable / disable the game, pick the track (top-down previews), laps, start / stop,
+ * Host panel (`?host=1`, WO-1074): enable / disable the game, pick the track (top-down previews), laps, bots (WO-1082), start / stop,
  * kick, the join address shown very large, and the two §2.6 switches for what the guests see INSIDE the game world
  * (the live lights, the LED wall pictures). It only calls /api/game/rc/state, /scene and /host — the game never
  * puts anything on a screen; showing the spectator page somewhere is the operator's own, separate decision.
@@ -34,6 +34,15 @@ export function startHost(root) {
 	const lapsVal = h('span.laps-val')
 	const lapsDown = h('button.ghost.sq', { type: 'button', text: '−', 'aria-label': 'Fewer laps' })
 	const lapsUp = h('button.ghost.sq', { type: 'button', text: '+', 'aria-label': 'More laps' })
+	/* WO-1082: server bots fill empty seats (rc-room-bots.js); idle phases only */
+	const botsVal = h('span.laps-val')
+	const botsDown = h('button.ghost.sq', { type: 'button', text: '−', 'aria-label': 'Fewer bots' })
+	const botsUp = h('button.ghost.sq', { type: 'button', text: '+', 'aria-label': 'More bots' })
+	const botLevel = h(
+		'select.bot-level',
+		{ 'aria-label': 'Bot level' },
+		...['easy', 'normal', 'hard'].map((v) => h('option', { value: v, text: v[0].toUpperCase() + v.slice(1) }))
+	)
 	const joinBox = h('div.join-box')
 	const tracksEl = h('div.host-tracks')
 	const playersEl = h('ul.host-players')
@@ -52,7 +61,8 @@ export function startHost(root) {
 		),
 		h(
 			'section.host-sec',
-			h('div.host-actions', enableBtn, disableBtn, startBtn, stopBtn, h('span.laps', lapsDown, lapsVal, lapsUp))
+			h('div.host-actions', enableBtn, disableBtn, startBtn, stopBtn, h('span.laps', lapsDown, lapsVal, lapsUp)),
+			h('div.host-actions', h('span.laps', botsDown, botsVal, botsUp), botLevel)
 		),
 		h('section.host-sec', h('h2', { text: 'Track' }), tracksEl),
 		h('section.host-sec', h('h2', { text: 'Players' }), playersEl),
@@ -109,6 +119,14 @@ export function startHost(root) {
 	wallBox.addEventListener('change', () =>
 		act({ action: 'wall', on: wallBox.checked }, `LED wall pictures in the game ${wallBox.checked ? 'on' : 'off'}.`)
 	)
+	const setBots = (n, level) => {
+		const count = Math.max(0, Math.min(9, n))
+		const note = count ? `${count} ${count === 1 ? 'bot' : 'bots'} on the grid.` : 'No bots.'
+		act({ action: 'bots', count, level: level || state?.botLevel || 'normal' }, note)
+	}
+	botsDown.addEventListener('click', () => setBots((state?.bots || 0) - 1))
+	botsUp.addEventListener('click', () => setBots((state?.bots || 0) + 1))
+	botLevel.addEventListener('change', () => setBots(state?.bots || 0, botLevel.value))
 	lapsDown.addEventListener('click', () => setLaps(-1))
 	lapsUp.addEventListener('click', () => setLaps(1))
 
@@ -159,7 +177,7 @@ export function startHost(root) {
 				'li',
 				sw,
 				h('span.pname', { text: p.name }),
-				h('span.pready', { text: p.connected === false ? 'offline' : p.ready ? 'ready' : 'not ready' }),
+				h('span.pready', { text: p.bot ? 'bot' : p.connected === false ? 'offline' : p.ready ? 'ready' : 'not ready' }),
 				kick
 			)
 			playersEl.append(li)
@@ -187,6 +205,12 @@ export function startHost(root) {
 		startBtn.disabled = !on || state.phase !== 'lobby' || !(state.players || []).length
 		stopBtn.disabled = !on || state.phase === 'lobby'
 		setText(lapsVal, `${state.laps || 3} laps`)
+		const idle = on && (state.phase === 'lobby' || state.phase === 'results')
+		setText(botsVal, `${state.bots || 0} ${state.bots === 1 ? 'bot' : 'bots'}`)
+		botsDown.disabled = !idle || !state.bots
+		botsUp.disabled = !idle || (state.players || []).length >= (state.maxPlayers || 10)
+		botLevel.disabled = !idle
+		if (document.activeElement !== botLevel) botLevel.value = state.botLevel || 'normal'
 		lightsBox.checked = on && state.lights === true
 		wallBox.checked = on && state.wall === true
 		lightsBox.disabled = wallBox.disabled = !on

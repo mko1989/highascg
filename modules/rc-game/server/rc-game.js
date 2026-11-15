@@ -11,6 +11,7 @@
 const { core } = require('./host')
 const WebSocket = core('ws')
 const { createRcRoom } = require('./rc-room')
+const { createRoomBots, MAX_BOTS, LEVELS } = require('./rc-room-bots')
 const { createSceneBaker, setSceneCtx } = require('./rc-scene')
 const { parseMessage } = require('./rc-sanitize')
 const { setRcGameEnabled } = require('./rc-public')
@@ -36,6 +37,7 @@ function createRcGame(deps = {}) {
 	const lanIps = deps.lanIps || (() => core('src/utils/lan-ipv4').getLanIPv4Addresses())
 	const baker = deps.baker || createSceneBaker({ log, ...(deps.bakerDeps || {}) })
 	let room = null
+	let bots = null // WO-1082: rc-room-bots.js while enabled
 	const sockets = new Set()
 	let lastRev = null
 	const text = new WeakMap() // message object → its JSON (a broadcast is stringified once)
@@ -50,6 +52,7 @@ function createRcGame(deps = {}) {
 	const joinUrls = () => [...lanIps()].sort((a, b) => cgnat(a) - cgnat(b)).map((ip) => `http://${ip}:${port()}/game/rc/`)
 
 	function sendTo(ws, m) {
+		if (ws.botSink) return ws.botSink(m) // WO-1082: a server bot's virtual socket (rc-room-bots.js)
 		if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > MAX_BUFFERED) return
 		try {
 			ws.send(json(m))
@@ -64,13 +67,14 @@ function createRcGame(deps = {}) {
 	const lights = lightsDeps ? createRcLights({ log, ...lightsDeps, send: sendTo }) : null
 	const video = videoDeps ? createRcVideo({ log, ...videoDeps }) : null
 	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev,
-		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false })
+		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, bots: bots ? bots.count() : 0, botLevel: bots ? bots.level() : 'normal' })
 
 	/** Bake (or reuse) the current scene and hand its tracks to the room. Errors are logged, not thrown. */
 	function refreshScene() {
 		return baker.get().then((out) => {
 			lastRev = out.rev
 			if (room) room.setScene(out.json)
+			bots?.setScene(out.json)
 			video?.refresh() // walls may have moved / changed source
 			return out
 		})
@@ -92,6 +96,10 @@ function createRcGame(deps = {}) {
 					/* already closed */
 				}
 			} })
+		const r = room
+		bots = createRoomBots({ now, timers: deps.timers, log, load: deps.loadBots,
+			connect: (c) => r.connect(c), handle: (c, m) => r.handle(c, m), disconnect: (c) => r.disconnect(c) })
+		bots.preload()
 		setRcGameEnabled(true)
 		lastRev = baker.rev()
 		refreshScene().catch((e) => log('warn', `[rc-game] scene bake failed: ${e.message}`))
@@ -112,6 +120,8 @@ function createRcGame(deps = {}) {
 		sockets.clear()
 		lights?.stop()
 		video?.stop() // closes the feed client (its worker stops if nobody else watches) and releases the lease
+		bots?.dispose()
+		bots = null
 		room.dispose()
 		room = null
 		log('info', '[rc-game] disabled')
@@ -127,6 +137,15 @@ function createRcGame(deps = {}) {
 			if (action === 'lights' || action === 'wall') {
 				if (typeof a.on !== 'boolean') return { status: 400, body: { ok: false, error: '`on` must be true or false', state: state() } }
 				;(action === 'lights' ? lights : video)?.setOn(a.on)
+			}
+			if (action === 'bots') {
+				const n = Number(a.count)
+				if (!Number.isInteger(n) || n < 0 || n > MAX_BOTS) return { status: 400, body: { ok: false, error: `count 0–${MAX_BOTS}`, state: state() } }
+				if (a.level != null && !LEVELS[a.level]) return { status: 400, body: { ok: false, error: 'level easy | normal | hard', state: state() } }
+				const ph = room.state().phase
+				if (ph !== 'lobby' && ph !== 'results') return { status: 409, body: { ok: false, error: 'a race is running', state: state() } }
+				bots.setCount(n, a.level)
+				return { status: 200, body: { ok: true, state: state() } }
 			}
 			const r = room.host(action, a)
 			if (!r.ok) return { status: r.status || 400, body: { ok: false, error: r.error, state: state() } }

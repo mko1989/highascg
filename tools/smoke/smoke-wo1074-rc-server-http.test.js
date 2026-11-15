@@ -361,6 +361,8 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 		/* WO-1082: the venue .glb is found in the open project's folder (read-only resolve) */
 		[`${DIR}/rc-scene.js`]: ['src/media/project-files'],
 		[`${DIR}/rc-scene-tex.js`]: ['child_process'],
+		/* WO-1082: the race bots import() the client's own pure modules (bot-brain.js, physics) by file URL */
+		[`${DIR}/rc-room-bots.js`]: ['url'],
 	}
 	const use = {
 		'src/fixtures/pixel-map-service': /^\.liveChannelMap\(ctx\)/,
@@ -372,7 +374,10 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 		const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '')
 		for (const m of code.matchAll(/\b(require|core)\(\s*'([^']+)'\s*\)/g)) {
 			/* WO-1082: rc-scene-tex.js spawns ffmpeg to shrink the venue's textures (an image filter on stdin → stdout) */
-			const builtin = (m[2] === 'events' && f.endsWith('rc-video.js')) || (m[2] === 'child_process' && f.endsWith('rc-scene-tex.js'))
+			const builtin =
+				(m[2] === 'events' && f.endsWith('rc-video.js')) ||
+				(m[2] === 'child_process' && f.endsWith('rc-scene-tex.js')) ||
+				(m[2] === 'url' && f.endsWith('rc-room-bots.js'))
 			if (m[1] === 'require' && (ownOnly.test(m[2]) || builtin)) {
 				if (builtin) seen.add(`${f} ${m[2]}`)
 				continue

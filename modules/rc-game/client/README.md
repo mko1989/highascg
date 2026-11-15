@@ -10,7 +10,7 @@ The wire format and the scene JSON are in `work/notes/rc-game-contract.md`.
 | ---------------------------- | ------------------------------------------------------------------------------------------- |
 | `http://<box>:4200/game/rc/` | Player: name + colour, lobby (drive around freely while waiting), race                      |
 | `…/game/rc/?spectate=1`      | Spectator: automatic race camera, big leaderboard, countdown and results; no controls       |
-| `…/game/rc/?host=1`          | Host panel: enable / disable, track (with previews), laps, start / stop, kick, join address |
+| `…/game/rc/?host=1`          | Host panel: enable / disable, track (with previews), laps, bots, start / stop, kick, join address |
 
 The host panel needs the normal API login (the session cookie of the HighAsCG web UI in the same browser, or
 `?host=1&token=…`). Players and spectators need no password while the game is enabled. While the game is off, every
@@ -55,7 +55,8 @@ gravity, air, walls; steer + = left), `ground.js` (floors + the one ramp rule), 
 start launch, spin-out, catch-up, `fx` flags), `track-math.js` (3D tracks; v1 2D tracks are converted), `lap-logic.js`,
 `standings.js`, `interp.js` (snapshot buffer + server clock), `protocol.js`, `net.js` (WebSocket with reconnect),
 `cameras.js`, `items.js` (boxes, roulette, held item, hazards, hit tests), `rocket.js` (the shared rocket path),
-`item-play.js` (item / launch / event glue), `scale.js` (§3 toy scale: the scene's one `scale` → scaled PHYS, wire
+`item-play.js` (item / launch / event glue), `bot-brain.js` (WO-1082: a race bot — the server runs it with these same
+modules, see `server/rc-room-bots.js`), `scale.js` (§3 toy scale: the scene's one `scale` → scaled PHYS, wire
 precision), `occ.js` (§3 occupancy grids: RLE decode, disc-vs-cells), `seg-grid.js` (segment grid for long tracks).
 
 §3 toy scale: the room stays life-size, everything the game adds is drawn and driven at `scene.scale` (live 0.1; missing

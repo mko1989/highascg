@@ -176,7 +176,7 @@ describe('WO-1074 game/rc static checks', () => {
 		const host = read('host.js')
 		assert.doesNotMatch(
 			host,
-			/action:\s*'(?!enable'|disable'|track'|start'|stop'|laps'|kick'|lights'|wall')/,
+			/action:\s*'(?!enable'|disable'|track'|start'|stop'|laps'|kick'|lights'|wall'|bots')/, // bots: WO-1082
 			'only the contract host actions'
 		)
 		/* §2.6: `lights` / `wall` only switch what the guests' game world shows — labelled so, and posted as booleans */

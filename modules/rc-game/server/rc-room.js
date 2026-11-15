@@ -70,7 +70,7 @@ function createRcRoom(deps) {
 		return {
 			maxPlayers, phase, trackId, laps, startAt: phase === 'countdown' || phase === 'race' ? startAt : null,
 			players: [...players.values()].sort((a, b) => a.id - b.id).map((p) => ({ id: p.id, name: p.name, color: p.color, ready: p.ready,
-				connected: p.connected, slot: p.slot, racing: p.racing })),
+				connected: p.connected, slot: p.slot, racing: p.racing, ...(p.bot ? { bot: true } : {}) })),
 			spectators: spectators(),
 			...items.snapshot(),
 		}
@@ -145,7 +145,7 @@ function createRcRoom(deps) {
 		if (slot == null || connected().length >= maxPlayers) return send(c.conn, { t: 'full' })
 		const id = nextId++
 		const p = { id, name: S.cleanName(m.name, `Player ${id}`), color: S.cleanColor(m.color, slot), ready: false, connected: true, slot,
-			racing: false, car: null, race: null, conn: c.conn }
+			racing: false, car: null, race: null, conn: c.conn, bot: !!c.conn?.botSink } // WO-1082: a server bot (rc-room-bots.js); a socket cannot claim it
 		players.set(id, p)
 		c.pid = id
 		c.joined = true
