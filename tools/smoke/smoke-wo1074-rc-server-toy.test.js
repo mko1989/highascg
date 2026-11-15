@@ -209,6 +209,17 @@ test('§3 the live project baked at 0.1 (read-only): ≥ 8 toy tracks, the mix, 
 	assert.ok(tun.some((q) => q.length >= 12 && q.length <= 30 && q.floor === 'hall'), `live: a medium hall track with a tunnel (${tun.map((q) => q.id)})`)
 	assert.ok(tun.some((q) => q.length >= 60), 'live: a long tour with a tunnel')
 	assert.ok(back.tracks.length - tun.length >= 3, 'live: ≥ 3 tracks without a tunnel')
+	// refinement 15.11: 3–4 tunnel tracks, each tunnel under a roof, ≤ 0.15 m out per end, no table used twice
+	assert.ok(tun.length >= 3 && tun.length <= 4, `live: ${tun.length} tracks with a tunnel`)
+	const TM = require('./lib/rc-tunnel-measure')
+	const seen = new Map()
+	for (const q of tun) {
+		for (const m of TM.measureTunnels(q, back, `live ${q.id}`)) {
+			const key = m.blobs.map((c) => c.map((v) => v.toFixed(2)).join()).sort().join(';')
+			assert.ok(!seen.has(key), `live: ${q.id} shares a table with ${seen.get(key)}`)
+			seen.set(key, q.id)
+		}
+	}
 	assert.ok(JSON.stringify(back.occ).length <= 400 * 1024, 'occ ≤ 400 kB')
 	assert.ok(text.length <= 1024 * 1024, `scene JSON ${text.length} bytes`)
 })

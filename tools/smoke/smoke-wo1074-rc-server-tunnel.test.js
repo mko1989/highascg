@@ -7,7 +7,9 @@
  * hall loop and the grand tour) valid on the JSON scene and re-measured independently (lib/rc-tunnel-measure.js:
  * own carve, own blob flood), the carve equal to the measure's, and the validator's rejections: a checkpoint, pad or
  * box inside, a tube too tight (a bend under 2 × the floor's radius), a portal that opens onto a table, a ribbon through a table
- * without a tunnel entry, a tunnel through no table, bad ranges.
+ * without a tunnel entry, a tunnel through no table, bad ranges. Refinement 15.11: every tunnel passes ≤ 25 % of the
+ * table's radius off its centre, ≥ 85 % under a roof and ≤ 0.15 m in the open per end; no two tracks share a table; a
+ * tube mostly in the open, or > 0.15 m out at an end, is rejected (validator and measure lib).
  */
 
 const test = require('node:test')
@@ -69,6 +71,14 @@ test('§3.1 generated: a medium hall loop and the grand tour tunnel through a ta
 			const inside = t.points.slice(q.from + 1, q.to).filter((p) => inTable(sc, p[0], p[2])).length
 			assert.ok(inside >= 10, `${t.id}: ${inside} points under the table`)
 		}
+		// refinement 15.11: through the MIDDLE of the table (≤ 25 % of its radius off the centre), under its top
+		for (const [k, q] of t.tunnels.entries()) {
+			const tb = sc.tables.find((r) => inTable({ tables: [r] }, ...m[k].blobs[0]))
+			const c = [(tb[0] + tb[2]) / 2, (tb[1] + tb[3]) / 2], R = Math.min(tb[2] - tb[0], tb[3] - tb[1]) / 2
+			const d = Math.min(...t.points.slice(q.from, q.to + 1).map((p) => Math.hypot(p[0] - c[0], p[2] - c[1])))
+			assert.ok(d <= 0.25 * R + 0.02, `${t.id}: tunnel ${k} passes ${d.toFixed(3)} m off the table centre (R ${R})`)
+			assert.ok(m[k].roof >= 0.85 && m[k].open.every((v) => v <= 0.15), `${t.id}: tunnel ${k} roof ${m[k].roof} open ${m[k].open}`)
+		}
 		// outside its tunnels no point is under a table
 		const tube = (i) => t.tunnels.some((q) => i >= q.from && i <= q.to)
 		t.points.forEach((p, i) => assert.ok(tube(i) || !inTable(sc, p[0], p[2]), `${t.id}: point ${i} under a table outside a tunnel`))
@@ -81,6 +91,43 @@ test('§3.1 generated: a medium hall loop and the grand tour tunnel through a ta
 			assert.deepEqual([...TM.carveFast(g, line.slice(0, 4), r)].sort((a, b) => a - b), [...TM.carveSet(g, line.slice(0, 4), r)].sort((a, b) => a - b))
 		}
 	}
+})
+
+test('§3.1 refinement: one table per track — no two tracks (nor two tunnels) share a table', { timeout: 180000 }, () => {
+	const { sc, json } = set()
+	const owner = new Map()
+	for (const t of json.tracks.filter((q) => q.tunnels?.length)) {
+		for (const q of TM.measureTunnels(t, json, `tunnel ${t.id}`)) {
+			for (const c of q.blobs) {
+				const k = sc.tables.findIndex((r) => inTable({ tables: [r] }, ...c))
+				assert.ok(k >= 0, `${t.id}: a blob off the tables`)
+				assert.ok(!owner.has(k), `${t.id} tunnels through table ${k}, already taken by ${owner.get(k)}`)
+				owner.set(k, t.id)
+			}
+		}
+	}
+	assert.ok(owner.size >= 3, `${owner.size} tables used`)
+	const g = sc.occ.find((q) => q.floor === 'hall')
+	const tables = B.tablesOf(g, sc.floors, sc.field)
+	assert.equal(tables.length, sc.tables.length, 'one table top per tablecloth table')
+	for (const q of tables) assert.ok(inTable(sc, ...q.c) && q.R > 0.6 && q.R < 1, `table ${q.id} at ${q.c} R ${q.R}`)
+})
+
+test('§3.1 refinement: a tube in the open is rejected — mostly outside (roof share), or > 0.15 m at an end', { timeout: 180000 }, () => {
+	const { json } = set()
+	const tour = json.tracks.find((q) => q.kind === 'room-long' && q.tunnels?.length)
+	const q0 = tour.tunnels[0], n = q0.to - q0.from
+	const wide = { ...tour, tunnels: [{ from: q0.from - Math.round(n / 2), to: q0.to }, ...tour.tunnels.slice(1)] } // ~ 1/3 of it out
+	assert.match(errs(wide, json), /tunnel 0: \d+\.\d % under a roof ≥ 0\.3 m \(≥ 85 %\)/)
+	assert.throws(() => TM.measureTunnels(wide, json, 'neg'), /under a roof/)
+	const t = json.tracks.find((q) => q.id === 'hall-tunnel')
+	const q = t.tunnels[0], P = t.points
+	const k = Math.ceil(0.2 / Math.hypot(P[q.from + 1][0] - P[q.from][0], P[q.from + 1][2] - P[q.from][2]))
+	assert.match(errs({ ...t, tunnels: [{ from: q.from - k, to: q.to }] }, json), /tunnel 0: 0\.\d+ m of tube in the open at the entry \(≤ 0\.15\)/)
+	assert.match(errs({ ...t, tunnels: [{ from: q.from, to: q.to + k }] }, json), /tunnel 0: 0\.\d+ m of tube in the open at the exit \(≤ 0\.15\)/)
+	assert.throws(() => TM.measureTunnels({ ...t, tunnels: [{ from: q.from - k, to: q.to }] }, json, 'neg'), /in the open at the entry/)
+	// and the generated one, through the table middle, passes both
+	assert.ok(validateTrack(t, json).ok, errs(t, json))
 })
 
 test('§3.1 validator: deco inside, too tight, a blocked portal, no tunnel entry, no table, bad ranges', { timeout: 180000 }, () => {

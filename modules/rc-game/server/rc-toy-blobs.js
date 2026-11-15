@@ -12,6 +12,11 @@
  *     ≥ ROOF (0.3 m) above the floor (a table top; rc-scene-height.js `bottomAbove`). No field → no roof.
  * `blobsOf(grid, floors, field)` labels a grid once (cached per grid and field object) → { lab: Int32Array (−1 = free cell),
  * blobs: [{ id, n, cells: [i0, k0, i1, k1], rect: [x0, z0, x1, z1], c: [x, z], ok, why }] }.
+ * §3.1 refinement (generator's choice, not a validity rule): `tablesOf(grid, floors, field)` → the TABLE TOPS inside the
+ * tunnel-able blobs: 4-connected height-field cells whose lowest geometry above floor + CLEAR lies TOP_MIN … TOP_MAX
+ * (0.6–1.2 m) above the floor (a table top, not a chair seat at ≈ 0.45–0.55 m, not the cloth itself, not the field's
+ * open "anything higher" top bin), TOP_AREA (0.3 m²) or more, inside one tunnel-able blob's box → [{ id, blob, c (centroid),
+ * R (√(area / π)), area, rect }] (cached like blobsOf). `tableTop(field, floorY)` → (x, z) → is it under a table top?
  */
 
 const BLOB_MIN = 0.8
@@ -19,6 +24,10 @@ const BLOB_MAX = 3.5
 const STAGE_GAP = 0.1
 const ROOF = 0.3
 const ROOF_SHARE = 0.5
+const CLEAR = 0.1 // m above the floor: the roof is the lowest geometry above this (over the car band)
+const TOP_MIN = 0.6
+const TOP_MAX = 1.2
+const TOP_AREA = 0.3
 
 const cache = new WeakMap()
 
@@ -95,4 +104,63 @@ function blobsOf(g, floors = [], field = null) {
 	return out
 }
 
-module.exports = { blobsOf, BLOB_MIN, BLOB_MAX }
+/** (x, z) → is the lowest geometry above floor + CLEAR a table top (TOP_MIN … TOP_MAX above the floor)? */
+function tableTop(field, floorY) {
+	if (!field) return () => false
+	const open = field.base + 31 * field.bin - 1e-9 // the field's top bin holds "anything higher"
+	return (x, z) => {
+		const v = field.bottomAbove(x, z, floorY + CLEAR)
+		return Number.isFinite(v) && v < open && v - floorY >= TOP_MIN && v - floorY <= TOP_MAX
+	}
+}
+
+const tableCache = new WeakMap()
+
+/** The table tops inside the tunnel-able blobs of grid g (world; see the header). */
+function tablesOf(g, floors = [], field = null) {
+	if (!field) return []
+	if (!tableCache.has(g)) tableCache.set(g, new Map())
+	const per = tableCache.get(g)
+	if (per.has(field)) return per.get(field)
+	const { blobs } = blobsOf(g, floors, field)
+	const top = tableTop(field, g.y)
+	const c = field.cell
+	const seen = new Set()
+	const out = []
+	for (const b of blobs) {
+		if (!b.ok) continue
+		const i0 = Math.ceil((b.rect[0] - field.x0) / c - 0.5), i1 = Math.floor((b.rect[2] - field.x0) / c - 0.5)
+		const k0 = Math.ceil((b.rect[1] - field.z0) / c - 0.5), k1 = Math.floor((b.rect[3] - field.z0) / c - 0.5)
+		const at = (i, k) => top(field.x0 + (i + 0.5) * c, field.z0 + (k + 0.5) * c)
+		for (let k = k0; k <= k1; k++) {
+			for (let i = i0; i <= i1; i++) {
+				const key = k * field.nx + i
+				if (seen.has(key) || !at(i, k)) continue
+				// flood the top inside this blob's box
+				const st = [[i, k]]
+				seen.add(key)
+				let n = 0, sx = 0, sz = 0
+				const r = [Infinity, Infinity, -Infinity, -Infinity]
+				while (st.length) {
+					const [a, e] = st.pop()
+					const x = field.x0 + (a + 0.5) * c, z = field.z0 + (e + 0.5) * c
+					n++, (sx += x), (sz += z)
+					r[0] = Math.min(r[0], x - c / 2), r[1] = Math.min(r[1], z - c / 2), r[2] = Math.max(r[2], x + c / 2), r[3] = Math.max(r[3], z + c / 2)
+					for (const [da, de] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+						const aa = a + da, ee = e + de, q = ee * field.nx + aa
+						if (aa < i0 || aa > i1 || ee < k0 || ee > k1 || seen.has(q) || !at(aa, ee)) continue
+						seen.add(q)
+						st.push([aa, ee])
+					}
+				}
+				const area = n * c * c
+				if (area < TOP_AREA) continue
+				out.push({ id: out.length, blob: b.id, c: [sx / n, sz / n], R: Math.sqrt(area / Math.PI), area, rect: r })
+			}
+		}
+	}
+	per.set(field, out)
+	return out
+}
+
+module.exports = { blobsOf, tablesOf, tableTop, BLOB_MIN, BLOB_MAX }

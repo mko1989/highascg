@@ -152,3 +152,9 @@ kart less simulator"; the game world should show the lights and the LED wall con
   clip the chair ring and the table edge instead of the middle of a table; both use the same table.
 - The game now lives in `modules/rc-game/` as an opt-in module — see WO-1076. All paths in the sections above are the
   old ones (`src/game` = `modules/rc-game/server`, `game/rc` = `modules/rc-game/client`).
+- Tunnel refinement (15.11): tunnels go through the middle of a round table (≤ 25 % of its radius off centre), a
+  different table per tunnel, ≤ 0.09 m of tube in the open at each end, no light shell. Live hall, GENERATOR_VERSION 7:
+  3 tracks with tunnels — `hall-tunnel` (20.5 m, one), both long tours (two each) — 8 without; 91–97 % of each tube is
+  under furniture. Relaxed: only 51–55 % is under the table TOP itself, because every table is ringed by solid chairs
+  (the rest is under chair covers). Bot laps all 11 tracks, 0 wall hits; offline suite 6471 tests, 0 fail.
+  Open: at toy scale the director's overview can be blocked by chair backs.

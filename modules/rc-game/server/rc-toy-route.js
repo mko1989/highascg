@@ -9,7 +9,8 @@
  *                      drop) on a straight leg, then through the hall to the far end and back (kind 'room-long', 1 lap);
  *   weave(ctx, spec) — a hall loop through the aisles around a block of tables (kind 'hall');
  *   tunnelLoop(ctx, spec) — §3.1: a hall loop through a tunnel under a table (rc-toy-tunnel.js corridors);
- *   a tour with `tunnel: true` first tries its route through the cheapest corridors, then without one.
+ *   a tour with `tunnel: true` first tries its route through up to 3 of the cheapest corridors, then without one;
+ *   §3.1: a table carries one track's tunnel only (ctx.used).
  * ctx: { U (unit scene), hall, stage, pg (hall plan grid, the stage as a wall), oc (occupancy cell, unit), onReject? }.
  * Each → the built track (validateTrack has passed on the unit scene) or null.
  */
@@ -97,7 +98,11 @@ function routeThrough(pg, S, targets, E, need, width, avoid = []) {
 			continue
 		}
 		const p = T.pull(pg, path, need + PULL).slice(1)
-		if (jump.has(j + 1)) p[p.length - 1] = stops[j + 1] // into a corridor exactly at its end
+		if (jump.has(j + 1)) {
+			p[p.length - 1] = stops[j + 1] // into a corridor exactly at its end
+			// (a point closer than 1.5 before it would make chaikin drop the end itself: the straight would skew off the corridor)
+			while (p.length > 1 && G.dist(p[p.length - 2], stops[j + 1]) < 1.5) p.splice(p.length - 2, 1)
+		}
 		out.push(...p)
 	}
 	out[out.length - 1] = E
@@ -135,6 +140,12 @@ function corridorReach(pg, c, need, width, from = c.B2) {
 		if (q < 0 || !seen[q] || pg.clr[q] < need) return null
 	}
 	return { pgm, seen }
+}
+
+/** §3.1: tracks never share a table — mark the corridors' tables taken (ctx.used, rc-toy-tunnel.js skips them). */
+function useTables(ctx, list) {
+	ctx.used ??= new Set()
+	for (const c of list) ctx.used.add(c.table)
 }
 
 /** A corridor as a routeThrough target. */
@@ -209,8 +220,8 @@ function tour(ctx, spec) {
 		// the route starts and ends LEAD further out along the legs, so the rounded joint stays tangent to them
 		const S2 = f.toWorld([b, vT + LEAD]), E2 = f.toWorld([a, vT + LEAD])
 		for (const tun of spec.tunnel ? tourTunnels(ctx, width, [S2, ...targets, E2]) : []) {
-			const t = tourOf(ctx, spec, { fixed, S, E, S2, E2, targets: tun.targets, avoid: [legPath(a), legPath(b)], need, list: [tun.c] })
-			if (t) return t
+			const t = tourOf(ctx, spec, { fixed, S, E, S2, E2, targets: tun.targets, avoid: [legPath(a), legPath(b)], need, list: tun.list })
+			if (t) return useTables(ctx, tun.list), t
 		}
 		const t = tourOf(ctx, spec, { fixed, S, E, S2, E2, targets, avoid: [legPath(a), legPath(b)], need, list: [] })
 		if (t) return t
@@ -231,32 +242,42 @@ function tourOf(ctx, spec, o) {
 		tunnels: o.list.map((c) => ({ a: c.a, b: c.b })) })
 }
 
-const TOUR_TRIES = 4
+const TOUR_POOL = 6 // the cheapest tables a tour may tunnel through
+const TOUR_PAIRS = 8 // pairs of them tried (cheapest first), then each alone
+const TOUR_SINGLES = 3
 
 /**
- * §3.1: a tour's tunnel — the corridors (one per blob, its cheapest heading) spliced into the tour's stops where the
- * detour is shortest → up to TOUR_TRIES [{ c, targets }], cheapest first.
+ * §3.1: a tour's tunnels — per table its cheapest corridor spliced into the tour's stops where the detour is shortest;
+ * TOUR_PAIRS pairs of the TOUR_POOL cheapest tables (cheapest pair first; two in one leg in the order they lie along it),
+ * then the TOUR_SINGLES cheapest alone → [{ list: [corridors], targets }].
  */
 function tourTunnels(ctx, width, stops) {
-	const all = []
+	const best = new Map()
+	const need = needOf(width, ctx.oc)
 	for (const c of TN.corridors(ctx, width)) {
 		for (let j = 0; j + 1 < stops.length; j++) {
 			const p = stops[j], q = stops[j + 1]
 			const cost = G.dist(p, c.A2) + G.dist(c.B2, q) - G.dist(p, q)
-			all.push({ c, j, cost })
+			const b = best.get(c.table)
+			if (!b || cost < b.cost - 1e-9) best.set(c.table, { c, j, cost })
 		}
 	}
-	all.sort((x, y) => x.cost - y.cost || x.c.blob - y.c.blob || x.c.ang - y.c.ang || x.j - y.j)
-	const seen = new Set(), out = []
-	const need = needOf(width, ctx.oc)
-	for (const x of all) {
-		if (seen.has(x.c.blob)) continue
-		seen.add(x.c.blob)
-		if (!corridorReach(ctx.pg, x.c, need, width, stops[0])) continue
-		const targets = stops.slice(1, -1)
-		targets.splice(x.j, 0, viaOf(x.c))
-		out.push({ c: x.c, targets })
-		if (out.length >= TOUR_TRIES) break
+	const pick = [...best.values()].sort((x, y) => x.cost - y.cost || x.c.table - y.c.table)
+		.filter((x) => corridorReach(ctx.pg, x.c, need, width, stops[0])).slice(0, TOUR_POOL)
+	const pairs = []
+	for (let a = 0; a < pick.length; a++) for (let b = a + 1; b < pick.length; b++) pairs.push([a, b])
+	pairs.sort((p, q) => pick[p[0]].cost + pick[p[1]].cost - pick[q[0]].cost - pick[q[1]].cost || p[0] - q[0] || p[1] - q[1])
+	const out = []
+	for (const combo of [...pairs.slice(0, TOUR_PAIRS), ...pick.slice(0, TOUR_SINGLES).map((_, k) => [k])]) {
+		const xs = combo.map((k) => pick[k])
+		const targets = stops.slice(1, -1).map((p) => ({ p }))
+		// splice from the last leg back, so earlier indices stay put; within one leg, in order along it
+		const along = (x) => {
+			const p = stops[x.j], q = stops[x.j + 1]
+			return (x.c.A2[0] - p[0]) * (q[0] - p[0]) + (x.c.A2[1] - p[1]) * (q[1] - p[1])
+		}
+		for (const x of [...xs].sort((a, b) => b.j - a.j || along(b) - along(a))) targets.splice(x.j, 0, { via: x })
+		out.push({ list: xs.map((x) => x.c), targets: targets.map((t) => (t.via ? viaOf(t.via.c) : t.p)) })
 	}
 	return out
 }
@@ -271,8 +292,8 @@ function tunnelLoop(ctx, spec) {
 	const seen = new Set()
 	let tries = 0
 	for (const c of TN.corridors(ctx, spec.width)) {
-		if (seen.has(c.blob)) continue // one heading per table (the shortest)
-		seen.add(c.blob)
+		if (seen.has(c.table)) continue // one heading per table (the best)
+		seen.add(c.table)
 		const cr = corridorReach(pg, c, need, spec.width)
 		if (!cr) continue
 		for (const off of OFFSETS) {
@@ -288,7 +309,7 @@ function tunnelLoop(ctx, spec) {
 				if (!smooth) continue
 				const t = finish(ctx, smooth, { id: spec.id, name: spec.name, floor: 'hall', kind: 'hall', y: hall.y, width: spec.width, features: {},
 					tunnels: [{ a: c.a, b: c.b }] })
-				if (t && t.length >= spec.len[0] && t.length <= spec.len[1]) return t
+				if (t && t.length >= spec.len[0] && t.length <= spec.len[1]) return useTables(ctx, [c]), t
 			}
 		}
 	}
@@ -296,7 +317,7 @@ function tunnelLoop(ctx, spec) {
 }
 
 const OFFSETS = [26, 34, 20]
-const LOOP_TRIES = 24
+const LOOP_TRIES = 60
 
 /** A hall loop through `targets` (world, unit) in order and back. spec: { id, name, width, targets, features }. */
 function weave(ctx, spec) {

@@ -105,7 +105,7 @@ export function buildTrackMesh(T, G = null) {
 	}
 	const arrows = arrowBatch(T).mesh(flatMat(4, { transparent: true, opacity: 0.3, depthWrite: false }))
 	if (arrows) group.add(arrows)
-	const tunnels = buildTunnels(T) // §3.1: the tubes through the tables
+	const tunnels = buildTunnels(T, G?.occRaw) // §3.1: the tubes through the tables (arches on the furniture faces)
 	if (tunnels) group.add(tunnels)
 	const deco = buildTrackDeco(T)
 	group.add(deco)

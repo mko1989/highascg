@@ -6,7 +6,11 @@
  * (rc-track-measure.js) for every toy track that has `tunnels`.
  *   carveSet(g, line, r) — the cells whose centres lie within r of the plan polyline (Set of cell indices);
  *   tunnelCarves(t, scene) — Map(grid floor → Set) of the active track's carve on each grid;
- *   measureTunnels(t, scene, tag) — every §3.1 rule → [{ from, to, len (m), blobs: [bbox centre] }].
+ *   measureTunnels(t, scene, tag) — every §3.1 rule → [{ from, to, len (m), blobs: [bbox centre], roof (share), open: [entry, exit] (m) }];
+ *   coverOfTube(g, bits, F, line) — the §3.1 refinement's numbers for a world centre line: { roof, open: [entry, exit], len }.
+ * Refinement (15.11): the portal straights are free in the CARVED grid (the track's own carve exempt); ≥ 85 % of the tube
+ * under a roof (geometry ≥ 0.3 m above the floor in the height field); ≤ 0.15 m in the open (neither blocked nor roofed)
+ * at each end. Sampled every 5 mm here (the validator every 10 mm).
  */
 
 const assert = require('node:assert/strict')
@@ -111,6 +115,35 @@ function blobOk(g, scene, F, box, tag) {
 	return [(r[0] + r[2]) / 2, (r[1] + r[3]) / 2]
 }
 
+const SAMPLE = 0.005
+
+/** The tube's roof share and its stretches in the open at both ends (world centre line [[x, z]]). */
+function coverOfTube(g, bits, F, line) {
+	const roofed = (x, z) => !!F && Number.isFinite(F.bottomAbove(x, z, g.y + 0.3))
+	const blocked = (x, z) => {
+		const i = Math.floor((x - g.x0) / g.cell), k = Math.floor((z - g.z0) / g.cell)
+		return i >= 0 && k >= 0 && i < g.w && k < g.h && bits[k * g.w + i] === 1
+	}
+	const L = []
+	let tot = 0
+	for (let j = 0; j + 1 < line.length; j++) L.push((tot += Math.hypot(line[j + 1][0] - line[j][0], line[j + 1][1] - line[j][1])))
+	let n = 0, roof = 0, first = null, last = null, j = 0
+	for (let d = 0; d <= tot + 1e-12; d = Math.min(d + SAMPLE, d >= tot ? Infinity : tot)) {
+		while (j < L.length - 1 && L[j] < d) j++
+		const a = line[j], b = line[j + 1], s0 = j ? L[j - 1] : 0, l = L[j] - s0
+		const u = l > 0 ? Math.min(1, Math.max(0, (d - s0) / l)) : 0
+		const x = a[0] + (b[0] - a[0]) * u, z = a[1] + (b[1] - a[1]) * u
+		n++
+		const r = roofed(x, z)
+		if (r) roof++
+		if (r || blocked(x, z)) {
+			if (first === null) first = d
+			last = d
+		}
+	}
+	return { roof: roof / n, open: first === null ? [tot, tot] : [first, tot - last], len: tot }
+}
+
 function measureTunnels(t, scene, tag) {
 	const list = t.tunnels || []
 	const P = t.points, n = P.length, w = t.width, half = w / 2, s = scene.scale
@@ -124,6 +157,7 @@ function measureTunnels(t, scene, tag) {
 	for (const r of [...(t.ramps || []), ...(t.decks || [])]) for (let i = r.from; i !== (r.to + 1) % n; i = (i + 1) % n) busyPt[i] = 1
 	for (const d of t.drops || []) busyPt[d.at] = busyPt[(d.at + 1) % n] = 1
 	const out = []
+	const carves = tunnelCarves(t, scene)
 	let last = -1
 	for (const [k, q] of list.entries()) {
 		const tg = `${tag} tunnel ${k}`
@@ -156,7 +190,8 @@ function measureTunnels(t, scene, tag) {
 		}
 		const rMin = 2 * (f.id === 'stage' ? 1.8 : 3) * s
 		for (let i = q.from; i <= q.to; i++) for (const m of [1, 2]) assert.ok(circum(P[(i - m + n) % n], P[i], P[(i + m) % n]) >= rMin - 1e-6, `${tg}: radius < ${rMin} m at ${i}`)
-		// both portals open onto 2 widths of straight, free in the uncarved grid
+		// both portals open onto 2 widths of straight, free in the carved grid (refinement: the carve's end cap frees the cloth)
+		const own = carves.get(g.floor) || new Set()
 		for (const [dir, i0] of [[-1, q.from], [1, q.to]]) {
 			for (let i = (i0 + dir + n) % n; fwd(...(dir < 0 ? [S[i], S[i0]] : [S[i0], S[i]])) <= 2 * w + 1e-9; i = (i + dir + n) % n) {
 				assert.ok(i < q.from || i > q.to, `${tg}: portal stretch wraps into the tunnel`)
@@ -167,7 +202,7 @@ function measureTunnels(t, scene, tag) {
 				const kz = (v) => Math.floor((v - g.z0) / g.cell), ix = (v) => Math.floor((v - g.x0) / g.cell)
 				for (let kk = Math.max(0, kz(Math.min(a[1], b[1]) - r) - 1); kk <= Math.min(g.h - 1, kz(Math.max(a[1], b[1]) + r) + 1); kk++) {
 					for (let ii = Math.max(0, ix(Math.min(a[0], b[0]) - r) - 1); ii <= Math.min(g.w - 1, ix(Math.max(a[0], b[0]) + r) + 1); ii++) {
-						if (!bits[kk * g.w + ii]) continue
+						if (!bits[kk * g.w + ii] || own.has(kk * g.w + ii)) continue
 						const d = segSquareDist(a, b, g.x0 + ii * g.cell, g.z0 + kk * g.cell, g.cell)
 						assert.ok(d >= r - 1e-9, `${tg}: the portal at ${i} is not on free floor (${d.toFixed(4)} m)`)
 					}
@@ -187,9 +222,13 @@ function measureTunnels(t, scene, tag) {
 			const d = segSeg([P[i][0], P[i][2]], [P[i + 1][0], P[i + 1][2]], [P[j][0], P[j][2]], [P[(j + 1) % n][0], P[(j + 1) % n][2]])
 			assert.ok(d >= 2 * (half + g.cell) - 1e-9, `${tg}: segment ${j} passes ${d.toFixed(3)} m from the tunnel`)
 		}
-		out.push({ from: q.from, to: q.to, len, blobs })
+		// refinement: under a roof, not in the open
+		const cov = coverOfTube(g, bits, F, line)
+		assert.ok(cov.roof >= 0.85, `${tg}: ${(cov.roof * 100).toFixed(1)} % under a roof ≥ 0.3 m (≥ 85 %)`)
+		for (const [e, side] of ['entry', 'exit'].entries()) assert.ok(cov.open[e] <= 0.15 + 1e-9, `${tg}: ${cov.open[e].toFixed(3)} m in the open at the ${side} (≤ 0.15)`)
+		out.push({ from: q.from, to: q.to, len, blobs, roof: cov.roof, open: cov.open })
 	}
 	return out
 }
 
-module.exports = { carveSet, carveFast, tunnelCarves, measureTunnels }
+module.exports = { carveSet, carveFast, tunnelCarves, measureTunnels, coverOfTube }

@@ -185,7 +185,8 @@ function pickStart(P, Y, busy, sp, width, gridRun = GRID_RUN, opts = {}) {
 
 /**
  * §3.1: the planned tunnels (meta.tunnels: [{ a, b }] — plan points where the carve starts and ends, on a pinned
- * straight) → index ranges [{ from, to }] of the resampled plan P (the points nearest a and b), each marked busy with
+ * straight) → index ranges [{ from, to }] of the resampled plan P (the points nearest a and b, or the next ones out when
+ * those lie inside — §3.1 refinement), each marked busy with
  * a width + 2 points either side (no start line or grid there) → [] without tunnels, null when one is not on the plan.
  */
 function tunnelRanges(P, sp, busy, meta) {
@@ -193,8 +194,12 @@ function tunnelRanges(P, sp, busy, meta) {
 	const n = P.length
 	for (const q of meta.tunnels || []) {
 		const near = (p) => P.reduce((b, x, i) => (G.dist(x, p) < G.dist(P[b], p) ? i : b), 0)
-		const from = near(q.a), to = near(q.b)
+		let from = near(q.a), to = near(q.b)
 		if (G.dist(P[from], q.a) > sp || G.dist(P[to], q.b) > sp || (to - from + n) % n > n / 2) return null
+		// rounded outwards: the carve covers the planned one, the portal straights lie on the planned ones
+		const ux = q.b[0] - q.a[0], uz = q.b[1] - q.a[1]
+		if ((P[from][0] - q.a[0]) * ux + (P[from][1] - q.a[1]) * uz > 1e-9) from = (from - 1 + n) % n
+		if ((P[to][0] - q.b[0]) * ux + (P[to][1] - q.b[1]) * uz < -1e-9) to = (to + 1) % n
 		const m = Math.ceil(meta.width / sp) + 2
 		for (let i = from - m; i !== to + m + 1; i++) busy[(i + n) % n] = 1
 		out.push({ from, to })

@@ -97,8 +97,19 @@ export function rng(seed = 1) {
 	}
 }
 
-/** Overview of a whole track: centre of its box, high and a little towards the audience. */
-export function overviewTarget(T) {
+export const FOCUS_SPAN = 30 // × scale: the director's toy-scale overview around the lead car (3 m at 1:10)
+
+/**
+ * Overview of a whole track: centre of its box, high and a little towards the audience (span ≥ 6 m: a toy track
+ * still gets a room-sized view). With `focus` (a car pose) on a toy-scale track (§3, scale < 1) the director's
+ * overview frames the table-sized neighbourhood of that car instead: span FOCUS_SPAN × scale.
+ */
+export function overviewTarget(T, focus = null) {
+	const s = T.scale ?? 1
+	if (focus && s < 1 && [focus.x, focus.y, focus.z].every(Number.isFinite)) {
+		const span = FOCUS_SPAN * s
+		return { eye: [focus.x, focus.y + span * 0.6, focus.z + span * 0.7], target: [focus.x, focus.y, focus.z] }
+	}
 	const b = T.box
 	const cx = (b.minX + b.maxX) / 2
 	const cz = (b.minZ + b.maxZ) / 2
@@ -205,7 +216,7 @@ export class Director {
 		const tn =
 			lead && this.tunnelAt && this.shot !== 'leader' && this.shot !== 'car' ? this.tunnelAt(lead.x, lead.z, lead.y) : null
 		if (tn) want = { eye: portalShot(tn.tube, s).eye, target: [lead.x, lead.y + 0.2 * s, lead.z] }
-		else if (this.shot === 'overview' || !c) want = overviewTarget(T)
+		else if (this.shot === 'overview' || !c) want = overviewTarget(T, lead)
 		else if ((this.shot === 'trackside' || this.shot === 'action') && this.side)
 			want = { eye: this.side, target: [c.x, c.y + 0.2 * s, c.z] }
 		else {

@@ -16,6 +16,11 @@
  * not in a tunnel, clear by width/2 + 1 cell in the UNCARVED grid); length 6–40; no pad, box, checkpoint, grid slot or
  * the start line inside or within 1 width of a portal; a tunnel never crosses another part of the track (every segment
  * outside it and its 2-width portal stretches keeps ≥ 2 × (width/2 + 1 cell) from its centre line).
+ * Refinement (15.11, contract §3.1): the portal stretches are clear in the CARVED grid (the carve's round end cap frees
+ * the cloth at the portal, so the tube starts at the furniture, not a carve radius in front of it); the tube is under a
+ * roof — ≥ ROOF_SHARE (85 %) of its centre line (sampled every SAMPLE) has geometry ≥ ROOF (0.3 m) above the floor in
+ * the height field; and it does not run in the open — at each end ≤ OPEN (0.15 m) of it lies before the first sample
+ * that is covered (a blocked cell of the uncarved grid, or roofed): `coverOf`, `tubeCover`.
  */
 
 const G = require('./rc-track-geo')
@@ -30,6 +35,42 @@ const PORTAL = 2 // widths of free straight beyond each portal; also the level-f
 const STRAIGHT_R = 8 // a portal stretch is straight: radius ≥ this (RADIUS_RAMP)
 const DECO = 1 // widths: no pad / box / checkpoint / grid slot / start line this close to a portal
 const RADIUS = { stage: 1.8, hall: 3 } // the floor's minimum turn radius (× 2 inside a tunnel)
+const ROOF = 0.3 // world m above the floor
+const ROOF_SHARE = 0.85
+const OPEN = 0.15 // world m per end
+const SAMPLE = 0.01 // world m
+
+/** (x, z) world → is there geometry ≥ ROOF above grid g's floor (the height field)? */
+const roofOf = (g, field) => (x, z) => !!field && Number.isFinite(field.bottomAbove(x, z, g.y + ROOF))
+
+/** (x, z) world → is the tube covered there: a blocked cell of the (uncarved) grid g, or roofed? */
+function coverOf(g, field) {
+	const roof = roofOf(g, field)
+	return (x, z) => {
+		const i = Math.floor((x - g.x0) / g.cell), k = Math.floor((z - g.z0) / g.cell)
+		if (i >= 0 && k >= 0 && i < g.w && k < g.h && g.bits[k * g.w + i]) return true
+		return roof(x, z)
+	}
+}
+
+/** The world polyline `line` ([[x, z]]) sampled every SAMPLE → { share (roofed), open: [entry, exit] (m before / after the first / last covered sample) }. */
+function tubeCover(line, roof, cover) {
+	const at = []
+	let s0 = 0
+	for (let j = 0; j + 1 < line.length; j++) {
+		const [ax, az] = line[j], [bx, bz] = line[j + 1]
+		const l = Math.hypot(bx - ax, bz - az)
+		for (let d = Math.ceil(s0 / SAMPLE) * SAMPLE - s0; d < l - 1e-12; d += SAMPLE) at.push([ax + ((bx - ax) * d) / l, az + ((bz - az) * d) / l, s0 + d])
+		s0 += l
+	}
+	at.push([...line[line.length - 1], s0])
+	let roofed = 0, first = null, last = null
+	for (const [x, z, d] of at) {
+		if (roof(x, z)) roofed++
+		if (cover(x, z)) (first ??= d), (last = d)
+	}
+	return { share: roofed / at.length, open: first === null ? [s0, s0] : [first, s0 - last], len: s0 }
+}
 
 /** → { list: [{ from, to }], seg (segment i in a tunnel), pt, error }. */
 function tunnelBook(track, n) {
@@ -127,6 +168,7 @@ function checkTunnels(track, scene, ctx) {
 		}
 		// both portals open onto 2 widths of free straight
 		const cellU = g.cell / toy.s
+		const gc = cv.grids.get(g) || g // the portal stretches see the carve (its end cap frees the cloth at the portal)
 		for (const [side, idx] of [['entry', ps.before], ['exit', ps.after]]) {
 			for (const i of idx) {
 				if (tb.pt[i]) return err(`${tag}: the ${side} portal runs into another tunnel at ${i}`)
@@ -134,8 +176,16 @@ function checkTunnels(track, scene, ctx) {
 				const j = side === 'entry' ? (i + 1) % n : (i - 1 + n) % n
 				const r = half * toy.s + g.cell
 				const S = toy.s
-				if (g.segNear(P[i][0] * S, P[i][1] * S, P[j][0] * S, P[j][1] * S, r) < r) return err(`${tag}: the ${side} portal does not open onto free floor (at ${i})`)
+				if (gc.segNear(P[i][0] * S, P[i][1] * S, P[j][0] * S, P[j][1] * S, r) < r) return err(`${tag}: the ${side} portal does not open onto free floor (at ${i})`)
 			}
+		}
+		// under a roof, not in the open
+		const line = []
+		for (let i = t.from; i <= t.to; i++) line.push([P[i][0] * toy.s, P[i][1] * toy.s])
+		const tc = tubeCover(line, roofOf(g, toy.field), coverOf(g, toy.field))
+		if (tc.share < ROOF_SHARE - 1e-9) return err(`${tag}: ${(tc.share * 100).toFixed(1)} % under a roof ≥ ${ROOF} m (≥ ${ROOF_SHARE * 100} %)`)
+		for (const [k2, side] of ['entry', 'exit'].entries()) {
+			if (tc.open[k2] > OPEN + 1e-9) return err(`${tag}: ${tc.open[k2].toFixed(3)} m of tube in the open at the ${side} (≤ ${OPEN})`)
 		}
 		// length
 		const len = along(t.from, t.to)
@@ -168,4 +218,4 @@ function checkTunnels(track, scene, ctx) {
 	return { grids: cv.grids }
 }
 
-module.exports = { tunnelBook, checkTunnels, LEN }
+module.exports = { tunnelBook, checkTunnels, coverOf, LEN, ROOF_SHARE, OPEN }

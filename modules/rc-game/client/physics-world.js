@@ -43,7 +43,9 @@ export function createEnv(T, floors = [], obstacles = [], opts = {}) {
 	const ground = createGround(fl, T, s)
 	ground.boxes = boxes // the deck pillars stand clear of them (track-decks.js)
 	/* §3.1: the active track's tunnels carved out (copies — the decoded scene grids are shared between tracks) */
-	ground.occ = carveTracks(prepareOcc(opts.occ), T, s)
+	const occRaw = prepareOcc(opts.occ)
+	ground.occ = carveTracks(occRaw, T, s)
+	ground.occRaw = occRaw // uncarved: where the furniture faces are (track-tunnel.js puts the portal arches on them)
 	return { T, ground, boxes, pads, s, P, tubes: tubesOf(T) }
 }
 

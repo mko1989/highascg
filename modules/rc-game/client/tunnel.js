@@ -2,18 +2,23 @@
  * §3.1 tunnels through tables (WO-1074) — pure: the tube of each tunnel of the active track, a dark arched corridor
  * along the centre line from … to (contract: walls + ceiling, inner height ≈ 0.75 × width). The server carved the
  * table's cells within width/2 + 1 cell (0.3 · scale) of that line (occ.js carveTracks), so the inner walls stand
- * there; the shell is THICK thick. Cross-section at lateral offset d (|d| ≤ w): straight walls up to the shoulder
+ * there; the cut skin (the scene cut's margin beyond the inner walls) is THICK thick — no shell is drawn inside the furniture
+ * (15.11: the beige shell showed through every chair and cloth the tube grazes). Cross-section at lateral offset d (|d| ≤ w): straight walls up to the shoulder
  * SHOULDER × height, then an elliptic arch up to the full height (profileTop).
  *   tubesOf(T) → [{ k, from, to, y, line: [[x, z]], wi, wo, h0, hi, ho, len }] (world; the track's own scale);
  *   tubeAt(tubes, x, z, y) → { tube, d, t (0 … 1 along it), top } for a point inside a tube's span, or null;
  *   cutSegments(tubes, max) → [[ax, az, bx, bz, y, wo, h0, ho]] — the outer volume, for the scene cut (tunnel-cut.js);
- *   portalShot(tube, s) → { eye, target } — a camera at the exit portal looking back up the tube (the director).
+ *   portalShot(tube, s) → { eye, target } — a camera at the exit portal looking back up the tube (the director);
+ *   portalInsets(tube, grids, s) → [entry, exit] — how far in from each end the furniture starts (the uncarved occupancy
+ *   grid under the tube's cross-section), so the drawn arch stands on the cloth / chair face, not in front of it.
  */
+import { cellBlocked } from './occ.js'
 
 export const TUBE_H = 0.75 // × width: the tube's inner height
 export const SHOULDER = 0.55 // × height: where the walls turn into the arch
 const CARVE = 0.3 // × scale: the carve's extra cell (rc-scene.js occupancy cell 0.3 · s)
-const THICK = 0.15 // × scale: shell thickness
+const THICK = 0.04 // × scale: the cut skin beyond the inner walls
+const INSET_MAX = 2 // × scale: an arch moves in at most this far (the server keeps ≤ 0.15 m of tube in the open per end)
 
 /** Height of the arch (half-width w, shoulder h0, apex h) above the floor at lateral offset d; −1 outside. */
 export function profileTop(d, w, h0, h) {
@@ -117,4 +122,41 @@ export function portalShot(tube, s = 1) {
 		eye: [p[0] + ux * 0.6 * s, tube.y + tube.hi * 0.7, p[1] + uz * 0.6 * s],
 		target: [p[0] - ux * tube.len * 0.5, tube.y + tube.hi * 0.25, p[1] - uz * tube.len * 0.5],
 	}
+}
+
+/**
+ * Distance in from each end of the tube to the first blocked cell of the UNCARVED grid at its floor under its
+ * cross-section (± wi): the face of the furniture it enters. Capped at INSET_MAX · scale and a third of the tube;
+ * no grid at its height → [0, 0].
+ */
+export function portalInsets(tube, grids, s = 1) {
+	const o = (grids || []).find((g) => g?.bits && Math.abs(g.y - tube.y) <= 0.02 * s)
+	if (!o) return [0, 0]
+	const L = tube.line
+	const cap = Math.min(INSET_MAX * s, tube.len / 3)
+	const step = o.cell / 3
+	const hit = (x, z, lx, lz) => {
+		for (let d = -tube.wi; d <= tube.wi + 1e-9; d += step) {
+			if (cellBlocked(o, Math.floor((x + lx * d - o.x0) / o.cell), Math.floor((z + lz * d - o.z0) / o.cell))) return true
+		}
+		return false
+	}
+	const inset = (pts) => {
+		let acc = 0
+		for (let i = 0; i + 1 < pts.length; i++) {
+			const [ax, az] = pts[i],
+				[bx, bz] = pts[i + 1]
+			const l = Math.hypot(bx - ax, bz - az)
+			if (!(l > 0)) continue
+			const ux = (bx - ax) / l,
+				uz = (bz - az) / l
+			for (let u = 0; u < l; u += step) {
+				if (acc + u > cap) return cap
+				if (hit(ax + ux * u, az + uz * u, uz, -ux)) return acc + u
+			}
+			acc += l
+		}
+		return Math.min(acc, cap)
+	}
+	return [inset(L), inset([...L].reverse())]
 }

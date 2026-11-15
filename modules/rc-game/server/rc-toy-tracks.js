@@ -166,7 +166,7 @@ const TOURS = [
 	{ id: 'room-long-tour', name: 'Grand hall tour', exit: 'ramp', legs: [[0.05, 0.95], [0.15, 0.85]], gridRun: 14,
 		aims: [[1, 1.5], [-1, 1.5]], tunnel: true },
 	{ id: 'room-long-leap', name: 'Long way round', exit: 'drop', legs: [[0.1, 0.9], [0.2, 0.8]], gridRun: 14,
-		aims: [[1, 0.3], [0, 1], [-1, 0.3]] },
+		aims: [[1, 0.3], [0, 1], [-1, 0.3]], tunnel: true },
 ]
 
 /** Generator over the toy track set: null between tries, { done, tracks (world), floors (world), bounds } last. */

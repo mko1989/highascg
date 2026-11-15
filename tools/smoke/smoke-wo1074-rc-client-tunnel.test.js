@@ -8,7 +8,8 @@
  * shared decoded grids stay untouched, a bot laps the track through the table without touching a wall, the same
  * track without its `tunnels` entry hits the table, the chase eye stays under the tube's ceiling, the director looks
  * in from the exit portal, the tube mesh builds headless without NaN, the scene cut patches materials, the minimap
- * dashes the tunnel.
+ * dashes the tunnel; 15.11: the arches stand on the furniture faces (portalInsets on the uncarved grid), no light
+ * shell (dark collars only), the director's toy overview frames the lead car (FOCUS_SPAN × scale).
  */
 
 const { describe, it, before } = require('node:test')
@@ -128,6 +129,11 @@ describe('WO-1074 §3.1 tunnels in the client', () => {
 		assert.ok(Math.abs(P.ceilingOf(env, mid[0], mid[1], tube.y) - (tube.y + tube.hi)) < 1e-9, 'the apex over the centre line')
 		assert.equal(P.ceilingOf(env, mid[0], mid[1], tube.y + 1), Infinity, 'above the tube: no ceiling')
 		assert.ok(Math.abs(tube.hi - TUN.TUBE_H * T.width) < 1e-12, 'height 0.75 × width')
+		// the director's toy overview frames the lead car's neighbourhood (FOCUS_SPAN × scale), not a 6 m span
+		const lead = { x: mid[0], y: tube.y, z: mid[1] }
+		const ov = CAM.overviewTarget(T, lead)
+		assert.ok(Math.abs(ov.eye[1] - tube.y - CAM.FOCUS_SPAN * S * 0.6) < 1e-9 && ov.target[0] === lead.x, 'toy overview around the lead')
+		assert.ok(ov.eye[1] - tube.y < CAM.overviewTarget(T).eye[1] - T.box.minY, 'closer than the whole-track overview')
 		const out = T.pts[(tube.to + 20) % T.n]
 		assert.equal(P.tunnelOf(env, out[0], out[1], tube.y), null, 'past the portal: not in it')
 	})
@@ -149,6 +155,43 @@ describe('WO-1074 §3.1 tunnels in the client', () => {
 			}
 		})
 		assert.ok(n > 1000, `${n} vertices`)
+		// 15.11: the arches stand on the furniture faces (uncarved grid), no light shell anywhere (dark collars only)
+		const [ia, ib] = tg.userData.tubes[0].drawn
+		const raw = env.ground.occRaw.find((o) => Math.abs(o.y - tube.y) <= 0.002)
+		const ins = TUN.portalInsets(tube, env.ground.occRaw, S)
+		assert.deepEqual([ia, ib], ins)
+		const line = tube.line, cut = (L, d) => {
+			let acc = 0
+			for (let i = 0; i + 1 < L.length; i++) {
+				const l = Math.hypot(L[i + 1][0] - L[i][0], L[i + 1][1] - L[i][1])
+				if (acc + l >= d) return [0, 1].map((q) => L[i][q] + ((L[i + 1][q] - L[i][q]) * (d - acc)) / l)
+				acc += l
+			}
+			return L[L.length - 1]
+		}
+		const across = (L, d) => {
+			const p = cut(L, d), q = cut(L, d + 0.005), l = Math.hypot(q[0] - p[0], q[1] - p[1])
+			const lx = (q[1] - p[1]) / l, lz = -(q[0] - p[0]) / l
+			let hit = false
+			for (let e = -tube.wi; e <= tube.wi; e += raw.cell / 3) hit ||= OCC.cellBlocked(raw, Math.floor((p[0] + lx * e - raw.x0) / raw.cell), Math.floor((p[1] + lz * e - raw.z0) / raw.cell))
+			return hit
+		}
+		for (const [L, d] of [[line, ia], [[...line].reverse(), ib]]) {
+			assert.ok(d < 0.15 + 1e-9, `the arch ${d.toFixed(3)} m in from the track's portal point`)
+			assert.ok(across(L, d + raw.cell / 3), 'furniture right behind the arch')
+			if (d > raw.cell) assert.ok(!across(L, d - raw.cell / 2), 'open floor in front of the arch')
+		}
+		tg.traverse((o) => {
+			if (!o.isMesh) return
+			const c = o.geometry.getAttribute('color')?.array || []
+			for (let i = 0; i < c.length; i += 3) {
+				const [r, g, b] = [c[i], c[i + 1], c[i + 2]]
+				const frame = r > 0.5 && g > 0.3 && b < 0.1, lamp = r > 0.9 && g > 0.8
+				assert.ok(frame || lamp || Math.max(r, g, b) < 0.04, `a light shell colour ${[r, g, b].map((v) => v.toFixed(3))}`)
+			}
+		})
+		const bare = MESH.buildTrackMesh(T).getObjectByName('tunnels')
+		assert.ok(bare, 'without grids: the whole tube, arches at the track points')
 		assert.equal(MESH.buildTrackMesh(TM.prepareTrack({ ...W.track, tunnels: undefined }, S)).getObjectByName('tunnels'), undefined)
 		// the minimap: a dashed stroke over the tunnel stretch
 		const dashes = []

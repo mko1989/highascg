@@ -382,3 +382,16 @@ The room stays life-size; the cars, tracks and everything the game adds shrink. 
   small glowing lights), all game geometry × scale, hiding the table's own faces. The chase camera stays inside the
   tube (treat the tube ceiling like a deck underside). Spectator / top cameras cannot see a car in a tunnel: its name
   tag stays visible and the director picks a portal or chase shot. The minimap draws tunnel stretches dashed.
+- **Refinement (lead, 15.11: "the track disappears into the tablecloth of a round table and comes out the other
+  side")**. Generator: each corridor runs through the MIDDLE of a table top (a field region whose underside is
+  0.6–1.2 m above the floor; the line passes ≤ 25 % of the table's radius off its centre); the portals sit where the
+  tube enters the furniture (the carve's round end cap frees the cloth there); one table carries at most one track's
+  tunnel (no two tracks share a table); a long tour may take 2–3. Validator (and measure lib): ≥ 85 % of the tube's
+  centre line under a roof (height field ≥ 0.3 m above the floor) and ≤ 0.15 m of it in the open (neither a blocked
+  cell of the uncarved grid nor roofed) at each end; the portal free-floor check reads the CARVED grid. Relaxed on the
+  live hall (every round table is ringed by chairs with floor-length covers, 10–25 cm apart): the generator asks only
+  ≥ 50 % of the line under the table top itself (the rest runs under the chair seats, which count as a roof; best
+  measured 0.52–0.56), and lines enter through a chair rather than between two (a line between chairs leaves > 0.15 m
+  in the open). Client: no outer shell — the tube is drawn from furniture face to furniture face (the uncarved grid
+  under its cross-section), a dark cloth-neutral collar (0.5 × scale) behind each striped arch; the scene cut reaches
+  0.04 × scale past the inner walls. The director's toy-scale overview frames 30 × scale around the lead car.
