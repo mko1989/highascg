@@ -1,0 +1,9 @@
+ch1 1080p5000 consumers: 740:shm
+ch2 3072x1024 consumers: 501:portaudio 741:shm 9277:ffmpeg
+ch3 3072x1024 consumers: 720:ffmpeg
+ch4 3072x1024 consumers: 720:ffmpeg
+ch5 1080p5000 consumers: 720:ffmpeg
+ch6 1080p5000 consumers: 720:ffmpeg
+ch7 1080p5000 consumers: 720:ffmpeg 753:shm
+ch8 64x36 consumers: 720:ffmpeg
+ch9 64x36 consumers: 720:ffmpeg

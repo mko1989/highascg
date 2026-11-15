@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-991 live WOs (35 open, 156 in progress, 800 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+992 live WOs (35 open, 156 in progress, 801 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -717,7 +717,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
 - 1057 DONE [companion] Companion: timeline transport did nothing (module 1.0.3) → 1057_WO_companion_timeline_transport_dead.md
 
-## devices-config — Devices tab, settings, config generation (60)
+## devices-config — Devices tab, settings, config generation (61)
 
 - 33 IN PROGRESS [devices-config+web-client] Device view (program): index & dependency order → 33_WO_DEVICE_VIEW_INDEX.md
 - 33a OPEN [devices-config+web-client] Device view: data model, persistence, and HTTP API → 33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md
@@ -779,6 +779,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1021 OPEN [devices-config+video-io] Route-heal points live sources at channels of a config that has not been applie… → 1021_WO_route_heal_points_live_sources_at_unapplied_channels.md
 - 1031 IN PROGRESS [devices-config+tracking-vr,video-io,network] Narvil show on the real setup: LED walls + tracking cameras on this box, camera… → 1031_WO_narvil_show_real_setup_two_boxes_and_custom_ptz.md
 - 1034 DONE [devices-config+mapping] One PGM destination on several GPU jacks (fill + key-only pair) → 1034_WO_destination_on_several_gpu_jacks_fill_key.md
+- 1084 DONE [devices-config+os-iso,mapping] Next show setup: screen consumers of unplugged outputs start anyway and cover t… → 1084_WO_next_show_setup_offline_screens_not_started.md
 
 ## os-iso — ISO, sticks, kernel, NVIDIA, boot (87)
 
