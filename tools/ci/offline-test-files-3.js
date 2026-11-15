@@ -276,6 +276,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1074-rc-client-qr.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-fullscreen.test.js',
 	'tools/smoke/smoke-wo1078-visualiser-sacn-fallback.test.js',
+	'tools/smoke/smoke-wo1080-tracking-memory.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-static.test.js',
 	'tools/smoke/smoke-wo1074-rc-client.test.js',
 	'tools/smoke/smoke-wo1074-rc-live-client.test.js',

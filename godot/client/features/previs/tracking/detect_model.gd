@@ -6,16 +6,17 @@ extends RefCounted
 
 const DEFAULTS := {
 	"enabled": false, "model": "yolo26n.onnx", "pose_model": "", "confidence": 0.2, "interval_ms": 67, "max_persons": 10,
-	"grace_ms": 500, "threads": 4, "pin_mode": "assist", "pin_marker_id": 1, "pin_point": "top",
+	"grace_ms": 500, "memory_ms": 30000, "threads": 4, "pin_mode": "assist", "pin_marker_id": 1, "pin_point": "top",
 	"smoothing": 0.15, "prediction": 8, "assist_radius_m": 1.0, "assist_strength": 0.5,
 	"simulate": false, "sim_persons": 1,  # WO-979: the server's imitated camera (detect-sim.js)
 }
 const LIMITS := {
 	"confidence": [0.1, 0.95], "interval_ms": [20, 2000], "max_persons": [1, 50], "grace_ms": [0, 10000],
+	"memory_ms": [0, 600000],
 	"threads": [1, 16], "pin_marker_id": [1, 65535], "smoothing": [0.01, 1], "prediction": [0, 30],
 	"assist_radius_m": [0.1, 10], "assist_strength": [0, 1], "sim_persons": [0, 4],
 }
-const INTS := ["interval_ms", "max_persons", "grace_ms", "threads", "pin_marker_id", "sim_persons"]
+const INTS := ["interval_ms", "max_persons", "grace_ms", "memory_ms", "threads", "pin_marker_id", "sim_persons"]
 const PIN_MODES := ["assist", "replace", "off"]
 const PIN_LABELS := {"assist": "Assist — nudge my marker onto the nearest person",
 	"replace": "Replace — the marker follows one detected person", "off": "Off — boxes only"}

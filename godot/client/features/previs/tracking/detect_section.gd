@@ -71,6 +71,7 @@ func _ready() -> void:
 	_num(g, "Every", "interval_ms", 1, "ms")
 	_num(g, "Max persons", "max_persons", 1, "")
 	_num(g, "Keep lost", "grace_ms", 50, "ms")
+	_num(g, "Remember", "memory_ms", 1000, "ms")  # WO-1080: a person back within this time keeps their id
 	_pin = OptionButton.new()
 	for m in D.PIN_MODES:
 		_pin.add_item(str(D.PIN_LABELS[m]).get_slice(" — ", 0))

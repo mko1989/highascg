@@ -5,7 +5,7 @@
  * cameras the sidecar watches, and sidecar pixel tracks → stage floor points.
  *
  * Slice (client-owned with the rest of previs.tracking; every field optional):
- *   { enabled: false, model: 'yolo26n.onnx', pose_model: '' (WO-667: off, or a pose model file), confidence: 0.2, interval_ms: 67, max_persons: 10, grace_ms: 500,
+ *   { enabled: false, model: 'yolo26n.onnx', pose_model: '' (WO-667: off, or a pose model file), confidence: 0.2, interval_ms: 67, max_persons: 10, grace_ms: 500, memory_ms: 30000,
  *     threads: 4, pin_mode: 'assist', pin_marker_id: 1, pin_point: 'top', smoothing: 0.15, prediction: 8,
  *     assist_radius_m: 1, assist_strength: 0.5,
  *     cameras: { <camera id>: { enabled: true, masks_enabled: false, masks: [{ enabled, vertices: [[x, y] 0–1, …] }] } } }
@@ -31,6 +31,7 @@ const DETECTION_DEFAULTS = Object.freeze({
 	interval_ms: 67,
 	max_persons: 10,
 	grace_ms: 500,
+	memory_ms: 30000, // WO-1080: how long a person who left the picture keeps their id (sidecar bytetrack.py)
 	threads: 4,
 	pin_mode: 'assist',
 	pin_marker_id: 1,
@@ -48,6 +49,7 @@ const LIMITS = {
 	interval_ms: [20, 2000],
 	max_persons: [1, 50],
 	grace_ms: [0, 10000],
+	memory_ms: [0, 600000],
 	threads: [1, 16],
 	pin_marker_id: [1, 65535],
 	smoothing: [0.01, 1],
@@ -80,6 +82,7 @@ function normalizeDetection(src) {
 	for (const k of Object.keys(LIMITS)) out[k] = clamp(s[k], LIMITS[k], DETECTION_DEFAULTS[k])
 	out.max_persons = Math.round(out.max_persons)
 	out.threads = Math.round(out.threads)
+	out.memory_ms = Math.round(out.memory_ms)
 	out.sim_persons = Math.round(out.sim_persons)
 	out.simulate = s.simulate === true
 	out.pin_marker_id = Math.round(out.pin_marker_id)

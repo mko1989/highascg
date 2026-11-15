@@ -186,9 +186,11 @@ class CameraDetector:
         allowance = max(nominal, max(self.gaps, default=0.0))
         coast = max(cfg["grace_ms"] / 1000.0, allowance)
         tracks = self.tracker.update([b for b in raw if b[4] >= conf], [b for b in raw if b[4] < conf], now,
-            allowance + coast, dt)
+            allowance + coast, dt, cfg.get("memory_ms", 0) / 1000.0)
         out = []
         for t in tracks:
+            if not t.confirmed:  # WO-1080: a blip of a frame or two is not a person yet
+                continue
             live = t.state == "tracked"
             out.append({"tid": t.track_id, "box": [round(v, 5) for v in t.box], "score": round(t.score, 3),
                 "age_s": 0.0 if live else round(max(0.0, now - t.last_seen - allowance), 3)})

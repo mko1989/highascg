@@ -6,7 +6,18 @@ track; detections bind in two greedy IoU passes — the high-confidence band fir
 fast movers), then the low band against every still-unmatched track (holds a performer dimming into shadow). Only
 high detections spawn tracks. Everything is in normalised 0–1 frame space.
 Changes: boxes are plain (x1, y1, x2, y2, score) tuples instead of DetectionBox; comments condensed. Same constants,
-noise model, gates, ranking and lifecycle.
+noise model, gates and ranking.
+
+WO-1080 (ours, not OpenFollow's) — the lifecycle has a memory. Live, a weakly detected person flickered: found for a
+few frames, lost, found again where they stood, each time under a new id (27 new ids in 90 s for 3 people).
+  remembered  a track that outlives its coast window is not deleted: it is parked at its last MEASURED box with no
+              velocity for `memory_s` and is not reported. A new high detection that no live track took is first
+              offered to the remembered tracks (same IoU gate / centre-distance rescue); a match revives the track
+              under its old id. Live tracks always choose first, so a memory never steals a detection.
+  confirmed   a track is reported once it was matched MIN_HITS times (hits survive a stay in memory), so a
+              two-frame blip never becomes a person, while a person who keeps flickering does.
+  coasting    a lost track loses DAMP of its velocity per step, so a longer "Keep lost" holds the person near where
+              they were last seen instead of sliding on at their last speed.
 """
 
 import numpy as np
@@ -15,6 +26,8 @@ HIGH_IOU_GATE = 0.2  # first association, against the Kalman-predicted box
 LOW_IOU_GATE = 0.5  # second association: strict, low boxes are noisy
 LOW_DETECTION_THRESHOLD = 0.1  # score floor of the low (recovery) band
 DIST_RESCUE_FACTOR = 1.5  # first pass only: centre within this many predicted-box widths
+MIN_HITS = 3  # WO-1080: matches before a track is reported
+DAMP = 0.85  # WO-1080: velocity kept per coasting step
 
 
 def _xyah(b):
@@ -77,8 +90,9 @@ class KalmanFilter:
 
 
 class Track:
-    """One person: Kalman state, 'tracked' | 'lost', a stable id. The reported box is the measurement while
-    tracked and the prediction while lost (a pinned marker glides through a short occlusion)."""
+    """One person: Kalman state, 'tracked' | 'lost' (coasting, reported) | 'remembered' (parked, not reported), a
+    stable id. The reported box is the measurement while tracked and the prediction while lost (a pinned marker
+    glides through a short occlusion)."""
 
     def __init__(self, box, kf, track_id, now):
         self._kf = kf
@@ -86,11 +100,17 @@ class Track:
         self.score = float(box[4])
         self.state = "tracked"
         self.last_seen = now
+        self.hits = 1
         self.mean, self.cov = kf.initiate(_xyah(box))
         self.box = tuple(float(v) for v in box[:4])
+        self.measured = self.box
 
     def predict(self, dt=1.0):
+        if self.state == "remembered":
+            return  # parked at its last measured box
         if self.state == "lost":
+            self.mean[4] *= DAMP ** dt
+            self.mean[5] *= DAMP ** dt
             self.mean[6] = 0.0  # unobserved: keep the shape, extrapolate the centre only
             self.mean[7] = 0.0
         self.mean, self.cov = self._kf.predict(self.mean, self.cov, dt)
@@ -98,15 +118,29 @@ class Track:
             self.box = _tlbr(self.mean)
 
     def update(self, box, now):
-        self.mean, self.cov = self._kf.update(self.mean, self.cov, _xyah(box))
+        if self.state == "remembered":  # revived: where it is now, no stale velocity or covariance
+            self.mean, self.cov = self._kf.initiate(_xyah(box))
+        else:
+            self.mean, self.cov = self._kf.update(self.mean, self.cov, _xyah(box))
         self.score = float(box[4])
         self.state = "tracked"
         self.last_seen = now
+        self.hits += 1
         self.box = tuple(float(v) for v in box[:4])
+        self.measured = self.box
 
     def mark_lost(self):
         self.state = "lost"
         self.box = _tlbr(self.mean)
+
+    def remember(self):
+        self.state = "remembered"
+        self.mean, self.cov = self._kf.initiate(_xyah(self.measured))
+        self.box = self.measured
+
+    @property
+    def confirmed(self):
+        return self.hits >= MIN_HITS
 
     @property
     def predicted(self):
@@ -119,20 +153,35 @@ class ByteTracker:
         self.tracks = []
         self._next_id = 0
 
-    def update(self, high, low, now, max_lost_s, dt=1.0):
-        """high: boxes ≥ confidence; low: [LOW_DETECTION_THRESHOLD, confidence). → the live tracks."""
+    def update(self, high, low, now, max_lost_s, dt=1.0, memory_s=0.0):
+        """high: boxes ≥ confidence; low: [LOW_DETECTION_THRESHOLD, confidence). → the live tracks (tracked and
+        coasting, confirmed or not); remembered ones stay inside for `memory_s` after they were last seen."""
         for t in self.tracks:
             t.predict(dt)
-        unmatched, new_high = _associate(self.tracks, high, HIGH_IOU_GATE, now, DIST_RESCUE_FACTOR)
-        still, _ = _associate(unmatched, low, LOW_IOU_GATE, now, 0.0)
+        seen = [t for t in self.tracks if t.state == "tracked"]
+        coasting = [t for t in self.tracks if t.state == "lost"]
+        parked = [t for t in self.tracks if t.state == "remembered"]
+        # WO-1080: a track measured last step chooses before a coasting one — with a longer "Keep lost" a coasting
+        # box next to a standing person out-ranked that person's own track and took over their detections
+        un_seen, new_high = _associate(seen, high, HIGH_IOU_GATE, now, DIST_RESCUE_FACTOR)
+        un_coast, new_high = _associate(coasting, new_high, HIGH_IOU_GATE, now, DIST_RESCUE_FACTOR)
+        still, _ = _associate(un_seen + un_coast, low, LOW_IOU_GATE, now, 0.0)
         for t in still:
             if t.state == "tracked":
                 t.mark_lost()
+        _, new_high = _associate(parked, new_high, HIGH_IOU_GATE, now, DIST_RESCUE_FACTOR)  # WO-1080: revive
         for b in new_high:
             self.tracks.append(Track(b, self._kf, self._next_id, now))
             self._next_id += 1
-        self.tracks = [t for t in self.tracks if t.state != "lost" or now - t.last_seen <= max_lost_s]
-        return self.tracks
+        keep = []
+        for t in self.tracks:
+            gone = now - t.last_seen
+            if t.state == "lost" and gone > max_lost_s:
+                t.remember()
+            if t.state != "remembered" or gone <= max(memory_s, 0.0):
+                keep.append(t)
+        self.tracks = keep
+        return [t for t in self.tracks if t.state != "remembered"]
 
 
 def _associate(tracks, dets, gate, now, dist_factor):

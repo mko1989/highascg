@@ -42,8 +42,8 @@ import pose  # noqa: E402
 import face  # noqa: E402
 import body  # noqa: E402
 
-DEFAULTS = {"model": "", "pose_model": "", "confidence": 0.2, "interval_ms": 67, "max_persons": 10, "grace_ms": 500, "threads": 4,
-    "faces": False, "bodies": False, "cameras": []}
+DEFAULTS = {"model": "", "pose_model": "", "confidence": 0.2, "interval_ms": 67, "max_persons": 10, "grace_ms": 500, "memory_ms": 30000,
+    "threads": 4, "faces": False, "bodies": False, "cameras": []}
 STALE_S = 1.0
 IDLE_S = 0.004
 FACE_EVERY_S = 1.0  # WO-675: per track; a face feature costs ~10 ms
