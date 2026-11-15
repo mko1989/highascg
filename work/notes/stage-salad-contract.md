@@ -133,7 +133,7 @@ reloads for that vegetable's time.
   previs, which keeps the last facing).
 - **Twin of the previs avatar** (godot/client/features/previs/tracking/person_avatar.gd, WO-1086): same unit frame
   (feet y 0, top UNIT_TOP 1.02, front +Z, the person's left +X; uniform scale height / 1.02), same parts, sizes,
-  positions, colours (shoes = bottom × 0.45, blush = skin → (1, 0.45, 0.5) at 0.45), 0.35 self-light. A smoke reads
+  positions, colours (shoes = bottom × 0.45, blush = skin → (1, 0.45, 0.5) at 0.45), 0.3 self-light (person_avatar.gdshader). A smoke reads
   the Godot constants from the .gd text and checks the twin's table.
 - **Hit parts** (unit frame, × height / 1.02): `head` sphere (0, 0.82, 0) r 0.19; `body` capsule (0, 0.36, 0)–(0, 0.60, 0)
   r 0.17 (torso + arms); `legs` capsule (0, 0.03, 0)–(0, 0.30, 0) r 0.12.
