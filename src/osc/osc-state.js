@@ -4,6 +4,7 @@ const EventEmitter = require('events')
 const { isSaneTimingValue, computeRemainingAndProgress, applyClipWindow } = require('./osc-state-timing')
 const { layerMethods } = require('./osc-state-layer')
 const { audioMethods } = require('./osc-state-audio')
+const { OscHealthCounters } = require('./osc-health-counters')
 
 /**
  * WO-235 T235.1: permanent, default-off raw OSC trace. Enable with `HIGHASCG_OSC_TRACE=1`
@@ -47,6 +48,8 @@ class OscState extends EventEmitter {
 		this._dirtyChannels = new Set()
 		/** WO-800: per-layer audio meters `{ [ch]: { [layer]: … } }` — see osc-state-audio.js `_routeLayerAudio` */
 		this._layerAudio = {}
+		/** WO-1088: cumulative consumer / shm counters for the keeping-up watch — not part of the snapshot */
+		this.health = new OscHealthCounters()
 	}
 
 	_emptyChannel() {
@@ -108,6 +111,7 @@ class OscState extends EventEmitter {
 		if (!m) return
 		const ch = parseInt(m[1], 10)
 		const rest = m[2]
+		this.health.note(ch, rest, vals.length ? vals : [packet.args]) // int64 counters arrive as one Long (_argValues drops it)
 		/* WO-401 F3-revised: dirty-marking is VALUE-aware — a channel is dirty only when a routed
 		 * message changed consumed state. With Caspar full-copying every channel each tick, the old
 		 * per-message `add(ch)` kept all channels permanently dirty, which made WS delta mode ship
@@ -282,6 +286,12 @@ class OscState extends EventEmitter {
 
 		this._dirtyChannels.add(ch)
 		this._scheduleEmit()
+	}
+
+	/** WO-1088: a layer's producer type + paused flag, without cloning the snapshot (null: no such layer). */
+	layerState(ch, layer) {
+		const l = this._channels[ch]?.layers?.[layer]
+		return l ? { type: l.type, paused: l.paused } : null
 	}
 
 	clear() {

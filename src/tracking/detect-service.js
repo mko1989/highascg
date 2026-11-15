@@ -330,6 +330,8 @@ function createDetectService(ctx, deps = {}) {
 		get solvedCameras() {
 			return cams.filter((c) => c.cam).length
 		},
+		/** WO-1088: what the keeping-up watch reads at 1 Hz — no model listing, no snapshot. */
+		health: () => ({ enabled: det.enabled, running: !!child && ready, intervalMs: det.interval_ms, sidecar: sidecarCams }),
 		status: () => ({ ...snapshot(), config: det, model: det.model, models: listModels(), models_dir: modelsDir, python, providers, error,
 			pid: child?.pid ?? null, sidecar: sidecarCams }),
 		_handle: handle,

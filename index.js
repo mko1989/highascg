@@ -321,6 +321,7 @@ function main() {
 			getOperatorWsCount: () => wsHandle.clients.size,
 		})
 		appCtx._stopReplicationService = () => stopReplicationService(appCtx)
+		appCtx._stopKeepingUp = require('./src/health/keeping-up-service').startKeepingUp(appCtx, { wsClients: wsHandle.clients }).stop // WO-1088
 		appCtx._stopUsbHotplugWatcher = startUsbHotplugWatcher(appCtx)
 		appCtx._stopUsbAutoMount = startUsbAutoMount(appCtx, { log: (m) => logger.info(m), logError: (m) => logger.error(m) })
 

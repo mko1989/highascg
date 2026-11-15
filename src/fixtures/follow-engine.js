@@ -32,6 +32,7 @@
  * weight) while the LD's grant allows it. The levels universe goes out after the rig's. Split mode: unchanged.
  */
 
+const { performance } = require('perf_hooks')
 const { encodeArtDmx } = require('./artdmx')
 const { normalizePatch, parseFixed } = require('./follow-patch')
 const { writeFixture } = require('./follow-ik')
@@ -248,6 +249,34 @@ class FollowEngine {
 	/** One frame: aim every fixture, then (master on) transmit changed / due universes. → packets sent. */
 	tick() {
 		const now = this.now()
+		const t0 = performance.now()
+		try {
+			return this._tick(now)
+		} finally {
+			this._time(now, performance.now() - t0) // WO-1088: tick gaps + cost for the keeping-up watch
+		}
+	}
+
+	/** WO-1088: accumulate one tick's gap since the last and its cost; takeTiming() hands the window over and resets. */
+	_time(now, workMs) {
+		const t = this._timing || (this._timing = { ticks: 0, workMs: 0, maxWorkMs: 0, maxGapMs: 0, prevAt: 0 })
+		if (t.prevAt) t.maxGapMs = Math.max(t.maxGapMs, now - t.prevAt)
+		t.prevAt = now
+		t.ticks++
+		t.workMs += workMs
+		t.maxWorkMs = Math.max(t.maxWorkMs, workMs)
+	}
+
+	/** → { ticks, fixtures, tickMs, meanWorkMs, maxWorkMs, maxGapMs } since the last call (null before any tick). */
+	takeTiming() {
+		const t = this._timing
+		if (!t || !t.ticks || !this._timer) return null
+		const out = { ticks: t.ticks, fixtures: this.fixtures.length, tickMs: TICK_MS, meanWorkMs: t.workMs / t.ticks, maxWorkMs: t.maxWorkMs, maxGapMs: t.maxGapMs }
+		Object.assign(t, { ticks: 0, workMs: 0, maxWorkMs: 0, maxGapMs: 0 })
+		return out
+	}
+
+	_tick(now) {
 		const dt = this._lastTick ? Math.min(0.5, (now - this._lastTick) / 1000) : 0
 		this._lastTick = now
 		this.pixelMap?.sample(now) // WO-807: average the mapped screen regions of each new channel frame

@@ -459,6 +459,7 @@ module.exports = {
 		_zonesSent = ''
 		if (_detect) _detect.stop()
 		_detect = createDetectService(ctx)
+		if (ctx) ctx.detectService = _detect // WO-1088: the keeping-up watch reads its rate
 		_detectSent = { json: '', at: 0 }
 		fusion.reset()
 		pose3d.reset()
@@ -482,6 +483,7 @@ module.exports = {
 		if (_zones) _zones.stop()
 		_zones = null
 		if (_detect) _detect.stop()
+		if (_ctx && _ctx.detectService === _detect) delete _ctx.detectService
 		_detect = null
 		if (_ctx && _ctx.trackingHub === hub) delete _ctx.trackingHub
 		if (_ctx) delete _ctx.fixtureService

@@ -398,4 +398,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1076-modules-runtime.test.js',
 	'tools/smoke/smoke-wo1076-modules-install.test.js',
 	'tools/smoke/smoke-wo1076-rc-game-module.test.js',
+	'tools/smoke/smoke-wo1088-keeping-up-model.test.js',
+	'tools/smoke/smoke-wo1088-keeping-up-checks.test.js',
+	'tools/smoke/smoke-wo1088-keeping-up-service.test.js',
 ]
