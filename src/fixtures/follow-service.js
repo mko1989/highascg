@@ -255,7 +255,7 @@ function createFollowService(ctx, hub, deps = {}) {
 				output_enabled: s.output_enabled,
 				output_blocked: lightingOn() ? null : 'server-duties',
 				protocol: s.protocol,
-				fixtures: s.fixtures.map(({ id, state, pan, tilt, problem, through, console }) => ({
+				fixtures: s.fixtures.map(({ id, state, pan, tilt, problem, through, console, level }) => ({
 					id,
 					state,
 					pan,
@@ -263,7 +263,10 @@ function createFollowService(ctx, hub, deps = {}) {
 					problem,
 					through,
 					console,
+					...(level !== undefined ? { level } : {}), // WO-1085: the spot handover's level
 				})),
+				// WO-1085: what the previs draws (thresholds) and the section shows
+				handover: { mode: s.handover.mode, thresholds: s.handover.thresholds, grant: s.handover.grant.state },
 			}
 		},
 		/**

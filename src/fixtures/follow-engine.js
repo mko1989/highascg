@@ -27,6 +27,9 @@
  * WO-708 / WO-709: `resolveAuto(fx, marks)` (set by the tracking module: src/tracking/auto-director.js) picks the
  * target of a head on Auto (follow AUTO_MARKER_ID) — its person's lane marker, or a home point (`home: true`, state
  * 'home') — instead of the hub marker 64999. Unset, Auto is the plain marker lookup (WO-707).
+ * WO-1085 spot handover (follow-handover.js, `fixtures.handover.mode` "handover"): `autoLanes` (the director's lanes) feed
+ * the handover core; an Auto head then aims / rests and gets its Dimmer from its level, and is "tracking" (read-through
+ * weight) while the LD's grant allows it. The levels universe goes out after the rig's. Split mode: unchanged.
  */
 
 const { encodeArtDmx } = require('./artdmx')
@@ -38,6 +41,7 @@ const { writeGdtf, cleanValue, normalizeDmx } = require('./gdtf-patch')
 const { encodeE131, boxCid } = require('./sacn')
 const { snapshotChannels, blendChannels } = require('./fixture-looks')
 const { AUTO_MARKER_ID } = require('../tracking/auto-follow')
+const { FollowHandover } = require('./follow-handover')
 
 // WO-897: the engine's own clock, 23 ms ≈ 43.5 Hz (under the DMX512 line rate) — it was "44 Hz" in the comments. A pixel
 // map kicks a tick per new Caspar frame (kick()): every 50 fps frame is sampled and sent once (the 23 ms clock skipped ~6.5
@@ -81,6 +85,9 @@ class FollowEngine {
 		this.resolveAuto = null
 		/** @type {null | { sample(now: number): void, write(buf: Uint8Array, fx: object, now: number): void }} WO-807 screen regions → pixels */
 		this.pixelMap = null
+		/** @type {null | ((headsOf: Function|null) => { lanes: { id, marker }[], home: Map|null })} WO-1085: the director's lanes */
+		this.autoLanes = null
+		this.handover = new FollowHandover(this)
 	}
 
 	/** project.fixtures slice → patch (keeps each fixture's last aim, so a re-patch does not snap heads). */
@@ -106,6 +113,7 @@ class FollowEngine {
 		this.psn = p.psn
 		this.through = p.through
 		this.fixtures = p.fixtures
+		this.handover.configure(p.handover) // WO-1085
 		const live = new Set(p.fixtures.map((f) => f.id))
 		for (const id of [...this._aim.keys()]) if (!live.has(id)) this._aim.delete(id)
 		for (const id of [...this._hold.keys()]) if (!live.has(id)) this._hold.delete(id)
@@ -254,6 +262,7 @@ class FollowEngine {
 			if (cf) u.buf.set(cf)
 			else u.buf.fill(0)
 		}
+		this.handover.step(now, marks) // WO-1085: spot handover decisions (null in Split mode)
 		for (const fx of this.fixtures) {
 			const cf = consoleOf(fx.universe)
 			let prev = this._aim.get(fx.id) || { pan: 0, tilt: 0, state: 'centre' }
@@ -261,10 +270,12 @@ class FollowEngine {
 			let next
 			const auto = fx.follow === AUTO_MARKER_ID && this.resolveAuto // WO-708: the director picks an Auto head's target
 			const m = auto ? this.resolveAuto(fx, marks) : fx.follow ? marks.get(fx.follow) : null
+			const hd = auto ? this.handover.decide(fx) : null
 			const h = this._hold.get(fx.id)
 			if (h && now > h.until) this._hold.delete(fx.id)
 			if (h && now <= h.until) next = { pan: h.pan, tilt: h.tilt, state: 'calibrating' }
 			else if (!fx.follow) next = { ...prev, state: prev.state === 'centre' ? 'centre' : 'holding' }
+			else if (hd) next = this.handover.aim(fx, hd, prev)
 			else if (!m) next = { ...prev, state: 'no marker' }
 			else if (m.stale) next = { ...prev, state: 'holding (stale)' }
 			else {
@@ -273,7 +284,8 @@ class FollowEngine {
 			}
 			this._aim.set(fx.id, next)
 			const aiming = next.state === 'following' || next.state === 'home'
-			const tracking = next.state === 'calibrating' || (aiming && Number(m?.status ?? 1) > 0)
+			const owned = hd ? true : aiming && Number(m?.status ?? 1) > 0 // WO-1085: a resting handover head stays ours (dark)
+			const tracking = next.state === 'calibrating' || (owned && (!auto || this.handover.granted(fx)))
 			const w0 = this._w.get(fx.id) || 0
 			const step = thru && thru.fade_s > 0 ? dt / thru.fade_s : 1
 			// No console frame yet = the aim alone is on the wire (w 1), so the console appearing fades in, never snaps.
@@ -298,6 +310,7 @@ class FollowEngine {
 				}
 				writeFixture(u.buf, fx, fx.moving && aimed ? next : null, fx.fixedList)
 			}
+			if (hd) this.handover.dim(u.buf, fx, hd, cf, this._w.get(fx.id)) // WO-1085: its level on the Dimmer
 			this.pixelMap?.write(u.buf, fx, now) // WO-807: mapped pixels' colour channels over the head's own
 		}
 		let sent = 0
@@ -314,7 +327,7 @@ class FollowEngine {
 			u.packets++
 			sent++
 		}
-		return sent
+		return sent + this.handover.send(now, marks)
 	}
 
 	status() {
@@ -336,8 +349,10 @@ class FollowEngine {
 					through: !this.through.enabled ? null : w <= 0 ? 'console' : w >= 1 ? 'tracking' : 'fading',
 					console: this.through.enabled ? cons : null,
 					state: fx.problem || fx.noSend ? 'not output' : a.state, pan: Math.round(a.pan * 100) / 100,
-					tilt: Math.round(a.tilt * 100) / 100, universe: fx.universe, address: fx.address, dest: fx.dest }
+					tilt: Math.round(a.tilt * 100) / 100, universe: fx.universe, address: fx.address, dest: fx.dest,
+					...(this.handover.decide(fx) ? { level: Math.round(this.handover.decide(fx).level * 100) / 100 } : {}) }
 			}),
+			handover: this.handover.status(), // WO-1085
 			dmx: { enabled: this.dmx.enabled, priority: this.dmx.priority, universes: [...this.dmx.universes],
 				visualise: this.dmx.visualise, sacn_port: this.dmx.sacn_port, iface: this.dmx.iface },
 			universes: [...this._uni.values()].map((u) => ({ protocol: u.protocol, dest: `${u.to.host}:${u.to.port}`,

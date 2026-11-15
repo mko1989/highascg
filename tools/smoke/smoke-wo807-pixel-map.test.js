@@ -238,7 +238,7 @@ describe('WO-807 project key and wiring', () => {
 	it('the follow engine samples at tick start and writes after each head; the service hangs off follow-service', () => {
 		const eng = SRC('src/fixtures/follow-engine.js')
 		assert.match(eng, /this\.pixelMap\?\.sample\(now\)/)
-		assert.match(eng, /writeFixture\(u\.buf, fx, fx\.moving && aimed \? next : null, fx\.fixedList\)\n\t\t\t\}\n\t\t\tthis\.pixelMap\?\.write\(u\.buf, fx, now\)/)
+		assert.match(eng, /writeFixture\(u\.buf, fx, fx\.moving && aimed \? next : null, fx\.fixedList\)\n\t\t\t\}\n\t\t\tif \(hd\) this\.handover\.dim\(u\.buf, fx, hd, cf, this\._w\.get\(fx\.id\)\) \/\/ WO-1085[^\n]*\n\t\t\tthis\.pixelMap\?\.write\(u\.buf, fx, now\)/)
 		const svc = SRC('src/fixtures/follow-service.js')
 		assert.match(svc, /const pixelMap = createPixelMapService\(ctx, engine, \{ log, send, isSelfLoop \}\)/)
 		assert.match(svc, /engine\.pixelMap = pixelMap/)

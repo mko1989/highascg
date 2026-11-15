@@ -91,4 +91,6 @@ module.exports = [
 	'tools/smoke/smoke-wo974-timeline-still-seek.test.js', // Caspar never answers CALL SEEK on an image
 	'tools/smoke/smoke-wo975-nvidia-sync-auto.test.js',
 	'tools/smoke/smoke-wo1084-next-show-setup.test.js', // WO-1084 screens not plugged in are not started
+	'tools/smoke/smoke-wo1085-handover-core.test.js', // WO-1085 Auto follow spot handover
+	'tools/smoke/smoke-wo1085-handover-engine.test.js',
 ]

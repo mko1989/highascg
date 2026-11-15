@@ -21,6 +21,8 @@
  *             view when it was pressed): every pool head aims at its homeAssign point (target.home → engine state
  *             'home'). Any person seen leaves the timed home at once.
  * resolveAuto(fx, marks) is the follow engine's hook (follow-engine.js tick); ptzTargetOf(camId) is WO-711's.
+ * WO-1085: handoverInput(headsOf) gives the engine's spot handover the lanes (uid + marker) and the home points while
+ * home is active; headsOf (uid → head ids, null in Split) replaces the split in the snapshot's `heads`.
  */
 
 const { createAutoFollow, AUTO_MARKER_ID, AUTO_NAME } = require('./auto-follow')
@@ -70,6 +72,7 @@ function createAutoDirector(deps = {}) {
 	let detecting = false
 	let hub = null
 	let planeZ = 0
+	let handoverHeads = null // WO-1085: uid → head ids while the engine runs the spot handover
 
 	const posOf = (p) => {
 		if (p.world) return [p.world[0], p.world[1]]
@@ -253,6 +256,12 @@ function createAutoDirector(deps = {}) {
 		return managed && homeActive ? 'home' : null
 	}
 
+	/** WO-1085: the spot handover's input, called by the follow engine every tick. */
+	function handoverInput(headsOf) {
+		handoverHeads = typeof headsOf === 'function' ? headsOf : null
+		return { lanes: lanes.map((l) => ({ id: l.uid, marker: l.marker })), home: homeActive ? homeMap : null }
+	}
+
 	function attached() {
 		return Object.assign({}, ...lanes.map((l) => l.follow.attached()))
 	}
@@ -276,7 +285,8 @@ function createAutoDirector(deps = {}) {
 				y: xy ? r2(xy[1]) : null,
 			}
 			if (nameOf.has(key)) o.name = nameOf.get(key)
-			o.heads = lane && !homeActive ? pool.filter((f) => assignment.get(f.id) === lane.uid).map((f) => f.id) : []
+			const split = () => pool.filter((f) => assignment.get(f.id) === lane.uid).map((f) => f.id)
+			o.heads = lane && !homeActive ? (handoverHeads ? handoverHeads(lane.uid) : split()) : []
 			o.ptz = lane ? camIds.filter((c) => ptzLane(c) === lane) : []
 			o.lost = !!lane && lane.lostAt !== null
 			return o
@@ -383,6 +393,7 @@ function createAutoDirector(deps = {}) {
 			grid = normalizeGrid(project?.previs?.tracking?.grid)
 		},
 		resolveAuto,
+		handoverInput,
 		ptzTargetOf,
 		attached,
 		snapshot,

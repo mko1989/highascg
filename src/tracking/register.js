@@ -77,7 +77,6 @@ const DETECT_EVENT = 'tracking:detections'
 const DETECT_MS = 66
 const PRESENTERS_EVENT = 'tracking:presenters'
 const PRESENTERS_MS = 500
-
 const hub = new MarkerHub()
 const puppet = require('./puppet').createPuppet({ hub, stage: () => require('../engine/project-scenes').loadFullProject()?.previs?.tracking?.grid ?? null, log: (lvl, msg) => _ctx?.log?.(lvl, msg), onWrite: () => _writes++ }) // WO-978, off at boot
 let _timer = null
@@ -451,6 +450,7 @@ module.exports = {
 		fixturesWatch.reset()
 		if (ctx) ctx.fixtureService = _follow // WO-615: /api/fixtures/program + type import reload
 		_follow.engine.resolveAuto = auto.resolveAuto // WO-708: Auto heads split across people / go home (WO-709)
+		_follow.engine.autoLanes = auto.handoverInput // WO-1085: the spot handover's lanes + home points
 		followProject(auto, ctx) // the grid rectangle (home points) from project.previs.tracking.grid
 		autoPtz.boot(ctx, { allowed: () => duties.has('ptz') })
 		_calib = createCalibration({ engine: _follow.engine, hub, frame: _follow.liveFrame }) // WO-700 frame
