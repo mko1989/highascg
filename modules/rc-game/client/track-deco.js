@@ -9,7 +9,22 @@ import { TriBatch, flatMat, canvasTexture, lin } from './mesh-util.js'
 
 const GANTRY_H = 2.1
 
-function bannerTexture() {
+/** The banner's word: the track's name in capitals (≤ 18 characters, cut at a word), else STAGE SPRINT (WO-1082). */
+export function bannerText(name) {
+	const clean = Array.from(String(name ?? ''))
+		.filter((ch) => ch.codePointAt(0) > 0x1f && !(ch.codePointAt(0) >= 0x7f && ch.codePointAt(0) <= 0x9f))
+		.join('')
+		.trim()
+		.toUpperCase()
+	if (!clean) return 'STAGE SPRINT'
+	if (clean.length <= 18) return clean
+	const cut = clean.slice(0, 18)
+	const sp = cut.lastIndexOf(' ')
+	return (sp > 6 ? cut.slice(0, sp) : cut).trim()
+}
+
+function bannerTexture(name) {
+	const text = bannerText(name)
 	return canvasTexture(512, 64, (ctx, w, h) => {
 		const sq = h / 2
 		for (let x = 0; x < w; x += sq) {
@@ -21,10 +36,10 @@ function bannerTexture() {
 		ctx.fillStyle = 'rgba(17,19,23,0.92)'
 		ctx.fillRect(w * 0.25, 0, w * 0.5, h)
 		ctx.fillStyle = '#ff7a1a'
-		ctx.font = 'bold 40px system-ui, sans-serif'
+		ctx.font = `bold ${text.length > 12 ? 30 : 40}px system-ui, sans-serif`
 		ctx.textAlign = 'center'
 		ctx.textBaseline = 'middle'
-		ctx.fillText('STAGE SPRINT', w / 2, h / 2 + 2)
+		ctx.fillText(text, w / 2, h / 2 + 2, w * 0.48)
 	})
 }
 
@@ -76,7 +91,7 @@ export function buildTrackDeco(T) {
 	}
 	const beam = new THREE.Mesh(
 		new THREE.BoxGeometry(span + 0.22 * k, 0.42 * k, 0.12 * k),
-		new THREE.MeshBasicMaterial({ map: bannerTexture() })
+		new THREE.MeshBasicMaterial({ map: bannerTexture(T.name) })
 	)
 	beam.position.set(g0.x, y + H - 0.25 * k, g0.z)
 	beam.rotation.y = yaw

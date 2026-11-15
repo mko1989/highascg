@@ -246,5 +246,5 @@ function updateBoard(G) {
 			return { name: p.name, color: p.color, info }
 		})
 	G.hud.leaderboard(rows)
-	G.hud.setStatus(phaseLabel(G))
+	G.hud.setStatus('') // the phase line already shows phaseLabel (updateHud): the join address once, not twice (WO-1082)
 }

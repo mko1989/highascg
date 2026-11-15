@@ -146,6 +146,7 @@ export function createHud(root, { spectator = false, toolbar = [], itemButton = 
 				resultsBody.append(tr)
 			})
 			setText(resultsNote, note)
+			toastEl.classList.remove('show') // the card covers the middle: a lap toast under it is only noise (WO-1082)
 			show(results, true)
 			if (!wasShown) x.confetti(true)
 		},

@@ -29,8 +29,8 @@ export function createWall(THREE, env = {}) {
 			const tex = new THREE.Texture()
 			tex.flipY = false // ImageBitmap uploads ignore flipY anyway; the UVs are v-down (stage-fx-math screenStrip)
 			tex.colorSpace = THREE.SRGBColorSpace
-			tex.generateMipmaps = false
-			tex.minFilter = THREE.LinearFilter
+			tex.generateMipmaps = true // a far wall minified without mips speckles (WO-1074 open item; WO-1082)
+			tex.minFilter = THREE.LinearMipmapLinearFilter
 			tex.magFilter = THREE.LinearFilter
 			r = { tex, mats: [], busy: false, pending: null, size: '' }
 			roles.set(role, r)
