@@ -18,8 +18,9 @@
  * standing where the bot stands could see (sk-view.js `botSees`, both ways) and a line to it that crosses no solid
  * cell at all (no tolerance); its splash spares every soldier outside that view from the fire position. No other path
  * applies bot damage.
- * Kills: score = kills − suicides (tdm: the team total moves the same way); nothing is scored outside a match; lobby
- * deaths respawn at once, match deaths after 3 s, at the spawn farthest from enemies, with 1.5 s protection.
+ * Kills: score = kills − suicides (tdm: the team total moves the same way; spot: kills score nothing, sk-spot.js
+ * scores); nothing is scored outside a match; lobby deaths respawn at once, match deaths after 3 s, at the spawn
+ * farthest from enemies, with 1.5 s protection.
  */
 
 const { WEAPONS, ROCKET, PICKUPS, RULES, dirOf } = require('./sk-rules')
@@ -115,13 +116,14 @@ function createCombat(X) {
 		X.toAll({ t: 'kill', id: v.id, by: by.id, w, at: now() })
 		if (X.phase() === 'match') {
 			v.deaths++
+			const pts = X.mode() !== 'spot' // Spotlight (WO-1083): only time in the light scores
 			if (by === v || (X.mode() === 'tdm' && by.team === v.team)) {
 				by.suicides++
-				by.score--
+				if (pts) by.score--
 				if (X.mode() === 'tdm' && (by.team === 0 || by.team === 1)) X.teams[by.team]--
 			} else {
 				by.kills++
-				by.score++
+				if (pts) by.score++
 				if (X.mode() === 'tdm' && (by.team === 0 || by.team === 1)) X.teams[by.team]++
 			}
 			X.scored()

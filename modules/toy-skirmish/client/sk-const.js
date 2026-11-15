@@ -123,7 +123,13 @@ export const PICKUPS = Object.freeze({
 export const FLAG = Object.freeze({ MOVING: 1, DEAD: 2, PROTECTED: 4, SURGE: 8 })
 
 export const PHASES = Object.freeze(['lobby', 'countdown', 'match', 'results'])
-export const MODES = Object.freeze(['dm', 'tdm'])
+export const MODES = Object.freeze(['dm', 'tdm', 'spot'])
+/** What each mode is called on screen (WO-1083: `spot` = Spotlight, hold the moving pool alone to score). */
+export const MODE_NAMES = Object.freeze({ dm: 'Free for all', tdm: 'Team match', spot: 'Spotlight' })
+/** Spotlight: seconds of warning before the pool moves (server sk-spot.js SPOT.warnMs). */
+export const SPOT_WARN_S = 5
+/** Bot skill levels the host can pick (server sk-bot-aim.js LEVELS). */
+export const BOT_LEVELS = Object.freeze(['easy', 'normal', 'hard'])
 /** Team colours in `tdm` (red 0 / blue 1). */
 export const TEAM_COLORS = Object.freeze(['#ff4d3d', '#3aa0ff'])
 export const TEAM_NAMES = Object.freeze(['Red', 'Blue'])

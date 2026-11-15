@@ -113,9 +113,11 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 			// mouse until "Warm up" was pressed. The lobby is the warm-up: the panel stays closed behind its button.
 			if (lobbyPanel.hidden && openBtn.hidden) show(openBtn, true)
 			const tdm = state.mode === 'tdm'
-			setText(lMode, tdm ? 'Team match (red vs blue)' : 'Free for all')
+			const spot = state.mode === 'spot'
+			setText(lMode, tdm ? 'Team match (red vs blue)' : spot ? 'Spotlight — stand in the light alone to score' : 'Free for all')
 			const lim = state.limits || {}
-			setText(lArena, `${arenaName || state.arenaId || ''} · ${lim.frags ?? (tdm ? 40 : 20)} frags or ${lim.minutes ?? 5} min`)
+			const goal = `${lim.frags ?? (tdm ? 40 : spot ? 60 : 20)} ${spot ? 'points' : 'frags'}`
+			setText(lArena, `${arenaName || state.arenaId || ''} · ${goal} or ${lim.minutes ?? 5} min`)
 			plist.textContent = ''
 			const players = state.players || []
 			for (const p of players) {

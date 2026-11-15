@@ -290,6 +290,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1081-sk-server-ws.test.js',
 	'tools/smoke/smoke-wo1083-sk-bot-view.test.js',
 	'tools/smoke/smoke-wo1083-sk-flat-decor.test.js',
+	'tools/smoke/smoke-wo1083-sk-spotlight.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-static.test.js',
 	'tools/smoke/smoke-wo1074-rc-client.test.js',
 	'tools/smoke/smoke-wo1074-rc-live-client.test.js',

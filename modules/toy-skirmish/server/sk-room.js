@@ -5,8 +5,10 @@
  * socket (max 10 incl. bots — a joining guest takes a bot's place; max 20 spectators), the host drives the phase
  * machine lobby (warm-up: run, shoot, pick up, nothing scored, deaths respawn at once) → countdown 3 s (frozen at the
  * spawns, full reset) → match (frag or time limit) → results 15 s (frozen) → lobby; `stop` → lobby. Modes: `dm` (score =
- * kills − suicides) and `tdm` (red 0 / blue 1, joiners to the smaller team, the host may move players). The referee
- * (fire / hit / boom / pick, damage, respawns) is sk-combat.js, the bots sk-bots.js. Contract §3 / §5 / §6 / §7.
+ * kills − suicides), `tdm` (red 0 / blue 1, joiners to the smaller team, the host may move players) and `spot`
+ * (WO-1083 "Spotlight": hold the moving pool alone, a point a second — sk-spot.js, ticked every 250 ms while the mode is
+ * on). The referee (fire / hit / boom / pick, damage, respawns) is sk-combat.js, the bots sk-bots.js. Contract §3 / §5 /
+ * §6 / §7.
  * Positions: a soldier's own `s` (≤ 20 / s) is ignored outside the arena rect + 2 u, faster than 6 u/s is clamped (with
  * 0.1 s of slack for network bunching), frozen outside lobby / match and while dead.
  * Timers: 1 Hz housekeeping while sockets are open, the 20 Hz `w` timer while anyone plays (sends only when something
@@ -18,6 +20,7 @@ const S = require('./sk-sanitize')
 const { RULES, SOLDIER } = require('./sk-rules')
 const { createCombat } = require('./sk-combat')
 const { createBots } = require('./sk-bots')
+const { createSpot, SPOT } = require('./sk-spot')
 const G = require('./sk-grid')
 const { floorOcc, sceneScaleOf } = require('./sk-arena-check')
 
@@ -48,7 +51,7 @@ function createSkRoom(deps) {
 	let arenaId = null
 	let startAt = null
 	let endsAt = null
-	const timer = { phase: null, house: null, world: null }
+	const timer = { phase: null, house: null, world: null, spot: null }
 	let dirty = false
 
 	const X = {
@@ -64,6 +67,7 @@ function createSkRoom(deps) {
 			broadcastState()
 			checkLimit()
 		},
+		spot: () => (mode === 'spot' ? spot.info() : null),
 	}
 	const players = X.players
 	const combat = createCombat(X)
@@ -72,6 +76,13 @@ function createSkRoom(deps) {
 		remove: (p) => removePlayer(p),
 		room: () => ({ maxPlayers, humans: humans().length }),
 	})
+
+	const spot = createSpot(X, { changed: () => broadcastState() })
+	/** The Spotlight tick runs while the mode is `spot` (any phase: the pool is there in the lobby, scores in a match). */
+	function syncSpotTimer() {
+		if (mode === 'spot' && !timer.spot) timer.spot = T.setInterval(spot.tick, SPOT.tickMs)
+		if (mode !== 'spot' && timer.spot) T.clearInterval(timer.spot), (timer.spot = null), spot.reset()
+	}
 
 	const humans = () => [...players.values()].filter((p) => !p.bot && p.connected)
 	const spectators = () => [...conns.values()].filter((c) => c.joined && c.spectator).length
@@ -87,7 +98,7 @@ function createSkRoom(deps) {
 			maxPlayers, phase, mode, arenaId, limits: { ...limits }, startAt: phase === 'countdown' ? startAt : null, endsAt, bots: bots.wanted(), botLevel: bots.level(),
 			players: [...players.values()].sort((a, b) => a.id - b.id).map((p) => ({ id: p.id, name: p.name, color: p.color, team: p.team, bot: p.bot,
 				connected: p.connected || p.bot, kills: p.kills, deaths: p.deaths, score: p.score })),
-			teams: X.teams.slice(), pk: combat.pkList(), spectators: spectators(),
+			teams: X.teams.slice(), pk: combat.pkList(), spectators: spectators(), spot: X.spot(),
 		}
 	}
 	const state = () => decorate(snapshot())
@@ -264,6 +275,7 @@ function createSkRoom(deps) {
 		// a new scene rev reshapes the arenas: pick the same id up again (or the first arena)
 		if (!X.arena || !arenas.includes(X.arena)) setArena(arenas.some((a) => a.id === arenaId) ? arenaId : arenas[0]?.id ?? null)
 		combat.resetPickups()
+		spot.reset()
 		if (respawn) combat.spawnAll()
 	}
 
@@ -294,6 +306,7 @@ function createSkRoom(deps) {
 		X.grid = a ? G.arenaGrid(a, floorOcc(scene, a.floor), X.u) : null
 		X.mask = X.grid ? G.passable(X.grid, SOLDIER.radius * X.u) : null
 		combat.resetPickups()
+		spot.reset()
 		bots.arenaChanged()
 	}
 
@@ -312,12 +325,13 @@ function createSkRoom(deps) {
 			}
 			case 'mode': {
 				if (!idle) return busy
-				if (a.mode !== 'dm' && a.mode !== 'tdm') return { ok: false, status: 400, error: "mode 'dm' or 'tdm'" }
+				if (!['dm', 'tdm', 'spot'].includes(a.mode)) return { ok: false, status: 400, error: "mode 'dm', 'tdm' or 'spot'" }
 				if (limits.frags === RULES.frags[mode]) limits.frags = RULES.frags[a.mode]
 				mode = a.mode
 				let n = 0
 				for (const p of [...players.values()].sort((x, y) => x.id - y.id)) p.team = mode === 'tdm' ? n++ % 2 : null
 				toLobby()
+				syncSpotTimer()
 				break
 			}
 			case 'limits': {
@@ -413,15 +427,15 @@ function createSkRoom(deps) {
 		/** Everything stops (the game is disabled): timers cleared, the room emptied. */
 		dispose() {
 			clearPhaseTimer()
-			for (const k of ['house', 'world']) if (timer[k]) T.clearInterval(timer[k])
-			timer.house = timer.world = null
+			for (const k of ['house', 'world', 'spot']) if (timer[k]) T.clearInterval(timer[k])
+			timer.house = timer.world = timer.spot = null
 			for (const p of players.values()) combat.clearRespawn(p)
 			bots.dispose()
 			conns.clear()
 			players.clear()
 		},
 		/** Diagnostics for the smokes. */
-		timers: () => ({ phase: !!timer.phase, house: !!timer.house, world: !!timer.world, bots: bots.running() }),
+		timers: () => ({ phase: !!timer.phase, house: !!timer.house, world: !!timer.world, spot: !!timer.spot, bots: bots.running() }),
 		connections: () => conns.size,
 		ctx: X,
 		combat,

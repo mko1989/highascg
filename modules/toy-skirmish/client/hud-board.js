@@ -15,13 +15,14 @@ export function createBoard(root) {
 	const sub = h('p.board-sub')
 	const teams = h('div.board-teams')
 	const body = h('tbody')
+	const scoreTh = h('th', { text: 'Score' })
 	const note = h('p.board-note')
 	const card = h(
 		'div.board-card',
 		title,
 		sub,
 		teams,
-		h('table.board-table', h('thead', h('tr', ...['#', 'Player', 'Frags', 'Deaths', 'Score'].map((t) => h('th', { text: t })))), body),
+		h('table.board-table', h('thead', h('tr', ...['#', 'Player', 'Frags', 'Deaths'].map((t) => h('th', { text: t })), scoreTh)), body),
 		note
 	)
 	const el = h('div.sk-board', card)
@@ -45,6 +46,7 @@ export function createBoard(root) {
 		if (k === key) return
 		key = k
 		setText(title, d.title)
+		setText(scoreTh, d.mode === 'spot' ? 'Points' : 'Score')
 		setText(sub, d.sub || '')
 		setText(note, d.note || '')
 		teams.textContent = ''

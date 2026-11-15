@@ -3,12 +3,13 @@
  * HUD of Stage Skirmish (WO-1081 §9): health + armour (bottom left), weapon + ammo and the 1–5 weapon strip (bottom
  * right), score (own place and the leader in `dm`, team totals in `tdm`; "Warm up" in the lobby), the match clock,
  * minimap + kill feed + connection dot + tool buttons (top right), "FRAG" / "fragged by" banners, the respawn
- * count-down, the start count-down, a red edge when hurt, toasts, and the scoreboard (hud-board.js). DOM only.
+ * count-down, the start count-down, a red edge when hurt, toasts, the Spotlight line (`spot` mode: who holds the pool,
+ * when it moves) and the scoreboard (hud-board.js). DOM only.
  */
 import { h, setText, show, safeColor } from './dom.js'
 import { createMinimap } from './minimap.js'
 import { createBoard, createKillFeed } from './hud-board.js'
-import { WEAPONS, WEAPON_ORDER, TEAM_COLORS, TEAM_NAMES, HP_MAX, AR_MAX } from './sk-const.js'
+import { WEAPONS, WEAPON_ORDER, TEAM_COLORS, TEAM_NAMES, HP_MAX, AR_MAX, MODE_NAMES } from './sk-const.js'
 import { ordinal } from './score.js'
 
 export function createHud(root, { spectator = false, toolbar = [] } = {}) {
@@ -21,7 +22,8 @@ export function createHud(root, { spectator = false, toolbar = [] } = {}) {
 	const tl = h('div.hud-tl.sk-tl', scoreMain, scoreSub, teamBar)
 	const clock = h('div.sk-clock')
 	const status = h('div.hud-status')
-	const tc = h('div.hud-tc', clock, status)
+	const spotLine = h('div.sk-spot-line')
+	const tc = h('div.hud-tc', clock, spotLine, status)
 	const mapCanvas = h('canvas.hud-map.sk-map', { width: spectator ? 320 : 180, height: spectator ? 240 : 135 })
 	const conn = h('div.hud-conn', { title: 'Connection' })
 	const tools = h('div.hud-tools', ...toolbar.map((b) => b.el))
@@ -99,7 +101,7 @@ export function createHud(root, { spectator = false, toolbar = [] } = {}) {
 			show(teamBar, tdm)
 			if (s.phase === 'lobby') {
 				setText(scoreMain, 'Warm up')
-				setText(scoreSub, `${tdm ? 'Team match' : 'Free for all'} · waiting for the host`)
+				setText(scoreSub, `${MODE_NAMES[s.mode] || MODE_NAMES.dm} · waiting for the host`)
 			} else if (tdm) {
 				const t = s.teams || [0, 0]
 				const me = s.players.find((p) => p.id === s.meId)
@@ -117,11 +119,18 @@ export function createHud(root, { spectator = false, toolbar = [] } = {}) {
 				if (me && s.rank) setText(scoreMain, `${ordinal(s.rank)} · ${me.score ?? 0}`)
 				else setText(scoreMain, lead ? `${lead.name} leads` : '')
 				const leadText = lead ? `leader ${lead.name} ${lead.score ?? 0}` : ''
-				setText(scoreSub, `${leadText}${leadText ? ' · ' : ''}to ${s.limits?.frags ?? 20}`)
+				const unit = s.mode === 'spot' ? ' points' : ''
+				setText(scoreSub, `${leadText}${leadText ? ' · ' : ''}to ${s.limits?.frags ?? 20}${unit}`)
 			}
 		},
 		clock(text) {
 			setText(clock, text || '')
+		},
+		/** The Spotlight line: { text, kind: 'mine' | 'other' | 'fight' | 'free' } or null. */
+		spot(v) {
+			setText(spotLine, v?.text || '')
+			spotLine.className = `sk-spot-line ${v?.kind || ''}`
+			show(spotLine, !!v?.text)
 		},
 		setStatus(text) {
 			setText(status, text || '')

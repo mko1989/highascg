@@ -43,7 +43,7 @@ const RULES = {
 	posSlack: 2, // positions outside the arena rect + 2 u are ignored
 	countdownMs: 3000, resultsMs: 15000,
 	maxPlayers: 10, maxSpectators: 20, maxBots: 6,
-	frags: { dm: 20, tdm: 40, min: 5, max: 100 }, minutes: { def: 5, min: 1, max: 30 },
+	frags: { dm: 20, tdm: 40, spot: 60, min: 5, max: 100 }, minutes: { def: 5, min: 1, max: 30 },
 }
 
 /** Arena rules (§4), lengths in u. */

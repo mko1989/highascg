@@ -13,7 +13,7 @@
  * MVR store read-only; when either is unavailable (or with --empty) the RC baker's default empty hall is used.
  * A session is enabled at start; then --arena / --mode / --bots are applied as host actions once the arenas exist.
  *
- *   node tools/dev/skirmish-dev-server.js [--port 4310] [--arena <id>] [--mode dm|tdm] [--bots n] [--fake-lights] [--empty]
+ *   node tools/dev/skirmish-dev-server.js [--port 4310] [--arena <id>] [--mode dm|tdm|spot] [--bots n] [--fake-lights] [--empty]
  *
  *   --fake-lights  a synthetic rig of moving heads over every arena (a slow sweeping pattern, cycling colours) instead
  *                  of the real follow service; without it the game has no lights (state.lights false).
@@ -115,7 +115,7 @@ function fakeLights(sceneOf) {
 
 async function main() {
 	const o = args(process.argv.slice(2))
-	if (o.help) return console.log('node tools/dev/skirmish-dev-server.js [--port 4310] [--arena id] [--mode dm|tdm] [--bots n] [--fake-lights] [--empty]')
+	if (o.help) return console.log('node tools/dev/skirmish-dev-server.js [--port 4310] [--arena id] [--mode dm|tdm|spot] [--bots n] [--fake-lights] [--empty]')
 	const requireCore = (id) => require(id.startsWith('src/') ? path.join(ROOT, id) : require.resolve(id, { paths: [ROOT] }))
 	const host = Object.freeze({ name: 'toy-skirmish', version: 'dev', moduleDir: MOD, coreRoot: ROOT, coreVersion: 'dev', requireCore,
 		log: (level, msg) => log(level, `[module:toy-skirmish] ${msg}`) })

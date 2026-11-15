@@ -1,7 +1,8 @@
 # WO-1083 — Stage Skirmish: bots see no farther than a player (no more cross-map shots); flat decor; Spotlight mode
 
 **Area:** web-client
-**Status: IN PROGRESS (15.11.26 — part 1 fixed, tested offline and on the box's server; part 2 being built)**
+**Status: DONE (15.11.26 — offline smokes; live bot matches on the box's server, max bot hit 6.63 u against the 7.09 u
+limit; Spotlight played live by bots and looked at in a headless Firefox; real phones / owner play not yet)**
 
 Owner 15.11 (after playing [WO-1081](./1081_WO_stage_skirmish_toy_soldier_shooter.md)): *"bots shouldnt be able to aim
 longer than a player can. there were cases were bots were shooting across the whole map."*
@@ -83,6 +84,28 @@ by the curved hall wall).
   filtered `occ`, so the server grid, the arenas and the client grid agree. The baked files and the RC game are not
   touched (`sk-kit.js` re-exports `rc-scene-height.js fromJSON` and `rc-scene-occ.js encodeRle`, read-only).
 
+### Part 2 — Spotlight mode (`spot`)
+
+What the game lacked most after WO-1081: a third way to play that is not just "frag more" and that gives bots and
+humans a reason to meet (with a 7 u sight, an empty arena is otherwise a lot of walking). Original idea and names.
+
+- `server/sk-spot.js` (new, pure): one pool of light (radius 2.5 u) on a pickup pad; it moves every 40 s to another
+  pad ≥ 12 u away when the arena allows (`movesAt` in the state; clients warn 5 s ahead). Alone inside = holder, a
+  point per full second in a match (`p.score`, `p.spot`); two or more = contested, nobody scores. Lobby: the pool is
+  there to try, nothing scored. `sk-room.js`: mode `spot` (host `mode {mode:'spot'}`), a 250 ms tick timer only while
+  the mode is on (cleared on a mode change and on dispose), the pool reset on arena change / lobby / start,
+  `state.spot` (`{x, z, r, movesAt, holder, contested}` or null), the points limit through the existing `limits.frags`
+  (`RULES.frags.spot` = 60). `sk-combat.js`: kills / suicides score nothing in `spot` (still counted).
+  `sk-bots.js`: in `spot` a bot walks to a random point inside the pool and waits there (fighting whoever comes
+  — under the same view rule), unless hurt below 40 hp with a health pickup worth it; it re-plans when the pool moves.
+- Client: `spot-view.js` (the pool on the floor: disc, dark edge, ring, soft halo; free = warm white, yours = green,
+  someone else's = their colour, contested = flashing orange; blinks before it moves), `spot-status.js` (pure: the HUD
+  line "You hold the light · +1 a second" / "<name> holds the light" / "Light contested!" / "The light is free", an
+  arrow + distance when the pool is out of view, "moves in N"), minimap ring, HUD score line and board in points,
+  lobby text, host panel: Spotlight mode button, points label, bot Skill buttons (easy / normal / hard).
+  `game.js` / `protocol.js` keep the mode (they folded every non-`tdm` mode to `dm`).
+- Contract (`work/notes/skirmish-game-contract.md`) §2 / §6 / §7 / §8 updated (view rule, `botlevel`, `spot`).
+
 ## Verified
 
 - `tools/smoke/smoke-wo1083-sk-bot-view.test.js` (10 tests): the view constants equal `client/cam.js`'s; `ndcOf` is
@@ -107,3 +130,31 @@ by the curved hall wall).
     The idle player was never found (0 hits: no bot came near it) — that is what the patrol change fixed.
   - run 2 (patrol loaded): stage 152 hits, max **6.29 u**, the idle player hit too; the run was then cut by a node
     restart from another session (the socket closed, the session came back disabled), so it was repeated (below).
+  - run 4 (everything of part 1 loaded), 2 min per arena: stage 63 hits, max 5.71 u (5 on the idle player);
+    crossroads 172, max **6.63 u** (20 on the idle player); banquet 105, max 5.83 u (5) — **340 hits, max 6.63 u, p99
+    6.24 u**, the idle player found and hit 30 times. Over runs 1 + 4: **910 live bot hits, none past 6.63 u.**
+- `smoke-wo1083-sk-spotlight.test.js` (4): the pool on a pickup pad in the lobby, warm-up scores nothing, alone =
+  exactly 3 points in 3 s, contested = none (and the state says so), a frag scores nothing, the pool moves after 40 s
+  ≥ 12 u, the points limit ends the match with `results.mode` `spot` and the holder first, 2 bots in 60 s stand in the
+  pool (187 bot-ticks) and score (34 points), the HUD line and arrows; no timer survives dispose. All skirmish smokes
+  (wo1081 × 13 files + wo1083 × 3): **96 / 96 pass**; eslint clean on the module, file-line limit and format gates pass.
+- LIVE Spotlight (box server, 4 bots, stage, 2 min, a spectator socket logging `state.spot`): the pool moved 4 times
+  (12.7, 12.1, 31.7, 12.6 u), 16 contested states, four different holders; points 26 / 18 / 17 / 4 with frags 6 / 2 /
+  1 / 3 (frags did not score); `results.mode` `spot`. A second socket compared `state.spot.holder` with the `w`
+  positions once a second: holder = the one soldier inside, every time.
+- Headless look (private Xvfb :77 + a throwaway firefox-esr profile, both TERMed after): the spectator page in a
+  Spotlight match — HUD "The light is free" / "<name> holds the light" / "Light contested!", "to 60 points", the board's
+  Points column, the minimap ring, the results board "Match over · <bot> wins" in points
+  (`work/notes/wo1083-evidence/*.jpg`). The first look showed the pool too faint on the light hall floor (warm white at 0.3,
+  a 0.4 mm lift z-fighting in the overview): now warm yellow, thicker edge and ring, lifted 1.2 mm; the banquet frame
+  shows it clearly with a bot standing in it.
+
+## Open / notes
+
+- Not verified on real phones or by the owner playing; the bot level buttons and the Spotlight button were exercised
+  over the host API, not clicked.
+- In the spectator overview of the `stage` arena a large black slab from the room scene covers the middle of the arena
+  (soldiers and the pool under it; the name tags float above). It is scene content (the RC scene / baker, another
+  session's area), not the skirmish's — worth a look there.
+- Flat decor: the skirmish now ignores occ cells with nothing above 0.3 u, but the RC game itself still treats every
+  occ cell (anything > 5 mm, e.g. a carpet) as a wall — for whoever owns the baker / RC game.

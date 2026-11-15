@@ -62,8 +62,8 @@ its world code instead of copying it:
 | Scene | `GET /api/game/sk/scene`, `GET /api/game/sk/scene.glb` (as RC: 403 while disabled, gzip, `?rev=` immutable) |
 | Socket | WebSocket `/api/game/sk/ws` (also under `/instance/<id>`) |
 
-`host` actions: `enable`, `disable`, `arena {id}`, `mode {mode: 'dm'|'tdm'}`, `limits {frags: 5–100, minutes: 1–30}`,
-`bots {n: 0–6}`, `start`, `stop`, `kick {id}`, `team {id, team}` (move a player), `lights {on}`, `wall {on}`.
+`host` actions: `enable`, `disable`, `arena {id}`, `mode {mode: 'dm'|'tdm'|'spot'}`, `limits {frags: 5–100, minutes: 1–30}`,
+`bots {n: 0–6}`, `botlevel {level: 'easy'|'normal'|'hard'}` (WO-1083), `start`, `stop`, `kick {id}`, `team {id, team}` (move a player), `lights {on}`, `wall {on}`.
 
 ## 3. Units, sizes, numbers (both sides use exactly these)
 
@@ -156,6 +156,11 @@ deaths, score, pickups, respawns, teams and the phase machine are the server's.*
 The match ends at the frag limit (default 20; `tdm`: team total, default 40) or the time limit (default 5 min); host
 `stop` → `lobby`. `dm`: every player for themselves, score = kills − suicides. `tdm`: red (0) / blue (1), joiners go to
 the smaller team, the host may move players; a player's colour is the team colour.
+`spot` ("Spotlight", WO-1083, `server/sk-spot.js`): every player for themselves; one pool of light (radius 2.5 u) lies
+on a pickup pad and moves to another pad every 40 s (≥ 12 u away when the arena allows; clients warn 5 s ahead). A
+soldier alone in it scores a point per full second; two or more inside = contested, nobody scores. Frags do not score
+(kills / deaths are still counted); the limit (`limits.frags`) is points, default 60. In the lobby the pool is there,
+nothing is scored.
 
 ## 7. Socket (JSON text frames; ≤ 2 KB; rate limits as RC)
 
@@ -186,15 +191,21 @@ Server → client:
 
 `<state>`: `{ enabled, phase, mode, arenaId, limits: { frags, minutes }, endsAt, bots, maxPlayers,
 players: [{ id, name, color, team, bot, connected, kills, deaths, score }], teams: [r, b], pk: [[id, until]],
-joinUrls, sceneRev, lights, wall }`.
+joinUrls, sceneRev, lights, wall, botLevel, spot }` — `botLevel` 'easy'|'normal'|'hard'; `spot` (mode `spot` only,
+else null) `{ x, z, r, movesAt, holder: id|null, contested }` in metres / server ms (WO-1083).
 
 ## 8. Bots (server)
 
 Host `bots {n}` adds up to 6 server-driven soldiers (named from a fixed list of our own, `bot: true`). They move on the
-arena's solid grid (grid path to a goal: a wanted pickup, else a random spawn; re-plan every 2–4 s or when stuck),
-turn towards the nearest visible enemy (line of sight on the grid), and fire the best weapon they hold with a reaction
-delay (0.35 s) and aim error (± 6°, ± 3° for `longshot`); their hits are decided by the server against its positions
-with the same rules as §5. They obey every limit a player does. No bots → no bot timer.
+arena's solid grid (grid path to a goal: a pickup worth it, else the spawn points they passed longest ago — a patrol;
+in `spot` the pool unless hurt; re-plan every 2–4 s or when stuck) and obey every limit a player does. No bots → no
+bot timer. **A bot never sees farther than a player (WO-1083):** it notices, turns to and fires at only an enemy a
+player standing where it stands could see — inside the follow camera's frame (`server/sk-view.js`, a 16:10 view, inner
+90 %: ± 4.75 u up / down screen, ± 6.85 u sideways, never past 7.09 u), both ways, with a line crossing no solid cell.
+The referee enforces it too: a bot's `hit` needs distance ≤ range (no slack), that view and that line; its splash
+spares everyone outside the view. Humanlike aim (`server/sk-bot-aim.js`): a reaction delay per sighting, a turn rate,
+fire only within a cone of the target, aim error growing with distance, a lost target is dropped. Host `botlevel`
+(`easy` / `normal` / `hard`) changes delay, turn rate and error — never the view.
 
 ## 9. Client: look and controls
 
@@ -251,7 +262,7 @@ module on the box.
   their own `color` in `state` in `tdm`; the client draws the team colour.
 - **Block rectangle:** `x`, `z` = its centre; `w` runs along X at `yaw` 0; `yaw` π/2 swaps `w` and `d`. A cell is
   solid when its centre lies inside the closed rectangle.
-- Dev server: `node tools/dev/skirmish-dev-server.js [--port 4310] [--arena id] [--mode dm|tdm] [--bots n]
+- Dev server: `node tools/dev/skirmish-dev-server.js [--port 4310] [--arena id] [--mode dm|tdm|spot] [--bots n]
   [--fake-lights] [--empty]`; host actions `POST /api/game/sk/host` without auth; LED wall pictures are off there
   (screens are listed, no video feed).
 - **After the client was built (lead):** `w` tuples are `[id, x, z, yaw, flags, weapon]` (the held weapon, so others

@@ -29,7 +29,7 @@ import { onMessage } from './session.js'
 import { startLoop } from './loop.js'
 import { tuneStageFx } from './stage-look.js'
 import { installDevHook } from './dev-hook.js'
-import { WEAPONS } from './sk-const.js'
+import { WEAPONS, MODES } from './sk-const.js'
 
 const STATE_POLL_MS = 4000
 
@@ -72,7 +72,7 @@ export async function startGame({ spectator = false } = {}) {
 		gameOff: () => gameOff(G),
 		hold: (w, toast) => hold(G, w, toast),
 		scoreInfo: () => ({
-			mode: G.state?.mode === 'tdm' ? 'tdm' : 'dm',
+			mode: MODES.includes(G.state?.mode) ? G.state.mode : 'dm',
 			phase: G.phase,
 			players: G.state?.players || [],
 			teams: G.state?.teams || [0, 0],
@@ -266,7 +266,7 @@ function boardInfo(G) {
 	const roster = new Map((st.players || []).map((p) => [p.id, p]))
 	// results rows carry no colour / bot flag (§7): take them from the roster
 	const players = res?.order?.length ? res.order.map((p) => ({ ...roster.get(p.id), ...p })) : st.players || []
-	const mode = res?.mode || (st.mode === 'tdm' ? 'tdm' : 'dm')
+	const mode = res?.mode || (MODES.includes(st.mode) ? st.mode : 'dm')
 	const teams = res?.teams || st.teams || [0, 0]
 	let sub = ''
 	if (res) {

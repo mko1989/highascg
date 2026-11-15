@@ -30,7 +30,7 @@ const code = files.filter((f) => /\.(js|mjs)$/.test(f))
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1')
 
 const PURE = ['sk-const.js', 'grid.js', 'move.js', 'shots.js', 'protocol.js', 'score.js', 'cam.js', 'net.js']
-const HOST_ACTIONS = ['enable', 'disable', 'arena', 'mode', 'limits', 'bots', 'start', 'stop', 'kick', 'team', 'lights', 'wall']
+const HOST_ACTIONS = ['enable', 'disable', 'arena', 'mode', 'limits', 'bots', 'start', 'stop', 'kick', 'team', 'lights', 'wall', 'botlevel']
 
 describe('WO-1081 Skirmish client: owner rules (source text)', () => {
 	it('has the expected files', () => {

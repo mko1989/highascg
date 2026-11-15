@@ -3,15 +3,18 @@
  * Per-frame work of Stage Skirmish (WO-1081 §5/§9): input → the own soldier (fixed 60 Hz steps against the arena's
  * solid grid, screen-relative running, mouse / stick aim), the trigger (combat.js), pick-ups, the own-state send;
  * the other soldiers drawn from their snapshot buffers (interpolated 100 ms back), rockets, effects, the live room
- * (the kit's stage-fx), the top-down camera (spectators: the whole arena or one player at a time), HUD every 100 ms.
+ * (the kit's stage-fx), the top-down camera (spectators: the whole arena or one player at a time), HUD every 100 ms,
+ * and in `spot` mode the spotlight pool (spot-view.js) with its HUD line and minimap ring (WO-1083).
  */
 import { stepSoldier, isMoving } from './move.js'
 import { stateMsg } from './protocol.js'
 import { followCam, arenaCam, easePose, screenToPlane, FOV_DEG } from './cam.js'
 import { tryFire, updateRockets, checkPickups } from './combat.js'
-import { respawnLeft } from './session.js'
+import { respawnLeft, nameOf } from './session.js'
 import { rankOf, leaderOf, fmtClock, isEnemy, cycleWeapon, weaponForKey } from './score.js'
-import { SOLDIER, FLAG, yawOf, fwd } from './sk-const.js'
+import { SOLDIER, FLAG, yawOf, fwd, SPOT_WARN_S } from './sk-const.js'
+import { createSpotView } from './spot-view.js'
+import { spotStatus } from './spot-status.js'
 
 const HUD_EVERY_MS = 100
 const SPEC_OVERVIEW_S = 10
@@ -122,6 +125,18 @@ export function startLoop(G) {
 		G.world.setCamera(G.camPose)
 	}
 
+	const spotOf = () => (G.state?.mode === 'spot' && G.state.spot) || null
+	const spotColor = (sp) => (sp.contested ? '#ff5a2a' : sp.holder == null ? '#ffd23a' : sp.holder === G.meId ? '#4dff7a' : G.remotes.get(sp.holder)?.color || '#ffffff')
+
+	function spotlight(t, sNow) {
+		const sp = spotOf()
+		if (sp && !G.spotView && G.arena) {
+			G.spotView = createSpotView(G.s)
+			G.world.scene.add(G.spotView.group)
+		}
+		G.spotView?.update(sp, { t, sNow, y: G.arena?.y ?? 0, meId: G.meId, colorOf: (id) => G.remotes.get(id)?.color ?? null })
+	}
+
 	function hud(sNow) {
 		const players = G.state?.players || []
 		if (!G.spectator) G.hud.vitals(G.me, G.held)
@@ -139,6 +154,9 @@ export function startLoop(G) {
 		const left = respawnLeft(G, sNow)
 		G.hud.respawn(!G.spectator && left != null && G.meId != null ? (left > 0.05 ? `Back in ${Math.ceil(left)}` : 'Respawning…') : '')
 		G.hud.surge(!G.spectator && (G.me?.surge || 0) > sNow)
+		const sp = spotOf()
+		const me = !G.spectator && G.my && G.alive ? G.my : null
+		G.hud.spot(spotStatus(sp, { meId: G.meId, phase: G.phase, sNow, me, nameOf: (id) => nameOf(G, id), s: G.s, warnS: SPOT_WARN_S }))
 		G.hud.feed.tick()
 		/* minimap */
 		const here = (id) => G.arenaView?.available(id, sNow)
@@ -149,7 +167,7 @@ export function startLoop(G) {
 			const mate = G.state?.mode === 'tdm' && !isEnemy(G.state, G.meId, r.id)
 			if (G.spectator || mate) dots.push({ x: r.pose.x, z: r.pose.z, color: r.color })
 		}
-		G.hud.minimap.draw({ pickups, dots, me: G.my && G.alive ? G.my : null })
+		G.hud.minimap.draw({ pickups, dots, me: G.my && G.alive ? G.my : null, spot: sp ? { x: sp.x, z: sp.z, r: sp.r, color: spotColor(sp) } : null })
 		/* the board: results, Tab / button, spectators always */
 		const showBoard = G.phase === 'results' || G.boardHeld || G.boardOn || G.spectator
 		if (showBoard) G.hud.board.render(G.ctl.boardInfo())
@@ -168,6 +186,7 @@ export function startLoop(G) {
 		G.skfx.update(dt)
 		G.fx?.update(dt)
 		G.arenaView?.update(t, sNow)
+		spotlight(t, sNow)
 		camera(dt, t)
 		if (now - hudAt > HUD_EVERY_MS) {
 			hudAt = now

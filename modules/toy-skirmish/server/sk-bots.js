@@ -6,8 +6,9 @@
  * timer only while bots exist):
  *   - moves on the arena's grid at 4.5 u/s: A* path (sk-grid.js findPath over the cells a soldier fits) to a goal — a
  *     pickup it wants (a weapon it lacks, health under 70, armour under 50, surge — near enough to be worth it), else
- *     a patrol of the spawn points it passed longest ago (kept until reached); re-plans every 2–4 s, when it arrives or
- *     when the path is gone; looks ahead along the path where the straight
+ *     a patrol of the spawn points it passed longest ago (kept until reached) — in `spot` mode the Spotlight pool
+ *     (WO-1083) instead, unless it is hurt and a health pickup is worth it, waiting inside; re-plans every 2–4 s,
+ *     when it arrives, when the pool moves or when the path is gone; looks ahead along the path where the straight
  *     line stays on passable cells; picks up what it touches (through the same rules as a player's `pick`);
  *   - notices, turns towards and fires at only what a player in its place could see (WO-1083, sk-bot-aim.js: the
  *     follow camera's frame both ways — never past 7.1 u — and a clear line on the full grid), after a reaction time,
@@ -109,6 +110,9 @@ function createBots(X, combat, hooks) {
 		const ai = p.ai
 		ai.replanAt = now() + 2000 + X.rng() * 2000
 		const it = wish(p)
+		const sp = X.spot?.()
+		ai.spotAt = sp?.movesAt ?? null
+		if (sp && !(it && it.kind === 'health' && p.hp < 40)) return toSpot(p, sp)
 		// a patrol goal is kept until it is reached (re-planned only for the path); a wanted pickup comes first
 		const keep = ai.goal && Math.hypot(ai.goal[0] - p.pos[0], ai.goal[1] - p.pos[1]) > VISIT_U * u() ? [ai.goal] : []
 		const goals = it ? [[it.x, it.z], ...keep, ...roam(p)] : [...keep, ...roam(p)]
@@ -125,6 +129,19 @@ function createBots(X, combat, hooks) {
 		ai.goal = null
 	}
 
+	/** Spotlight (WO-1083): into the pool, to a point inside it (several bots spread out), and wait there. */
+	function toSpot(p, sp) {
+		const ai = p.ai
+		const inside = Math.hypot(sp.x - p.pos[0], sp.z - p.pos[1]) <= sp.r * 0.7
+		const a = X.rng() * Math.PI * 2, r = sp.r * 0.5 * X.rng()
+		const goals = inside ? [] : [[sp.x + Math.cos(a) * r, sp.z + Math.sin(a) * r], [sp.x, sp.z]]
+		for (const g of goals) {
+			const path = G.findPath(X.grid, X.mask, p.pos[0], p.pos[1], g[0], g[1])
+			if (path && path.length > 1) return Object.assign(ai, { goal: null, path, i: 0 })
+		}
+		Object.assign(ai, { goal: null, path: null })
+	}
+
 	/** A straight walk the soldier's circle never touches a solid cell on (exact clearance every quarter cell). */
 	function walkable(ax, az, bx, bz) {
 		const d = Math.hypot(bx - ax, bz - az)
@@ -137,7 +154,8 @@ function createBots(X, combat, hooks) {
 	/** One walking step; → the walking yaw, or null when it stood still. */
 	function move(p, dt) {
 		const ai = p.ai
-		if (!ai.path || ai.i >= ai.path.length || now() >= ai.replanAt) plan(p)
+		const spotAt = X.spot?.()?.movesAt ?? null
+		if (!ai.path || ai.i >= ai.path.length || now() >= ai.replanAt || spotAt !== (ai.spotAt ?? null)) plan(p)
 		if (!ai.path) return null
 		let step = SOLDIER.speed * u() * dt
 		const before = p.pos.slice()

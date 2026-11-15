@@ -2,7 +2,8 @@
 /**
  * The HUD minimap of Stage Skirmish (WO-1081 §9): the arena from above (x right, z down — the camera's frame), its
  * solid cells pre-rendered once per arena, the pick-ups (a dot in the kind's colour while there), team-mates, and the
- * own soldier as an arrow along its aim. Enemies are not shown to players (the spectator map shows everyone).
+ * own soldier as an arrow along its aim, and the Spotlight pool (`spot` mode, WO-1083) as a ring. Enemies are not
+ * shown to players (the spectator map shows everyone).
  * Canvas 2D only; positions go through score.js minimapFit.
  */
 import { minimapFit } from './score.js'
@@ -51,13 +52,23 @@ export function createMinimap(canvas) {
 
 	/**
 	 * @param {{ pickups: { x, z, kind, here: boolean }[], dots: { x, z, color: string }[],
-	 *   me?: { x, z, yaw } | null }} d
+	 *   me?: { x, z, yaw } | null, spot?: { x, z, r, color: string } | null }} d
 	 */
 	function draw(d) {
 		if (!ctx) return
 		ctx.clearRect(0, 0, canvas.width, canvas.height)
 		if (!fit || !base) return
 		ctx.drawImage(base, 0, 0)
+		if (d.spot) {
+			const [x, y] = fit.toPx(d.spot.x, d.spot.z)
+			ctx.fillStyle = 'rgba(255,236,170,0.28)'
+			ctx.strokeStyle = d.spot.color
+			ctx.lineWidth = 2
+			ctx.beginPath()
+			ctx.arc(x, y, Math.max(4, d.spot.r * fit.k), 0, Math.PI * 2)
+			ctx.fill()
+			ctx.stroke()
+		}
 		for (const p of d.pickups || []) {
 			const [x, y] = fit.toPx(p.x, p.z)
 			ctx.fillStyle = p.here ? hex(pickupColor(p.kind)) : 'rgba(255,255,255,0.18)'

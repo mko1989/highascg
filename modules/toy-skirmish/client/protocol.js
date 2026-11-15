@@ -4,7 +4,7 @@
  * and returns null for anything unknown or malformed. Positions are world metres rounded to 1 mm or finer so they keep
  * ≥ 3 significant digits of a u at the toy scale (RC contract §3: 1 mm at scale 0.1).
  */
-import { isWeapon, PHASES } from './sk-const.js'
+import { isWeapon, PHASES, MODES } from './sk-const.js'
 
 export const MAX_NAME = 16
 export const SEND_INTERVAL_MS = 55 // ≈ 18 Hz, under the server's 20 Hz limit
@@ -175,7 +175,7 @@ export function decode(text) {
 			if (!Array.isArray(m.order)) return null
 			return {
 				t: 'results',
-				mode: m.mode === 'tdm' ? 'tdm' : 'dm',
+				mode: MODES.includes(m.mode) ? m.mode : 'dm',
 				order: m.order.filter(obj),
 				teams: Array.isArray(m.teams) ? m.teams.map((v) => (num(v) ? v : 0)) : null,
 				final: m.final !== false,

@@ -2,9 +2,10 @@
 /**
  * Host panel of Stage Skirmish (`?host=1`, WO-1081 §2/§9): enable / disable, the join address as a QR code (the kit's
  * join-code.js + its vendored generator) and in large type, the arena (top-down previews of the solid grid), mode
- * (free for all / teams), frag and time limits, bots, start / stop, the two switches for what the guests see INSIDE
- * the game world (live lights, LED wall pictures), and the roster with kick and team moves. It only calls
- * /api/game/sk/state, /scene and /host — the game never puts anything on a screen, and this panel offers no way to.
+ * (free for all / teams / spotlight), frag (points) and time limits, bots and their skill (WO-1083), start / stop, the
+ * two switches for what the guests see INSIDE the game world (live lights, LED wall pictures), and the roster with
+ * kick and team moves. It only calls /api/game/sk/state, /scene and /host — the game never puts anything on a screen,
+ * and this panel offers no way to.
  */
 import { h, setText, show, apiGet, apiHost, safeColor } from './dom.js'
 import { qrMatrix, drawQr } from './kit/join-code.js'
@@ -12,7 +13,7 @@ import { prepareOcc } from './kit/occ.js'
 import { sceneScale } from './kit/scale.js'
 import { buildArenaGrid } from './grid.js'
 import { createMinimap } from './minimap.js'
-import { TEAM_COLORS, TEAM_NAMES } from './sk-const.js'
+import { TEAM_COLORS, TEAM_NAMES, BOT_LEVELS } from './sk-const.js'
 
 export function renderJoinCode(url, el) {
 	el.textContent = ''
@@ -45,6 +46,13 @@ export function startHost(root) {
 	const stopBtn = h('button.ghost', { type: 'button', text: 'Stop → lobby' })
 	const dmBtn = h('button.ghost.mode', { type: 'button', text: 'Free for all' })
 	const tdmBtn = h('button.ghost.mode', { type: 'button', text: 'Teams' })
+	const spotBtn = h('button.ghost.mode', { type: 'button', text: 'Spotlight' })
+	const levelBtns = BOT_LEVELS.map((l) => {
+		const b = h('button.ghost.mode', { type: 'button', text: l[0].toUpperCase() + l.slice(1) })
+		b.dataset.level = l
+		return b
+	})
+	const fragsLbl = h('span.host-lbl', { text: 'Frag limit' })
 	const joinBox = h('div.join-box')
 	const arenasEl = h('div.host-tracks')
 	const playersEl = h('ul.host-players')
@@ -69,9 +77,10 @@ export function startHost(root) {
 		h(
 			'section.host-sec',
 			h('h2', { text: 'Match' }),
-			h('div.host-actions', dmBtn, tdmBtn),
-			h('div.host-actions', h('span.host-lbl', { text: 'Frag limit' }), frags.el, h('span.host-lbl', { text: 'Time' }), minutes.el),
-			h('div.host-actions', h('span.host-lbl', { text: 'Bots' }), bots.el)
+			h('div.host-actions', dmBtn, tdmBtn, spotBtn),
+			h('p.hint', { text: 'Spotlight: a pool of light moves around the arena; standing in it alone scores a point a second.' }),
+			h('div.host-actions', fragsLbl, frags.el, h('span.host-lbl', { text: 'Time' }), minutes.el),
+			h('div.host-actions', h('span.host-lbl', { text: 'Bots' }), bots.el, h('span.host-lbl', { text: 'Skill' }), ...levelBtns)
 		),
 		h('section.host-sec', h('h2', { text: 'Arena' }), arenasEl),
 		h('section.host-sec', h('h2', { text: 'Players' }), playersEl),
@@ -113,7 +122,7 @@ export function startHost(root) {
 		const l = lim()
 		const f = Math.max(5, Math.min(100, (l.frags || 20) + df))
 		const m = Math.max(1, Math.min(30, (l.minutes || 5) + dm))
-		act({ action: 'limits', frags: f, minutes: m }, `Limits: ${f} frags · ${m} min`)
+		act({ action: 'limits', frags: f, minutes: m }, `Limits: ${f} ${state?.mode === 'spot' ? 'points' : 'frags'} · ${m} min`)
 	}
 	function setBots(d) {
 		const n = Math.max(0, Math.min(6, (state?.bots | 0) + d))
@@ -125,6 +134,8 @@ export function startHost(root) {
 	stopBtn.addEventListener('click', () => act({ action: 'stop' }, 'Back to the lobby.'))
 	dmBtn.addEventListener('click', () => act({ action: 'mode', mode: 'dm' }, 'Mode: free for all'))
 	tdmBtn.addEventListener('click', () => act({ action: 'mode', mode: 'tdm' }, 'Mode: teams'))
+	spotBtn.addEventListener('click', () => act({ action: 'mode', mode: 'spot' }, 'Mode: spotlight'))
+	for (const b of levelBtns) b.addEventListener('click', () => act({ action: 'botlevel', level: b.dataset.level }, `Bot skill: ${b.dataset.level}`))
 	lightsBox.addEventListener('change', () =>
 		act({ action: 'lights', on: lightsBox.checked }, `Live lights in the game ${lightsBox.checked ? 'on' : 'off'}.`)
 	)
@@ -199,10 +210,17 @@ export function startHost(root) {
 		show(disableBtn, on)
 		startBtn.disabled = !on || state.phase !== 'lobby' || !n
 		stopBtn.disabled = !on || state.phase === 'lobby'
-		dmBtn.classList.toggle('on', state.mode !== 'tdm')
+		dmBtn.classList.toggle('on', state.mode !== 'tdm' && state.mode !== 'spot')
 		tdmBtn.classList.toggle('on', state.mode === 'tdm')
-		dmBtn.disabled = tdmBtn.disabled = !on || state.phase !== 'lobby'
-		setText(frags.val, `${lim().frags ?? 20} frags`)
+		spotBtn.classList.toggle('on', state.mode === 'spot')
+		dmBtn.disabled = tdmBtn.disabled = spotBtn.disabled = !on || state.phase !== 'lobby'
+		for (const b of levelBtns) {
+			b.classList.toggle('on', (state.botLevel || 'normal') === b.dataset.level)
+			b.disabled = !on
+		}
+		const pts = state.mode === 'spot'
+		setText(fragsLbl, pts ? 'Points' : 'Frag limit')
+		setText(frags.val, `${lim().frags ?? 20} ${pts ? 'points' : 'frags'}`)
 		setText(minutes.val, `${lim().minutes ?? 5} min`)
 		setText(bots.val, `${state.bots | 0}`)
 		lightsBox.checked = on && state.lights === true
