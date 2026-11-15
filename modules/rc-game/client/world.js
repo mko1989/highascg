@@ -136,7 +136,7 @@ function freeze(root) {
 	root.updateMatrixWorld(true)
 }
 
-/** Lambert instead of PBR on "low" (much cheaper per pixel on phones); keeps colour / vertex colours / opacity. */
+/** Lambert instead of PBR on "low" (much cheaper per pixel on phones); keeps colour / texture / vertex colours / opacity. */
 function cheapMaterials(root, low) {
 	root.traverse((o) => {
 		if (!o.isMesh) return
@@ -147,6 +147,8 @@ function cheapMaterials(root, low) {
 			o.userData.rcOrigMat = m
 			o.material = new THREE.MeshLambertMaterial({
 				color: m.color,
+				map: m.map, // WO-1082: the venue's textures (carpet, wood floor, truss) stay on "low"
+				flatShading: m.flatShading, // the scene GLB has no normals
 				vertexColors: m.vertexColors,
 				side: m.side,
 				transparent: m.transparent,

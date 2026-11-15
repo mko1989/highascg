@@ -358,6 +358,9 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 		[`${DIR}/rc-lights-fk.js`]: ['src/fixtures/gdtf-ik'],
 		[`${DIR}/rc-lights.js`]: ['src/fixtures/gdtf-store', 'src/fixtures/follow-patch'],
 		[`${DIR}/rc-video.js`]: ['events', 'src/fixtures/pixel-map-service', 'src/system/video-surfaces'],
+		/* WO-1082: the venue .glb is found in the open project's folder (read-only resolve) */
+		[`${DIR}/rc-scene.js`]: ['src/media/project-files'],
+		[`${DIR}/rc-scene-tex.js`]: ['child_process'],
 	}
 	const use = {
 		'src/fixtures/pixel-map-service': /^\.liveChannelMap\(ctx\)/,
@@ -368,8 +371,10 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 		const src = fs.readFileSync(path.join(ROOT, f), 'utf8')
 		const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '')
 		for (const m of code.matchAll(/\b(require|core)\(\s*'([^']+)'\s*\)/g)) {
-			if (m[1] === 'require' && (ownOnly.test(m[2]) || (m[2] === 'events' && f.endsWith('rc-video.js')))) {
-				if (m[2] === 'events') seen.add(`${f} events`)
+			/* WO-1082: rc-scene-tex.js spawns ffmpeg to shrink the venue's textures (an image filter on stdin → stdout) */
+			const builtin = (m[2] === 'events' && f.endsWith('rc-video.js')) || (m[2] === 'child_process' && f.endsWith('rc-scene-tex.js'))
+			if (m[1] === 'require' && (ownOnly.test(m[2]) || builtin)) {
+				if (builtin) seen.add(`${f} ${m[2]}`)
 				continue
 			}
 			if (f.endsWith('/host.js')) continue // the one file that holds the fallback require(id)

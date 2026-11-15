@@ -120,7 +120,7 @@ export function startLoop(G) {
 				fov += (fWant - fov) * (1 - Math.exp(-6 * dt))
 				G.world.setFov(fov)
 			}
-			G.world.setCamera(cam)
+			G.world.setCamera(G.devCam || cam) // dev-hook.js: a fixed pose for headless screenshots
 		}
 
 		/* ---- countdown lights (HUD + gantry) ---- */

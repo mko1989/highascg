@@ -105,11 +105,11 @@ test('visibleParts applies place, moved, hidden layers / objects and layer colou
 	assert.equal(G.stageFloor({ width: 0, depth: 6 }), null)
 })
 
-test('bakeScene: floors, obstacles, valid tracks, a flat GLB within budget; the venue GLB is ignored and said so', async () => {
+test('bakeScene: floors, obstacles, valid tracks, a flat GLB within budget; a venue .glb that is not there is said so (WO-1082)', async () => {
 	const inp = sceneInputs({ name: 'P', previs: { mvr: { ...cfg, venue_glb: 'venue.glb' }, tracking: { grid: { width: 8, depth: 6, x_offset: 2, y_offset: 4, z_offset: 1.2 } },
 		stage: { objects: [{ type: 'led_wall', panels: [8, 4], panel_mm: [500, 500], position: [2, 1.2, -8], rotation: [0, 0, 0] }] } } })
 	const calls = { mesh: 0 }
-	const { json, glb } = await bakeScene(inp, 'r1', { mvrStore: fakeStore(scene(), meshes, calls) })
+	const { json, glb } = await bakeScene(inp, 'r1', { mvrStore: fakeStore(scene(), meshes, calls), venueFile: () => null })
 	assert.equal(calls.mesh, 2, 'one mesh read per distinct template')
 	const hall = json.floors.find((f) => f.id === 'hall'), stage = json.floors.find((f) => f.id === 'stage')
 	assert.ok(hall && stage)
@@ -134,7 +134,7 @@ test('bakeScene: floors, obstacles, valid tracks, a flat GLB within budget; the 
 	assert.ok(F.bandHit(-10, 12, 0.3, 0.2, 2) && F.bandHit(14, 12, 0.3, 0.2, 2), 'truss legs in the field')
 	assert.ok(F.bandHit(2, 10, 0.3, 5.5, 6.5) && !F.bandHit(2, 10, 0.3, 0.1, 5.5), 'the light the GLB draws hangs at 6 m')
 	assert.ok(!F.bandHit(8, 10, 1, 0.1, 7) && !F.bandHit(2, -4, 1, 0.1, stage.y), 'open floor; the stage is cleared below its top')
-	assert.equal(json.dropped.venueGlb, 'ignored')
+	assert.equal(json.dropped.venueGlb, 'missing', 'WO-1082: the MVR parts are drawn and the bake says the venue file was not found')
 	assert.equal(json.dropped.fixtures, 0)
 	assert.equal(json.glb, '/api/game/rc/scene.glb?rev=r1')
 	assert.equal(json.stats.bytes, glb.length)

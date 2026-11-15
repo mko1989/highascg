@@ -21,6 +21,7 @@ module.exports = (h) => {
 		handleStatic: ({ method, path, search }) => (isRcStaticPath(path) ? serveRcStatic(path, { method, query: search }) : null),
 		onBoot(ctx) {
 			bootCtx = ctx
+			require('./server/rc-scene').setSceneCtx(ctx) // WO-1082: Stage Skirmish's bake (same file) finds the venue .glb too
 		},
 		/** Module disabled / server stopping: end the running session (sockets, lights, wall feed) and close the public paths. */
 		async onShutdown() {

@@ -11,7 +11,7 @@
 const { core } = require('./host')
 const WebSocket = core('ws')
 const { createRcRoom } = require('./rc-room')
-const { createSceneBaker } = require('./rc-scene')
+const { createSceneBaker, setSceneCtx } = require('./rc-scene')
 const { parseMessage } = require('./rc-sanitize')
 const { setRcGameEnabled } = require('./rc-public')
 const { createRcLights, rcLightsDeps, withLiveScene } = require('./rc-lights')
@@ -210,6 +210,7 @@ function useRcGame(game) {
 
 /** The process-wide game (created on first use; port from the live config). */
 function getRcGame(ctx) {
+	setSceneCtx(ctx) // WO-1082: the venue .glb is looked up in this context's project folder
 	if (!_game) {
 		_game = createRcGame({
 			ctx,

@@ -3,7 +3,10 @@
 /**
  * WO-1074 — RC car game: the scene from the active project — the MVR scene the previs shows (project.previs.mvr, read
  * through src/stage/mvr-store.js), the tracking stage (project.previs.tracking.grid) and the stage objects
- * (project.previs.stage.objects) → { rev, name, glb, bounds, floors, obstacles, tracks, dropped, stats } + ONE merged GLB.
+ * (project.previs.stage.objects) → { rev, name, glb, bounds, floors, obstacles, tracks, dropped, stats, venue } + ONE merged GLB.
+ * WO-1082: with a venue .glb (project.previs.mvr.venue_glb, WO-1003) the room is drawn from it the way the previs draws
+ * it (rc-scene-venue.js): Capture's meshes, materials and (shrunk, rc-scene-tex.js) textures instead of the MVR's flat
+ * 3DS parts, plus the objects only the .glb has; the floors, occupancy and height field come from those triangles.
  * Baked once per `rev` off the request path (awaiting setImmediate between chunks), one bake at a time, cached on disk
  * under ~/.highascg/cache/rc-game/<rev>.{json,glb,glb.gz} — never in the repo or under projects/. A request during the
  * bake waits for it. Never touches Caspar: reads the project and the MVR store only.
@@ -19,10 +22,14 @@ const G = require('./rc-scene-geom')
 const M = require('./rc-scene-mesh')
 const H = require('./rc-scene-height')
 const O = require('./rc-scene-occ')
+const V = require('./rc-scene-venue')
+const T = require('./rc-scene-tex')
+const { sceneGlb } = require('./rc-scene-glb')
 const { RC_SCALE, sceneScale } = require('./rc-scale')
 const { generateTracksAsync, GENERATOR_VERSION } = require('./rc-tracks')
 
-const BAKE_VERSION = 4 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights; 4: §3 scale + occ)
+const BAKE_VERSION = 5 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights; 4: §3 scale + occ; 5: venue .glb)
+const FLAT_DECOR = 0.3 // u (× scale = 3 cm live): what lies this low on a floor is floor, not an occupancy obstacle
 const REV_MEMO_MS = 2000
 const KEEP_CACHED = 6
 const BOX = 'game:box'
@@ -30,20 +37,35 @@ const BOX = 'game:box'
 const defaultCacheDir = () => path.join(os.homedir(), '.highascg', 'cache', 'rc-game')
 const nextTick = () => new Promise((r) => setImmediate(r))
 
-/** What the bake reads from a project → { id, name, cfg, grid, stageObjects, projectName }. */
+/** What the bake reads from a project → { id, name, cfg, venue, grid, stageObjects, projectName }. */
 function sceneInputs(project) {
 	const pv = project?.previs && typeof project.previs === 'object' ? project.previs : {}
 	const cfg = pv.mvr && typeof pv.mvr === 'object' ? pv.mvr : {}
 	const id = /^[0-9a-f]{12}$/.test(String(cfg.id || '')) ? String(cfg.id) : ''
-	return { id, name: String(cfg.name || ''), cfg, grid: pv.tracking?.grid || null,
+	return { id, name: String(cfg.name || ''), cfg, venue: typeof cfg.venue_glb === 'string' ? cfg.venue_glb : '', grid: pv.tracking?.grid || null,
 		stageObjects: Array.isArray(pv.stage?.objects) ? pv.stage.objects : [], projectName: String(project?.name || '') }
+}
+
+let sceneCtx = null
+/** The app context (rc-game.js getRcGame / register onBoot): the venue file is found in the project folder of its config. */
+function setSceneCtx(ctx) {
+	if (ctx) sceneCtx = ctx
+}
+/** The venue .glb `name` in the open project's folder → its path or null (src/media/project-files.js). */
+function defaultVenueFile(name) {
+	try {
+		return core('src/media/project-files').resolve(sceneCtx || {}, name)
+	} catch {
+		return null
+	}
 }
 
 /** The revision: scene id + a hash of everything that changes the bake (§3: the scale too). */
 function revOf(inp, recStat, scale = 1) {
 	const c = inp.cfg
 	const h = crypto.createHash('sha1').update(JSON.stringify([BAKE_VERSION, GENERATOR_VERSION, inp.id, recStat, c.place, c.hidden_layers, c.hidden_objects,
-		c.layer_colors, c.moved, inp.grid, inp.stageObjects, M.MAX_TRIS, M.MAX_BYTES, scale]))
+		c.layer_colors, c.moved, inp.grid, inp.stageObjects, M.MAX_TRIS, M.MAX_BYTES, scale, FLAT_DECOR,
+		...(inp.venue ? [inp.venue, inp.venueStat ?? null, T.TEX_BUDGET, T.MAX_EDGE] : [])]))
 	return `${inp.id || 'none'}-${h.digest('hex').slice(0, 10)}`
 }
 
@@ -64,19 +86,23 @@ async function bakeScene(inp, rev, deps = {}) {
 	const store = deps.mvrStore || core('src/stage/mvr-store')
 	const rec = inp.id ? store.get(inp.id) : null
 	const templates = new Map([[BOX, M.boxTemplate()]])
-	const parts = rec?.scene ? G.visibleParts(rec.scene, inp.cfg) : []
+	const venue = rec?.scene && inp.venue ? await loadVenue(inp, rec.scene, deps.venueFile || defaultVenueFile, deps.meanColor || T.ffmpegMeanColor) : null
+	const parts = venue?.parts || (rec?.scene ? G.visibleParts(rec.scene, inp.cfg) : [])
 	const failed = []
 	for (const key of new Set(parts.map((p) => p.key))) {
 		let t
 		try {
-			const buf = await store.mesh(inp.id, key)
-			t = buf ? M.readTemplate(buf) : null
+			if (key.startsWith(V.KEY)) t = venue.model.template(Number(key.slice(V.KEY.length)))
+			else {
+				const buf = await store.mesh(inp.id, key)
+				t = buf ? M.readTemplate(buf) : null
+			}
 		} catch {
 			t = null
 		}
 		if (t) templates.set(key, t)
 		else failed.push(key)
-		await pause()
+		if (!key.startsWith(V.KEY) || templates.size % 64 === 0) await pause()
 	}
 	for (const b of G.stageObjectBoxes(inp.stageObjects)) parts.push({ key: BOX, xf: b.xf, color: b.color, fixture: false, uuid: b.name })
 	const boxes = []
@@ -106,7 +132,10 @@ async function bakeScene(inp, rev, deps = {}) {
 			if (v[k] > hi[k % 3]) hi[k % 3] = v[k]
 		}
 		for (const g of grids) g.grid.tri(...v)
-		for (const g of occ) g.tri(...v)
+		// WO-1082: flat decor — a triangle lying wholly within FLAT_DECOR u of a floor (a rug, a mat, a cable cover, a carpet
+		// laid on the hall floor) is driven over, not around: it never blocks a cell (v2's ground rule: a step ≤ 0.3 u)
+		const top = Math.max(v[1], v[4], v[7])
+		for (const g of occ) if (top > g.y + FLAT_DECOR * scale) g.tri(...v)
 		field.tri(...v)
 	}
 	const inst = await M.instanceParts(parts, templates, plan, onTri, pause)
@@ -123,17 +152,64 @@ async function bakeScene(inp, rev, deps = {}) {
 	const gen = await generateTracksAsync({ floors, obstacles, bounds: { min: lo, max: hi }, field, ...(toy ? { scale, occ } : {}) }, pause)
 	const arena = gen.floors.find((f) => f.id === 'arena')
 	if (arena) inst.primitives.push(...arenaSlab(arena))
-	const glb = M.sceneGlb(inst.primitives)
+	const lines = venue?.model ? V.venueLines(venue.lineParts, venue.model, Math.max(plan.cell, 0.01)) : []
+	inst.primitives.push(...lines)
+	const tex = venue?.model ? await venueTextures(venue.model, inst.primitives, deps.encodeImage, pause) : { mats: new Map(), count: 0, bytes: 0 }
+	const glb = venue?.model ? sceneGlb(inst.primitives, tex.mats) : M.sceneGlb(inst.primitives)
 	const json = {
 		rev, name: rec?.name || inp.name || inp.projectName || 'Empty arena', glb: `/api/game/rc/scene.glb?rev=${rev}`,
 		...(toy ? { scale } : {}),
 		bounds: { min: gen.bounds.min.map(r3), max: gen.bounds.max.map(r3) }, floors: gen.floors, obstacles, heights: field.toJSON(),
 		...(toy ? { occ: occ.map((g) => g.toJSON()) } : {}), tracks: gen.tracks,
 		dropped: { fixtures: plan.dropped.fixtures, objects: plan.dropped.objects, simplifiedCellM: plan.dropped.cell,
-			meshesFailed: failed.length, venueGlb: inp.cfg.venue_glb ? 'ignored' : null },
+			meshesFailed: failed.length, venueGlb: venue ? venue.status : null },
+		...(venue?.model ? { venue: { file: inp.venue, swapped: venue.swapped, extra: venue.extra, extraLayers: venue.layers, textures: tex.count, textureBytes: tex.bytes,
+			flatTextures: venue.flat, lineSegments: lines.reduce((n, l) => n + l.indices.length / 2, 0) } } : {}),
 		stats: { triangles: inst.tris + (arena ? 2 : 0), bytes: glb.length, parts: plan.keep.filter(Boolean).length, bakeMs: Date.now() - t0 },
 	}
 	return { json, glb }
+}
+
+/**
+ * The venue .glb → { status: 'used' | 'missing' | 'unreadable', model, parts, swapped, extra, layers }. Anything short of
+ * a readable file leaves `parts` null (the MVR's own parts are drawn) and says why in `status`.
+ */
+async function loadVenue(inp, scene, venueFile, meanColor) {
+	let buf
+	try {
+		const file = venueFile(inp.venue)
+		buf = file ? await fs.promises.readFile(file) : null
+	} catch {
+		buf = null
+	}
+	if (!buf) return { status: 'missing', parts: null }
+	let model
+	try {
+		model = V.parseVenue(buf)
+	} catch {
+		return { status: 'unreadable', parts: null }
+	}
+	if (!model.meshes) return { status: 'unreadable', parts: null }
+	const v = V.venueParts(scene, inp.cfg, model)
+	const mesh = (p) => (p.key.startsWith(V.KEY) ? Number(p.key.slice(V.KEY.length)) : -1)
+	const lineParts = v.parts.filter((p) => mesh(p) >= 0 && model.hasLines(mesh(p)))
+	const parts = v.parts.filter((p) => mesh(p) < 0 || model.hasTris(mesh(p)) || !model.hasLines(mesh(p))) // line-only meshes: venueLines
+	const flat = await V.flattenHeavyTextures(model, parts, meanColor)
+	return { status: 'used', model, ...v, parts, lineParts, flat }
+}
+
+/** The images the kept textured buckets use, shrunk → { mats: Map tex → { name, image }, count, bytes }. */
+async function venueTextures(model, primitives, encode, pause) {
+	const used = new Set(primitives.filter((p) => p.tex != null).map((p) => model.materials[p.tex]?.image).filter((i) => i != null))
+	const shrunk = await T.shrinkImages(model.images.map((im, i) => (used.has(i) ? im : null)), { encode, pause })
+	const mats = new Map()
+	for (const p of primitives) {
+		if (p.tex == null || mats.has(p.tex)) continue
+		const m = model.materials[p.tex]
+		mats.set(p.tex, { name: m?.name || '', image: m?.image != null ? shrunk[m.image] : null })
+	}
+	const keys = new Map(shrunk.filter(Boolean).map((s) => [s.key, s.data.length]))
+	return { mats, count: keys.size, bytes: [...keys.values()].reduce((a, b) => a + b, 0) }
 }
 
 function arenaSlab(a) {
@@ -166,6 +242,15 @@ function createSceneBaker(deps = {}) {
 			project = null
 		}
 		const inp = sceneInputs(project)
+		if (inp.venue) {
+			try {
+				const f = (deps.venueFile || defaultVenueFile)(inp.venue)
+				const s = f ? fs.statSync(f) : null
+				inp.venueStat = s ? [s.size, Math.round(s.mtimeMs)] : 'missing'
+			} catch {
+				inp.venueStat = 'missing'
+			}
+		}
 		let st = null
 		if (inp.id) {
 			try {
@@ -216,7 +301,7 @@ function createSceneBaker(deps = {}) {
 	async function build(inp, rev) {
 		const disk = await fromDisk(rev)
 		if (disk) return disk
-		const { json, glb } = await bakeScene(inp, rev, { mvrStore: store, pause: deps.pause, scale })
+		const { json, glb } = await bakeScene(inp, rev, { mvrStore: store, pause: deps.pause, scale, venueFile: deps.venueFile, encodeImage: deps.encodeImage })
 		const gz = await new Promise((res) => zlib.gzip(glb, { level: 6 }, (e, b) => res(e ? null : b)))
 		const out = { rev, json, text: JSON.stringify(json), glb, gz }
 		log('info', `[rc-game] scene ${rev} baked in ${json.stats.bakeMs} ms: ${json.stats.triangles} triangles, ${glb.length} bytes, ` +
@@ -242,4 +327,4 @@ function createSceneBaker(deps = {}) {
 	return { rev: () => current().rev, get, peek: () => ready, cacheDir }
 }
 
-module.exports = { createSceneBaker, bakeScene, sceneInputs, revOf }
+module.exports = { createSceneBaker, bakeScene, sceneInputs, revOf, setSceneCtx }

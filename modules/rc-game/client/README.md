@@ -66,5 +66,7 @@ Browser modules: `main.js` (mode switch), `game.js` + `session.js` + `loop.js` (
 `world.js`, `track-mesh.js` + `track-deco.js` + `mesh-util.js` (ribbon, ramps, ledges, gantry), `props.js` (pads,
 item boxes), `fx-view.js` (hazards, one-shots), `car-model.js` + `car-fx.js`, `input.js`, `hud.js` + `hud-extra.js` +
 `icons.js`, `lobby.js`, `host.js`, `screens.js`, `audio.js`, `trackdraw.js`, `dom.js`.
-Styles: `rc.css`, `rc-ui.css`, `rc-hud.css`, `rc-touch.css`. Everything is procedural (no images, no external URLs).
+Styles: `rc.css`, `rc-ui.css`, `rc-hud.css`, `rc-touch.css`. Everything the game draws is procedural (no image files, no external URLs); the scene GLB may carry the venue's
+textures (WO-1082), which three.js decodes from the GLB itself. `dev-hook.js`: `?dev=1` on 127.0.0.1 only — a fixed
+camera for verification screenshots (`window.__rcDev.setCam`).
 Tests: `tools/smoke/smoke-wo1074-rc-client*.test.js` (fixtures in `tools/smoke/lib/rc-client-fixtures.js`).

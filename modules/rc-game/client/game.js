@@ -7,6 +7,7 @@
 import * as THREE from 'three'
 import { $, apiGet, isPhone, storeGet, storeSet, sessGet, sessSet } from './dom.js'
 import { createWorld } from './world.js'
+import { installDevHook } from './dev-hook.js'
 import { buildTrackMesh, disposeGroup } from './track-mesh.js'
 import { createProps } from './props.js'
 import { createFxView } from './fx-view.js'
@@ -67,6 +68,7 @@ export async function startGame({ spectator = false } = {}) {
 		launch: null,
 	}
 	G.ctl = { setTrack: (id) => setTrack(G, id), toGrid: () => toGrid(G), gameOff: () => gameOff(G) }
+	installDevHook(G) // WO-1082: 127.0.0.1 + ?dev=1 only (headless checks on the box)
 
 	/* ---------- wait for the game to be enabled ---------- */
 	const st = await waitEnabled(screens)

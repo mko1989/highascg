@@ -101,19 +101,24 @@ function boxTemplate() {
 		bounds: { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] }, simple: new Map(), exact: true }
 }
 
-/** Vertex clustering at `cell` (template units): vertices snapped to a grid and merged, collapsed / repeated triangles dropped. */
+/**
+ * Vertex clustering at `cell` (template units): vertices snapped to a grid and merged, collapsed / repeated triangles
+ * dropped. A textured prim (WO-1082: `uv`) keeps its UV seams — vertices merge only when their UVs agree (1/64).
+ */
 function cluster(prim, cell) {
 	const map = new Map()
 	const rem = new Uint32Array(prim.pos.length / 3)
 	const pos = []
+	const uv = prim.uv ? [] : null
 	for (let i = 0; i < rem.length; i++) {
 		const x = Math.round(prim.pos[3 * i] / cell), y = Math.round(prim.pos[3 * i + 1] / cell), z = Math.round(prim.pos[3 * i + 2] / cell)
-		const k = `${x},${y},${z}`
+		const k = uv ? `${x},${y},${z},${Math.round(prim.uv[2 * i] * 64)},${Math.round(prim.uv[2 * i + 1] * 64)}` : `${x},${y},${z}`
 		let v = map.get(k)
 		if (v === undefined) {
 			v = pos.length / 3
 			map.set(k, v)
 			pos.push(prim.pos[3 * i], prim.pos[3 * i + 1], prim.pos[3 * i + 2])
+			if (uv) uv.push(prim.uv[2 * i], prim.uv[2 * i + 1])
 		}
 		rem[i] = v
 	}
@@ -127,16 +132,17 @@ function cluster(prim, cell) {
 		seen.add(s)
 		idx.push(a, b, c)
 	}
-	return { pos: new Float32Array(pos), idx: new Uint32Array(idx), color: prim.color }
+	return { pos: new Float32Array(pos), idx: new Uint32Array(idx), color: prim.color, ...(uv ? { uv: new Float32Array(uv), mat: prim.mat } : {}) }
 }
 
 /** A template simplified at world `cell` (template used at most at `scale`) → { prims, tris, verts } (cached). */
 function simplified(t, cell, scale) {
 	const key = `${cell}`
-	if (t.exact) return t.simple.get(key) || (t.simple.set(key, { prims: t.prims, tris: t.tris, verts: t.prims[0].pos.length / 3 }), t.simple.get(key))
+	if (t.exact) return t.simple.get(key) || (t.simple.set(key, { prims: t.prims, tris: t.tris, verts: t.prims[0].pos.length / 3, uvVerts: 0 }), t.simple.get(key))
 	if (!t.simple.has(key)) {
 		const prims = t.prims.map((p) => cluster(p, cell / Math.max(scale, 1e-6)))
-		t.simple.set(key, { prims, tris: prims.reduce((s, p) => s + p.idx.length / 3, 0), verts: prims.reduce((s, p) => s + p.pos.length / 3, 0) })
+		t.simple.set(key, { prims, tris: prims.reduce((s, p) => s + p.idx.length / 3, 0), verts: prims.reduce((s, p) => s + p.pos.length / 3, 0),
+			uvVerts: prims.reduce((s, p) => s + (p.uv ? p.pos.length / 3 : 0), 0) })
 	}
 	return t.simple.get(key)
 }
@@ -150,7 +156,7 @@ async function planBudget(parts, templates, pause = async () => {}, budget = {})
 	const scale = new Map()
 	for (const p of parts) scale.set(p.key, Math.max(scale.get(p.key) || 0, scaleOf(p.xf)))
 	const cost = async (cell, keep) => {
-		let tris = 0, verts = 0, k = 0
+		let tris = 0, verts = 0, uvs = 0, k = 0
 		for (let i = 0; i < parts.length; i++) {
 			if (!keep[i]) continue
 			const t = templates.get(parts[i].key)
@@ -159,8 +165,9 @@ async function planBudget(parts, templates, pause = async () => {}, budget = {})
 			const s = simplified(t, cell, scale.get(parts[i].key))
 			tris += s.tris
 			verts += s.verts
+			uvs += s.uvVerts || 0
 		}
-		return { tris, bytes: tris * 12 + verts * 12 }
+		return { tris, bytes: tris * 12 + verts * 12 + uvs * 8 }
 	}
 	const fits = (c) => c.tris <= maxTris && c.bytes <= maxBytes
 	let keep = parts.map(() => true)
@@ -189,7 +196,7 @@ async function planBudget(parts, templates, pause = async () => {}, budget = {})
 		const s = templates.get(parts[i].key) ? simplified(templates.get(parts[i].key), cell, scale.get(parts[i].key)) : { tris: 0, verts: 0 }
 		keep[i] = false
 		gone.add(parts[i].uuid || `part${i}`)
-		over = { tris: over.tris - s.tris, bytes: over.bytes - s.tris * 12 - s.verts * 12 }
+		over = { tris: over.tris - s.tris, bytes: over.bytes - s.tris * 12 - s.verts * 12 - (s.uvVerts || 0) * 8 }
 	}
 	return { cell, keep, ...over, dropped: { ...dropped, objects: gone.size, cell } }
 }
@@ -198,8 +205,9 @@ async function planBudget(parts, templates, pause = async () => {}, budget = {})
 const colorKey = (c) => c.slice(0, 3).map((v) => Math.round(Math.max(0, Math.min(1, v)) * 64)).join(',')
 
 /**
- * Instance the kept parts into one primitive per colour (glb-write Prims, flat); `onTri(9 floats)` sees every world
- * triangle (obstacles). → { primitives, tris }.
+ * Instance the kept parts into one primitive per colour (glb-write Prims, flat) — and, WO-1082, one per textured venue
+ * material (`tex` = its index in the venue's materials, with UVs; a layer colour never repaints a venue part: its
+ * `color` is null); `onTri(9 floats)` sees every world triangle (obstacles). → { primitives, tris }.
  */
 async function instanceParts(parts, templates, plan, onTri, pause = async () => {}) {
 	const scale = new Map()
@@ -213,9 +221,13 @@ async function instanceParts(parts, templates, plan, onTri, pause = async () => 
 		if (!t) continue
 		const s = simplified(t, plan.cell, scale.get(p.key))
 		for (const pr of s.prims) {
+			const textured = !p.color && pr.uv && pr.mat != null
 			const color = p.color || pr.color || DEFAULT_COLOR
-			const key = colorKey(color)
-			if (!buckets.has(key)) buckets.set(key, { color: key.split(',').map((v) => Number(v) / 64).concat(1), pos: [], idx: [] })
+			const key = textured ? `t${pr.mat}` : colorKey(color)
+			if (!buckets.has(key)) {
+				buckets.set(key, textured ? { color: color.slice(0, 4), tex: pr.mat, pos: [], idx: [], uv: [] }
+					: { color: key.split(',').map((v) => Number(v) / 64).concat(1), pos: [], idx: [] })
+			}
 			const b = buckets.get(key)
 			const base = b.pos.length / 3
 			const w = []
@@ -224,6 +236,7 @@ async function instanceParts(parts, templates, plan, onTri, pause = async () => 
 				b.pos.push(q[0], q[1], q[2])
 				w.push(q)
 			}
+			if (b.uv) for (let v = 0; v < pr.uv.length; v++) b.uv.push(pr.uv[v])
 			for (let k = 0; k < pr.idx.length; k += 3) {
 				b.idx.push(base + pr.idx[k], base + pr.idx[k + 1], base + pr.idx[k + 2])
 				if (onTri) {
@@ -239,11 +252,12 @@ async function instanceParts(parts, templates, plan, onTri, pause = async () => 
 			await pause()
 		}
 	}
-	const primitives = [...buckets.values()].map((b) => ({ positions: new Float32Array(b.pos), indices: new Uint32Array(b.idx), color: b.color, flat: true }))
+	const primitives = [...buckets.values()].map((b) => ({ positions: new Float32Array(b.pos), indices: new Uint32Array(b.idx), color: b.color, flat: true,
+		...(b.uv ? { uvs: new Float32Array(b.uv), tex: b.tex } : {}) }))
 	return { primitives, tris }
 }
 
 /** Primitives → ONE GLB (one mesh, one node). */
 const sceneGlb = (primitives) => writeGlb([{ name: 'rc-scene', primitives }])
 
-module.exports = { MAX_TRIS, MAX_BYTES, readTemplate, boxTemplate, cluster, planBudget, instanceParts, sceneGlb }
+module.exports = { MAX_TRIS, MAX_BYTES, accessor, nodeXf, readTemplate, boxTemplate, cluster, planBudget, instanceParts, sceneGlb }

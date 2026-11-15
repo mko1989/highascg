@@ -60,10 +60,22 @@ public.
   "obstacles": [{ "min": [x, y, z], "max": [x, y, z] }],
   "tracks": [ Track, … ] }
 ```
-- `glb`: ONE merged binary glTF of the visible scene, small enough for a phone: target ≤ 8 MB and ≤ 400 k triangles;
-  positions only + per-object flat colour (vertex colours or a few materials), no textures. Fixtures may be left out or
-  drawn as their meshes if the budget allows; trusses, stage, risers, floor, walls, LED walls stay. Baked once per
-  `rev` and cached on disk under the OS temp dir / `~/.highascg/cache` (never inside the repo, never under projects/).
+- `glb`: ONE merged binary glTF of the visible scene, small enough for a phone: ≤ 400 k triangles, geometry ≤ 7.5 MB
+  (`MAX_BYTES`) plus textures ≤ 1.5 MB (`TEX_BUDGET`, WO-1082) — ≈ 9 MB in all, ≈ 4.6 MB gzipped on the wire. One
+  node / mesh `rc-scene`; flat primitives carry positions only + one material per colour; textured primitives (the
+  venue's carpet, parquet, truss …) add TEXCOORD_0 and a named material with a JPEG/PNG `baseColorTexture` (REPEAT
+  sampler); one LINES primitive (mode 1) may carry the venue's line work. Fixtures may be left out or drawn as their
+  meshes if the budget allows; trusses, stage, risers, floor, walls, LED walls stay. Baked once per `rev` and cached on
+  disk under `~/.highascg/cache/rc-game/` (never inside the repo, never under projects/).
+- **The venue .glb (WO-1082).** When the project has a Capture venue export (`project.previs.mvr.venue_glb`, the file the
+  previs merges), the baker merges it exactly like the previs (`mvr_venue.gd`, WO-1003): objects matched by Capture
+  uuid swap their MVR boxes for the .glb meshes (fixtures and bound screens keep their MVR parts), .glb-only meshes are
+  extras on their Capture layer (hidden layers / hidden objects stay hidden), layer colours never repaint them. Images
+  are shrunk by ffmpeg in a child process (≤ 1024 px, halved until the budget fits); a textured material over 8000
+  triangles (Capture writes per-face UVs, so it cannot be welded) is drawn in its picture's mean colour instead. The
+  scene JSON reports it as `venue: { file, swapped, extra, extraLayers, textures, textureBytes, flatTextures,
+  lineSegments }` and `dropped.venueGlb` (`used` | `missing` | `unreadable`); no .glb → the plain MVR bake. The venue
+  file's name, size and mtime are part of `rev`.
 - `floors`: the drivable planes. `stage` comes from the tracking stage (`project.previs.tracking.grid`: width, depth,
   x_offset, y_offset, z_offset in the PSN frame — convert) when there is one; `hall` is the scene's ground (y of the
   lowest large horizontal surface, default 0) clipped to the scene's footprint. No scene loaded → a default 30 × 20 m
@@ -355,6 +367,8 @@ The room stays life-size; the cars, tracks and everything the game adds shrink. 
   Row-major, z rows from `z0`, x from `x0`; `rle` = run lengths alternating FREE, BLOCKED, FREE … (starts with free,
   a leading 0 when the first cell is blocked); cell (i, j) covers x0 + i·cell … +cell, z0 + j·cell … +cell.
   Blocked = a drawn triangle crosses that cell inside the band, dilated by nothing (the client adds the car radius).
+  **Flat decor (WO-1082):** a triangle whose top is at most `FLAT_DECOR` (0.3) × scale (3 cm live) above the floor
+  never blocks — carpets, rugs, floor graphics and floor tiles are driven over, not around; a 10 cm step still blocks.
 - Collision (client physics, and the validator for track clearance): a car whose y is within [floor.y − 0.02·s,
   floor.y + CAR_H·s] collides with blocked cells of that floor's grid like a wall (normal from the grid gradient /
   nearest free direction; same restitution and scrape as a wall). Cars on a ramp or deck above the band ignore it.

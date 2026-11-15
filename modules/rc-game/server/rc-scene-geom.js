@@ -371,6 +371,9 @@ function obstaclesFrom(perFloor) {
 
 module.exports = {
 	IDENTITY,
+	xf12,
+	placementOf,
+	hexToLinear,
 	compose,
 	apply,
 	scaleOf,
