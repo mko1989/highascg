@@ -97,7 +97,7 @@ function applyState(G, state) {
 	if (G.phase !== prev) onPhase(G, prev)
 	G.hud.score(G.ctl.scoreInfo())
 	if (!G.spectator && G.meId != null) {
-		if (G.phase === 'lobby') G.lobby.showLobby(state, G.meId, G.arena?.name, { reveal: prev !== 'lobby' })
+		if (G.phase === 'lobby') G.lobby.showLobby(state, G.meId, G.arena?.name)
 		else G.lobby.hide()
 	}
 }

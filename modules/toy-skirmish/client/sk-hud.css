@@ -311,3 +311,12 @@ body.mode-player:not(.joined) .sk-respawn {
 #hud .hud-toast:empty {
 	display: none;
 }
+
+/* Owner 15.11: the hall floor is white — every HUD text gets a dark edge so it reads on it. */
+#hud,
+#lobby .lobby-open {
+	text-shadow:
+		0 0 2px #000,
+		0 0 6px rgba(0, 0, 0, 0.85),
+		0 1px 2px #000;
+}

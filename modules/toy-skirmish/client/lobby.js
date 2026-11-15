@@ -72,7 +72,7 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 	const lArena = h('div.laps')
 	const plist = h('ul.players')
 	const lMsg = h('p.hint')
-	const warmBtn = h('button.big.go', { type: 'button', text: 'Warm up' })
+	const warmBtn = h('button.big.go', { type: 'button', text: 'Back to the warm-up' })
 	const changeBtn = h('button.ghost', { type: 'button', text: 'Change name / colour' })
 	changeBtn.addEventListener('click', () => onRejoin())
 	const lobbyPanel = h(
@@ -106,13 +106,12 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 			setText(joinInfo, info)
 		},
 		/** Lobby phase. @param {object} state @param {any} meId @param {string} arenaName */
-		showLobby(state, meId, arenaName, { reveal = false } = {}) {
+		showLobby(state, meId, arenaName) {
 			show(root, true)
 			show(joinPanel, false)
-			if (reveal || (lobbyPanel.hidden && openBtn.hidden)) {
-				show(lobbyPanel, true)
-				show(openBtn, false)
-			}
+			// Owner 15.11: "cant roam and shoot before the match starts" — the panel covered the play and took the
+			// mouse until "Warm up" was pressed. The lobby is the warm-up: the panel stays closed behind its button.
+			if (lobbyPanel.hidden && openBtn.hidden) show(openBtn, true)
 			const tdm = state.mode === 'tdm'
 			setText(lMode, tdm ? 'Team match (red vs blue)' : 'Free for all')
 			const lim = state.limits || {}

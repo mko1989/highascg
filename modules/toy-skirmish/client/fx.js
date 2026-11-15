@@ -15,11 +15,11 @@ import { ROCKET } from './sk-const.js'
 const MAX_LIVE = 400
 
 const TRACER = {
-	pea: { color: 0xfff27a, w: 0.05, life: 0.09 },
-	rattler: { color: 0xffa040, w: 0.04, life: 0.06 },
-	scatter: { color: 0xc8ff6a, w: 0.035, life: 0.08 },
-	longshot: { color: 0x5ae8ff, w: 0.09, life: 0.45 },
-	thumper: { color: 0xc49bff, w: 0.05, life: 0.1 },
+	pea: { color: 0xfff27a, core: 0xf0a800, w: 0.11, life: 0.16 },
+	rattler: { color: 0xffa040, core: 0xff5a00, w: 0.09, life: 0.12 },
+	scatter: { color: 0xc8ff6a, core: 0x4fb800, w: 0.08, life: 0.14 },
+	longshot: { color: 0x5ae8ff, core: 0x00a0e0, w: 0.16, life: 0.5 },
+	thumper: { color: 0xc49bff, core: 0x8a48ff, w: 0.11, life: 0.16 },
 }
 
 export function createFx(scene, s = 1) {
@@ -72,11 +72,31 @@ export function createFx(scene, s = 1) {
 			side: THREE.DoubleSide,
 		})
 
-	/** A flat streak from a to b at height y (beam texture across its width). */
+	/**
+	 * Solid, normally blended paint under a glow (owner 15.11: "cant see shots on white floor" — additive light adds
+	 * nothing to a white floor). A shot is a dark outline + a saturated core, which read on any floor, + the glow,
+	 * which reads on a dark one.
+	 */
+	const paintMat = (color, opacity) =>
+		new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide })
+	const INK = 0x10121a
+
+	/** A flat streak from a to b at height y: outline, core, glow. */
 	function tracer(ax, az, bx, bz, y, w = 'pea') {
 		const st = TRACER[w] || TRACER.pea
 		const len = Math.hypot(bx - ax, bz - az)
 		if (len < 1e-5) return
+		const rot = Math.atan2(bx - ax, bz - az)
+		const streak = (mat, width, dy, order, a0) => {
+			const q = new THREE.Mesh(quadGeo, mat)
+			q.scale.set(width, 1, len)
+			q.position.set((ax + bx) / 2, y + dy, (az + bz) / 2)
+			q.rotation.y = rot
+			q.renderOrder = order
+			add(q, st.life, (k) => (q.material.opacity = a0 * (1 - k * k)))
+		}
+		streak(paintMat(INK, 0.8), st.w * s * 1.5, -0.02 * s, 4, 0.8)
+		streak(paintMat(st.core, 1), st.w * s * 0.7, -0.01 * s, 5, 1)
 		const m = new THREE.Mesh(quadGeo, glowMat(st.color, beamTex))
 		m.scale.set(st.w * s, 1, len)
 		m.position.set((ax + bx) / 2, y, (az + bz) / 2)
@@ -107,9 +127,17 @@ export function createFx(scene, s = 1) {
 	}
 
 	function ring(x, y, z, color, r0, r1, life) {
+		const ink = new THREE.Mesh(ringGeo, paintMat(INK, 0.5))
+		ink.position.set(x, y - 0.01 * s, z)
+		ink.renderOrder = 5
 		const m = new THREE.Mesh(ringGeo, glowMat(color, null))
 		m.position.set(x, y, z)
 		m.renderOrder = 6
+		add(ink, life, (k) => {
+			const r = (r0 + (r1 - r0) * (1 - (1 - k) * (1 - k))) * 1.04
+			ink.scale.set(r, 1, r)
+			ink.material.opacity = 0.5 * (1 - k)
+		})
 		add(m, life, (k) => {
 			const r = r0 + (r1 - r0) * (1 - (1 - k) * (1 - k))
 			m.scale.set(r, 1, r)

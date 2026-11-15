@@ -59,6 +59,24 @@ Built by two builders against the contract (server, client), each half checked b
 - NOT verified: on the box's real server (module not enabled — show on); LED wall pictures (the dev server has no
   video feed); real phones, gamepad, sound, frame rate on a real GPU.
 
+## Owner play test 1 (15.11.26, module hot-enabled on the box at 12:21, three bots)
+
+Owner: "the base of the game is cool. the problems, cant see shots on white floor. cant roam and shoot before the
+match starts."
+
+- **Shots on the white hall floor.** Every effect was additive light (`fx.js` `glowMat`), which adds nothing to white,
+  and the streaks were 4–5 mm wide and lived 60–90 ms. Now a shot is a dark outline + a saturated solid core (normal
+  blending) under the glow, twice as wide, 120–160 ms (Longshot 500 ms); explosion rings get the dark edge too. HUD
+  text got a dark edge (`sk-hud.css`) — it was white on white.
+- **Warm-up.** Moving and firing in the lobby did work (checked: `lastFireAt` advances in phase `lobby`), but after
+  joining a panel "Waiting for the host to start" covered the middle of the screen and took the mouse until its "Warm
+  up" button was pressed. The panel now stays closed behind the "Lobby" button: joining drops you straight into the
+  warm-up.
+- Verified in the dev server (headless, "Under the Tables", white floor): after joining there is no panel, the soldier
+  aims and fires; the Longshot streak is clearly visible on white. The short streaks of the other four weapons expire
+  between two frames at the 5 fps of the headless renderer, so they were NOT seen there — same code path as the
+  Longshot's; owner to confirm on a real screen.
+
 ## Open
 
 - Enable on the box after the show: `POST /api/modules/enable {"name":"toy-skirmish"}`, then the host panel
