@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-992 live WOs (35 open, 155 in progress, 802 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+992 live WOs (35 open, 154 in progress, 803 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -688,7 +688,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 844 DONE [web-client] Sweep: web client bugs → 844_WO_sweep_web_client_bugs.md
 - 1074 IN PROGRESS [web-client+engine] RC car racing game in the show's 3D scene (browser, up to 10 players) → 1074_WO_rc_car_game_in_previs_scene.md
 - 1081 IN PROGRESS [web-client] Stage Skirmish: a toy-soldier top-down shooter in the show's room (second game… → 1081_WO_stage_skirmish_toy_soldier_shooter.md
-- 1082 IN PROGRESS [web-client+engine] Games draw the real venue models (the venue .glb, textures, the carpet) → 1082_WO_games_draw_the_real_venue_models.md
+- 1082 DONE [web-client+engine] Games draw the real venue models (the venue .glb, textures, the carpet) → 1082_WO_games_draw_the_real_venue_models.md
 - 1083 DONE [web-client] Stage Skirmish: bots see no farther than a player (no more cross-map shots); fl… → 1083_WO_skirmish_bots_fair_sight_and_spotlight_mode.md
 
 ## companion — Companion integration (23)
