@@ -283,3 +283,19 @@ test('Devices "running differs": a window the gate held back (or the hot-plug op
 	const src = fs.readFileSync(path.join(ROOT, 'src/config/config-compare.js'), 'utf8')
 	assert.ok(src.includes('compareExpectedToServer(serverChannels, moduleChannels, { screenGate: screenGateChannels(self) })'))
 })
+
+test('a dark physical port is never guessed onto the one lit head; the layout check calls it offline, not wrong', () => {
+	const { resolveSysIdToXrandrOutput } = require('../../src/utils/xrandr-output-resolve')
+	const displays = [{ name: 'DP-3', connected: true }]
+	const opts = { displays, inventory: [], config: {} }
+	assert.equal(resolveSysIdToXrandrOutput('DP-4/DP-5', opts), 'DP-4', 'dark pair: itself, not the operator\'s DP-3')
+	assert.equal(resolveSysIdToXrandrOutput('DP-6/DP-7', opts), 'DP-6')
+	assert.equal(resolveSysIdToXrandrOutput('DP-2/DP-3', opts), 'DP-3', 'the live member of the pair')
+	const { compareXrandrLayout } = require('../../src/utils/xrandr-layout-verify')
+	const v = compareXrandrLayout(
+		[{ sysId: 'DP-3', x: 0, y: 0, width: 1920, height: 1080, mode: '1920x1080' }, { sysId: 'DP-4', x: 2048, y: 0, width: 3072, height: 1024 }],
+		[{ name: 'DP-3', x: 0, y: 0, resolution: '1920x1080', refreshHz: 50 }]
+	)
+	assert.equal(v.ok, true, 'no OS-Watchdog re-apply loop for a screen that is not plugged in')
+	assert.deepEqual(v.offline, ['DP-4'])
+})

@@ -223,6 +223,16 @@ function resolveSysIdToXrandrOutput(sysId, opts = {}) {
 	const fromAlias = resolveFromDeviceGraphAlias(raw, aliasMap)
 	if (fromAlias) return fromAlias
 
+	/* WO-1084: "DP-4/DP-5" is one physical port's two NVIDIA names (device-graph externalRef): the live one, else the
+	 * port is dark — returned as itself so apply leaves it out and the screen gate keeps its windows closed. The
+	 * same-kind guess below once put every dark program jack onto the one lit head (the operator's monitor). */
+	const pairParts = raw.split('/').map((p) => p.trim()).filter(Boolean)
+	if (pairParts.length > 1 && pairParts.every(looksLikeXrandrOutputName)) {
+		const list = opts.displays || getDisplaysXrandrDetailed()?.displays || []
+		const isLive = (n) => list.some((d) => d?.connected !== false && String(d?.name || '').toLowerCase() === n.toLowerCase())
+		return pairParts.find(isLive) || pairParts[0]
+	}
+
 	const rawKey = raw.toLowerCase()
 	if (looksLikeXrandrOutputName(raw)) {
 		const live = (opts.displays || getDisplaysXrandrDetailed()?.displays || []).some(

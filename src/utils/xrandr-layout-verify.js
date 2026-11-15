@@ -56,11 +56,15 @@ function compareXrandrLayout(planned, actual, opts = {}) {
 	const actualByName = new Map((actual || []).map((a) => [String(a.name), a]))
 	/** @type {Array<{ sysId: string, field: string, expected: string|number, actual: string|number|null }>} */
 	const mismatches = []
+	/** @type {string[]} */
+	const offline = []
 
 	for (const p of planned || []) {
 		const a = actualByName.get(p.sysId)
 		if (!a) {
-			mismatches.push({ sysId: p.sysId, field: 'connected', expected: 'connected', actual: null })
+			/* WO-1084: a planned output that is not plugged in is offline, not wrong — apply leaves it out (WO-919 F4) and
+			 * the screen gate keeps its windows closed; re-applying cannot plug it in (the watchdog looped 12× on it). */
+			offline.push(p.sysId)
 			continue
 		}
 		if (Math.abs((a.x || 0) - p.x) > posTol) {
@@ -98,7 +102,7 @@ function compareXrandrLayout(planned, actual, opts = {}) {
 		}
 	}
 
-	return { ok: mismatches.length === 0, mismatches, planned, actual: connected }
+	return { ok: mismatches.length === 0, mismatches, planned, actual: connected, offline }
 }
 
 /**

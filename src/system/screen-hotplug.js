@@ -224,6 +224,7 @@ function startScreenHotplugWatch(ctx, injected = {}) {
 			busy = false
 		}
 	}
+	ctx.log?.('info', `[Screen hot-plug] watching ${readDrm().size} connector(s) (settle ${SETTLE_MS} ms)`)
 	const timer = setInterval(() => void tick(), POLL_MS)
 	if (typeof timer.unref === 'function') timer.unref()
 	return () => clearInterval(timer)
