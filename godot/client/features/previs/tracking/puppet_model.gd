@@ -40,3 +40,18 @@ static func stage_body() -> Dictionary:
 static func body(on: bool, pattern: String, speed: float, size: float) -> Dictionary:
 	return {"enabled": on, "pattern": pattern if pattern in PATTERNS else "circle", "speed": snappedf(speed, 0.01),
 		"size": snappedf(size, 0.01)}
+
+
+## WO-1087 test puppet people (puppet_people_row.gd, /api/tracking/puppet/people): answer (may be null) → one status line.
+static func people_summary(s: Variant) -> String:
+	if not (s is Dictionary) or (s as Dictionary).is_empty():
+		return "No answer — the Tracking module is off on the server."
+	var d: Dictionary = s
+	if d.get("error") is String:
+		return "Refused: %s" % d.error
+	if d.get("enabled") != true:
+		return ("Off — switched itself off (time limit). " if d.get("stopped") == "ttl" else "Off. ") + "Test people for the previs avatars and Auto follow."
+	var st: Dictionary = d.get("stage") if d.get("stage") is Dictionary else {}
+	var where := "standing in the stage centre (stage too small)" if st.get("degenerate") == true else "walking the stage"
+	return "ON — %d test %s %s · off by itself in %d min" % [int(d.get("count", 1)), "person" if int(d.get("count", 1)) == 1 else "people",
+		where, ceili(float(d.get("ends_in_s", 0.0)) / 60.0)]

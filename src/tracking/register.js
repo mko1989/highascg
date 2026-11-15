@@ -6,7 +6,8 @@
  * every client gets `tracking:markers` (≤ 30 Hz while anything moves, a 1 Hz heartbeat, and at once when a marker
  * goes stale). `ctx.trackingHub` is the hub for server consumers; markers leave the box through the follow service
  * (src/fixtures/follow-service.js: PSN trackers, WO-631, or this box's own pan / tilt over Art-Net, WO-616 T11).
- * WO-978 test puppet (puppet.js): GET / POST /api/tracking/puppet — a simulated person writing marker 1 (source puppet).
+ * WO-978 test puppet (puppet.js): GET / POST /api/tracking/puppet — a simulated person writing marker 1 (source puppet);
+ * WO-1087 test puppet people (puppet-people.js): …/puppet/people — 1–3 simulated WORLD persons on the stage (no camera).
  *
  * HTTP: GET /api/tracking/markers · POST /api/tracking/markers {id,x,y,z,name?} or {markers:[…]} ·
  *       DELETE /api/tracking/markers/<id> · GET /api/tracking/stats · GET /api/tracking/follow (engine status) · GET /api/tracking/fixtures (WO-615 T5 GDTF axes / beams)
@@ -39,8 +40,7 @@
  *       drives hub marker 65000 + n, and a zone action `presenter` fires that presenter's actions.
  * Verification walk (T10d, src/tracking/verify-walk.js): GET /api/tracking/verify · POST {action: 'start', a: [x,y],
  *       b: [x,y], person?} | {action: 'stop'} | {action: 'reset'} — sampled after every fusion step with a new frame.
- * Auto director (WO-708 / WO-709, src/tracking/auto-director.js + auto-routes.js): heads on Follow → Auto split across
- *       the detected people (pins 1–9), home after nobody is seen; /api/tracking/auto… and WS tracking:auto (≤ 5 Hz).
+ * Auto director (WO-708 / WO-709, auto-director.js + auto-routes.js): Follow → Auto heads split across the people (pins 1–9), home after nobody is seen; /api/tracking/auto…, WS tracking:auto (≤ 5 Hz).
  */
 
 'use strict'
@@ -78,6 +78,7 @@ const DETECT_MS = 66
 const PRESENTERS_EVENT = 'tracking:presenters'
 const PRESENTERS_MS = 500
 const hub = new MarkerHub()
+const people = require('./puppet-people').createPuppetPeople({ stage: () => require('../engine/project-scenes').loadFullProject()?.previs?.tracking?.grid ?? null, log: (lvl, msg) => _ctx?.log?.(lvl, msg) }) // WO-1087, off at boot
 const puppet = require('./puppet').createPuppet({ hub, stage: () => require('../engine/project-scenes').loadFullProject()?.previs?.tracking?.grid ?? null, log: (lvl, msg) => _ctx?.log?.(lvl, msg), onWrite: () => _writes++ }) // WO-978, off at boot
 let _timer = null
 let _ctx = null
@@ -147,23 +148,16 @@ function pinTick() {
 	if (stepped) pose3d.update(fusion.persons(now), _detect.frames(), now)
 	if (!cfg.enabled) fusion.reset()
 	if (stepped && walk.run) walk.sample(withPins(_detect.snapshot(), now), now)
-	const persons = _detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()
+	const persons = [...(_detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()), ...people.pinPersons()] // WO-1087 test people too
 	pin.step({ cfg, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt })
 	const fixtures = duties.has('auto') ? _follow?.engine?.fixtures || [] : [] // WO-712: Auto off → no pool
-	auto.step({ cfg, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt, fixtures })
+	const run = people.live && !cfg.enabled ? { ...cfg, enabled: true } : cfg // WO-1087: test people drive Auto with detection off
+	auto.step({ cfg: run, available: _detect.available || people.live, persons, hub, planeZ: _detect.planeZ, now, dt, fixtures })
 }
 
 /** Fused world persons in the pin's person shape (detect-pin.js T10b). */
 function worldPersons(now) {
-	return fusion.persons(now).map((w) => ({
-		key: `w:${w.id}`,
-		camera: 'world',
-		tid: w.id,
-		world: [w.x, w.y],
-		score: w.score,
-		age_s: w.age_s,
-		area: w.area,
-	}))
+	return fusion.persons(now).map((w) => ({ key: `w:${w.id}`, camera: 'world', tid: w.id, world: [w.x, w.y], score: w.score, age_s: w.age_s, area: w.area }))
 }
 
 /** Broadcast when a write landed, the stale set changed, or the heartbeat is due (never for an empty, idle hub). */
@@ -212,7 +206,7 @@ function zonesTick() {
  */
 function withPins(snap, now = hub.now()) {
 	const att = { ...auto.attached(), ...pin.attached() } // the operator's own pin wins a shared person
-	const world = pose3d.decorate(fusion.persons(now), now)
+	const world = pose3d.decorate(fusion.persons(now), now).concat(people.persons()) // WO-1087: test people as world persons
 	const owner = new Map()
 	for (const w of world) if (w.age_s === 0) for (const k of w.keys) owner.set(k, w.id)
 	for (const c of snap.cameras) {
@@ -263,7 +257,7 @@ function pick(body) {
 	const key = String(data?.key || '')
 	if (!/^\S+:\d+$/.test(key)) return reply(400, { error: 'key must be camera:tid or w:<id>' })
 	const now = hub.now()
-	const persons = _detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()
+	const persons = [...(_detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()), ...people.pinPersons()]
 	if (!persons.some((p) => p.key === key)) return reply(404, { error: `no detected person ${key} right now` })
 	pin.request(key, now)
 	const cfg = _detect.config
@@ -329,7 +323,7 @@ async function handleApi({ method, path, body, req }) {
 	const audio = await handleAudioDesk(_desk, _presenters, { method, path, body }) // WO-731, before the presenter routes
 	if (audio) return audio
 	const pr =
-		(await handlePresenters(_presenters, { method, path, body, req, capture: () => takeCameraPictures({ presenters: _presenters, detect: _detect, worldPersons: () => fusion.persons(hub.now()) }) })) || handleAuto(auto, { method, path, body }) || puppet.handle(method, path, body)
+		(await handlePresenters(_presenters, { method, path, body, req, capture: () => takeCameraPictures({ presenters: _presenters, detect: _detect, worldPersons: () => fusion.persons(hub.now()) }) })) || handleAuto(auto, { method, path, body }) || puppet.handle(method, path, body) || people.handle(method, path, body)
 	if (pr) return pr
 	if (method === 'GET' && path === '/api/tracking/stats') {
 		return reply(200, {
@@ -484,6 +478,7 @@ module.exports = {
 		autoPtz.stop()
 		_calib = _rig = _spot = null
 		puppet.stop('shutdown')
+		people.stop('shutdown') // WO-1087
 		if (_zones) _zones.stop()
 		_zones = null
 		if (_detect) _detect.stop()

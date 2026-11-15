@@ -89,7 +89,7 @@ describe('WO-707 Follow → Auto', () => {
 		assert.match(reg, /const fixtures = duties\.has\('auto'\) \? _follow\?\.engine\?\.fixtures \|\| \[\] : \[\]/)
 		assert.match(
 			reg,
-			/auto\.step\(\{ cfg, available: _detect\.available, persons, hub, planeZ: _detect\.planeZ, now, dt, fixtures \}\)/
+			/auto\.step\(\{ cfg: run, available: _detect\.available \|\| people\.live, persons, hub, planeZ: _detect\.planeZ, now, dt, fixtures \}\)/
 		)
 		const dir = fs.readFileSync(path.join(__dirname, '../../src/tracking/auto-director.js'), 'utf8')
 		assert.match(dir, /pool = \(fixtures \|\| \[\]\)\.filter\(\(f\) => f\.follow === AUTO_MARKER_ID\)/)

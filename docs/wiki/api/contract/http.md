@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-600 routes.
+601 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -566,6 +566,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | * | `/api/tracking/follow/calibrate/rig` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/follow/calibrate/spot` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/markers` | handler | `src/tracking/register.js` |
+| * | `/api/tracking/puppet/people` | handler | `src/tracking/puppet-people.js` |
 | * | `/api/tracking/stats` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/verify` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/zones` | handler | `src/tracking/register.js` |
@@ -697,4 +698,5 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/show-timers/show-timers-routes.js` | WO-734 — `GET /api/show-timers` (the timers as JSON) and `GET /api/show-timers/widget.js` (the strip the served pages include: `<div id="show-timers"></div><scr |
 | `src/timecode/routes-ltc.js` | WO-974 — LTC timecode API. |
 | `src/tracking/auto-routes.js` | WO-708 / WO-709 — HTTP + WS of the Auto director (auto-director.js), wired from register.js. |
+| `src/tracking/puppet-people.js` | WO-1087 — test puppet PEOPLE: 1–3 simulated tracked persons that need no camera, no solved camera and no detection. |
 | `src/tracking/register.js` | Tracking module registration (WO-616; WO-19 / WO-30 boundaries). |

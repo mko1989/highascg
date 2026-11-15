@@ -74,6 +74,7 @@ func _ready() -> void:
 		var p: Dictionary = driver.pos(driver.selected)
 		return {"id": driver.selected, "x": p.get("x"), "y": p.get("y"), "z": p.get("z")}
 	add_child(puppet)
+	add_child(preload("res://features/previs/tracking/puppet_people_row.gd").new())  # WO-1087 test people (avatars)
 
 
 func set_defs(markers: Array) -> void:

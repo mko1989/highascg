@@ -94,7 +94,7 @@ func set_detections(snap: Variant) -> void:
 	if not _on:
 		return
 	if style == "avatars":
-		avatars.show_cards(M.cards(snap, _cams), Time.get_ticks_msec() / 1000.0)
+		avatars.show_cards(M.cards(snap, _cams) + M.puppet_cards(snap), Time.get_ticks_msec() / 1000.0)  # WO-1087 test people
 		return
 	var seen := {}
 	for c in M.cards(snap, _cams, _pick, Time.get_ticks_msec() / 1000.0):  # WO-701 sticky camera

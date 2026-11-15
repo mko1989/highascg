@@ -42,6 +42,7 @@ var _phase := 0.0
 var _clock := 0.0
 var _last_t := NAN
 var _placed := false
+var tag: Label3D  # WO-1087: the floating "TEST puppet n" over a test person (null for a real one)
 
 
 func _init() -> void:
@@ -197,6 +198,23 @@ func _apply_colours(look: Dictionary, k: float) -> void:
 		var m: StandardMaterial3D = mats[key]
 		m.albedo_color = c
 		m.emission = c
+
+
+## WO-1087: a floating label over the head ("" hides it) — a test puppet person says it is one.
+func set_tag(text: String) -> void:
+	if tag == null and text != "":
+		tag = Label3D.new()
+		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		tag.position = Vector3(0, UNIT_TOP + 0.13, 0)
+		tag.pixel_size = 0.002
+		tag.font_size = 48
+		tag.outline_size = 14
+		tag.modulate = Color(1.0, 0.8, 0.25)
+		tag.outline_modulate = Color(0.08, 0.06, 0.04)
+		add_child(tag)
+	if tag != null and tag.text != text:
+		tag.text = text
+		tag.visible = text != ""
 
 
 ## What the avatar shows now (tests): {top, bottom, skin, hair, shoes, blush: Color}, height, yaw, position.

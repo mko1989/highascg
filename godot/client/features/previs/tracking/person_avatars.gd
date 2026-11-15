@@ -17,7 +17,7 @@ var _live := {}  # world id → {node, memo {key}, keys []}
 var _gone := []  # [{node, memo, keys, at}] — waiting HOLD_S to be adopted
 
 
-## One snapshot's cards (person_cards_model.cards: id, feet, height, joints, keys, looks) at `now` seconds.
+## One snapshot's cards (person_cards_model.cards / puppet_cards: id, feet, height, joints, keys, looks, tag?) at `now` s.
 func show_cards(cards: Array, now: float) -> void:
 	var seen := {}
 	for c in cards:
@@ -42,6 +42,7 @@ func show_cards(cards: Array, now: float) -> void:
 		var look := AV.look(AV.pick(c.get("looks", []), e.memo))
 		(e.node as Node3D).visible = true
 		e.node.set_target(C.psn_to_godot(c.feet), float(c.height), look, c.get("joints"), now)
+		e.node.set_tag(str(c.get("tag", "")))  # WO-1087: test puppet people are labelled
 	for g in _gone.duplicate():
 		if now - float(g.at) > HOLD_S:
 			_drop(g.node)
