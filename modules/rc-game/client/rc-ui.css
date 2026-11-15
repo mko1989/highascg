@@ -343,7 +343,21 @@ label {
 	margin-left: auto;
 	color: var(--text);
 }
+.join-slot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 18px;
+}
+.join-qr {
+	width: clamp(140px, 22vw, 260px);
+	height: auto;
+	border-radius: 6px;
+	image-rendering: pixelated;
+	flex: none;
+}
 .join-url {
+	flex: 1 1 240px;
 	font-size: clamp(28px, 6vw, 72px);
 	font-weight: 800;
 	letter-spacing: 0.01em;
@@ -356,6 +370,9 @@ label {
 	margin-top: 10px;
 	font-size: 0.6em;
 	opacity: 0.8;
+}
+.join-slot + .join-slot .join-qr {
+	width: clamp(90px, 12vw, 150px);
 }
 .host-tracks {
 	display: grid;

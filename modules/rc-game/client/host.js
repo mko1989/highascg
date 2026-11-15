@@ -8,13 +8,18 @@
 import { h, setText, show, apiGet, apiHost, safeColor } from './dom.js'
 import { previewTrack } from './trackdraw.js'
 import { sceneScale } from './scale.js'
+import { qrMatrix, drawQr } from './join-code.js'
 
-/**
- * HOOK: draw a join code for `url` into `el`. No QR library is installed (and the venue may be offline), so this just
- * prints the URL. Replace the body with a QR renderer later; keep the signature.
- */
+/** The join address for a phone: a QR code to scan, and the address in large type for typing it in. */
 export function renderJoinCode(url, el) {
 	el.textContent = ''
+	try {
+		const cv = h('canvas.join-qr', { role: 'img', 'aria-label': `QR code for ${url}` })
+		drawQr(cv, qrMatrix(url))
+		el.append(cv)
+	} catch {
+		/* an address too long for a QR code: the printed address still works */
+	}
 	el.append(h('div.join-url', { text: url }))
 }
 
@@ -43,7 +48,7 @@ export function startHost(root) {
 			'section.host-sec',
 			h('h2', { text: 'Join on your phone' }),
 			joinBox,
-			h('p.hint', { text: 'Same Wi-Fi as this box. Type the address into the phone’s browser.' })
+			h('p.hint', { text: 'Same Wi-Fi as this box. Scan the code with the phone’s camera, or type the address into its browser.' })
 		),
 		h(
 			'section.host-sec',

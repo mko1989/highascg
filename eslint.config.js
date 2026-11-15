@@ -14,6 +14,7 @@ const IGNORES = [
 	'dist-map/**',
 	'cef-cache/**',
 	'vendor/**',
+	'modules/**/vendor/**',
 	'src/pixelhue/vendor/**',
 	'docs/**',
 	'work/references/**',

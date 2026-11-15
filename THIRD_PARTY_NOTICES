@@ -272,3 +272,13 @@ Libraries the binary uses, not part of this repository:
     release tarball. Chromium inside libcef.so carries its own third-party notices (about:credits).
   FFmpeg — https://ffmpeg.org — linked dynamically against the Ubuntu 26.04 system packages (libavcodec62 …), which
     are built with --enable-gpl (libx264, libx265), so that combination is GPL; installed by apt, not shipped by us.
+
+================================================================================
+qrcode-generator 2.0.4 — https://github.com/kazuhikoarase/qrcode-generator
+Copyright (c) 2009 Kazuhiko Arase
+License: MIT (http://www.opensource.org/licenses/mit-license.php; the notice is kept in the file).
+
+  modules/rc-game/client/vendor/qrcode-generator.mjs  ← dist/qrcode.mjs of the npm package, unchanged
+
+Used by the RC game module's host panel to draw the join address as a QR code (WO-1074). "QR Code" is a registered
+trademark of DENSO WAVE INCORPORATED.

@@ -16,7 +16,7 @@ view or scoreboard to the led wall in the room."*
   `/api/stage/mvr/<id>`: 3392 objects for "Narvil IDE 11.2026"). That is too many requests / triangles for a phone, so
   the game gets one merged, simplified GLB.
 - Auth: API paths are checked by `src/server/auth.js` `isPublicApiPath`; static paths are not authenticated at all.
-- No QR library is installed (`qrcode` absent) — the host panel prints the join address.
+- No QR library was installed at first (`qrcode` absent) — the host panel printed the join address only. Added 15.11, see "QR code" below.
 - The spec both halves were built against: `work/notes/rc-game-contract.md`.
 
 ## What was done
@@ -158,3 +158,16 @@ kart less simulator"; the game world should show the lights and the LED wall con
   under furniture. Relaxed: only 51–55 % is under the table TOP itself, because every table is ringed by solid chairs
   (the rest is under chair covers). Bot laps all 11 tracks, 0 wall hits; offline suite 6471 tests, 0 fail.
   Open: at toy scale the director's overview can be blocked by chair backs.
+
+## QR code for the join address (15.11, owner: "Add the qr")
+
+- `modules/rc-game/client/vendor/qrcode-generator.mjs` — `qrcode-generator` 2.0.4 (MIT, Kazuhiko Arase), `dist/qrcode.mjs`
+  unchanged. Vendored inside the module, not an npm dependency of the core: it works offline, ships in the module
+  tarball, and the core still names nothing of the game. Credited in `THIRD_PARTY_NOTICES`.
+- `modules/rc-game/client/join-code.js` — `qrMatrix(text)` (level M, smallest version) and `drawQr(canvas, matrix, px)`
+  (black on white, 4-module quiet zone). Canvas, not a `data:` image, so the page CSP is untouched.
+- `host.js renderJoinCode` draws the code next to the address in large type; if the code cannot be made the address is
+  still printed. One code per join address (LAN first).
+- `eslint.config.js` ignores `modules/**/vendor/**`.
+- Verified offline: `tools/smoke/smoke-wo1074-rc-client-qr.test.js` (3 tests: finder patterns / timing / size of the
+  symbol, quiet zone, vendoring + printed address). Full suite 6474 tests, 0 fail.
