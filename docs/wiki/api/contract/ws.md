@@ -67,7 +67,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `error` | `src/server/ws-server.js` |  |
 | server → clients | `fixtures:console_selection` | `src/fixtures/console-selection.js` |  |
 | server → clients | `global_border_sync` | `src/artnet/artnet-output.js` |  |
-| server → clients | `gpu_topology_changed` | `src/bootstrap/gpu-drm-hotplug-watch.js` |  |
+| server → clients | `gpu_topology_changed` | `src/bootstrap/gpu-drm-hotplug-watch.js`, `src/system/screen-hotplug.js` |  |
 | server → clients | `lighting.error` | `src/engine/timeline-playback-light.js` |  |
 | server → clients | `live_state` | `src/replication/live-state-feed.js`, `src/server/ws-server.js` |  |
 | server → clients | `log_line` | `index.js` |  |
