@@ -291,6 +291,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1083-sk-bot-view.test.js',
 	'tools/smoke/smoke-wo1083-sk-bot-unstick.test.js',
 	'tools/smoke/smoke-wo1083-sk-flat-decor.test.js',
+	'tools/smoke/smoke-wo1083-sk-screen-cut.test.js',
 	'tools/smoke/smoke-wo1083-sk-spotlight.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-static.test.js',
 	'tools/smoke/smoke-wo1074-rc-client.test.js',

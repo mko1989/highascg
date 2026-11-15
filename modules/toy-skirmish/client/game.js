@@ -197,6 +197,7 @@ async function loadScene(G) {
 	G.skfx = createFx(G.world.scene, G.s)
 	G.world.setNear(G.s)
 	G.fx?.load(G.scene)
+	G.world.clipScreens() // new pictures: those over the arena get the cut (setArena below may return early)
 	G.arenas = new Map((G.scene.arenas || []).filter((a) => a?.id && Array.isArray(a.rect)).map((a) => [a.id, a]))
 	setArena(G, G.state?.arenaId)
 	G.screens.loading(0, 'Loading the room…')
@@ -220,7 +221,7 @@ export function setArena(G, id) {
 	G.arenaView?.dispose()
 	G.arenaView = createArenaView(G.arena, G.s)
 	G.world.scene.add(G.arenaView.group)
-	G.world.setCut(G.arena.y, G.s)
+	G.world.setCut(G.arena.y, G.s, G.arena.rect)
 	G.hud.minimap.setArena(G.grid)
 	G.camPose = null
 	for (const r of G.rockets) r.handle?.end()

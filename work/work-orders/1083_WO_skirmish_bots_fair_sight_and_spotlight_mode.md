@@ -163,12 +163,21 @@ humans a reason to meet (with a 7 u sight, an empty arena is otherwise a lot of 
 - `check-unwired-exports`: `sk-bot-aim.js` (`REACQUIRE_MS`, `angDiff`, `turnTowards`, `canSee`) and `sk-view.js`
   (`inFrame`) are internal helpers — no longer exported.
 
+- **The black slab over the `stage` arena** (diagnosed by the baker session): not baked geometry but the LED wall
+  picture `led_wall_2` (pgm1, centre [-4.5, 3.5, -5], 5 × 4 m) standing in the middle of the arena. The kit's stage
+  effects add picture quads (`screen:<id>`) to the scene root, so the cut-away plane (only on `world.statics`) never
+  reached them; black whenever programme 1 is black. Fix: `client/screen-cut.js` (pure) — a picture whose plan
+  footprint overlaps the active arena (+ 1 m on the sides and towards the camera, minus a 0.5 m backdrop band along the
+  far edge) gets the same plane (`sk-world.js clipScreens`, re-run by `setCut(y, s, rect)` and after new screens in
+  `game.js loadScene`); every other picture stays uncut. On the live room: `led_wall_2` is cut on `stage`, the back wall
+  `led_wall_1` (at the far edge) stays, both stay when playing in the hall. `smoke-wo1083-sk-screen-cut.test.js` (2: the
+  rule on the live numbers incl. the margins, the wiring by source incl. the kit's `screen:<id>` naming). Live:
+  spectator on `stage` in a headless Firefox — the whole arena with all soldiers visible, a thin dark line where the
+  wall foot is (`work/notes/wo1083-evidence/stage-wall-picture-before.jpg` / `-cut.jpg`).
+
 ## Open / notes
 
 - Not verified on real phones or by the owner playing; the bot level buttons and the Spotlight button were exercised
   over the host API, not clicked.
-- In the spectator overview of the `stage` arena a large black slab from the room scene covers the middle of the arena
-  (soldiers and the pool under it; the name tags float above). It is scene content (the RC scene / baker, another
-  session's area), not the skirmish's — worth a look there.
 - Flat decor: the skirmish now ignores occ cells with nothing above 0.3 u, but the RC game itself still treats every
   occ cell (anything > 5 mm, e.g. a carpet) as a wall — for whoever owns the baker / RC game.
