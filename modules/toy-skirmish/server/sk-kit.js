@@ -10,7 +10,8 @@
  *   createRcLights, rcLightsDeps, withLiveScene   rc-lights.js — the live rig in the game world (§2.6 of the RC contract)
  *   createRcVideo, rcVideoDeps  rc-video.js — the LED wall pictures
  *   serveRcStatic               rc-static.js — the static-file logic (decode once, traversal / symlink refused, MIME list)
- *   occFromJSON, distanceTransform   rc-scene-occ.js — the occupancy grid
+ *   occFromJSON, distanceTransform, occEncodeRle   rc-scene-occ.js — the occupancy grid
+ *   heightsFromJSON             rc-scene-height.js — the scene's height field (what stands how high; WO-1083 flat decor)
  *   MAX_MESSAGE_BYTES, cleanName, cleanColor, PALETTE   rc-sanitize.js — the 2 KB cap and the name / colour rules
  *   core                        the sibling's host.core(id): `src/…` core files and core npm packages (`ws`)
  * Nothing under modules/rc-game/ is edited. Sibling missing → `Stage Skirmish needs the "rc-game" module installed`.
@@ -61,6 +62,7 @@ function kit() {
 	const video = require(file('rc-video.js'))
 	const stat = require(file('rc-static.js'))
 	const occ = require(file('rc-scene-occ.js'))
+	const heights = require(file('rc-scene-height.js'))
 	const san = require(file('rc-sanitize.js'))
 	loaded = {
 		dir,
@@ -75,6 +77,8 @@ function kit() {
 		serveRcStatic: stat.serveRcStatic,
 		occFromJSON: occ.fromJSON,
 		distanceTransform: occ.distanceTransform,
+		occEncodeRle: occ.encodeRle,
+		heightsFromJSON: heights.fromJSON,
 		MAX_MESSAGE_BYTES: san.MAX_MESSAGE_BYTES,
 		cleanName: san.cleanName,
 		cleanColor: san.cleanColor,
