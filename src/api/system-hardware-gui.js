@@ -146,10 +146,12 @@ function spawnGuiDetached(action, opts = {}) {
 		void applyNvidiaDisplayPolicy(env, { log: opts.log })
 	}
 
-	// WO-1012: Zoom runs in its own user scope, so a node restart does not end the meeting (the unit is KillMode=mixed)
+	// Every app started here runs in its own scope of the USER manager, outside highascg.service. The unit is
+	// KillMode=mixed, so each node restart (update, crash, Apply) SIGKILLed whatever the dock had opened: Zoom
+	// mid-meeting (WO-1012), a file manager mid-copy, and Firefox with the operator's tabs (WO-1079, owner 15.11:
+	// "it will sometimes close by itself"). Without a user manager the plain argv is used.
 	const launched = bin
-	// The file manager too: SIGKILLed mid-copy it leaves a USB volume dirty.
-	if (action === 'file-manager' || (opts.extraEnv && require('../zoom/zoom-launch-env').isZoomBin(bin))) {
+	{
 		const cmd = require('../zoom/zoom-launch-env').userScopeArgv(bin, args)
 		bin = cmd.bin
 		args = cmd.args

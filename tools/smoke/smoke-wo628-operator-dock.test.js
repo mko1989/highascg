@@ -159,5 +159,20 @@ describe('WO-628 routes', () => {
 		assert.ok(fn.indexOf('print("[client] dock %s pressed" % action)') < fn.indexOf('await NuclearGate.post'), 'press logged before the request')
 		assert.match(gd, /b\.action_mode = BaseButton\.ACTION_MODE_BUTTON_PRESS/)
 	})
-})
 
+	/* WO-1079: a node restart SIGKILLs the unit's cgroup (KillMode=mixed) — no dock app may live in it */
+	it('WO-1079: every dock app starts in a user scope, not only Zoom and the file manager', () => {
+		const fs = require('node:fs')
+		const src = fs.readFileSync(require.resolve('../../src/api/system-hardware-gui.js'), 'utf8')
+		const body = src.slice(src.indexOf('function spawnGuiDetached('), src.indexOf('const proc = spawn(bin, args, {'))
+		assert.match(body, /const launched = bin\n\t\{\n\t\tconst cmd = require\('\.\.\/zoom\/zoom-launch-env'\)\.userScopeArgv\(bin, args\)/)
+		assert.doesNotMatch(body, /if \(action === 'file-manager' \|\|/, 'the scope is not conditional on the app')
+		const { userScopeArgv } = require('../../src/zoom/zoom-launch-env')
+		const ff = '/usr/local/lib/highascg/highascg-launch-operator-firefox.sh'
+		assert.deepEqual(userScopeArgv(ff, ['about:blank'], { exists: () => true, uid: 1000 }), {
+			bin: '/usr/bin/systemd-run',
+			args: ['--user', '--scope', '--collect', '--quiet', '--', ff, 'about:blank'],
+			scoped: true,
+		})
+	})
+})

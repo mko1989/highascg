@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-986 live WOs (35 open, 151 in progress, 800 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+987 live WOs (35 open, 152 in progress, 800 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -429,7 +429,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1072 IN PROGRESS [lighting+tracking-vr,godot-client] Match the project to the lighting console's head positions (MagicQ CSV) → 1072_WO_match_project_to_console_head_positions.md
 - 1078 IN PROGRESS [lighting] visualiser: the sACN-driven part of the rig stays dark → 1078_WO_visualiser_sacn_part_of_rig_dark.md
 
-## godot-client — Godot client (169)
+## godot-client — Godot client (170)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -600,6 +600,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1067 IN PROGRESS [godot-client] Game controllers moved the GUI focus; they belong to the games and the Previs c… → 1067_WO_gamepads_never_drive_the_gui_previs_camera.md
 - 1070 IN PROGRESS [godot-client] APC40 pad banks; the whole visuals library on the pads by dominant colour → 1070_WO_apc_pad_banks_library_by_colour.md
 - 1077 IN PROGRESS [godot-client] Operator dock: a click on the Firefox icon did nothing (14.11 evening) → 1077_WO_dock_firefox_click_did_nothing.md
+- 1079 IN PROGRESS [godot-client] Firefox opened from the dock closes by itself → 1079_WO_dock_firefox_closes_by_itself.md
 
 ## web-client — Web client (83)
 
