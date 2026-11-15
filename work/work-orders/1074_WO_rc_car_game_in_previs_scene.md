@@ -1,7 +1,7 @@
 # WO-1074 — RC car racing game in the show's 3D scene (browser, up to 10 players)
 
 **Area:** web-client, engine
-**Status: IN PROGRESS (14.11.26 — version 2 built and run on the box in headless Chrome; never on a real GPU or phone; see "Version 2")**
+**Status: IN PROGRESS (15.11.26 — toy scale, tunnels, module and QR code run on the box in headless Chrome; never on a real GPU or phone)**
 
 Owner, 14.11: *"Is it possible to host on the box some kind of a game for instance rc car racers … played inside the
 previs scene … a browser game both for laptops and mobile."* → *"Implement the rc cars game. Generate some different
@@ -171,3 +171,21 @@ kart less simulator"; the game world should show the lights and the LED wall con
 - `eslint.config.js` ignores `modules/**/vendor/**`.
 - Verified offline: `tools/smoke/smoke-wo1074-rc-client-qr.test.js` (3 tests: finder patterns / timing / size of the
   symbol, quiet zone, vendoring + printed address). Full suite 6474 tests, 0 fail.
+
+## Verified on the box (15.11.26 07:00–07:05, node restarted at commit fb45db79, module enabled, show off)
+
+- Host `enable` → journal `scene 405f970d98a2-d841e6d4a2 baked in 17202 ms: 382001 triangles, 7229492 bytes, 2 floors,
+  0 obstacles, 11 tracks`; `/scene` has `scale 0.1`, 11 tracks, `hall-tunnel` 20.5 m with 1 tunnel, the two long tours
+  138.3 / 142.0 m with 2 tunnels each and `laps 1`.
+- Race: 2 headless Chromes (software GL, nice 19, ~7 fps) on `hall-tunnel`, 2 laps, lights and wall pictures on. Bot1
+  finished both laps (62.0 s and 49.5 s at that frame rate — the track crosses the tunnel each lap), picked up 3 item
+  boxes, used turbo and slick; both pages got 995 wall-picture frames and the lights snapshot. Bot0 completed no lap
+  inside the 120 s window — not investigated (the old driver script steers poorly at 7 fps; the offline bot laps every
+  track). Screenshots: scratchpad `qr/race1/` (toy car between chair legs).
+- QR code: host panel screenshot `qr/host.png`; OpenCV's QR detector reads both codes from the canvases and from the
+  screenshot itself: `http://192.168.50.64:4200/game/rc/` and the VPN address. No console errors.
+- Never on a screen: from the scene bake to the end of the race (journal 07:01:10–07:05:15) the server sent Caspar
+  nothing but its routine `INFO` queries (242 of them) — no play, load, mixer or clear line on any channel.
+- ffmpeg clean-up: 0 zombie processes after the race and after `disable` (9 zombies before the restart, from the old
+  worker); no wall-feed ffmpeg left.
+- Left: game session disabled, module enabled, pgm2 empty.

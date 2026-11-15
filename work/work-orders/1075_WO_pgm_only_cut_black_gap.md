@@ -1,7 +1,7 @@
 # WO-1075 — A cut on a PGM-only screen went to black before the new look played
 
 **Area:** engine
-**Status: IN PROGRESS (14.11.26 — fixed and pinned offline; NOT run on the box: the show was on, no restart, no screen tests)**
+**Status: DONE (15.11.26 — four cuts on pgm2 on the box: the new look plays before the old one is removed, never an empty channel)**
 
 Owner, 14.11: "Yes [fix the ~180 ms of black on normal cuts on PGM-only screens], but no restarts and tests on screen,
 it's back on show."
@@ -44,3 +44,19 @@ it's back on show."
 - When the old look is on bank B (110+) and the new one plays on bank A (10+), the new look is under the old one until
   the sweep lands (same tick, a few ms after the PLAY) — no black, but the cut is at the sweep, not the PLAY.
 - A take **with a fade** on a PGM-only screen still clears the old look first and fades in from black (unchanged here).
+
+## Verified on the box (15.11.26 07:05–07:07, node restarted 07:00 at commit fb45db79, show off)
+
+- Four cuts on pgm2 (channel 4, PGM-only) through `POST /api/scene/take` (`forceCut`), alternating a still and a
+  movie, while a probe polled the server's OSC view of the channel every ~29 ms:
+  ```
+  1021 TAKE B    1314 {10: movie, 110: still}   1375 {10: movie}
+  3468 TAKE A    3748 {10: movie, 110: still}   3804 {110: still}
+  5908 TAKE B    6206 {10: movie}               (swap inside one poll)
+  8336 TAKE A    8661 {10: movie, 110: still}   8712 {110: still}
+  ```
+  The new layer is there before the old one goes in three cuts and in the same poll in the fourth; no sample shows the
+  channel without a playing look layer (before the fix: ~180 ms empty).
+- The journal at the box's log level shows only `BEGIN…COMMIT (8 cmds)` and `play-acked=130ms`, not the single PLAY /
+  STOP lines, so the order was read from OSC, not from the journal.
+- Not looked at with eyes on the wall. pgm2 was cleared afterwards and is empty again, as found.

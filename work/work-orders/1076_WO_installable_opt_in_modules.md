@@ -1,7 +1,7 @@
 # WO-1076 — Installable, opt-in modules (external modules: install / enable / disable at runtime)
 
 **Area:** engine, process
-**Status: IN PROGRESS (14.11.26 — core infrastructure built, 13/13 new smokes + offline suite green; NOT on the running server (show on, no restart); the RC game is not moved yet; no GUI page)**
+**Status: DONE (15.11.26 — live on the box: rc-game found, off after the restart, enabled at runtime, a race run through it; open: a settings page in the clients, tarballs from CI)**
 
 Owner, 14.11 (about the RC car game, WO-1074): "I hope the game is detachable. I'd like it to be an opt in module that
 is installed when the user wants it."
@@ -221,3 +221,14 @@ after the next restart, with no module installed nothing changes); the RC game a
   never-on-a-screen pin now also requires every core file to be reached through `core()` (mutation-checked both ways).
 - **Not verified:** the running server (not restarted, show on). After the next restart the game is OFF on this box
   until `POST /api/modules/enable {"name":"rc-game"}`.
+
+## Verified on the box (15.11.26, node restarted 07:00 at commit fb45db79)
+
+- After the restart: journal `[modules] external "rc-game" installed, disabled`; `GET /api/modules?available=1` lists it
+  (`enabled:false, loaded:false, compatible:true`); `GET /api/game/rc/state` → 404; `/game/rc/` falls through to the
+  web UI page (nothing of the game is served).
+- `POST /api/modules/enable {"name":"rc-game"}` → `loaded:true` without a restart (journal `loaded external "rc-game"
+  1.0.0 (repo)`); `/api/game/rc/state` → `{"enabled":false}`, `/game/rc/` → the game page, the vendored file inside the
+  module is served. A two-car race then ran through the module (WO-1074).
+- Left: module enabled (`~/.highascg/modules.json`), game session off. Not tried on the box: disable, uninstall, an
+  install from a tarball (all covered by the smokes only).
