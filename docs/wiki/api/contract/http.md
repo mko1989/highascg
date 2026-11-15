@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-596 routes.
+600 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -184,6 +184,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/game/rc/scene` | registry | `modules/rc-game/server/routes-rc-game.js` |
 | GET | `/api/game/rc/scene.glb` | registry | `modules/rc-game/server/routes-rc-game.js` |
 | GET | `/api/game/rc/state` | registry | `modules/rc-game/server/routes-rc-game.js` |
+| POST | `/api/game/sk/host` | registry | `modules/toy-skirmish/server/routes-sk.js` |
+| GET | `/api/game/sk/scene` | registry | `modules/toy-skirmish/server/routes-sk.js` |
+| GET | `/api/game/sk/scene.glb` | registry | `modules/toy-skirmish/server/routes-sk.js` |
+| GET | `/api/game/sk/state` | registry | `modules/toy-skirmish/server/routes-sk.js` |
 | GET | `/api/hardware/displays` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | GET | `/api/hardware/modeline-preview` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | * | `/api/health` | handler | `src/cg-studio/routes.js` |
@@ -613,6 +617,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | Module | What it is |
 |---|---|
 | `modules/rc-game/server/routes-rc-game.js` | WO-1074 — RC car game (work/notes/rc-game-contract.md). |
+| `modules/toy-skirmish/server/routes-sk.js` | WO-1081 — Stage Skirmish (work/notes/skirmish-game-contract.md §2). |
 | `src/api/router-dispatch.js` | Route request dispatch (split from `router.js`). |
 | `src/api/router.js` | Main HTTP API dispatcher (split from companion `api-routes.js`). |
 | `src/api/routes-amcp.js` | Basic AMCP HTTP: batch, play/load/loadbg, pause/resume, stop/clear, call, swap, add/remove, raw, restart, kill. |

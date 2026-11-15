@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-988 live WOs (35 open, 153 in progress, 800 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+989 live WOs (35 open, 154 in progress, 800 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -602,7 +602,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1077 IN PROGRESS [godot-client] Operator dock: a click on the Firefox icon did nothing (14.11 evening) → 1077_WO_dock_firefox_click_did_nothing.md
 - 1079 IN PROGRESS [godot-client] Firefox opened from the dock closes by itself → 1079_WO_dock_firefox_closes_by_itself.md
 
-## web-client — Web client (83)
+## web-client — Web client (84)
 
 - 05 DONE [web-client+video-io] Live Video Preview (go2rtc) + Settings Modal + Audio Monitoring → 05_WO_LIVE_PREVIEW_SETTINGS.md
 - 14 DONE [web-client+devices-config] Offline Preparation Mode → 14_WO_OFFLINE_PREPARATION_MODE.md
@@ -687,6 +687,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 827 DONE [web-client] Web client: Looks deck says "No looks" after a server import (+ six ReferenceEr… → 827_WO_web_looks_deck_empty_after_import.md
 - 844 DONE [web-client] Sweep: web client bugs → 844_WO_sweep_web_client_bugs.md
 - 1074 IN PROGRESS [web-client+engine] RC car racing game in the show's 3D scene (browser, up to 10 players) → 1074_WO_rc_car_game_in_previs_scene.md
+- 1081 IN PROGRESS [web-client] Stage Skirmish: a toy-soldier top-down shooter in the show's room (second game… → 1081_WO_stage_skirmish_toy_soldier_shooter.md
 
 ## companion — Companion integration (23)
 

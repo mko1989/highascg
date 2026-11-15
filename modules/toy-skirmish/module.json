@@ -1,0 +1,8 @@
+{
+	"name": "toy-skirmish",
+	"version": "1.0.0",
+	"title": "Stage Skirmish",
+	"description": "Toy soldiers battle it out top-down in the show's 3D room, deathmatch or teams, with weapon pickups and bots (browser, up to 10 players). Shows the live lights and LED wall pictures. Needs the rc-game module installed. Never puts anything on a screen.",
+	"main": "register.js",
+	"requiresCore": ">=2026.5.20"
+}

@@ -37,7 +37,7 @@ const path = require('path')
 const REPO_ROOT = path.join(__dirname, '../..')
 
 /** Where exports are GATED (an orphan here fails the build). */
-const EXPORT_ROOTS = ['client/components', 'client/lib', 'src', 'modules/rc-game/server'] // modules: server halves only (browser ES modules export for each other and for smokes)
+const EXPORT_ROOTS = ['client/components', 'client/lib', 'src', 'modules/rc-game/server', 'modules/toy-skirmish/server'] // modules: server halves only (browser ES modules export for each other and for smokes)
 /** Where references are LOOKED FOR (everything that can reasonably call into the above). */
 // WO-836: + test/ (its unit tests are real consumers) and the root index.js (the boot entry that requires src/)
 const REFERENCE_ROOTS = ['client', 'src', 'modules', 'tools', 'template', 'scripts', 'test', 'index.js']
