@@ -77,4 +77,4 @@ function botSees(a, b, u) {
 	return inFrame(dx, dz) && inFrame(-dx, -dz)
 }
 
-module.exports = { VIEW, REACH_U, ndcOf, inFrame, reachAlong, botSees }
+module.exports = { VIEW, REACH_U, ndcOf, reachAlong, botSees }

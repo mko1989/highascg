@@ -94,4 +94,4 @@ function choose(p, d) {
 	return null
 }
 
-module.exports = { LEVELS, LEVEL_IDS, REACQUIRE_MS, wrap, angDiff, turnTowards, canSee, spot, aimStep, shotYaw, choose }
+module.exports = { LEVELS, LEVEL_IDS, wrap, spot, aimStep, shotYaw, choose }
