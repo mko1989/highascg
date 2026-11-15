@@ -82,5 +82,8 @@ func test_client_rows() -> void:
 	c.fps = 15
 	c.cpu_pct = -1.0
 	d = _pairs(M.client_rows(c, 28))
-	t.eq(d["FPS"][1], 2, "under 20 fps alarms")
+	t.eq(d["FPS"][1], 0, "WO-1088: no fixed fps thresholds — a client capped low on purpose is not an alarm")
+	c.merge({"fps": 61, "fps_target": 100, "fps_why": "2× the 50 fps show, feeding Caspar", "fps_level": 1}, true)
+	d = _pairs(M.client_rows(c, 28))
+	t.eq(d["FPS"], ["61 / 100 · 2× the 50 fps show, feeding Caspar", 1], "WO-1088: against its target, with why + the keeping-up level")
 	t.eq(d["CPU"], ["—", 0], "first tick has no CPU window")

@@ -23,6 +23,7 @@ const ConnectionEye := preload("res://app/connection_eye.gd")
 const ConnectionMenu := preload("res://app/connection_menu.gd")
 const LogsDialog := preload("res://app/logs_dialog.gd")
 const PerfOverlay := preload("res://app/perf_overlay.gd")
+const KeepingUp := preload("res://app/keeping_up.gd")
 const UiIcons := preload("res://app/ui_icons.gd")
 const HeaderProject := preload("res://app/header_project.gd")
 const HandoverWatch := preload("res://app/handover_watch.gd")
@@ -49,6 +50,8 @@ var inspector: InspectorPanel
 var osc: OscMirror
 var perf: PerfOverlay
 var _perf_btn: Button
+var keeping: KeepingUp  # WO-1088: the "keeping up" watch — the pulse icon's colour + the worst offender's label
+var _keeping_label: Label
 
 
 func _ready() -> void:
@@ -156,6 +159,11 @@ func _ready() -> void:
 	perf = PerfOverlay.new()  # WO-623 — after the header button exists so its state syncs on boot
 	perf.toggled.connect(func(on: bool) -> void: _perf_btn.set_pressed_no_signal(on))
 	add_child(perf)
+	keeping = KeepingUp.new()
+	add_child(keeping)
+	perf.keeping = keeping
+	keeping.changed.connect(_show_keeping)
+	_show_keeping(keeping.summary)
 	_add_dock()
 
 
@@ -245,7 +253,17 @@ func _build_header() -> Control:
 	header_status = HeaderStatus.new()  # PGM timer · wall clock · headphones
 	header_status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(header_status)
-	_perf_btn = UiIcons.button("pulse", "Performance overlay — CPU / GPU / RAM of this client and the box (F3)")
+	_keeping_label = Label.new()  # WO-1088: only while something is not keeping up — the worst offender, in words
+	_keeping_label.visible = false
+	_keeping_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	_keeping_label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_keeping_label.gui_input.connect(func(e: InputEvent) -> void:
+		var mb := e as InputEventMouseButton
+		if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			perf.set_on(not perf.is_on()))
+	_keeping_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_keeping_label)
+	_perf_btn = UiIcons.button("pulse", "Health — keeping up, CPU / GPU / RAM of this client and the box (F3)")
 	_perf_btn.toggle_mode = true
 	_perf_btn.flat = true
 	_perf_btn.add_theme_color_override("icon_pressed_color", ThemeBuilder.ACCENT)
@@ -257,6 +275,24 @@ func _build_header() -> Control:
 	_eye.context_requested.connect(func() -> void: ConnectionMenu.show_menu(_eye, handover))
 	row.add_child(_eye)
 	return bar
+
+
+## WO-1088: calm (plain icon) when everything keeps up; amber / red icon + the worst offender's label when not.
+func _show_keeping(sm: Dictionary) -> void:
+	var lvl := clampi(int(sm.get("level", 0)), 0, 2)
+	var col: Color = [ThemeBuilder.ACCENT, ThemeBuilder.WARN, ThemeBuilder.ERROR][lvl]
+	_keeping_label.visible = lvl > 0
+	_keeping_label.text = str(sm.get("label", ""))
+	_keeping_label.tooltip_text = "Not keeping up — click for the health panel (F3)"
+	_keeping_label.add_theme_color_override("font_color", col)
+	for k in ["icon_normal_color", "icon_hover_color", "icon_focus_color"]:
+		if lvl > 0:
+			_perf_btn.add_theme_color_override(k, col)
+		else:
+			_perf_btn.remove_theme_color_override(k)
+	_perf_btn.add_theme_color_override("icon_pressed_color", col)
+	_perf_btn.add_theme_color_override("icon_hover_pressed_color", col if lvl > 0 else ThemeBuilder.ACCENT_HOVER)
+	_perf_btn.tooltip_text = ("%s — click for details (F3)" % sm.get("label", "")) if lvl > 0 else "Health — everything keeps up. CPU / GPU / RAM of this client and the box (F3)"
 
 
 ## Eye click → server logs (the web's connection-eye click); a second click closes them.

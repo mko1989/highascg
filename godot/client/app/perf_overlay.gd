@@ -5,6 +5,9 @@ extends CanvasLayer
 ## nothing when off. Toggled from the header (pulse icon) or F3; remembered in ui.cfg [overlay] perf.
 
 const M := preload("res://app/perf_overlay_model.gd")
+const KM := preload("res://app/keeping_up_model.gd")
+const Pacer := preload("res://app/render_pacer.gd")
+const INCIDENTS_SHOWN := 5
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const UI_CFG := "user://ui.cfg"
 const CLIENT_S := 0.5
@@ -22,6 +25,7 @@ var _prev_ticks := -1
 var _client_rows: Array = []
 var _vps: Array = []  # root window + every SubViewport (previs 3D) — render time is summed over all of them
 var _vp_age := 0
+var keeping: Node  # WO-1088: app/keeping_up.gd (the shell sets it) — the "Keeping up" list on top
 
 
 func _ready() -> void:
@@ -80,6 +84,8 @@ func _process(delta: float) -> void:
 	if _t_host >= HOST_S and not _host_busy:
 		_t_host = 0.0
 		_poll_host()
+		if keeping != null:
+			keeping.refresh()  # the measured values move between the server's on-change broadcasts
 	if _t_client >= CLIENT_S:
 		_client_rows = M.client_rows(_sample_client(_t_client), M.cores_of(_host))
 		_t_client = 0.0
@@ -101,6 +107,9 @@ func _sample_client(dt: float) -> Dictionary:
 			rgpu += RenderingServer.viewport_get_measured_render_time_gpu((vp as Viewport).get_viewport_rid())
 	var c := {
 		"fps": Engine.get_frames_per_second(),
+		"fps_target": Pacer.target(),
+		"fps_why": Pacer.why(),
+		"fps_level": keeping.own_level() if keeping != null else 0,
 		"frame_ms": Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
 		"render_cpu_ms": rcpu,
 		"render_gpu_ms": rgpu,
@@ -136,8 +145,35 @@ func _poll_host() -> void:
 	_render()
 
 
+## WO-1088: "KEEPING UP" — one line per check, offenders first, each target vs measured; an offender's hint under it;
+## then the last incidents (what, when, how long, worst value), so a problem that came and went is still there.
+func _keeping_cells() -> Array:
+	var cells: Array = []
+	if keeping == null:
+		return cells
+	var colours := [ThemeBuilder.TEXT, ThemeBuilder.WARN, ThemeBuilder.ERROR]
+	var sm: Dictionary = keeping.summary
+	cells.append(["KEEPING UP", 10, ThemeBuilder.ACCENT])
+	cells.append(["all keeping up" if int(sm.level) == 0 else str(sm.label), 10, colours[clampi(int(sm.level), 0, 2)]])
+	for c in sm.checks:
+		var lvl := clampi(int(c.get("level", 0)), 0, 2)
+		cells.append([str(c.get("name", "")), 12, ThemeBuilder.TEXT_MUTED])
+		cells.append([str(c.get("text", "")) + ("" if lvl == 0 else "  · " + str(c.get("status", ""))), 12, colours[lvl]])
+		if lvl > 0 and str(c.get("hint", "")) != "":
+			cells.append(["", 10, ThemeBuilder.TEXT_MUTED])
+			cells.append([str(c.hint), 10, ThemeBuilder.TEXT_MUTED, true])
+	var incs: Array = sm.incidents
+	if not incs.is_empty():
+		cells.append(["RECENT", 10, ThemeBuilder.ACCENT])
+		cells.append(["", 10, ThemeBuilder.ACCENT])
+		for i in incs.slice(0, INCIDENTS_SHOWN):
+			cells.append([KM.clock(float(i.get("startedAt", 0))), 11, ThemeBuilder.TEXT_MUTED])
+			cells.append([KM.incident_line(i), 11, colours[clampi(int(i.get("level", 1)), 0, 2)], true])
+	return cells
+
+
 func _render() -> void:
-	var cells: Array = []  # [text, size, colour] — two per grid row
+	var cells: Array = _keeping_cells()  # [text, size, colour, wrap?] — two per grid row
 	for sec in [["THIS CLIENT", _client_rows], ["BOX", M.host_rows(_host)]]:
 		cells.append([sec[0], 10, ThemeBuilder.ACCENT])
 		cells.append(["", 10, ThemeBuilder.ACCENT])
@@ -157,3 +193,6 @@ func _render() -> void:
 		l.text = cells[i][0]
 		l.add_theme_font_size_override("font_size", cells[i][1])
 		l.add_theme_color_override("font_color", cells[i][2])
+		var wrap: bool = cells[i].size() > 3 and cells[i][3]  # hints / incident lines wrap at a fixed width
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if wrap else TextServer.AUTOWRAP_OFF
+		l.custom_minimum_size.x = 340 if wrap else 0

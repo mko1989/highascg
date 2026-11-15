@@ -54,12 +54,16 @@ static func _row(label: String, value: String, lvl := 0) -> Dictionary:
 	return {"label": label, "value": value, "level": lvl}
 
 
-## client: {fps, frame_ms, render_cpu_ms, render_gpu_ms, draw_calls, objects, vram, static_mem, cpu_pct, rss}
-## (missing / negative → "—"). cores scales the client's CPU% into a machine share like the server does.
+## client: {fps, fps_target, fps_why, fps_level, frame_ms, render_cpu_ms, render_gpu_ms, draw_calls, objects, vram,
+## static_mem, cpu_pct, rss} (missing / negative → "—"). cores scales the client's CPU% into a machine share like the
+## server does. WO-1088: FPS reads against its cap and why ("100 / 100 · 2× the 50 fps show, feeding Caspar"); its level is
+## the debounced keeping-up level of that target (app/keeping_up_model.gd), not a fixed threshold.
 static func client_rows(c: Dictionary, cores: int) -> Array:
 	var fps := float(c.get("fps", -1))
+	var target := int(c.get("fps_target", 0))
+	var fps_txt := ("%d" % fps if fps >= 0 else "—") + (" / %d · %s" % [target, str(c.get("fps_why", ""))] if target > 0 else "")
 	var rows := [
-		_row("FPS", "%d" % fps if fps >= 0 else "—", 2 if fps >= 0 and fps < 20 else (1 if fps >= 0 and fps < 45 else 0)),
+		_row("FPS", fps_txt, clampi(int(c.get("fps_level", 0)), 0, 2)),
 		_row("Frame", "%.1f ms" % float(c.frame_ms) if float(c.get("frame_ms", -1)) >= 0 else "—"),
 	]
 	if float(c.get("render_cpu_ms", -1)) >= 0:

@@ -8,6 +8,7 @@ extends Node
 
 var viewport: SubViewport
 var sink: RefCounted  # HshmSink, created through ClassDB so this file parses where the extension is missing
+const Pacer := preload("res://app/render_pacer.gd")  # WO-1088: 2× the channel rate only while a ring is written
 var skipped := 0
 const MAX_IN_FLIGHT := 2
 
@@ -34,6 +35,7 @@ func start(vp: SubViewport, ring_name: String, fps := 50) -> String:
 		return err
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_rd = RenderingServer.get_rendering_device()
+	Pacer.publish_started(get_instance_id(), fps)  # before the first published frame (_process)
 	return ""
 
 
@@ -41,8 +43,14 @@ func start(vp: SubViewport, ring_name: String, fps := 50) -> String:
 func stop() -> void:
 	if sink != null:
 		sink.close()
+		Pacer.publish_stopped(get_instance_id())  # the cap comes down after a hold, not now
 	sink = null
 	viewport = null
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and sink != null:  # freed while writing (not _exit_tree: an undocked tab re-parents)
+		Pacer.publish_stopped(get_instance_id())
 
 
 func _process(_delta: float) -> void:
