@@ -274,6 +274,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1074-rc-client-net.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-render.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-qr.test.js',
+	'tools/smoke/smoke-wo1074-rc-client-fullscreen.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-static.test.js',
 	'tools/smoke/smoke-wo1074-rc-client.test.js',
 	'tools/smoke/smoke-wo1074-rc-live-client.test.js',

@@ -11,6 +11,7 @@ import { buildTrackMesh, disposeGroup } from './track-mesh.js'
 import { createProps } from './props.js'
 import { createFxView } from './fx-view.js'
 import { createHud, toolButton } from './hud.js'
+import { fullscreenButton } from './fullscreen.js'
 import { createLobby } from './lobby.js'
 import { createInput } from './input.js'
 import { createAudio } from './audio.js'
@@ -103,7 +104,9 @@ export async function startGame({ spectator = false } = {}) {
 		storeSet('quality', q)
 		el.textContent = q === 'low' ? 'LQ' : 'HQ'
 	})
+	const fsEl = fullscreenButton()
 	if (!spectator) toolbar.push(qBtn) // the spectator page (maybe on a wall) shows no buttons at all
+	if (!spectator && fsEl) toolbar.push({ el: fsEl })
 	G.hud = createHud($('#hud'), { spectator, toolbar, itemButton: spectator ? null : $('#t-item') })
 	G.muteBtn = toolbar.find((b) => b.el.title.startsWith('Sound'))?.el || null
 

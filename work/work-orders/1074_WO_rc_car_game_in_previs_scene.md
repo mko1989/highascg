@@ -172,6 +172,23 @@ kart less simulator"; the game world should show the lights and the LED wall con
 - Verified offline: `tools/smoke/smoke-wo1074-rc-client-qr.test.js` (3 tests: finder patterns / timing / size of the
   symbol, quiet zone, vendoring + printed address). Full suite 6474 tests, 0 fail.
 
+## Full-screen button (15.11, owner: "need a fullscreen button on the client game browser")
+
+**Investigation.** The page had no way to drop the phone browser's address bar; a landscape phone loses a large part
+of a 390 px high view to it. The HUD toolbar is covered by the join form and the lobby panel, so a toolbar-only button
+cannot be reached before the race.
+
+**Done.** `modules/rc-game/client/fullscreen.js`: `createFullscreen` (standard Fullscreen API, webkit names as
+fallback, landscape orientation lock after entering, never throws) and `fullscreenButton` (returns null where the
+browser has no API — iPhone Safari — so no dead button). Wired in three places: HUD toolbar (`game.js`, players only;
+the spectator page keeps no buttons), join form header and lobby actions (`lobby.js`). Icon is drawn in CSS
+(`rc-ui.css` `.fs-ico`): the page's "no URL anywhere" smoke rejects the SVG namespace string.
+
+**Verified.** `smoke-wo1074-rc-client-fullscreen.test.js` (4 tests, in the curated list). On the box, headless Chrome
+at 844×390 against the live server: the join-form button is the top element at its position, a click enters full
+screen (`document.fullscreenElement` set, title "Leave full screen"), a second click leaves; after joining, the toolbar
+button is visible and on top; no console errors. Not tested: a real phone (Android landscape lock, iPad webkit path).
+
 ## Verified on the box (15.11.26 07:00–07:05, node restarted at commit fb45db79, module enabled, show off)
 
 - Host `enable` → journal `scene 405f970d98a2-d841e6d4a2 baked in 17202 ms: 382001 triangles, 7229492 bytes, 2 floors,

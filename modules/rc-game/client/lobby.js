@@ -5,6 +5,7 @@
 import { h, setText, show, storeGet, storeSet, COLORS, safeColor } from './dom.js'
 import { sanitizeName, MAX_NAME } from './protocol.js'
 import { previewTrack } from './trackdraw.js'
+import { fullscreenButton } from './fullscreen.js'
 
 export function createLobby(root, { onJoin, onReady, onRejoin }) {
 	root.textContent = ''
@@ -58,7 +59,7 @@ export function createLobby(root, { onJoin, onReady, onRejoin }) {
 	const joinCanvas = h('canvas.track-preview', { width: 220, height: 140 })
 	const joinPanel = h(
 		'div.panel.join',
-		h('h1', { text: 'Stage Sprint RC' }),
+		h('div.panel-head', h('h1', { text: 'Stage Sprint RC' }), fullscreenButton()),
 		h(
 			'div.cols',
 			h('div.col', h('label', { text: 'Name' }), nameIn, h('label', { text: 'Colour' }), swatches, joinBtn),
@@ -88,7 +89,7 @@ export function createLobby(root, { onJoin, onReady, onRejoin }) {
 			h('div.col', h('h2', { text: 'Waiting for the start' }), plist, lMsg),
 			h('div.col.preview', lCanvas, lTrack, lLaps)
 		),
-		h('div.actions', readyBtn, driveBtn, changeBtn)
+		h('div.actions', readyBtn, driveBtn, changeBtn, fullscreenButton())
 	)
 	const openBtn = h('button.tool.lobby-open', { type: 'button', text: 'Lobby', title: 'Show the lobby' })
 

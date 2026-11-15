@@ -420,3 +420,42 @@ label {
 .host-players .pready {
 	color: var(--dim);
 }
+
+/* ---------- full-screen button (toolbar, join form, lobby) ---------- */
+.fs-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.fs-ico {
+	--c: linear-gradient(currentColor, currentColor);
+	width: 18px;
+	height: 18px;
+	pointer-events: none;
+	background:
+		var(--c) left top / 7px 2.5px,
+		var(--c) left top / 2.5px 7px,
+		var(--c) right top / 7px 2.5px,
+		var(--c) right top / 2.5px 7px,
+		var(--c) left bottom / 7px 2.5px,
+		var(--c) left bottom / 2.5px 7px,
+		var(--c) right bottom / 7px 2.5px,
+		var(--c) right bottom / 2.5px 7px;
+	background-repeat: no-repeat;
+}
+.fs-btn.on {
+	border-color: var(--accent);
+}
+.fs-btn.on .fs-ico {
+	width: 12px;
+	height: 12px;
+}
+.panel-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 10px;
+}
+.actions .fs-btn {
+	margin-left: auto;
+}
