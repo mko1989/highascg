@@ -1,0 +1,210 @@
+{
+  "version": 1,
+  "devices": [
+    {
+      "id": "caspar_host",
+      "role": "caspar_host",
+      "label": "Caspar / HighAsCG host"
+    },
+    {
+      "id": "destinations",
+      "role": "destinations",
+      "label": "Screen destinations"
+    }
+  ],
+  "connectors": [
+    {
+      "id": "local_use",
+      "deviceId": "caspar_host",
+      "kind": "local_use",
+      "index": 0,
+      "label": "Local use"
+    },
+    {
+      "id": "dst_in_dst_operator_gui",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "Operator GUI",
+      "externalRef": "dst_operator_gui"
+    },
+    {
+      "id": "dst_in_dst_mw7t9epz_1",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "PGM/PRV 1",
+      "externalRef": "dst_mw7t9epz_1"
+    },
+    {
+      "id": "dlsdi_1",
+      "deviceId": "caspar_host",
+      "kind": "decklink_io",
+      "index": 0,
+      "label": "DeckLink 1",
+      "caspar": {
+        "ioDirection": "in"
+      },
+      "externalRef": "1"
+    },
+    {
+      "id": "dlsdi_2",
+      "deviceId": "caspar_host",
+      "kind": "decklink_io",
+      "index": 1,
+      "label": "DeckLink 2",
+      "caspar": {
+        "ioDirection": "in"
+      },
+      "externalRef": "2"
+    },
+    {
+      "id": "dlsdi_3",
+      "deviceId": "caspar_host",
+      "kind": "decklink_io",
+      "index": 2,
+      "label": "DeckLink 3",
+      "caspar": {
+        "ioDirection": "in"
+      },
+      "externalRef": "3"
+    },
+    {
+      "id": "dlsdi_4",
+      "deviceId": "caspar_host",
+      "kind": "decklink_io",
+      "index": 3,
+      "label": "DeckLink 4",
+      "caspar": {
+        "ioDirection": "unassigned"
+      },
+      "externalRef": "4"
+    },
+    {
+      "id": "dst_in_host_decklink_input_1",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "DeckLink 1",
+      "caspar": {
+        "hostRole": "decklink_input",
+        "hostChannel": 5,
+        "slot": 1
+      },
+      "externalRef": "host_decklink_input_1"
+    },
+    {
+      "id": "dst_in_host_decklink_input_2",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "DeckLink 2",
+      "caspar": {
+        "hostRole": "decklink_input",
+        "hostChannel": 6,
+        "slot": 2
+      },
+      "externalRef": "host_decklink_input_2"
+    },
+    {
+      "id": "dst_in_dst_mwced94x_1",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "PGM 2",
+      "externalRef": "dst_mwced94x_1"
+    },
+    {
+      "id": "dst_in_host_decklink_input_3",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "label": "DeckLink 3",
+      "caspar": {
+        "hostRole": "decklink_input",
+        "hostChannel": 7,
+        "slot": 3
+      },
+      "externalRef": "host_decklink_input_3"
+    },
+    {
+      "id": "audio_1",
+      "deviceId": "caspar_host",
+      "kind": "audio_out",
+      "label": "Audio 1",
+      "externalRef": "hw:0,0"
+    },
+    {
+      "id": "audio_2",
+      "deviceId": "caspar_host",
+      "kind": "audio_out",
+      "label": "Audio 2",
+      "externalRef": "hw:2,0"
+    },
+    {
+      "id": "gpu_p0",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P0",
+      "caspar": {
+        "bus": "pgm",
+        "mainIndex": 0
+      },
+      "externalRef": "DP-0/DP-1"
+    },
+    {
+      "id": "gpu_p1",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P1",
+      "caspar": {
+        "bus": "pgm",
+        "mainIndex": 0
+      },
+      "externalRef": "DP-3"
+    },
+    {
+      "id": "gpu_p2",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P2",
+      "caspar": {
+        "bus": "pgm",
+        "mainIndex": 0
+      },
+      "externalRef": "DP-4/DP-5"
+    },
+    {
+      "id": "gpu_p3",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P3",
+      "caspar": {
+        "bus": "pgm",
+        "mainIndex": 0
+      },
+      "externalRef": "DP-6/DP-7"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_dst_in_dst_mw7t9epz_1_gpu_p1",
+      "sourceId": "dst_in_dst_mw7t9epz_1",
+      "sinkId": "gpu_p1"
+    },
+    {
+      "id": "e_dst_in_dst_mwced94x_1_gpu_p2",
+      "sourceId": "dst_in_dst_mwced94x_1",
+      "sinkId": "gpu_p2"
+    },
+    {
+      "id": "e_dst_in_dst_mwced94x_1_gpu_p3",
+      "sourceId": "dst_in_dst_mwced94x_1",
+      "sinkId": "gpu_p3"
+    },
+    {
+      "id": "e_dst_in_dst_mw7t9epz_1_audio_1",
+      "sourceId": "dst_in_dst_mw7t9epz_1",
+      "sinkId": "audio_1"
+    },
+    {
+      "id": "e_dst_in_dst_operator_gui_gpu_p1",
+      "sourceId": "dst_in_dst_operator_gui",
+      "sinkId": "gpu_p1"
+    }
+  ]
+}

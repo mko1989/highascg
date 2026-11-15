@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "destinations": [
+    {
+      "id": "dst_operator_gui",
+      "label": "Operator GUI",
+      "mainScreenIndex": 0,
+      "mode": "operator_gui",
+      "audioLayout": "stereo",
+      "videoMode": "1080p5000",
+      "width": 1920,
+      "height": 1080,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "edidLabel": "",
+      "inheritsProjectFps": true,
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      },
+      "autoLaunch": true,
+      "headless": false,
+      "videoOutput": "shm",
+      "shmName": "opgui"
+    },
+    {
+      "id": "dst_mw7t9epz_1",
+      "label": "PGM/PRV 1",
+      "mainScreenIndex": 0,
+      "mode": "pgm_prv",
+      "audioLayout": "stereo",
+      "videoMode": "custom",
+      "width": 3072,
+      "height": 1024,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "edidLabel": "",
+      "inheritsProjectFps": false,
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      }
+    },
+    {
+      "id": "dst_mwced94x_1",
+      "label": "PGM 2",
+      "mainScreenIndex": 1,
+      "mode": "pgm_only",
+      "audioLayout": "stereo",
+      "videoMode": "custom",
+      "width": 3072,
+      "height": 1024,
+      "fps": 50,
+      "caspar": {
+        "bus": "pgm"
+      },
+      "edidLabel": "",
+      "inheritsProjectFps": false,
+      "stream": {
+        "type": "rtmp",
+        "source": "program_1",
+        "url": "",
+        "key": "",
+        "quality": "medium"
+      }
+    }
+  ],
+  "edidNotes": ""
+}

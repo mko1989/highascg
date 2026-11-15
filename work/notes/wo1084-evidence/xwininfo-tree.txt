@@ -1,0 +1,405 @@
+
+xwininfo: Window id: 0x244 (the root window) (has no name)
+
+  Root window id: 0x244 (the root window) (has no name)
+  Parent window id: 0x0 (none)
+     41 children:
+     0x140004d "HighAsCG dock": ("Godot_Engine" "HighAsCG Operator")  160x4+880+1076  +880+1076
+        1 child:
+        0x140004e (has no name): ()  1x1+0+0  +880+1076
+     0x180000c (has no name): ()  1x1+0+0  +0+0
+     0x1c00001 ".": ("." ".")  10x10+10+10  +10+10
+     0x1a00000 "Chromium clipboard": ()  10x10+-100+-100  +-100+-100
+     0x1800002 (has no name): ()  1x1+0+0  +0+0
+     0x800013 (has no name): ()  1x1+0+0  +0+0
+     0x1400004 (has no name): ()  1x1+0+0  +0+0
+     0xe002bf (has no name): ()  1920x1+0+1079  +0+1079
+     0xe002be (has no name): ()  1920x1+0+0  +0+0
+     0xe002bd (has no name): ()  1x1080+1919+0  +1919+0
+     0xe002bc (has no name): ()  1x1080+0+0  +0+0
+     0xe002b7 "NoMachine Desktop Viewed": ("nxrunner.bin" "Nxrunner.bin")  267x72+0+0  +0+0
+     0xe002ac "nxrunner.bin": ("nxrunner.bin" "Nxrunner.bin")  960x432+0+0  +0+0
+     0xe002aa "nxrunner.bin": ("nxrunner.bin" "Nxrunner.bin")  960x432+0+0  +0+0
+     0xe00036 "NoMachine Whiteboard": ("nxrunner.bin" "Nxrunner.bin")  740x560+590+260  +590+260
+     0xe00007 (has no name): ()  1x1+0+0  +0+0
+     0xe00005 "NoMachine Transfer Tracking": ("nxrunner.bin" "Nxrunner.bin")  278x107+820+491  +820+491
+     0x80000f (has no name): ()  1x1+0+0  +0+0
+     0x600186 (has no name): ()  1x1+0+0  +0+0
+     0x1000001 "xdg-desktop-portal-gtk": ("xdg-desktop-portal-gtk" "Xdg-desktop-portal-gtk")  10x10+10+10  +10+10
+     0xa0000c (has no name): ()  1x1+-1+-1  +-1+-1
+     0xa00007 "IBus Panel": ("ibus-ui-gtk" "ibus-ui-gtk")  16x16+0+0  +0+0
+        1 child:
+        0xa00008 (has no name): ()  1x1+-1+-1  +-1+-1
+     0x800003 "ibus-xim": ()  1x1+0+0  +0+0
+        1 child:
+        0x800004 (has no name): ()  1x1+-1+-1  +-1+-1
+     0xa00001 "ibus-ui-gtk3": ("ibus-ui-gtk3" "Ibus-ui-gtk3")  10x10+10+10  +10+10
+     0xc00001 "ibus-extension-gtk3": ("ibus-extension-gtk3" "Ibus-extension-gtk3")  10x10+10+10  +10+10
+     0x800001 "ibus-x11": ("ibus-x11" "")  10x10+10+10  +10+10
+     0x60011f "Openbox": ("" (none))  1x1+-100+-100  +-100+-100
+     0x600173 (has no name): ()  1x1+0+0  +0+0
+        1 child:
+        0x600174 (has no name): ()  1x1+0+0  +1+1
+     0x600171 (has no name): ()  1x1+0+0  +0+0
+        1 child:
+        0x600172 (has no name): ()  1x1+0+0  +1+1
+     0x60016e (has no name): ()  1x1+0+0  +0+0
+        1 child:
+        0x60016f (has no name): ()  1x1+0+0  +1+1
+     0x60016a (has no name): ("OPENBOX_FOCUS_CYCLE_POPUP" "OPENBOX_FOCUS_CYCLE_POPUP")  1x1+0+0  +0+0
+        3 children:
+        0x60016d (has no name): ()  1x1+0+0  +1+1
+        0x60016c (has no name): ()  1x1+0+0  +1+1
+        0x60016b (has no name): ()  1x1+0+0  +1+1
+     0x600167 (has no name): ()  1x1+0+0  +0+0
+        2 children:
+        0x600169 (has no name): ()  1x1+0+0  +1+1
+        0x600168 (has no name): ()  1x1+0+0  +1+1
+     0x600166 (has no name): ()  1x1+0+0  +0+0
+     0x600165 (has no name): ()  1x1+0+0  +0+0
+     0x600164 (has no name): ()  1x1+0+0  +0+0
+     0x600163 (has no name): ()  1x1+0+0  +0+0
+     0x60034a (has no name): ()  3072x1024+1613+0  +1613+0
+        56 children:
+        0x180000b "Screen consumer [4|3072x1024]": ("casparcg" "Screen consumer [4|3072x1024]")  3072x1024+0+0  +1613+0
+        0x600396 (has no name): ()  1x1+0+0  +1613+0
+        0x600395 (has no name): ()  1x1+0+0  +1613+0
+        0x600394 (has no name): ()  1x1+0+0  +1613+0
+        0x600393 (has no name): ()  1x1+0+0  +1613+0
+        0x600392 (has no name): ()  1x1+0+0  +1613+0
+        0x600391 (has no name): ()  1x1+0+0  +1613+0
+        0x600390 (has no name): ()  1x1+0+0  +1613+0
+        0x60038f (has no name): ()  1x1+0+0  +1613+0
+        0x60038e (has no name): ()  1x1+0+0  +1613+0
+        0x60038d (has no name): ()  1x1+0+0  +1613+0
+        0x60038c (has no name): ()  1x1+0+0  +1613+0
+        0x60038b (has no name): ()  1x1+0+0  +1613+0
+        0x60038a (has no name): ()  1x1+0+0  +1613+0
+        0x600389 (has no name): ()  1x1+0+0  +1613+0
+        0x600388 (has no name): ()  1x1+0+0  +1613+0
+        0x600387 (has no name): ()  1x1+0+0  +1613+0
+        0x600386 (has no name): ()  1x1+0+0  +1613+0
+        0x600385 (has no name): ()  1x1+0+0  +1613+0
+        0x600384 (has no name): ()  1x1+0+0  +1613+0
+        0x600383 (has no name): ()  1x1+0+0  +1613+0
+        0x600382 (has no name): ()  1x1+0+0  +1613+0
+        0x600381 (has no name): ()  1x1+0+0  +1613+0
+        0x600380 (has no name): ()  1x1+0+0  +1613+0
+        0x60037f (has no name): ()  1x1+0+0  +1613+0
+        0x60037e (has no name): ()  1x1+0+0  +1613+0
+        0x60037d (has no name): ()  1x1+0+0  +1613+0
+        0x60037c (has no name): ()  1x1+0+0  +1613+0
+        0x60037b (has no name): ()  1x1+0+0  +1613+0
+        0x60037a (has no name): ()  1x1+0+0  +1613+0
+        0x600379 (has no name): ()  1x1+0+0  +1613+0
+        0x600378 (has no name): ()  1x1+0+0  +1613+0
+        0x600377 (has no name): ()  1x1+0+0  +1613+0
+        0x600376 (has no name): ()  1x1+0+0  +1613+0
+        0x600375 (has no name): ()  1x1+0+0  +1613+0
+        0x600374 (has no name): ()  1x1+0+0  +1613+0
+        0x600373 (has no name): ()  1x1+0+0  +1613+0
+        0x600372 (has no name): ()  1x1+0+0  +1613+0
+        0x600371 (has no name): ()  1x1+0+0  +1613+0
+        0x600370 (has no name): ()  1x1+0+0  +1613+0
+        0x60036f (has no name): ()  1x1+0+0  +1613+0
+        0x60036a (has no name): ()  1x1+0+0  +1613+0
+           4 children:
+           0x60036e (has no name): ()  1x1+0+0  +1613+0
+           0x60036d (has no name): ()  1x1+0+0  +1613+0
+           0x60036c (has no name): ()  1x1+0+0  +1613+0
+           0x60036b (has no name): ()  1x1+0+0  +1613+0
+        0x600362 (has no name): ()  1x1+0+0  +1613+0
+        0x600361 (has no name): ()  1x1+0+0  +1613+0
+        0x60035b (has no name): ()  1x1+0+0  +1613+0
+        0x60035a (has no name): ()  1x1+0+0  +1613+0
+        0x600359 (has no name): ()  1x1+0+0  +1613+0
+        0x600358 (has no name): ()  1x1+0+0  +1613+0
+        0x600357 (has no name): ()  1x1+0+0  +1613+0
+        0x600356 (has no name): ()  1x1+0+0  +1613+0
+        0x600355 (has no name): ()  1x1+0+0  +1613+0
+           12 children:
+           0x600369 (has no name): ()  14x14+0+0  +1613+0
+           0x600368 (has no name): ()  16x16+0+0  +1613+0
+           0x600367 (has no name): ()  14x14+0+0  +1613+0
+           0x600366 (has no name): ()  14x14+0+0  +1613+0
+           0x600365 (has no name): ()  14x14+0+0  +1613+0
+           0x600364 (has no name): ()  14x14+0+0  +1613+0
+           0x600363 (has no name): ()  1x1+0+0  +1613+0
+           0x600360 (has no name): ()  7x26+0+0  +1613+0
+           0x60035f (has no name): ()  25x6+0+0  +1613+0
+           0x60035e (has no name): ()  7x26+0+0  +1613+0
+           0x60035d (has no name): ()  25x6+0+0  +1613+0
+           0x60035c (has no name): ()  1x1+0+0  +1613+0
+        0x600350 (has no name): ()  1x1+0+0  +1613+0
+           2 children:
+           0x600352 (has no name): ()  1x1+0+0  +1613+0
+           0x600351 (has no name): ()  1x1+0+0  +1613+0
+        0x60034f (has no name): ()  1x1+0+0  +1613+0
+           1 child:
+           0x600354 (has no name): ()  1x1+0+0  +1613+0
+        0x60034e (has no name): ()  1x1+0+0  +1613+0
+        0x60034d (has no name): ()  1x1+0+0  +1613+0
+           1 child:
+           0x600353 (has no name): ()  1x1+0+0  +1613+0
+        0x60034b (has no name): ()  3072x1024+0+0  +1613+0
+           1 child:
+           0x60034c (has no name): ()  3072x1024+0+0  +1613+0
+     0x6002fd (has no name): ()  3072x1024+0+0  +0+0
+        56 children:
+        0x1800009 "Screen consumer [2|3072x1024]": ("casparcg" "Screen consumer [2|3072x1024]")  3072x1024+0+0  +0+0
+        0x600349 (has no name): ()  1x1+0+0  +0+0
+        0x600348 (has no name): ()  1x1+0+0  +0+0
+        0x600347 (has no name): ()  1x1+0+0  +0+0
+        0x600346 (has no name): ()  1x1+0+0  +0+0
+        0x600345 (has no name): ()  1x1+0+0  +0+0
+        0x600344 (has no name): ()  1x1+0+0  +0+0
+        0x600343 (has no name): ()  1x1+0+0  +0+0
+        0x600342 (has no name): ()  1x1+0+0  +0+0
+        0x600341 (has no name): ()  1x1+0+0  +0+0
+        0x600340 (has no name): ()  1x1+0+0  +0+0
+        0x60033f (has no name): ()  1x1+0+0  +0+0
+        0x60033e (has no name): ()  1x1+0+0  +0+0
+        0x60033d (has no name): ()  1x1+0+0  +0+0
+        0x60033c (has no name): ()  1x1+0+0  +0+0
+        0x60033b (has no name): ()  1x1+0+0  +0+0
+        0x60033a (has no name): ()  1x1+0+0  +0+0
+        0x600339 (has no name): ()  1x1+0+0  +0+0
+        0x600338 (has no name): ()  1x1+0+0  +0+0
+        0x600337 (has no name): ()  1x1+0+0  +0+0
+        0x600336 (has no name): ()  1x1+0+0  +0+0
+        0x600335 (has no name): ()  1x1+0+0  +0+0
+        0x600334 (has no name): ()  1x1+0+0  +0+0
+        0x600333 (has no name): ()  1x1+0+0  +0+0
+        0x600332 (has no name): ()  1x1+0+0  +0+0
+        0x600331 (has no name): ()  1x1+0+0  +0+0
+        0x600330 (has no name): ()  1x1+0+0  +0+0
+        0x60032f (has no name): ()  1x1+0+0  +0+0
+        0x60032e (has no name): ()  1x1+0+0  +0+0
+        0x60032d (has no name): ()  1x1+0+0  +0+0
+        0x60032c (has no name): ()  1x1+0+0  +0+0
+        0x60032b (has no name): ()  1x1+0+0  +0+0
+        0x60032a (has no name): ()  1x1+0+0  +0+0
+        0x600329 (has no name): ()  1x1+0+0  +0+0
+        0x600328 (has no name): ()  1x1+0+0  +0+0
+        0x600327 (has no name): ()  1x1+0+0  +0+0
+        0x600326 (has no name): ()  1x1+0+0  +0+0
+        0x600325 (has no name): ()  1x1+0+0  +0+0
+        0x600324 (has no name): ()  1x1+0+0  +0+0
+        0x600323 (has no name): ()  1x1+0+0  +0+0
+        0x600322 (has no name): ()  1x1+0+0  +0+0
+        0x60031d (has no name): ()  1x1+0+0  +0+0
+           4 children:
+           0x600321 (has no name): ()  1x1+0+0  +0+0
+           0x600320 (has no name): ()  1x1+0+0  +0+0
+           0x60031f (has no name): ()  1x1+0+0  +0+0
+           0x60031e (has no name): ()  1x1+0+0  +0+0
+        0x600315 (has no name): ()  1x1+0+0  +0+0
+        0x600314 (has no name): ()  1x1+0+0  +0+0
+        0x60030e (has no name): ()  1x1+0+0  +0+0
+        0x60030d (has no name): ()  1x1+0+0  +0+0
+        0x60030c (has no name): ()  1x1+0+0  +0+0
+        0x60030b (has no name): ()  1x1+0+0  +0+0
+        0x60030a (has no name): ()  1x1+0+0  +0+0
+        0x600309 (has no name): ()  1x1+0+0  +0+0
+        0x600308 (has no name): ()  1x1+0+0  +0+0
+           12 children:
+           0x60031c (has no name): ()  14x14+0+0  +0+0
+           0x60031b (has no name): ()  16x16+0+0  +0+0
+           0x60031a (has no name): ()  14x14+0+0  +0+0
+           0x600319 (has no name): ()  14x14+0+0  +0+0
+           0x600318 (has no name): ()  14x14+0+0  +0+0
+           0x600317 (has no name): ()  14x14+0+0  +0+0
+           0x600316 (has no name): ()  1x1+0+0  +0+0
+           0x600313 (has no name): ()  7x26+0+0  +0+0
+           0x600312 (has no name): ()  25x6+0+0  +0+0
+           0x600311 (has no name): ()  7x26+0+0  +0+0
+           0x600310 (has no name): ()  25x6+0+0  +0+0
+           0x60030f (has no name): ()  1x1+0+0  +0+0
+        0x600303 (has no name): ()  1x1+0+0  +0+0
+           2 children:
+           0x600305 (has no name): ()  1x1+0+0  +0+0
+           0x600304 (has no name): ()  1x1+0+0  +0+0
+        0x600302 (has no name): ()  1x1+0+0  +0+0
+           1 child:
+           0x600307 (has no name): ()  1x1+0+0  +0+0
+        0x600301 (has no name): ()  1x1+0+0  +0+0
+        0x600300 (has no name): ()  1x1+0+0  +0+0
+           1 child:
+           0x600306 (has no name): ()  1x1+0+0  +0+0
+        0x6002fe (has no name): ()  3072x1024+0+0  +0+0
+           1 child:
+           0x6002ff (has no name): ()  3072x1024+0+0  +0+0
+     0x6002b0 (has no name): ()  3072x1024+1613+0  +1613+0
+        56 children:
+        0x1800007 "Screen consumer [4|3072x1024]": ("casparcg" "Screen consumer [4|3072x1024]")  3072x1024+0+0  +1613+0
+        0x6002fc (has no name): ()  1x1+0+0  +1613+0
+        0x6002fb (has no name): ()  1x1+0+0  +1613+0
+        0x6002fa (has no name): ()  1x1+0+0  +1613+0
+        0x6002f9 (has no name): ()  1x1+0+0  +1613+0
+        0x6002f8 (has no name): ()  1x1+0+0  +1613+0
+        0x6002f7 (has no name): ()  1x1+0+0  +1613+0
+        0x6002f6 (has no name): ()  1x1+0+0  +1613+0
+        0x6002f5 (has no name): ()  1x1+0+0  +1613+0
+        0x6002f4 (has no name): ()  1x1+0+0  +1613+0
+        0x6002f3 (has no name): ()  1x1+0+0  +1613+0
+        0x6002f2 (has no name): ()  1x1+0+0  +1613+0
+        0x6002f1 (has no name): ()  1x1+0+0  +1613+0
+        0x6002f0 (has no name): ()  1x1+0+0  +1613+0
+        0x6002ef (has no name): ()  1x1+0+0  +1613+0
+        0x6002ee (has no name): ()  1x1+0+0  +1613+0
+        0x6002ed (has no name): ()  1x1+0+0  +1613+0
+        0x6002ec (has no name): ()  1x1+0+0  +1613+0
+        0x6002eb (has no name): ()  1x1+0+0  +1613+0
+        0x6002ea (has no name): ()  1x1+0+0  +1613+0
+        0x6002e9 (has no name): ()  1x1+0+0  +1613+0
+        0x6002e8 (has no name): ()  1x1+0+0  +1613+0
+        0x6002e7 (has no name): ()  1x1+0+0  +1613+0
+        0x6002e6 (has no name): ()  1x1+0+0  +1613+0
+        0x6002e5 (has no name): ()  1x1+0+0  +1613+0
+        0x6002e4 (has no name): ()  1x1+0+0  +1613+0
+        0x6002e3 (has no name): ()  1x1+0+0  +1613+0
+        0x6002e2 (has no name): ()  1x1+0+0  +1613+0
+        0x6002e1 (has no name): ()  1x1+0+0  +1613+0
+        0x6002e0 (has no name): ()  1x1+0+0  +1613+0
+        0x6002df (has no name): ()  1x1+0+0  +1613+0
+        0x6002de (has no name): ()  1x1+0+0  +1613+0
+        0x6002dd (has no name): ()  1x1+0+0  +1613+0
+        0x6002dc (has no name): ()  1x1+0+0  +1613+0
+        0x6002db (has no name): ()  1x1+0+0  +1613+0
+        0x6002da (has no name): ()  1x1+0+0  +1613+0
+        0x6002d9 (has no name): ()  1x1+0+0  +1613+0
+        0x6002d8 (has no name): ()  1x1+0+0  +1613+0
+        0x6002d7 (has no name): ()  1x1+0+0  +1613+0
+        0x6002d6 (has no name): ()  1x1+0+0  +1613+0
+        0x6002d5 (has no name): ()  1x1+0+0  +1613+0
+        0x6002d0 (has no name): ()  1x1+0+0  +1613+0
+           4 children:
+           0x6002d4 (has no name): ()  1x1+0+0  +1613+0
+           0x6002d3 (has no name): ()  1x1+0+0  +1613+0
+           0x6002d2 (has no name): ()  1x1+0+0  +1613+0
+           0x6002d1 (has no name): ()  1x1+0+0  +1613+0
+        0x6002c8 (has no name): ()  1x1+0+0  +1613+0
+        0x6002c7 (has no name): ()  1x1+0+0  +1613+0
+        0x6002c1 (has no name): ()  1x1+0+0  +1613+0
+        0x6002c0 (has no name): ()  1x1+0+0  +1613+0
+        0x6002bf (has no name): ()  1x1+0+0  +1613+0
+        0x6002be (has no name): ()  1x1+0+0  +1613+0
+        0x6002bd (has no name): ()  1x1+0+0  +1613+0
+        0x6002bc (has no name): ()  1x1+0+0  +1613+0
+        0x6002bb (has no name): ()  1x1+0+0  +1613+0
+           12 children:
+           0x6002cf (has no name): ()  14x14+0+0  +1613+0
+           0x6002ce (has no name): ()  16x16+0+0  +1613+0
+           0x6002cd (has no name): ()  14x14+0+0  +1613+0
+           0x6002cc (has no name): ()  14x14+0+0  +1613+0
+           0x6002cb (has no name): ()  14x14+0+0  +1613+0
+           0x6002ca (has no name): ()  14x14+0+0  +1613+0
+           0x6002c9 (has no name): ()  1x1+0+0  +1613+0
+           0x6002c6 (has no name): ()  7x26+0+0  +1613+0
+           0x6002c5 (has no name): ()  25x6+0+0  +1613+0
+           0x6002c4 (has no name): ()  7x26+0+0  +1613+0
+           0x6002c3 (has no name): ()  25x6+0+0  +1613+0
+           0x6002c2 (has no name): ()  1x1+0+0  +1613+0
+        0x6002b6 (has no name): ()  1x1+0+0  +1613+0
+           2 children:
+           0x6002b8 (has no name): ()  1x1+0+0  +1613+0
+           0x6002b7 (has no name): ()  1x1+0+0  +1613+0
+        0x6002b5 (has no name): ()  1x1+0+0  +1613+0
+           1 child:
+           0x6002ba (has no name): ()  1x1+0+0  +1613+0
+        0x6002b4 (has no name): ()  1x1+0+0  +1613+0
+        0x6002b3 (has no name): ()  1x1+0+0  +1613+0
+           1 child:
+           0x6002b9 (has no name): ()  1x1+0+0  +1613+0
+        0x6002b1 (has no name): ()  3072x1024+0+0  +1613+0
+           1 child:
+           0x6002b2 (has no name): ()  3072x1024+0+0  +1613+0
+     0x600170 (has no name): ()  1x1+0+0  +0+0
+     0x600221 (has no name): ()  1920x1080+0+0  +0+0
+        56 children:
+        0x1400006 "HighAsCG Operator (DEBUG)": ("Godot_Engine" "HighAsCG Operator")  1920x1080+0+0  +0+0
+           1 child:
+           0x1400007 (has no name): ()  1x1+0+0  +0+0
+        0x60026d (has no name): ()  1x1+0+0  +0+0
+        0x60026c (has no name): ()  1x1+0+0  +0+0
+        0x60026b (has no name): ()  1x1+0+0  +0+0
+        0x60026a (has no name): ()  1x1+0+0  +0+0
+        0x600269 (has no name): ()  1x1+0+0  +0+0
+        0x600268 (has no name): ()  1x1+0+0  +0+0
+        0x600267 (has no name): ()  1x1+0+0  +0+0
+        0x600266 (has no name): ()  1x1+0+0  +0+0
+        0x600265 (has no name): ()  1x1+0+0  +0+0
+        0x600264 (has no name): ()  1x1+0+0  +0+0
+        0x600263 (has no name): ()  1x1+0+0  +0+0
+        0x600262 (has no name): ()  1x1+0+0  +0+0
+        0x600261 (has no name): ()  1x1+0+0  +0+0
+        0x600260 (has no name): ()  1x1+0+0  +0+0
+        0x60025f (has no name): ()  1x1+0+0  +0+0
+        0x60025e (has no name): ()  1x1+0+0  +0+0
+        0x60025d (has no name): ()  1x1+0+0  +0+0
+        0x60025c (has no name): ()  1x1+0+0  +0+0
+        0x60025b (has no name): ()  1x1+0+0  +0+0
+        0x60025a (has no name): ()  1x1+0+0  +0+0
+        0x600259 (has no name): ()  1x1+0+0  +0+0
+        0x600258 (has no name): ()  1x1+0+0  +0+0
+        0x600257 (has no name): ()  1x1+0+0  +0+0
+        0x600256 (has no name): ()  1x1+0+0  +0+0
+        0x600255 (has no name): ()  1x1+0+0  +0+0
+        0x600254 (has no name): ()  1x1+0+0  +0+0
+        0x600253 (has no name): ()  1x1+0+0  +0+0
+        0x600252 (has no name): ()  1x1+0+0  +0+0
+        0x600251 (has no name): ()  1x1+0+0  +0+0
+        0x600250 (has no name): ()  1x1+0+0  +0+0
+        0x60024f (has no name): ()  1x1+0+0  +0+0
+        0x60024e (has no name): ()  1x1+0+0  +0+0
+        0x60024d (has no name): ()  26x1+1893+1079  +1893+1079
+        0x60024c (has no name): ()  1x1+0+0  +0+0
+        0x60024b (has no name): ()  1x25+1919+1055  +1919+1055
+        0x60024a (has no name): ()  26x1+1+1079  +1+1079
+        0x600249 (has no name): ()  1x1+0+0  +0+0
+        0x600248 (has no name): ()  1x25+0+1055  +0+1055
+        0x600247 (has no name): ()  1866x1+27+1079  +27+1079
+        0x600246 (has no name): ()  1x1+0+0  +0+0
+        0x600241 (has no name): ()  1x1+0+0  +0+0
+           4 children:
+           0x600245 (has no name): ()  1x1+0+0  +0+0
+           0x600244 (has no name): ()  1x1+0+0  +0+0
+           0x600243 (has no name): ()  1x1+0+0  +0+0
+           0x600242 (has no name): ()  1x1+0+0  +0+0
+        0x600239 (has no name): ()  1x1030+1919+26  +1919+26
+        0x600238 (has no name): ()  1x1030+0+26  +0+26
+        0x600232 (has no name): ()  1918x1+1+27  +1+27
+        0x600231 (has no name): ()  1x25+1919+1  +1919+1
+        0x600230 (has no name): ()  26x1+1894+0  +1894+0
+        0x60022f (has no name): ()  26x1+0+0  +0+0
+        0x60022e (has no name): ()  1868x1+26+0  +26+0
+        0x60022d (has no name): ()  1x25+0+1  +0+1
+        0x60022c (has no name): ()  1918x26+1+1  +1+1
+           12 children:
+           0x600240 (has no name): ()  14x14+1855+6  +1856+7
+           0x60023f (has no name): ()  16x16+7+5  +8+6
+           0x60023e (has no name): ()  14x14+0+0  +1+1
+           0x60023d (has no name): ()  14x14+0+0  +1+1
+           0x60023c (has no name): ()  14x14+1897+6  +1898+7
+           0x60023b (has no name): ()  14x14+1876+6  +1877+7
+           0x60023a (has no name): ()  1818x16+30+5  +31+6
+           0x600237 (has no name): ()  7x26+1911+0  +1912+1
+           0x600236 (has no name): ()  25x6+1893+0  +1894+1
+           0x600235 (has no name): ()  7x26+0+0  +1+1
+           0x600234 (has no name): ()  25x6+0+0  +1+1
+           0x600233 (has no name): ()  1868x6+25+0  +26+1
+        0x600227 (has no name): ()  1x1+0+0  +0+0
+           2 children:
+           0x600229 (has no name): ()  1x1+0+0  +0+0
+           0x600228 (has no name): ()  1x1+0+0  +0+0
+        0x600226 (has no name): ()  1x1+0+0  +0+0
+           1 child:
+           0x60022b (has no name): ()  1x1+0+0  +0+0
+        0x600225 (has no name): ()  1x1+0+0  +0+0
+        0x600224 (has no name): ()  1x1+0+0  +0+0
+           1 child:
+           0x60022a (has no name): ()  1x1+0+0  +0+0
+        0x600222 (has no name): ()  1920x1080+0+0  +0+0
+           1 child:
+           0x600223 (has no name): ()  1920x1080+0+0  +0+0
+

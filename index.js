@@ -355,6 +355,8 @@ function main() {
 		}, 4000)
 		// WO-638: a boot whose screens need choosing holds Caspar and asks on every screen; the answer lays out X,
 		// so the watchdog (which can only replay the stale plan) sits that boot out.
+		// WO-1084: before the gate can release Caspar, the run.sh screen gate must know whose screen to keep clear.
+		require('./src/system/operator-output-file').syncOperatorOutputFile(appCtx)
 		const bootScreens = require('./src/system/boot-screen-assignment').startBootScreenGate(appCtx)
 		if (!bootScreens.pending) appCtx._stopOsLayoutWatchdog = startOsLayoutWatchdog(appCtx)
 

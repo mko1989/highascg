@@ -398,7 +398,16 @@ async function buildLiveSnapshot(ctx) {
 		},
 		caspar,
 		virtualCamera: require('./routes-virtual-camera').getStatusPayload(ctx),
+		screenOutputs: screenOutputsOf(ctx), // WO-1084: destinations configured but not started, and why
 		warnings,
+	}
+}
+
+function screenOutputsOf(ctx) {
+	try {
+		return require('../system/screen-output-status').liveScreenOutputStatus(ctx).destinations
+	} catch {
+		return {}
 	}
 }
 

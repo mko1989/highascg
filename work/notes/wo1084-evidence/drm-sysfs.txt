@@ -1,0 +1,4 @@
+card0-DP-1 status=disconnected enabled=disabled modes=
+card0-DP-2 status=connected enabled=disabled modes=1920x1080 1920x1080 1920x1080 1680x1050 1280x1024 1280x1024 1440x900 1280x960 1280x800 1152x864 1280x720 1280x720 1280x720 1440x576 1024x768 1024x768 1024x768 1440x480 800x600 800x600 800x600 800x600 720x576 720x480 640x480 640x480 640x480 640x480 
+card0-DP-3 status=disconnected enabled=disabled modes=
+card0-DP-4 status=disconnected enabled=disabled modes=

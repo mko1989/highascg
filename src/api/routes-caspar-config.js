@@ -156,7 +156,8 @@ async function writeCasparConfigToDiskUnserialized(ctx, opts = {}) {
 	let changed = true
 	try {
 		const existing = await fs.readFile(filePath, 'utf8')
-		if (existing === xml) changed = false
+		// WO-1084: the run.sh screen gate marks windows it did not start; the file still says the same thing.
+		if (require('../config/screen-connector-gate').restoreOfflineScreens(existing) === xml) changed = false
 	} catch {
 		/* missing/unreadable file → treat as changed */
 	}
@@ -193,6 +194,7 @@ async function writeCasparConfigToDiskUnserialized(ctx, opts = {}) {
 			)
 		} catch (_) {}
 	}
+	require('../system/operator-output-file').syncOperatorOutputFile(ctx) // WO-1084: the run.sh gate keeps it clear
 	return { ok: true, path: filePath, changed }
 }
 

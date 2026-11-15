@@ -42,7 +42,8 @@ function parseScreenConsumerRects(xml) {
 	channels.forEach((block, idx) => {
 		/* WO-1034: every <screen> of the channel — a destination on two jacks (fill + key) and slice windows are
 		 * further windows of the same channel, each with its own place. */
-		for (const s of block.match(/<screen>[\s\S]*?<\/screen>/g) || []) {
+		/* WO-1084: a window the run.sh screen gate did not start sits in a marker comment — no window to place. */
+		for (const s of block.replace(/<!--[\s\S]*?-->/g, '').match(/<screen>[\s\S]*?<\/screen>/g) || []) {
 			const num = (tag) => {
 				const m = s.match(new RegExp(`<${tag}>(-?\\d+)</${tag}>`))
 				return m ? parseInt(m[1], 10) : null

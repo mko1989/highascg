@@ -59,8 +59,18 @@ function collectGpuLayoutAssignments(config) {
 	const dests = destinationsFromConfig(config)
 	const connectorById = new Map(connectors.map((c) => [String(c?.id || ''), c]))
 
+	/* WO-1084: a jack can carry the operator cable AND a destination left there by the boot answer (no free screen) —
+	 * the operator wins it, so the plan keeps the operator's head (mode, place) and the destination stays unplaced. */
+	const operatorSrc = new Set(
+		dests.filter((d) => String(d?.mode || '').toLowerCase() === 'operator_gui').map((d) => `dst_in_${d.id}`)
+	)
+	const firstInEdge = (connectorId) => {
+		const all = edges.filter((e) => e.sinkId === connectorId)
+		return all.find((e) => operatorSrc.has(String(e.sourceId || ''))) || all[0]
+	}
+
 	const inEdgeSourceKind = (connectorId) => {
-		const inEdge = edges.find((e) => e.sinkId === connectorId)
+		const inEdge = firstInEdge(connectorId)
 		if (!inEdge) return ''
 		const src = connectorById.get(String(inEdge.sourceId || ''))
 		return String(src?.kind || '')
@@ -88,7 +98,7 @@ function collectGpuLayoutAssignments(config) {
 		let edgeDerivedMode = null
 		let edgeDerivedMainIndex = null
 
-		const inEdge = edges.find(e => e.sinkId === c.id)
+		const inEdge = firstInEdge(c.id)
 		let boundDest = null
 		const edgeKind = inEdge ? inEdgeSourceKind(c.id) : ''
 		const fedByPixelMap = edgeKind === 'pixel_map_out'

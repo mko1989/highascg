@@ -12,6 +12,7 @@
  *  - `pending`         the server recorded "restart needed" (output wiring: device-view-decklink-wiring.js sets
  *                      `ctx.casparApplyPending`); persisted here so a node restart keeps it; cleared by a good Apply;
  *  - `running_differs` `configComparison` (running INFO CONFIG vs the generated one, config-compare.js) has issues.
+ * `unwritten` ignores the WO-1084 screen-gate marks (a window run.sh did not start because its screen is unplugged).
  * Consumers added over AMCP at runtime (stream, record, meter-null, compose, shm, v4l2) are not in casparcg.config
  * nor in INFO CONFIG, and nothing here reads `INFO <ch>` consumers — they can never make the box dirty.
  */
@@ -22,6 +23,8 @@ const crypto = require('crypto')
 const PENDING_KEY = 'casparRestartPending'
 
 const hash = (s) => (s == null ? null : crypto.createHash('sha1').update(String(s)).digest('hex'))
+/** WO-1084: the screen gate's marks (run.sh at launch, the hot-plug watcher while running) are not a config change. */
+const unmarked = (s) => (s == null ? s : require('./screen-connector-gate').restoreOfflineScreens(s))
 
 function defaultDeps(ctx) {
 	const routes = require('../api/routes-caspar-config')
@@ -44,7 +47,7 @@ function defaultDeps(ctx) {
 function rememberConfigAtConnect(ctx, injected) {
 	try {
 		const deps = { ...defaultDeps(ctx), ...(injected || {}) }
-		ctx._casparConfigAtConnect = { hash: hash(deps.readFile(deps.configPath(ctx))), at: deps.now() }
+		ctx._casparConfigAtConnect = { hash: hash(unmarked(deps.readFile(deps.configPath(ctx)))), at: deps.now() }
 	} catch {
 		ctx._casparConfigAtConnect = null
 	}
@@ -95,11 +98,12 @@ function casparConfigDirty(ctx, { deps: injected } = {}) {
 		reasons.push({ code: 'unwritten', text: `could not build the Caspar config: ${e?.message || e}` })
 	}
 	const disk = deps.readFile(deps.configPath(ctx))
-	if (generated != null && generated !== disk) {
+	// WO-1084: windows the run.sh screen gate did not start are marked in the file, not removed — same config.
+	if (generated != null && generated !== unmarked(disk)) {
 		reasons.push({ code: 'unwritten', text: disk == null ? 'casparcg.config is missing' : 'cables or settings changed since the last Apply' })
 	} else if (generated != null) {
 		const at = ctx?._casparConfigAtConnect
-		if (at?.hash && hash(disk) !== at.hash) reasons.push({ code: 'not_restarted', text: 'casparcg.config was written but Caspar was not restarted' })
+		if (at?.hash && hash(unmarked(disk)) !== at.hash) reasons.push({ code: 'not_restarted', text: 'casparcg.config was written but Caspar was not restarted' })
 	}
 	const pending = pendingOf(ctx, deps)
 	if (pending) reasons.push({ code: 'pending', text: `restart needed (${pending.why || 'recorded'})` })

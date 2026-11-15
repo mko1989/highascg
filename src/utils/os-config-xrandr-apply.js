@@ -257,9 +257,11 @@ async function applyX11Layout(config, opts = {}) {
 		processHead(info)
 	}
 	const mapGpu = Array.isArray(layout.mappingGpuOutputs) ? layout.mappingGpuOutputs : []
+	/* WO-1084: the operator's monitor keeps the operator's mode — first claim on a shared output wins, and a destination
+	 * left on the operator's jack (no free screen at the boot answer) once switched it to the PGM resolution. */
+	Object.values(layout.operatorGui || {}).forEach(processHeadDeduped) /* WO-573 follow-up */
 	Object.values(layout.screens).forEach(processHeadDeduped)
 	Object.values(layout.multiview).forEach(processHeadDeduped)
-	Object.values(layout.operatorGui || {}).forEach(processHeadDeduped) /* WO-573 follow-up */
 	Object.values(layout.prv || {}).forEach(processHeadDeduped) /* WO-364 PRV heads */
 	Object.values(layout.screenExtra || {}).forEach(processHeadDeduped) /* WO-1034 extra jacks of a screen */
 	mapGpu.forEach(processHeadDeduped)

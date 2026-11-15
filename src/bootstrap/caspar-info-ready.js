@@ -29,6 +29,15 @@ function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCas
 		 * which casparcg.config it read (GET /api/caspar-config/dirty: written but not restarted). */
 		require('../engine/air-snapshot').rememberConnectRoles(appCtx, getChannelMap)
 		require('../config/caspar-config-dirty').rememberConfigAtConnect(appCtx)
+		/* WO-1084: say which screen destinations run.sh did not start and why ("PGM 2: DP-4/DP-5 not connected — not
+		 * started"), then keep that true while Caspar runs (screens plugged in / pulled: screen-hotplug.js). */
+		try {
+			const st = require('../system/screen-output-status')
+			for (const l of st.offlineLogLines(st.liveScreenOutputStatus(appCtx))) appCtx.log('info', `[Screen gate] ${l}`)
+		} catch (e) {
+			appCtx.log('debug', `[Screen gate] status: ${e?.message || e}`)
+		}
+		if (!appCtx._stopScreenHotplug) appCtx._stopScreenHotplug = require('../system/screen-hotplug').startScreenHotplugWatch(appCtx)
 		handleCasparConnected()
 		/* First connect: is the primed card really on air? (after the boot splash, which fetch-server-info-config ran) */
 		const cardChecked = reconnect

@@ -97,6 +97,11 @@ run_caspar() {
 	if command -v node >/dev/null 2>&1 && [ -f "$CASPAR_ROOT/tools/runtime/enforce-screen-consumer-policy.js" ]; then
 		caspar_supervisor_log "$(node "$CASPAR_ROOT/tools/runtime/enforce-screen-consumer-policy.js" "$CONFIG_PATH" 2>&1 | tail -n 1)"
 	fi
+	# WO-1084: a <screen> window only opens on a lit screen, never on the operator's — the others stay in the file as
+	# reasoned "not started" marks (undone and decided again on every launch). Best-effort: never blocks.
+	if command -v node >/dev/null 2>&1 && [ -f "$CASPAR_ROOT/tools/runtime/gate-screen-consumers.js" ]; then
+		caspar_supervisor_log "$(node "$CASPAR_ROOT/tools/runtime/gate-screen-consumers.js" "$CONFIG_PATH" 2>&1 | tail -n 1)"
+	fi
 	# WO-779: HDMI/DP audio is muted at the card until something switches IEC958 on (no PulseAudio here).
 	# Only the switch of the output set in Devices (audio_outputs.json) is turned on; the others stay as they are.
 	caspar_supervisor_log "$(sh "$CASPAR_ROOT/tools/runtime/unmute-hdmi-audio.sh" "${HIGHASCG_CONFIG_PATH:-$CASPAR_ROOT/config}" 2>&1 | tail -n 1)"

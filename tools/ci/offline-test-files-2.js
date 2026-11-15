@@ -90,4 +90,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1060-ltc-per-timeline.test.js',
 	'tools/smoke/smoke-wo974-timeline-still-seek.test.js', // Caspar never answers CALL SEEK on an image
 	'tools/smoke/smoke-wo975-nvidia-sync-auto.test.js',
+	'tools/smoke/smoke-wo1084-next-show-setup.test.js', // WO-1084 screens not plugged in are not started
 ]
