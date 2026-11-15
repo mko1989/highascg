@@ -3,7 +3,7 @@ extends RefCounted
 ## tracked person best, how tall their card is, and their cut-out mask. Pure; person_cards.gd draws the result.
 ##
 ## Input = the WS `tracking:detections` snapshot (src/tracking/register.js withPins):
-##   cameras[] {id, role, stale, mask_size?, persons[] {tid, box [x1,y1,x2,y2] 0–1, age_s, mask?}}
+##   cameras[] {id, role, stale, mask_size?, persons[] {tid, box [x1,y1,x2,y2] 0–1, age_s, mask?, traits? (WO-1086)}}
 ##   world {plane_z, persons[] {id, x, y, height|null, keys ["camId:tid", …], age_s}}
 ## plus the tracking cameras (tracking_model.normalize(...).cameras: {id, role, raster [w,h], cam {...}}).
 
@@ -21,7 +21,7 @@ const MAX_HEIGHT := 2.6
 
 ## One card per world person a camera currently sees: {id, cam_id, role, box, mask, mask_size, feet [x,y,z] PSN,
 ## height, width (m), views (WO-666: the solved cameras that paint their dummy, person_dummy_model.views_for),
-## joints (WO-667: 17 PSN body joints | null, src/tracking/pose3d.js)}.
+## joints (WO-667: 17 PSN body joints | null, src/tracking/pose3d.js), keys and looks (WO-1086 avatars)}.
 ## `cams` = normalized tracking cameras. With `now` (seconds) the camera is sticky per person (WO-701): `pick`
 ## {world id: memory} is the caller's, kept between snapshots; without it the best view of this snapshot.
 static func cards(snap: Variant, cams: Array, pick := {}, now := NAN) -> Array:
@@ -59,7 +59,17 @@ static func cards(snap: Variant, cams: Array, pick := {}, now := NAN) -> Array:
 		out.append({"id": int(wp.id), "cam_id": str(v.cam.id), "role": str(v.cam.get("role", ce.role)), "box": box,
 			"mask": str(v.person.get("mask", "")), "mask_size": v.cam.get("mask_size", []), "feet": feet,
 			"height": h, "width": h * bw / bh, "views": PD.views_for(wp, views, by_id),
-			"joints": wp.get("joints")})
+			"joints": wp.get("joints"), "keys": wp.get("keys", []), "looks": looks(wp, ranked)})
+	return out
+
+
+## WO-1086: the person's looks (the sidecar's `traits` on a camera person), best view first: [{key "cam:tid", traits}].
+static func looks(wp: Dictionary, ranked: Array) -> Array:
+	var out := []
+	for v in ranked:
+		var tr: Variant = v.person.get("traits")
+		if tr is Dictionary:
+			out.append({"key": "%s:%s" % [v.cam.id, int(v.person.get("tid", -1))], "traits": tr})
 	return out
 
 

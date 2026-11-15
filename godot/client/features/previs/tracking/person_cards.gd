@@ -6,6 +6,8 @@ extends Node3D
 ##   (person_dummy.gdshader), its front turned toward the best camera; WO-667 (step 3) when the world person carries
 ##   body joints (a pose model runs), the mannequin is posed instead: ellipsoids between the joints
 ##   (person_pose_model.gd), every part painted by the same material.
+## - WO-1086 avatars (the default): a friendly cartoon figure per person coloured from the look the sidecar derived
+##   (person_avatars.gd) — no camera video at all, so this style leases no surface.
 ## Maths in person_cards_model.gd / person_dummy_model.gd. Video comes from VideoSurfaces, held only while drawn.
 
 const M := preload("res://features/previs/tracking/person_cards_model.gd")
@@ -17,7 +19,8 @@ const CARD_SHADER := preload("res://features/previs/tracking/person_card.gdshade
 const DUMMY_SHADER := preload("res://features/previs/tracking/person_dummy.gdshader")
 const TrackingModel := preload("res://features/previs/tracking/tracking_model.gd")
 const UI_CFG := "user://ui.cfg"
-const STYLES := ["off", "cards", "dummies"]  # picker item index → style; ui.cfg [previs] people
+const STYLES := ["off", "cards", "dummies", "avatars"]  # picker item index → style; ui.cfg [previs] people
+const PEOPLE_REV := 1086  # ui.cfg [previs] people_rev: WO-1086 moved a stored "dummies" to "avatars" once
 
 var picker := OptionButton.new()  # the toolbar's "People" choice
 var style := "off"
@@ -29,15 +32,23 @@ var _cards := {}  # world id → {node (cards: the quad; dummies: a body Node3D)
 var _unit_sphere := SphereMesh.new()  # posed parts: radius 0.5, stretched per part
 var _held := {}  # role → true
 var _probe_tex: Texture2D  # dev probe: stands in for every camera's video
+var avatars := preload("res://features/previs/tracking/person_avatars.gd").new()  # WO-1086
 
 
 func _ready() -> void:
-	for label in ["People: off", "People: cut-outs", "People: dummies"]:
+	add_child(avatars)
+	for label in ["People: off", "People: cut-outs", "People: dummies", "People: avatars"]:
 		picker.add_item(label)
-	picker.tooltip_text = "Tracked people on the stage. Cut-outs: each one's live picture from the camera that sees them best. Dummies: a mannequin painted from every solved camera that sees them."
+	picker.tooltip_text = "Tracked people on the stage. Cut-outs: each one's live picture from the camera that sees them best. Dummies: a mannequin painted from every solved camera that sees them. Avatars: a cartoon figure in each person's clothes and hair colours, no camera picture."
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
-	var saved: Variant = cfg.get_value("previs", "people", "cards" if cfg.get_value("previs", "cutouts", false) == true else "off")
+	var saved: Variant = cfg.get_value("previs", "people", "cards" if cfg.get_value("previs", "cutouts", false) == true else "avatars")
+	if int(cfg.get_value("previs", "people_rev", 0)) < PEOPLE_REV:  # owner 15.11 asked for characters instead of dummies
+		saved = "avatars" if saved == "dummies" else saved
+		cfg.set_value("previs", "people_rev", PEOPLE_REV)
+		if cfg.has_section_key("previs", "people"):
+			cfg.set_value("previs", "people", saved)
+		cfg.save(UI_CFG)
 	set_style(str(saved))
 	picker.item_selected.connect(func(i: int) -> void:
 		set_style(STYLES[i])
@@ -47,11 +58,11 @@ func _ready() -> void:
 		c.save(UI_CFG))
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _load_cams())
 	_load_cams()
-	if Config.args.has("probe-cutouts"):  # dev: --probe-cutouts=<dir>[:dummies] (WO-665 / WO-666)
+	if Config.args.has("probe-cutouts"):  # dev: --probe-cutouts=<dir>[:dummies|:avatars] (WO-665 / 666 / 1086)
 		_probe(str(Config.args["probe-cutouts"]))
 
 
-## "off" | "cards" | "dummies" (anything else → off).
+## "off" | "cards" | "dummies" | "avatars" (anything else → off).
 func set_style(s: String) -> void:
 	style = s if s in STYLES else "off"
 	picker.select(STYLES.find(style))
@@ -81,6 +92,9 @@ func _load_cams() -> void:
 ## One WS tracking:detections snapshot.
 func set_detections(snap: Variant) -> void:
 	if not _on:
+		return
+	if style == "avatars":
+		avatars.show_cards(M.cards(snap, _cams), Time.get_ticks_msec() / 1000.0)
 		return
 	var seen := {}
 	for c in M.cards(snap, _cams, _pick, Time.get_ticks_msec() / 1000.0):  # WO-701 sticky camera
@@ -243,6 +257,7 @@ func _hold_roles() -> void:
 
 
 func _clear() -> void:
+	avatars.clear()
 	for e in _cards.values():
 		(e.node as Node).queue_free()
 	_cards.clear()
@@ -261,7 +276,7 @@ func _enter_tree() -> void:
 		_hold_roles()
 
 
-## Dev probe: <dir>/frame.png + persons.json ({raster, mask_size, persons [{box, mask}], joints?}, from a real run) as
+## Dev probe: <dir>/frame.png + persons.json ({raster, mask_size, persons [{box, mask, traits?}], joints?}) as
 ## one solved camera 8 m downstage; the person stands where that camera's box puts them, as tall as it measures.
 ## Saves the 3D view from the camera's side (<dir>/render.png, 3 s) and from behind (render_back.png, 4 s).
 func _probe(arg: String) -> void:
@@ -276,11 +291,11 @@ func _probe(arg: String) -> void:
 	var ce := {"id": "p", "role": "probe", "raster": [w, h], "cam": cam}
 	var height := M.estimate_height(ce, b, [feet[0], feet[1], 0.0])
 	var snap := {"cameras": [{"id": "p", "role": "probe", "stale": false, "mask_size": inp.mask_size,
-		"persons": [{"tid": 1, "box": b, "age_s": 0.0, "mask": inp.persons[0].mask}]}],
+		"persons": [{"tid": 1, "box": b, "age_s": 0.0, "mask": inp.persons[0].mask, "traits": inp.persons[0].get("traits")}]}],
 		"world": {"plane_z": 0.0, "persons": [{"id": 1, "x": feet[0], "y": feet[1], "height": height, "keys": ["p:1"],
 			"joints": inp.get("joints")}]}}  # WO-667: persons.json may carry pose3d joints for the same camera
 	print("[probe-cutouts] feet ", feet, " height ", height)
-	set_style("dummies" if arg.ends_with(":dummies") else "cards")
+	set_style("dummies" if arg.ends_with(":dummies") else "avatars" if arg.ends_with(":avatars") else "cards")
 	var tick := Timer.new()
 	tick.wait_time = 0.2
 	tick.timeout.connect(func() -> void:
