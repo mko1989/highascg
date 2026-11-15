@@ -271,3 +271,15 @@ test('INFO parsing and the action plan touch screen consumers only', () => {
 	assert.deepEqual(plan.remove.map((a) => a.line), ['REMOVE 2-601'])
 	assert.deepEqual(plan.add, [], 'channels with no INFO answer are left alone')
 })
+
+test('Devices "running differs": a window the gate held back (or the hot-plug opened) is not a difference', () => {
+	const { compareExpectedToServer } = require('../../src/config/config-compare')
+	const row = (index, hasScreen) => ({ index, videoMode: '1080p5000', hasScreen, hasDecklinkOutput: false })
+	const expected = [row(1, true), row(2, true), row(3, false), row(4, true)]
+	const running = [row(1, true), row(2, false), row(3, false), row(4, false)]
+	assert.equal(compareExpectedToServer(running, expected).length, 2, 'without the gate: two differences')
+	assert.deepEqual(compareExpectedToServer(running, expected, { screenGate: new Set([2, 4]) }), [])
+	assert.equal(compareExpectedToServer(running, expected, { screenGate: new Set([2]) }).length, 1, 'only the gated channel is exempt')
+	const src = fs.readFileSync(path.join(ROOT, 'src/config/config-compare.js'), 'utf8')
+	assert.ok(src.includes('compareExpectedToServer(serverChannels, moduleChannels, { screenGate: screenGateChannels(self) })'))
+})

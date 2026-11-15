@@ -114,7 +114,7 @@ function screenOutputStatus(config, src = {}) {
 			reason: off.length ? offlineReason(jacks, off[0].reason) : '',
 			jacks,
 			channels: chs,
-			offline: off.map((m) => m.channel),
+			offline: [...new Set(off.map((m) => m.channel))],
 		}
 	}
 	return { destinations: byDest }

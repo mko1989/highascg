@@ -168,10 +168,13 @@ function parseExpectedChannels(config) {
 /**
  * Pure: expected (project) channels vs running channels. Same-index pairs differ in mode, Caspar screen consumer or
  * DeckLink output; a different channel count is reported once and the common prefix is still compared.
+ * WO-1084: `opts.screenGate` = channels whose screen window the screen gate decided (not started because its screen is
+ * unplugged or the operator's, or opened later by the hot-plug watcher) — a screen on/off there is not a difference.
  * @param {Array} serverChannels
  * @param {Array} expected
+ * @param {{ screenGate?: Set<number> }} [opts]
  */
-function compareExpectedToServer(serverChannels, expected) {
+function compareExpectedToServer(serverChannels, expected, opts = {}) {
 	const issues = []
 	if (serverChannels.length !== expected.length) {
 		issues.push(`Channel count: server ${serverChannels.length} vs loaded project ${expected.length}.`)
@@ -183,7 +186,7 @@ function compareExpectedToServer(serverChannels, expected) {
 		const sv = (s.videoMode || '').trim()
 		const mv = (m.videoMode || '').trim()
 		if (sv && mv && sv !== mv) issues.push(`Ch ${s.index}: server "${sv}" ≠ project "${mv}"`)
-		if (s.hasScreen !== m.hasScreen) {
+		if (s.hasScreen !== m.hasScreen && !opts.screenGate?.has(Number(s.index))) {
 			issues.push(`Ch ${s.index}: Caspar screen output is ${s.hasScreen ? 'on' : 'off'}, the project expects ${m.hasScreen ? 'on' : 'off'}`)
 		}
 		if (s.hasDecklinkOutput !== m.hasDecklinkOutput) {
@@ -191,6 +194,19 @@ function compareExpectedToServer(serverChannels, expected) {
 		}
 	}
 	return issues
+}
+
+/** WO-1084: channels with a gate mark in casparcg.config, plus those the hot-plug watcher opened since the connect. */
+function screenGateChannels(self) {
+	const out = new Set((self?._screenHotplugStarted || []).map(Number))
+	try {
+		const file = require('../api/routes-caspar-config').resolveCasparConfigWritePath(self)
+		const xml = require('fs').readFileSync(file, 'utf8')
+		for (const m of require('./screen-connector-gate').listOfflineScreens(xml)) out.add(m.channel)
+	} catch {
+		/* no file: nothing gated */
+	}
+	return out
 }
 
 /**
@@ -225,7 +241,7 @@ function refreshConfigComparison(self) {
 			}))
 			issues = expectError
 				? [`Could not build the loaded project's Caspar config: ${expectError}`]
-				: compareExpectedToServer(serverChannels, moduleChannels)
+				: compareExpectedToServer(serverChannels, moduleChannels, { screenGate: screenGateChannels(self) })
 			moduleScreenCount = moduleChannels.filter((m) => m.hasScreen).length
 			screensCountMismatch = !expectError && serverPhysicalScreens.length !== moduleScreenCount
 			aligned = issues.length === 0

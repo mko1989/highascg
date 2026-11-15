@@ -29,6 +29,7 @@ function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCas
 		 * which casparcg.config it read (GET /api/caspar-config/dirty: written but not restarted). */
 		require('../engine/air-snapshot').rememberConnectRoles(appCtx, getChannelMap)
 		require('../config/caspar-config-dirty').rememberConfigAtConnect(appCtx)
+		appCtx._screenHotplugStarted = [] // a (re)started Caspar read the file: the windows are the file's again
 		/* WO-1084: say which screen destinations run.sh did not start and why ("PGM 2: DP-4/DP-5 not connected — not
 		 * started"), then keep that true while Caspar runs (screens plugged in / pulled: screen-hotplug.js). */
 		try {

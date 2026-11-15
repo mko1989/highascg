@@ -164,6 +164,7 @@ async function reconcileScreens(ctx, injected = {}) {
 		await deps.send(a.line).then(() => res.added.push([a.channel, a.port]), (e) => log('warn', `[Screen hot-plug] ADD ${a.channel}-${a.port}: ${e?.message || e}`))
 	}
 	if (res.added.length) {
+		ctx._screenHotplugStarted = [...new Set([...(ctx._screenHotplugStarted || []), ...res.added.map(([c]) => c)])]
 		res.lines.push(`started ${res.added.map(([c, p]) => `ch${c}-${p}`).join(', ')} — its screen came up`)
 		try {
 			await deps.place()
@@ -214,6 +215,8 @@ function startScreenHotplugWatch(ctx, injected = {}) {
 			}
 			await reconcileScreens(ctx, injected)
 			tracker.rebase(readDrm())
+			// the Devices "running differs" check reads the gate's decisions (config-compare.js screenGateChannels)
+			await require('../config/config-compare').refreshConfigComparison(ctx).catch(() => {})
 			if (typeof ctx._wsBroadcast === 'function') ctx._wsBroadcast('gpu_topology_changed', { at: Date.now(), reason: 'screen_hotplug' })
 		} catch (e) {
 			ctx.log?.('warn', `[Screen hot-plug] ${e?.message || e}`)
