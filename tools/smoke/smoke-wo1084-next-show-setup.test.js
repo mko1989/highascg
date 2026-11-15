@@ -313,3 +313,46 @@ test('test isolation: under node --test the operator file is a private temp file
 	hp.startScreenHotplugWatch({ config: {}, log: (_l, m) => lines.push(m) })()
 	assert.deepEqual(lines, [], 'no "[Screen hot-plug] watching" — the watcher did not start')
 })
+
+test('building blocks: window rect + INFO port, operator name, channel owners, jacks and the reason in words', () => {
+	assert.deepEqual(gate.screenRect(screen(2, 1920)), { x: 1920, y: 0, width: 1920, height: 1080 })
+	assert.equal(gate.screenRect('<screen><device>1</device></screen>'), null, 'no position')
+	assert.equal(gate.screenPort(screen(2, 0)), 601)
+	assert.equal(gate.screenPort(screen(2, 0, 1920, true)), 611, 'key-only: 600 + 10 + (device - 1)')
+	assert.equal(gate.screenPort(screen(61, 0)), 660)
+
+	const { operatorNamesFrom } = require('../../src/system/operator-output-file')
+	assert.deepEqual(operatorNamesFrom([{ name: 'DP-0', port: 1 }, { name: 'DP-3', port: 2 }], 2), ['DP-3'])
+	assert.deepEqual(operatorNamesFrom([{ name: 'DP-3', port: 2 }], null), [], 'no flag: unknown, file left alone')
+
+	const config = {
+		screenDestinations: {
+			destinations: [
+				{ id: 'op', mode: 'operator_gui', label: 'Operator GUI' },
+				{ id: 'a', mode: 'pgm_prv', label: 'PGM/PRV 1', mainScreenIndex: 0 },
+				{ id: 'b', mode: 'pgm_only', label: 'PGM 2', mainScreenIndex: 1 },
+			],
+		},
+		deviceGraph: {
+			connectors: [
+				{ id: 'gpu_p1', kind: 'gpu_out', externalRef: 'DP-2/DP-3' },
+				{ id: 'gpu_p2', kind: 'gpu_out', externalRef: 'DP-4/DP-5' },
+			],
+			edges: [
+				{ sourceId: 'dst_in_a', sinkId: 'gpu_p1' },
+				{ sourceId: 'dst_in_op', sinkId: 'gpu_p1' },
+				{ sourceId: 'dst_in_b', sinkId: 'gpu_p2' },
+			],
+		},
+	}
+	const owners = status.channelOwners(config, { programChannels: [2, 4], previewChannels: [3, null] })
+	assert.deepEqual([...owners.entries()].map(([ch, o]) => `${ch}:${o.destId}/${o.half}`), ['2:a/pgm', '3:a/prv', '4:b/pgm'])
+	const lit = [{ name: 'DP-3', connected: true }]
+	const jacksA = status.destinationJacks(config, 'a', lit)
+	assert.deepEqual(jacksA, [{ id: 'gpu_p1', ref: 'DP-2/DP-3', name: 'DP-3', connected: true, operator: true }])
+	const jacksB = status.destinationJacks(config, 'b', lit)
+	assert.equal(jacksB[0].connected, false)
+	assert.equal(status.offlineReason(jacksA, ''), 'DP-3 is the operator screen')
+	assert.equal(status.offlineReason(jacksB, ''), 'DP-4/DP-5 not connected')
+	assert.equal(status.offlineReason([], 'ch4 no connected screen there'), 'no connected screen there', 'no cables: the gate\'s words')
+})
