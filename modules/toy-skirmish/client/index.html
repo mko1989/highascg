@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+		/>
+		<meta name="theme-color" content="#151a26" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="format-detection" content="telephone=no" />
+		<title>Stage Skirmish</title>
+		<!-- WO-1081: the RC kit's base styles (unchanged, served from /game/sk/kit/) + the game's own. -->
+		<link rel="stylesheet" href="/game/sk/kit/rc.css" />
+		<link rel="stylesheet" href="/game/sk/kit/rc-ui.css" />
+		<link rel="stylesheet" href="/game/sk/sk.css" />
+		<link rel="stylesheet" href="/game/sk/sk-hud.css" />
+		<link rel="stylesheet" href="/game/sk/sk-touch.css" />
+		<!-- The only inline script: the import map (data, not code). Everything else is an external module. -->
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "/vendor/three/build/three.module.js",
+					"three/addons/": "/vendor/three/examples/jsm/"
+				}
+			}
+		</script>
+		<script type="module" src="/game/sk/main.js"></script>
+	</head>
+	<body>
+		<canvas id="view" aria-label="Arena view" tabindex="0"></canvas>
+		<div id="hud"></div>
+		<div id="touch" aria-hidden="true">
+			<div id="tz-move" class="tzone move">
+				<div class="stick-base"><div class="stick-knob"></div></div>
+				<span class="tzone-label">move</span>
+			</div>
+			<div id="tz-aim" class="tzone aim">
+				<div class="stick-base"><div class="stick-knob"></div></div>
+				<span class="tzone-label">aim + fire</span>
+			</div>
+			<div id="t-weapon" class="tbtn weapon"><span>weapon</span></div>
+		</div>
+		<div id="lobby" hidden></div>
+		<div id="loading" hidden></div>
+		<div id="host"></div>
+		<div id="screen" hidden></div>
+		<div id="rotate">
+			<div class="panel screen-card">
+				<div class="rotate-icon"></div>
+				<h1>Turn your phone sideways</h1>
+				<p>The skirmish is played in landscape.</p>
+			</div>
+		</div>
+	</body>
+</html>

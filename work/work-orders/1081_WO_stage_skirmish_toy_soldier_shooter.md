@@ -25,10 +25,42 @@ vibes but top down. also as a module. also the lights/video is live from the roo
 - **Show on:** the game runs only in `tools/dev/skirmish-dev-server.js` (127.0.0.1:4310, no Caspar) until the module
   is enabled on the box after the show.
 
-## What was done
+## What was done (15.11.26)
 
-(filled in when the two halves are verified)
+Built by two builders against the contract (server, client), each half checked by the lead before its commit.
+
+- **Server** `modules/toy-skirmish/` (`register.js`, `server/sk-*.js`, 2 660 lines): `sk-kit.js` (the RC sibling's
+  baker, lights, video), `sk-arenas.js` + `sk-arena-check.js` (deterministic arenas per scene rev, toy blocks as cover,
+  `validateArena`), `sk-grid.js` (solid grid, line of sight, A*), `sk-room.js` + `sk-combat.js` (phases, modes, the
+  referee for fire / hit / boom / pick), `sk-bots.js`, `sk-sanitize.js`, `sk-static.js` (`/game/sk/*` and the
+  `/game/sk/kit/*` alias), `sk-ws.js`, `routes-sk.js`, `sk-public.js`, `sk-game.js`.
+- **Client** `modules/toy-skirmish/client/` (5 130 lines, no build step): pure logic (`grid.js`, `move.js`, `shots.js`,
+  `protocol.js`, `score.js`, `cam.js`, `sk-const.js`) and the view (`sk-world.js` with the cut-away plane,
+  `soldier-model.js`, `arena-view.js`, `fx.js`, `stage-look.js`, HUD, lobby, host panel, input for keyboard + mouse /
+  twin touch sticks / gamepad). Kit files used unchanged: `world.js`, `occ.js`, `interp.js`, `mesh-util.js`,
+  `fullscreen.js`, `join-code.js` + QR, `scale.js`, `stage-fx*.js`, `rc.css`, `rc-ui.css`. Copy-adapted because they
+  are tied to the RC API: `dom.js`, `net.js`, `sk-screens.js`.
+- `tools/dev/skirmish-dev-server.js`: the game alone on 127.0.0.1:4310 (reads the project read-only, no Caspar).
+- Lead after review: the held weapon rides in every `w` tuple; the follow camera came down from 14 u to 9 u.
+- Contract clarifications from both halves: `work/notes/skirmish-game-contract.md` §12.
 
 ## Verified
 
-(nothing yet)
+- 79 tests in `tools/smoke/smoke-wo1081-sk-*.test.js` (37 server, 42 client; in the curated list), among them: the
+  client's grid and spread are bit-identical to the server's, every accept / reject rule of the referee, module load /
+  unload through the module host, the owner rules by source grep (no URL but `/api/game/sk`, `/game/sk/`,
+  `/vendor/three/`; no Caspar, look, layer or project write). RC smokes unchanged and passing.
+- Live room (rev 405f970d98a2-d841e6d4a2): 8 valid arenas (stage, tables, foh, aisle, backrow, banquet, sidehall,
+  crossroads), 40–80 u per side, 16 spawns, 10–11 pickups, 20–44 blocks, 11–13 % solid.
+- Dev server + headless Chrome (lead, 1280×720, 4 bots, fake lights): join → match → the soldier moves and fires, a
+  bot fragged the player, respawn countdown, kill feed, minimap, cut-away room with fence and light glow; no console
+  errors. Builder's runs: weapon pickup and ammo, a kill, results screen, phone layout with real touch events, host
+  panel with QR, spectator view.
+- NOT verified: on the box's real server (module not enabled — show on); LED wall pictures (the dev server has no
+  video feed); real phones, gamepad, sound, frame rate on a real GPU.
+
+## Open
+
+- Enable on the box after the show: `POST /api/modules/enable {"name":"toy-skirmish"}`, then the host panel
+  `/game/sk/?host=1`; check the wall pictures and the real lights there.
+- The dev hook (`?dev=1`, page on 127.0.0.1 only) drives the own soldier for tests; it gives no advantage.

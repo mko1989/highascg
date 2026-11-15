@@ -1,0 +1,6 @@
+{
+	"//": "Scope marker (WO-1081) — tells Node.js (the smoke tests) to parse the ES module .js files of the Stage Skirmish client as ESM, like the browser does. Do not add dependencies here.",
+	"name": "highascg-toy-skirmish",
+	"private": true,
+	"type": "module"
+}

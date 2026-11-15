@@ -1,0 +1,313 @@
+/* Stage Skirmish (WO-1081) — in-game HUD: score / clock / minimap / kill feed, own health + armour, weapon strip,
+ * banners, count-down, hurt flash, surge tag. Built on the RC kit's #hud layout (rc.css). */
+.sk-tl {
+	max-width: 40vw;
+}
+.sk-score-main {
+	font-size: 30px;
+	font-weight: 800;
+	line-height: 1.05;
+}
+.sk-score-sub {
+	font-size: 15px;
+	color: var(--dim);
+}
+.sk-teams {
+	display: flex;
+	gap: 6px;
+	margin-top: 6px;
+}
+.sk-team {
+	padding: 2px 10px;
+	border-radius: 6px;
+	font-weight: 800;
+	font-size: 18px;
+	color: #fff;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.sk-clock {
+	font-size: 28px;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.04em;
+}
+.sk-map {
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: rgba(10, 14, 22, 0.55);
+}
+.sk-feed {
+	list-style: none;
+	margin: 8px 0 0;
+	padding: 0;
+	font-size: 14px;
+	text-align: right;
+}
+.sk-feed li {
+	margin-top: 3px;
+	padding: 2px 8px;
+	border-radius: 5px;
+	background: rgba(10, 14, 22, 0.55);
+	display: inline-block;
+	clear: both;
+	float: right;
+}
+.sk-feed li.mine {
+	background: rgba(255, 194, 58, 0.3);
+}
+.feed-name {
+	font-weight: 700;
+}
+.feed-w {
+	color: var(--dim);
+	margin: 0 6px;
+}
+
+/* own vitals (bottom left) + weapon (bottom right) */
+.sk-vitals {
+	position: absolute;
+	left: calc(14px + var(--sl));
+	bottom: calc(12px + var(--sb));
+	display: grid;
+	gap: 6px;
+}
+.sk-vital {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.sk-ico {
+	width: 22px;
+	text-align: center;
+	font-weight: 900;
+	font-size: 20px;
+}
+.sk-ico.hp {
+	color: var(--hp);
+}
+.sk-ico.ar {
+	color: var(--ar);
+	font-size: 16px;
+}
+.sk-num {
+	min-width: 44px;
+	font-size: 28px;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+}
+.sk-bar {
+	width: 140px;
+	height: 10px;
+	border-radius: 5px;
+	background: rgba(255, 255, 255, 0.12);
+	overflow: hidden;
+}
+.sk-fill {
+	height: 100%;
+	transform-origin: left center;
+	transition: transform 0.15s;
+}
+.sk-fill.hp {
+	background: var(--hp);
+}
+.sk-fill.hp.low {
+	background: var(--bad);
+}
+.sk-fill.ar {
+	background: var(--ar);
+}
+.sk-weapon {
+	position: absolute;
+	right: calc(14px + var(--sr));
+	bottom: calc(12px + var(--sb));
+	text-align: right;
+}
+.sk-wname {
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--dim);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+.sk-ammo {
+	font-size: 40px;
+	font-weight: 900;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+.sk-ammo.empty {
+	color: var(--bad);
+}
+.sk-strip {
+	display: flex;
+	gap: 4px;
+	margin-top: 6px;
+	justify-content: flex-end;
+}
+.sk-slot {
+	min-width: 54px;
+	padding: 3px 6px;
+	border-radius: 6px;
+	border: 1px solid var(--line);
+	background: rgba(10, 14, 22, 0.5);
+	font-size: 11px;
+	text-align: left;
+	opacity: 0.35;
+	display: grid;
+	grid-template-columns: auto 1fr;
+	column-gap: 4px;
+}
+.sk-slot.have {
+	opacity: 0.85;
+}
+.sk-slot.held {
+	opacity: 1;
+	border-color: var(--accent);
+	background: rgba(255, 194, 58, 0.18);
+}
+.slot-key {
+	font-weight: 900;
+	color: var(--accent);
+}
+.slot-name {
+	font-weight: 700;
+	white-space: nowrap;
+}
+.slot-ammo {
+	grid-column: 1 / -1;
+	font-variant-numeric: tabular-nums;
+	color: var(--dim);
+}
+
+/* banners, count-down, respawn */
+.sk-banner {
+	position: absolute;
+	left: 50%;
+	top: 24%;
+	transform: translate(-50%, -50%) scale(0.9);
+	font-size: 30px;
+	font-weight: 900;
+	opacity: 0;
+	transition:
+		opacity 0.2s,
+		transform 0.2s;
+	white-space: nowrap;
+}
+.sk-banner.show {
+	opacity: 1;
+	transform: translate(-50%, -50%) scale(1);
+}
+.sk-banner.frag {
+	color: var(--accent);
+}
+.sk-banner.dead {
+	color: var(--bad);
+}
+.sk-respawn {
+	position: absolute;
+	left: 50%;
+	top: 62%;
+	transform: translateX(-50%);
+	font-size: 24px;
+	font-weight: 800;
+	padding: 6px 16px;
+	border-radius: 10px;
+	background: rgba(10, 14, 22, 0.6);
+}
+.sk-big {
+	position: absolute;
+	left: 50%;
+	top: 45%;
+	transform: translate(-50%, -50%);
+	font-size: max(80px, 22vmin);
+	font-weight: 900;
+	color: var(--accent);
+}
+.sk-hurt {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	box-shadow: inset 0 0 120px 30px rgba(255, 40, 30, 0.75);
+	opacity: 0;
+}
+.sk-hurt.on {
+	animation: sk-hurt 0.45s ease-out;
+}
+@keyframes sk-hurt {
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+.sk-surge-tag {
+	position: absolute;
+	left: 50%;
+	bottom: calc(14px + var(--sb));
+	transform: translateX(-50%);
+	padding: 3px 14px;
+	border-radius: 8px;
+	font-weight: 900;
+	letter-spacing: 0.2em;
+	color: #fff;
+	background: var(--surge);
+	box-shadow: 0 0 22px var(--surge);
+}
+#hud .hud-tools {
+	pointer-events: auto;
+}
+#hud.spectator .sk-score-main {
+	font-size: 40px;
+}
+#hud.spectator .sk-clock {
+	font-size: 40px;
+}
+@media (max-height: 420px) {
+	.sk-score-main {
+		font-size: 22px;
+	}
+	.sk-clock {
+		font-size: 22px;
+	}
+	.sk-map {
+		width: 128px;
+		height: 96px;
+	}
+	.sk-num {
+		font-size: 22px;
+		min-width: 36px;
+	}
+	.sk-bar {
+		width: 90px;
+	}
+	.sk-ammo {
+		font-size: 28px;
+	}
+	.sk-slot {
+		min-width: 0;
+	}
+	.slot-name {
+		display: none;
+	}
+	.sk-feed {
+		font-size: 12px;
+	}
+}
+/* before the own soldier exists (join form, game off) there are no own vitals to show */
+body.mode-player:not(.joined) .sk-vitals,
+body.mode-player:not(.joined) .sk-weapon,
+body.mode-player:not(.joined) .sk-respawn {
+	display: none;
+}
+/* the kit's toast sits mid-screen — on the own soldier here: lower it, out of the play */
+#hud .hud-toast {
+	top: 74%;
+	font-size: 20px;
+	padding: 4px 14px;
+	border-radius: 10px;
+	background: rgba(10, 14, 22, 0.55);
+}
+#hud .hud-toast:empty {
+	display: none;
+}

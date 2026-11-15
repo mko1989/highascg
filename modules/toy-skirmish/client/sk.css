@@ -1,0 +1,196 @@
+/* Stage Skirmish (WO-1081) — page-level styles over the RC kit's rc.css / rc-ui.css (served unchanged from
+ * /game/sk/kit/): accent colour, lobby / join extras, scoreboard + results, host page bits. HUD: sk-hud.css,
+ * touch sticks: sk-touch.css. No external fonts or assets. */
+:root {
+	--accent: #ffc23a;
+	--red: #ff4d3d;
+	--blue: #3aa0ff;
+	--hp: #4fd27a;
+	--ar: #46a8ff;
+	--surge: #ff4fd8;
+}
+#view {
+	cursor: crosshair;
+}
+body.mode-spectate #view {
+	cursor: default;
+}
+
+/* ---------- join / lobby ---------- */
+.sk-lobby-info .track-name {
+	font-size: 22px;
+	font-weight: 800;
+}
+.sk-lobby-info .laps {
+	color: var(--dim);
+	margin: 4px 0 10px;
+}
+#lobby .players li .pready {
+	text-transform: lowercase;
+}
+
+/* ---------- scoreboard / results ---------- */
+.sk-board {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+	z-index: 4;
+	width: min(560px, 92vw);
+	max-height: 86vh;
+	overflow: hidden;
+}
+.board-card {
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 14px;
+	padding: 14px 18px 12px;
+	text-shadow: none;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+.sk-board.final .board-card {
+	border-color: var(--accent);
+}
+.board-title {
+	margin: 0;
+	font-size: 22px;
+}
+.sk-board.final .board-title {
+	font-size: 30px;
+	color: var(--accent);
+}
+.board-sub {
+	margin: 2px 0 8px;
+	font-size: 18px;
+	font-weight: 700;
+}
+.board-sub:empty,
+.board-note:empty {
+	display: none;
+}
+.board-teams {
+	display: flex;
+	gap: 10px;
+	margin-bottom: 8px;
+}
+.board-teams:empty {
+	display: none;
+}
+.team-total {
+	flex: 1;
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	border-left: 6px solid;
+	padding: 4px 10px;
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 6px;
+}
+.team-name {
+	font-weight: 700;
+}
+.team-score {
+	font-size: 26px;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+}
+.board-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-variant-numeric: tabular-nums;
+}
+.board-table th {
+	text-align: left;
+	font-size: 12px;
+	color: var(--dim);
+	font-weight: 600;
+	text-transform: uppercase;
+	padding: 2px 6px;
+}
+.board-table td {
+	padding: 4px 6px;
+	border-top: 1px solid var(--line);
+	white-space: nowrap;
+}
+.board-table td:nth-child(2) {
+	width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 0;
+}
+.board-table td.score {
+	font-weight: 800;
+	text-align: right;
+}
+.board-table tr.me td {
+	background: rgba(255, 194, 58, 0.16);
+}
+.board-table tr.offline td {
+	opacity: 0.5;
+}
+.board-table .swatch {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border-radius: 3px;
+	margin-right: 8px;
+	vertical-align: -1px;
+}
+.board-note {
+	margin: 8px 0 0;
+	color: var(--dim);
+	font-size: 14px;
+}
+#hud.spectator .sk-board {
+	left: auto;
+	right: calc(14px + var(--sr));
+	top: auto;
+	bottom: calc(14px + var(--sb));
+	transform: none;
+	width: min(420px, 40vw);
+}
+#hud.spectator .sk-board.final {
+	left: 50%;
+	top: 50%;
+	right: auto;
+	bottom: auto;
+	transform: translate(-50%, -50%) scale(1.25);
+}
+@media (max-height: 420px) {
+	.board-card {
+		padding: 8px 12px;
+	}
+	.board-table td {
+		padding: 2px 6px;
+	}
+	.board-title {
+		font-size: 18px;
+	}
+}
+
+/* ---------- host page ---------- */
+.host-lbl {
+	color: var(--dim);
+	align-self: center;
+}
+.host-switch {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 6px 0;
+	font-size: 16px;
+}
+.host-switch input {
+	width: 20px;
+	height: 20px;
+}
+button.mode.on {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+.join-box {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+}

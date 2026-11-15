@@ -123,7 +123,7 @@ function createSkRoom(deps) {
 		for (const p of live) {
 			if (!p.pos) continue
 			const flags = (p.mv ? 1 : 0) | (p.alive ? 0 : 2) | (p.protectUntil > t ? 4 : 0) | (p.surgeUntil > t ? 8 : 0)
-			const e = [p.id, p.pos[0], p.pos[1], p.yaw, flags]
+			const e = [p.id, p.pos[0], p.pos[1], p.yaw, flags, p.held || 'pea'] // 6th: the weapon shown (contract §12)
 			const key = e.join(',')
 			if (key !== p.sent) (p.sent = key), (dirty = true)
 			a.push(e)

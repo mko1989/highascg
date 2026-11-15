@@ -254,3 +254,8 @@ module on the box.
 - Dev server: `node tools/dev/skirmish-dev-server.js [--port 4310] [--arena id] [--mode dm|tdm] [--bots n]
   [--fake-lights] [--empty]`; host actions `POST /api/game/sk/host` without auth; LED wall pictures are off there
   (screens are listed, no video feed).
+- **After the client was built (lead):** `w` tuples are `[id, x, z, yaw, flags, weapon]` (the held weapon, so others
+  draw it before the first shot). The owner also reports `boom` when its rocket ends its 4 s flight in the open; the
+  server accepts it (within reach of the fire ray). `results.order` carries no colour — the client takes it from the
+  roster. Own hit claims are made with a locally drawn seed right after `fire` (the server's seed arrives later); the
+  server re-checks every claim. The follow camera is 9 u up, not 14 (a soldier was 30 px tall at 720p).

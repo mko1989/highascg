@@ -146,7 +146,7 @@ test('positions: rect + 2 u, 6 u/s clamp, 20 per second, frozen while dead; `w` 
 	assert.deepEqual(a.p.pos, [0.5, 0], 'within the speed limit')
 	clock.advance(WORLD_MS)
 	const w = last(b, 'w')
-	assert.deepEqual(w.a.find((e) => e[0] === a.id), [a.id, 0.5, 0, 0, 1], 'moving')
+	assert.deepEqual(w.a.find((e) => e[0] === a.id), [a.id, 0.5, 0, 0, 1, 'pea'], 'moving, with the weapon shown')
 	const sent = b.out.filter((m) => m.t === 'w').length
 	clock.advance(WORLD_MS * 4)
 	assert.equal(b.out.filter((m) => m.t === 'w').length, sent, 'nothing changed → no `w`')
