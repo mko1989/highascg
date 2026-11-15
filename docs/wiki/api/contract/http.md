@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-603 routes.
+607 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -184,6 +184,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/game/rc/scene` | registry | `modules/rc-game/server/routes-rc-game.js` |
 | GET | `/api/game/rc/scene.glb` | registry | `modules/rc-game/server/routes-rc-game.js` |
 | GET | `/api/game/rc/state` | registry | `modules/rc-game/server/routes-rc-game.js` |
+| POST | `/api/game/salad/host` | registry | `modules/stage-salad/server/routes-salad.js` |
+| GET | `/api/game/salad/scene` | registry | `modules/stage-salad/server/routes-salad.js` |
+| GET | `/api/game/salad/scene.glb` | registry | `modules/stage-salad/server/routes-salad.js` |
+| GET | `/api/game/salad/state` | registry | `modules/stage-salad/server/routes-salad.js` |
 | POST | `/api/game/sk/host` | registry | `modules/toy-skirmish/server/routes-sk.js` |
 | GET | `/api/game/sk/scene` | registry | `modules/toy-skirmish/server/routes-sk.js` |
 | GET | `/api/game/sk/scene.glb` | registry | `modules/toy-skirmish/server/routes-sk.js` |
@@ -620,6 +624,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | Module | What it is |
 |---|---|
 | `modules/rc-game/server/routes-rc-game.js` | WO-1074 — RC car game (work/notes/rc-game-contract.md). |
+| `modules/stage-salad/server/routes-salad.js` | WO-1089 — Stage Salad (work/notes/stage-salad-contract.md §2). |
 | `modules/toy-skirmish/server/routes-sk.js` | WO-1081 — Stage Skirmish (work/notes/skirmish-game-contract.md §2). |
 | `src/api/router-dispatch.js` | Route request dispatch (split from `router.js`). |
 | `src/api/router.js` | Main HTTP API dispatcher (split from companion `api-routes.js`). |

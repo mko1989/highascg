@@ -45,7 +45,9 @@ modules/stage-salad/client/   index.html, *.js, *.css   (package.json "type": "m
 - **Shared pure ES modules in `client/`, also `require()`d by the server** (Node ≥ 22: require of an ES module):
   `veggies.js` (the ammo table), `flight.js` (the flight model), `venue.js` (the play frame, slots and colliders), `aim.js` (the aim solver: bots, the dev hook),
   `avatar-body.js` (the avatar's proportions and hit parts). One copy: server referee, bots and client prediction run the
-  same code, so a smoke can prove they agree.
+  same code, so a smoke can prove they agree. **Caveat (measured 15.11):** Node keeps an ES module in its own loader
+  cache even after its `require.cache` entry is dropped, so a module disable / enable reloads the server files but NOT
+  these five — a change to them is live on the server only after a node restart (the browser gets it at once).
 
 ## 2. URLs (port 4200)
 

@@ -106,11 +106,10 @@ test('colliders: a flat hard shot meets the stage front or the LED wall, a lob o
 	const tries = [20, 22, 24, 26, 28, 30].map((deg) => fly(VG.carrot, 0, 0, deg, 1).ends[0])
 	const wallHit = tries.find((e) => e.tag === 'wall')
 	assert.ok(wallHit, tries.map((e) => `${e.k}@${e.tag}`).join(' '))
-	assert.ok(wallHit.p[0] > 12.6 && wallHit.p[0] < 12.9 && wallHit.p[1] > 0.639 && wallHit.p[1] < 4.239, `on the wall's face: ${wallHit.p}`)
-	const wall = v.colliders.find((c) => c.tag === 'wall')
-	assert.ok(Math.abs(wall.c[1] - wall.h[1] - v.hall.y) < 1e-3, 'the skirt reaches the floor')
+	assert.ok(wallHit.p[0] > 12.6 && wallHit.p[0] < 12.9 && wallHit.p[1] > 1.239 && wallHit.p[1] < 4.239, `on the wall's face: ${wallHit.p}`)
+	// the real wall is flown 0.6 m over the stage (the previs shows the drape through the gap): a low shot goes under it
 	const under = F.simulate(VG.tomato, { i: 0, p: [11.5, 0.95, 3.5], v: [12, 0, 0] }, v, {})
-	assert.equal(under.tag, 'wall', 'nothing flies under the LED wall')
+	assert.equal(under.tag, 'room', `under the LED wall to the back wall: ${under.tag}`)
 	const up = fly(VG.carrot, 0, 0, 70, 1).ends[0]
 	assert.ok(up.p[1] < v.ceiling + 0.01, 'never through the ceiling')
 	const truss = F.simulate(VG.tomato, { i: 0, p: [9.2, 3.5, 0.5], v: [0, 8, 0] }, v, {})
