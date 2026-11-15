@@ -153,3 +153,74 @@ skirmish loads it through `modules/toy-skirmish/server/sk-kit.js` and serves the
   wall picture by eye (programme black during the test).
 - Seen, not mine: `smoke-wo1081-sk-server-bots` fails ("bot 5 walked 13 u") with and without the band change; it
   passed before 489851a1 (WO-1083 Spotlight) — for the skirmish owner.
+
+## Follow-up — a second show (Hilton Wawer): live smokes pinned, an empty ballroom's floor and tours
+
+### Investigation
+
+- 15.11 the owner loaded "90C PGRP Hilton Wawer" (`projects/_mvr/2e2b02a736fd`): an empty ballroom, no tables, a
+  3 × 15 m stage against the +x wall, 13 568 chandelier objects. Two smokes went red locally:
+  `smoke-wo1074-rc-server-toy` ("live: 5 tracks") and `smoke-wo1074-rc-server-tracks` ("live: ≥ 3 room tracks"). Both
+  baked "the newest project with an MVR scene" and asserted Narvil's facts (≥ 8 tracks, tunnels through its tables).
+- The 5 tracks were **a real shortfall, not an empty room being less rich**. The flat levels below the stage
+  (`rc-scene-geom.js hallFloor`) were: two floor-plan sheets at y 0 ("Podłoga 2 wymiary sal", "Podłoga 3 z zawiesiami"),
+  each 1883.7 m², and the carpet "Dywan" at y 0.24, 1883.5 m². A level's area was the SUM of its boxes: 3767 m² for the
+  plans, so the carpet level (1883.5) missed "≥ half the largest level" (1883.85) by 0.3 m², and the hall was put at
+  y 0.005. Every wall ("Ściany", "Boazeria") starts at 0.24, above the toy band (hall + 0.03 … 0.06), so the hall grid had
+  889 blocked cells (only the curtains), the stage was 0.634 m high instead of 0.4, and the cars drove 24 cm under the
+  carpet. The single-sided wall quads are not the problem: the occupancy pass draws triangles regardless of facing
+  (with the right floor: 9 856 cells, the walls and pilasters).
+- With the floor fixed: 9 tracks. The two whole-room tours were still missing. Traced (`rc-toy-route.js tour`): the
+  stops are the farthest reachable cells, which in an empty room are its far corners; the first leg reaches the corner
+  along the wall and its keep-out band (2 × width + 1) closes the only way out, so `route` corner → corner returns null.
+  In Narvil the tables keep the stops in aisles.
+- At 21:25 the owner hid the chandeliers (13 730 → 186 parts). Without them the budget planner no longer simplified the
+  geometry (5 cm → 2 mm cell), and the live bake gave 6 tracks: every stage ramp was rejected with "scene geometry under
+  it or within 1 m above it". In the toy height field (5 cm cells, 2.5 cm bins, base = hall + 5 mm) every cell of the
+  stage rect still held bin 16 (0.646–0.671 m): the stage covering "Wykładzina" (0.64–0.65 m), 1 cm above the stage
+  level that the tracking grid gives (0.639). `field.clearBelow(stage.rect, stage.y)` cleared only up to the stage level,
+  so the stage's own covering counted as an obstacle within 1 u (0.1 m) above a ramp's top end. Under the 5 cm
+  simplification that thin slab had been clustered away.
+
+### What was done
+
+- `rc-scene-geom.js`: `unionArea` (x strips between box edges, merged z runs): a level's area counts overlaps once.
+  Narvil: the same hall (0.839, same rect).
+- `rc-toy-route.js tour`: when the extreme stops do not give a tour, retry with stops that keep `ROOMY` = 2, 4, 6 track
+  widths more clearance (the first that routes wins). The retry runs only after the existing attempts failed, so a
+  furnished room (Narvil) gets exactly the tours it got before.
+- `rc-scene.js`: the height field clears the stage up to `stage.y + FLAT_DECOR × scale` (3 cm live). This is the same
+  rule as the occupancy band: flat decor on a floor is floor. BAKE_VERSION 8 (7: hall level + tours, 8: stage field;
+  output changes for the same input, so the rev changes and the scene re-bakes).
+- Smokes: `tools/smoke/lib/rc-live-scene.js` (new): `liveScene({ id })` = the project showing THAT scene, `liveScene()`
+  = the newest, read-only. The show-specific tests are pinned to Narvil (`NARVIL = '405f970d98a2'`, skip with the scene
+  path in the message when it is not there, as on CI) with their strictness (and a stage is now asserted, not a skip
+  reason). New tests run on the newest scene and check only what holds for any show: it bakes, a hall, ≥ 1 track, every
+  track valid + re-measured (toy) / on the ground model (v2), the occ, JSON, obstacle and GLB budgets.
+  `smoke-wo1082-rc-empty-hall.test.js` (new, CI list): a synthetic room of that shape (two plan sheets at 0, a carpet at
+  0.24, single-sided wall quads, a 3 × 15 m stage 0.4 m high near a long wall, its covering 1 cm proud): the hall is
+  the carpet, walls are in the band, the room is free, room tracks + the bridge + both tours, no tunnel; source guards.
+
+### What was VERIFIED to work
+
+- Hilton offline at 0.1: hall 0.005 → **0.241**, stage 0.4 above it, 889 → 9 856 blocked cells, **5 → 11 tracks**
+  (room-loop, room-leap, room-double, hall-bridge, hall-weave, stage-oval, stage-gp, hall-jump, hall-gp,
+  room-long-tour 139 m, room-long-leap 138 m). No tunnel: correct, the room has no tables.
+- Narvil at 0.1: tracks + floors + occ digest identical before / after (`fbe3f9e7edb2`, HEAD files compiled in place
+  vs the worktree), the same 11 tracks.
+- Mutations (each makes the empty-hall smoke fail):
+  - the area summed again → the hall is at y 0;
+  - `ROOMY = []` → no tours;
+  - the stage cleared only to `stage.y` → no room tracks.
+- Smokes: Narvil-pinned + newest (Hilton) live tests in both files: 16 pass, 0 fail, 0 skipped. All RC + skirmish smokes
+  (wo1074, wo1076, wo1081, wo1082, wo1083): 333 pass, 0 fail. Gate loop: listed in the follow-up report.
+- **On the box** (node restarted twice under the lock): the live Hilton bake went from 6 tracks (rev
+  `2e2b02a736fd-b8a3cabbb3`, before the stage field fix) to **11 tracks** (rev `2e2b02a736fd-61f16f727d`, 2.2 s): hall
+  0.241, stage 0.639, room-loop, room-leap, room-double, hall-bridge, hall-weave, stage-oval, stage-gp, hall-jump,
+  hall-gp, room-long-tour 139 m, room-long-leap 137 m. 6 hard bots, 1 lap of room-long-tour, watched over a WebSocket
+  spectator: all 6 finished, 112.5–121.3 s (23 box claims, 11 item effects, 12 hazards, 10 spins); whole node 13.8 % of
+  a core. (A first attempt was cut by another session's node restart at 21:36.) Left: RC disabled, bots 0, Skirmish
+  disabled.
+- Not changed: the active project. Seen, not fixed: a stage whose SHORT end faces the deepest part of the hall gives a
+  tour that covers < 70 % of the hall and is rejected (synthetic, not a live show). At scale 1 (v2, not used live) the
+  Hilton room gives 2 hall tracks, no room track.
