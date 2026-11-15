@@ -18,12 +18,15 @@ async function handleGet(deps) {
 
 async function handleLaunch(body, ctx) {
 	const pw = checkNuclearPassword(body, ctx)
-	if (!pw.ok)
+	if (!pw.ok) {
+		// WO-1077: a refused dock click used to leave no line anywhere
+		if (typeof ctx?.log === 'function') ctx.log('warn', `[dock] ${String(parseBody(body)?.action || '(none)')}: refused — ${pw.error}`)
 		return {
 			status: pw.status || 403,
 			headers: JSON_HEADERS,
 			body: jsonBody({ ok: false, error: pw.error, passwordRequired: true }),
 		}
+	}
 	const r = await launchOrFocus(parseBody(body)?.action, ctx)
 	return { status: r.status, headers: JSON_HEADERS, body: jsonBody(r.body) }
 }

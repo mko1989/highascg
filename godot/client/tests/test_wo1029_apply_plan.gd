@@ -70,6 +70,10 @@ func test_results() -> void:
 	t.ok(good.ok and good.warn, "unrestored items: warn colour")
 	t.eq(M.result({"ok": true, "message": "done"}, null).summary, "done", "old single answer")
 	t.eq(M.restored_text({}), "", "no block")
+	# WO-1077: a card block that says "not restored" used to end in `Dictionary == true` (script error, the Apply result line was lost)
+	t.eq(M.restored_text({"looks": 1, "card": {"restored": false}}), "restored 1 look", "card not restored: no test card, no error")
+	t.eq(M.restored_text({"card": {"restored": true, "ch": 2}}), "restored test card", "card restored")
+	t.eq(M.restored_text({"card": true}), "restored test card", "card as a flag")
 	t.eq(M.mmss(3725), "62:05", "mm:ss")
 
 

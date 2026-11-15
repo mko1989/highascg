@@ -233,7 +233,7 @@ static func restored_text(rs: Variant) -> String:
 	if _count(rs.get("layers")) > 0:
 		parts.append(_plural(_count(rs.layers), "layer"))
 	var card: Variant = rs.get("card")
-	if card is Dictionary and card.get("restored") != false and not card.is_empty() or card == true:
+	if (card is Dictionary and card.get("restored") != false and not card.is_empty()) or (card is bool and card):
 		parts.append("test card")
 	var tl: Variant = rs.get("timeline")
 	if tl is Dictionary and not tl.is_empty():

@@ -131,8 +131,11 @@ async function launchOrFocus(action, ctx, deps = {}) {
 	const a = String(action || '').trim()
 	if (a === SELF_ACTION) return focusSelf(ctx, deps)
 	const gate = deps.isHelperAction || isHelperAction
-	if (!a || !gate(a)) return { status: 400, body: { ok: false, error: `Unknown app: ${a || '(none)'}` } }
 	const log = typeof ctx?.log === 'function' ? ctx.log : () => {}
+	if (!a || !gate(a)) {
+		log('warn', `[dock] ${a || '(none)'}: refused — unknown app`)
+		return { status: 400, body: { ok: false, error: `Unknown app: ${a || '(none)'}` } }
+	}
 	const find = deps.findGuiWindowIds || require('../utils/x-display-session').findGuiWindowIds
 	let wins = { usable: [], blocked: [] }
 	try {

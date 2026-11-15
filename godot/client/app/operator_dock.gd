@@ -244,6 +244,9 @@ func _button(tip: String) -> Button:
 	b.mouse_entered.connect(_show_bubble.bind(b))
 	b.mouse_exited.connect(func() -> void: _bubble.hide())
 	b.focus_mode = Control.FOCUS_NONE
+	# WO-1077: act on the press, not the release — a release that lands off the icon (pointer jitter over a remote
+	# desktop, the dock or its name bubble changing under the pointer) made the click do nothing, with no trace
+	b.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	b.custom_minimum_size = Vector2(D.CELL, D.CELL)
 	b.expand_icon = true
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -272,6 +275,7 @@ func _open_more() -> void:
 
 
 func launch(action: String, b: Button) -> void:
+	print("[client] dock %s pressed" % action)  # WO-1077: a click that never gets an answer still leaves a line
 	if b != null:
 		b.modulate = Color(1, 1, 1, 0.45)  # pressed feedback until the server answers
 	var res: Dictionary = await NuclearGate.post(self, "/api/system/dock/launch", {"action": action}, DevicesTarget.box_api)

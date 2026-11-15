@@ -142,4 +142,22 @@ describe('WO-628 routes', () => {
 		assert.match(src, /routes\.get\('\/api\/system\/dock'/)
 		assert.match(src, /routes\.post\('\/api\/system\/dock\/launch'/)
 	})
+
+	/* WO-1077: a dock click that does nothing must leave a trace on both sides */
+	it('WO-1077: refused launches are logged; the client logs the press and acts on it', async () => {
+		const fs = require('node:fs')
+		const path = require('node:path')
+		const root = path.join(__dirname, '..', '..')
+		const lines = []
+		const r = await launchOrFocus('app:not-installed', { log: (lvl, m) => lines.push(`${lvl} ${m}`) }, { isHelperAction: () => false })
+		assert.equal(r.status, 400)
+		assert.deepEqual(lines, ['warn [dock] app:not-installed: refused — unknown app'])
+		const route = fs.readFileSync(path.join(root, 'src', 'api', 'routes-operator-dock.js'), 'utf8')
+		assert.match(route, /if \(!pw\.ok\) \{[\s\S]*ctx\.log\('warn', `\[dock\] \$\{[^`]*refused/)
+		const gd = fs.readFileSync(path.join(root, 'godot', 'client', 'app', 'operator_dock.gd'), 'utf8')
+		const fn = gd.slice(gd.indexOf('func launch(action: String, b: Button)'))
+		assert.ok(fn.indexOf('print("[client] dock %s pressed" % action)') < fn.indexOf('await NuclearGate.post'), 'press logged before the request')
+		assert.match(gd, /b\.action_mode = BaseButton\.ACTION_MODE_BUTTON_PRESS/)
+	})
 })
+
