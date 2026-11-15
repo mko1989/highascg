@@ -166,6 +166,32 @@ describe('WO-1087 test puppet people', () => {
 		assert.equal(free.status().seed, 1073741824, 'no seed: a fresh one per start')
 	})
 
+	it('personal space: test people never walk through each other', () => {
+		const rect = W.stageRect(GRID)
+		const a = { x: 11, y: 0, h: 0, v: 1, target: [12, 0] }, b = { x: 11.2, y: 0, h: Math.PI, v: 1, target: [10.6, 0] }
+		W.keepApart([a, b], rect)
+		assert.ok(Math.abs(Math.hypot(b.x - a.x, b.y - a.y) - W.SPACE_M) < 1e-9, 'pushed apart to SPACE_M')
+		assert.deepEqual([a.target, b.target], [null, null], 'both were heading at the other: new legs')
+		const c = { x: rect.lo[0], y: 0, h: 0, v: 0, target: [12, 0] }, d = { x: rect.lo[0], y: 0, h: 0, v: 0, target: [12, 1] }
+		W.keepApart([c, d], rect)
+		assert.ok(W.inside(rect, c.x, c.y) && W.inside(rect, d.x, d.y), 'still on the stage')
+		assert.deepEqual(d.target, [12, 1], 'standing: keeps its leg')
+		const far = { x: 10.5, y: -5, h: 0, v: 1, target: [11, -5] }
+		W.keepApart([far, { x: 11.5, y: -5, h: Math.PI, v: 1, target: [10.5, -5] }], rect)
+		assert.deepEqual([far.x, far.target], [10.5, [11, -5]], 'far enough: untouched')
+		let t = 0
+		const p = createPuppetPeople({ stage: () => GRID, now: () => t,
+			timers: { setInterval: () => 1, clearInterval: () => {} } })
+		p.configure({ enabled: true, count: 3, seed: 7 })
+		let min = Infinity
+		for (let i = 0; i < 6000; i++) {
+			p.step((t += 66))
+			const ps = p.persons()
+			for (let j = 0; j < ps.length; j++) for (let k = j + 1; k < ps.length; k++) min = Math.min(min, Math.hypot(ps[j].x - ps[k].x, ps[j].y - ps[k].y))
+		}
+		assert.ok(min > W.SPACE_M * 0.8, `closest pair ${min.toFixed(3)} m over 6.6 min of three walkers`)
+	})
+
 	it('wiring: register.js world + pin persons, Auto with detection off, route, shutdown; nothing persisted', () => {
 		const reg = read('src/tracking/register.js')
 		assert.match(reg, /const people = require\('\.\/puppet-people'\)\.createPuppetPeople\(/)
@@ -180,6 +206,8 @@ describe('WO-1087 test puppet people', () => {
 		assert.doesNotMatch(pp, /writeFile|saveProject|project-scenes|autosave/, 'never writes the project or a file')
 		const cards = read('godot/client/features/previs/tracking/person_cards.gd')
 		assert.match(cards, /avatars\.show_cards\(M\.cards\(snap, _cams\) \+ M\.puppet_cards\(snap\), /)
+		assert.match(cards, /\tavatars\.show_cards\(M\.puppet_cards\(snap\), /, 'cut-outs / dummies draw test people as avatars')
+		assert.match(read('src/tracking/puppet-people.js'), /W\.keepApart\(people\.map\(\(p\) => p\.walker\), rect\)/)
 		assert.match(read('godot/client/features/previs/tracking/person_cards_model.gd'), /static func puppet_cards\(snap: Variant\) -> Array:/)
 		assert.match(read('godot/client/features/previs/tracking/person_avatars.gd'), /e\.node\.set_tag\(str\(c\.get\("tag", ""\)\)\)/)
 		assert.match(read('godot/client/features/previs/tracking/markers_section.gd'), /add_child\(preload\("res:\/\/features\/previs\/tracking\/puppet_people_row\.gd"\)\.new\(\)\)/)

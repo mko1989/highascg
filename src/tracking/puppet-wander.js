@@ -28,6 +28,7 @@ const PAUSE_S = [1, 4]
 const LOOK_ROUND = 0.35 // chance a pause turns to look somewhere else
 const ARRIVE_M = 0.15
 const MAX_DT = 0.25 // s — a stalled timer never turns into a jump
+const SPACE_M = 0.6 // m between two test people's floor points: avatars never walk through each other
 const HEIGHT_M = [1.55, 1.95]
 
 // tools/tracking-detect/traits.py (kept equal by smoke-wo1087-puppet-people)
@@ -141,4 +142,28 @@ function stepWalker(w, r, rect, dt) {
 	return w
 }
 
-module.exports = { rng, randomLook, stageRect, inside, createWalker, stepWalker, CLOTH, HAIR, SKIN, HAIR_LEN, MARGIN, V_MAX, ACCEL, TURN, MAX_DT, HEIGHT_M }
+/**
+ * Personal space for several walkers (after each step): two closer than `space` are pushed apart along the line
+ * between them (half each, back into `rect`), and one that is heading at the other gives up its leg and picks a new
+ * one next step. Mutates the walkers.
+ */
+function keepApart(ws, rect, space = SPACE_M) {
+	for (let i = 0; i < ws.length; i++) {
+		for (let j = i + 1; j < ws.length; j++) {
+			const a = ws[i], b = ws[j]
+			let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy)
+			if (d >= space || rect.degenerate) continue
+			if (d < 1e-6) [dx, dy, d] = [1, 0, 1] // on top of each other: split along x
+			const ux = dx / d, uy = dy / d, push = (space - Math.min(d, space)) / 2
+			a.x = clamp(a.x - ux * push, rect.lo[0], rect.hi[0])
+			a.y = clamp(a.y - uy * push, rect.lo[1], rect.hi[1])
+			b.x = clamp(b.x + ux * push, rect.lo[0], rect.hi[0])
+			b.y = clamp(b.y + uy * push, rect.lo[1], rect.hi[1])
+			if (a.v > 0 && Math.cos(a.h) * ux + Math.sin(a.h) * uy > 0.3) a.target = null
+			if (b.v > 0 && -(Math.cos(b.h) * ux + Math.sin(b.h) * uy) > 0.3) b.target = null
+		}
+	}
+	return ws
+}
+
+module.exports = { rng, randomLook, stageRect, inside, createWalker, stepWalker, keepApart, SPACE_M, CLOTH, HAIR, SKIN, HAIR_LEN, MARGIN, V_MAX, ACCEL, TURN, MAX_DT, HEIGHT_M }

@@ -79,6 +79,7 @@ function createPuppetPeople({ stage = () => null, now = Date.now, timers = { set
 		const dt = Math.max(0, t - last) / 1000
 		last = t
 		for (const p of people) W.stepWalker(p.walker, walkRng, rect, dt)
+		W.keepApart(people.map((p) => p.walker), rect)
 		steps++
 	}
 
