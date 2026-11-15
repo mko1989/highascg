@@ -180,6 +180,7 @@ async function reconcileScreens(ctx, injected = {}) {
 /** Always-on watcher (cheap: one sysfs read per poll). Returns a stop function. */
 function startScreenHotplugWatch(ctx, injected = {}) {
 	const off = String(process.env.HIGHASCG_SCREEN_HOTPLUG || '').trim() === '0'
+	if (process.env.NODE_TEST_CONTEXT && !injected.readDrm) return () => {} // a smoke never drives the box's Caspar
 	if (off || ctx?.config?.offline_mode || /^(1|true|yes)$/i.test(String(process.env.HIGHASCG_HEADLESS || ''))) return () => {}
 	try {
 		if (require('../bootstrap/sandbox').isSandbox()) return () => {}

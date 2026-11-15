@@ -97,10 +97,15 @@ function readDrmStatuses(drmPath = '/sys/class/drm') {
 	return out
 }
 
+let _testFile = null
+/** The box's file; a private temp file under `node --test` (a smoke must never tell the next launch whose screen to keep clear). */
 function operatorOutputFile() {
-	return (
-		process.env.HIGHASCG_OPERATOR_OUTPUT_FILE || path.join(os.homedir(), '.highascg', 'run', 'operator-output.json')
-	)
+	if (process.env.HIGHASCG_OPERATOR_OUTPUT_FILE) return process.env.HIGHASCG_OPERATOR_OUTPUT_FILE
+	if (process.env.NODE_TEST_CONTEXT) {
+		if (!_testFile) _testFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'highascg-test-operator-output-')), 'operator-output.json')
+		return _testFile
+	}
+	return path.join(os.homedir(), '.highascg', 'run', 'operator-output.json')
 }
 
 /** The operator's screen name(s) as node last wrote them; [] when unknown. */

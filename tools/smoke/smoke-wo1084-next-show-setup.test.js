@@ -299,3 +299,17 @@ test('a dark physical port is never guessed onto the one lit head; the layout ch
 	assert.equal(v.ok, true, 'no OS-Watchdog re-apply loop for a screen that is not plugged in')
 	assert.deepEqual(v.offline, ['DP-4'])
 })
+
+test('test isolation: under node --test the operator file is a private temp file and no watcher starts', () => {
+	const prev = process.env.HIGHASCG_OPERATOR_OUTPUT_FILE
+	delete process.env.HIGHASCG_OPERATOR_OUTPUT_FILE
+	try {
+		assert.ok(cs.operatorOutputFile().startsWith(os.tmpdir()), cs.operatorOutputFile())
+		assert.ok(!cs.operatorOutputFile().includes('.highascg'))
+	} finally {
+		if (prev != null) process.env.HIGHASCG_OPERATOR_OUTPUT_FILE = prev
+	}
+	const lines = []
+	hp.startScreenHotplugWatch({ config: {}, log: (_l, m) => lines.push(m) })()
+	assert.deepEqual(lines, [], 'no "[Screen hot-plug] watching" — the watcher did not start')
+})
