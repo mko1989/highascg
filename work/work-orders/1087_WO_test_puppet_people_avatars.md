@@ -1,7 +1,7 @@
 # WO-1087 — Test puppet people: simulated tracked persons with a random look that never leave the stage
 
 **Area:** tracking-vr, godot-client
-**Status: IN PROGRESS (15.11.26 — built, committed, running on the box; the avatar shows only after the owner's next GUI relaunch — see "Waiting for a relaunch")**
+**Status: IN PROGRESS (15.11.26 — built, committed, running on the box; the avatar was looked at close up in the real GUI and tuned (see "Follow-up 15.11 late"); open: the WO-1085 handover driven by the puppet, PSN)**
 
 Owner 15.11 (follow-up to WO-1086, after relaunching the GUI): *"show me an avatar with random look. make it a test
 puppet. make sure the test puppet doesnt leave the stage"*.
@@ -192,3 +192,136 @@ The file stays under 500 lines because `worldPersons` was folded onto one line.
   pool is empty), so no lane got heads. The puppet is in the director's person list.
 - **PSN:** not sent, because the output master is off. That is intended, and it was not switched on.
 - **The camera-view tracking overlay:** there are no tracking cameras to overlay on.
+
+## Follow-up 15.11 late — the avatar looked at close up, stray labels, People modes, the row
+
+The owner allowed GUI restarts ("you can restart and touch gui. im leaving for the night"). Every relaunch and
+pointer session ran under `flock -o /tmp/highascg-gui.lock`, started with the GUI's own environ and arguments.
+
+### Investigation
+
+**How it was looked at: the dev probe `avatar_probe.gd`.**
+
+- It is enabled by `--probe-avatar=<dir>` and hooked in `person_cards.gd _ready`. Nothing runs without the flag.
+- Writing a name to `<dir>/go` makes it aim the real previs orbit camera at the first avatar and save a set of
+  views: front, three-quarter, both sides, back, face (1.3 m), and wide.
+- It also writes 6 s of feet and yaw per frame to `<name>_motion.json`.
+- Then it puts the camera back.
+- Looks were switched through `POST /api/tracking/puppet/people {seed}`. The seeds were picked offline to cover
+  each class:
+
+| seed | skin | hair | height |
+|---|---|---|---|
+| 1314122551 | dark | black, short | 1.75 m |
+| 45 | lightest | blonde, long | 1.56 m |
+| 93 | dark | bald | 1.80 m |
+| 63 | darkest | grey, short | 1.55 m |
+
+- "New look" and the 3-person runs added more looks, from 1.56 m to 1.95 m.
+
+**What read badly in the first pass (v2 and l1 shots):**
+
+1. **Pale skin and blonde hair blew out to white inside a front-spot beam** (`l1_side_l`, `l1_face`).
+   - The per-light saturation `l/(0.7+l)` capped each light at about 1.
+   - Three spots, the house light, the 0.3 self-light and the rim added past 1.
+   - Dark skin and saturated clothes were fine.
+2. **The soles sank 2 % of H (about 3.5 cm) into the stage top.**
+   - The shoe centre was at unit y 0.025 with semi-axis 0.045.
+   - The tracked feet point itself was exact: `motion.json` y = 0.639 on every frame.
+3. **Test people walked through each other** (`m3_face`: two heads inside each other).
+   - `puppet-wander.js` had no separation.
+   - Offline, three walkers on the box's stage came within **0.025 m** in 6.6 min.
+4. **People: cut-outs and People: dummies showed nothing for a test person, only its marker pin** (`modes_sheet.png`).
+   - A puppet has no picture to cut out or paint.
+   - `person_cards.gd set_detections` only drew `puppet_cards` in the avatars style.
+   - The row's tooltip promises they show as avatars.
+5. **The stray magenta "Puppet · test puppet" label on the LED wall:**
+   - It was a WO-978 marker-puppet **pin** (`marker_pins_3d.gd`) left over from before a node restart.
+   - The new process had an empty hub and broadcasts `tracking:markers` only on change, so the client kept the
+     stale pin for ever.
+   - The same freeze applies to `tracking:detections`: avatars stood still after a restart until something changed.
+   - This was a bug.
+6. **The "Pin"-like marker at the feet:**
+   - It is the Auto director's lane hub marker riding on the person (source `detect`, z = plane). That is
+     legitimate, and it is now named "Auto — tracked person n" by the WO-1085 work.
+   - Its 0.012 tag was the size of the TEST label and sat on top of the shoes.
+7. **The motion was smooth** apart from a 15 Hz sawtooth (per-frame step 8.9 → 4.8 mm) from easing toward each
+   snapshot.
+   - The 0.3 s hitches in `motion.json` are the probe's own synchronous `save_png`, not the avatar.
+8. **The face and proportions read well:**
+   - dot eyes (smaller, with a glint), a curved smile, blush that works on every skin tone;
+   - the three hair classes are distinct from the front, side and back;
+   - the TEST label clears the head at every distance.
+   - The header comment claimed "4½ heads tall". The build is **2.9 heads**, which is the charm, so the text was
+     corrected rather than the figure.
+
+### What was done
+
+- **`person_avatar.gdshader`:** each light now fills a fraction of the headroom under `LIGHT_MAX` 0.75
+  (`room · l/(0.5+l)`), so any number of lights tends to the cap and never passes it.
+- **`person_avatar.gd`:**
+  - the soles sit at y 0: the shoe is at `−HIP_Y + 0.045`;
+  - the header comment now says three heads tall.
+  - Earlier in this pass: the smile is an arc on the face surface, the eyes are smaller with a glint, the hair
+    cap has a back-of-head piece, and walking uses a 0.15 s lead (dead reckoning) between snapshots.
+- **`src/tracking/puppet-wander.js` `keepApart` and `puppet-people.js` `step`** add personal space between test
+  people:
+  - two closer than `SPACE_M` 0.6 m are pushed apart, half each, back inside the stage;
+  - one heading at the other picks a new leg.
+- **`person_cards.gd`:** in cut-outs and dummies the test people are drawn as avatars. A style switch still clears
+  them through `_clear()`.
+- **`marker_pins_3d.gd`:**
+  - re-reads `/api/tracking/markers` on ready and on every WS (re)connect;
+  - a person-riding pin (`source == "detect"`) gets a small left-aligned tag beside its ball.
+- **`marker_driver.gd`:** re-reads `/api/tracking/detections` on (re)connect.
+- **Tests:**
+  - `test_person_avatar.gd`: material is the avatar shader with no sampler; the smile is a lower arc on the face;
+    soles on the stage top and hair top = H at 1.55, 1.75 and 1.95 m.
+  - `test_puppet_people_wo1087.gd`: a puppet shows in cards, dummies and avatars, and a switch clears it.
+  - `smoke-wo1087`: personal space, including three walkers for 6.6 min staying > 0.48 m apart; wiring greps for
+    `keepApart` and the every-mode avatars line.
+- **WO-1086:** has an "Avatar spec" section for the three.js twin (WO-1089).
+
+### What was VERIFIED
+
+All shots are in `/tmp/claude-1000/-home-casparcg/b8ff075d-eabe-4bed-9570-f2b4603d84a3/scratchpad/pp/probe/` (`<round>_all.png` sheets, single views, motion JSON) and `/tmp/claude-1000/-home-casparcg/b8ff075d-eabe-4bed-9570-f2b4603d84a3/scratchpad/pp/`.
+
+**Colour under beams (round l2, seed 45, after the light cap):**
+- pale skin and blonde hair keep their colour in the beam in every view;
+- dark skin (d1, d2) is still bright and readable;
+- the eye glints read on dark skin.
+
+**Feet:**
+- `motion.json` floor y = 0.639 on every frame of every round;
+- after the shoe fix, the soles are on the deck (round f1).
+
+**Motion:**
+- steady walk per-frame steps 6.3–7.8 mm, changing smoothly (v2 at 16.3–17.1 s), and about 10 mm at 1 m/s (d2);
+- no surge-and-stall.
+
+**People modes with three puppets running** (`modes_sheet2.png`, after the fix): cut-outs, dummies and avatars
+each show the avatars, and off shows none. Switching produced no script errors in `godot-client.log`.
+
+**The "Test people" row, clicked on the GUI** (Previs → Camera → Markers):
+
+| action | API afterwards |
+|---|---|
+| New look | the same seed with a new look (1.552 m short → 1.932 m long) |
+| count 3 | 3 people |
+| off | `enabled:false`, no people; row text "Off. Test people for the previs avatars…" |
+| on | `enabled:true`, 3 people with a new seed; row text "ON — 3 test people walking the stage · off by itself in 120 min" |
+
+**Personal space live** after a node restart: three puppets polled for 30 s, closest pair **0.599 m**.
+
+**Stale pin:** the WO-978 label is gone after the relaunch with the resync, and the GUI logged
+"ws reconnected — resync" after the node restart.
+
+**Tests:**
+- Godot `HIGHASCG_TEST_ONLY=test_p`: 1699 passed, 0 failed;
+- `smoke-wo1087`: 6 of 6;
+- the full gates are listed in the commit report.
+
+### Not verified (still)
+
+- The WO-1085 three-front handover and PSN driven by the puppet. Same reasons as above.
+

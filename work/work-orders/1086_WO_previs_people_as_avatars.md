@@ -84,7 +84,7 @@ inferred about the person, and the real face (the avatar's face is the same simp
 
 ## Avatar style ("pebble people")
 
-Our own design: a toy-like figure, about 4½ heads tall, built from a few Godot primitive meshes (no assets, no
+Our own design: a toy-like figure, about three heads tall (corrected 15.11: the build is 1.02 / 0.35), built from a few Godot primitive meshes (no assets, no
 downloads), flat matte colours:
 - a big round head (sphere, skin tone) with two dot eyes, a small dark smile and two soft blush dots — identical for
   everyone, never derived from a face;
@@ -193,3 +193,144 @@ showing them the look they called horrible. "cards" and "off" stay as stored; ev
   someone in view — or the WO-979 imitated camera (project setting `previs.tracking.detection.simulate = true`, a
   solved camera still needed), whose persons now carry four fixed looks.
 - A real tracking camera with a person on the rig (none in the live project now).
+
+## Avatar spec (for the three.js twin, WO-1089) — as built and seen on the box, 15.11 late
+
+The source of truth is `godot/client/features/previs/tracking/person_avatar.gd`, `person_avatar.gdshader` and
+`person_avatar_model.gd`. If this section and the code ever disagree, the code wins. This is a snapshot after the
+WO-1087 look-and-fix pass.
+
+### Frame and scale
+
+- One **unit frame** per person. Feet are at y = 0, up is +Y, the front (face) is +Z, and the person's own left is
+  +X. three.js uses the same right-handed Y-up axes, so copy the numbers as they are.
+- The top of the hair is at `UNIT_TOP = 1.02`. The whole figure is scaled uniformly by `H / 1.02`, where H is the
+  person's height in metres. The tracker clamps H; test people use 1.55 to 1.95 m.
+- The figure is placed with its feet on the tracked floor point (the stage top, plane_z) and turned about +Y by its
+  yaw. Yaw 0 faces +Z.
+- At yaw 0 in Godot the front is +Z. In PSN the feet are `(x, z, −y)`, and walking toward PSN +x gives yaw π/2.
+- Proportions: the head is 0.35 across and the figure is 1.02 tall, so it is **about 2.9 heads tall**. The head
+  is a third of the height. This toy ratio is what makes it read as friendly from the house.
+- **Primitives only.** Every round part is one sphere of radius 1, scaled per part: the values below are its
+  semi-axes (x, y, z). Every limb is a capsule.
+  - Godot's `CapsuleMesh.height` is the **total** length, caps included.
+  - three.js `CapsuleGeometry(radius, length)` takes the **straight middle only**, so use `length = height − 2·radius`.
+- No shadows are cast. There are no textures and no camera pixels.
+
+### Parts (unit frame; multiply every number by H / 1.02)
+
+| part | shape | centre (x, y, z) | size | material |
+|---|---|---|---|---|
+| head | sphere | (0, 0.815, 0) | r 0.175 | skin |
+| torso | capsule r 0.13, total 0.36 (y 0.30 to 0.66) | (0, 0.48, 0) | scale (1, 1, 0.8) (flatter front to back) | top |
+| arm ×2 | capsule r 0.042, total 0.24 | pivot at the shoulder (±0.155, 0.60, 0); the capsule centre is 0.11 below the pivot | — | top |
+| hand ×2 | sphere | 0.245 below the shoulder pivot | r 0.05 | skin |
+| leg ×2 | capsule r 0.058, total 0.30 | pivot at the hip (±0.065, 0.32, 0); the capsule centre is 0.15 below the pivot | — | bottom |
+| shoe ×2 | ellipsoid | (0, −0.275, +0.025) from the hip pivot, so the centre is at y 0.045 | semi-axes (0.075, 0.045, 0.11) | shoes |
+| eye ×2 | ellipsoid | (±0.058, 0.83, 0.161) | (0.019, 0.025, 0.011) | eye |
+| eye glint ×2 | sphere | (±0.058 + 0.007, 0.838, 0.171) | r 0.0055 | glint |
+| blush ×2 | ellipsoid | (±0.10, 0.775, 0.137) | (0.028, 0.017, 0.009) | blush |
+| smile | tube along an arc, plus a ball on each end | see "Face" | tube r 0.0085 | mouth |
+| hair cap (short and long) | ellipsoid | (0, 0.86, −0.02) | (0.185, 0.16, 0.185) | hair |
+| back of the head (short and long) | ellipsoid | (0, 0.80, −0.045) | (0.18, 0.13, 0.16) | hair |
+| hair fall (long only) | capsule r 0.12, total 0.34 | (0, 0.72, −0.075) | scale (1.6, 1, 0.65) | hair |
+
+Notes on the table:
+
+- The glint offset is +0.007 on **both** eyes, not mirrored. Both catch-lights sit on the same side.
+- Pinned by `test_standing_soles_on_the_floor_hair_at_the_height`:
+  - Standing, the soles are at exactly y 0, and the top of the hair is exactly 1.02, which is H.
+  - Leg capsules end at y 0.02, inside the shoes.
+  - The shoes used to sink 2 % of H into the stage (fixed 15.11).
+
+### Hair classes
+
+`traits.hair_len` is one of `short`, `long` or `bald`. Anything else is treated as `short`.
+
+- **short:** the cap and the back of the head. The cap's front edge sits on the forehead above the eyes. The
+  back-of-head piece covers the skull down to the nape, and a little skin shows at the neck.
+- **long:** short plus the fall. The fall reaches the shoulders and frames the face from the front.
+- **bald:** no hair parts at all. It is a clean skin-coloured head, deliberately not a "bald cap" in hair colour.
+
+### Face (identical for everyone, never derived from the person)
+
+The face sits on the front of the head, low and wide. The eyes are 0.015 above the head centre (y 0.815) and the smile is
+0.025 below it. In detail:
+
+- **Eyes:** two dark, slightly tall ovals, (0.11, 0.10, 0.14), roughness 0.3. Each has a small unshaded white
+  glint high on the person's left. The glint is what makes it read as alive at a distance.
+- **Smile:** a thin tube of radius 0.0085 along the **lower** arc of a circle.
+  - The circle is centred at (x 0, y 0.79) with radius 0.036. The arc runs from 205° to 335°, where 270° is
+    straight down, so the ends turn up.
+  - Each centre-line point is laid onto the head sphere: `z = sqrt(0.175² − x² − (y − 0.815)²) + 0.002`.
+  - The ends are capped with balls of the same radius.
+  - It is about 0.08 wide, a quarter of the head. Colour (0.42, 0.14, 0.17), roughness 0.6.
+  - In three.js, a `TubeGeometry` over a `CatmullRomCurve3` of about 17 such points matches it.
+- **Blush:** two soft flattened dots on the cheeks, outside and below the eyes. The colour is
+  `skin.lerp((1.0, 0.45, 0.5), 0.45)`, so it always works with the skin tone, light or dark.
+- There is no nose, no ears and no eyebrows. That is deliberate: our style, not a console Mii.
+
+### Colours
+
+- Traits arrive as `[r, g, b]` 0–255 sRGB from the sidecar or the puppet. Use them as the albedo colour
+  (in three.js, `Color.setRGB(r/255, g/255, b/255, SRGBColorSpace)`).
+- **Shoes** are the bottom colour darkened by 55 %: `c * 0.45` per channel.
+- Missing keys fall back to the neutral clay figure:
+  - top (0.70, 0.73, 0.78), bottom (0.40, 0.43, 0.50), skin (0.87, 0.74, 0.63), hair (0.32, 0.25, 0.20);
+  - hair_len short.
+- When the look changes, colours fade toward it at `1 − exp(−2.5·dt)` per frame, which is about a second.
+
+### Material (one flat-colour shader per colour, `person_avatar.gdshader`)
+
+- **Matte:** roughness 0.9, no specular highlights worth copying.
+- **Self-light:** `emission = albedo · (0.3 + 0.2 · (1 − N·V)³)`. That is a 30 % glow so the figure reads in a dark
+  venue, plus a soft rim.
+- **Per light:**
+  - `wrap = clamp((N·L + 0.4) / 1.4, 0, 1)`, a wrapped lambert with no hard terminator;
+  - `l = lightColour · attenuation · wrap / π`;
+  - then `diffuse += max(0.75 − diffuse, 0) · l / (0.5 + l)`.
+- Each light only fills part of the remaining headroom under **0.75**, so any number of spots can never sum past it.
+  The brightest the figure can get is about 1.1 × its colour. That is why pale skin and blonde hair stay their colour
+  inside a beam: before this they blew out to white (seen on the box, 15.11).
+- In three.js you get this with a `ShaderMaterial` (or `onBeforeCompile` on `MeshLambertMaterial`) that accumulates
+  `diffuse` the same way. A plain `MeshLambertMaterial` with `emissive = colour · 0.3` is the fallback, but it WILL
+  blow out under strong spots.
+
+### Motion
+
+`person_avatar.gd step()` runs every frame. `blend(dt, k) = 1 − exp(−k·dt)`.
+
+- **Position:**
+  - Eases to the target at rate 8/s.
+  - While walking (speed ≥ `WALK_MIN` 0.35 m/s), the target is led by `velocity · min(time since the last
+    snapshot, 0.15 s)`. This is dead reckoning: the 15 Hz snapshots no longer make a surge-and-stall.
+  - Measured on the box: the per-frame step varies by under 1 mm at a steady walk.
+- **Speed** is measured over a 0.6 s window, so ±5–10 cm box jitter never reads as walking.
+- **Facing:**
+  - Uses the pose's body facing when one is present.
+  - Otherwise faces the walk direction once speed ≥ 0.35 m/s.
+  - Otherwise keeps the last yaw. Yaw eases at 5/s.
+- **Height** eases at 3/s.
+- **Walk cycle:**
+  - Phase advances by `dt · speed / (0.35 · H) · π`.
+  - `k = clamp((speed − 0.35) / (1.4 − 0.35), 0, 1)`.
+  - Swing is `sin(phase) · 0.5 · k` rad about the X axis. arm_l moves with leg_r, and arm_r with leg_l, in
+    opposite directions.
+  - Body bob is `|sin(phase)| · 0.025 · k` in unit-frame y.
+  - Limbs ease at 9/s.
+- **Standing:** the arms hang 0.12 rad out from the body (rotation about +Z: + for the left arm, − for the right).
+  The body breathes: y-scale is `1 + 0.006 · sin(2.2 · t)`.
+- **Posed limbs:** when the sidecar sends joints, each limb hangs toward its joint direction. The legs never point
+  above `y = −0.5` (a squat, never a leg in the air).
+
+### Labels
+
+- **Test people** (WO-1087) carry a billboard label over the head:
+  - text `TEST puppet n`, warm yellow (1.0, 0.8, 0.25) with a dark outline (0.08, 0.06, 0.04);
+  - placed at unit y `1.02 + 0.13`, scaled with the figure;
+  - Godot `pixel_size` 0.002 at font 48, which is roughly 0.1 m tall text. It clears the head at every distance
+    seen.
+- Real people have no label.
+- The hub's Auto marker for a person ("Auto — tracked person n", `marker_pins_3d.gd`) is a separate thing. It is a
+  small cyan tag beside its ball at the feet.
+
