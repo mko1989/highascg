@@ -145,6 +145,27 @@ function kpsFrom(t) {
 	return Array.isArray(k) && k.length === 51 && k.every((v) => typeof v === 'number' && v >= 0 && v <= 1) ? k : null
 }
 
+const TRAIT_COLOURS = ['top', 'bottom', 'skin', 'hair']
+const HAIR_LEN = new Set(['short', 'long', 'bald'])
+
+/**
+ * WO-1086: a track's look for the previs avatars (tools/tracking-detect/traits.py) — only the known keys, colours as
+ * [r, g, b] whole numbers 0–255, hair_len one of short / long / bald, `locked` a boolean — or null.
+ */
+function traitsFrom(t) {
+	const src = t?.traits
+	if (!src || typeof src !== 'object' || Array.isArray(src)) return null
+	const out = {}
+	for (const k of TRAIT_COLOURS) {
+		const c = src[k]
+		if (Array.isArray(c) && c.length === 3 && c.every((v) => Number.isInteger(v) && v >= 0 && v <= 255)) out[k] = c.slice()
+	}
+	if (!Object.keys(out).length) return null
+	if (HAIR_LEN.has(src.hair_len)) out.hair_len = src.hair_len
+	out.locked = src.locked === true
+	return out
+}
+
 /** WO-665: `[w, h]` of the sidecar's mask grid, or null (a detection-only model sends none). */
 function maskSizeFrom(msg) {
 	const s = msg?.mask_size
@@ -165,6 +186,7 @@ function personsFrom(msg, camEntry, planeZ = 0) {
 			// WO-665: a seg model's cut-out mask (base64 bit grid inside the box, tools/tracking-detect/seg.py)
 			...(typeof t.mask === 'string' && MASK_RE.test(t.mask) ? { mask: t.mask } : {}),
 			...(kpsFrom(t) ? { kps: t.kps } : {}), // WO-667: body keypoints from the sidecar's pose model
+			...(traitsFrom(t) ? { traits: traitsFrom(t) } : {}), // WO-1086: palette colours for the previs avatars
 		})
 	}
 	return out

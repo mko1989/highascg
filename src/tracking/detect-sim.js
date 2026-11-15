@@ -12,7 +12,7 @@
  *
  *   stdin   {"type":"config", "interval_ms", "cameras":[{"id"}], "sim_persons"?, …}   (again on every project change)
  *   stdout  {"type":"ready"} once, then per camera every interval_ms (min 33)
- *           {"type":"tracks","camera","frame","w":1920,"h":1080,"ms":1,"tracks":[{"tid","box","score","age_s"}]}
+ *           {"type":"tracks","camera","frame","w":1920,"h":1080,"ms":1,"tracks":[{"tid","box","score","age_s","traits"}]}
  *           and {"type":"status","cameras":{id:{"state":"ok","detail":"fake","fps"}}} every second.
  * The people (config sim_persons, else FAKE_DETECT_PERSONS, default 1, max 4) walk a slow ping-pong across the
  * picture, so the Auto director sees persons that move. Exits when stdin closes (the server went away), like the real
@@ -31,6 +31,14 @@ let timer = null
 let statusAt = 0
 const t0 = Date.now()
 
+/** WO-1086: each simulated person's look (tools/tracking-detect/traits.py palettes), so the avatars have colours. */
+const LOOKS = [
+	{ top: [200, 40, 44], bottom: [30, 40, 80], skin: [234, 196, 166], hair: [60, 40, 28], hair_len: 'short', locked: true },
+	{ top: [50, 140, 70], bottom: [196, 170, 130], skin: [176, 124, 88], hair: [25, 22, 22], hair_len: 'long', locked: true },
+	{ top: [236, 236, 232], bottom: [28, 28, 30], skin: [214, 165, 128], hair: [220, 190, 120], hair_len: 'long', locked: true },
+	{ top: [110, 170, 220], bottom: [70, 100, 140], skin: [128, 86, 58], hair: [150, 150, 150], hair_len: 'bald', locked: true },
+]
+
 /** Person k's normalised box at time t (s): a 0.1 × 0.5 box whose centre ping-pongs between x 0.2 and 0.8. */
 function boxOf(k, t) {
 	const phase = (((t / 20 + k / Math.max(1, PERSONS)) % 1) + 1) % 1
@@ -43,7 +51,7 @@ function step() {
 	const t = (Date.now() - t0) / 1000
 	frame++
 	for (const c of cameras) {
-		const tracks = Array.from({ length: PERSONS }, (_, k) => ({ tid: k + 1, box: boxOf(k, t), score: 0.9, age_s: 0 }))
+		const tracks = Array.from({ length: PERSONS }, (_, k) => ({ tid: k + 1, box: boxOf(k, t), score: 0.9, age_s: 0, traits: LOOKS[k % LOOKS.length] }))
 		emit({ type: 'tracks', camera: c.id, frame, w: 1920, h: 1080, ms: 1, tracks })
 	}
 	if (Date.now() - statusAt >= 1000) {

@@ -15,7 +15,8 @@ Protocol (JSON lines):
           body keypoints (pose.py, a second session on the same frame); with "faces" (WO-675) a live track gets
           "face": [128 floats] (face.py, YuNet + SFace) at most every FACE_EVERY_S and only while a face is visible;
           with "bodies" (WO-675 P2) "body": [768 floats] (body.py, youtureid) at most every BODY_EVERY_S, never for a
-          box another person covers
+          box another person covers; WO-1086 "traits" {top, bottom, skin, hair: [r,g,b], hair_len, locked} (traits.py,
+          a few palette colours per person for the previs avatars — never pixels)
          {"type": "status", "cameras": {id: {"state": "ok" | "waiting" | "stale", "detail", "fps", "ms"}}}  — 1 Hz
          {"type": "error", "detail"}
   stdin  {"type": "capture", "id": 7, "dir": "/tmp/highascg-presenters"}  — WO-1036: at each camera's next detection
@@ -41,6 +42,7 @@ import hshm_abi  # noqa: E402
 import pose  # noqa: E402
 import face  # noqa: E402
 import body  # noqa: E402
+import traits  # noqa: E402
 
 DEFAULTS = {"model": "", "pose_model": "", "confidence": 0.2, "interval_ms": 67, "max_persons": 10, "grace_ms": 500, "memory_ms": 30000,
     "threads": 4, "faces": False, "bodies": False, "cameras": []}
@@ -83,6 +85,7 @@ class Camera:
         self.det = detector.CameraDetector()
         self.face_at = {}  # WO-675: tid → when its face was last looked for
         self.body_at = {}  # WO-675 P2: tid → when its body feature was last taken
+        self.traits = traits.CameraTraits()  # WO-1086: each person's look (colours, hair) for the previs avatars
         self.last_step = 0.0
         self.last_frame = 0.0
         self.steps = 0
@@ -299,6 +302,9 @@ def main():
                 detector.seg.attach(tracks, raw, backend.last_seg)  # WO-665: cut-out masks (seg models only)
                 if poser is not None:  # WO-667: body keypoints for the posed dummies
                     pose.attach(tracks, poser.predict(rgb, cfg["confidence"]))
+                # WO-1086: a few palette colours per person for the previs avatars (raw pixels; after seg + pose)
+                cam.traits.attach(tracks, face.bgr_from_bgra(pixels, r.width, r.height, r.stride), now,
+                    max(1.0, cfg["memory_ms"] / 1000.0))
                 if cam.capture is not None:  # WO-1036: the operator asked for a picture of everyone on stage
                     req, cam.capture = cam.capture, None
                     emit({"type": "captured", "id": req.get("id"), "camera": cam.id,
