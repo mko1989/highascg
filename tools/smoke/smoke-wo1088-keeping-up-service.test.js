@@ -44,6 +44,9 @@ describe('WO-1088 keeping-up service', () => {
 			assert.ok(logs.some(([, m]) => /^\[keeping-up\] recovered after \d+ s: Operator client at 61 of 100 fps — worst behind, 61 \/ 100 fps$/.test(m)))
 			assert.equal(svc.summary().incidents[0].ended, 'recovered')
 			assert.equal(routes.handleReport('{"key":"fps"}', ctx).status, 400, 'client id required')
+			routes.handleReport(JSON.stringify({ ...body, client: 'odd', level: 7 }), ctx)
+			svc.sampleOnce()
+			assert.equal(svc.summary().checks.find((c) => c.key === 'client:odd:fps').status, 'failing', 'a level out of range is clamped to failing')
 		} finally {
 			svc.stop()
 		}

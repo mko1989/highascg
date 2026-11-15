@@ -220,7 +220,7 @@ function startKeepingUp(ctx, opts = {}) {
 			const key = String(b.key || '').slice(0, 64)
 			if (!client || !key) return { ok: false, error: 'client and key are required' }
 			const str = (v, n = 160) => String(v ?? '').slice(0, n)
-			const result = { key: `client:${client}:${key}`, group: 'client', name: str(b.name, 64) || 'Client', level: Number(b.level) || 0,
+			const result = { key: `client:${client}:${key}`, group: 'client', name: str(b.name, 64) || 'Client', level: Math.max(0, Math.min(2, Math.round(Number(b.level) || 0))),
 				target: b.target ?? null, measured: b.measured ?? null, unit: str(b.unit, 16), text: str(b.text), label: str(b.label),
 				hint: str(b.hint, 240), severity: Number(b.severity) || 0, client }
 			reported.set(result.key, { result, until: Date.now() + REPORT_TTL_MS })

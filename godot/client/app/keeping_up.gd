@@ -9,6 +9,7 @@ extends Node
 const M := preload("res://app/keeping_up_model.gd")
 const Pacer := preload("res://app/render_pacer.gd")
 const REPORT_EVERY_S := 10.0
+const BOOT_GRACE_MS := 15000  # a launching client loads the show and its tabs: slow first seconds are not an incident
 
 signal changed(summary: Dictionary)
 
@@ -68,7 +69,8 @@ func _sample() -> void:
 	var target := Pacer.target()
 	var pub := Pacer.publishing()
 	var fps := Engine.get_frames_per_second()
-	_state = M.step(_state, M.fps_level(fps, target, pub, Pacer.fed_fps()))
+	var raw := M.OK if Time.get_ticks_msec() < BOOT_GRACE_MS or Pacer.settling() else M.fps_level(fps, target, pub, Pacer.fed_fps())
+	_state = M.step(_state, raw)
 	var lvl := int(_state.status)
 	_local = M.fps_check(fps, target, Pacer.why(), lvl, pub)
 	_since_report += 1.0

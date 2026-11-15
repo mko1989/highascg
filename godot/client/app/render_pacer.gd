@@ -9,11 +9,13 @@ extends RefCounted
 ## line is the operator's own cap: never touched. project.godot keeps max_fps=100, the boot value until boot() runs.
 
 const HOLD_S := 5.0
+const SETTLE_MS := 6000  # after a publisher starts (its shaders compile, the cap rises) fps is judged only after this
 const FALLBACK_FPS := 60
 
 static var channel_fps := 0.0  ## the show's program rate (channelMap) — used when the monitor's refresh is unknown
 static var _active := {}  # publisher instance id → the channel fps it feeds
 static var _lower_seq := 0
+static var _started_ms := -100000  # when the last publisher started
 static var _operator_cap := -1  # -1: not read yet; 0: none; else the --max-fps the client was started with
 
 
@@ -83,6 +85,12 @@ static func why() -> String:
 	return ("the %d Hz monitor" % roundi(hz)) if hz >= 20.0 else ("the %d fps show" % idle_fps(hz, channel_fps))
 
 
+## True for SETTLE_MS after a publisher started: a Visuals source going on air compiles its shaders and the per-second
+## fps average trails the raised cap — not a "not keeping up" incident.
+static func settling() -> bool:
+	return Time.get_ticks_msec() - _started_ms < SETTLE_MS
+
+
 ## Shell, once at start: the boot cap (project max_fps 100) comes down after HOLD_S unless a publisher started.
 static func boot() -> void:
 	_schedule_apply()
@@ -90,6 +98,7 @@ static func boot() -> void:
 
 static func publish_started(id: int, fps: float) -> void:
 	_active[id] = fps
+	_started_ms = Time.get_ticks_msec()
 	_lower_seq += 1  # a pending lowering is void
 	_apply()
 

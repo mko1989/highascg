@@ -63,7 +63,8 @@ static func fps_check(fps: float, target: int, why: String, level: int, publishi
 		"hint": FPS_HINT % (", and the Visuals it feeds judder on air" if publishing else ""), "severity": target - f}
 
 
-## Server summary + this client's own checks → {level, status, label, checks, incidents}. The server's copy of this
+## Server summary + this client's own checks → {level, status, label, short, checks, incidents} (`short`: the worst
+## check's name, for the narrow header). The server's copy of this
 ## client's report (key client:<my_id>:…) is left out: the local one is fresher.
 static func merge(server: Variant, local: Array, my_id: String) -> Dictionary:
 	var checks: Array = []
@@ -78,7 +79,7 @@ static func merge(server: Variant, local: Array, my_id: String) -> Dictionary:
 	var worst: Dictionary = checks[0] if not checks.is_empty() and int(checks[0].get("level", 0)) > OK else {}
 	var lvl := int(worst.get("level", OK))
 	return {"level": lvl, "status": STATUS[lvl], "label": str(worst.get("label", worst.get("name", ""))) if lvl > OK else "",
-		"checks": checks, "incidents": incidents}
+		"short": str(worst.get("name", "")) if lvl > OK else "", "checks": checks, "incidents": incidents}
 
 
 static func _before(a: Dictionary, b: Dictionary) -> bool:

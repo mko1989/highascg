@@ -262,6 +262,12 @@ func _build_header() -> Control:
 		if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 			perf.set_on(not perf.is_on()))
 	_keeping_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_keeping_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # takes the spacer's room, never pushes the icon off
+	_keeping_label.size_flags_stretch_ratio = 8.0
+	_keeping_label.clip_text = true
+	_keeping_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_keeping_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_keeping_label.add_theme_font_size_override("font_size", 13)
 	row.add_child(_keeping_label)
 	_perf_btn = UiIcons.button("pulse", "Health — keeping up, CPU / GPU / RAM of this client and the box (F3)")
 	_perf_btn.toggle_mode = true
@@ -282,8 +288,8 @@ func _show_keeping(sm: Dictionary) -> void:
 	var lvl := clampi(int(sm.get("level", 0)), 0, 2)
 	var col: Color = [ThemeBuilder.ACCENT, ThemeBuilder.WARN, ThemeBuilder.ERROR][lvl]
 	_keeping_label.visible = lvl > 0
-	_keeping_label.text = str(sm.get("label", ""))
-	_keeping_label.tooltip_text = "Not keeping up — click for the health panel (F3)"
+	_keeping_label.text = str(sm.get("short", sm.get("label", "")))  # the header is narrow: the check's name; the label is the tooltip
+	_keeping_label.tooltip_text = "%s — click for the health panel (F3)" % sm.get("label", "")
 	_keeping_label.add_theme_color_override("font_color", col)
 	for k in ["icon_normal_color", "icon_hover_color", "icon_focus_color"]:
 		if lvl > 0:
