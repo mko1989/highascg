@@ -7,8 +7,8 @@
  * long, laps), every track valid and re-measured from its points and the grids' RLE (lib/rc-track-measure.js
  * measureToy: the toy rules in metres, every v2 / §2.7 rule in the unit frame), determinism, the validator's toy
  * rejections (a ribbon by a blocked cell, a deck over one, widths, laps), the bake at scale 0.1 vs 1 (scale, occ, no
- * obstacle boxes, rev), and the live project baked at 0.1 (read-only, when present; §3.1: ≥ 2 tracks tunnel through its
- * tables, a medium hall track and a long tour, ≥ 3 do not).
+ * obstacle boxes, rev), the Narvil scene baked at 0.1 (read-only, when present; §3.1: ≥ 2 tracks tunnel through its
+ * tables, a medium hall track and a long tour, ≥ 3 do not) and the newest live scene (any show: valid tracks, budgets).
  */
 
 const test = require('node:test')
@@ -18,6 +18,7 @@ const O = require('../../modules/rc-game/server/rc-scene-occ')
 const SC = require('../../modules/rc-game/server/rc-scale')
 const { bakeScene, sceneInputs, revOf } = require('../../modules/rc-game/server/rc-scene')
 const { measureToy, decodeRle, toyHall, boxTris } = require('./lib/rc-track-measure')
+const { liveScene, NARVIL } = require('./lib/rc-live-scene')
 
 /** A scene as the client gets it: JSON text (grids → RLE, field → heights). */
 const asJson = (sc, tracks) => JSON.parse(JSON.stringify({ scale: sc.scale, floors: sc.floors, obstacles: sc.obstacles, bounds: sc.bounds,
@@ -26,10 +27,9 @@ const asJson = (sc, tracks) => JSON.parse(JSON.stringify({ scale: sc.scale, floo
 const lenOf = (t) => t.length
 const MIX = { short: (t) => lenOf(t) >= 4 && lenOf(t) <= 10, medium: (t) => lenOf(t) >= 12 && lenOf(t) <= 30, long: (t) => lenOf(t) >= 60 }
 
-/** Every track valid on the JSON scene and re-measured; the §3 mix; laps; unique ids. */
-function checkSet(json, label) {
+/** Every track valid on the JSON scene and re-measured; laps; unique ids (what holds for ANY scene). */
+function checkTracks(json, label) {
 	const T = json.tracks
-	assert.ok(T.length >= 8, `${label}: ${T.length} tracks (${T.map((t) => t.id).join()})`)
 	assert.equal(new Set(T.map((t) => t.id)).size, T.length, `${label}: unique ids`)
 	for (const t of T) {
 		const v = validateTrack(t, json)
@@ -37,6 +37,13 @@ function checkSet(json, label) {
 		measureToy(t, json, label)
 		assert.equal(t.laps, MIX.long(t) ? 1 : 3, `${label} ${t.id}: laps ${t.laps}`)
 	}
+}
+
+/** checkTracks + ≥ 8 tracks and the §3 mix (a furnished hall with a stage). */
+function checkSet(json, label) {
+	const T = json.tracks
+	assert.ok(T.length >= 8, `${label}: ${T.length} tracks (${T.map((t) => t.id).join()})`)
+	checkTracks(json, label)
 	const n = (f) => T.filter(f).length
 	assert.ok(n(MIX.short) >= 2, `${label}: ≥ 2 short tracks (4–10 m): ${T.map(lenOf).join()}`)
 	assert.ok(n(MIX.medium) >= 3, `${label}: ≥ 3 medium tracks (12–30 m)`)
@@ -164,62 +171,54 @@ test('§3 bake at scale 0.1: scale, one grid per floor, no obstacle boxes, defla
 	assert.equal(revOf(inp, null, 1), revOf(inp, null))
 })
 
-/** The live box's newest project with an MVR scene (read-only), as in smoke-wo1074-rc-server-tracks.test.js. */
-function liveInputs() {
-	const fs = require('fs')
-	const path = require('path')
-	const { LIVE_PROJECTS_DIR } = require('../../src/engine/projects-root')
-	let best = null
-	for (const f of fs.existsSync(LIVE_PROJECTS_DIR) ? fs.readdirSync(LIVE_PROJECTS_DIR) : []) {
-		if (!/^[\w-]+\.json$/.test(f)) continue
-		try {
-			const full = path.join(LIVE_PROJECTS_DIR, f)
-			const inp = sceneInputs(JSON.parse(fs.readFileSync(full, 'utf8')))
-			const t = fs.statSync(full).mtimeMs
-			if (inp.id && fs.existsSync(path.join(LIVE_PROJECTS_DIR, '_mvr', `${inp.id}.json`)) && (!best || t > best.t)) best = { inp, t }
-		} catch {
-			/* not a project */
-		}
-	}
-	return best && { inp: best.inp, dir: LIVE_PROJECTS_DIR }
+/** A live scene baked at 0.1 (read-only; one bake per scene id for this file). */
+const liveBakes = new Map()
+function bakeLive(live) {
+	if (!liveBakes.has(live.inp.id)) liveBakes.set(live.inp.id, bakeScene(live.inp, 'smoke-toy', { mvrStore: live.mvrStore, scale: SC.RC_SCALE }))
+	return liveBakes.get(live.inp.id)
 }
 
-test('§3 the live project baked at 0.1 (read-only): ≥ 8 toy tracks, the mix, valid and re-measured, JSON size', { timeout: 300000 }, async (t) => {
-	const live = liveInputs()
-	if (!live) return t.skip('no project with an MVR scene on this machine')
-	const store = require('../../src/stage/mvr-store')
-	const withLive = (fn) => {
-		const prev = process.env.HIGHASCG_PROJECTS_DIR
-		process.env.HIGHASCG_PROJECTS_DIR = live.dir
-		try {
-			return fn()
-		} finally {
-			if (prev == null) delete process.env.HIGHASCG_PROJECTS_DIR
-			else process.env.HIGHASCG_PROJECTS_DIR = prev
-		}
-	}
-	const mvrStore = { get: (id) => withLive(() => store.get(id)), mesh: (id, key) => withLive(() => store.mesh(id, key)) }
-	const { json } = await bakeScene(live.inp, 'smoke-toy', { mvrStore, scale: SC.RC_SCALE })
+// WO-1082: the show-specific facts are pinned to the scene they describe (Narvil: a furnished 27 × 61 m banquet hall,
+// stage 0.58 m) — never to "whatever is newest" (the owner loading another show broke them, 15.11); off this box: skip.
+test('§3 the Narvil scene baked at 0.1 (read-only): ≥ 8 toy tracks, the mix, tunnels through its tables, JSON size', { timeout: 300000 }, async (t) => {
+	const live = liveScene({ id: NARVIL })
+	if (!live) return t.skip(`the Narvil scene (projects/_mvr/${NARVIL}) is not on this machine`)
+	const { json } = await bakeLive(live)
 	const text = JSON.stringify(json)
 	const back = JSON.parse(text)
-	if (!back.floors.some((f) => f.id === 'stage')) return t.skip('the live scene has no stage')
-	checkSet(back, 'live')
+	assert.ok(back.floors.some((f) => f.id === 'stage'), 'Narvil: a stage')
+	checkSet(back, 'Narvil')
 	// §3.1: tunnels through the live tables — a medium hall track and a long tour, ≥ 3 tracks without
 	const tun = back.tracks.filter((q) => q.tunnels?.length)
-	assert.ok(tun.some((q) => q.length >= 12 && q.length <= 30 && q.floor === 'hall'), `live: a medium hall track with a tunnel (${tun.map((q) => q.id)})`)
-	assert.ok(tun.some((q) => q.length >= 60), 'live: a long tour with a tunnel')
-	assert.ok(back.tracks.length - tun.length >= 3, 'live: ≥ 3 tracks without a tunnel')
+	assert.ok(tun.some((q) => q.length >= 12 && q.length <= 30 && q.floor === 'hall'), `Narvil: a medium hall track with a tunnel (${tun.map((q) => q.id)})`)
+	assert.ok(tun.some((q) => q.length >= 60), 'Narvil: a long tour with a tunnel')
+	assert.ok(back.tracks.length - tun.length >= 3, 'Narvil: ≥ 3 tracks without a tunnel')
 	// refinement 15.11: 3–4 tunnel tracks, each tunnel under a roof, ≤ 0.15 m out per end, no table used twice
-	assert.ok(tun.length >= 3 && tun.length <= 4, `live: ${tun.length} tracks with a tunnel`)
+	assert.ok(tun.length >= 3 && tun.length <= 4, `Narvil: ${tun.length} tracks with a tunnel`)
 	const TM = require('./lib/rc-tunnel-measure')
 	const seen = new Map()
 	for (const q of tun) {
-		for (const m of TM.measureTunnels(q, back, `live ${q.id}`)) {
+		for (const m of TM.measureTunnels(q, back, `Narvil ${q.id}`)) {
 			const key = m.blobs.map((c) => c.map((v) => v.toFixed(2)).join()).sort().join(';')
-			assert.ok(!seen.has(key), `live: ${q.id} shares a table with ${seen.get(key)}`)
+			assert.ok(!seen.has(key), `Narvil: ${q.id} shares a table with ${seen.get(key)}`)
 			seen.set(key, q.id)
 		}
 	}
 	assert.ok(JSON.stringify(back.occ).length <= 400 * 1024, 'occ ≤ 400 kB')
 	assert.ok(text.length <= 1024 * 1024, `scene JSON ${text.length} bytes`)
+})
+
+// WO-1082: whatever show is live (the newest project with an MVR scene) — only what holds for ANY show
+test('§3 the newest live scene baked at 0.1 (read-only): bakes, every track valid and re-measured, budgets', { timeout: 300000 }, async (t) => {
+	const live = liveScene()
+	if (!live) return t.skip('no project with an MVR scene on this machine')
+	const { json } = await bakeLive(live)
+	const text = JSON.stringify(json)
+	const back = JSON.parse(text)
+	const label = `newest (${live.name})`
+	assert.ok(back.floors.some((f) => f.id === 'hall'), `${label}: a hall floor`)
+	assert.ok(back.tracks.length >= 1, `${label}: at least one track`)
+	checkTracks(back, label)
+	assert.ok(JSON.stringify(back.occ).length <= 400 * 1024, `${label}: occ ≤ 400 kB`)
+	assert.ok(text.length <= 1024 * 1024, `${label}: scene JSON ${text.length} bytes`)
 })

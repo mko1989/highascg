@@ -3,7 +3,8 @@
 /**
  * WO-1074 v2 — RC game tracks (modules/rc-game/server/rc-tracks.js, rc-track-check*.js, rc-ground.js; contract §2.1): 3D tracks
  * generated on synthetic scenes (hall + stage, stage only, tiny floor, many obstacles, no scene, the default hall around
- * a stage) and on the live project's scene (read-only, when present). Every emitted track passes validateTrack, the
+ * a stage), on the Narvil scene (read-only, when present: its show-specific facts) and on the newest live scene (any
+ * show: valid tracks, budgets — WO-1082). Every emitted track passes validateTrack, the
  * generation is deterministic, at least two tracks always exist, a hall + stage gives ≥ 3 room tracks (hall → ramp →
  * stage → ramp / drop → hall) and a hall-only one. Measured from the points themselves (lib/rc-track-measure.js), not
  * through the validator: ramp slope ≤ 18°, no kink > 6°, level everywhere else, drops go down and land 3–8 m on, pads /
@@ -19,6 +20,7 @@ const assert = require('node:assert/strict')
 const { generateTracks, validateTrack, GENERATOR_VERSION } = require('../../modules/rc-game/server/rc-tracks')
 const Gr = require('../../modules/rc-game/server/rc-ground')
 const { measure, span, plan, furnishedHall } = require('./lib/rc-track-measure')
+const { liveScene, NARVIL } = require('./lib/rc-live-scene')
 
 /** Generate, validate, measure, check determinism. */
 function check(scene, label, min = 2) {
@@ -269,59 +271,51 @@ test('§2.7 decks pass between 0.75 m tables and a truss at 4 m; never under a l
 	else assert.doesNotMatch(v.errors.join(), /m < /)
 })
 
-/** The live box's newest project that shows an MVR scene, read straight from projects/ (never written). */
-function liveInputs() {
-	const fs = require('fs')
-	const path = require('path')
-	const { LIVE_PROJECTS_DIR } = require('../../src/engine/projects-root')
-	const { sceneInputs } = require('../../modules/rc-game/server/rc-scene')
-	let best = null
-	for (const f of fs.existsSync(LIVE_PROJECTS_DIR) ? fs.readdirSync(LIVE_PROJECTS_DIR) : []) {
-		if (!/^[\w-]+\.json$/.test(f)) continue
-		try {
-			const full = path.join(LIVE_PROJECTS_DIR, f)
-			const inp = sceneInputs(JSON.parse(fs.readFileSync(full, 'utf8')))
-			const t = fs.statSync(full).mtimeMs
-			if (inp.id && fs.existsSync(path.join(LIVE_PROJECTS_DIR, '_mvr', `${inp.id}.json`)) && (!best || t > best.t)) best = { inp, t }
-		} catch {
-			/* not a project */
-		}
-	}
-	return best && { inp: best.inp, dir: LIVE_PROJECTS_DIR }
+/** A live scene baked at scale 1 (read-only; one bake per scene id for this file). */
+const liveBakes = new Map()
+function bakeLive(live) {
+	const { bakeScene } = require('../../modules/rc-game/server/rc-scene')
+	if (!liveBakes.has(live.inp.id)) liveBakes.set(live.inp.id, bakeScene(live.inp, 'smoke', { mvrStore: live.mvrStore }))
+	return liveBakes.get(live.inp.id)
 }
 
-test('the live project scene (read-only): room + hall tracks, every one valid and on the ground model, GLB budget', { timeout: 180000 }, async (t) => {
-	const live = liveInputs()
-	if (!live) return t.skip('no project with an MVR scene on this machine')
-	const store = require('../../src/stage/mvr-store')
-	// mvr-store reads projectsRoot() (a temp dir under the test runner); point it at the live dir only for each read call
-	const withLive = (fn) => {
-		const prev = process.env.HIGHASCG_PROJECTS_DIR
-		process.env.HIGHASCG_PROJECTS_DIR = live.dir
-		try {
-			return fn()
-		} finally {
-			if (prev == null) delete process.env.HIGHASCG_PROJECTS_DIR
-			else process.env.HIGHASCG_PROJECTS_DIR = prev
-		}
-	}
-	const mvrStore = { get: (id) => withLive(() => store.get(id)), mesh: (id, key) => withLive(() => store.mesh(id, key)) }
-	const { bakeScene } = require('../../modules/rc-game/server/rc-scene')
-	const { json, glb } = await bakeScene(live.inp, 'smoke', { mvrStore })
-	assert.ok(json.tracks.length >= 2, json.tracks.map((x) => x.id).join())
+/** Every track valid and on the ground model; the obstacle and GLB budgets (what holds for ANY scene). */
+function checkLive(json, glb, label) {
 	for (const tr of json.tracks) {
 		const v = validateTrack(tr, json)
-		assert.ok(v.ok, `${tr.id}: ${v.errors.join(', ')}`)
-		measure(tr, json, 'live')
+		assert.ok(v.ok, `${label} ${tr.id}: ${v.errors.join(', ')}`)
+		measure(tr, json, label)
 	}
-	if (json.floors.some((f) => f.id === 'stage') && json.floors.some((f) => f.id === 'hall')) {
-		assert.ok(json.tracks.filter((x) => x.floor === 'room').length >= 3, 'live: ≥ 3 room tracks')
-		assert.ok(json.tracks.some((x) => x.floor === 'hall'), 'live: a hall-only track')
-		// §2.7: the live hall (27 × 61 m, banquet tables) carries ≥ 2 whole-room deck tracks, and a height field
-		const H = json.floors.find((f) => f.id === 'hall').rect
-		if (Math.max(H[2] - H[0], H[3] - H[1]) >= 50) assert.ok(json.tracks.filter((x) => x.kind === 'room-long').length >= 2, 'live: ≥ 2 room-long tracks')
-		assert.ok(json.heights && typeof json.heights.data === 'string', 'live: heights in the scene JSON')
-	}
-	assert.ok(json.obstacles.length <= 300)
-	assert.ok(glb.length <= 8 * 1024 * 1024 && json.stats.triangles <= 400000, `${glb.length} bytes, ${json.stats.triangles} triangles`)
+	assert.ok(json.obstacles.length <= 300, `${label}: ${json.obstacles.length} obstacles`)
+	assert.ok(glb.length <= 8 * 1024 * 1024 && json.stats.triangles <= 400000, `${label}: ${glb.length} bytes, ${json.stats.triangles} triangles`)
+}
+
+// WO-1082: the show-specific facts are pinned to the scene they describe (Narvil: a furnished 27 × 61 m banquet hall
+// with a stage) — never to "whatever is newest" (the owner loading another show broke them, 15.11); off this box: skip.
+test('the Narvil scene (read-only): room + hall tracks, room-long decks, every one valid and on the ground model, GLB budget', { timeout: 180000 }, async (t) => {
+	const live = liveScene({ id: NARVIL })
+	if (!live) return t.skip(`the Narvil scene (projects/_mvr/${NARVIL}) is not on this machine`)
+	const { json, glb } = await bakeLive(live)
+	assert.ok(json.tracks.length >= 2, json.tracks.map((x) => x.id).join())
+	checkLive(json, glb, 'Narvil')
+	assert.ok(json.floors.some((f) => f.id === 'stage') && json.floors.some((f) => f.id === 'hall'), 'Narvil: a hall and a stage')
+	assert.ok(json.tracks.filter((x) => x.floor === 'room').length >= 3, 'Narvil: ≥ 3 room tracks')
+	assert.ok(json.tracks.some((x) => x.floor === 'hall'), 'Narvil: a hall-only track')
+	// §2.7: the hall (27 × 61 m, banquet tables) carries ≥ 2 whole-room deck tracks, and a height field
+	const H = json.floors.find((f) => f.id === 'hall').rect
+	assert.ok(Math.max(H[2] - H[0], H[3] - H[1]) >= 50, `Narvil: the hall is ${H}`)
+	assert.ok(json.tracks.filter((x) => x.kind === 'room-long').length >= 2, 'Narvil: ≥ 2 room-long tracks')
+	assert.ok(json.heights && typeof json.heights.data === 'string', 'Narvil: heights in the scene JSON')
+})
+
+// WO-1082: whatever show is live (the newest project with an MVR scene) — only what holds for ANY show
+test('the newest live scene (read-only): bakes, every track valid and on the ground model, budgets', { timeout: 180000 }, async (t) => {
+	const live = liveScene()
+	if (!live) return t.skip('no project with an MVR scene on this machine')
+	const { json, glb } = await bakeLive(live)
+	const label = `newest (${live.name})`
+	assert.ok(json.floors.some((f) => f.id === 'hall'), `${label}: a hall floor`)
+	assert.ok(json.tracks.length >= 1, `${label}: at least one track`)
+	checkLive(json, glb, label)
+	assert.ok(json.heights && typeof json.heights.data === 'string', `${label}: heights in the scene JSON`)
 })
