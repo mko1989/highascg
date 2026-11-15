@@ -25,7 +25,7 @@ const gdtfStore = require('./gdtf-store')
 const { decodeVisual } = require('./gdtf-visual')
 const { offsetAt } = require('./beam-offset')
 const { features, aimValues } = require('./gdtf-features')
-const { SacnFrames, inputFrame } = require('./dmx-input')
+const { SacnFrames, inputFrame, sacnUniversesFor } = require('./dmx-input')
 const { normalizeLooks, recallInto } = require('./fixture-looks')
 const { chainOf } = require('./gdtf-ik')
 const { cleanValue } = require('./gdtf-patch')
@@ -182,13 +182,10 @@ function createFollowService(ctx, hub, deps = {}) {
 		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' && lightingOn() })
 		// WO-615 T7: visualiser mode reads the console's universes of the typed patch (Art-Net via the shared tap).
 		const vis = engine.dmx.visualise ? engine.fixtures.filter((f) => f.gdtf && f.enabled) : []
-		if ((engine.through.enabled && engine.protocol === 'artnet') || vis.some((f) => f.protocol === 'artnet'))
-			consoleFrames.start()
+		// WO-1078: both protocols for every visualised universe — a rig split over Art-Net and sACN is patched "artnet"
+		if ((engine.through.enabled && engine.protocol === 'artnet') || vis.length) consoleFrames.start()
 		else consoleFrames.stop()
-		sacnIn.configure(
-			vis.filter((f) => f.protocol === 'sacn').map((f) => f.universe),
-			engine.dmx.sacn_port
-		)
+		sacnIn.configure(sacnUniversesFor(vis), engine.dmx.sacn_port)
 		const ok = engine.fixtures.filter((f) => !f.problem).length
 		log(
 			'info',
