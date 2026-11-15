@@ -31,6 +31,7 @@ const R_STAGE = RS + 0.25
 const TIP = 8 // straight leg beyond the ramp / drop run before the route takes over
 const PULL = 2 // unit: the string pulling keeps this much more (rounding a taut corner cuts in towards what it hugs)
 const LEAD = 6 // the route's first / last stop lies this much further out along the leg
+const ROOMY = [2, 4, 6] // × width: a tour's stops' extra clearance on the retry, first that routes wins (WO-1082)
 const MAX_POINTS = 2500
 const MAX_LENGTH = 2000 // unit (200 m at scale 0.1; 2500 points keep the spacing ≤ 0.8, under 0.5 × width)
 
@@ -212,19 +213,28 @@ function tour(ctx, spec) {
 		const legPath = (u) => T.dense([f.toWorld([u, 0]), f.toWorld([u, vL])])
 		const seen = T.reach(pg, f.toWorld([b, vT + LEAD]), need)
 		if (!seen) continue
-		const targets = spec.aims.map(([wu, wv]) => T.extreme(pg, seen, need, (x, z) => {
+		// the route starts and ends LEAD further out along the legs, so the rounded joint stays tangent to them
+		const S2 = f.toWorld([b, vT + LEAD]), E2 = f.toWorld([a, vT + LEAD])
+		const stopsAt = (lim) => spec.aims.map(([wu, wv]) => T.extreme(pg, seen, lim, (x, z) => {
 			const [u, v] = f.fromWorld([x, z])
 			return wu * u + wv * v
 		}))
+		const targets = stopsAt(need)
 		if (targets.some((p) => !p)) continue
-		// the route starts and ends LEAD further out along the legs, so the rounded joint stays tangent to them
-		const S2 = f.toWorld([b, vT + LEAD]), E2 = f.toWorld([a, vT + LEAD])
 		for (const tun of spec.tunnel ? tourTunnels(ctx, width, [S2, ...targets, E2]) : []) {
 			const t = tourOf(ctx, spec, { fixed, S, E, S2, E2, targets: tun.targets, avoid: [legPath(a), legPath(b)], need, list: tun.list })
 			if (t) return useTables(ctx, tun.list), t
 		}
 		const t = tourOf(ctx, spec, { fixed, S, E, S2, E2, targets, avoid: [legPath(a), legPath(b)], need, list: [] })
 		if (t) return t
+		// WO-1082: an EMPTY room's extremes are its corners: the first leg arrives along the wall and its keep-out band
+		// shuts the only way on — stops that keep ROOMY clearance (turning room) instead, tried only after the above
+		for (const extra of ROOMY) {
+			const roomy = stopsAt(need + extra * width)
+			if (roomy.some((p) => !p)) continue
+			const r = tourOf(ctx, spec, { fixed, S, E, S2, E2, targets: roomy, avoid: [legPath(a), legPath(b)], need, list: [] })
+			if (r) return r
+		}
 	}
 	return null
 }

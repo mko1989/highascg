@@ -28,7 +28,7 @@ const { sceneGlb } = require('./rc-scene-glb')
 const { RC_SCALE, sceneScale } = require('./rc-scale')
 const { generateTracksAsync, GENERATOR_VERSION } = require('./rc-tracks')
 
-const BAKE_VERSION = 6 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights; 4: §3 scale + occ; 5: venue .glb; 6: occ band from FLAT_DECOR)
+const BAKE_VERSION = 8 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights; 4: §3 scale + occ; 5: venue .glb; 6: occ band from FLAT_DECOR; 7: hall level by union area, roomy tours; 8: stage field cleared to FLAT_DECOR)
 const FLAT_DECOR = 0.3 // u (× scale = 3 cm live): what lies this low on a floor is floor, not an occupancy obstacle
 const REV_MEMO_MS = 2000
 const KEEP_CACHED = 6
@@ -144,7 +144,8 @@ async function bakeScene(inp, rev, deps = {}) {
 	// (parts the GLB leaves out — fixtures, dropped small objects — are not drawn, so a deck may pass through them)
 	// the stage seen from the hall is a wall of the ground model (and its ramps' destination), not an obstacle
 	if (stage && stage.y > hall.y + 0.05) for (const g of [grids[0]?.grid, occ[0]]) if (g) g.clear(stage.rect, 0.02)
-	if (stage && stage.y > hall.y) field.clearBelow(stage.rect, stage.y)
+	// WO-1082: the stage's own flat decor (a covering 1 cm proud, tape, a mat) is stage floor in the height field too, as in occ
+	if (stage && stage.y > hall.y) field.clearBelow(stage.rect, stage.y + FLAT_DECOR * scale)
 	const obstacles = G.obstaclesFrom(grids.map((g) => ({ floor: g.floor, grid: g.grid })))
 	for (const f of floors) {
 		lo[0] = Math.min(lo[0], f.rect[0]); lo[1] = Math.min(lo[1], f.y); lo[2] = Math.min(lo[2], f.rect[1])

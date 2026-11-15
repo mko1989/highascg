@@ -158,11 +158,33 @@ function stageFloor(grid) {
 /**
  * The hall: the visible floor — the HIGHEST level of large horizontal surfaces below the stage (parts ≤ 0.2 m thick,
  * ≥ 4 m² each, ≥ 20 m² together within 5 cm) whose area is at least half the largest such level's (a venue model can
- * carry a sub-floor under its finished floor: Narvil's grey floor at 0 under the hotel floor at 0.82). y = the top of
+ * carry a sub-floor under its finished floor: Narvil's grey floor at 0 under the hotel floor at 0.82). A level's area is
+ * the UNION of its surfaces' footprints (WO-1082: two plan drawings of the same room at 0 summed to twice the room and
+ * outvoted the room's carpet floor at 0.24 — Hilton Wawer drove 24 cm under the floor, no wall in the band). y = the top of
  * the level's highest surface (a dance floor 2 cm proud of the hall floor is still the floor, and the ribbon drawn on it
  * stays visible); rect = the bbox of the level's surfaces ∩ the scene's footprint. None → y 0 and the footprint (no
  * geometry → the stage + 18 m all round (at least 30 × 20 m), or 30 × 20 m around the origin).
  */
+/** Area covered by the boxes' xz footprints, overlaps counted once (x strips between box edges, merged z runs). */
+function unionArea(boxes) {
+	const xs = [...new Set(boxes.flatMap((b) => [b.min[0], b.max[0]]))].sort((a, b) => a - b)
+	let area = 0
+	for (let i = 0; i + 1 < xs.length; i++) {
+		const cx = (xs[i] + xs[i + 1]) / 2
+		const runs = boxes.filter((b) => cx > b.min[0] && cx < b.max[0]).map((b) => [b.min[2], b.max[2]]).sort((p, q) => p[0] - q[0])
+		let len = 0, z0 = 0, z1 = 0
+		runs.forEach(([lo, hi], j) => {
+			if (j && lo <= z1) return void (z1 = Math.max(z1, hi))
+			len += z1 - z0
+			z0 = lo
+			z1 = hi
+		})
+		len += z1 - z0
+		area += len * (xs[i + 1] - xs[i])
+	}
+	return area
+}
+
 function hallFloor(boxes, footprint, stage) {
 	const flat = boxes.filter((b) => b.max[1] - b.min[1] <= 0.2 && (b.max[0] - b.min[0]) * (b.max[2] - b.min[2]) >= 4 &&
 		(!stage || b.max[1] < stage.y - 0.3))
@@ -175,7 +197,7 @@ function hallFloor(boxes, footprint, stage) {
 		else levels.push({ y0: f.max[1], items: [f] })
 	}
 	for (const l of levels) {
-		l.area = l.items.reduce((s, g) => s + areaOf(g), 0)
+		l.area = unionArea(l.items)
 		l.y = Math.max(...l.items.map((g) => g.max[1]))
 	}
 	const ok = levels.filter((l) => l.area >= 20)
