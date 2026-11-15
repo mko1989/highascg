@@ -13,14 +13,21 @@
  * Dimmer — a typed head's first channel with a `Dimmer` function: level × base, base = the console's dimmer under
  * read-through (the LD keeps the intensity; blended by the read-through weight w like pan / tilt), else the
  * programmer's Dimmer, else full. Colour, zoom, shutter, … stay the console's (read-through) or the programmer's.
- * Grant (read-through only: there must be a console frame to give the heads back to) — channel ≥ 50 % = HighAsCG may
- * drive the pool, < 50 % = the console's values pass through (the read-through fade). per_head: channel address + i
- * for the i-th pool head (patch order). Fail-safe: the last fresh value is held GRANT_HOLD_MS after the console frame
- * goes stale (STALE_MS 2.5 s), then the grant is released — the read-through fades the heads back to the console's
- * last frame (ConsoleFrames.last). A console never seen = not granted.
- * Levels universe — channel address + i = pool head i's level 0–255 (patch order), then 1 "someone followed", then 9
- * for A1…A9 and 9 for Pin 1…9 (255 while that lane's person is tracked). Sent while the follow output master is on,
- * through the engine's send (lighting duty), never onto a rig universe or this box's own input.
+ * Grant — a channel in the console's Art-Net frame to this box (per_head: channel address + i for the i-th pool head,
+ * patch order); the console input is listened to whenever a grant is configured (follow-service.js).
+ *   Rig (own DMX with read-through): a switch — ≥ 50 % = HighAsCG may drive the pool's pan / tilt / Dimmer, < 50 % =
+ *   the console's values pass through (the read-through fade). A half-way pan between the desk's and the person's is
+ *   no look, so the rig stays a switch; the fade gives it the soft edge.
+ *   Levels universe (WO-1085 follow-up, PSN + levels): proportional — every head level × grant / 255, slewed at
+ *   1 / fade_s (a fader snapped to 0 still fades the levels), so one desk fader cross-fades the automation in and out.
+ * Fail-safe: the last fresh value is held GRANT_HOLD_MS after the console frame goes stale (STALE_MS 2.5 s), then the
+ * grant is released — the read-through fades the heads back to the console's last frame (ConsoleFrames.last), and the
+ * levels fade to 0 (HighAsCG no longer hears the LD's permission, so it stops asking for light). A console never seen
+ * = not granted. No grant configured = full scale, as before.
+ * Levels universe — channel address + i = pool head i's level 0–255 (patch order), then 1 "someone followed", 9 for
+ * A1…A9, 9 for Pin 1…9 (255 while that lane's person is tracked; never scaled — information), then 1 echoing the
+ * grant applied now (0 with no grant configured). Sent while the follow output master is on, through the engine's
+ * send (lighting duty), never onto a rig universe, the grant's universe or this box's own input.
  */
 
 const { createHandover, thresholds } = require('../tracking/auto-handover')
@@ -34,7 +41,7 @@ const GRANT_HOLD_MS = 5000
 const REFRESH_MS = 1000
 const AUTO_LANES = 9
 const PIN_BASE = 64980 // auto-director.js Pin k = 64980 + k
-const EXTRA_CH = 1 + AUTO_LANES * 2
+const EXTRA_CH = 1 + AUTO_LANES * 2 + 1 // + the grant echo
 
 const num = (v, d, lo, hi) => {
 	const n = Number(v)
@@ -99,6 +106,8 @@ class FollowHandover {
 		this.thresholds = []
 		this._dim = new Map() // fixture id → dimmer { c, f }
 		this._grant = { state: 'off', data: null, at: 0 }
+		this._applied = null // the levels' grant now, 0…1 per head (per_head) or [one]; null = unscaled
+		this._appliedAt = null
 		this._levels = { to: null, problem: null, buf: new Uint8Array(512), last: null, at: 0, seq: 0, packets: 0 }
 	}
 
@@ -118,6 +127,7 @@ class FollowHandover {
 		if (this.cfg.grant.enabled) reads.add(this.cfg.grant.universe)
 		if (!to) problem = `bad destination "${L.dest}"`
 		else if (hit) problem = `universe ${L.universe} is the rig's (${hit.name})`
+		else if (this.cfg.grant.enabled && L.protocol === 'artnet' && L.universe === this.cfg.grant.universe) problem = `universe ${L.universe} is the grant's`
 		else if (e._isSelfLoop(to, L.universe, L.protocol)) problem = "would loop into this box's own input"
 		else if (L.protocol === 'artnet' && reads.has(L.universe) && e._reachesSelf(to)) problem = 'would be read back as the console frame'
 		else if (L.address - 1 + this._pool().length + EXTRA_CH > 512) problem = 'runs past channel 512'
@@ -141,17 +151,33 @@ class FollowHandover {
 	/** Read the grant channel's universe (once per tick). */
 	_readGrant(now) {
 		const g = this.cfg.grant
-		if (!g.enabled || !this._thru()) return void (this._grant = { state: 'off', data: null, at: 0 })
+		if (!g.enabled || !this.engine.consoleFrames) return void (this._grant = { state: 'off', data: null, at: 0 })
 		const f = this.engine.consoleFrames.frame(g.universe, now)
 		if (f) this._grant = { state: 'live', data: Uint8Array.from(f), at: now }
 		else if (this._grant.data && now - this._grant.at <= GRANT_HOLD_MS) this._grant.state = 'held'
 		else this._grant = { state: this._grant.at ? 'lost' : 'none', data: null, at: this._grant.at }
 	}
 
-	/** May HighAsCG drive this Auto head now (the LD's grant)? */
+	/** The levels' grant: towards the fresh / held value (0 once lost), at 1 / fade_s per second. */
+	_slewGrant(now) {
+		const g = this.cfg.grant
+		if (this._grant.state === 'off') return void ((this._applied = null), (this._appliedAt = null))
+		const dt = this._appliedAt === null ? 0 : Math.max(0, Math.min(0.5, (now - this._appliedAt) / 1000))
+		this._appliedAt = now
+		const step = this.cfg.fade_s > 0 ? dt / this.cfg.fade_s : Infinity
+		const d = this._grant.data
+		const prev = this._applied || []
+		this._applied = Array.from({ length: g.per_head ? this._pool().length : 1 }, (_, i) => {
+			const want = d ? (d[g.address - 1 + i] ?? 0) / 255 : 0
+			const cur = prev[i] ?? 0
+			return want > cur ? Math.min(want, cur + step) : Math.max(want, cur - step)
+		})
+	}
+
+	/** May HighAsCG drive this Auto head of the rig now (the LD's grant, read-through only)? */
 	granted(fx) {
 		const g = this.cfg.grant
-		if (this._grant.state === 'off') return true
+		if (this._grant.state === 'off' || !this._thru()) return true
 		if (!this._grant.data) return false
 		const i = g.per_head ? this._pool().indexOf(fx) : 0
 		return i >= 0 && (this._grant.data[g.address - 1 + i] ?? 0) >= 128
@@ -161,6 +187,7 @@ class FollowHandover {
 	step(now, marks) {
 		const e = this.engine
 		this._readGrant(now)
+		this._slewGrant(now)
 		const on = this.cfg.mode === 'handover'
 		const input = typeof e.autoLanes === 'function' ? e.autoLanes(on ? (uid) => this.core.activeFor(uid) : null) : null
 		this.lanes = Array.isArray(input?.lanes) ? input.lanes : []
@@ -228,7 +255,8 @@ class FollowHandover {
 			const hd = this.decisions?.get(fx.id)
 			const st = e._aim.get(fx.id)?.state
 			const v = this.cfg.mode === 'handover' ? (hd ? hd.level : 0) : st === 'following' || st === 'home' ? 1 : 0
-			if (L.address - 1 + i < 512) b[L.address - 1 + i] = Math.round(v * 255)
+			const k = this._applied ? (this._applied[this.cfg.grant.per_head ? i : 0] ?? 0) : 1
+			if (L.address - 1 + i < 512) b[L.address - 1 + i] = Math.round(v * k * 255)
 		})
 		const at = L.address - 1 + pool.length
 		for (const l of this.lanes) {
@@ -238,6 +266,7 @@ class FollowHandover {
 			if (at < 512) b[at] = 255
 			if (k >= 0 && k < AUTO_LANES * 2 && at + 1 + k < 512) b[at + 1 + k] = 255
 		}
+		if (this._applied && at + EXTRA_CH - 1 < 512) b[at + EXTRA_CH - 1] = this._echo()
 		if (!L.enabled || !u.to || u.problem || !e.enabled) return 0
 		if (u.last && Buffer.from(b).equals(u.last) && now - u.at < REFRESH_MS) return 0
 		u.seq = (u.seq % 255) + 1
@@ -250,6 +279,12 @@ class FollowHandover {
 		return 1
 	}
 
+	/** The grant applied to the levels now, 0–255 (per head: their mean) — echoed after the presence channels. */
+	_echo() {
+		const a = this._applied || []
+		return a.length ? Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 255) : 0
+	}
+
 	status() {
 		const L = this.cfg.levels
 		const u = this._levels
@@ -257,7 +292,10 @@ class FollowHandover {
 			...this.cfg,
 			levels: { ...L, problem: u.problem, live: L.enabled && !u.problem && !!u.to && this.engine.enabled, packets: u.packets },
 			grant: { ...this.cfg.grant, state: this._grant.state, age_ms: this._grant.at ? this.engine.now() - this._grant.at : null,
-				needs_through: this.cfg.grant.enabled && !this._thru(), value: this._grant.data?.[this.cfg.grant.address - 1] ?? null },
+				applies: this._thru() ? 'rig' : 'levels', value: this._grant.data?.[this.cfg.grant.address - 1] ?? null,
+				applied: this._applied ? this._echo() : null,
+				// own DMX without read-through: no console frame to hand the rig back to — the grant scales the levels only
+				needs_through: this.cfg.grant.enabled && this.engine.protocol === 'artnet' && !this._thru() },
 			thresholds: this.thresholds,
 			no_dimmer: this._heads().filter((f) => !this._dim.has(f.id)).map((f) => f.id),
 		}

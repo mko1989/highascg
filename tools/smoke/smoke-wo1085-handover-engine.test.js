@@ -227,7 +227,7 @@ describe('WO-1085 engine: the automation levels universe', () => {
 		assert.equal(d[19], 255, 'A1')
 		assert.equal(d[20], 0, 'A2')
 		assert.equal(r.eng.status().handover.levels.live, true)
-		assert.equal(EXTRA_CH, 19)
+		assert.equal(EXTRA_CH, 20)
 	})
 
 	it('Split mode: following heads 255; sent only while the follow output master is on', () => {
@@ -247,6 +247,113 @@ describe('WO-1085 engine: the automation levels universe', () => {
 		const r = rig({ handover: { levels: { ...levels, universe: 1 } } })
 		r.run(1, () => r.person(5, 3))
 		assert.ok(r.sent.every((p) => p.d.data.length === 512 && p.d.portAddress === 1), 'only the rig universe went out')
+	})
+})
+
+describe('WO-1085 engine: the grant scales the levels universe (PSN + levels)', () => {
+	const levels = { enabled: true, universe: 100, address: 11, dest: '127.0.0.1:6455' }
+	const ECHO = 10 + 8 + EXTRA_CH - 1 // after the 8 head levels, "someone followed", A1…A9, Pin 1…9
+	const psn = (grant = { enabled: true, universe: 5, address: 1 }, extra = {}) =>
+		rig({ withConsole: true, handover: { mode: 'handover', levels, grant, ...extra }, output: { protocol: 'psn' }, dmx: { enabled: false } })
+	const grantFrame = (v, per = null) => {
+		const d = new Uint8Array(512)
+		if (per) per.forEach((x, i) => (d[i] = x))
+		else d[0] = v
+		return d
+	}
+	const last = (r) => r.sent.filter((p) => p.d.portAddress === 100).at(-1).d.data
+	const heads = (d) => [...d.subarray(10, 18)]
+
+	for (const [v, want] of [[0, 0], [128, 128], [255, 255]]) {
+		it(`grant ${v}: head levels × ${v} / 255, presence unscaled, the echo says ${want}`, () => {
+			const r = psn()
+			r.run(4, () => {
+				r.cons.feed(5, grantFrame(v))
+				r.person(5, 3)
+			})
+			const d = last(r)
+			assert.deepEqual(heads(d), [0, 0, 0, 0, 0, want, want, want])
+			assert.equal(d[18], 255, '"someone followed" is information: never scaled')
+			assert.equal(d[19], 255, 'A1 never scaled')
+			assert.equal(d[ECHO], want, 'the grant HighAsCG applies, echoed')
+			assert.equal(r.sent.filter((p) => p.d.portAddress === 1).length, 0, 'PSN: no rig universe')
+			assert.equal(r.eng.status().handover.grant.applies, 'levels')
+			assert.equal(r.eng.status().handover.grant.needs_through, false)
+		})
+	}
+
+	it('a fader snapped 255 → 0 → 255 fades the levels at 1 / fade_s (never a step)', () => {
+		const r = psn(undefined, { fade_s: 1 })
+		r.run(4, () => {
+			r.cons.feed(5, grantFrame(255))
+			r.person(5, 3)
+		})
+		const maxStep = Math.ceil((255 * DT) / 1000) + 1
+		let prev = heads(last(r))
+		let lowest = 255
+		for (const v of [0, 255])
+			r.run(2, () => {
+				r.cons.feed(5, grantFrame(v))
+				r.person(5, 3)
+				const h = heads(last(r))
+				h.forEach((x, i) => assert.ok(Math.abs(x - prev[i]) <= maxStep, `head ${i + 1} ${prev[i]} → ${x} in one tick`))
+				lowest = Math.min(lowest, h[5])
+				prev = h
+			})
+		assert.equal(lowest, 0, 'reached 0')
+		assert.deepEqual(prev, [0, 0, 0, 0, 0, 255, 255, 255], 'and back')
+	})
+
+	it('a lost console: the last grant held GRANT_HOLD_MS past stale, then the levels fade to 0', () => {
+		const r = psn()
+		r.run(4, () => {
+			r.cons.feed(5, grantFrame(255))
+			r.person(5, 3)
+		})
+		r.run((STALE_MS + GRANT_HOLD_MS - 300) / 1000, () => r.person(5, 3))
+		assert.deepEqual(heads(last(r)), [0, 0, 0, 0, 0, 255, 255, 255], 'held')
+		assert.equal(r.eng.status().handover.grant.state, 'held')
+		let prev = heads(last(r))
+		r.run(2, () => {
+			r.person(5, 3)
+			const h = heads(last(r))
+			h.forEach((x, i) => assert.ok(Math.abs(x - prev[i]) <= 8, `head ${i + 1} ${prev[i]} → ${x} (step)`))
+			prev = h
+		})
+		assert.equal(r.eng.status().handover.grant.state, 'lost')
+		assert.deepEqual(prev, Array(8).fill(0), 'stopped asking for light')
+		assert.equal(last(r)[18], 255, 'still says someone is followed')
+		assert.equal(last(r)[ECHO], 0)
+	})
+
+	it('never seen = 0; per-head grant scales each head; levels on the grant universe refused', () => {
+		const r = psn()
+		r.run(2, () => r.person(5, 3))
+		assert.deepEqual(heads(last(r)), Array(8).fill(0))
+		assert.equal(r.eng.status().handover.grant.state, 'none')
+		const p = psn({ enabled: true, universe: 5, address: 1, per_head: true })
+		p.run(4, () => {
+			p.cons.feed(5, grantFrame(0, [255, 255, 255, 255, 255, 255, 0, 128]))
+			p.person(5, 3)
+		})
+		assert.deepEqual(heads(last(p)), [0, 0, 0, 0, 0, 255, 0, 128])
+		assert.equal(last(p)[ECHO], Math.round(((6 * 255 + 128) / 8 / 255) * 255), 'the echo: the mean')
+		const clash = rig({ handover: { levels: { ...levels, universe: 5 }, grant: { enabled: true, universe: 5 } } })
+		assert.match(clash.eng.status().handover.levels.problem, /grant/)
+	})
+
+	it('no grant configured: full scale and the echo channel 0, as before', () => {
+		const r = psn({ enabled: false })
+		r.run(3, () => r.person(5, 3))
+		const d = last(r)
+		assert.deepEqual(heads(d), [0, 0, 0, 0, 0, 255, 255, 255])
+		assert.equal(d[ECHO], 0)
+		assert.equal(r.eng.status().handover.grant.applied, null)
+	})
+
+	it('wiring: the console input is listened to whenever a grant is configured', () => {
+		const svc = fs.readFileSync(path.join(ROOT, 'src/fixtures/follow-service.js'), 'utf8')
+		assert.match(svc, /\|\| engine\.handover\.cfg\.grant\.enabled \|\| vis\.length\) consoleFrames\.start\(\)/)
 	})
 })
 

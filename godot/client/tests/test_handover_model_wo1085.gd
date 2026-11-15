@@ -71,7 +71,18 @@ func test_status_text() -> void:
 	t.eq(H.grant_text({"state": "live", "value": 40}), "the console has the heads (40)")
 	t.eq(H.grant_text({"state": "held"}).contains("held"), true)
 	t.eq(H.grant_text({"state": "lost"}).contains("last frame"), true)
-	t.eq(H.grant_text({"needs_through": true}).contains("read-through"), true)
+	t.eq(H.grant_text({"needs_through": true, "state": "live", "value": 255, "applied": 255}).contains("read-through"), true)
+
+
+func test_grant_text_levels_mode() -> void:
+	# WO-1085 follow-up: PSN + levels — the grant scales the levels; the status shows the fader and what is applied.
+	t.eq(H.grant_text({"applies": "levels", "state": "live", "value": 128, "applied": 64}), "LD fader 50 % — levels × 25 %")
+	t.eq(H.grant_text({"applies": "levels", "state": "held", "value": 255, "applied": 255}), "console silent — last grant held — levels × 100 %")
+	t.eq(H.grant_text({"applies": "levels", "state": "lost", "applied": 51}), "console lost — levels fading to 0 — levels × 20 %")
+	t.eq(H.grant_text({"applies": "levels", "state": "none", "universe": 5}), "no console frame on U5 yet — levels at 0")
+	var s := H.status_text({"mode": "split", "levels": {"enabled": true, "live": true, "packets": 3},
+		"grant": {"enabled": true, "applies": "levels", "state": "live", "value": 255, "applied": 255}})
+	t.eq(s, "Split: every Auto head follows its person (WO-708) · levels: 3 packets · grant: LD fader 100 % — levels × 100 %")
 
 
 func test_section_edits_and_hides() -> void:
@@ -81,13 +92,14 @@ func test_section_edits_and_hides() -> void:
 	var got := []
 	sec.edited.connect(func(h: Dictionary) -> void: got.append(h))
 	sec.show_handover({})
-	t.eq(sec._form.visible, false, "Split: only the mode picker")
+	t.eq(sec._heads.visible, false, "Split: no spot settings")
+	t.eq(sec._gr_on.visible and sec._lv_on.visible, true, "Split: the levels universe and the grant stay reachable")
 	sec._mode.select(1)
 	sec._mode.item_selected.emit(1)
 	t.eq(got.size(), 1)
 	t.eq(got[-1].mode, "handover")
 	sec.show_handover(got[-1])
-	t.eq(sec._form.visible, true)
+	t.eq(sec._heads.visible, true)
 	t.eq(sec._lv_uni.visible, false, "levels rows hidden while off")
 	sec._heads.value = 2
 	t.eq(got[-1].heads, 2, "heads per person")

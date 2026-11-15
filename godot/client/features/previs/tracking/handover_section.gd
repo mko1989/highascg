@@ -63,8 +63,9 @@ func _ready() -> void:
 	_lv_dest.focus_exited.connect(func() -> void: _emit_in("levels", "dest", _lv_dest.text.strip_edges()))
 	_pair("Levels destination", _lv_dest)
 	_gr_on = _check("LD grant channel", func(on: bool) -> void: _emit_in("grant", "enabled", on))
-	_gr_on.tooltip_text = ("A channel in the console's frame (read-through): ≥ 50 % = HighAsCG drives the spot heads,\n" +
-		"< 50 % = the console's values pass through. A console silent for 7.5 s hands the heads back to its last frame.")
+	_gr_on.tooltip_text = ("A channel the console sends to this box (Art-Net). PSN + levels: the head levels are scaled by it —\n" +
+		"one desk fader cross-fades the automation in and out. Own DMX with read-through: ≥ 50 % = HighAsCG drives the\n" +
+		"spot heads, < 50 % = the console's values pass through. Console silent for 7.5 s = levels fade to 0 / heads go back.")
 	_pair("Grant", _gr_on)
 	_gr_uni = _spin(0, H.PORT_ADDRESS_MAX, 1, func(v: float) -> void: _emit_in("grant", "universe", int(v)))
 	_pair("Grant universe (console)", _gr_uni)
@@ -86,8 +87,8 @@ func show_handover(h: Dictionary) -> void:
 		return
 	var on: bool = handover.mode == "handover"
 	_mode.select(0 if not on else 1)
-	_form.visible = on
-	_status.visible = on
+	for c: Control in [_heads, _margin, _fade, _idle]:  # Split: only the levels universe and the grant
+		_row_visible(c, on)
 	_put(_heads, handover.heads)
 	_put(_margin, handover.margin_m)
 	_put(_fade, handover.fade_s)

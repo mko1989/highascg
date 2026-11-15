@@ -81,9 +81,12 @@ static func _clip(at: Vector2, d: Vector2, lo: Vector2, hi: Vector2) -> Array:
 static func status_text(st: Variant) -> String:
 	if not st is Dictionary or st.is_empty():
 		return "Server not reporting the handover (Tracking module off, or an older server)."
-	if st.get("mode") != "handover":
-		return "Split: every Auto head follows its person (WO-708)."
-	var parts := ["%d threshold%s" % [st.get("thresholds", []).size(), "" if st.get("thresholds", []).size() == 1 else "s"]]
+	var spot: bool = st.get("mode") == "handover"
+	var parts := []
+	if spot:
+		parts.append("%d threshold%s" % [st.get("thresholds", []).size(), "" if st.get("thresholds", []).size() == 1 else "s"])
+	else:
+		parts.append("Split: every Auto head follows its person (WO-708)")
 	var lv: Dictionary = st.get("levels") if st.get("levels") is Dictionary else {}
 	if lv.get("enabled") == true:
 		parts.append("levels: " + (str(lv.problem) if lv.get("problem") != null and str(lv.get("problem")) != "" else
@@ -92,15 +95,31 @@ static func status_text(st: Variant) -> String:
 	if g.get("enabled") == true:
 		parts.append("grant: " + grant_text(g))
 	var nd: Array = st.get("no_dimmer") if st.get("no_dimmer") is Array else []
-	if not nd.is_empty():
+	if spot and not nd.is_empty():
 		parts.append("no Dimmer channel: " + ", ".join(nd.map(func(x: Variant) -> String: return str(x))))
 	return " · ".join(parts)
 
 
-## The LD's grant channel, said plainly (state from follow-handover.js _readGrant; value = the channel's byte).
+static func _pct(v: Variant) -> int:
+	return roundi(float(v) / 2.55) if v is int or v is float else 0
+
+
+## The LD's grant channel, said plainly (follow-handover.js status: state from _readGrant, value = the channel's byte,
+## applied = what scales the levels now, applies "rig" = read-through switch / "levels" = PSN + levels, proportional).
 static func grant_text(g: Dictionary) -> String:
-	if g.get("needs_through") == true:
-		return "needs Art-Net read-through (the heads must have a console to go back to)"
+	var scaled := " — levels × %d %%" % _pct(g.get("applied")) if g.get("applied") != null else ""
+	if g.get("applies") == "levels" or g.get("needs_through") == true:
+		var only := " (own DMX needs read-through to hand the heads back; only the levels follow it)" if g.get("needs_through") == true else ""
+		match str(g.get("state")):
+			"live":
+				return "LD fader %d %%%s%s" % [_pct(g.get("value")), scaled, only]
+			"held":
+				return "console silent — last grant held%s" % scaled
+			"lost":
+				return "console lost — levels fading to 0%s" % scaled
+			"none":
+				return "no console frame on U%d yet — levels at 0" % int(g.get("universe", 0))
+		return str(g.get("state", "off"))
 	var on: bool = (g.get("value") is int or g.get("value") is float) and float(g.value) >= 128.0
 	match str(g.get("state")):
 		"live":

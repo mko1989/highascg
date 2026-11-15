@@ -183,7 +183,8 @@ function createFollowService(ctx, hub, deps = {}) {
 		// WO-615 T7: visualiser mode reads the console's universes of the typed patch (Art-Net via the shared tap).
 		const vis = engine.dmx.visualise ? engine.fixtures.filter((f) => f.gdtf && f.enabled) : []
 		// WO-1078: both protocols for every visualised universe — a rig split over Art-Net and sACN is patched "artnet"
-		if ((engine.through.enabled && engine.protocol === 'artnet') || vis.length) consoleFrames.start()
+		// WO-1085: the LD's grant channel is read from the console's Art-Net in every mode (PSN + levels too)
+		if ((engine.through.enabled && engine.protocol === 'artnet') || engine.handover.cfg.grant.enabled || vis.length) consoleFrames.start()
 		else consoleFrames.stop()
 		sacnIn.configure(sacnUniversesFor(vis), engine.dmx.sacn_port)
 		const ok = engine.fixtures.filter((f) => !f.problem).length
