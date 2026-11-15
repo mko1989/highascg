@@ -290,6 +290,11 @@ func _card(d: Dictionary, anchors: Dictionary) -> Control:
 	var cue := DM.remote_cue(d.dest, DevicesTarget.value("channelMap"), Store.cluster if DevicesTarget.editing_id == "" else null)
 	if cue != "":  # WO-1029 C15: this destination's screen is output by another linked server
 		wrap.add_child(_label("  " + cue, ThemeBuilder.TEXT_MUTED, 11))
+	var off := DM.offline_cue(str(d.id), _payload)
+	if off != "":  # WO-1084: configured, but its screen is not plugged in (or is the operator's) — not started
+		var ol := _label("  " + off, ThemeBuilder.WARN, 11)
+		ol.tooltip_text = "Plug the screen in: its windows start by themselves. The destination stays configured."
+		wrap.add_child(ol)
 	for l in d.links:
 		wrap.add_child(_label("  • " + str(l), ThemeBuilder.TEXT_MUTED, 11))
 	return wrap

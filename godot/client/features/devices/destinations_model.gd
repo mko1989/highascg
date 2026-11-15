@@ -136,6 +136,20 @@ static func remote_cue(dest: Dictionary, cm: Variant, cluster: Variant = null) -
 	return SC.cue(cm, idx, cluster)
 
 
+## WO-1084: a screen destination that is configured but not started (its screen is not plugged in, or it would cover
+## the operator's screen) — "Not started: DP-4/DP-5 not connected"; "" while it runs. From the server's
+## `live.screenOutputs` (screen-output-status.js), keyed by destination id.
+static func offline_cue(dest_id: String, payload: Variant) -> String:
+	var so: Variant = R.d(R.d(R.d(payload).get("live")).get("screenOutputs")).get(dest_id)
+	if not (so is Dictionary):
+		return ""
+	var state := R.s(so.get("state"))
+	if state != "offline" and state != "partial":
+		return ""
+	var why := R.s(so.get("reason"))
+	return ("Some windows not started" if state == "partial" else "Not started") + (": " + why if why != "" else "")
+
+
 ## The summary table, [[label, value]…] in the web's order.
 static func summary_rows(d: Dictionary, intent: Variant) -> Array:
 	var mode := R.s(d.get("mode")) if H.truthy(d.get("mode")) else "pgm_prv"
