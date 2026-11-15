@@ -1,7 +1,7 @@
 # WO-1085 — Auto follow: spot handover (N nearest heads lit, the rest dark, cross-faded take-overs; PSN-only levels to the desk; the LD's grant)
 
 **Area:** tracking-vr, lighting, godot-client
-**Status: DONE (15.11.26 — 25 node + 6 Godot tests; box harness on the live patch → 127.0.0.1:6455; Split byte-identical to HEAD; GUI shows on the next relaunch; MA3 side untested)**
+**Status: DONE (15.11.26 — 33 node + 7 Godot tests; box harnesses on the live patch → 127.0.0.1:6455; Split / no-grant byte-identical; follow-up: grant scales the PSN levels; GUI shows on the next relaunch; MA3 side untested)**
 
 Owner (15.11): "id like an effect that the lone presenter is lit by the 3 heads and the rest is off, then when he moves
 the heads follow him but also other heads 'take over' when his crossing a threshold." — "id like to also be able to send
@@ -105,7 +105,8 @@ the console drives the fronts.
   the read-through console universe or the grant universe read back (`reachesSelf`), a block past channel 512.
   Split mode sends 255 for every following / home head.
 - **Output c — off**: levels off, output master off → nothing.
-- **The LD's grant** (`grant`: universe + address, optional `per_head` = N consecutive channels, patch order):
+- **The LD's grant** (`grant`: universe + address, optional `per_head` = N consecutive channels, patch order): *(Follow-up below: the grant now also
+  scales the levels universe, proportionally, in PSN + levels mode.)*
   read-through only (the heads need a console frame to go back to; without read-through the section says
   `needs_through`). ≥ 128 = HighAsCG drives the pool's pan / tilt / Dimmer; < 128 = the console's values pass through
   with the read-through fade. Revoking freezes the head's level in a `released` phase while the read-through weight
@@ -142,25 +143,83 @@ the console drives the fronts.
   `offline-test-files-2.js`; `godot/client/tests/test_handover_model_wo1085.gd` (6 tests). WO-807's pixel-map smoke
   pinned "pixel map right after writeFixture" — repointed to include the new Dimmer line (same strictness).
 
-### grandMA3 side (PSN only + levels) — NOT TESTED, no desk here
+### grandMA3 side (PSN + levels, the one-fader workflow) — NOT TESTED against a desk
 
 1. PSN as in the in-app help (`godot/client/help/psn-output.md`, grandMA3 ≥ 1.7): one MArker per Auto lane (tracker
-   id 64999 = A1, 64998 = A2 …), the spot heads' fixture group set to that MArker on XYZ page 3.
-2. Levels: Menu → DMX Protocols → Art-Net (or sACN) → an **Input** line for the levels universe from this box.
-3. Per pool head one sequence holding that head's Dimmer at full (or the look you want), on an executor.
-4. Menu → In & Out → **DMX Remotes**: one remote per head channel (start address + i), target = that executor,
-   type fader — the executor fader follows HighAsCG's level, so the cross-fades are HighAsCG's timing.
-5. Optional: channel start + N ("someone followed") on a remote → a sequence for "nobody on stage" (house look).
-6. HighAsCG: Follow → Output PosiStageNet ON, Spot handover, "Send head levels to the console" with the desk's IP.
-Check on the desk: HTP vs LTP of the executor against other playbacks, and that the remote's fader range maps 0–255.
+   id 64999 = A1, 64998 = A2 …), the spot heads' fixture group set to that MArker on XYZ page 3. The desk aims.
+2. **The grant fader**: patch one spare channel as a dimmer-only fixture named e.g. "HighAsCG grant" on a universe
+   the desk outputs to this box over Art-Net (Menu → DMX Protocols → Art-Net → an Output line to this box's IP). Put
+   it on a fader. In HighAsCG: Follow → Spot handover → Grant on, that universe (port-address) and address.
+3. **The levels**: Menu → DMX Protocols → Art-Net (or sACN) → an **Input** line for the levels universe from this
+   box. Per pool head one sequence holding that head's Dimmer at full (or the look you want), on an executor; Menu →
+   In & Out → **DMX Remotes**: one remote per head channel (start address + i), target = that executor, type fader.
+   HighAsCG's level is the fader, so the take-over cross-fades are HighAsCG's timing.
+4. **The workflow**: grant fader up = the automation's levels arrive (scaled by the fader, slewed at the take-over
+   fade, so a snapped fader still fades); grant fader down = levels 0 = the executors sit at 0 and the LD's own
+   playbacks have the fronts. Pan / tilt keep following through PSN either way (they are dark unless lit).
+5. Information channels (never scaled): start + N "someone followed", then A1…A9, Pin 1…9 — e.g. a remote on
+   "someone followed" for a house look; the channel after them echoes the grant HighAsCG applies now (0–255), so a
+   desk channel monitor shows the permission is honoured.
+6. Lost desk → HighAsCG holds the last grant 7.5 s (2.5 s stale + 5 s), then fades its levels to 0.
+Check on the desk: HTP vs LTP of the executors against other playbacks, and that a DMX remote's fader maps 0–255.
 
 ### Deferred / not built
 
-- sACN console input for the grant (read-through is Art-Net only today, as WO-632).
+- sACN console input for the grant (the console input is Art-Net only today, as WO-632).
 - PREAIM_S (0.5 s) is a constant, not a setting; the Auto overlay's per-slot head counts (WO-710) do not apply in
   handover mode (N heads per person replaces them).
 - Going home: lit heads dip (fade out → re-aim dark → fade up at home, ~1.5 s); accepted to keep "never a lit swing".
 - Generic (non-GDTF) heads have no Dimmer: they aim like the rest but cannot be darkened (listed in `no_dimmer`).
+
+## Follow-up (15.11, owner): the grant in PSN + levels mode
+
+Owner: "psn plus an extra universe seems good. how to make the input universe from highascg drive real dimmers but
+only when the operator lets it". **Investigation**: the grant was read only with read-through
+(`follow-handover.js _readGrant` returned "off" unless `_thru()`), and the console's Art-Net input
+(`ConsoleFrames`) was only started for read-through or the visualiser (`follow-service.js` apply). In PSN mode the
+desk drives every real dimmer, so the only thing the grant can hold back is the levels universe.
+
+**What was done** (`src/fixtures/follow-handover.js`, `follow-service.js`, Godot `handover_model.gd` /
+`handover_section.gd`):
+- The grant is read in every mode once configured; `follow-service.js` starts the console input when
+  `handover.grant.enabled` (the WO-1078 pin `|| vis.length) consoleFrames.start()` still matches).
+- **Levels: proportional.** Each head level × grant / 255 (per head with `per_head`), slewed towards the value at
+  1 / `fade_s` per second (`_slewGrant`): one desk fader cross-fades the whole automation, a fader snapped to 0 or
+  full still fades (≤ 7 per 25 ms tick at 1 s). Presence channels stay unscaled; a new channel after Pin 9 echoes the
+  applied grant (`EXTRA_CH` 19 → 20; the per-head echo is the mean). The levels apply the proportional grant in
+  every mode (also next to read-through).
+- **Rig (own DMX + read-through) keeps the ≥ 50 % switch.** Why not proportional there too: the grant hands over
+  pan / tilt as well, and a pan half-way between the desk's position and the person is no look; the read-through
+  fade already gives the switch a soft edge. Own DMX without read-through: the grant scales the levels only
+  (`needs_through` says so).
+- **Fail-safe**: the same hold — the last fresh value is used for `GRANT_HOLD_MS` (5 s) after the frame is stale
+  (2.5 s); then (state "lost") the target is 0 and the levels fade out: when HighAsCG can no longer hear the LD's
+  permission it stops asking for light. The rig is untouched (in PSN mode the desk drives it). Never seen = 0.
+- **Collisions**: the levels universe on the grant's Art-Net universe is refused (`levels.problem`), on top of the
+  rig / self-loop / read-back refusals.
+- **No grant configured**: unscaled, echo channel 0 — the packets are byte-identical to before.
+- **Status / UI**: `grant.applies` ("levels" | "rig"), `grant.value` (the fader's byte), `grant.applied` (0–255).
+  The Godot section keeps the levels and grant rows reachable in Split too (the spot settings hide); its status line
+  reads e.g. "grant: LD fader 50 % — levels × 50 %", "console silent — last grant held …", "console lost — levels
+  fading to 0 …", "no console frame on U5 yet — levels at 0".
+
+**Verified**:
+- Engine suite 22/22 (8 new: grant 0 / 128 / 255 → head levels 0 / 128 / 255 with presence 255 and the echo equal,
+  no rig packets in PSN; fader snaps 255 → 0 → 255 with no step > 7; lost console held for GRANT_HOLD_MS then faded
+  to 0 with "someone followed" still 255; never seen = 0; per-head [255, 0, 128] on the three active heads with the
+  mean echoed; levels on the grant universe refused; no grant = full scale, echo 0; the service wiring pin).
+- Golden compare against the commit before the follow-up (`a0f7dca4`), no grant configured: handover PSN + levels
+  849 / 849, handover Art-Net + levels 849 / 849, Split + levels 615 / 615 packets identical.
+- Box harness (`box-harness-grant.js`: the live patch read-only, PSN mode, a real `ConsoleFrames` fed encoded Art-Net
+  grant packets at ~40 Hz on U5 ch 512 — no socket on :6454, so the live server's input saw nothing; real
+  `ArtnetSender` → 127.0.0.1:6455, 201 / 201 packets captured, no rig universe): presenter at y −3 → FP3-5 chosen;
+  fader 0 → levels 0 while presence 255; ramp to 255 over 2 s → 121 at 5 s, 255 by 7 s; snap to 0 at 10 s → 0 by
+  11 s; snap to 255 at 13 s → 255 by 14 s; 128 at 16 s → 128; console silent at 19.0 s → held 128 until 26.48 s,
+  all 0 at 26.95 s; largest head-level change per tick 7.0 (slew 6.4 + rounding). Echo channel followed throughout.
+- Live server restarted (21:22:55, flock + PID guard): `handover.grant` "off" / applies "levels", console input not
+  started (grant off in the owner's show), no new errors (the live-audio ALSA bridge error is on every boot since
+  20:53, before this work).
+- Godot `test_handover`: 76 passed (levels-mode grant texts, Split keeps levels + grant reachable).
 
 ## What was VERIFIED
 
