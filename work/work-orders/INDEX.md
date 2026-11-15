@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-992 live WOs (35 open, 154 in progress, 803 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+993 live WOs (35 open, 154 in progress, 804 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -947,7 +947,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 922 DONE [media] Media import keeps Polish file names on every path (URL downloads saved the %-e… → 922_WO_media_import_utf8_names.md
 - 951 DONE [media+godot-client] Import a .gtzip lower third (NewTek LiveGraphics-style) as a CG Studio template → 951_WO_gtzip_lower_third_import.md
 
-## tracking-vr — Tracking, previs, VR (36)
+## tracking-vr — Tracking, previs, VR (37)
 
 - 17 DONE [tracking-vr+web-client] 3D Previs — Live Video on Imported 3D Stage Models → 17_WO_3D_PREVIS.md
 - 30 IN PROGRESS [tracking-vr+process] Previs & Tracking Module — Packaging and Integration → 30_WO_PREVIS_TRACKING_MODULE.md
@@ -985,6 +985,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1036 DONE [tracking-vr+godot-client] Presenters from a tracking-camera picture, named by the operator → 1036_WO_presenters_from_tracking_camera.md
 - 1040 DONE [tracking-vr+godot-client] Tracking camera solve: camera 2 lands under the deck, facing away (stage out of… → 1040_WO_tracking_camera_solve_mirror_when_origin_behind.md
 - 1080 IN PROGRESS [tracking-vr] tracking: new person ids all the time, no memory, detections not held → 1080_WO_tracking_person_ids_no_memory.md
+- 1085 DONE [tracking-vr+lighting,godot-client] Auto follow: spot handover (N nearest heads lit, the rest dark, cross-faded tak… → 1085_WO_auto_follow_spot_handover.md
 
 ## testing-ci — Tests and CI (28)
 
