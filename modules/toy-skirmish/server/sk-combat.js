@@ -14,12 +14,17 @@
  *         4 u, no line of sight needed, the owner × 0.5 (no surge on himself), team-mates spared in tdm
  *   pick  alive, phase lobby / match, the pickup is there, server position within 0.5 u (+ 0.5 u slack: it is ≤ 50 ms
  *         old) → weapon / ammo (refused when held at max), health +35 (not at 100), armour +50 (not at 100), surge 20 s
+ * Bots (WO-1083) on top: a bot's `hit` needs the server distance ≤ range (no slack), the victim inside what a player
+ * standing where the bot stands could see (sk-view.js `botSees`, both ways) and a line to it that crosses no solid
+ * cell at all (no tolerance); its splash spares every soldier outside that view from the fire position. No other path
+ * applies bot damage.
  * Kills: score = kills − suicides (tdm: the team total moves the same way); nothing is scored outside a match; lobby
  * deaths respawn at once, match deaths after 3 s, at the spawn farthest from enemies, with 1.5 s protection.
  */
 
 const { WEAPONS, ROCKET, PICKUPS, RULES, dirOf } = require('./sk-rules')
 const G = require('./sk-grid')
+const { botSees } = require('./sk-view')
 
 /** @param {object} X the room context (sk-room.js) */
 function createCombat(X) {
@@ -181,7 +186,9 @@ function createCombat(X) {
 		if (X.mode() === 'tdm' && v.team === p.team) return false
 		if (!rec || WEAPONS[rec.w].kind !== 'hitscan' || t - rec.at > RULES.fireWindowMs || rec.left <= 0) return false
 		const W = WEAPONS[rec.w]
-		if (Math.hypot(v.pos[0] - p.pos[0], v.pos[1] - p.pos[1]) > (W.range + RULES.hitSlack) * u()) return false
+		// a bot's positions are the server's own (no latency slack) and it hurts only what a player in its place could see
+		if (Math.hypot(v.pos[0] - p.pos[0], v.pos[1] - p.pos[1]) > (W.range + (p.bot ? 0 : RULES.hitSlack)) * u()) return false
+		if (p.bot && (!botSees(p.pos, v.pos, u()) || !G.lineClear(X.grid, p.pos[0], p.pos[1], v.pos[0], v.pos[1]))) return false
 		if (!G.lineClear(X.grid, p.pos[0], p.pos[1], v.pos[0], v.pos[1], true)) return false
 		const k = Math.min(m.k, rec.left)
 		rec.left -= k
@@ -205,6 +212,7 @@ function createCombat(X) {
 		for (const v of [...X.players.values()]) {
 			if (!v.alive || !v.pos || v.protectUntil > t) continue
 			if (v !== p && X.mode() === 'tdm' && v.team === p.team) continue
+			if (v !== p && p.bot && !botSees(rec.p, v.pos, u())) continue // a bot's rocket spares what it could not see from where it fired
 			const d = Math.hypot(v.pos[0] - m.p[0], v.pos[1] - m.p[1])
 			if (d >= R) continue
 			const base = WEAPONS.thumper.dmg * (1 - d / R)

@@ -107,7 +107,7 @@ test('join → welcome + spawn + state; names cleaned; spectators; full', (t) =>
 	assert.deepEqual(w.you, { id: a.id, name: 'Ola b', color: '#ff5533', team: null, spectator: false })
 	assert.equal(w.state.arenaId, 'box')
 	assert.equal(w.state.phase, 'lobby')
-	assert.deepEqual(Object.keys(w.state), ['maxPlayers', 'phase', 'mode', 'arenaId', 'limits', 'startAt', 'endsAt', 'bots', 'players', 'teams', 'pk', 'spectators'])
+	assert.deepEqual(Object.keys(w.state), ['maxPlayers', 'phase', 'mode', 'arenaId', 'limits', 'startAt', 'endsAt', 'bots', 'botLevel', 'players', 'teams', 'pk', 'spectators'])
 	assert.equal(last(a, 'spawn').id, a.id)
 	assert.equal(last(a, 'me').hp, 100)
 	const b = join(42, { color: 'red' })

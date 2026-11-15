@@ -5,27 +5,29 @@
  * towards the 10 players, so a joining guest takes a bot's place and a leaving one gives it back. Each bot (10 Hz,
  * timer only while bots exist):
  *   - moves on the arena's grid at 4.5 u/s: A* path (sk-grid.js findPath over the cells a soldier fits) to a goal — a
- *     pickup it wants (a weapon it lacks / is low on, health under 70, armour under 50, surge), else a random spawn;
- *     re-plans every 2–4 s, when it arrives or when the path is gone; looks ahead along the path where the straight
+ *     pickup it wants (a weapon it lacks, health under 70, armour under 50, surge — near enough to be worth it), else
+ *     a patrol of the spawn points it passed longest ago (kept until reached); re-plans every 2–4 s, when it arrives or
+ *     when the path is gone; looks ahead along the path where the straight
  *     line stays on passable cells; picks up what it touches (through the same rules as a player's `pick`);
- *   - turns towards the nearest visible enemy (line of sight on the full grid, within 45 u) and, once that enemy has
- *     been in sight for 0.35 s, fires the best weapon it holds for the distance with an aim error of ± 6° (± 3° for the
- *     Longshot) — through the same `fire` acceptance as a player (interval, ammo);
+ *   - notices, turns towards and fires at only what a player in its place could see (WO-1083, sk-bot-aim.js: the
+ *     follow camera's frame both ways — never past 7.1 u — and a clear line on the full grid), after a reaction time,
+ *     at a limited turn rate, with an aim error that grows with distance; the host's level (easy / normal / hard) sets
+ *     those numbers — through the same `fire` acceptance as a player (interval, ammo);
  *   - its hits are decided by the server against its own positions: hitscan pellets (the shot's seed, mulberry32, as
  *     every client draws them) are traced to the first soldier or solid cell, enemy hits go through the same `hit`
- *     rules (§5); a Thumper rocket is flown to its first solid cell / soldier / 4 s and reported as the owner's `boom`
+ *     rules (§5, plus the bot view rule there); a Thumper rocket is flown to its first solid cell / soldier / 4 s and reported as the owner's `boom`
  *     after its flight time.
  */
 
 const G = require('./sk-grid')
 const { kit } = require('./sk-kit')
 const { WEAPONS, ROCKET, SOLDIER, RULES, pelletYaws, dirOf, yawTo } = require('./sk-rules')
+const A = require('./sk-bot-aim')
 
 const NAMES = ['Sgt Sprocket', 'Pip Pebble', 'Cpl Crumb', 'Major Mallow', 'Cadet Button', 'Lt Biscuit']
 const BOT_MS = 100
-const REACTION_MS = 350
-const SIGHT_U = 45
-const DEG = Math.PI / 180
+const WISH_MIN = 0.9 // a pickup's worth / (1 + distance / 10 u): a missing weapon within ~23 u, health when hurt
+const VISIT_U = 3 // a patrol point counts as visited this close
 
 /**
  * @param {object} X the room context  @param {object} combat sk-combat.js
@@ -33,6 +35,7 @@ const DEG = Math.PI / 180
  */
 function createBots(X, combat, hooks) {
 	let wanted = 0
+	let level = 'normal'
 	const list = []
 	let timer = null
 	const now = () => X.now()
@@ -44,7 +47,8 @@ function createBots(X, combat, hooks) {
 		const name = NAMES.find((n) => !used.has(n)) || `Bot ${list.length + 1}`
 		const pal = kit().PALETTE
 		const p = hooks.add(name, pal[(NAMES.indexOf(name) + 3) % pal.length])
-		p.ai = { n: 0, path: null, i: 0, goal: null, replanAt: 0, target: null, seenSince: 0, rockets: [], last: now() }
+		p.ai = { n: 0, path: null, i: 0, goal: null, replanAt: 0, target: null, seenSince: 0, reactMs: 0, lostId: null, lostAt: 0, aim: null,
+			seen: new Map(), rockets: [], last: now() }
 		list.push(p)
 		combat.spawn(p, X.phase() === 'countdown' || X.phase() === 'results' ? { until: now() + RULES.protectMs } : {})
 	}
@@ -71,18 +75,7 @@ function createBots(X, combat, hooks) {
 	const enemiesOf = (p) => [...X.players.values()].filter((q) => q !== p && q.alive && q.pos && (q.connected || q.bot) &&
 		(X.mode() !== 'tdm' || q.team !== p.team))
 
-	/** Nearest enemy in sight (full grid, not spawn-protected). */
-	function sight(p) {
-		let best = null, bd = SIGHT_U * u()
-		for (const q of enemiesOf(p)) {
-			if (q.protectUntil > now()) continue
-			const d = Math.hypot(q.pos[0] - p.pos[0], q.pos[1] - p.pos[1])
-			if (d < bd && G.lineClear(X.grid, p.pos[0], p.pos[1], q.pos[0], q.pos[1])) (best = q), (bd = d)
-		}
-		return best
-	}
-
-	/** The pickup worth walking to, or null. */
+	/** The pickup worth walking to (worth ≥ WISH_MIN: one it lacks or needs, not a top-up across the map), or null. */
 	function wish(p) {
 		let best = null, bs = 0
 		for (const it of X.arena.pickups) {
@@ -96,28 +89,40 @@ function createBots(X, combat, hooks) {
 			const s = v / (1 + Math.hypot(it.x - p.pos[0], it.z - p.pos[1]) / (10 * u()))
 			if (s > bs) (best = it), (bs = s)
 		}
-		return best
+		return bs >= WISH_MIN ? best : null
+	}
+
+	/**
+	 * Patrol (WO-1083: a bot sees no farther than a player, so it has to go and look): the spawn points it has not
+	 * passed for the longest time, one of the three oldest at random, not the one it stands at.
+	 */
+	function roam(p) {
+		const ai = p.ai
+		const A = X.arena
+		const list = A.spawns.map((sp, i) => ({ sp, at: ai.seen.get(i) ?? -Infinity, r: X.rng() }))
+			.filter((o) => Math.hypot(o.sp.x - p.pos[0], o.sp.z - p.pos[1]) > VISIT_U * u())
+			.sort((a, b) => a.at - b.at || a.r - b.r)
+		return list.slice(0, 3).sort((a, b) => a.r - b.r).map((o) => [o.sp.x, o.sp.z])
 	}
 
 	function plan(p) {
 		const ai = p.ai
-		const A = X.arena
 		ai.replanAt = now() + 2000 + X.rng() * 2000
 		const it = wish(p)
-		const goals = it ? [[it.x, it.z]] : []
-		for (let n = 0; n < 3; n++) {
-			const s = A.spawns[Math.floor(X.rng() * A.spawns.length)]
-			goals.push([s.x, s.z])
-		}
+		// a patrol goal is kept until it is reached (re-planned only for the path); a wanted pickup comes first
+		const keep = ai.goal && Math.hypot(ai.goal[0] - p.pos[0], ai.goal[1] - p.pos[1]) > VISIT_U * u() ? [ai.goal] : []
+		const goals = it ? [[it.x, it.z], ...keep, ...roam(p)] : [...keep, ...roam(p)]
 		for (const g of goals) {
 			const path = G.findPath(X.grid, X.mask, p.pos[0], p.pos[1], g[0], g[1])
 			if (path && path.length > 1) {
+				ai.goal = it && g[0] === it.x && g[1] === it.z ? null : g
 				ai.path = path
 				ai.i = 0 // the own cell's centre first (the bot stands somewhere in it), the look-ahead skips it when it can
 				return
 			}
 		}
 		ai.path = null
+		ai.goal = null
 	}
 
 	/** A straight walk the soldier's circle never touches a solid cell on (exact clearance every quarter cell). */
@@ -129,10 +134,11 @@ function createBots(X, combat, hooks) {
 		return true
 	}
 
+	/** One walking step; → the walking yaw, or null when it stood still. */
 	function move(p, dt) {
 		const ai = p.ai
 		if (!ai.path || ai.i >= ai.path.length || now() >= ai.replanAt) plan(p)
-		if (!ai.path) return false
+		if (!ai.path) return null
 		let step = SOLDIER.speed * u() * dt
 		const before = p.pos.slice()
 		while (step > 1e-9 && ai.i < ai.path.length) {
@@ -155,21 +161,13 @@ function createBots(X, combat, hooks) {
 		}
 		p.pos = [Math.round(p.pos[0] * 1e4) / 1e4, Math.round(p.pos[1] * 1e4) / 1e4]
 		const moved = Math.hypot(p.pos[0] - before[0], p.pos[1] - before[1])
-		if (moved > 1e-6 && !ai.target) p.yaw = Math.round(yawTo(before[0], before[1], p.pos[0], p.pos[1]) * 1000) / 1000
+		X.arena.spawns.forEach((sp, i) => {
+			if (Math.hypot(sp.x - p.pos[0], sp.z - p.pos[1]) <= VISIT_U * u()) ai.seen.set(i, now())
+		})
 		for (const it of X.arena.pickups) {
 			if (combat.available(it.id) && Math.hypot(it.x - p.pos[0], it.z - p.pos[1]) <= RULES.pickRadius * u()) combat.pick(p, { id: it.id })
 		}
-		return moved > 1e-6
-	}
-
-	/** Best weapon held (with ammo) for a target d u away, or null. */
-	function choose(p, d) {
-		const has = (w) => p.w[w] !== undefined && p.w[w] !== 0 && d <= WEAPONS[w].range
-		if (has('scatter') && d <= 12) return 'scatter'
-		if (has('thumper') && d > ROCKET.splash + 1.5) return 'thumper'
-		if (has('longshot') && d > 18) return 'longshot'
-		for (const w of ['rattler', 'longshot', 'scatter', 'pea']) if (has(w)) return w
-		return null
+		return moved > 1e-6 ? yawTo(before[0], before[1], p.pos[0], p.pos[1]) : null
 	}
 
 	/** First soldier (other than p) a ray meets before `max`: { q, t } or null. */
@@ -191,12 +189,11 @@ function createBots(X, combat, hooks) {
 	function shoot(p, target) {
 		const ai = p.ai
 		const d = Math.hypot(target.pos[0] - p.pos[0], target.pos[1] - p.pos[1]) / u()
-		const w = choose(p, d)
+		const w = A.choose(p, d)
 		if (!w) return
 		const last = p.lastFire[w]
 		if (last != null && now() - last < WEAPONS[w].interval * 1000) return
-		const err = (w === 'longshot' ? 3 : 6) * DEG
-		const yaw = yawTo(p.pos[0], p.pos[1], target.pos[0], target.pos[1]) + (X.rng() * 2 - 1) * err
+		const yaw = A.shotYaw(X, p, d, A.LEVELS[level])
 		const rec = combat.fire(p, { w, n: ++ai.n, p: p.pos.slice(), yaw: Math.round(yaw * 1000) / 1000 })
 		if (!rec) return
 		if (WEAPONS[w].kind === 'rocket') {
@@ -232,17 +229,17 @@ function createBots(X, combat, hooks) {
 			if (!p.alive || !p.pos || !X.grid || !acting()) {
 				ai.path = null
 				ai.target = null
+				ai.aim = null
 				if (p.mv) (p.mv = 0), X.dirty()
 				continue
 			}
-			const moved = move(p, dt)
-			const q = sight(p) // after the step: a bot fires only at what it sees from where it stands
-			if (q !== ai.target) (ai.target = q), (ai.seenSince = t)
-			if (q) p.yaw = Math.round(yawTo(p.pos[0], p.pos[1], q.pos[0], q.pos[1]) * 1000) / 1000
-			p.mv = moved ? 1 : 0
+			const heading = move(p, dt)
+			const q = A.spot(X, p, enemiesOf(p), t) // after the step: only what it sees from where it stands
+			const ready = A.aimStep(X, p, q, t, dt, heading, A.LEVELS[level])
+			p.mv = heading != null ? 1 : 0
 			p.moveAt = t
 			X.dirty()
-			if (q && t - ai.seenSince >= REACTION_MS && p.alive) shoot(p, q)
+			if (ready && p.alive) shoot(p, q)
 		}
 	}
 
@@ -253,13 +250,20 @@ function createBots(X, combat, hooks) {
 			sync()
 		},
 		wanted: () => wanted,
+		/** The host's bot skill (sk-bot-aim.js LEVELS). → false for an unknown level. */
+		setLevel(l) {
+			if (!A.LEVELS[l]) return false
+			level = l
+			return true
+		},
+		level: () => level,
 		/** The host kicked a bot: one fewer wanted. */
 		kick(p) {
 			wanted = Math.max(0, wanted - 1)
 			remove(p)
 		},
 		arenaChanged() {
-			for (const p of list) (p.ai.path = null), (p.ai.rockets = [])
+			for (const p of list) (p.ai.path = null), (p.ai.goal = null), (p.ai.rockets = []), p.ai.seen.clear()
 		},
 		list: () => list.slice(),
 		running: () => !!timer,

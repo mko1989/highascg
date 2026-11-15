@@ -84,7 +84,7 @@ function createSkRoom(deps) {
 
 	function snapshot() {
 		return {
-			maxPlayers, phase, mode, arenaId, limits: { ...limits }, startAt: phase === 'countdown' ? startAt : null, endsAt, bots: bots.wanted(),
+			maxPlayers, phase, mode, arenaId, limits: { ...limits }, startAt: phase === 'countdown' ? startAt : null, endsAt, bots: bots.wanted(), botLevel: bots.level(),
 			players: [...players.values()].sort((a, b) => a.id - b.id).map((p) => ({ id: p.id, name: p.name, color: p.color, team: p.team, bot: p.bot,
 				connected: p.connected || p.bot, kills: p.kills, deaths: p.deaths, score: p.score })),
 			teams: X.teams.slice(), pk: combat.pkList(), spectators: spectators(),
@@ -333,6 +333,9 @@ function createSkRoom(deps) {
 				bots.setWanted(a.n)
 				break
 			}
+			case 'botlevel': // WO-1083: easy / normal / hard (reaction, turn rate, aim error — never the view rule)
+				if (!bots.setLevel(a.level)) return { ok: false, status: 400, error: "level 'easy', 'normal' or 'hard'" }
+				break
 			case 'start':
 				if (!idle) return busy
 				return start()

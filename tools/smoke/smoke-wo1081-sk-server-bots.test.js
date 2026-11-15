@@ -4,7 +4,8 @@
  * WO-1081 — Stage Skirmish bots (work/notes/skirmish-game-contract.md §8) on a generated arena of the default hall (baked
  * into a temp cache): the host's count and the free places (a joining guest takes a bot's place), the bot timer only
  * while bots exist, and one simulated minute of a match (injected clock and timers) watched through a spectator:
- * bots move along passable cells, fire only at an enemy in line of sight within 45 u, never faster than the weapon's
+ * bots move along passable cells, fire only at an enemy in line of sight inside a player's view (WO-1083: sk-view.js
+ * botSees, never past 7.1 u), never faster than the weapon's
  * interval and never a weapon they do not hold, and they score.
  */
 
@@ -22,6 +23,7 @@ const { createSkScene } = require('../../modules/toy-skirmish/server/sk-scene')
 const { createSkRoom } = require('../../modules/toy-skirmish/server/sk-room')
 const R = require('../../modules/toy-skirmish/server/sk-rules')
 const G = require('../../modules/toy-skirmish/server/sk-grid')
+const V = require('../../modules/toy-skirmish/server/sk-view')
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'wo1081-bots-'))
 let scene = null
@@ -110,7 +112,7 @@ test('a simulated minute: bots never overlap a solid cell, fire only with line o
 		if (m.t !== 'shot' || !ctx) return
 		const p = ctx.players.get(m.id)
 		const enemies = [...ctx.players.values()].filter((q) => q !== p && q.alive && q.pos)
-		shots.push({ m, w: { ...p.w }, at: ctx.now(), seen: enemies.some((q) => Math.hypot(q.pos[0] - p.pos[0], q.pos[1] - p.pos[1]) <= 45 * ctx.u + 1e-9 &&
+		shots.push({ m, w: { ...p.w }, at: ctx.now(), seen: enemies.some((q) => V.botSees(p.pos, q.pos, ctx.u) &&
 			G.lineClear(ctx.grid, p.pos[0], p.pos[1], q.pos[0], q.pos[1])) })
 	})
 	ctx = X
