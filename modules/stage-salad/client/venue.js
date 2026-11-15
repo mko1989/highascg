@@ -16,6 +16,7 @@ export const WALL_DEPTH = 0.12
 export const TRUSS_R = 0.2
 export const LIGHT_R = 0.22
 export const MAX_LIGHT_SPHERES = 40
+export const SKIRT_MAX = 2.5 // m — a screen this close above the floor gets a skirt down to it
 
 const r4 = (v) => Math.round(v * 1e4) / 1e4 + 0
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d)
@@ -115,7 +116,11 @@ function lightColliders(lights) {
 	return out
 }
 
-function wallColliders(screens) {
+/**
+ * The screens as thin boxes behind their pictures. An upright picture whose bottom edge is at most SKIRT_MAX above the
+ * hall floor reaches down to it (the black skirt / truss under a real LED wall): nothing flies through under it.
+ */
+function wallColliders(screens, floorY) {
 	const out = []
 	for (const s of Array.isArray(screens) ? screens : []) {
 		if (!Array.isArray(s?.p) || !Array.isArray(s?.size)) continue
@@ -123,7 +128,10 @@ function wallColliders(screens) {
 		if (!(w > 0.05 && h > 0.05)) continue
 		const ax = axesYXZ(s.rot).map((v) => v.map(r4))
 		const c = s.p.map((v, j) => r4(num(v) - ax[2][j] * (WALL_DEPTH / 2)))
-		out.push({ k: 'obox', c, ax, h: [r4(w / 2), r4(h / 2), WALL_DEPTH / 2], tag: 'wall' })
+		let hh = h / 2
+		const gap = c[1] - hh - floorY
+		if (ax[1][1] > 0.95 && gap > 0 && gap <= SKIRT_MAX) (hh += gap / 2), (c[1] = r4(c[1] - gap / 2))
+		out.push({ k: 'obox', c, ax, h: [r4(w / 2), r4(hh), WALL_DEPTH / 2], tag: 'wall' })
 	}
 	return out
 }
@@ -152,7 +160,7 @@ export function buildVenue(scene, live = {}) {
 	const [hx0, hz0, hx1, hz1] = hall.rect
 	const colliders = [{ k: 'plane', n: [0, 1, 0], d: hall.y, tag: 'floor' }]
 	if (stage.y > hall.y + 0.02) colliders.push({ k: 'box', min: [stage.rect[0], hall.y - 0.2, stage.rect[1]], max: [stage.rect[2], stage.y, stage.rect[3]], tag: 'stage' })
-	colliders.push(...wallColliders(live.screens), ...lightColliders(live.lights))
+	colliders.push(...wallColliders(live.screens, hall.y), ...lightColliders(live.lights))
 	colliders.push(
 		{ k: 'plane', n: [1, 0, 0], d: hx0, tag: 'room' },
 		{ k: 'plane', n: [-1, 0, 0], d: -hx1, tag: 'room' },
