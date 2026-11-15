@@ -84,6 +84,10 @@ func resync() -> void:
 	var zr: Dictionary = await Api.get_json("/api/tracking/zones")
 	if zr.ok and zr.data is Dictionary:
 		_adopt_zones(zr.data)
+	var dr: Dictionary = await Api.get_json("/api/tracking/detections")  # WO-1087: people as they are now (a restarted
+	if dr.ok and dr.data is Dictionary:  # node sends no tracking:detections while nothing changes: avatars froze)
+		detections = dr.data
+		detected.emit()
 
 
 ## Project markers + floor grid (home = grid centre on the floor).

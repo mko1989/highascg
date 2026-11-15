@@ -18,6 +18,19 @@ func _ready() -> void:
 	var ws := get_node_or_null("/root/Ws")  # the autoload (looked up, so tests can load this script without it)
 	if ws != null:
 		ws.message.connect(_on_ws)
+		ws.connected.connect(resync)
+	resync()
+
+
+## WO-1087: the hub's list as it is now. A node that restarts with an empty hub never broadcasts tracking:markers
+## (nothing changes), so without this a pin of the old process (the marker puppet) stood on the stage for good.
+func resync() -> void:
+	var api := get_node_or_null("/root/Api")
+	if api == null:
+		return
+	var res: Dictionary = await api.get_json("/api/tracking/markers")
+	if res.ok and res.data is Dictionary:
+		show_markers((res.data as Dictionary).get("markers", []))
 
 
 func _on_ws(type: String, data: Variant) -> void:
@@ -98,4 +111,10 @@ func _place(pin: Dictionary, m: Dictionary) -> void:
 	var tag := pin.tag as Label3D
 	tag.text = lk.text
 	tag.modulate = lk.color
-	tag.position = Vector3(0, h + 0.3, 0)
+	# WO-1087: a pin a tracked person drives (Auto / detect, at their feet) — the person is drawn right there, so its
+	# tag is small and beside the ball, not a big label across their legs
+	var worn: bool = m.get("source") == "detect"
+	tag.pixel_size = 0.005 if worn else 0.012
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if worn else HORIZONTAL_ALIGNMENT_CENTER
+	tag.offset = Vector2(36, 0) if worn else Vector2.ZERO
+	tag.position = Vector3(0, h + (0.02 if worn else 0.3), 0)
