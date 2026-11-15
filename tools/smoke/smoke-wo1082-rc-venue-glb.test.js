@@ -192,6 +192,8 @@ const scene = () => ({
 		// a 1.5 × 1.5 m rug, 2 cm thick, on the carpet (flat decor: driven over) and a 10 cm step beside it (blocks)
 		{ uuid: 'rug', layer: 'Decor', parts: [{ mesh: 'cube', xform: boxXf([1.5, 0.02, 1.5], [-6, 0.02, 0]) }] },
 		{ uuid: 'step', layer: 'Decor', parts: [{ mesh: 'cube', xform: boxXf([1.5, 0.1, 1.5], [-6, 0.06, 4]) }] },
+		// a thin plate rising 0 → 12 cm over 4 m (x 0 … 4 after place.x): floor where it is below 3 cm, an obstacle above
+		{ uuid: 'slope', layer: 'Decor', parts: [{ mesh: 'cube', xform: [4, 0.12, 0, 0, 0.005, 0, 0, 0, 1.5, 0, 0.06, -6] }] },
 		{
 			uuid: 'SPOT',
 			layer: 'Lights',
@@ -328,6 +330,9 @@ test('toy scale: the carpet leaves the occupancy grid empty; a missing / unreada
 		// rug −4.75 … −3.25 (x, after place.x), −0.75 … 0.75 (z): its edges and top lie within 3 cm (0.3 u) of the floor
 		for (const [x, z] of [[-4.75, 0], [-3.25, 0], [-4, -0.75], [-4, 0.75], [-4, 0]]) assert.ok(!g.blocked(x, z), `flat rug (${x}, ${z}) is floor`)
 		assert.ok(g.blocked(-4.75, 4) || g.blocked(-4.77, 4), 'the 10 cm step is an obstacle')
+		// the band starts at 0.3 u: the low end of a sloped plate is floor even though the plate rises higher elsewhere
+		for (const x of [0.2, 0.5]) assert.ok(!g.blocked(x, -6), `sloped plate below 3 cm (x ${x}) is floor`)
+		for (const x of [1.4, 1.7]) assert.ok(g.blocked(x, -6), `sloped plate inside the band, 3 … 6 cm (x ${x}), blocks`)
 		const bad = path.join(dir, 'bad.glb')
 		fs.writeFileSync(bad, 'not a glb')
 		assert.equal((await bakeScene(inp, 'v3', { ...deps, venueFile: () => bad })).json.dropped.venueGlb, 'unreadable')

@@ -28,7 +28,7 @@ const { sceneGlb } = require('./rc-scene-glb')
 const { RC_SCALE, sceneScale } = require('./rc-scale')
 const { generateTracksAsync, GENERATOR_VERSION } = require('./rc-tracks')
 
-const BAKE_VERSION = 5 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights; 4: §3 scale + occ; 5: venue .glb)
+const BAKE_VERSION = 6 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights; 4: §3 scale + occ; 5: venue .glb; 6: occ band from FLAT_DECOR)
 const FLAT_DECOR = 0.3 // u (× scale = 3 cm live): what lies this low on a floor is floor, not an occupancy obstacle
 const REV_MEMO_MS = 2000
 const KEEP_CACHED = 6
@@ -122,7 +122,9 @@ async function bakeScene(inp, rev, deps = {}) {
 	}
 	const plan = await M.planBudget(parts, templates, pause)
 	const grids = toy ? [] : floors.map((f) => ({ floor: f, grid: G.slabGrid(f, Math.max(0.25, Math.max(f.rect[2] - f.rect[0], f.rect[3] - f.rect[1]) / 400)) }))
-	const occ = toy ? floors.map((f) => O.createOcc(f, { cell: 0.3 * scale, lo: 0.05 * scale, hi: 0.6 * scale })) : []
+	// WO-1082: the band starts at FLAT_DECOR (3 cm live), not 5 mm: what stays lower in a cell is floor to drive on (v2's
+	// ground rule — a step ≤ 0.3 u is driven over), also where a large / sloped triangle only rises above it elsewhere
+	const occ = toy ? floors.map((f) => O.createOcc(f, { cell: 0.3 * scale, lo: FLAT_DECOR * scale, hi: 0.6 * scale })) : []
 	const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
 	// §2.7: the height field (what stands under / hangs over an elevated deck) is filled in the same pass
 	const field = H.createHeightField(hall.rect, hall.y, toy ? { cell: 0.5 * scale, bin: 0.25 * scale, eps: 0.05 * scale, deflate: true } : {})
