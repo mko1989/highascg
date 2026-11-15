@@ -146,7 +146,8 @@ static func normalize(slice: Variant) -> Dictionary:
 		"through": normalize_through(o.get("through"))}, "dmx": normalize_dmx(s.get("dmx")), "patch": out,
 		"groups": preload("res://features/previs/fixtures/programmer_model.gd").normalize_groups(s.get("groups")),
 		"looks": preload("res://features/previs/fixtures/look_fixtures_model.gd").normalize_looks(s.get("looks")),
-		"marks": normalize_marks(s.get("marks"))}
+		"marks": normalize_marks(s.get("marks")),
+		"handover": preload("res://features/previs/tracking/handover_model.gd").normalize(s.get("handover"))}  # WO-1085
 
 
 ## WO-700 fixtures.marks — stage marks a head is calibrated on: [{id (1…), name, x, y, z}] in PSN metres (x stage

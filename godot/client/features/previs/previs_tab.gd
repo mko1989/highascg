@@ -53,6 +53,7 @@ var markers: MarkerDriver
 var coverage: Coverage3D
 var fixtures3d := preload("res://features/previs/fixtures/fixtures_3d.gd").new()  # WO-615 T5 GDTF fixtures
 var cards := preload("res://features/previs/tracking/person_cards.gd").new()  # WO-665 cut-out cards
+var handover3d := preload("res://features/previs/tracking/handover_3d.gd").new()  # WO-1085 threshold lines
 var aim_drag := preload("res://features/previs/fixtures/aim_drag.gd").new()  # WO-679 right-drag a head
 var mover := preload("res://features/previs/move/move_targets.gd").new()  # WO-682 what the Position card / a drag moves
 var move_drag := preload("res://features/previs/move/move_drag.gd").new()  # WO-682 left-drag the selection
@@ -90,6 +91,7 @@ func _ready() -> void:
 	for n: Node in [mvr, coverage, fixtures3d, preload("res://features/previs/tracking/marker_pins_3d.gd").new()]:  # WO-978 hub markers
 		stage.add_child(n)
 	stage.add_child(preload("res://features/previs/fixtures/calib_marks_3d.gd").new())  # WO-700 stage marks
+	stage.add_child(handover3d)
 	fixtures3d.follow(mvr)  # WO-678: heads take their MVR layer's colour
 	aim_drag.post = func(b: Dictionary) -> Dictionary: return await Api.post_json("/api/fixtures/program/aim", b)
 	stage.add_child(cards)
@@ -129,6 +131,7 @@ func _ready() -> void:
 			track_page.follow.refresh()
 		if track_page.zones != null:
 			track_page.zones.refresh()
+		handover3d.show_thresholds(markers.handover, track_page.mode == "follow", Store.project)
 		_push_zones())
 	markers.detected.connect(func() -> void:
 		track_view.set_detections(markers.detections)
@@ -202,6 +205,7 @@ func _on_tracking_changed() -> void:
 		track_page.follow.set_calib_camera(str(track_page.entry().get("id", "")))
 	track_view.zones_mode = track_page.mode == "zones"
 	track_view.detect_mode = track_page.mode == "detect"
+	handover3d.show_thresholds(markers.handover, track_page.mode == "follow", Store.project)
 	_push_zones()
 	_push_masks()
 	_apply_drive()

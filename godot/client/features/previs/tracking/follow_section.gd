@@ -8,6 +8,7 @@ const F := preload("res://features/previs/tracking/follow_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Calibrate := preload("res://features/previs/tracking/calibrate_section.gd")
 const FollowOutput := preload("res://features/previs/tracking/follow_output.gd")
+const Handover := preload("res://features/previs/tracking/handover_section.gd")
 
 ## [label, path, min, max, step]  (path "pan.ch" = data.pan.ch)
 const FIELDS := [["Universe (port-addr)", "universe", 0, 32767, 1], ["Address", "address", 1, 512, 1],
@@ -37,6 +38,7 @@ var _confirm_del: ConfirmationDialog
 var _form: GridContainer
 var _calib: Calibrate  # WO-624 E3 calibrate_section.gd
 var _output: FollowOutput  # WO-631 PSN / Art-Net choice
+var _handover: Handover  # WO-1085 Auto heads: Split or spot handover
 var _pending := {}  # an output change waiting for the "switch while ON" confirmation
 var _confirm_switch: ConfirmationDialog
 
@@ -66,6 +68,12 @@ func _ready() -> void:
 		_apply_output(o))
 	add_child(_output)
 	_confirm_switch = _dialog("", func() -> void: _apply_output(_pending))
+	_handover = Handover.new()
+	_handover.edited.connect(func(h: Dictionary) -> void:
+		data.handover = h
+		_persist(true))
+	_output.polled.connect(func(body: Dictionary) -> void: _handover.show_status(body.get("handover")))
+	add_child(_handover)
 	_list = ItemList.new()
 	_list.custom_minimum_size.y = 120
 	_list.item_selected.connect(func(i: int) -> void:
@@ -207,6 +215,7 @@ func refresh() -> void:
 		return
 	_out.set_pressed_no_signal(data.output.enabled)
 	show_output()
+	_handover.show_handover(data.handover)
 	_list.clear()
 	for fx in data.patch:
 		var a := aim(fx.id)
@@ -215,6 +224,8 @@ func refresh() -> void:
 			fx.address, " [%s]" % fx.mode if str(fx.typeId) != "" else "", _marker_name(fx.follow), st]
 		if st == "following":
 			txt += "  %.1f° / %.1f°" % [float(a.pan), float(a.tilt)]
+		if a.get("level") is float or a.get("level") is int:  # WO-1085 spot handover: the head's level
+			txt += "  lit %d%%" % roundi(float(a.level) * 100.0)
 		if a.get("through") is String:  # WO-632 read-through: who has pan / tilt, and is the console feed live
 			txt += "  [%s%s]" % [a.through, {"held": " · console lost, its look held", "none": " · no console frames"}.get(
 				str(a.get("console", "")), "")]

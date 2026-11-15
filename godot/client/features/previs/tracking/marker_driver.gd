@@ -45,6 +45,7 @@ var grabbed := 0
 var synced := false  # the hub answered (module on) — no heartbeats into a missing module
 var follow := {}  # fixture id → {state, pan, tilt, problem} (server follow engine, WO-616 T11)
 var follow_on := false  # the server's Art-Net output master
+var handover := {}  # WO-1085 the spot handover: {mode, thresholds, grant} (tracking:follow)
 var zones := {}  # zone id → {occupied, count, occupants, last_kind} (server zone engine, WO-616 T7)
 var zones_on := false
 var zones_seen := false  # the server zone engine answered (module on)
@@ -309,6 +310,7 @@ func _on_ws(type: String, data: Variant) -> void:
 
 func _adopt_follow(data: Dictionary) -> void:
 	follow_on = data.get("output_enabled") == true
+	handover = data.get("handover") if data.get("handover") is Dictionary else {}
 	follow = {}
 	for f in data.get("fixtures", []):
 		if f is Dictionary:

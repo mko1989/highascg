@@ -257,7 +257,7 @@ class FollowHandover {
 			...this.cfg,
 			levels: { ...L, problem: u.problem, live: L.enabled && !u.problem && !!u.to && this.engine.enabled, packets: u.packets },
 			grant: { ...this.cfg.grant, state: this._grant.state, age_ms: this._grant.at ? this.engine.now() - this._grant.at : null,
-				needs_through: this.cfg.grant.enabled && !this._thru() },
+				needs_through: this.cfg.grant.enabled && !this._thru(), value: this._grant.data?.[this.cfg.grant.address - 1] ?? null },
 			thresholds: this.thresholds,
 			no_dimmer: this._heads().filter((f) => !this._dim.has(f.id)).map((f) => f.id),
 		}

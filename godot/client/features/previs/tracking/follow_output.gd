@@ -12,6 +12,7 @@ const PROTOCOLS := [["psn", "PosiStageNet → console (MA3 / MagicQ aim)"], ["ar
 const AXES := [["stage", "Stage frame: X stage left · Y upstage · Z up"], ["y_up", "Y up: x · height · −upstage (PSN text)"]]
 
 signal edited(output: Dictionary)  # a new {protocol, psn} for project.fixtures.output (enabled untouched)
+signal polled(body: Dictionary)  # WO-1085: the GET /api/tracking/follow answer (the handover status shows it)
 
 var output := {}
 var _proto: OptionButton
@@ -86,6 +87,7 @@ func poll() -> void:
 	_server = psn
 	_console = body.get("console") if body.get("console") is Dictionary else {}
 	show_output(output)
+	polled.emit(body)
 
 
 func show_output(o: Dictionary) -> void:
