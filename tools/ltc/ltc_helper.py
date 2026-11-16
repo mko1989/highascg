@@ -17,18 +17,7 @@ encode  stdin: control lines  `locate TC` | `align TC EPOCH_MS` (TC starts playi
 probe   prints {"ok":true,"lib":path} or {"ok":false,"error":...} and exits 0/1.
 """
 
-import argparse
-import ctypes
-import ctypes.util
-import fcntl
-import json
-import os
-import select
-import subprocess
-import sys
-import termios
-import threading
-import time
+import argparse, ctypes, ctypes.util, fcntl, json, os, select, signal, subprocess, sys, termios, threading, time  # noqa: E401
 from array import array
 
 LTC_TV_525_60, LTC_TV_625_50, LTC_TV_1125_60, LTC_TV_FILM_24 = 0, 1, 2, 3
@@ -48,16 +37,13 @@ class LTCFrameExt(ctypes.Structure):
 class SMPTETimecode(ctypes.Structure):
     _fields_ = [("timezone", ctypes.c_char * 6)] + [(n, ctypes.c_ubyte) for n in ("years", "months", "days", "hours", "mins", "secs", "frame")]
 
-
 assert ctypes.sizeof(LTCFrameExt) == 368 and ctypes.sizeof(SMPTETimecode) == 13  # libltc 1.3.x x86_64/arm64
 
 
 def load_lib():
     cands = [os.environ.get("HIGHASCG_LIBLTC") or "", "libltc.so.11", ctypes.util.find_library("ltc") or ""]
     err = None
-    for c in cands:
-        if not c:
-            continue
+    for c in filter(None, cands):
         try:
             lib = ctypes.CDLL(c)
             break
@@ -159,6 +145,9 @@ def emit(rec):
         sys.stderr.flush()
 
 
+OPEN_PCMS = []  # closed on every exit path (quit, SIGTERM, write error): see AlsaSink.close
+
+
 class SinkError(Exception):
     """phase 'open' (exit 5: the device is not there / busy) or 'write' (exit 4: it went away while playing)."""
 
@@ -192,6 +181,12 @@ class AlsaSink:
         if r < 0:
             a.snd_pcm_close(self.pcm)
             raise SinkError("open", self.err(r), r)
+        OPEN_PCMS.append(self)
+
+    def close(self):  # WO-1092: a dshare client that dies unclosed leaves its channels marked used until Caspar restarts
+        if self.pcm:
+            self.a.snd_pcm_close(self.pcm)
+            self.pcm = None
 
     def err(self, r):
         return self.a.snd_strerror(r).decode("utf-8", "replace")
@@ -490,10 +485,15 @@ def main():
     if a.mode == "probe":
         print(json.dumps({"ok": True, "lib": lib._path}))
         return
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, lambda *_: sys.exit(0))
     try:
         (cmd_decode if a.mode == "decode" else cmd_encode)(lib, a)
     except KeyboardInterrupt:
         pass
+    finally:
+        for s in OPEN_PCMS:
+            s.close()
 
 
 if __name__ == "__main__":

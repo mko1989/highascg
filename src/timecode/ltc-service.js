@@ -8,7 +8,7 @@
 const { normalizeLtcConfig, inputProblem, outputProblem } = require('./ltc-config')
 const { probeLibltc, setLibPath, APT_HINT } = require('./ltc-helper')
 const { createLtcInput } = require('./ltc-input')
-const { createLtcOutput } = require('./ltc-output')
+const { createLtcOutput, whenClosed } = require('./ltc-output')
 const { decideChase, chaseOps } = require('./ltc-lock')
 const { fpsMode, tcToFrames, parseTc, ltcModeForRate } = require('./timecode-math')
 const { currentTarget } = require('./ltc-share-io')
@@ -262,7 +262,13 @@ function createLtcService({ appCtx, log = () => {} }) {
 		start()
 	}
 
-	return { start, stop, restart, status, health, onShutdown: stop }
+	/** WO-1092: waits (≤ 1 s) for the encoder to close its PCM before node exits. */
+	function onShutdown() {
+		stop()
+		return whenClosed(1000)
+	}
+
+	return { start, stop, restart, status, health, onShutdown }
 }
 
 module.exports = { createLtcService, ltcOutPlayhead, ltcOutMode }

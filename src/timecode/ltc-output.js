@@ -26,6 +26,10 @@ const ALIGN_LEAD_MS = 30 // an align names a frame this far ahead (the helper re
 const JUMP_FRAMES = 3 // a report this far off is a playhead jump, not drift (slews keep drift < 1 frame)
 const HEALTHY_MS = 5000 // a sink that played this long resets the back-off
 const WINDOW_MS = 60000 // health: under-runs / drift re-aligns counted over the last minute
+const QUIT_GRACE_MS = [500, 1500] // a stopping encoder gets `quit`, then SIGTERM, then SIGKILL
+/** Encoders told to quit that have not exited yet: a new one waits for them, so a dshare client's channels are free
+ * (a client that dies unclosed keeps them marked used until Caspar restarts — WO-1092, box). */
+const dying = new Set()
 
 /**
  * @param {{ cfg: object, fps: unknown, log?: Function, getPlayhead?: () => ({ playing: boolean, position: number } | null),
@@ -168,11 +172,16 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null, t
 		enc = null
 		sink = null
 		running = holding = ready = awaitAlign = false
-		try {
-			e?.stdin?.end('quit\n')
-			e?.kill('SIGKILL')
-		} catch {
-			/* gone */
+		if (e && e.exitCode == null && e.signalCode == null) {
+			dying.add(e)
+			e.once('close', () => dying.delete(e))
+			try {
+				e.stdin?.end('quit\n')
+			} catch {
+				/* gone */
+			}
+			const kill = (sig) => () => dying.has(e) && e.kill(sig)
+			for (const [i, ms] of QUIT_GRACE_MS.entries()) setTimeout(kill(i ? 'SIGKILL' : 'SIGTERM'), ms).unref?.()
 		}
 		try {
 			s?.kill('SIGKILL')
@@ -237,6 +246,7 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null, t
 			setState('missing', `${where.label || where.pcm} is not connected`)
 			return pollPresence()
 		}
+		if (dying.size) return later(start, 50) // the previous encoder is still closing its PCM
 		starts++
 		setState('starting')
 		const opts = { channels: where.channels, channel: where.positions, volume: cfg.volumeDb, stopped: true, report: REPORT_FRAMES,
@@ -255,6 +265,8 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null, t
 			const gone = !t || !t.present || /no such device|no such file/i.test(lastError)
 			if (code === 3) fail('error', 'libltc missing (sudo apt install libltc11)')
 			else if (code === 5 && /busy/i.test(lastError)) fail('busy', `${where.pcm}: in use by another program`)
+			else if (code === 5 && where.share && /invalid argument/i.test(lastError))
+				fail('busy', `channel ${where.ltcChannels.join('+')} is still held by an LTC process that did not close — Settings ▸ Nuclear ▸ Restart CasparCG frees it`)
 			else if ((code === 5 || code === 4) && gone) fail('missing', `${where.pcm}: ${lastError || 'not connected'}`)
 			else fail('error', `${where.pcm}: ${lastError || `encoder exited ${code}`}`)
 		})
@@ -328,4 +340,12 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null, t
 	return { start: begin, stop, sync, status, mode }
 }
 
-module.exports = { createLtcOutput, targetFramesAt: S.targetFramesAt }
+/** Resolves once every stopping encoder has closed its PCM (or after `ms`): node's shutdown waits on it — systemd SIGKILLs
+ * what is left the moment node exits (KillMode=mixed), and a killed dshare client keeps LTC's channels blocked. */
+function whenClosed(ms = 1000) {
+	const left = [...dying]
+	if (!left.length) return Promise.resolve()
+	return Promise.race([Promise.all(left.map((e) => new Promise((r) => e.once('close', r)))), new Promise((r) => setTimeout(r, ms))])
+}
+
+module.exports = { createLtcOutput, whenClosed, targetFramesAt: S.targetFramesAt }

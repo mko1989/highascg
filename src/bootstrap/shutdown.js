@@ -27,7 +27,7 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 			if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onShutdown()
 			if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onShutdown()
 			if (appCtx._audioCaptureLifecycle) appCtx._audioCaptureLifecycle.onShutdown()
-			if (appCtx._ltcService) appCtx._ltcService.onShutdown() // WO-974
+			if (appCtx._ltcService) await appCtx._ltcService.onShutdown() // WO-974; WO-1092: waits ≤ 1 s for LTC out to close its PCM
 			if (appCtx._pixelhueFollow) appCtx._pixelhueFollow.stop() // WO-1063
 			try {
 				const { stopAllLiveAudioBridges } = require('../audio/live-audio-bridge')

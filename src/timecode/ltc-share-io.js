@@ -38,11 +38,15 @@ function deviceUse(index, dev) {
 	return { busy: true, openChannels: m ? parseInt(m[1], 10) : 0 }
 }
 
-/** Most channels the device takes: asks ALSA when the device is free (cached), else what it is open with. */
-function deviceChannels(index, dev, fallback = 2) {
+/**
+ * Most channels the device takes: asks ALSA once when the device is free (cached), else what it is open with.
+ * `ask: false` never opens the device: LTC out's (re)start path runs while Caspar may be opening the shared program PCM,
+ * and a probe holding hw:N,D at that moment made Caspar fall back to "default" (box, WO-1092 Apply race).
+ */
+function deviceChannels(index, dev, fallback = 2, { ask = true } = {}) {
 	const key = `${index},${dev}`
 	const use = deviceUse(index, dev)
-	if (!use.busy && process.env.HIGHASCG_ASOUND_ROOT == null) {
+	if (ask && !use.busy && !probeCache.has(key) && process.env.HIGHASCG_ASOUND_ROOT == null) {
 		const r = spawnSync('aplay', ['-D', `hw:${index},${dev}`, '--dump-hw-params', '-t', 'raw', '-f', 'S16_LE', '-c', '1', '-r', '48000', '/dev/null'],
 			{ encoding: 'utf8', timeout: 3000 })
 		const m = /CHANNELS:\s*\[?(\d+)(?:\s+(\d+))?\]?/.exec(String(r.stderr || '') + String(r.stdout || ''))
@@ -111,7 +115,7 @@ function currentTarget(out, appConfig) {
 	const cards = parseCards(cardsText)
 	const hw = parseAlsaHw(pre.share ? pre.program.deviceName : out.device)
 	const card = hw ? cards.find((c) => c.id === hw.card || String(c.index) === hw.card) : null
-	const probe = card ? { channels: deviceChannels(card.index, hw.dev, out.channels) } : {}
+	const probe = card ? { channels: deviceChannels(card.index, hw.dev, out.channels, { ask: false }) } : {}
 	const t = resolveLtcTarget(out, appConfig, cardsText, probe)
 	if (t.ok && t.share && t.block) writeShareBlock(t.block)
 	return t
