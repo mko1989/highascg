@@ -11,6 +11,7 @@ extends SubViewport
 
 const C := preload("res://features/previs/tracking/camera_model.gd")
 const Quality := preload("res://features/previs/previs_quality.gd")  # WO-892
+const House := preload("res://features/previs/house_lights.gd")  # WO-1099
 
 const MAX_W := 2048  # render width cap (the overlay is a ghost, not the programme picture)
 const MAX_OVERSCAN := 2.0
@@ -87,6 +88,9 @@ func attach(world: World3D, env: Environment, hide_layers: int) -> void:
 	e.background_mode = Environment.BG_CLEAR_COLOR
 	e.glow_enabled = false
 	cam.environment = e
+	if not House.shared().changed.is_connected(_on_house):
+		House.shared().changed.connect(_on_house)
+	_on_house(House.shared().level)
 	if not Quality.shared().changed.is_connected(_on_quality):  # WO-892
 		Quality.shared().changed.connect(_on_quality)
 	_on_quality()
@@ -98,6 +102,12 @@ func _on_quality(_level := 0) -> void:
 	var p: Dictionary = Quality.shared().current()
 	Quality.apply_viewport(self, p, true)
 	Quality.apply_env(cam.environment as Environment, p, false)
+
+
+## WO-1099: the overlay is a geometry aid — it never goes dark with the house lights: its own Environment keeps the full
+## fill, plus a share standing in for the shared world's sun while that is off.
+func _on_house(h: float) -> void:
+	(cam.environment as Environment).ambient_light_energy = House.overlay_ambient(h)
 
 
 ## Pose / fov / lens from a tracking camera entry (tracking_model). → false when the camera is not usable.

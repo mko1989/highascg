@@ -15,6 +15,7 @@ const Tint := preload("res://features/previs/model_tint.gd")
 const Haze := preload("res://features/previs/haze.gd")
 const Quality := preload("res://features/previs/previs_quality.gd")  # WO-892
 const Cone := preload("res://features/previs/fixtures/beam_cone.gd")
+const House := preload("res://features/previs/house_lights.gd")  # WO-1099: the rig is show light — never dimmed
 
 var _colors := {}  # WO-641: typeId → "#rrggbb" (project.previs.fixture_colors)
 var _layer_colors := {}  # WO-678: MVR layer → "#rrggbb"; a head patched from an MVR object takes its layer's colour
@@ -40,6 +41,7 @@ var haze := 0.0  # WO-786 (haze.gd): the views' haze level — the world's fog +
 
 
 func _ready() -> void:
+	set_meta(House.SHOW_LIGHT, true)
 	_watch = preload("res://features/previs/fixtures/fixtures_watch.gd").new()  # WO-797: kept across rebuilds
 	add_child(_watch)
 	_watch.add_child(preload("res://features/previs/fixtures/console_selection_feed.gd").new())  # WO-857: under _watch, a rebuild frees every other child
@@ -376,12 +378,19 @@ func apply(data: Dictionary) -> void:
 		var beams: Dictionary = v.get("beams", {}) if v.get("beams") is Dictionary else {}
 		for id in parts.beams:
 			_light(parts.beams[id], beams.get(id, {}) if beams.get(id) is Dictionary else {})
+	_pick()
+
+
+## WO-1099: the quality's number of real spot lights go to the brightest beams (beam_cone.gd pick).
+func _pick() -> void:
+	var p: Dictionary = Quality.shared().current()
+	House.shared().lit[get_instance_id()] = Cone.pick(_fx, int(p.lights), Quality.spot_shadow_budget(p)) if F.renders(get_viewport()) else 0
 
 
 ## WO-892: the render quality — cone shader / segments, spot shadows up to its budget (previs_quality.gd).
 func _quality(_level := 0) -> void:
 	var p: Dictionary = Quality.shared().current()
-	Cone.apply(_fx, _cone, _shader, Quality.spot_shadow_budget(p), p)
+	Cone.apply(_fx, _cone, _shader, Quality.spot_shadow_budget(p), p)  # WO-1099: it picks the real lights too
 
 
 func _set_haze(h: float) -> void:
@@ -400,7 +409,8 @@ func set_beams(on: bool) -> void:
 
 func _light(p: Dictionary, b: Dictionary) -> void:
 	var t := F.shown_tint(b, beams_on)
-	var lit := t.a > 0.004
+	var lit := t.a > F.LIT
+	p.i = t.a  # WO-1099: beam_cone.gd pick ranks the beams by it
 	(p.lens as StandardMaterial3D).emission = Color(t.r, t.g, t.b)
 	(p.lens as StandardMaterial3D).emission_energy_multiplier = t.a * 4.0
 	if p.get("body") is GeometryInstance3D:
@@ -416,7 +426,6 @@ func _light(p: Dictionary, b: Dictionary) -> void:
 		(p.cone as MeshInstance3D).transform = Transform3D(Basis.from_scale(s), Vector3(0, -s.y * 0.5, 0))
 	if p.has("light"):
 		var sl := p.light as SpotLight3D
-		sl.visible = lit
 		sl.light_color = Color(t.r, t.g, t.b)
 		sl.light_energy = t.a * 8.0
 		sl.light_volumetric_fog_energy = 1.0 + 3.0 * haze  # WO-786: the spot lights the haze around its beam
@@ -483,6 +492,7 @@ func bounds() -> AABB:
 func _notification(what: int) -> void:  # WO-891: PREDELETE, not _exit_tree — the Previs / Live tab moves between windows
 	if what != NOTIFICATION_PREDELETE:
 		return
+	House.shared().lit.erase(get_instance_id())
 	for t in _meshes.values():
 		if t != null:
 			(t as Node).free()

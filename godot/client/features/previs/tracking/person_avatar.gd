@@ -24,6 +24,8 @@ const YAW_RATE := 5.0
 const COLOUR_RATE := 2.5  # a new look fades in over about a second
 const LIMB_RATE := 9.0
 const SELF_LIGHT := 0.3  # emission as a share of the colour
+const RIM := 0.2  # person_avatar.gdshader rim
+const House := preload("res://features/previs/house_lights.gd")  # WO-1099
 const LEAD_MAX := 0.15  # s — between snapshots a walking figure keeps going at its speed (no 15 Hz surge-and-stall)
 const SMILE := {"y": 0.79, "r": 0.036, "tube": 0.0085, "from": 3.578, "to": 5.847}  # 205° … 335°
 const VEL_WINDOW := 0.6  # s — speed is measured over this baseline, so box jitter never reads as walking
@@ -55,11 +57,20 @@ func _init() -> void:
 	for k in ["top", "bottom", "skin", "hair", "shoes", "blush"]:
 		var m := ShaderMaterial.new()
 		m.shader = SHADER
-		m.set_shader_parameter("self_light", SELF_LIGHT)
 		mats[k] = m
+	House.shared().changed.connect(house)
+	house(House.shared().level)
 	_build()
 	_apply_colours(AV.look(null), 1.0)
 
+
+## WO-1099: house lights off → the avatar is lit by the rig like everything else; only a small self-light floor (ui.cfg
+## [previs] avatar_floor) keeps a presenter outside every beam readable, the rim fading with it (no glowing figure).
+func house(h: float) -> void:
+	var sl := House.self_light(SELF_LIGHT, h, House.shared().avatar_floor)
+	for m: ShaderMaterial in mats.values():
+		m.set_shader_parameter("self_light", sl)
+		m.set_shader_parameter("rim", RIM * sl / SELF_LIGHT)
 
 func _build() -> void:
 	var s := _meshes()

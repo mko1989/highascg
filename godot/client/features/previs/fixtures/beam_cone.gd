@@ -51,18 +51,37 @@ static func code(soft: bool) -> String:
 		.replace("//SOFT_FRAGMENT", (SOFT_FRAGMENT % str(SOFT_M)) if soft else "")
 
 
-## Quality `p` (previs_quality.gd) onto a rig: the shader variant, the cone's segments, and shadows on the first
-## spot_shadow_budget lights (a gobo spot keeps its shadow — its projection needs it). `fx` is fixtures_3d.gd's _fx.
-static func apply(fx: Dictionary, cone: CylinderMesh, shader: Shader, budget: int, p: Dictionary) -> void:
+## Quality `p` (previs_quality.gd) onto a rig: the shader variant, the cone's segments, and which spot lights are real
+## lights (pick). `fx` is fixtures_3d.gd's _fx.
+static func apply(fx: Dictionary, cone: CylinderMesh, shader: Shader, budget: int, p: Dictionary) -> int:
 	var c := code(bool(p.soft_cone))
 	if shader.code != c:
 		shader.code = c
 	cone.radial_segments = int(p.cone_segs)
-	var n := 0
+	return pick(fx, int(p.lights), budget)
+
+
+## WO-1099 — the rig's real lights this frame: of the lit beams (intensity `i`, set by fixtures_3d.gd _light) that carry a
+## SpotLight3D, the `cap` brightest are shown (ties: build order), the first `budget` of them with a shadow; a gobo spot
+## keeps its shadow (its projection needs one). Every other spot is hidden: with the house lights off the floor pools,
+## the lit walls and people are these lights, so the brightest beams get them. → how many beams are lit at all.
+static func pick(fx: Dictionary, cap: int, budget: int) -> int:
+	var lit := 0
+	var cands: Array = []
 	for id in fx:
 		for b: Dictionary in (fx[id].beams as Dictionary).values():
+			var i := float(b.get("i", 0.0))
+			lit += int(i > F.LIT)
 			if b.has("light"):
-				var sl := b.light as SpotLight3D
-				sl.set_meta("qshadow", n < budget)
-				sl.shadow_enabled = n < budget or sl.light_projector != null
-				n += 1
+				cands.append([-i if i > F.LIT else 1.0, cands.size(), b.light])
+	cands.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0] or (x[0] == y[0] and x[1] < y[1]))  # brightest, then build order
+	for r in cands.size():
+		var sl := cands[r][2] as SpotLight3D
+		var on := float(cands[r][0]) < 0.0 and r < cap
+		var shadow := on and r < budget
+		if sl.visible != on:
+			sl.visible = on
+		sl.set_meta("qshadow", shadow)
+		if sl.shadow_enabled != (shadow or sl.light_projector != null):
+			sl.shadow_enabled = shadow or sl.light_projector != null
+	return lit

@@ -113,13 +113,13 @@ func test_cone_apply_sets_shadows_up_to_the_budget() -> void:
 	var fx := {}
 	for i in 5:
 		var sl := SpotLight3D.new()
-		fx["f%d" % i] = {"beams": {"b": {"light": sl}}}
+		fx["f%d" % i] = {"beams": {"b": {"light": sl, "i": 1.0}}}  # WO-1099: lit beams (pick ranks by intensity)
 	fx["f4"].beams.b.light.light_projector = PlaceholderTexture2D.new()  # a gobo spot
 	var cone := CylinderMesh.new()
 	var sh := Shader.new()
 	var p := Quality.preset(2)
 	p.spot_shadows = 2
-	Cone.apply(fx, cone, sh, 2, p)
+	t.eq(Cone.apply(fx, cone, sh, 2, p), 5, "5 lit beams")
 	var on := fx.values().map(func(f: Dictionary) -> bool: return f.beams.b.light.shadow_enabled)
 	t.eq(on, [true, true, false, false, true], "first 2 spots + the gobo spot cast shadows")
 	t.eq(cone.radial_segments, 48)
@@ -151,9 +151,10 @@ func test_level_is_stored_per_client() -> void:
 func test_picker_has_a_level_per_item() -> void:
 	var box := Quality.picker()
 	var pm := (box.get_child(0) as MenuButton).get_popup()
-	t.eq(pm.item_count, 6, "4 levels, a separator, Haze (WO-1010)")
+	t.eq(pm.item_count, 7, "4 levels, a separator, Haze (WO-1010), House lights (WO-1099)")
 	t.ok(pm.get_item_tooltip(3).contains("Not while on air"), "Ultra warns")
 	t.ok(pm.get_item_text(5).begins_with("Haze: "), "the Haze submenu shows its level")
 	t.ok(pm.get_item_submenu_node(5) != null, "Haze is a submenu")
+	t.ok(pm.get_item_text(6).begins_with("House lights: ") and pm.get_item_submenu_node(6) != null, "House lights: a submenu showing its level")
 	t.ok((box.get_child(0) as MenuButton).text.begins_with("Quality: "))
 	box.free()

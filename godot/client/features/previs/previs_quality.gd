@@ -9,6 +9,7 @@ extends RefCounted
 ## Ultra adds 1.5x supersampling, SSIL, higher SSAO / SSR, 32 spot shadows on an 8192 atlas, a 128 fog grid.
 ## No TAA / FSR2 (they ghost on video and beams), no SDFGI. The GPU is shared with Caspar on air: the picker shows the
 ## measured GPU time of the views. Macs and the Compatibility renderer are held at Low (WO-689).
+## WO-1099: the rig's real spot lights per level (`lights`: the brightest lit beams) — Low 24, Medium 48, High 64, Ultra 96.
 
 signal changed(level: int)
 
@@ -22,16 +23,18 @@ const LOW := {
 	"ssao": false, "ssao_q": 2, "ssao_half": true, "ssil": false, "ssr": false, "ssr_q": 1,
 	"glow_thr": 1.0, "sun_splits": 0, "floor_rough": 1.0, "spot_shadows": 0,
 	"fog": 64, "fog_filter": true, "soft": 2, "dir_atlas": 4096,
-	"soft_cone": false, "cone_segs": 24, "led_aa": false,
+	"soft_cone": false, "cone_segs": 24, "led_aa": false, "lights": 24,
 }
-const MEDIUM := {"smaa": true, "atlas": 4096, "soft_cone": true, "cone_segs": 48, "led_aa": true, "floor_rough": 0.4}
+const MEDIUM := {
+	"smaa": true, "atlas": 4096, "soft_cone": true, "cone_segs": 48, "led_aa": true, "floor_rough": 0.4, "lights": 48,
+}
 const HIGH := {
 	"msaa": 4, "ssao": true, "ssr": true, "ssr_q": 2, "glow_thr": 0.85, "sun_splits": 2, "floor_rough": 0.35,
-	"spot_shadows": 16, "fog": 96, "soft": 3,
+	"spot_shadows": 16, "fog": 96, "soft": 3, "lights": 64,
 }
 const ULTRA := {
 	"scale": 1.5, "atlas": 8192, "ssao_q": 3, "ssao_half": false, "ssil": true, "ssr_q": 3,
-	"spot_shadows": 32, "fog": 128, "soft": 4, "dir_atlas": 8192,
+	"spot_shadows": 32, "fog": 128, "soft": 4, "dir_atlas": 8192, "lights": 96,
 }
 const TIPS := [
 	"Cheapest: the views as they were, plus debanding.",
@@ -197,7 +200,7 @@ static func picker() -> Control:
 	var box := HBoxContainer.new()
 	var o := MenuButton.new()  # WO-1010: a menu, so Haze sits in it as a submenu (it was its own toolbar picker)
 	o.flat = false
-	o.tooltip_text = "Render quality and haze of the 3D views (this client only). Applies at once."
+	o.tooltip_text = "Render quality, haze and house lights of the 3D views (this client only). Applies at once."
 	var pm := o.get_popup()
 	for i in NAMES.size():
 		pm.add_radio_check_item(NAMES[i], i)
@@ -208,6 +211,9 @@ static func picker() -> Control:
 	pm.add_submenu_node_item("Haze", Haze.menu())
 	var haze_at := pm.item_count - 1
 	pm.set_item_tooltip(haze_at, "Haze in the 3D views: the beams show as shafts of light, as with a hazer in the venue.")
+	var House := preload("res://features/previs/house_lights.gd")  # WO-1099
+	pm.add_submenu_node_item("House lights", House.menu())
+	pm.set_item_tooltip(haze_at + 1, "The general light on the room (the 'sun'). Off = only the rig's own light, the LED walls and the projections.")
 	var sync := func() -> void:
 		if not is_instance_valid(o):  # Haze.shared() outlives a freed picker
 			return
@@ -215,6 +221,7 @@ static func picker() -> Control:
 		for i in NAMES.size():
 			pm.set_item_checked(i, i == lv)
 		pm.set_item_text(haze_at, "Haze: " + str(Haze.LEVELS[Haze.nearest(Haze.shared().level)][0]))
+		pm.set_item_text(haze_at + 1, "House lights: " + str(House.LEVELS[House.nearest(House.shared().level)][0]))
 		o.text = "Quality: " + NAMES[lv]
 	pm.id_pressed.connect(func(i: int) -> void:
 		if i < NAMES.size():
@@ -222,10 +229,11 @@ static func picker() -> Control:
 		sync.call())
 	pm.about_to_popup.connect(sync)
 	Haze.shared().changed.connect(func(_h: float) -> void: sync.call())
+	House.shared().changed.connect(func(_h: float) -> void: sync.call())
 	sync.call()
 	box.add_child(o)
 	var lab := Label.new()
-	lab.tooltip_text = "Measured GPU time to draw the 3D views. The GPU is shared with the playout."
+	lab.tooltip_text = "Measured GPU time to draw the 3D views. The GPU is shared with the playout. House lights off: the room is dark on purpose."
 	lab.modulate = Color(1, 1, 1, 0.6)
 	box.add_child(lab)
 	var t := Timer.new()
@@ -233,6 +241,7 @@ static func picker() -> Control:
 	t.autostart = true
 	t.timeout.connect(func() -> void:
 		var ms := gpu_ms()
-		lab.text = "GPU %.1f ms" % ms if ms > 0.0 else "")
+		var hint := House.hint(House.shared().level, House.shared().lit_beams())  # WO-1099: a dark view is not a broken one
+		lab.text = ("GPU %.1f ms" % ms if ms > 0.0 else "") + (" · " if ms > 0.0 and hint != "" else "") + hint)
 	box.add_child(t)
 	return box

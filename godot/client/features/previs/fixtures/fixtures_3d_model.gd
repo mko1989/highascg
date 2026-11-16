@@ -9,7 +9,9 @@ extends RefCounted
 
 const Tint := preload("res://features/previs/model_tint.gd")
 
-const MAX_LIGHTS := 64  ## SpotLight3D budget over the whole rig; further beams (and Glow beams) draw cone + lens only
+const MAX_LIGHTS := 128  ## SpotLight3D nodes over the whole rig; further beams (and Glow beams) draw cone + lens only.
+## WO-1099: how many of them shine at once is the quality's `lights` (the brightest beams, beam_cone.gd pick).
+const LIT := 0.004  ## a beam brighter than this is lit
 const CONE_LENGTH := 12.0  ## metres
 const CONE_ALPHA := 0.16
 const MAX_GOBOS := 16  ## projecting lights (each needs a shadow map); further gobos show as plain spots

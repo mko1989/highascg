@@ -9,6 +9,7 @@ signal model_loaded(meshes: Array)
 const FLOOR_LAYER := 1 << 19  # WO-616 T12: the camera overlay culls the floor plane (the real floor is in the picture)
 const Quality := preload("res://features/previs/previs_quality.gd")  # WO-892
 const PadCamera := preload("res://features/previs/pad_camera.gd")  # WO-1067
+const House := preload("res://features/previs/house_lights.gd")  # WO-1099
 const MIN_DIST := 2.0  # the wheel's closest orbit distance (WO-1025: then it dollies on)
 const PRESETS := {"Front": Vector3(0.0, 0.12, 12.0), "Top": Vector3(0.0, 1.45, 14.0), "ISO": Vector3(-0.75, 0.45, 13.0)}
 
@@ -46,7 +47,6 @@ func _ready() -> void:
 	add_child(we)
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, -30, 0)
-	sun.light_energy = 0.6
 	sun.light_volumetric_fog_energy = 0.0  # WO-786: haze shows the heads' beams, not a lit room
 	add_child(sun)
 	var floor_mi := MeshInstance3D.new()
@@ -66,6 +66,8 @@ func _ready() -> void:
 	_update_camera()
 	Quality.shared().changed.connect(_on_quality)  # WO-892
 	_on_quality()
+	House.shared().changed.connect(_on_house)
+	_on_house(House.shared().level)
 	if Config.args.has("xr"):  # WO-741
 		walk = load("res://features/previs/xr/xr_walk.gd").attach(self)
 
@@ -80,6 +82,32 @@ func _on_quality(_level := 0) -> void:
 	if vp is SubViewport:
 		Quality.apply_viewport(vp, p)
 		Quality.register_meter(vp)
+
+
+## WO-1099: house lights — the ambient fill, the sun and every venue glow of this stage (the rig is show light).
+func _on_house(h: float) -> void:
+	House.apply_stage(environment, sun, h)
+	House.dim_tree(self, h)
+
+
+func _enter_tree() -> void:  # WO-1099: meshes that join the stage later (MVR, venue, models) take the house level
+	if not get_tree().node_added.is_connected(_on_node_added):
+		get_tree().node_added.connect(_on_node_added)
+
+
+func _exit_tree() -> void:
+	if get_tree().node_added.is_connected(_on_node_added):
+		get_tree().node_added.disconnect(_on_node_added)
+
+
+func _on_node_added(n: Node) -> void:
+	if n is MeshInstance3D and House.shared().level < 1.0 and is_ancestor_of(n):
+		_dim_late.call_deferred(n)  # deferred: its materials are set right after it enters
+
+
+func _dim_late(n: Node) -> void:
+	if is_instance_valid(n) and n.is_inside_tree() and not House.in_show_light(n, self):
+		House.dim_mesh(n as MeshInstance3D, House.shared().level)
 
 
 func load_glb_bytes(bytes: PackedByteArray) -> bool:
@@ -158,6 +186,7 @@ static func led_material(tex: Texture2D) -> StandardMaterial3D:
 	m.emission_texture = tex
 	m.emission_energy_multiplier = 1.0
 	m.roughness = 0.5
+	m.set_meta(House.SHOW_LIGHT, true)  # WO-1099: a picture is show light
 	return m
 
 
