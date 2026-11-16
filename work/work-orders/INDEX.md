@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1001 live WOs (36 open, 155 in progress, 810 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1002 live WOs (36 open, 155 in progress, 811 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -952,7 +952,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 922 DONE [media] Media import keeps Polish file names on every path (URL downloads saved the %-e… → 922_WO_media_import_utf8_names.md
 - 951 DONE [media+godot-client] Import a .gtzip lower third (NewTek LiveGraphics-style) as a CG Studio template → 951_WO_gtzip_lower_third_import.md
 
-## tracking-vr — Tracking, previs, VR (40)
+## tracking-vr — Tracking, previs, VR (41)
 
 - 17 DONE [tracking-vr+web-client] 3D Previs — Live Video on Imported 3D Stage Models → 17_WO_3D_PREVIS.md
 - 30 IN PROGRESS [tracking-vr+process] Previs & Tracking Module — Packaging and Integration → 30_WO_PREVIS_TRACKING_MODULE.md
@@ -994,6 +994,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1086 IN PROGRESS [tracking-vr+godot-client] Previs: tracked people as friendly avatars derived from the person (no camera p… → 1086_WO_previs_people_as_avatars.md
 - 1087 IN PROGRESS [tracking-vr+godot-client] Test puppet people: simulated tracked persons with a random look that never lea… → 1087_WO_test_puppet_people_avatars.md
 - 1091 DONE [tracking-vr+godot-client] Tracking camera: a new camera sees the stage, rough aim in the Camera view, zoo… → 1091_WO_tracking_camera_aim_at_stage_and_view_nav.md
+- 1094 DONE [tracking-vr+godot-client,os-iso] Person detection runtime: status, install / repair / remove and offline provisi… → 1094_WO_detection_runtime_install_from_gui.md
 
 ## testing-ci — Tests and CI (28)
 
