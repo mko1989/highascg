@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1000 live WOs (35 open, 157 in progress, 808 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1000 live WOs (35 open, 156 in progress, 809 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -602,7 +602,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1077 IN PROGRESS [godot-client] Operator dock: a click on the Firefox icon did nothing (14.11 evening) → 1077_WO_dock_firefox_click_did_nothing.md
 - 1079 IN PROGRESS [godot-client] Firefox opened from the dock closes by itself → 1079_WO_dock_firefox_closes_by_itself.md
 - 1088 DONE [godot-client+engine] "Client at 100 fps?" + one clear "keeping up" signal (header pulse turns amber… → 1088_WO_client_fps_target_and_keeping_up_signal.md
-- 1093 IN PROGRESS [godot-client+audio,devices-config] Settings menu review: one place per setting, 17 panes → 7 → 1093_WO_settings_menu_review_and_compaction.md
+- 1093 DONE [godot-client+audio,devices-config] Settings menu review: one place per setting, 17 panes → 7 → 1093_WO_settings_menu_review_and_compaction.md
 
 ## web-client — Web client (88)
 

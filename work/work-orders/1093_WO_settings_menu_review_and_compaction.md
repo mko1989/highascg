@@ -1,7 +1,7 @@
 # WO-1093 — Settings menu review: one place per setting, 17 panes → 7
 
 **Area:** godot-client, audio, devices-config
-**Status: IN PROGRESS**
+**Status: DONE (16.11.26, on glass: every pane + fold screenshotted, the 3 moved keys and 2 moved Settings controls round-tripped through a node restart; Godot 28 845/0, offline suite green except other WOs' files)**
 
 Owner, 16.11: "we need a review of the whole settings menu. it got too big. also there are a couple of items buttons
 that made sense only in webui. a tab like live audio seems redundant as all the audio settings are in devices and
@@ -177,7 +177,7 @@ licences (About).
 | Media / USB | unchanged | — |
 | This screen | UI scale, operator screen (+ current operator display line), simulated server | Lockscreen |
 | Companion | check, host, port | Button previews (Satellite) · Previews for the web client and Companion · Variables |
-| System | updates (version, check, install), start-up | System time · Remote access (Tailscale) · Game controllers · DeckLink driver · GDTF fixture library · Hardware |
+| System | updates (version, check, install), start-up | System time · Tailscale · Game controllers · Blackmagic DeckLink · GDTF library · Hardware |
 | Nuclear | unchanged | — |
 | About | support bundle + server logs, attribution | — |
 | (Timecode) | WO-1092 | — |
@@ -189,8 +189,184 @@ hand-listed `newConfig`, `settings-post.js:161,396`), no apply: changing them mu
 
 ## What was done
 
-(in progress)
+Commits: e86251ac (this WO + inventory), 40d47808 (restructure), b1c73e6b (fold stays open), 56e98b21 (CI list).
+
+**Settings tab** (`settings_tab.gd`): the pane list is Defaults · Media / USB · This screen · Companion · System ·
+Timecode · Nuclear · About. The tab strip now fits (no scroll arrows). Rarely used blocks are folds. Every fold uses
+the same widget: `pane_kit.fold()` is a flat accent toggle "▸ / ▾ title". `pane_kit.fold_pane()` hides a moved pane's
+own heading when it repeats the fold title. The panes inside load lazily on first show, because Godot 4 propagates
+`visibility_changed` to children.
+
+- **Defaults** (`settings_panes.defaults`) now holds only the editor defaults: layer position, scene, timeline,
+  transition (9 controls).
+- **This screen** (`settings_panes.this_screen`): UI scale, "Choose operator screen…" and the operator-display line.
+  The line moved from System and is re-read after the picker finishes. Also here: Simulated server, and a Lockscreen
+  fold.
+- **Companion**: Check, host and port, plus three folds:
+  - Button previews (Satellite);
+  - Previews for the web client and Companion: the `composePreview.*` rows that were in Defaults;
+  - Variables: the former pane.
+- **System**:
+  - At the top: Updates, then Start-up (`startup.mode`, from Defaults).
+  - Folds: System time (`system_pane.gd`, now time only), Tailscale, Game controllers, Blackmagic DeckLink, GDTF
+    library, Hardware.
+  - The new `hardware_pane.gd` is the `/api/system/hardware` summary that was split out of `system_pane.gd`.
+- **About**: Diagnostics (support bundle, server logs) above the attribution.
+
+**Removed from the Godot UI.** Every key, route and server feature stays; how each one is still reached:
+
+| Item | Why | Still reachable |
+|---|---|---|
+| Settings → Network pane | duplicate | Devices server page (`server_controls.gd` → `network_pane.gd`), `/api/system/network*` |
+| Settings → Live audio: capture device, status, refresh | duplicate | Devices live-audio inspector |
+| Live audio: ALSA mixer | duplicate | Audio tab (WO-799) |
+| Live audio: audio-preview bus (enable, bus, screen, OpenAL device), "when solo cleared" | superseded by the Devices audio output "Monitor" tick (WO-406), Audio tab SOLO/HP (WO-801), header headphones | `casparServer.audioRouting.audioPreview.*` / `audio_preview_*` via `POST /api/settings`, web settings |
+| Live audio: PGM screen | legacy fallback (`live_audio_pgm_all_screens`) | `casparServer.live_audio_pgm_screen` via `POST /api/settings` |
+| Live audio: "Apply PLAY + PGM routes" | re-PLAYs every input on air; boot/reconnect and Start do it | `POST /api/audio/live-inputs/apply`, web UI |
+| System: Open browser / Open file manager | kiosk era (WO-646) | `POST /api/system/gui-launch`, web UI |
+| Defaults: Invert touchpad scroll | web only (no Godot reader) | `ui.invertTouchpadScroll`, web settings |
+
+The Live audio pane's Save was also broken: `POST /api/audio/live-inputs/config` (`routes-audio.js:455-480`) merges
+only a nested `casparServer`, so the flat layer, audio-only and preview keys never persisted. This is pinned in
+smoke-wo1093, and the endpoint is left unchanged for the web.
+
+**Moved to Devices** (`host_input_controls.gd pgm_routes()`, `input_slots_model.gd pgm_route_body()`):
+
+- A fold "Program routes (all live audio inputs)" now sits in every live-audio input inspector.
+- It holds three controls:
+  - put the program routes back after a restart (`live_audio_pgm_always_on`);
+  - program layer of input 1, Layer 1–9 (`live_audio_pgm_layer`);
+  - audio only (`live_audio_pgm_audio_only`).
+- Each change is one `POST /api/settings {casparServer:{key}}` on the inspected server, followed by a settings
+  re-read. `casparServer` is in the hand-listed `newConfig`, and the merge is per key.
+- There is no apply, so nothing on air is re-PLAYed. A refused save puts the control back.
+- The fold stays open across the rebuild that a save triggers (b1c73e6b, found on glass).
+
+**Strings:**
+
+- `audio_tab.gd` "+" tooltip: device and route defaults are now in the Devices inspector.
+- `network_pane.gd` header.
+
+Two strings are left on purpose: "configure in Settings → live audio" (`live_sources_model.gd`) and "remove one in
+Settings or Audio Mixer" (`live_input_model.gd`). They are web-parity strings pinned by web-generated goldens
+(`tests/golden/live_sources.json`, `devices_live_input.json`), and the web UI is not changed here.
+
+**Tests:**
+
+- `tests/test_settings_layout_wo1093.gd`, 13 tests: the pane list and order, every fold and its home, Defaults holding
+  only editor defaults, the kiosk buttons gone, Network only on Devices, ALSA only in Audio, fold open/close and
+  heading hiding, and the program-route save body plus its wiring with no apply.
+- `test_live_audio_settings.gd` lost only the deleted model's status-line test. Its ALSA tests stay.
+- `tools/smoke/smoke-wo1093-settings-save-paths.test.js`, 12 tests:
+  - every section a kept or moved control writes reaches the saved config through `newConfig`;
+  - each of the 3 moved keys saves alone and leaves every other `casparServer` key untouched;
+  - the old live-inputs/config drop is pinned.
+- `smoke-wo825-wiring` was repointed to the GDTF fold.
+
+### Counts after: 8 panes (7 + Timecode), ≈ 111 controls, 55 visible before opening a fold
+
+| Pane | Visible | In folds |
+|---|---|---|
+| Defaults | 9 | — |
+| Media / USB | 7 | — |
+| This screen | 3 | Lockscreen 12 |
+| Companion | 3 | Satellite 5 · previews 5 · Variables 6 |
+| System | 4 | time 4 · Tailscale 11 · controllers 3 · DeckLink 5 · GDTF 4 · hardware 1 |
+| Timecode | 15 (WO-1092) | — |
+| Nuclear | 12 | — |
+| About | 2 | — |
+
+Before: 17 panes, ≈ 152 controls plus 4 ALSA. What left:
+
+- Network (20): on Devices.
+- Live audio (17): 3 to Devices, the rest duplicates or API-only.
+- Kiosk buttons (2).
+- Touchpad (1).
+
+### Follow-ups / owner questions
+
+1. The DeckLink driver / tools fold could live on the Devices DeckLink inspector. It stays in System for now as a
+   box-level install.
+2. `features/settings/alsa_mixer_panel.gd` is used only by the Audio tab and could move to `features/audio/`. That is
+   a file move only.
+3. Is the audio-preview bus (`audioRouting.audioPreview`, OpenAL device) dead now that Monitor and HP exist? If yes,
+   retire the server path in a separate WO.
+4. Dead or legacy server inputs, not deleted:
+   - `live_audio_pgm_screen` (only read when `live_audio_pgm_all_screens` is false);
+   - the flat-key half of `POST /api/audio/live-inputs/config`;
+   - `/api/system/gui-launch` has no Godot caller (the web still has one).
+5. The two web-parity strings above should change when the web settings modal is reworked.
 
 ## What was verified
 
-(in progress)
+**Godot.**
+
+- `GODOT=~/.local/opt/godot/godot ./run-client.sh --test`: **28 845 passed, 0 failed** with the restructure. Then the
+  fold fix: test_devices 11 893/0 and test_settings 117/0.
+- `--check`: boot OK.
+
+**Smokes.** smoke-wo1093 12/12, smoke-wo825 3/3.
+
+**Gates** (exit codes):
+
+| Gate | Exit | Note |
+|---|---|---|
+| verify:script-paths | 0 | |
+| check-max-file-lines | 0 | after moving the list entry (56e98b21) |
+| check-unwired-exports | 1 | WO-1092's uncommitted `src/timecode/ltc-out-sync.js`, `ltc-share*.js`, `ltc-service.js` and WO-1094's untracked `src/tracking/runtime-*.js`; none are WO-1093 files |
+| node index.js --no-http | 0 | |
+| lint | 0 | |
+| format:check | 0 | |
+| npm-audit-ci | 0 | |
+| run-offline-tests | 1 | see below |
+
+run-offline-tests: 6794 tests, 6784 pass. The 3 failing files are other WOs':
+
+- `smoke-wo1058-ltc-alsa-pacing`: WO-1092's in-progress "dying sink" assertion.
+- `smoke-wo598-api-contract`: `http.md` is stale for WO-1092's `/api/ltc/devices` and WO-1094's
+  `/api/tracking/runtime*`.
+- `check-wos`: INDEX.md was stale for the untracked WO-1094 file. This WO's INDEX commit leaves that line out so CI does not reference a file that is not committed; the WO-1094 agent's own `build-index` adds it.
+
+**On glass** (one GUI, relaunched with the same args via setsid under `flock -o /tmp/highascg-gui.lock`; project
+"90C PGRP Hilton Wawer" active). Screenshots are in the session scratchpad
+`/tmp/claude-1000/-home-casparcg/b8ff075d-eabe-4bed-9570-f2b4603d84a3/scratchpad/shots/`:
+
+- Before: `before_00_current.png` … `before_17_about.png`.
+- After, panes: `after_01_defaults`, `after_02_media`, `after_03_this_screen` (+ `after_03a_lockscreen`),
+  `after_04_companion` (+ `after_04a_companion_previews`), `after_05_system` (+ `after_05a_system_time`,
+  `after_05b_hardware`, `after_05c_tailscale`: folded headings hidden, lazy loads ran), `after_06_timecode`,
+  `after_07_nuclear`, `after_08_about`.
+- After, Devices: `after_11_live_audio_inspector` and `after_12_crop` (the fold, reading true / Layer 2 / true).
+
+**Round-trips** (change in the GUI → API → `kill -TERM` node under the restart lock → API → restore in the GUI → API):
+
+| Control | Changed | After restart | Restored |
+|---|---|---|---|
+| `live_audio_pgm_always_on` | true → false | false (API + `config/caspar_server.json`) | true |
+| `live_audio_pgm_audio_only` | true → false | false | true |
+| `live_audio_pgm_layer` | 2 → 3 | 3 | 2 |
+| `startup.mode` (moved Defaults → System) | ask → gui | gui | ask |
+| `editorDefaults.timeline.loopAlways` (kept) | false → true | true | false |
+
+- The Devices inspector re-read the persisted values after the restart (`after_18_crop.png`).
+- `live_audio_input_1_pgm_channels` stayed `''` throughout: no route was touched.
+- The end state is in `after_19_restored.png` and `after_23_state.png`.
+
+**Settings diff, start vs end** (`/api/settings` + `config/*.json`):
+
+- No WO-1093 key differs.
+- `ltc.output.*` changed: the WO-1092 agent's keys (`leadMs` → `fps` / `latencyMs` / `pair` / `userBits` /
+  `whenPaused`).
+- `decklinkInputsStatus.updatedAt` changed, which is a runtime timestamp.
+- `config/device_graph.json` lost a `sources` array. That array is derived: `augmentGraphWithSources`
+  (`routes-device-view.js:40`) rebuilds it on every GET `/api/device-view`. It was in the file only because an earlier
+  save had serialised the augmented graph, and any settings save rewrites the slice without it. The API answer is
+  unchanged (it never had `deviceGraph.sources`).
+
+**Not verified:**
+
+- Composing previews on glass. The mode, fps and JPEG rows sit behind the fold, and a change would start or stop
+  ffmpeg consumers on Caspar. The save path is covered by smoke-wo1093 only.
+- Tailscale, DeckLink install, GDTF and controller actions were not pressed. They are unchanged panes, only re-parented.
+- Lockscreen settings were not changed (the pane is unchanged, kept in `ui.cfg`).
+- The web UI was not opened (it is unchanged).
