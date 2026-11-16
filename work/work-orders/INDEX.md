@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1002 live WOs (36 open, 155 in progress, 811 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1003 live WOs (36 open, 155 in progress, 812 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -785,7 +785,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1034 DONE [devices-config+mapping] One PGM destination on several GPU jacks (fill + key-only pair) → 1034_WO_destination_on_several_gpu_jacks_fill_key.md
 - 1084 DONE [devices-config+os-iso,mapping] Next show setup: screen consumers of unplugged outputs start anyway and cover t… → 1084_WO_next_show_setup_offline_screens_not_started.md
 
-## os-iso — ISO, sticks, kernel, NVIDIA, boot (88)
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (89)
 
 - 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
 - 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
@@ -875,6 +875,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 996 DONE [os-iso+process] Retire the dd-flash / scripted-partition stick tools (sticks are Ventoy-only) → 996_WO_retire_dd_flash_stick_tools.md
 - 1023 DONE [os-iso+caspar-build] Web-UI update "FAILED" on boxes without the drop-update volume (and no Caspar s… → 1023_WO_update_apply_fails_without_drop_volume.md
 - 1095 OPEN [os-iso+process] ISO redistribution audit: what an ISO built today would ship that we have no ri… → 1095_WO_iso_third_party_redistribution_audit.md
+- 1096 DONE [os-iso+process,testing-ci] ISO redistribution fixes: ship only what we may distribute, with its licences a… → 1096_WO_iso_redistribution_fixes.md
 
 ## network — Cluster, replication, Tailscale, auth (45)
 
