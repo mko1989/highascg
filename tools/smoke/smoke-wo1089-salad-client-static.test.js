@@ -55,7 +55,7 @@ describe('WO-1089 Salad client: owner rules (source text)', () => {
 	})
 
 	it('root-relative paths are only the game API, the game files and three', () => {
-		const ok = /^\/(api\/game\/salad(\/|$)|game\/salad\/|vendor\/three\/)/
+		const ok = /^\/(api\/game\/salad(\/|$)|game\/salad\/|vendor\/three\/|game\/world\/)/ // WO-1101: world-join.js accepts only a /game/world/ renderer URL
 		for (const f of files) {
 			const s = f.endsWith('.js') ? strip(read(f)) : read(f)
 			for (const m of s.matchAll(/(?:['"`]|(?:href|src)=")(\/[a-z][^'"`\s]*)/gi)) {

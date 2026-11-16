@@ -9,6 +9,7 @@ import * as THREE from 'three'
 import { $, apiGet, isPhone, isTouchDevice, storeGet, storeSet, sessGet, sessSet } from './dom.js'
 import { createWorld } from './kit/world.js'
 import { createStageFx } from './kit/stage-fx.js'
+import { createWorldJoin } from './world-join.js'
 import { fullscreenButton } from './kit/fullscreen.js'
 import { createScreens } from './screens.js'
 import { createHud, toolButton } from './hud.js'
@@ -80,6 +81,7 @@ export async function startGame({ spectator = false } = {}) {
 	G.fx = createStageFx({ THREE, scene, quality, send: (m) => G.net?.send(m) ?? false,
 		onHouse: (level) => G.world.setHouse(level) }) // WO-1099 house lights (players and spectators alike)
 	G.avatars = createAvatars(THREE, scene, { quality })
+	G.wj = createWorldJoin(G, { send: (m) => G.net?.send(m) ?? false }) // WO-1101 Game World (idle without the world module)
 	G.slings = createSlings(THREE, scene)
 	G.proj = createProjectileView(THREE, scene)
 	G.aimView = createAimView(THREE, scene)
@@ -96,6 +98,7 @@ export async function startGame({ spectator = false } = {}) {
 			const q = G.world.quality === 'low' ? 'high' : 'low'
 			G.world.setQuality(q)
 			G.fx?.setQuality(q)
+			G.wj?.setQuality(q)
 			G.avatars.setQuality(q)
 			storeSet('quality', q)
 			el.textContent = q === 'low' ? 'LQ' : 'HQ'

@@ -160,6 +160,7 @@ export function startLoop(G) {
 		G.fx?.update(dt)
 		runLater(sNow)
 		camera(dt, now)
+		G.wj?.frame(sNow, dt) // WO-1101 Game World visitors (nothing without the world)
 		if (now - hudAt > HUD_EVERY_MS) {
 			hudAt = now
 			hud(sNow)

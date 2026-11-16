@@ -16,12 +16,15 @@ module.exports = (h) => {
 	const { attachSaladWs } = require('./server/salad-ws')
 	const { serveSaladStatic, isSaladStaticPath } = require('./server/salad-static')
 	const { isSaladPublicPath, setSaladEnabled } = require('./server/salad-public')
+	const world = require('./server/salad-world') // WO-1101 Game World: a descriptor in the process-global registry (no require of the world module)
+	let bootCtx = null
+	world.register(() => require('./server/salad-game').getSaladGame(bootCtx))
 	return {
 		name: 'stage-salad',
 		apiPathPrefixes: ['/api/game/salad'],
 		registerRoutes: (routes) => require('./server/routes-salad').register(routes),
 		publicPaths: (m, p) => isSaladPublicPath(m, p),
-		onHttpServer: (server, ctx) => attachSaladWs(server, ctx),
+		onHttpServer: (server, ctx) => ((bootCtx = ctx), attachSaladWs(server, ctx)),
 		handleStatic: ({ method, path, search }) => (isSaladStaticPath(path) ? serveSaladStatic(path, { method, query: search }) : null),
 		/** Module disabled / server stopping: end the running session (sockets, timers, lights, wall feed), close the public paths. */
 		async onShutdown() {
@@ -29,6 +32,7 @@ module.exports = (h) => {
 				require('./server/salad-game').shutdownSaladGame()
 			} catch {}
 			setSaladEnabled(false)
+			world.unregister()
 			kitHost.release()
 		},
 	}

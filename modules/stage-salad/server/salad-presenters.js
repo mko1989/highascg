@@ -172,11 +172,26 @@ function createPresenters(deps) {
 		return dodge
 	}
 
+	/** WO-1102 Game World R7 "make way": a friendly side step along the stage towards `dir` [x, z] (the referee rations it). */
+	function makeWay(tid, dir, t = now()) {
+		const av = avs.get(tid)
+		if (!av || av.lost || av.dodge || safe) return null
+		const r = venue()?.front?.r || [1, 0]
+		const side = dir[0] * r[0] + dir[1] * r[1] >= 0 ? 1 : -1
+		const dodge = { kind: 'step', from: t, until: t + DODGE.stepMs, dx: [r3(r[0] * side * B.STEP_DX), r3(r[1] * side * B.STEP_DX)] }
+		av.dodge = dodge
+		emit({ t: 'dodge', tid, kind: dodge.kind, from: dodge.from, until: dodge.until, dx: dodge.dx })
+		return dodge
+	}
+
 	return {
 		ingest,
 		tick,
 		partsAt,
 		planDodge,
+		makeWay,
+		/** WO-1101 Game World: the avatar's current dodge ({ kind, from, until, dx }) or null. */
+		dodgeOf: (tid) => avs.get(tid)?.dodge || null,
 		pose: (tid, t) => (avs.has(tid) ? pose(avs.get(tid), t) : null),
 		setMode(m, ids = []) {
 			if (!['auto', 'ids', 'dummy'].includes(m)) return false

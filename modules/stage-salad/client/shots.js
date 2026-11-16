@@ -117,6 +117,22 @@ export class ShotBook {
 		return false
 	}
 
+	/**
+	 * WO-1102 Game World: a decoded `xb` — the server's flight bounced off another game's car / soldier (a collider this
+	 * client does not have). The projectile flies on from the server's p / v at that flight time.
+	 */
+	onBounce(m) {
+		const pr = this._find(m.id, m.n, m.i)
+		if (!pr || pr.end || pr.state !== 'fly') return false
+		const bounces = pr.f.bounces + 1
+		pr.f = createFlight(pr.veg, { i: m.i, p: m.p, v: m.v })
+		pr.f.t = Math.max(0, (m.at - (pr.sts ?? pr.ts)) / 1000)
+		pr.f.bounces = bounces
+		pr.p = m.p.slice()
+		pr.v = m.v.slice()
+		return true
+	}
+
 	/** A phase change: the server dropped its flights. Splats on the floor stay. */
 	clear() {
 		this.live = []

@@ -16,6 +16,7 @@ const { createSaladRoom, RULES } = require('./salad-room')
 const { createSaladScene } = require('./salad-scene')
 const { parseMessage } = require('./salad-sanitize')
 const { setSaladEnabled } = require('./salad-public')
+const { createSaladWorld } = require('./salad-world')
 
 const MAX_SOCKETS = RULES.maxPlayers + RULES.maxSpectators
 const MSG_RATE = 30 // messages / s per socket (aim ≤ 10 + fire ≤ 3 + pings), burst the same
@@ -50,6 +51,7 @@ function createSaladGame(deps = {}) {
 	const baker = deps.baker || K.createSceneBaker({ log, ...(deps.bakerDeps || {}) })
 	const scene = createSaladScene({ baker })
 	let room = null
+	let world = null // WO-1101 Game World link while enabled (does nothing without the world module)
 	let lastRev = null
 	let sceneJson = null
 	let venue = null
@@ -142,7 +144,9 @@ function createSaladGame(deps = {}) {
 
 	function enable() {
 		if (room) return
-		room = createSaladRoom({ now, timers: deps.timers, rng: deps.rng, send: sendTo, decorate,
+		world = createSaladWorld({ room: () => room, send: sendTo, lights, now })
+		const w = world
+		room = createSaladRoom({ now, timers: deps.timers, rng: deps.rng, send: sendTo, decorate, xw: () => w.hooks(),
 			close: (ws, code, reason) => {
 				try {
 					ws.close(code, reason)
@@ -154,11 +158,14 @@ function createSaladGame(deps = {}) {
 		lastRev = scene.rev()
 		if (venue) room.setVenue(venue)
 		refreshScene().catch((e) => log('warn', `[stage-salad] scene failed: ${e.message}`))
+		world.attach()
 		log('info', '[stage-salad] enabled')
 	}
 
 	function disable() {
 		if (!room) return
+		world?.detach()
+		world = null
 		setSaladEnabled(false)
 		for (const ws of sockets) {
 			sendTo(ws, { t: 'off' })
@@ -233,6 +240,7 @@ function createSaladGame(deps = {}) {
 				if (room) video?.subscribe(ws, m.on === true)
 				return
 			}
+			if (m.t === 'wq') return world?.quality(ws, m) // WO-1101: the visitor cap of the client's quality tier
 			if (!room) return
 			room.handle(ws, m)
 			if (m.t === 'join') startPoll()
@@ -258,6 +266,8 @@ function createSaladGame(deps = {}) {
 		attach,
 		socketCount: () => sockets.size,
 		room: () => room,
+		/** WO-1101 Game World: the room adapter while enabled (salad-world.js). */
+		worldAdapter: () => world?.adapter || null,
 		venue: () => venue,
 		polling: () => !!poll,
 		pollOnce,

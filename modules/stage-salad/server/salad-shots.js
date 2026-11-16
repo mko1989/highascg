@@ -20,6 +20,8 @@ const { points } = require('./salad-score')
 const DEG = Math.PI / 180
 const LIMITS = { yawDeg: 55, pitchMin: -10, pitchMax: 70, perSecond: 3, slackMs: 60 }
 const MAX_LIVE = 60 // flights at once (20 players × a pea burst is 100 — the oldest are cut short)
+const WORLD_TAGS = new Set(['car', 'soldier']) // WO-1102 Game World colliders (hub.colliders: other games' cars / soldiers)
+const WORLD_GAP = 0.1 // s between two world contacts of one flight (a sphere resting against a car is one contact)
 const r3 = (v) => Math.round(v * 1000) / 1000 + 0
 const angDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a))
 
@@ -108,6 +110,7 @@ function createShots(X, presenters) {
 			}
 		}
 		X.toAll(msg)
+		if (e.k === 'land' && rec.xw) rec.xw.landed({ g: 'salad', pid: rec.p.id, veg: rec.veg.id, p: msg.p, tag: e.tag || '', i: f.i }) // WO-1102 R2 / R5
 		if (!rec.open) {
 			if (!rec.hit) rec.p.streak = 0
 			me(rec.p)
@@ -120,16 +123,37 @@ function createShots(X, presenters) {
 		live.splice(live.indexOf(rec), 1)
 	}
 
+	/**
+	 * WO-1102: a flight met another game's car / soldier (the world hub's sphere colliders, flight.js's own bounce / splat
+	 * rules decide what the vegetable does). The world referee decides the effect; a bounce re-anchors the clients' copy
+	 * of the flight (`xb`), a splat ends it (`end` with tag car / soldier).
+	 */
+	function worldContact(rec, f, xw) {
+		if (f.xwT != null && f.t - f.xwT < WORLD_GAP) return
+		f.xwT = f.t
+		try {
+			xw.contact({ g: 'salad', pid: rec.p.id, veg: rec.veg.id, p: f.p.slice(), v: f.v.slice(), tag: f.lastTag, end: !!f.end })
+		} catch {}
+		if (!f.end) X.toAll({ t: 'xb', id: rec.p.id, n: rec.n, i: f.i, p: f.p.map(r3), v: f.v.map(r3), at: rec.ts + Math.round(f.t * 1000) })
+	}
+
 	/** Step every open flight up to time t (the room's tick). */
 	function tick(t = X.now()) {
 		if (!live.length) return
 		const v = X.venue()
 		if (!v) return
-		const opts = { hitTest: hitTestAt(t) }
+		const xw = X.xw ? X.xw() : null // WO-1102 Game World hooks (null without the world: the flights are exactly as before)
+		const extra = xw ? xw.colliders() : null
+		const opts = extra && extra.length ? { hitTest: hitTestAt(t), extra } : { hitTest: hitTestAt(t) }
 		for (const rec of live.slice()) {
 			const tau = (t - rec.ts) / 1000
+			rec.xw = xw
 			for (const f of rec.flights) {
-				while (!f.end && f.t < tau) S.flight.stepFlight(f, v, opts)
+				while (!f.end && f.t < tau) {
+					const before = f.lastContactT
+					S.flight.stepFlight(f, v, opts)
+					if (opts.extra && f.lastContactT !== before && WORLD_TAGS.has(f.lastTag)) worldContact(rec, f, xw)
+				}
 				if (f.end && !f.reported) (f.reported = true), finish(rec, f)
 			}
 			if (!rec.open) live.splice(live.indexOf(rec), 1)
@@ -140,6 +164,8 @@ function createShots(X, presenters) {
 		fire,
 		tick,
 		active: () => live.length,
+		/** WO-1101 Game World: the open flights (vegetables in the air) — [{ rec, f }], newest last. */
+		flights: () => live.flatMap((rec) => rec.flights.filter((f) => !f.end).map((f) => ({ rec, f }))),
 		/** Phase change / stop: open flights end where they are (no score). */
 		clear() {
 			live.length = 0

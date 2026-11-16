@@ -70,6 +70,7 @@ function onPhase(G, prev) {
 
 export function onMessage(G, m) {
 	if (G.fx?.onMessage(m)) return
+	if (G.wj?.onMessage(m)) return // WO-1101 Game World: wst / wv / xb / xbonus
 	const sNow = G.net ? G.net.serverNow() : 0
 	switch (m.t) {
 		case 'welcome':

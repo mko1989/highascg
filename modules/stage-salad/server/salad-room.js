@@ -62,6 +62,7 @@ function createSaladRoom(deps) {
 		toAll: (m) => toAll(m),
 		toPlayer: (p, m) => p.conn && send(p.conn, m),
 		scored: () => stateSoon(),
+		xw: () => (deps.xw ? deps.xw() : null), // WO-1102 Game World flight hooks (salad-world.js), null without the world
 	}
 	const presenters = createPresenters({ now, rng, venue: () => venue, onEvent: (m) => toAll(m) })
 	const shots = createShots(X, presenters)
@@ -424,6 +425,9 @@ function createSaladRoom(deps) {
 			players.clear()
 		},
 		timers: () => ({ phase: !!timer.phase, house: !!timer.house, tick: !!timer.tick }),
+		/** WO-1101 Game World (salad-world.js): joined sockets, players, the venue, the standings. */
+		world: () => ({ phase, safe, startAt, conns: [...conns.values()].filter((c) => c.joined), players, venue }),
+		order: () => order(),
 		connections: () => conns.size,
 		ctx: X,
 		shots,
