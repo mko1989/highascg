@@ -7,6 +7,7 @@ extends VBoxContainer
 ## are the Devices live-audio inspector + the Audio tab), Network lives on the Devices server page only, Updates /
 ## Tailscale / DeckLink / GDTF library / Controllers / hardware are System folds, Variables + compose preview are
 ## Companion folds, Lockscreen + UI scale + simulated server are This screen, Diagnostics is About.
+## WO-1105: + Games (its own pane: hosting the browser games and the Game World is used live during an event).
 
 const Form := preload("res://features/settings/settings_form.gd")
 const Panes := preload("res://features/settings/settings_panes.gd")
@@ -25,6 +26,7 @@ const VariablesPane := preload("res://features/settings/variables_pane.gd")
 const LibraryPane := preload("res://features/settings/library_pane.gd")  # WO-825
 const LockscreenPane := preload("res://features/settings/lockscreen_pane.gd")
 const ControllersPane := preload("res://features/settings/controllers_pane.gd")  # WO-1066
+const GamesPane := preload("res://features/settings/games_pane.gd")  # WO-1105
 
 signal logs_requested
 
@@ -55,6 +57,7 @@ func _ready() -> void:
 	var screen := _pane("This screen")
 	Panes.this_screen(screen)
 	K.fold_pane(screen, "Lockscreen", LockscreenPane.new())  # WO-838
+	_pane("Games").add_child(GamesPane.new())  # WO-1105: hosting the browser games + the Game World, used live
 	_comp_status = Label.new()
 	_comp_check = Button.new()
 	_comp_check.text = "Check"
