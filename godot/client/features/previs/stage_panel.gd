@@ -62,6 +62,7 @@ func _ready() -> void:
 	_list = ItemList.new()
 	preload("res://features/previs/previs_ui.gd").fit_list(_list, 8)  # WO-948: as tall as its rows
 	_list.item_selected.connect(func(i: int) -> void: _select(str(builder.objects[i].id)))
+	_list.empty_clicked.connect(func(_at: Vector2, _b: int) -> void: deselect())  # WO-1100: below the rows
 	add_child(_list)
 	_info = Label.new()
 	_info.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -231,6 +232,12 @@ func _free_x() -> float:
 ## Public: select from outside (3D click).
 func select(id: String) -> void:
 	_select(id)
+
+
+## WO-1100: nothing selected — the list row, the yellow box (selection_changed) and the inspector fields go.
+func deselect() -> void:
+	_list.deselect_all()
+	_select("")
 
 
 func _select(id: String) -> void:

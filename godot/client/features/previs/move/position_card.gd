@@ -35,7 +35,7 @@ func _ready() -> void:
 		grid.add_child(sb)
 		_spins[f[1]] = sb
 	var hint := Label.new()
-	hint.text = "Drag the selection in 3D (shift: up / down) · arrows, Page Up / Down, Q / E nudge"
+	hint.text = "Drag the selection in 3D (shift: up / down) · arrows, Page Up / Down, Q / E nudge · Esc / click empty space: deselect"
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	hint.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	add_child(hint)
