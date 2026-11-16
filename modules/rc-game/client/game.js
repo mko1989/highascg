@@ -80,7 +80,7 @@ export async function startGame({ spectator = false } = {}) {
 	G.fxView = createFxView(G.world.scene)
 	/* §2.6 live lights + wall pictures: before the scene loads (lxfull arrives as soon as the socket opens) */
 	G.fx = createStageFx({ THREE, scene: G.world.scene, quality, send: (m) => G.net?._sendRaw(m) ?? false,
-		onHouse: (on) => G.world.setHouse(on) }) // WO-1099 house lights (players and spectators alike)
+		onHouse: (level) => G.world.setHouse(level) }) // WO-1099 house lights (players and spectators alike)
 	document.addEventListener('visibilitychange', () => G.fx?.setEnabled(!document.hidden)) // hidden tab: no pictures
 	window.addEventListener('pagehide', () => G.fx?.dispose())
 	window.addEventListener('resize', () => G.world.resize())

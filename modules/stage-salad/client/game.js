@@ -78,7 +78,7 @@ export async function startGame({ spectator = false } = {}) {
 	G.world.setFov(spectator ? 50 : 55)
 	const scene = G.world.scene
 	G.fx = createStageFx({ THREE, scene, quality, send: (m) => G.net?.send(m) ?? false,
-		onHouse: (on) => G.world.setHouse(on) }) // WO-1099 house lights (players and spectators alike)
+		onHouse: (level) => G.world.setHouse(level) }) // WO-1099 house lights (players and spectators alike)
 	G.avatars = createAvatars(THREE, scene, { quality })
 	G.slings = createSlings(THREE, scene)
 	G.proj = createProjectileView(THREE, scene)

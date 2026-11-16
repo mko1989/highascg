@@ -96,7 +96,9 @@ describe('WO-1089 Salad client: owner rules (source text)', () => {
 
 	it('host page: only the contract actions (with the presenter-safe pause), no way to put the game on a screen', () => {
 		const s = strip(read('host.js'))
-		const used = new Set([...s.matchAll(/action:\s*'([a-z]+)'/g)].map((m) => m[1]))
+		const slider = strip(fs.readFileSync(path.join(DIR, '..', '..', 'rc-game', 'client', 'house-slider.js'), 'utf8')) // WO-1099: the House lights slider posts `house` (host.js imports it via kit/)
+		assert.match(s, /createHouseSlider\(/)
+		const used = new Set([...(s + slider).matchAll(/action:\s*'([a-z]+)'/g)].map((m) => m[1]))
 		for (const a of used) assert.ok(HOST_ACTIONS.includes(a), `unknown host action ${a}`)
 		for (const a of HOST_ACTIONS) assert.ok(used.has(a), `host action ${a} missing`)
 		assert.match(s, /Pause — presenter safe/)

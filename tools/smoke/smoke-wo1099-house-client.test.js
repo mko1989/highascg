@@ -114,15 +114,67 @@ describe('applyHouse', () => {
 	})
 })
 
+describe('house level: curve, restore, toggle', () => {
+	const mk = () => {
+		const hemi = new THREE.HemisphereLight(0xeef2ff, 0x4a4234, 2.6)
+		const root = new THREE.Group()
+		const m = new THREE.MeshStandardMaterial({ color: 0x806040, emissive: 0x334455, emissiveIntensity: 1.5 })
+		root.add(new THREE.Mesh(new THREE.BoxGeometry(), m))
+		return { hemi, root, m, c0: m.color.toArray() }
+	}
+	it('the curve: level^2.2 — 0 → 0, 0.5 ≈ 0.2176, 1 → 1; normHouse clamps and converts booleans', () => {
+		assert.equal(H.houseCurve(0), 0)
+		assert.equal(H.houseCurve(1), 1)
+		assert.ok(Math.abs(H.houseCurve(0.5) - Math.pow(0.5, 2.2)) < 1e-12 && Math.abs(H.houseCurve(0.5) - 0.2176) < 1e-3)
+		assert.deepEqual([true, false, 2, -1, NaN, 'x', undefined, 0.25].map(H.normHouse), [1, 0, 1, 0, 1, 1, 1, 0.25])
+		assert.equal(H.lerpHex(0x030407, 0x151a26, 0), 0x030407)
+		assert.equal(H.lerpHex(0x030407, 0x151a26, 1), 0x151a26)
+		const mid = H.lerpHex(0x000000, 0x204060, 0.5)
+		assert.equal(mid, (0x10 << 16) | (0x20 << 8) | 0x30)
+	})
+	it('level 0 = the old off exactly, level 1 = the old on exactly, 0.5 in between by the curve', () => {
+		const { hemi, root, m, c0 } = mk()
+		H.applyHouse({ lights: [hemi], venue: root, level: 0 })
+		assert.ok(Math.abs(hemi.intensity - 2.6 * H.HOUSE_FLOOR) < 1e-12)
+		assert.ok(Math.abs(m.color.r - c0[0] * H.HOUSE_VENUE) < 1e-12)
+		assert.equal(m.emissiveIntensity, 0)
+		H.applyHouse({ lights: [hemi], venue: root, level: 0.5 })
+		const g = Math.pow(0.5, 2.2)
+		assert.ok(Math.abs(hemi.intensity - 2.6 * (H.HOUSE_FLOOR + (1 - H.HOUSE_FLOOR) * g)) < 1e-12)
+		assert.ok(Math.abs(m.color.g - c0[1] * (H.HOUSE_VENUE + (1 - H.HOUSE_VENUE) * g)) < 1e-12)
+		assert.ok(Math.abs(m.emissiveIntensity - 1.5 * g) < 1e-12)
+		const snap = [hemi.intensity, m.color.toArray(), m.emissiveIntensity]
+		H.applyHouse({ lights: [hemi], venue: root, level: 0.5 }) // idempotent
+		assert.deepEqual([hemi.intensity, m.color.toArray(), m.emissiveIntensity], snap)
+		H.applyHouse({ lights: [hemi], venue: root, level: 1 })
+		assert.equal(hemi.intensity, 2.6)
+		assert.deepEqual(m.color.toArray(), c0)
+		assert.equal(m.emissiveIntensity, 1.5)
+		H.applyHouse({ lights: [hemi], venue: root, on: true }) // `on` still works
+		H.applyHouse({ lights: [hemi], venue: root, on: false })
+		assert.ok(Math.abs(hemi.intensity - 2.6 * H.HOUSE_FLOOR) < 1e-12)
+		for (const lv of [0.9, 0.3, 0.77, 1]) H.applyHouse({ lights: [hemi], venue: root, level: lv }) // a drag, then home
+		assert.equal(hemi.intensity, 2.6)
+		assert.deepEqual(m.color.toArray(), c0, 'exact restore after any path')
+	})
+	it('houseToggle: lit → 0 remembering the level; dark → the last non-zero level (default 1)', () => {
+		assert.deepEqual(H.houseToggle(0.6, 1), { level: 0, last: 0.6 })
+		assert.deepEqual(H.houseToggle(0, 0.6), { level: 0.6, last: 0.6 })
+		assert.deepEqual(H.houseToggle(0), { level: 1, last: 1 })
+		assert.deepEqual(H.houseToggle(0, 0), { level: 1, last: 1 })
+	})
+})
+
 describe('stage-fx hands house to onHouse', () => {
-	it('welcome / state → onHouse(bool); a state without the field (older server) → nothing; no hook → no throw', () => {
+	it('welcome / state → onHouse(level); a boolean of an older server → 1 / 0; no field → nothing; no hook → no throw', () => {
 		const calls = []
 		const scene = new THREE.Scene()
 		const fx = FX.createStageFx({ THREE, scene, send: () => true, onHouse: (on) => calls.push(on) })
 		assert.equal(fx.onMessage({ t: 'welcome', state: { lights: true, wall: true, house: false } }), false)
 		assert.equal(fx.onMessage({ t: 'state', state: { lights: true, wall: true, house: true } }), false)
+		fx.onMessage({ t: 'state', state: { lights: true, wall: true, house: 0.5 } })
 		fx.onMessage({ t: 'state', state: { lights: true, wall: true } })
-		assert.deepEqual(calls, [false, true])
+		assert.deepEqual(calls, [0, 1, 0.5])
 		const plain = FX.createStageFx({ THREE, scene: new THREE.Scene(), send: () => true }) // no hook: no throw
 		assert.equal(plain.onMessage({ t: 'state', state: { house: false } }), false)
 		fx.dispose()
@@ -133,30 +185,39 @@ describe('stage-fx hands house to onHouse', () => {
 describe('wiring (source)', () => {
 	it('world.js: setHouse darkens the background, scales hemi + sun, and the venue follows every load / quality swap', () => {
 		const w = read('rc-game/client/world.js')
-		assert.match(w, /import \{ applyHouse, HOUSE_BG_OFF \} from '\.\/house\.js'/)
-		assert.match(w, /setHouse\(on\) \{[\s\S]*?renderer\.setClearColor\(on \? BG : HOUSE_BG_OFF, 1\)[\s\S]*?scene\.background\.setHex\(on \? BG : HOUSE_BG_OFF\)[\s\S]*?applyHouse\(\{ lights: \[hemi, sun\], on \}\)/)
+		assert.match(w, /import \{ applyHouse, houseCurve, lerpHex, normHouse, HOUSE_BG_OFF \} from '\.\/house\.js'/)
+		assert.match(w, /setHouse\(level\) \{[\s\S]*?level = normHouse\(level\)[\s\S]*?lerpHex\(HOUSE_BG_OFF, BG, houseCurve\(level\)\)[\s\S]*?renderer\.setClearColor\(bg, 1\)[\s\S]*?scene\.background\.setHex\(bg\)[\s\S]*?applyHouse\(\{ lights: \[hemi, sun\], level \}\)/)
 		assert.match(w, /cheapMaterials\(world\.model, world\.quality === 'low'\)\n\t+applyCut\(world\.model\) \/\/ §3\.1[^\n]*\n\t+houseVenue\(\)/, 'setQuality')
 		assert.match(w, /cheapMaterials\(world\.model, world\.quality === 'low'\)\n\t+applyCut\(world\.model\)\n\t+houseVenue\(\)\n\t+return \{ ok: true \}/, 'loadScene')
-		assert.match(w, /const houseVenue = \(\) => applyHouse\(\{ venue: statics, on: houseOn \}\)/, 'the venue = world.statics (GLB, ground, arena)')
+		assert.match(w, /const houseVenue = \(\) => applyHouse\(\{ venue: statics, level: houseLevel \}\)/, 'the venue = world.statics (GLB, ground, arena)')
 		assert.match(w, /addArena\(statics, info\)\n\t+houseVenue\(\)\n\t+return \{ ok: true, arena: true \}/, 'the plain arena')
 		assert.match(w, /color: m\.userData\.houseColor \? new THREE\.Color\(\)\.fromArray\(m\.userData\.houseColor\) : m\.color/, 'low copies from the undimmed colour')
 	})
 
 	it('each game hands house to its world (players and spectators share game.js)', () => {
 		for (const f of ['rc-game/client/game.js', 'toy-skirmish/client/game.js', 'stage-salad/client/game.js'])
-			assert.match(read(f), /createStageFx\(\{[^}]*\n?\t*onHouse: \(on\) => G\.world\.setHouse\(on\) \}\)/, f)
+			assert.match(read(f), /createStageFx\(\{[^}]*\n?\t*onHouse: \(level\) => G\.world\.setHouse\(level\) \}\)/, f)
 		assert.match(read('toy-skirmish/client/sk-world.js'), /import \{ createWorld \} from '\.\/kit\/world\.js'/)
 		assert.match(read('stage-salad/client/game.js'), /import \{ createWorld \} from '\.\/kit\/world\.js'/)
-		assert.match(read('rc-game/client/stage-fx.js'), /if \(typeof state\.house === 'boolean'\) o\.onHouse\?\.\(state\.house\)/)
+		assert.match(read('rc-game/client/stage-fx.js'), /typeof state\.house === 'number' \|\| typeof state\.house === 'boolean'\) o\.onHouse\?\.\(typeof state\.house === 'boolean' \? \(state\.house \? 1 : 0\) : state\.house\)/)
 	})
 
-	it('each host page: a "House lights" switch with its tooltip, posting { action: house, on }, synced from state', () => {
-		for (const g of ['rc-game', 'toy-skirmish', 'stage-salad']) {
+	it('each host page: label + range 0–100 + % (house-slider.js) where the checkbox was, posting { action: house, level }, synced from state', () => {
+		const sl = read('rc-game/client/house-slider.js')
+		assert.match(sl, /type: 'range', min: 0, max: 100, step: 1/)
+		assert.match(sl, /h\('span\.house-lbl', \{ text: 'House lights'/)
+		assert.match(sl, /post\(\{ action: 'house', level: lv \}\)/)
+		assert.match(sl, /THROTTLE_MS = 100/)
+		assert.match(sl, /range\.addEventListener\('change'/)
+		assert.match(sl, /if \(dragging \|\| timer /, 'sync never fights a drag')
+		for (const [g, imp] of [['rc-game', './house-slider.js'], ['toy-skirmish', './kit/house-slider.js'], ['stage-salad', './kit/house-slider.js']]) {
 			const s = read(`${g}/client/host.js`)
-			assert.match(s, /h\('label\.host-switch', \{ title: "The general light on the room\. Off = a dark room lit only by the rig, the LED walls and the game's own lights\." \}, houseBox, ' House lights'\),\n\t+h\('label\.host-switch', lightsBox, ' Live lights in the game'\)/, g)
-			assert.match(s, /act\(\{ action: 'house', on: houseBox\.checked \}/, g)
-			assert.match(s, /houseBox\.checked = on && state\.house !== false/, g)
-			assert.match(s, /houseBox\.disabled = lightsBox\.disabled = wallBox\.disabled = !on/, g)
+			assert.ok(s.includes(`import { createHouseSlider } from '${imp}'`), g)
+			assert.match(s, /createHouseSlider\(\{ h, post: apiHost, say: \(t\) => say\(t\) \}\)/, g)
+			assert.match(s, /houseSlider\.el,\n\t+h\('label\.host-switch', lightsBox, ' Live lights in the game'\)/, g)
+			assert.match(s, /houseSlider\.sync\(state, on\)/, g)
+			assert.match(s, /lightsBox\.disabled = wallBox\.disabled = !on/, g)
 		}
+		assert.ok(read('rc-game/client/house-slider.js').includes('The general light on the room'), 'tooltip kept')
 	})
 })

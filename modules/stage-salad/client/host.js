@@ -7,6 +7,7 @@
  * the game world (live lights, LED wall pictures). It only calls /api/game/salad/state and /host — the game never puts
  * anything on a screen, and this panel offers no way to.
  */
+import { createHouseSlider } from './kit/house-slider.js'
 import { h, setText, show, apiGet, apiHost, safeColor } from './dom.js'
 import { qrMatrix, drawQr } from './kit/join-code.js'
 import { TEAMS } from './hud-board.js'
@@ -57,7 +58,7 @@ export function startHost(root) {
 	const targetsEl = h('div.host-actions.salad-targets')
 	const joinBox = h('div.join-box')
 	const playersEl = h('ul.host-players')
-	const houseBox = h('input', { type: 'checkbox' }) // WO-1099
+	const houseSlider = createHouseSlider({ h, post: apiHost, say: (t) => say(t) }) // WO-1099 house lights level
 	const lightsBox = h('input', { type: 'checkbox' })
 	const wallBox = h('input', { type: 'checkbox' })
 	let state = null
@@ -94,7 +95,7 @@ export function startHost(root) {
 		h(
 			'section.host-sec',
 			h('h2', { text: 'In the game world' }),
-			h('label.host-switch', { title: "The general light on the room. Off = a dark room lit only by the rig, the LED walls and the game's own lights." }, houseBox, ' House lights'),
+			houseSlider.el,
 			h('label.host-switch', lightsBox, ' Live lights in the game'),
 			h('label.host-switch', wallBox, ' LED wall pictures in the game'),
 			h('p.hint', { text: 'What every guest sees inside their own game. Off = dark rig / blank walls in the game.' })
@@ -148,7 +149,6 @@ export function startHost(root) {
 	for (const b of levelBtns) b.addEventListener('click', () => act({ action: 'botlevel', level: b.dataset.level }, `Bot skill: ${b.dataset.level}`))
 	autoBtn.addEventListener('click', () => act({ action: 'target', mode: 'auto' }, 'Target: automatic'))
 	dummyBtn.addEventListener('click', () => act({ action: 'target', mode: 'dummy' }, 'Target: the stand-in'))
-	houseBox.addEventListener('change', () => act({ action: 'house', on: houseBox.checked }, `House lights ${houseBox.checked ? 'on' : 'off'}.`))
 	lightsBox.addEventListener('change', () => act({ action: 'lights', on: lightsBox.checked }, `Live lights in the game ${lightsBox.checked ? 'on' : 'off'}.`))
 	wallBox.addEventListener('change', () => act({ action: 'wall', on: wallBox.checked }, `LED wall pictures in the game ${wallBox.checked ? 'on' : 'off'}.`))
 
@@ -226,10 +226,10 @@ export function startHost(root) {
 		setText(secs.val, fmtSecs(state.secs || 90))
 		secs.minus.disabled = secs.plus.disabled = !on || state.phase !== 'lobby'
 		setText(bots.val, `${state.bots | 0}`)
-		houseBox.checked = on && state.house !== false // older servers: no field = the room lit
+		houseSlider.sync(state, on)
 		lightsBox.checked = on && state.lights === true
 		wallBox.checked = on && state.wall === true
-		houseBox.disabled = lightsBox.disabled = wallBox.disabled = !on
+		lightsBox.disabled = wallBox.disabled = !on
 		const urls = on ? state.joinUrls || [] : []
 		if (urls.join('|') !== lastJoin) {
 			lastJoin = urls.join('|')

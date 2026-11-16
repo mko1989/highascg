@@ -7,7 +7,7 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { applyCut, setCut } from './tunnel-cut.js'
-import { applyHouse, HOUSE_BG_OFF } from './house.js'
+import { applyHouse, houseCurve, lerpHex, normHouse, HOUSE_BG_OFF } from './house.js'
 
 const BG = 0x151a26
 
@@ -35,9 +35,9 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 	const statics = new THREE.Group()
 	statics.name = 'scene-static'
 	scene.add(statics)
-	let houseOn = true
+	let houseLevel = 1
 	/* the venue's materials follow the switch; the lights only on setHouse (sk-world.js sets its own levels after creation) */
-	const houseVenue = () => applyHouse({ venue: statics, on: houseOn }) // the GLB, the ground plane, the plain arena
+	const houseVenue = () => applyHouse({ venue: statics, level: houseLevel }) // the GLB, the ground plane, the plain arena
 
 	const world = {
 		THREE,
@@ -70,17 +70,19 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 		render() {
 			renderer.render(scene, camera)
 		},
-		/** WO-1099 house lights (host switch `state.house`): off = dark room, rig / walls / game objects untouched. */
-		setHouse(on) {
-			on = on !== false
-			if (on === houseOn) return
-			houseOn = on
-			renderer.setClearColor(on ? BG : HOUSE_BG_OFF, 1)
-			scene.background.setHex(on ? BG : HOUSE_BG_OFF)
-			applyHouse({ lights: [hemi, sun], on })
+		/** WO-1099 house lights (host slider `state.house`, 0..1): 0 = dark room, rig / walls / game objects untouched. */
+		setHouse(level) {
+			level = normHouse(level) // a number 0..1 (an older server's boolean = 1 / 0): scalar / colour writes only, live while dragging
+			if (level === houseLevel) return
+			houseLevel = level
+			const bg = lerpHex(HOUSE_BG_OFF, BG, houseCurve(level))
+			renderer.setClearColor(bg, 1)
+			scene.background.setHex(bg)
+			applyHouse({ lights: [hemi, sun], level })
 			houseVenue()
 		},
-		isHouseOn: () => houseOn,
+		isHouseOn: () => houseLevel > 0,
+		houseLevel: () => houseLevel,
 		/** §3 toy scale: the near plane may come down to NEAR · s (a 6 cm car seen from a few cm never clips). */
 		setNear(s) {
 			nearScale = s > 0 ? Math.min(1, s) : 1

@@ -64,7 +64,7 @@ modules/stage-salad/client/   index.html, *.js, *.css   (package.json "type": "m
 
 Host actions: `enable`, `disable`, `start`, `stop`, `round {secs: 30–600}`, `bots {n: 0–8}`, `botlevel {level: easy|
 normal|hard}`, `teams {on}`, `target {mode: 'auto'|'dummy'|'ids', ids?: [tid…]}`, `safe {on}` (pause / presenter
-safe), `kick {id}`, `lights {on}`, `wall {on}`, `house {on}` (WO-1099 house lights, RC §2.6).
+safe), `kick {id}`, `lights {on}`, `wall {on}`, `house {level 0..1}` (WO-1099 house lights slider, RC §2.6; `on` boolean still accepted = 1 / 0; state `house` is the number, default 1).
 
 ## 3. Frame and venue (`venue.js` — `buildVenue(sceneJson, live)`; the server puts the result in the scene as `salad`)
 

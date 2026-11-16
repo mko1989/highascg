@@ -68,7 +68,7 @@ function createSkGame(deps = {}) {
 	const lightsDeps = deps.lightsDeps || (deps.ctx ? K.rcLightsDeps(deps.ctx, { send: sendTo, log }) : null)
 	const lights = lightsDeps ? K.createRcLights({ log, ...lightsDeps, send: sendTo }) : null
 	const video = videoDeps ? K.createRcVideo({ log, ...videoDeps }) : null
-	let house = true // WO-1099 house lights (as rc-game.js): off = the room dark in every client, the rig / walls / game lit
+	let house = 1 // WO-1099 house lights LEVEL 0..1 (1 = the room lit): every client dims its own room (world.js setHouse); lives like lights / wall
 	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev,
 		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house })
 
@@ -130,10 +130,13 @@ function createSkGame(deps = {}) {
 		else if (action === 'disable') disable()
 		else if (!room) return { status: 409, body: { ok: false, error: 'the game is not enabled', state: state() } }
 		else {
-			if (action === 'lights' || action === 'wall' || action === 'house') {
+			if (action === 'house') {
+				const lv = a.level !== undefined ? a.level : typeof a.on === 'boolean' ? (a.on ? 1 : 0) : undefined // `on` kept for older hosts
+				if (typeof lv !== 'number' || Number.isNaN(lv)) return { status: 400, body: { ok: false, error: '`level` must be a number 0..1 (or `on` true / false)', state: state() } }
+				house = Math.min(1, Math.max(0, lv)) // WO-1099: only state
+			} else if (action === 'lights' || action === 'wall') {
 				if (typeof a.on !== 'boolean') return { status: 400, body: { ok: false, error: '`on` must be true or false', state: state() } }
-				if (action === 'house') house = a.on // WO-1099: only state — every client dims its own room
-				else (action === 'lights' ? lights : video)?.setOn(a.on)
+				;(action === 'lights' ? lights : video)?.setOn(a.on)
 			}
 			const r = room.host(action, a)
 			if (!r.ok) return { status: r.status || 400, body: { ok: false, error: r.error, state: state() } }

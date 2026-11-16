@@ -267,8 +267,11 @@ Built as NEW files only (wired in by the lead after v2 lands): server `src/game/
 client `game/rc/stage-fx.js` (+ helpers `game/rc/stage-fx-*.js`). Both features cost nothing while the game is disabled
 or nobody is connected, and each can be switched off by the host (`host` actions `{action:'lights', on}` and
 `{action:'wall', on}`; state carries `"lights": true, "wall": true`; default both on). WO-1099 house lights:
-`{action:'house', on}` (state `"house": true`, default on; only state — every client dims its own room: hemisphere + sun
-to a readability floor, background near black, the scene GLB's own glow out; the rig, the walls and the game's objects
+`{action:'house', level}` (a SLIDER: `level` a number 0..1, clamped, 400 for a non-number / NaN; `on` true/false kept = 1 / 0;
+state `"house": 1`, a number, default 1; only state, survives disable/enable — every client dims its own room by the curve
+g = level^2.2: lights × (0.3 + 0.7 g), room colours × (0.1 + 0.9 g), glow × g, background lerped near-black → lit by g, so 0
+is the old "off" and 1 the old "on" exactly; a boolean `house` from an older server = 1 / 0. Host page: label + range 0–100 +
+"%", throttled ~100 ms + once on change, label click toggles 0 ↔ last level; the rig, the walls and the game's objects
 untouched — `game/rc/house.js` through `world.setHouse`, applied from `welcome` / `state` via stage-fx `onHouse`).
 
 **Scene JSON additions**

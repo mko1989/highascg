@@ -63,7 +63,7 @@ its world code instead of copying it:
 | Socket | WebSocket `/api/game/sk/ws` (also under `/instance/<id>`) |
 
 `host` actions: `enable`, `disable`, `arena {id}`, `mode {mode: 'dm'|'tdm'|'spot'}`, `limits {frags: 5–100, minutes: 1–30}`,
-`bots {n: 0–6}`, `botlevel {level: 'easy'|'normal'|'hard'}` (WO-1083), `start`, `stop`, `kick {id}`, `team {id, team}` (move a player), `lights {on}`, `wall {on}`, `house {on}` (WO-1099 house lights, RC §2.6).
+`bots {n: 0–6}`, `botlevel {level: 'easy'|'normal'|'hard'}` (WO-1083), `start`, `stop`, `kick {id}`, `team {id, team}` (move a player), `lights {on}`, `wall {on}`, `house {level 0..1}` (WO-1099 house lights slider, RC §2.6; `on` boolean still accepted = 1 / 0; state `house` is the number, default 1).
 
 ## 3. Units, sizes, numbers (both sides use exactly these)
 

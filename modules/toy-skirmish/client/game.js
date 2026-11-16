@@ -90,7 +90,7 @@ export async function startGame({ spectator = false } = {}) {
 	G.world = createSkWorld($('#view'), { phone, quality })
 	G.skfx = createFx(G.world.scene, 1)
 	G.fx = createStageFx({ THREE, scene: G.world.scene, quality, send: (m) => G.net?.send(m) ?? false,
-		onHouse: (on) => G.world.setHouse(on) }) // WO-1099 house lights (players and spectators alike)
+		onHouse: (level) => G.world.setHouse(level) }) // WO-1099 house lights (players and spectators alike)
 	tuneStageFx(G.fx)
 	document.addEventListener('visibilitychange', () => G.fx?.setEnabled(!document.hidden))
 	window.addEventListener('pagehide', () => G.fx?.dispose())

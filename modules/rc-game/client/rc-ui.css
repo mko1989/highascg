@@ -459,3 +459,24 @@ label {
 .actions .fs-btn {
 	margin-left: auto;
 }
+
+/* WO-1099 host page: the House lights slider (house-slider.js) */
+.host-switch {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 6px 0;
+	font-size: 16px;
+}
+.house-switch input[type="range"] {
+	width: min(220px, 50vw);
+	height: auto;
+}
+.house-lbl {
+	cursor: pointer;
+	user-select: none;
+}
+.house-pct {
+	min-width: 3.5em;
+	color: var(--dim, #9aa);
+}

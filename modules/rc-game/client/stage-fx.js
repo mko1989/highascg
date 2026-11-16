@@ -7,7 +7,7 @@
  *   fx.load(sceneJson)          a scene was (re)loaded: floors, `lights`, `screens`, `heads` (WO-1090: the patched heads'
  *                               own models in the scene GLB turn with their beams — head-follow.js)
  *   fx.onMessage(m)             every decoded JSON message; → true when it was ours (`lx`, `lxfull`) — it also peeks at
- *                               `welcome` / `state` (host switches `lights` / `wall`; `house` → onHouse(on), WO-1099:
+ *                               `welcome` / `state` (host switches `lights` / `wall`; `house` (a level 0..1) → onHouse(level), WO-1099:
  *                               the game's world.setHouse) and returns false for them
  *   fx.onBinary(data)           every binary socket message (ArrayBuffer or Blob) → true when it was a wall picture
  *   fx.update(dt)               every rendered frame (seconds since the last)
@@ -26,7 +26,7 @@ const MAX_LIGHTS = 150
 
 /**
  * @param {{ THREE: typeof import('three'), scene: any, send?: (m: object) => any, quality?: 'low'|'high',
- *   createImageBitmap?: Function, Blob?: any, onHouse?: (on: boolean) => void }} o
+ *   createImageBitmap?: Function, Blob?: any, onHouse?: (level: number) => void }} o
  */
 export function createStageFx(o) {
 	const { THREE } = o
@@ -96,7 +96,7 @@ export function createStageFx(o) {
 			lightsOn = state.lights
 			if (!lightsOn) for (const l of lights) ((l.tgt = { ...l.tgt, a: 0 }), (l.moving = true))
 		}
-		if (typeof state.house === 'boolean') o.onHouse?.(state.house) // WO-1099 house lights (world.setHouse)
+		if (typeof state.house === 'number' || typeof state.house === 'boolean') o.onHouse?.(typeof state.house === 'boolean' ? (state.house ? 1 : 0) : state.house) // WO-1099 house lights (world.setHouse)
 		if (typeof state.wall === 'boolean' && state.wall !== wallOn) {
 			wallOn = state.wall
 			wall.setVisible(enabled && wallOn)

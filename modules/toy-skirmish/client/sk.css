@@ -185,6 +185,18 @@ body.mode-spectate #view {
 	width: 20px;
 	height: 20px;
 }
+.house-switch input[type="range"] {
+	width: min(220px, 50vw);
+	height: auto;
+}
+.house-lbl {
+	cursor: pointer;
+	user-select: none;
+}
+.house-pct {
+	min-width: 3.5em;
+	color: var(--dim, #9aa);
+}
 button.mode.on {
 	border-color: var(--accent);
 	color: var(--accent);
