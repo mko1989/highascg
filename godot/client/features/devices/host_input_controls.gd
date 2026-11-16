@@ -133,6 +133,9 @@ func _boot(show_status: Callable, fill: Callable) -> void:
 		fill.call(H.R.d(d.data).get("devices"))
 
 
+static var _pgm_routes_open := false  # a save re-reads settings and rebuilds the inspector: keep the fold open
+
+
 ## WO-1093 — "▸ Program routes (all live audio inputs)": the three defaults every live audio input shares, moved here from
 ## the removed Settings → Live audio pane. Folded (rarely touched); each change is one POST /api/settings
 ## {casparServer: {key}} (IS.pgm_route_body), then the settings re-read; a refused save puts the control back.
@@ -140,14 +143,16 @@ func pgm_routes() -> Control:
 	var ui := IS.read_live_audio(H.R.d(H.R.d(DevicesTarget.settings.settings).get("casparServer")))
 	var box := _section()
 	var body := _section()
-	body.visible = false
+	body.visible = _pgm_routes_open
 	var tog := Button.new()
 	tog.flat = true
 	tog.toggle_mode = true
+	tog.button_pressed = _pgm_routes_open
 	tog.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	tog.text = "▸ Program routes (all live audio inputs)"
+	tog.text = ("▾ " if _pgm_routes_open else "▸ ") + "Program routes (all live audio inputs)"
 	tog.add_theme_font_size_override("font_size", 11)
 	tog.toggled.connect(func(on: bool) -> void:
+		_pgm_routes_open = on
 		body.visible = on
 		tog.text = ("▾ " if on else "▸ ") + "Program routes (all live audio inputs)")
 	box.add_child(tog)
