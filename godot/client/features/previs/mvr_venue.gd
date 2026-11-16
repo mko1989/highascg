@@ -74,12 +74,13 @@ static func meshes_by_uuid(json: Dictionary, gnodes: Array, meshes: Array) -> Di
 	return {"by": by, "meshes": count}
 
 
-## A Capture export (its glTF JSON names the CAPTURE_model extension) — the bytes of a .glb, its whole JSON chunk: Capture
+## A Capture export (its glTF JSON names the CAPTURE_model extension) or a WO-1098 OBJ import (HIGHASCG_venue) — the bytes of a .glb, its whole JSON chunk: Capture
 ## lists extensionsUsed at the END (Narvil: 3.2 MB of JSON, the name first at ~3.1 MB — a 64 KB peek missed it, 09.11).
 static func is_capture(bytes: PackedByteArray) -> bool:
 	if bytes.size() < 20 or bytes.slice(0, 4).get_string_from_ascii() != "glTF":
 		return false
-	return bytes.slice(20, 20 + bytes.decode_u32(12)).get_string_from_ascii().contains("\"CAPTURE_model\"")
+	var j := bytes.slice(20, 20 + bytes.decode_u32(12)).get_string_from_ascii()
+	return j.contains("\"CAPTURE_model\"") or j.contains("\"HIGHASCG_venue\"")  # WO-1098: an imported OBJ venue too
 
 
 ## project.previs.mvr.venue_glb = `name` ("" = none); the MVR section and the 3D views follow on project_changed.
@@ -145,5 +146,7 @@ static func _fill(node: Node3D, parts: Array) -> void:
 
 static func _ext(d: Variant) -> Dictionary:
 	var e: Variant = (d as Dictionary).get("extensions", {}) if d is Dictionary else {}
-	var c: Variant = (e as Dictionary).get("CAPTURE_model", {}) if e is Dictionary else {}
+	var c: Variant = {}
+	if e is Dictionary:  # WO-1098: the OBJ importer writes the same shape as HIGHASCG_venue
+		c = (e as Dictionary).get("CAPTURE_model", (e as Dictionary).get("HIGHASCG_venue", {}))
 	return c if c is Dictionary else {}

@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-619 routes.
+623 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -606,6 +606,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/variables/batch` | registry | `src/api/router.js`, `src/api/routes-state.js` |
 | GET | `/api/variables/custom` | registry | `src/api/router.js` |
 | POST | `/api/variables/custom` | registry | `src/api/router.js`, `src/api/routes-state.js` |
+| GET | `/api/venue-import` | registry | `src/api/routes-venue-import.js` |
+| POST | `/api/venue-import/cancel` | registry | `src/api/routes-venue-import.js` |
+| POST | `/api/venue-import/files` | registry | `src/api/routes-venue-import.js` |
+| POST | `/api/venue-import/start` | registry | `src/api/routes-venue-import.js` |
 | GET | `/api/video-surfaces` | registry | `src/api/router.js` |
 | POST | `/api/video-surfaces/lease` | registry | `src/api/router.js` |
 | GET | `/api/virtual-camera` | registry | `src/api/router.js`, `src/api/routes-virtual-camera.js` |
@@ -704,6 +708,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-tracking-runtime.js` | WO-1094 — the person-detection runtime (src/tracking/runtime-*.js; the work is tools/tracking-detect/install.sh): GET  /api/tracking/runtime[?net=1]          →  |
 | `src/api/routes-usb-ingest.js` | USB media ingest REST API (WO-29). |
 | `src/api/routes-v4l2-input.js` |  |
+| `src/api/routes-venue-import.js` | WO-1098 — venue import: an OBJ (+ MTL + texture folder, or one zip of them; a SketchUp .skp for its pictures only) → a venue .glb in the project folder (src/med |
 | `src/api/routes-virtual-camera.js` |  |
 | `src/api/routes-vr.js` | WO-770 — explicit VR session from the operator GUI (see src/vr/vr-session.js): GET  /api/vr/status → { installed, serverRunning, headsetConnected, sessionRunnin |
 | `src/api/routes-zoom-audio.js` | WO-1012 stage C — two-way Zoom audio (src/zoom/zoom-audio.js). |

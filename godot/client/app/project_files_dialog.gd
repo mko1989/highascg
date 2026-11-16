@@ -3,8 +3,11 @@ extends AcceptDialog
 ## PDFs and Excel sheets kept in the project folder on the server (so they travel with the show). Add files… or drop
 ## files from the desktop on this window; Open shows one in this machine's own viewer; Save copy… downloads it; Remove
 ## deletes it (asked). MVR and .glb files are used from the Previs (MVR scene → Import…, Models).
+## WO-1098: an .obj (with its .mtl and pictures, a folder or a .zip; a .skp for its pictures) is converted on the server
+## into a venue .glb here (core/venue_import.gd) — progress and the report on the status line, Cancel while it runs.
 
 const PF := preload("res://core/project_files.gd")
+const VI := preload("res://core/venue_import.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
 const PaneKit := preload("res://features/settings/pane_kit.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -14,6 +17,7 @@ var _status: Label
 var _open: Button
 var _save: Button
 var _remove: Button
+var _cancel: Button
 var _files: Array = []
 
 
@@ -24,7 +28,7 @@ func _ready() -> void:
 	var v := VBoxContainer.new()
 	add_child(v)
 	var hint := Label.new()
-	hint.text = "MVR, GLB, PDF and Excel files kept with this show (its project folder on the server). Drop files here to add them."
+	hint.text = "MVR, GLB, PDF and Excel files kept with this show (its project folder on the server). Drop files here to add them.\nVenue from SketchUp: " + VI.HELP + " " + VI.SKP_ONLY + "."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.custom_minimum_size.x = 560  # a wrapping label without a width measures one word per line (window too tall)
 	hint.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -39,7 +43,7 @@ func _ready() -> void:
 	v.add_child(_list)
 	var row := HBoxContainer.new()
 	v.add_child(row)
-	for spec in [["Add files…", _pick], ["Open", _open_selected], ["Save copy…", _save_selected], ["Remove", _ask_remove]]:
+	for spec in [["Add files…", _pick], ["Open", _open_selected], ["Save copy…", _save_selected], ["Remove", _ask_remove], ["Cancel import", func() -> void: VI.cancel()]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
@@ -48,6 +52,8 @@ func _ready() -> void:
 			"Open": _open = b
 			"Save copy…": _save = b
 			"Remove": _remove = b
+			"Cancel import": _cancel = b
+	_cancel.visible = false
 	_open.tooltip_text = "Open in this computer's own viewer (double-click does the same)"
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -57,13 +63,25 @@ func _ready() -> void:
 	get_tree().root.files_dropped.connect(_on_dropped)
 	Ws.on("change", func(d: Variant) -> void:
 		if visible and d is Dictionary and str(d.get("path")) in [PF.EVENT_PATH, "project.activated"]:
-			refresh())
+			refresh()
+		elif d is Dictionary and str(d.get("path")) == VI.EVENT_PATH and d.get("value") is Dictionary:
+			_on_job(d.value))
 	_sync()
 
 
 func open() -> void:
 	popup_centered(Vector2i(640, 440))
 	refresh()
+	var j: Dictionary = await Api.get_json("/api/venue-import")
+	if j.ok and j.data is Dictionary and str(j.data.get("state")) == "running":
+		_on_job(j.data)
+
+
+func _on_job(j: Dictionary) -> void:
+	_cancel.visible = str(j.get("state")) == "running"
+	var text := VI.job_text(j)
+	if text != "" and visible:
+		_status.text = text
 
 
 func refresh() -> void:
@@ -95,7 +113,7 @@ func _pick() -> void:
 	dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILES
 	dlg.access = FileDialog.ACCESS_FILESYSTEM
 	dlg.title = "Add files to the project"
-	dlg.filters = PF.filters()
+	dlg.filters = PackedStringArray([PF.filters()[0], "*.obj, *.mtl, *.zip, *.skp, *.jpg, *.jpeg, *.png ; Venue (OBJ + MTL + pictures)"])
 	dlg.current_dir = preload("res://core/platform.gd").start_dir()
 	dlg.files_selected.connect(func(paths: PackedStringArray) -> void:
 		dlg.queue_free()
@@ -112,8 +130,17 @@ func _on_dropped(paths: PackedStringArray) -> void:
 
 
 func _add(paths: PackedStringArray) -> void:
-	_status.text = await PF.upload(paths, func(t: String) -> void: _status.text = t)
-	refresh()
+	var venue := VI.expand(paths)
+	var docs := PackedStringArray(Array(paths).filter(func(p: String) -> bool: return PF.accepts(p)))
+	if not docs.is_empty() or not VI.starts_import(venue):
+		_status.text = await PF.upload(docs if VI.starts_import(venue) else paths, func(t: String) -> void: _status.text = t)
+		refresh()
+	if VI.starts_import(venue):
+		var r: Dictionary = await VI.upload_and_start(venue, func(t: String) -> void: _status.text = t)
+		if not r.ok:
+			_status.text = "✗ " + str(r.error)
+		else:
+			_on_job(r.job)
 
 
 func _open_selected() -> void:

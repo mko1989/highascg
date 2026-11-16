@@ -20,8 +20,9 @@ const { accessor, nodeXf } = require('./rc-scene-mesh')
 
 const KEY = 'venue:' // template keys of venue meshes: venue:<glTF mesh index>
 
+// WO-1098: the OBJ importer's venue .glb names its layers the same way under its own extension name
 const ext = (o) => {
-	const e = o && typeof o === 'object' ? o.extensions?.CAPTURE_model : null
+	const e = o && typeof o === 'object' ? o.extensions?.CAPTURE_model || o.extensions?.HIGHASCG_venue : null
 	return e && typeof e === 'object' ? e : {}
 }
 

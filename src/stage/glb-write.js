@@ -8,7 +8,14 @@
  * @typedef {{ positions: Float32Array, normals?: Float32Array, uvs?: Float32Array, indices: Uint32Array, color?: number[],
  *   material?: string, flat?: boolean }} Prim  (uvs → TEXCOORD_0; material = the glTF material name, e.g. the WO-612 export's 'screen';
  *   flat = positions only, no NORMAL — a viewer shades it flat, WO-1074's phone-sized game scene)
- * @typedef {{ name: string, primitives: Prim[] }} Mesh
+ * @typedef {{ name: string, primitives: Prim[], node?: { extensions?: object, extras?: object } }} Mesh
+ *
+ * WO-1098 (the OBJ venue importer) — `opts`, all optional; without them the output is byte for byte what it was:
+ *   materials: Map name → { color [r,g,b,a] linear, image?: { data, mime, key }, doubleSided?, alpha?: 'BLEND',
+ *              roughness?, metallic? } — a prim whose `material` is listed gets this material (textured with REPEAT
+ *              wrapping and trilinear mips when it has an image and the prim has uvs) instead of the flat one;
+ *   root: { name, matrix?, extensions?, extras? } — every mesh node becomes a child of this one node (a placement);
+ *   asset: merged into json.asset (extensions / extras); extensionsUsed: string[].
  */
 
 function pad4(n) {
@@ -39,7 +46,7 @@ function smoothNormals(pos, idx) {
 }
 
 /** @param {Mesh[]} meshes → Buffer (GLB) */
-function writeGlb(meshes) {
+function writeGlb(meshes, opts = {}) {
 	const chunks = []
 	let offset = 0
 	const json = { asset: { version: '2.0', generator: 'HighAsCG' }, scene: 0, scenes: [{ nodes: [] }], nodes: [],
@@ -64,6 +71,31 @@ function writeGlb(meshes) {
 		}
 		return mats.get(key)
 	}
+	const r3 = (v) => Math.round(v * 1000) / 1000
+	const images = new Map() // image key → texture index
+	const texture = (img) => {
+		if (!images.has(img.key)) {
+			json.images = json.images || []
+			json.textures = json.textures || []
+			json.samplers = json.samplers || [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 }]
+			json.images.push({ bufferView: view(img.data), mimeType: img.mime })
+			json.textures.push({ sampler: 0, source: json.images.length - 1 })
+			images.set(img.key, json.textures.length - 1)
+		}
+		return images.get(img.key)
+	}
+	const rich = new Map() // `${name}|${textured}` → material index
+	const richMaterial = (name, def, textured) => {
+		const key = `${name}|${textured ? 1 : 0}`
+		if (!rich.has(key)) {
+			const pbr = { baseColorFactor: (def.color || [1, 1, 1, 1]).slice(0, 4).map(r3), metallicFactor: r3(def.metallic ?? 0), roughnessFactor: r3(def.roughness ?? 0.8) }
+			if (textured) pbr.baseColorTexture = { index: texture(def.image) }
+			json.materials.push({ name, pbrMetallicRoughness: pbr, doubleSided: def.doubleSided !== false, ...(def.alpha === 'BLEND' ? { alphaMode: 'BLEND' } : {}) })
+			rich.set(key, json.materials.length - 1)
+		}
+		return rich.get(key)
+	}
+	const richOf = (p) => (opts.materials && p.material ? opts.materials.get(p.material) : null)
 	for (const m of meshes) {
 		const prims = []
 		for (const p of m.primitives) {
@@ -83,18 +115,29 @@ function writeGlb(meshes) {
 					componentType: 5126, count, type: 'VEC3' })
 				attributes.NORMAL = json.accessors.length - 1
 			}
-			if (p.uvs && p.uvs.length === count * 2) {
+			const def = richOf(p)
+			if (p.uvs && p.uvs.length === count * 2 && (!def || def.image)) {
 				json.accessors.push({ bufferView: view(p.uvs, 34962), componentType: 5126, count, type: 'VEC2' })
 				attributes.TEXCOORD_0 = json.accessors.length - 1
 			}
 			json.accessors.push({ bufferView: view(p.indices, 34963), componentType: 5125, count: p.indices.length, type: 'SCALAR' })
-			prims.push({ attributes, indices: json.accessors.length - 1, material: material(p.color, p.material), mode: 4 })
+			const mat = def ? richMaterial(p.material, def, !!(def.image && attributes.TEXCOORD_0 != null)) : material(p.color, p.material)
+			prims.push({ attributes, indices: json.accessors.length - 1, material: mat, mode: 4 })
 		}
 		if (!prims.length) continue
 		json.meshes.push({ name: m.name, primitives: prims })
-		json.nodes.push({ name: m.name, mesh: json.meshes.length - 1 })
+		json.nodes.push({ name: m.name, mesh: json.meshes.length - 1, ...(m.node?.extensions ? { extensions: m.node.extensions } : {}),
+			...(m.node?.extras ? { extras: m.node.extras } : {}) })
 		json.scenes[0].nodes.push(json.nodes.length - 1)
 	}
+	if (opts.root && json.nodes.length) {
+		const r = opts.root
+		json.nodes.push({ name: r.name || 'root', children: json.scenes[0].nodes.slice(), ...(r.matrix ? { matrix: r.matrix } : {}),
+			...(r.extensions ? { extensions: r.extensions } : {}), ...(r.extras ? { extras: r.extras } : {}) })
+		json.scenes[0].nodes = [json.nodes.length - 1]
+	}
+	if (opts.asset) Object.assign(json.asset, opts.asset)
+	if (opts.extensionsUsed?.length) json.extensionsUsed = opts.extensionsUsed.slice()
 	json.buffers.push({ byteLength: offset })
 	if (!json.materials.length) delete json.materials
 	return packGlb(json, Buffer.concat(chunks))
