@@ -234,7 +234,7 @@ function createLtcOutput({ cfg, fps, log = () => {}, getPlayhead = () => null, t
 		if (!where) return fail('error', 'no output device chosen')
 		if (where.problem) return fail('error', where.problem)
 		if (!where.present) {
-			setState('missing', `${where.label || where.pcm}: not connected`)
+			setState('missing', `${where.label || where.pcm} is not connected`)
 			return pollPresence()
 		}
 		starts++

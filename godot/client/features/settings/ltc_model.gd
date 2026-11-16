@@ -8,8 +8,7 @@ const OUT_FPS := [["timeline", "Follow the timeline"], ["23.976", "23.976"], ["2
 	["29.97df", "29.97 drop-frame"], ["29.97ndf", "29.97 non-drop"], ["30", "30"]]
 const OUT_SOURCE := [["timeline", "Timeline playhead"], ["clock", "Time of day"], ["test", "Test: free-run from the start TC"]]
 const WHEN_PAUSED := [["silence", "Silence (a chasing reader parks)"], ["hold", "Repeat the paused frame"]]
-const OUT_STATE := {"missing": "device not connected", "busy": "device in use by another program", "error": "not running",
-	"starting": "starting", "silent": "silent", "off": "off"}
+
 const STATE_LABEL := {"none": "no signal", "acquiring": "acquiring", "locked": "locked", "freewheel": "freewheel",
 	"still": "parked", "lost": "lost"}
 
@@ -55,7 +54,7 @@ static func _out_text(o: Variant) -> String:
 		return str(o.problem)
 	var st := str(o.get("state", ""))
 	if o.get("error") and o.get("running") != true:
-		return ("%s (%s)" % [OUT_STATE[st], str(o.error)]) if OUT_STATE.has(st) else "stopped (%s)" % str(o.error)
+		return str(o.error) if st in ["missing", "busy", "error"] else "stopped (%s)" % str(o.error)  # WO-1092: the server words it
 	if o.get("running") == true and o.get("tc") != null:
 		return str(o.tc)
 	return "silent (timeline not playing)" if str(o.get("source", "")) == "timeline" else "starting"

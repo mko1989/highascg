@@ -254,7 +254,7 @@ describe('WO-1092: keeping-up "LTC out"', () => {
 		assert.deepEqual(ltcChecks({ ltc: null }), [])
 		assert.deepEqual(ltcChecks({ ltc: { state: 'off' } }), [])
 		assert.equal(ltcChecks({ ltc: { state: 'running', tc: '01:00:00:00', driftMs: 0.4 } })[0].level, 0)
-		const m = ltcChecks({ ltc: { state: 'missing', error: 'plughw:CARD=Pro,DEV=0: not connected' } })[0]
+		const m = ltcChecks({ ltc: { state: 'missing', error: 'plughw:CARD=Pro,DEV=0 is not connected' } })[0]
 		assert.equal(m.level, 1)
 		assert.equal(m.label, 'LTC out: device not connected')
 		assert.equal(ltcChecks({ ltc: { state: 'busy' } })[0].label, 'LTC out: device in use by another program')

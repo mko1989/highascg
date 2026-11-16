@@ -71,10 +71,10 @@ func test_transport_readout() -> void:  # WO-1059
 
 
 func test_out_status_words_wo1092() -> void:
-	var miss := _st(false, true, {"output": {"state": "missing", "running": false, "error": "plughw:CARD=Pro,DEV=0: not connected"}})
-	t.eq(LM.status_line(miss), "Out device not connected (plughw:CARD=Pro,DEV=0: not connected)")
-	var busy := _st(false, true, {"output": {"state": "busy", "running": false, "error": "hw in use"}})
-	t.eq(LM.status_line(busy), "Out device in use by another program (hw in use)")
+	var miss := _st(false, true, {"output": {"state": "missing", "running": false, "error": "plughw:CARD=Pro,DEV=0 is not connected"}})
+	t.eq(LM.status_line(miss), "Out plughw:CARD=Pro,DEV=0 is not connected")
+	var busy := _st(false, true, {"output": {"state": "busy", "running": false, "error": "hcg_ltc_PCH_0: in use by another program"}})
+	t.eq(LM.status_line(busy), "Out hcg_ltc_PCH_0: in use by another program")
 	var run := {"state": "running", "running": true, "tc": "01:00:00:00", "device": "HDA NVidia — HDMI 2", "channels": [7, 8],
 		"rate": 48000, "delayMs": 31.4, "driftMs": 0.42, "underruns": 0}
 	t.eq(LM.out_detail(run), "→ HDA NVidia — HDMI 2 · ch 7+8 · 48 kHz · device 31 ms · drift 0.4 ms · 0 under-runs")

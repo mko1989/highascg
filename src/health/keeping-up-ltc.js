@@ -19,7 +19,7 @@ function ltcChecks(s) {
 	if (!l || l.state === 'off') return []
 	const base = { key: 'ltc-out', group: 'output', name: 'LTC out', rise: 2, fall: 2, target: 'running, locked' }
 	if (WORDS[l.state]) {
-		return [{ ...base, level: BEHIND, measured: l.state, text: l.error ? `${WORDS[l.state]} — ${l.error}` : WORDS[l.state], severity: 10,
+		return [{ ...base, level: BEHIND, measured: l.state, text: l.error || WORDS[l.state], severity: 10,
 			label: `LTC out: ${WORDS[l.state]}`, hint: 'No timecode reaches the LTC receivers (lighting, sound, recorders): check the cable / card, or pick another device in Audio ▸ LTC out.' }]
 	}
 	const under = Number(l.underrunsRecent) || 0

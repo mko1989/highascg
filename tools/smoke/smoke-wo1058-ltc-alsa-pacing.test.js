@@ -142,7 +142,7 @@ describe('WO-1058: LTC out paced by the sound card', { skip }, () => {
 			const s = out.status()
 			assert.equal(s.starts, 1)
 			assert.equal(s.state, 'running')
-			assert.deepEqual(logs.filter((l) => !l.startsWith('debug')), ['warn [LTC out] missing: USB LTC box: not connected', 'info [LTC out] back: USB LTC box'])
+			assert.deepEqual(logs.filter((l) => !l.startsWith('debug')), ['warn [LTC out] missing: USB LTC box is not connected', 'info [LTC out] back: USB LTC box'])
 		} finally {
 			out.stop()
 		}
