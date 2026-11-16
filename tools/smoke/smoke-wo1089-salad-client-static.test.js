@@ -32,7 +32,7 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/
 
 const SHARED = ['veggies.js', 'flight.js', 'venue.js', 'avatar-body.js', 'aim.js']
 const PURE = ['protocol.js', 'net.js', 'aim-input.js', 'shots.js', 'cam.js', 'avatar-spec.js', ...SHARED]
-const HOST_ACTIONS = ['enable', 'disable', 'start', 'stop', 'round', 'bots', 'botlevel', 'teams', 'target', 'safe', 'kick', 'lights', 'wall']
+const HOST_ACTIONS = ['enable', 'disable', 'start', 'stop', 'round', 'bots', 'botlevel', 'teams', 'target', 'safe', 'kick', 'lights', 'wall', 'house'] // house: WO-1099
 
 describe('WO-1089 Salad client: owner rules (source text)', () => {
 	it('has the expected files', () => {

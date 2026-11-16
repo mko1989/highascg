@@ -358,6 +358,7 @@ function createSaladRoom(deps) {
 			}
 			case 'lights':
 			case 'wall':
+			case 'house': // WO-1099 house lights
 				break // switched by the service; only the state broadcast happens here
 			default:
 				return { ok: false, status: 400, error: 'unknown action' }

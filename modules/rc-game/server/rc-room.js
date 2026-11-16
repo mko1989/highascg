@@ -298,7 +298,7 @@ function createRcRoom(deps) {
 		return { ok: true }
 	}
 
-	/** Host actions (track / laps / start / stop / kick; lights / wall only broadcast); enable / disable belong to the service. */
+	/** Host actions (track / laps / start / stop / kick; lights / wall / house only broadcast); enable / disable belong to the service. */
 	function host(action, a = {}) {
 		const idle = phase === 'lobby' || phase === 'results'
 		switch (action) {
@@ -340,6 +340,7 @@ function createRcRoom(deps) {
 			}
 			case 'lights':
 			case 'wall':
+			case 'house': // WO-1099 house lights
 				break // §2.6 switches: flipped by the service (rc-game.js); only the state broadcast happens here
 			default:
 				return { ok: false, status: 400, error: 'unknown action' }

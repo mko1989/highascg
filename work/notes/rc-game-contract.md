@@ -24,7 +24,7 @@ Angles in radians. A car's `yaw` is the rotation about +Y; yaw 0 faces −Z (thr
 | Host panel (enable, pick track, start / stop, shows the join address) | `/game/rc/?host=1` | client |
 | three.js | `/vendor/three/…` (already mounted from node_modules/three; check `vendorDirs` in src/server) | server |
 | Game state | `GET /api/game/rc/state` | server |
-| Host actions | `POST /api/game/rc/host` `{ action: 'enable'|'disable'|'track'|'start'|'stop'|'laps'|'kick'|'lights'|'wall'|'bots', … }` (`lights` / `wall`: §2.6; `bots`: below) | server |
+| Host actions | `POST /api/game/rc/host` `{ action: 'enable'|'disable'|'track'|'start'|'stop'|'laps'|'kick'|'lights'|'wall'|'house'|'bots', … }` (`lights` / `wall` / `house`: §2.6; `bots`: below) | server |
 | Scene description | `GET /api/game/rc/scene` | server |
 | Scene mesh (one merged GLB) | `GET /api/game/rc/scene.glb` | server |
 | Realtime | WebSocket `/api/game/rc/ws` | server |
@@ -266,7 +266,10 @@ side = big Go pedal, Brake, Drift, Item. All procedural — no asset files, no f
 Built as NEW files only (wired in by the lead after v2 lands): server `src/game/rc-lights.js`, `src/game/rc-video.js`;
 client `game/rc/stage-fx.js` (+ helpers `game/rc/stage-fx-*.js`). Both features cost nothing while the game is disabled
 or nobody is connected, and each can be switched off by the host (`host` actions `{action:'lights', on}` and
-`{action:'wall', on}`; state carries `"lights": true, "wall": true`; default both on).
+`{action:'wall', on}`; state carries `"lights": true, "wall": true`; default both on). WO-1099 house lights:
+`{action:'house', on}` (state `"house": true`, default on; only state — every client dims its own room: hemisphere + sun
+to a readability floor, background near black, the scene GLB's own glow out; the rig, the walls and the game's objects
+untouched — `game/rc/house.js` through `world.setHouse`, applied from `welcome` / `state` via stage-fx `onHouse`).
 
 **Scene JSON additions**
 ```json

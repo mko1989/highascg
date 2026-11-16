@@ -2,12 +2,13 @@
  * WO-1074 §2.6 — the live show inside the RC game world: the rig's beams / floor pools / lens glows and the LED walls'
  * pictures (work/notes/rc-game-contract.md "2.6"; wiring: work/notes/rc-game-live-wiring.md).
  *
- *   const fx = createStageFx({ THREE, scene, send, quality })   once, as soon as the world exists (before the scene loads:
+ *   const fx = createStageFx({ THREE, scene, send, quality, onHouse })   once, as soon as the world exists (before the scene loads:
  *                                                              `lxfull` arrives right after the socket opens)
  *   fx.load(sceneJson)          a scene was (re)loaded: floors, `lights`, `screens`, `heads` (WO-1090: the patched heads'
  *                               own models in the scene GLB turn with their beams — head-follow.js)
  *   fx.onMessage(m)             every decoded JSON message; → true when it was ours (`lx`, `lxfull`) — it also peeks at
- *                               `welcome` / `state` (host switches `lights` / `wall`) and returns false for them
+ *                               `welcome` / `state` (host switches `lights` / `wall`; `house` → onHouse(on), WO-1099:
+ *                               the game's world.setHouse) and returns false for them
  *   fx.onBinary(data)           every binary socket message (ArrayBuffer or Blob) → true when it was a wall picture
  *   fx.update(dt)               every rendered frame (seconds since the last)
  *   fx.setQuality('low'|'high') low = pools and lens glows only (no cones)
@@ -25,7 +26,7 @@ const MAX_LIGHTS = 150
 
 /**
  * @param {{ THREE: typeof import('three'), scene: any, send?: (m: object) => any, quality?: 'low'|'high',
- *   createImageBitmap?: Function, Blob?: any }} o
+ *   createImageBitmap?: Function, Blob?: any, onHouse?: (on: boolean) => void }} o
  */
 export function createStageFx(o) {
 	const { THREE } = o
@@ -95,6 +96,7 @@ export function createStageFx(o) {
 			lightsOn = state.lights
 			if (!lightsOn) for (const l of lights) ((l.tgt = { ...l.tgt, a: 0 }), (l.moving = true))
 		}
+		if (typeof state.house === 'boolean') o.onHouse?.(state.house) // WO-1099 house lights (world.setHouse)
 		if (typeof state.wall === 'boolean' && state.wall !== wallOn) {
 			wallOn = state.wall
 			wall.setVisible(enabled && wallOn)

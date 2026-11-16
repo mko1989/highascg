@@ -47,6 +47,7 @@ export function startHost(root) {
 	const tracksEl = h('div.host-tracks')
 	const playersEl = h('ul.host-players')
 	/* §2.6: what the guests' game world shows — nothing here reaches a real output */
+	const houseBox = h('input', { type: 'checkbox' }) // WO-1099
 	const lightsBox = h('input', { type: 'checkbox' })
 	const wallBox = h('input', { type: 'checkbox' })
 
@@ -69,6 +70,7 @@ export function startHost(root) {
 		h(
 			'section.host-sec',
 			h('h2', { text: 'In the game world' }),
+			h('label.host-switch', { title: "The general light on the room. Off = a dark room lit only by the rig, the LED walls and the game's own lights." }, houseBox, ' House lights'),
 			h('label.host-switch', lightsBox, ' Live lights in the game'),
 			h('label.host-switch', wallBox, ' LED wall pictures in the game'),
 			h('p.hint', { text: 'What every guest sees inside their own game. Off = dark rig / blank walls in the game.' })
@@ -113,6 +115,9 @@ export function startHost(root) {
 		const laps = Math.max(1, Math.min(20, (state?.laps || 3) + d))
 		act({ action: 'laps', laps })
 	}
+	houseBox.addEventListener('change', () =>
+		act({ action: 'house', on: houseBox.checked }, `House lights ${houseBox.checked ? 'on' : 'off'}.`)
+	)
 	lightsBox.addEventListener('change', () =>
 		act({ action: 'lights', on: lightsBox.checked }, `Live lights in the game ${lightsBox.checked ? 'on' : 'off'}.`)
 	)
@@ -211,9 +216,10 @@ export function startHost(root) {
 		botsUp.disabled = !idle || (state.players || []).length >= (state.maxPlayers || 10)
 		botLevel.disabled = !idle
 		if (document.activeElement !== botLevel) botLevel.value = state.botLevel || 'normal'
+		houseBox.checked = on && state.house !== false // older servers: no field = the room lit
 		lightsBox.checked = on && state.lights === true
 		wallBox.checked = on && state.wall === true
-		lightsBox.disabled = wallBox.disabled = !on
+		houseBox.disabled = lightsBox.disabled = wallBox.disabled = !on
 		const urls = on ? state.joinUrls || [] : []
 		const joinKey = urls.join('|')
 		if (joinKey !== lastJoinKey) {

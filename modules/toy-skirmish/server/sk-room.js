@@ -310,7 +310,7 @@ function createSkRoom(deps) {
 		bots.arenaChanged()
 	}
 
-	/** Host actions (arena / mode / limits / bots / start / stop / kick / team; lights / wall only broadcast). */
+	/** Host actions (arena / mode / limits / bots / start / stop / kick / team; lights / wall / house only broadcast). */
 	function host(action, a = {}) {
 		const idle = phase === 'lobby' || phase === 'results'
 		const busy = { ok: false, status: 409, error: 'a match is running' }
@@ -381,6 +381,7 @@ function createSkRoom(deps) {
 			}
 			case 'lights':
 			case 'wall':
+			case 'house': // WO-1099 house lights
 				break // §2.6 switches: flipped by the service; only the state broadcast happens here
 			default:
 				return { ok: false, status: 400, error: 'unknown action' }

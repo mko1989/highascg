@@ -1,11 +1,13 @@
 /* global window */
 /**
  * three.js world of the RC game (WO-1074): renderer, camera, simple lights, the scene GLB (with progress) or a plain
- * arena when there is none, and the quality setting (pixel-ratio cap, cheap materials on "low").
+ * arena when there is none, the quality setting (pixel-ratio cap, cheap materials on "low") and the house lights
+ * (WO-1099 setHouse: house.js — re-applied to the venue after every scene load and quality swap).
  */
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { applyCut, setCut } from './tunnel-cut.js'
+import { applyHouse, HOUSE_BG_OFF } from './house.js'
 
 const BG = 0x151a26
 
@@ -33,6 +35,9 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 	const statics = new THREE.Group()
 	statics.name = 'scene-static'
 	scene.add(statics)
+	let houseOn = true
+	/* the venue's materials follow the switch; the lights only on setHouse (sk-world.js sets its own levels after creation) */
+	const houseVenue = () => applyHouse({ venue: statics, on: houseOn }) // the GLB, the ground plane, the plain arena
 
 	const world = {
 		THREE,
@@ -52,6 +57,7 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 			camera.updateProjectionMatrix()
 			if (world.model) cheapMaterials(world.model, world.quality === 'low')
 			applyCut(world.model) // §3.1 (the "low" Lambert copies too)
+			houseVenue() // WO-1099: the copies (or the restored originals) dimmed / lit as the switch says
 			world.resize()
 		},
 		resize() {
@@ -64,6 +70,17 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 		render() {
 			renderer.render(scene, camera)
 		},
+		/** WO-1099 house lights (host switch `state.house`): off = dark room, rig / walls / game objects untouched. */
+		setHouse(on) {
+			on = on !== false
+			if (on === houseOn) return
+			houseOn = on
+			renderer.setClearColor(on ? BG : HOUSE_BG_OFF, 1)
+			scene.background.setHex(on ? BG : HOUSE_BG_OFF)
+			applyHouse({ lights: [hemi, sun], on })
+			houseVenue()
+		},
+		isHouseOn: () => houseOn,
 		/** §3 toy scale: the near plane may come down to NEAR · s (a 6 cm car seen from a few cm never clips). */
 		setNear(s) {
 			nearScale = s > 0 ? Math.min(1, s) : 1
@@ -103,13 +120,16 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 					sharpTextures(world.model, renderer)
 					cheapMaterials(world.model, world.quality === 'low')
 					applyCut(world.model)
+					houseVenue()
 					return { ok: true }
 				} catch (e) {
 					addArena(statics, info)
+					houseVenue()
 					return { ok: false, error: String(e?.message || e) }
 				}
 			}
 			addArena(statics, info)
+			houseVenue()
 			return { ok: true, arena: true }
 		},
 	}
@@ -162,7 +182,7 @@ function cheapMaterials(root, low) {
 			if (!m || Array.isArray(m) || !m.isMeshStandardMaterial) return
 			o.userData.rcOrigMat = m
 			o.material = new THREE.MeshLambertMaterial({
-				color: m.color,
+				color: m.userData.houseColor ? new THREE.Color().fromArray(m.userData.houseColor) : m.color, // WO-1099: undimmed
 				map: m.map, // WO-1082: the venue's textures (carpet, wood floor, truss) stay on "low"
 				flatShading: m.flatShading, // the scene GLB has no normals
 				vertexColors: m.vertexColors,

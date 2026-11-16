@@ -64,7 +64,7 @@ modules/stage-salad/client/   index.html, *.js, *.css   (package.json "type": "m
 
 Host actions: `enable`, `disable`, `start`, `stop`, `round {secs: 30–600}`, `bots {n: 0–8}`, `botlevel {level: easy|
 normal|hard}`, `teams {on}`, `target {mode: 'auto'|'dummy'|'ids', ids?: [tid…]}`, `safe {on}` (pause / presenter
-safe), `kick {id}`, `lights {on}`, `wall {on}`.
+safe), `kick {id}`, `lights {on}`, `wall {on}`, `house {on}` (WO-1099 house lights, RC §2.6).
 
 ## 3. Frame and venue (`venue.js` — `buildVenue(sceneJson, live)`; the server puts the result in the scene as `salad`)
 
@@ -187,7 +187,7 @@ Server → client:
 `<state>`: `{ enabled, phase, startAt, endsAt, secs, teams, teamScores, bots, botLevel, safe, target: { mode, ids },
 targets: [{ tid, name, puppet, dummy, lost, height, look: { top, bottom, skin, hair: [r,g,b], hair_len } }],
 players: [{ id, name, color, slot, team, bot, connected, score, hits, shots, best }], spectators, maxPlayers,
-joinUrls, sceneRev, venueRev, lights, wall }`. `venueRev` changes when the live screens / lights move the colliders:
+joinUrls, sceneRev, venueRev, lights, wall, house }`. `venueRev` changes when the live screens / lights move the colliders:
 clients refetch the scene JSON then.
 
 ## 10. Bots (server, `salad-bots.js`; aim through the shared `aim.js` solver)

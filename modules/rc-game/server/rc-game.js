@@ -66,8 +66,9 @@ function createRcGame(deps = {}) {
 	const lightsDeps = deps.lightsDeps || (deps.ctx ? rcLightsDeps(deps.ctx, { send: sendTo, log }) : null)
 	const lights = lightsDeps ? createRcLights({ log, ...lightsDeps, send: sendTo }) : null
 	const video = videoDeps ? createRcVideo({ log, ...videoDeps }) : null
+	let house = true // WO-1099 house lights: the room's general light in the game world (off = only the rig, walls, game lights)
 	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev,
-		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, bots: bots ? bots.count() : 0, botLevel: bots ? bots.level() : 'normal' })
+		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house, bots: bots ? bots.count() : 0, botLevel: bots ? bots.level() : 'normal' })
 
 	/** Bake (or reuse) the current scene and hand its tracks to the room. Errors are logged, not thrown. */
 	function refreshScene() {
@@ -134,9 +135,10 @@ function createRcGame(deps = {}) {
 		else if (action === 'disable') disable()
 		else if (!room) return { status: 409, body: { ok: false, error: 'the game is not enabled', state: state() } }
 		else {
-			if (action === 'lights' || action === 'wall') {
+			if (action === 'lights' || action === 'wall' || action === 'house') {
 				if (typeof a.on !== 'boolean') return { status: 400, body: { ok: false, error: '`on` must be true or false', state: state() } }
-				;(action === 'lights' ? lights : video)?.setOn(a.on)
+				if (action === 'house') house = a.on // only state: every client dims its own room (world.js setHouse)
+				else (action === 'lights' ? lights : video)?.setOn(a.on)
 			}
 			if (action === 'bots') {
 				const n = Number(a.count)

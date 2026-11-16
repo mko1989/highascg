@@ -63,7 +63,7 @@ its world code instead of copying it:
 | Socket | WebSocket `/api/game/sk/ws` (also under `/instance/<id>`) |
 
 `host` actions: `enable`, `disable`, `arena {id}`, `mode {mode: 'dm'|'tdm'|'spot'}`, `limits {frags: 5–100, minutes: 1–30}`,
-`bots {n: 0–6}`, `botlevel {level: 'easy'|'normal'|'hard'}` (WO-1083), `start`, `stop`, `kick {id}`, `team {id, team}` (move a player), `lights {on}`, `wall {on}`.
+`bots {n: 0–6}`, `botlevel {level: 'easy'|'normal'|'hard'}` (WO-1083), `start`, `stop`, `kick {id}`, `team {id, team}` (move a player), `lights {on}`, `wall {on}`, `house {on}` (WO-1099 house lights, RC §2.6).
 
 ## 3. Units, sizes, numbers (both sides use exactly these)
 
@@ -191,7 +191,7 @@ Server → client:
 
 `<state>`: `{ enabled, phase, mode, arenaId, limits: { frags, minutes }, endsAt, bots, maxPlayers,
 players: [{ id, name, color, team, bot, connected, kills, deaths, score }], teams: [r, b], pk: [[id, until]],
-joinUrls, sceneRev, lights, wall, botLevel, spot }` — `botLevel` 'easy'|'normal'|'hard'; `spot` (mode `spot` only,
+joinUrls, sceneRev, lights, wall, house, botLevel, spot }` — `botLevel` 'easy'|'normal'|'hard'; `spot` (mode `spot` only,
 else null) `{ x, z, r, movesAt, holder: id|null, contested }` in metres / server ms (WO-1083).
 
 ## 8. Bots (server)
