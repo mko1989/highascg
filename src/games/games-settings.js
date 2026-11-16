@@ -44,13 +44,21 @@ function normalizeGamesSettings(raw) {
 	}
 }
 
-/** POST /api/settings {games: partial} merged onto the current section (defaults merge per game and key). */
+/** POST /api/settings {games: partial} merged onto the current section (defaults merge per game and key; null removes). */
 function mergeGamesSettings(cur, patch) {
 	const c = normalizeGamesSettings(cur)
 	const p = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {}
 	const defaults = { ...c.defaults }
 	if (p.defaults && typeof p.defaults === 'object') {
-		for (const id of Object.keys(p.defaults)) defaults[id] = { ...(defaults[id] || {}), ...(p.defaults[id] || {}) }
+		for (const id of Object.keys(p.defaults)) {
+			if (p.defaults[id] === null) {
+				delete defaults[id] // null = this game back to its own defaults
+				continue
+			}
+			const d = { ...(defaults[id] || {}), ...(p.defaults[id] || {}) }
+			for (const k of Object.keys(d)) if (d[k] === null) delete d[k] // a null key = that one back to the game's own
+			defaults[id] = d
+		}
 	}
 	return normalizeGamesSettings({ ...c, ...p, defaults })
 }

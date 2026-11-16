@@ -159,6 +159,7 @@ test('rows: running = a round is on (a paused one too), never lobby / results; p
 	assert.equal(at({ ...base, phase: 'round' }).running, true)
 	const paused = at({ ...base, phase: 'round', paused: true, safe: true })
 	assert.deepEqual([paused.running, paused.phase, paused.safe], [true, 'paused', true])
+	assert.equal(at({ ...base, phase: 'round', safe: true }).phase, 'paused', 'salad pauses as `safe` (no `paused` key) — still shown paused')
 	assert.equal(at({ ...base, phase: 'lobby' }).players, 1, 'connected humans only')
 	assert.deepEqual(at({ ...base, phase: 'lobby' }).bots, { n: 1, level: 'hard', max: hosting.bots.max, levels: hosting.bots.levels })
 	assert.equal(at({ enabled: false }).phase, 'closed')

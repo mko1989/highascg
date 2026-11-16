@@ -103,6 +103,8 @@ test('games settings: normalized (unknown keys, bad ids and values dropped), mer
 	assert.deepEqual(GS.mergeGamesSettings(cur, { defaults: { rc: { botLevel: 'easy' }, salad: { main: 120 } } }).defaults,
 		{ rc: { bots: 2, main: 4, botLevel: 'easy' }, salad: { main: 120 } })
 	assert.deepEqual(GS.mergeGamesSettings(cur, { defaults: { rc: { main: null } } }).defaults.rc, { bots: 2 }, 'null resets to the game’s own')
+	assert.deepEqual(GS.mergeGamesSettings(cur, { defaults: { rc: { bots: null } } }).defaults.rc, { main: 4 }, 'any null key resets')
+	assert.deepEqual(GS.mergeGamesSettings(cur, { defaults: { rc: null } }).defaults, {}, 'a null game drops all its defaults')
 	assert.deepEqual(defaults.games, { joinAddress: '', autoOpen: false, defaults: {} }, 'factory default: automatic, never auto-open')
 })
 

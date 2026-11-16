@@ -42,7 +42,7 @@ function gameRow(m, { desc, hostingOf, stateOf, worldState, settings, ip, port }
 	const open = !!st?.enabled
 	const h = d ? hostingOf(d) : null
 	const safe = open && typeof h?.isSafe === 'function' ? !!safeCall(() => h.isSafe(st)) : open && st.paused === true
-	const phase = !moduleOn ? 'off' : !open ? 'closed' : st.paused ? 'paused' : String(st.phase || 'lobby')
+	const phase = !moduleOn ? 'off' : !open ? 'closed' : st.paused || safe ? 'paused' : String(st.phase || 'lobby') // salad pauses as `safe`
 	const people = open && Array.isArray(st.players) ? st.players : []
 	const b = open && h?.bots ? safeCall(() => h.bots.read(st)) || {} : {}
 	const mainVal = open && h?.main ? safeCall(() => h.main.read(st)) : null
