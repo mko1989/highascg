@@ -9,6 +9,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Calibrate := preload("res://features/previs/tracking/calibrate_section.gd")
 const FollowOutput := preload("res://features/previs/tracking/follow_output.gd")
 const Handover := preload("res://features/previs/tracking/handover_section.gd")
+const DeskFeed := preload("res://features/previs/tracking/desk_feed_section.gd")  # WO-1097
 
 ## [label, path, min, max, step]  (path "pan.ch" = data.pan.ch)
 const FIELDS := [["Universe (port-addr)", "universe", 0, 32767, 1], ["Address", "address", 1, 512, 1],
@@ -39,6 +40,7 @@ var _form: GridContainer
 var _calib: Calibrate  # WO-624 E3 calibrate_section.gd
 var _output: FollowOutput  # WO-631 PSN / Art-Net choice
 var _handover: Handover  # WO-1085 Auto heads: Split or spot handover
+var _feed: DeskFeed  # WO-1097 the fronts' final values to the lighting desk
 var _pending := {}  # an output change waiting for the "switch while ON" confirmation
 var _confirm_switch: ConfirmationDialog
 
@@ -74,6 +76,12 @@ func _ready() -> void:
 		_persist(true))
 	_output.polled.connect(func(body: Dictionary) -> void: _handover.show_status(body.get("handover")))
 	add_child(_handover)
+	_feed = DeskFeed.new()
+	_feed.edited.connect(func(f: Dictionary) -> void:
+		data.feed = f
+		_persist(true))
+	_output.polled.connect(func(body: Dictionary) -> void: _feed.show_status(body.get("feed")))
+	add_child(_feed)
 	_list = ItemList.new()
 	_list.custom_minimum_size.y = 120
 	_list.item_selected.connect(func(i: int) -> void:
@@ -216,6 +224,7 @@ func refresh() -> void:
 	_out.set_pressed_no_signal(data.output.enabled)
 	show_output()
 	_handover.show_handover(data.handover)
+	_feed.show_feed(data.get("feed"))
 	_list.clear()
 	for fx in data.patch:
 		var a := aim(fx.id)

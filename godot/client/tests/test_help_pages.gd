@@ -4,7 +4,8 @@ extends RefCounted
 const MD := preload("res://app/markdown_bbcode.gd")
 const HelpDialog := preload("res://app/help_dialog.gd")
 const Fold := preload("res://features/previs/fold_section.gd")
-const TOPICS := ["psn-output", "calibrate-heads", "calibrate-cameras", "calibrate-ptz", "vr-walk", "tracking-desk-test"]
+const TOPICS := ["psn-output", "calibrate-heads", "calibrate-cameras", "calibrate-ptz", "vr-walk", "tracking-desk-test",
+	"desk-feed-magicq", "desk-feed-grandma3"]
 var t
 
 
@@ -70,6 +71,7 @@ func test_wired_where_the_owner_needs_it() -> void:
 		"res://features/previs/fixtures/fixtures_section.gd": "[CalibrateFold.new()], \"calibrate-heads\")",
 		"res://features/previs/tracking/tracking_page.gd": "\"calibrate-cameras\")",
 		"res://features/previs/tracking/ptz_calibrate_fold.gd": "HelpDialog.beside(_toggle, \"calibrate-ptz\")",
+		"res://features/previs/tracking/desk_feed_section.gd": "HelpDialog.beside(_on, \"desk-feed-magicq\")",  # WO-1097
 	}
 	for path in wires:
 		t.ok(FileAccess.get_file_as_string(path).contains(wires[path]), "%s opens its help page" % path.get_file())

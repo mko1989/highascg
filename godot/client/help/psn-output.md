@@ -31,6 +31,8 @@ A marker that stops updating is sent with status 0, so the desk can hold or drop
 | Obsidian Onyx | no | — |
 
 For a desk without PSN input, use **Art-Net backup (this box aims)**: this box aims the patched heads itself.
+To keep HighAsCG's own aim (calibration, spot handover) and let the LD take the fronts under a fader, send the
+desk feed instead: [MagicQ](desk-feed-magicq.md), [grandMA3](desk-feed-grandma3.md).
 
 ## grandMA3
 
