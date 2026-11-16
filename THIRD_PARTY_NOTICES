@@ -334,6 +334,19 @@ UI icons (WO-1096 inventory) — every third-party icon in client/assets and god
   deleted three unused unlicensed files (two "Uploaded to: SVG Repo" cables, camera-icon.svg).
 
 ================================================================================
+MakeHuman system assets — godot/client/assets/people/ (woman.glb, man.glb, *.webp; WO-1103)
+https://static.makehumancommunity.org/about/license.html — makehuman_system_assets_cc0.zip and MPFB 2.0.18's data
+Copyright (C) 2020 Data Collection AB, Joel Palmius, Jonas Hauquier (released to the public domain)
+License: CC0 1.0 Universal — NOT under HighAsCG's AGPL. "All core assets are shared under Creative Commons, CC0. [...]
+You do not need to pay anything, include any copyright notices nor give attribution."
+
+  The previs test-puppet bodies (a woman and a man) are built only from MakeHuman CC0 assets: the base mesh and its
+  targets, the female1605 / male1591 proxies, the game_engine rig and weights, skins, eyes, eyebrows, eyelashes, hair
+  (ponytail01, short02) and clothes (female_elegantsuit01, shoes03, male_elegantsuit01, shoes04). Per-file sources
+  and quotes: godot/client/assets/people/LICENSES.json; recipe: tools/people/. Blender and MPFB's code (GPL) were
+  build tools only; none of their code is shipped.
+
+================================================================================
 npm runtime dependencies (node_modules/, shipped in the ISO and the server release tarball)
   Every package keeps its own licence file in node_modules/<name>/. CI (tools/ci/check-npm-licenses.js, WO-1096) fails
   the build on any production dependency whose licence is missing, "none", UNLICENSED or not on the allowlist.

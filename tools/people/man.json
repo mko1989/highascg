@@ -1,0 +1,63 @@
+{
+ "macro": {
+  "gender": 1.0,
+  "age": 0.6,
+  "muscle": 0.55,
+  "weight": 0.5,
+  "proportions": 0.75,
+  "height": 0.55,
+  "cupsize": 0.5,
+  "firmness": 0.5,
+  "race": {
+   "asian": 0.2,
+   "caucasian": 0.6,
+   "african": 0.2
+  }
+ },
+ "proxy": "male1591.proxy",
+ "skin": "young_caucasian_male.mhmat",
+ "bodyparts": [
+  [
+   "eyes",
+   "high-poly.mhclo"
+  ],
+  [
+   "eyebrows",
+   "eyebrow002.mhclo"
+  ],
+  [
+   "eyelashes",
+   "eyelashes01.mhclo"
+  ],
+  [
+   "hair",
+   "short02.mhclo"
+  ]
+ ],
+ "eyes_lod1": "low-poly.mhclo",
+ "clothes": [
+  "male_elegantsuit01.mhclo",
+  "shoes04.mhclo"
+ ],
+ "roles": {
+  "short02": "hair",
+  "eyebrow002": "eyebrows",
+  "eyelashes01": "eyelashes",
+  "male_elegantsuit01": "clothes",
+  "high-poly": "eyes",
+  "low-poly": "eyes",
+  "shoes04": "shoes"
+ },
+ "decimate": {
+  "lod0": {
+   "skin": 0.6,
+   "clothes": 0.5,
+   "shoes": 0.5
+  },
+  "lod1": {
+   "hair": 0.4,
+   "clothes": 0.12,
+   "shoes": 0.2
+  }
+ }
+}
