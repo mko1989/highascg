@@ -194,10 +194,11 @@ describe('WO-765 position table (CSV)', () => {
 		const mm = (A, B) => A.map((r) => B[0].map((_, j) => r.reduce((s, v, k) => s + v * B[k][j], 0)))
 		mm(mm(Rz, Ry), Rx).flat().forEach((v, i) => assert.ok(Math.abs(v - R.flat()[i]) < 1e-9))
 	})
-	it('MagicQ frame: X = MVR X, Y up, Z towards the audience (−MVR Y), its own headings', () => {
-		const rows = rigCsv([head('hang', {})], { desk: 'magicq' }).trim().split('\r\n')
-		assert.equal(rows[0], 'Head no,Head name,Universe,DMX,X Pos,Y Pos,Z Pos,X Rot,Y Rot,Z Rot,Status')
-		assert.match(rows[1], /^1,hang,,,1,5,-2,0,0,0,calibrated$/)
+	it('MagicQ frame: X = MVR X, Y up, Z towards the audience (−MVR Y); WO-1072 format (DMX U-AAA, trailing comma)', () => {
+		const rows = rigCsv([head('hang', {}), head('yaw', { yaw: 30 })], { desk: 'magicq', addressOf: () => ({ universe: 0, address: 41, protocol: 'artnet' }) }).trim().split('\r\n')
+		assert.equal(rows[0], 'Head no,Head name,DMX,X,Y,Z,RotX,RotY,RotZ,')
+		assert.equal(rows[1], '1,hang,1-041,1,5,-2,0,0,0,')
+		assert.equal(rows[2], '1,yaw,1-041,1,5,-2,0,-30,0,', 'console-match.js consoleRotation: RotY = −yaw')
 	})
 })
 
@@ -222,7 +223,7 @@ describe('WO-765 route GET /api/stage/rig-export', () => {
 			assert.equal(rep.heads[0].status, 'calibrated')
 			assert.equal('matrix' in rep.heads[0], false)
 			const csv = await handleRigExport({ format: 'csv', desk: 'magicq' }, deps)
-			assert.match(csv.body, /^Head no,.*\r\n104,Untouched 4,0,1,0\.2,6,-0,|^Head no,.*\r\n104,Untouched 4,0,1,0\.2,6,0,/)
+			assert.match(csv.body, /^Head no,.*\r\n104,Untouched 4,1-001,0\.2,6,0,/)
 			assert.equal((await handleRigExport({}, { loadProject: () => ({}) })).status, 404)
 		} finally {
 			fs.rmSync(dir, { recursive: true, force: true })

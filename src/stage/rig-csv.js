@@ -16,9 +16,10 @@
  *        itself carries the exact matrix.
  *   desk 'magicq' (docs.chamsys.co.uk/magicq 1.9.9.x trackers.html: "X and Z as horizontal … Y as vertical", "MagicQ
  *        has Z positive towards the audience"; patching.html CSV headings "Head no", "Head name", "Universe", "DMX",
- *        "X Pos", "Y Pos", "Z Pos", "X Rot", "Y Rot", "Z Rot", metres): X = MVR X, Y = MVR Z, Z = −MVR Y. The X sign
- *        and the rotations are what MagicQ PC 1.9.8.3 showed after importing this export's MVR (WO-765, on the box);
- *        load it with Patch → Import Heads, option "Vis only" (positions only, matched by DMX address).
+ *        "X", "Y", "Z", "RotX", "RotY", "RotZ", metres): X = MVR X, Y = MVR Z, Z = −MVR Y — the format WO-1072
+ *        (console-match.js exportCsv) proved on MagicQ PC 1.9.8.3: DMX as "<universe>-<address>" with Art-Net
+ *        universes +1, and every row ends with a comma (MagicQ drops the last character of a line's last field).
+ *        Load it with Patch → Import Heads, option "Vis data only" (positions + rotations, matched by DMX address).
  */
 
 const r3 = (v) => Math.round(v * 1000) / 1000 || 0
@@ -56,13 +57,13 @@ const cell = (v) => {
 
 /**
  * @param {object[]} heads  mvr-rig-export.js report.heads (each with `matrix`, the world matrix written / kept)
- * @param {{ desk?: 'mvr' | 'magicq', addressOf?: (id: string) => { universe: number, address: number } | null }} [opts]
+ * @param {{ desk?: 'mvr' | 'magicq', addressOf?: (id: string) => { universe: number, address: number, protocol?: string } | null }} [opts]
  * @returns {string}
  */
 function rigCsv(heads, opts = {}) {
 	const magicq = opts.desk === 'magicq'
 	const head = magicq
-		? ['Head no', 'Head name', 'Universe', 'DMX', 'X Pos', 'Y Pos', 'Z Pos', 'X Rot', 'Y Rot', 'Z Rot', 'Status']
+		? ['Head no', 'Head name', 'DMX', 'X', 'Y', 'Z', 'RotX', 'RotY', 'RotZ', '']
 		: ['Fixture ID', 'Name', 'Universe', 'Address', 'X (m, stage left +)', 'Y (m, upstage +)', 'Z (m, up)',
 			'Rot X (deg)', 'Rot Y (deg)', 'Rot Z (deg)', 'Status', 'Moved (m)', 'Turned (deg)', 'Fit', 'UUID']
 	const rows = [head]
@@ -76,7 +77,8 @@ function rigCsv(heads, opts = {}) {
 			const C = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
 			const Rq = C.map((row) => [0, 1, 2].map((c) => row.reduce((s, v, k) => s + v * [0, 1, 2].reduce((t, j) => t + R[k][j] * C[c][j], 0), 0)))
 			const [rx, ry, rz] = eulerZYX(Rq)
-			rows.push([h.fid ?? '', h.name, a?.universe ?? '', a?.address ?? '', r3(m[12]), r3(m[14]), r3(-m[13]), r2(rx), r2(ry), r2(rz), h.status])
+			const dmx = a ? `${a.universe + (a.protocol === 'sacn' ? 0 : 1)}-${String(a.address).padStart(3, '0')}` : ''
+			rows.push([h.fid ?? '', h.name, dmx, r3(m[12]), r3(m[14]), r3(-m[13]), r2(rx), r2(ry), r2(rz), ''])
 		} else {
 			const [rx, ry, rz] = eulerZYX(R)
 			rows.push([h.fid ?? '', h.name, a?.universe ?? '', a?.address ?? '', r3(m[12]), r3(m[13]), r3(m[14]), r2(rx), r2(ry), r2(rz),

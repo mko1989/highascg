@@ -68,7 +68,7 @@ async function handleRigExport(query = {}, deps = {}) {
 		const byId = new Map(patch.map((f) => [f.id, f]))
 		const addressOf = (id) => {
 			const f = byId.get(id)
-			return f && Number.isFinite(Number(f.address)) ? { universe: Number(f.universe) || 0, address: Number(f.address) } : null
+			return f && Number.isFinite(Number(f.address)) ? { universe: Number(f.universe) || 0, address: Number(f.address), protocol: f.protocol } : null
 		}
 		const desk = query.desk === 'magicq' ? 'magicq' : 'mvr'
 		return { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8',

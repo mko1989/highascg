@@ -10,8 +10,8 @@
  *             a shift); two or more spread ≥ ROW_SPREAD_M along the row → a straight line through them (the row's
  *             turn and rake). A row without an anchor gets the rig fit alone.
  *   yaw       patched yaw − the rig turn (pose.yaw runs clockwise seen from above: 90 = stage left) + the mean yaw the
- *             row's anchors are off by. Hang stays as patched; pitch / roll too, unless anchors of the row had them
- *             solved (WO-764, dof 6) — then the row's mean change (a raked pipe rakes every head on it).
+ *             row's anchors are off by. Hang stays as patched; pitch / roll too, unless every anchor of the row (2+)
+ *             had them solved (WO-764, dof 6) and they agree — then the row's mean change (a raked pipe).
  *
  * Residuals (what the operator reads): a measured head — its solve fit (rms_deg) and `loo_m`, how far the model misses
  * it when it is left out. An inferred head — `residual_m`, leave-one-out misses of heads predicted the way it is: on a
@@ -22,6 +22,7 @@
 
 const RIG_SPREAD_M = 0.5
 const ROW_SPREAD_M = 1
+const ROW_TILT_AGREE_DEG = 2
 
 const DEG = 180 / Math.PI
 const wrap = (v) => ((((v + 180) % 360) + 360) % 360) - 180
@@ -72,8 +73,13 @@ function predict(head, anchors, rowOf) {
 	const err = own.map((a) => sub(a.s, fit.apply(a.p)))
 	const dyaw = own.reduce((s, a) => s + wrap(a.yaw - (a.yaw0 - fit.turn * DEG)), 0) / own.length
 	out.yaw += dyaw
-	const tilted = own.filter((a) => a.tilt)
-	if (tilted.length) out.tilt = [0, 1].map((i) => tilted.reduce((s, a) => s + a.tilt[i], 0) / tilted.length)
+	// WO-764: a raked pipe rakes every head on it — believed only when 2+ anchors of the row were solved with pitch / roll
+	// and agree (within ROW_TILT_AGREE_DEG); one tilted anchor is a turned clamp, its own (WO-765 harness: carrying one
+	// head's 5° to its row-mates made them worse than the patch)
+	if (own.length >= 2 && own.every((a) => a.tilt)) {
+		const t = [0, 1].map((i) => own.reduce((s, a) => s + a.tilt[i], 0) / own.length)
+		if (own.every((a) => Math.hypot(a.tilt[0] - t[0], a.tilt[1] - t[1]) <= ROW_TILT_AGREE_DEG)) out.tilt = t
+	}
 	const along = (q) => (row.dir ? q[0] * row.dir[0] + q[1] * row.dir[1] + q[2] * row.dir[2] : 0)
 	const u = own.map((a) => along(a.p))
 	const lo = u.indexOf(Math.min(...u))

@@ -13,6 +13,7 @@ const fs = require('fs')
 const path = require('path')
 const { solveHeadPose, turnedDeg } = require('../../src/fixtures/calibrate-pose')
 const { normalizeMap } = require('../../src/fixtures/beam-offset')
+const { inferRig } = require('../../src/fixtures/rig-infer')
 const { parseDescription } = require('../../src/fixtures/gdtf-parse')
 const { buildRig } = require('../../src/fixtures/gdtf-rig')
 const { chainOf, beamOf } = require('../../src/fixtures/gdtf-ik')
@@ -163,6 +164,19 @@ describe('WO-764 head pose solve (calibrate-pose.js)', () => {
 		assert.equal(s.pose.hang, 'floor')
 		assert.ok(off(s.pose, truth) < 0.01, `position ${off(s.pose, truth)} m`)
 		assert.ok(turnedDeg(s.pose, truth) < 0.1, `rotation ${turnedDeg(s.pose, truth)}°`)
+	})
+
+	it('rig inference: a raked pipe (every anchor of the row tilted alike) rakes its heads; one turned clamp does not', () => {
+		const heads = [0, 1, 2, 3, 4].map((i) => ({ id: `h${i}`, pose: { x: i * 2, y: 0, z: 6, yaw: 0, pitch: 0, roll: 0, hang: 'truss' } }))
+		const rows = [{ id: 'r1', heads: heads.map((h) => h.id), dir: [1, 0, 0] }]
+		const at = (i, pitch, dof) => ({ ok: true, dof, rms_deg: 0.1, pose: { x: i * 2, y: 0, z: 6, yaw: 0, pitch, roll: 0, hang: 'truss' } })
+		const pitchOf = (r, id) => r.heads.find((h) => h.id === id).pose.pitch
+		const raked = inferRig(heads, { h0: at(0, 4, 6), h4: at(4, 4.5, 6) }, rows)
+		assert.ok(Math.abs(pitchOf(raked, 'h2') - 4.25) < 0.01, 'the row rake')
+		const one = inferRig(heads, { h0: at(0, 5, 6), h4: at(4, 0, 4) }, rows)
+		assert.equal(pitchOf(one, 'h2'), 0, 'a single tilted anchor is its own clamp')
+		const differ = inferRig(heads, { h0: at(0, 5, 6), h4: at(4, -3, 6) }, rows)
+		assert.equal(pitchOf(differ, 'h2'), 0, 'tilts that disagree are not a rake')
 	})
 
 	it('pins keep the mark they were taken on (at, name) — the session solves the pose from them', () => {
