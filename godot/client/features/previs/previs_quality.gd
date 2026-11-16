@@ -200,7 +200,7 @@ static func picker() -> Control:
 	var box := HBoxContainer.new()
 	var o := MenuButton.new()  # WO-1010: a menu, so Haze sits in it as a submenu (it was its own toolbar picker)
 	o.flat = false
-	o.tooltip_text = "Render quality, haze and house lights of the 3D views (this client only). Applies at once."
+	o.tooltip_text = "Render quality and haze of the 3D views (this client only). Applies at once."
 	var pm := o.get_popup()
 	for i in NAMES.size():
 		pm.add_radio_check_item(NAMES[i], i)
@@ -211,9 +211,7 @@ static func picker() -> Control:
 	pm.add_submenu_node_item("Haze", Haze.menu())
 	var haze_at := pm.item_count - 1
 	pm.set_item_tooltip(haze_at, "Haze in the 3D views: the beams show as shafts of light, as with a hazer in the venue.")
-	var House := preload("res://features/previs/house_lights.gd")  # WO-1099
-	pm.add_submenu_node_item("House lights", House.menu())
-	pm.set_item_tooltip(haze_at + 1, "The general light on the room (the 'sun'). Off = only the rig's own light, the LED walls and the projections.")
+	var House := preload("res://features/previs/house_lights.gd")  # WO-1099: its slider sits beside this menu
 	var sync := func() -> void:
 		if not is_instance_valid(o):  # Haze.shared() outlives a freed picker
 			return
@@ -221,7 +219,6 @@ static func picker() -> Control:
 		for i in NAMES.size():
 			pm.set_item_checked(i, i == lv)
 		pm.set_item_text(haze_at, "Haze: " + str(Haze.LEVELS[Haze.nearest(Haze.shared().level)][0]))
-		pm.set_item_text(haze_at + 1, "House lights: " + str(House.LEVELS[House.nearest(House.shared().level)][0]))
 		o.text = "Quality: " + NAMES[lv]
 	pm.id_pressed.connect(func(i: int) -> void:
 		if i < NAMES.size():
@@ -229,9 +226,9 @@ static func picker() -> Control:
 		sync.call())
 	pm.about_to_popup.connect(sync)
 	Haze.shared().changed.connect(func(_h: float) -> void: sync.call())
-	House.shared().changed.connect(func(_h: float) -> void: sync.call())
 	sync.call()
 	box.add_child(o)
+	box.add_child(House.control())
 	var lab := Label.new()
 	lab.tooltip_text = "Measured GPU time to draw the 3D views. The GPU is shared with the playout. House lights off: the room is dark on purpose."
 	lab.modulate = Color(1, 1, 1, 0.6)

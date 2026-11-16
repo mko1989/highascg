@@ -151,10 +151,10 @@ func test_level_is_stored_per_client() -> void:
 func test_picker_has_a_level_per_item() -> void:
 	var box := Quality.picker()
 	var pm := (box.get_child(0) as MenuButton).get_popup()
-	t.eq(pm.item_count, 7, "4 levels, a separator, Haze (WO-1010), House lights (WO-1099)")
+	t.eq(pm.item_count, 6, "4 levels, a separator, Haze (WO-1010)")
 	t.ok(pm.get_item_tooltip(3).contains("Not while on air"), "Ultra warns")
 	t.ok(pm.get_item_text(5).begins_with("Haze: "), "the Haze submenu shows its level")
 	t.ok(pm.get_item_submenu_node(5) != null, "Haze is a submenu")
-	t.ok(pm.get_item_text(6).begins_with("House lights: ") and pm.get_item_submenu_node(6) != null, "House lights: a submenu showing its level")
+	t.eq(box.get_child(1).name, &"HouseLights", "WO-1099: the House lights slider right beside the menu")
 	t.ok((box.get_child(0) as MenuButton).text.begins_with("Quality: "))
 	box.free()

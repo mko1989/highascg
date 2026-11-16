@@ -84,10 +84,18 @@ func _on_quality(_level := 0) -> void:
 		Quality.register_meter(vp)
 
 
-## WO-1099: house lights — the ambient fill, the sun and every venue glow of this stage (the rig is show light).
+## WO-1099: house lights — the ambient fill, the sun and every venue glow of this stage (the rig is show light). The
+## glow list is collected once per change of the tree (a venue / model load), so a slider step only writes numbers.
+var _glow: Array = []
+var _glow_stale := true
+
+
 func _on_house(h: float) -> void:
 	House.apply_stage(environment, sun, h)
-	House.dim_tree(self, h)
+	if _glow_stale:
+		_glow_stale = false
+		_glow = House.collect(self)
+	House.dim(_glow, h)
 
 
 func _enter_tree() -> void:  # WO-1099: meshes that join the stage later (MVR, venue, models) take the house level
@@ -101,13 +109,14 @@ func _exit_tree() -> void:
 
 
 func _on_node_added(n: Node) -> void:
-	if n is MeshInstance3D and House.shared().level < 1.0 and is_ancestor_of(n):
-		_dim_late.call_deferred(n)  # deferred: its materials are set right after it enters
+	if n is MeshInstance3D and not _glow_stale and is_ancestor_of(n):
+		_glow_stale = true  # one rescan for a whole venue load, after its materials are set
+		_restale.call_deferred()
 
 
-func _dim_late(n: Node) -> void:
-	if is_instance_valid(n) and n.is_inside_tree() and not House.in_show_light(n, self):
-		House.dim_mesh(n as MeshInstance3D, House.shared().level)
+func _restale() -> void:
+	if is_inside_tree():
+		_on_house(House.shared().level)
 
 
 func load_glb_bytes(bytes: PackedByteArray) -> bool:

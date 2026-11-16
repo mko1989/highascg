@@ -1,5 +1,6 @@
 extends RefCounted
-## WO-1099 — House lights in the 3D views: the per-client level (ui.cfg [previs] house_lights, default on), what follows
+## WO-1099 — House lights in the 3D views: the per-client slider level (ui.cfg [previs] house_lights, default 100 %),
+## its perceptual curve, the label toggle back to the last level, what follows
 ## it (the stage's ambient + sun, a venue's emissive materials, the avatars' self-light down to a floor) and what does
 ## not (the rig, LED pictures, the Camera overlay's own fill), and the rig's real spot lights going to the brightest
 ## beams up to each quality level's cap.
@@ -19,16 +20,54 @@ func test_default_on_and_stored_per_client() -> void:
 	var h: RefCounted = House.new()
 	var got := []
 	h.changed.connect(func(v: float) -> void: got.append(v))
-	h.set_level(0.0, path)
+	h.set_level(0.0, true, path)
 	t.eq(got, [0.0], "changed fires")
 	cfg.load(path)
 	t.eq(cfg.get_value("previs", "house_lights"), 0.0, "stored in [previs] house_lights")
-	h.set_level(7.0, path)
+	h.set_level(7.0, true, path)
 	t.eq(h.level, 1.0, "clamped")
+	h.set_level(0.42, false, path)
+	cfg.load(path)
+	t.eq([h.level, cfg.get_value("previs", "house_lights")], [0.42, 1.0], "a drag step is live, not saved")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
-	t.eq(House.LEVELS.map(func(l: Array) -> String: return l[0]), ["On", "Dim", "Off"])
-	t.eq(House.nearest(0.0), 2)
-	t.eq(House.nearest(0.31), 1)
+
+
+func test_toggle_remembers_the_last_level() -> void:
+	var path := "user://test_house_lights.cfg"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var h: RefCounted = House.new()
+	h.set_level(0.35, true, path)
+	h.toggle(path)
+	t.eq(h.level, 0.0, "the label: off in one click")
+	h.toggle(path)
+	t.eq(h.level, 0.35, "… and back to where it was")
+	h.set_level(0.0, true, path)
+	h.toggle(path)
+	t.eq(h.level, 0.35, "dragged to 0: the label still returns to the last lit level")
+	var cfg := ConfigFile.new()
+	cfg.load(path)
+	t.eq(cfg.get_value("previs", "house_last"), 0.35, "remembered across launches ([previs] house_last)")
+	var fresh: RefCounted = House.new()
+	fresh.toggle(path)
+	fresh.toggle(path)
+	t.eq(fresh.level, 1.0, "nothing remembered: back to full")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+func test_curve_is_perceptual_and_smooth() -> void:
+	t.eq([House.gain(0.0), House.gain(1.0)], [0.0, 1.0], "the ends: dark and as before")
+	var half := House.gain(0.5)
+	t.ok(half > 0.2 and half < 0.24, "50 %% = ~22 %% linear light, ~half as bright on an sRGB screen (%f)" % half)
+	var prev := 0.0
+	var max_step := 0.0
+	for k in range(1, 101):
+		var g := House.gain(k / 100.0)
+		if g <= prev:
+			t.ok(false, "strictly rising at %d %%" % k)
+		max_step = maxf(max_step, g - prev)
+		prev = g
+	t.ok(max_step < 0.025, "no 1 %% step jumps (largest %f)" % max_step)
+	t.ok(is_equal_approx(House.gain(-1.0), 0.0) and is_equal_approx(House.gain(2.0), 1.0), "clamped")
 
 
 func test_stage_env_and_sun_follow() -> void:
@@ -38,8 +77,11 @@ func test_stage_env_and_sun_follow() -> void:
 	t.ok(sun.visible and is_equal_approx(sun.light_energy, House.SUN_ENERGY) and env.ambient_light_energy == 1.0, "on = as before")
 	House.apply_stage(env, sun, 0.0)
 	t.ok(not sun.visible and env.ambient_light_energy == 0.0, "off: no sun, no ambient fill")
-	House.apply_stage(env, sun, 0.3)
-	t.ok(sun.visible and is_equal_approx(sun.light_energy, House.SUN_ENERGY * 0.3), "dim scales the sun")
+	House.apply_stage(env, sun, 0.5)
+	t.ok(sun.visible and is_equal_approx(sun.light_energy, House.SUN_ENERGY * House.gain(0.5)), "the sun follows the curve")
+	t.ok(is_equal_approx(env.ambient_light_energy, House.gain(0.5)), "the ambient with it")
+	House.apply_stage(env, sun, 0.01)
+	t.ok(sun.visible and sun.light_energy < 0.001, "near 0: still on, energy ~0 — hiding it at 0 does not pop")
 	House.apply_stage(null, null, 0.0)  # a view without its world yet
 	sun.free()
 
@@ -48,6 +90,7 @@ func test_stage_applies_the_shared_level() -> void:
 	var src := FileAccess.get_file_as_string("res://features/previs/previs_stage.gd")
 	t.ok(src.contains("House.shared().changed.connect(_on_house)") and src.contains("House.apply_stage(environment, sun, h)"), "every stage follows")
 	t.ok(src.contains("get_tree().node_added.connect(_on_node_added)"), "meshes that load later take the level")
+	t.ok(src.contains("_glow = House.collect(self)") and src.contains("House.dim(_glow, h)"), "a slider step writes numbers, no tree walk")
 	t.ok(src.contains("m.set_meta(House.SHOW_LIGHT, true)"), "a GLB screen's picture is show light")
 	t.ok(not src.contains("sun.light_energy = 0.6"), "the sun's energy comes from House.SUN_ENERGY")
 
@@ -83,16 +126,18 @@ func test_venue_emission_dims_and_restores() -> void:
 	lens.material_override = lmat
 	rig.add_child(lens)
 	root.add_child(rig)
-	House.dim_tree(root, 1.0)
+	var list := House.collect(root)
+	t.eq(list.size(), 1, "only the venue glow is house light")
+	House.dim(list, 1.0)
 	t.ok(not glow.has_meta(House.ORIG), "full house light: nothing touched")
-	House.dim_tree(root, 0.0)
+	House.dim(list, 0.0)
 	t.eq(glow.emission_energy_multiplier, 0.0, "a venue glow is house light: off")
 	t.eq(pic.emission_energy_multiplier, 1.0, "the picture stays")
 	t.eq(lmat.emission_energy_multiplier, 3.0, "the rig stays")
 	t.ok(House.in_show_light(lens, root) and not House.in_show_light(venue, root))
-	House.dim_tree(root, 0.3)
-	t.ok(is_equal_approx(glow.emission_energy_multiplier, 0.6), "dim: a share of the original, not of the dimmed value")
-	House.dim_tree(root, 1.0)
+	House.dim(list, 0.5)
+	t.ok(is_equal_approx(glow.emission_energy_multiplier, 2.0 * House.gain(0.5)), "half: the curve's share of the original")
+	House.dim(list, 1.0)
 	t.eq(glow.emission_energy_multiplier, 2.0, "on: back to the model's own")
 	root.free()
 
@@ -123,7 +168,8 @@ func test_hint() -> void:
 	t.eq(House.hint(1.0, 0), "", "on: no line")
 	t.eq(House.hint(0.0, 3), "House lights off")
 	t.eq(House.hint(0.0, 0), "House lights off — rig dark", "a dark rig with the house off: say it is on purpose")
-	t.eq(House.hint(0.3, 0), "House lights dimmed — rig dark")
+	t.eq(House.hint(0.5, 0), "House lights 50 %")
+	t.eq(House.hint(0.2, 0), "House lights 20 % — rig dark")
 
 
 func test_light_cap_per_quality() -> void:
@@ -161,4 +207,15 @@ func test_rig_reports_and_never_dims() -> void:
 	t.ok(src.contains("p.i = t.a"), "each beam's intensity for the pick")
 	t.ok(not src.contains("sl.visible = lit"), "visibility is the pick's")
 	var q := FileAccess.get_file_as_string("res://features/previs/previs_quality.gd")
-	t.ok(q.contains('pm.add_submenu_node_item("House lights", House.menu())'), "the switch sits in the Quality menu")
+	t.ok(q.contains("box.add_child(House.control())"), "the slider sits beside the Quality menu")
+
+
+func test_control_is_a_slider_with_a_toggle() -> void:
+	var c := House.control()
+	var sl := c.get_node("Level") as HSlider
+	var b := c.get_node("Toggle") as Button
+	t.eq([sl.min_value, sl.max_value], [0.0, 100.0], "0–100 %")
+	t.eq(sl.value, roundf(House.shared().level * 100.0), "shows the level")
+	t.ok(b.text.begins_with("House"), "the label")
+	t.eq(sl.focus_mode, Control.FOCUS_NONE, "arrows stay with the 3D view")
+	c.free()
