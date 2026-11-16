@@ -6,8 +6,9 @@
  *  - the API: `body` cartoon (default, persons unchanged but for body / heading) / woman / man / mixed, refusals, human
  *    heights from the same draw (the walk and looks under a seed are the same whatever the body), `walk: false` stands
  *    them where they are and `walk: true` walks on;
- *  - the shipped bodies: the GLBs + textures exist, the licence manifest names every shipped file with a CC0 source,
- *    THIRD_PARTY_NOTICES names them, the build recipe is in the repo, every file has a "keep" .import;
+ *  - the shipped bodies (Microsoft Rocketbox, MIT): scenes, moves and textures exist, the licence manifest names every
+ *    shipped file with its Rocketbox source at the pinned commit, THIRD_PARTY_NOTICES carries the MIT notice, the
+ *    build recipe (fetch at that commit + bake + textures) is in the repo, every texture has a "keep" .import;
  *  - the Godot wiring (source text): the row's Look / Walk controls, the cards carry body + heading, the layer picks the
  *    human node for woman / man only.
  */
@@ -93,25 +94,28 @@ describe('WO-1103 human test puppets', () => {
 
 	it('the shipped bodies: files, "keep" imports, licence manifest, notices, build recipe', () => {
 		const man = JSON.parse(read(`${PEOPLE}/LICENSES.json`))
-		const shipped = fs.readdirSync(path.join(ROOT, PEOPLE)).filter((f) => /\.(glb|webp)$/.test(f)).sort()
+		const COMMIT = '0943055db6ec570bcef9f2c8b41c9e5467c808f9' // the pinned Microsoft Rocketbox commit
+		const shipped = fs.readdirSync(path.join(ROOT, PEOPLE)).filter((f) => /\.(scn|res|webp|glb)$/.test(f)).sort()
 		for (const b of ['woman', 'man']) {
-			assert.ok(shipped.includes(`${b}.glb`), `${b}.glb shipped`)
-			for (const tone of ['light', 'mid', 'dark']) assert.ok(shipped.includes(`${b}_skin_${tone}.webp`), `${b} skin ${tone}`)
+			for (const f of [`${b}.scn`, `${b}_moves.res`]) assert.ok(shipped.includes(f), `${f} shipped`)
+			for (const m of ['body', 'head', 'body_n', 'head_n', 'body_s', 'head_s', 'hair']) assert.ok(shipped.includes(`${b}_${m}.webp`), `${b} ${m} map`)
 		}
 		assert.deepEqual(man.files.map((e) => e.file).sort(), shipped, 'one manifest row per shipped file, no stale rows')
 		for (const e of man.files) {
-			assert.equal(e.licence, 'CC0-1.0', `${e.file}: CC0`)
-			assert.ok(e.from.length >= 1 && e.from.every((s) => s.asset && s.author && /^https?:\/\//.test(s.source)), `${e.file}: sources`)
-			assert.equal(read(`${PEOPLE}/${e.file}.import`).trim(), '[remap]\n\nimporter="keep"', `${e.file}: packed as is`)
+			assert.equal(e.licence, 'MIT', `${e.file}: MIT`)
+			assert.ok(e.from.length >= 1 && e.from.every((s) => s.asset && /Microsoft/.test(s.author) && s.source.startsWith(`https://github.com/microsoft/Microsoft-Rocketbox/tree/${COMMIT}/Assets/`)), `${e.file}: Rocketbox sources at the pinned commit`)
+			if (e.file.endsWith('.webp')) assert.equal(read(`${PEOPLE}/${e.file}.import`).trim(), '[remap]\n\nimporter="keep"', `${e.file}: packed as is`)
 			assert.ok(fs.statSync(path.join(ROOT, PEOPLE, e.file)).size < 3e6, `${e.file}: small`)
 		}
-		assert.match(man.licenceQuote, /All core assets are shared under Creative Commons, CC0/)
-		assert.match(man.licenceUrl, /^https:\/\/static\.makehumancommunity\.org\/about\/license\.html$/)
+		assert.match(man.licenceQuote, /Copyright \(c\) 2020 Microsoft — Permission is hereby granted, free of charge/)
+		assert.equal(man.licenceUrl, `https://github.com/microsoft/Microsoft-Rocketbox/blob/${COMMIT}/LICENSE.md`)
 		const notices = read('THIRD_PARTY_NOTICES')
-		assert.match(notices, /MakeHuman/)
-		assert.match(notices, /godot\/client\/assets\/people/)
-		for (const f of ['tools/people/build_human.py', 'tools/people/pack_tex.py', 'tools/people/woman.json', 'tools/people/man.json', 'tools/people/README.md'])
+		assert.match(notices, /Microsoft Rocketbox Avatar Library — godot\/client\/assets\/people\//)
+		assert.match(notices, /Copyright \(c\) 2020 Microsoft\n\n {2}Permission is hereby granted, free of charge/, 'the MIT notice travels with the files')
+		assert.doesNotMatch(notices, /MakeHuman system assets/, 'no stale section for files no longer shipped')
+		for (const f of ['tools/people/rocketbox_build.sh', 'tools/people/rocketbox_bake.gd', 'tools/people/rocketbox_tex.py', 'tools/people/README.md'])
 			assert.ok(fs.existsSync(path.join(ROOT, f)), `${f}: the recipe is in the repo`)
+		assert.match(read('tools/people/rocketbox_build.sh'), new RegExp(`^COMMIT=${COMMIT}$`, 'm'), 'the recipe fetches the pinned commit')
 	})
 
 	it('Godot wiring: the row, the cards, the layer', () => {

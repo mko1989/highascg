@@ -5,7 +5,7 @@ extends Node
 ## plus `<dir>/<name>_motion.json` (its feet and yaw every frame for 6 s: floor height, smoothness). The orbit camera
 ## is put back where it was after each round. Nothing runs without the flag.
 ## WO-1103: a `go` whose text is JSON runs avatar_probe_sweep.gd instead (quality × house × view shots of every figure,
-## or the frame cost of n human puppets); a human's motion rows also carry its feet and the drawn balls of its feet.
+## or the frame cost of n human puppets); a human's motion rows also carry its drawn toes and its walk cycle rate.
 
 const VIEWS := [["front", 0.0, 3.2, 0.12], ["three_quarter", 0.75, 3.2, 0.12], ["side", PI / 2.0, 1.6, 0.1],
 	["side_l", -PI / 2.0, 1.6, 0.1], ["back", PI, 3.2, 0.12], ["face", 0.25, 1.3, 0.05], ["wide", 0.5, 7.0, 0.45]]
@@ -20,10 +20,13 @@ var _queue := []
 var _motion := []
 var _motion_until := 0.0
 var _saved := {}
+var _sweeping := false
 
 
 func _process(dt: float) -> void:
 	_poll += dt
+	if _sweeping:  # the sweep drives itself
+		return
 	if not _busy and _poll > 0.5:
 		_poll = 0.0
 		if FileAccess.file_exists(dir + "/go"):
@@ -40,12 +43,10 @@ func _process(dt: float) -> void:
 	if a != null and now < _motion_until:
 		var sh: Dictionary = a.shown()
 		var row := [now, sh.pos.x, sh.pos.y, sh.pos.z, sh.yaw]
-		if sh.has("feet"):  # WO-1103: [air, planted x, z, drawn ball x, y, z] per foot
-			for i in 2:
-				var f: Dictionary = sh.feet[i]
-				var b: Vector3 = sh.balls[i]
-				var at: Vector3 = f.at if f.at is Vector3 else Vector3.ZERO
-				row.append_array([f.air, at.x, at.z, b.x, b.y, b.z])
+		if sh.has("feet"):  # WO-1103: the drawn toes (x, y, z per foot) + the walk cycle rate
+			for v: Vector3 in sh.feet:
+				row.append_array([v.x, v.y, v.z])
+			row.append(sh.get("cadence", 0.0))
 		_motion.append(row)
 	if _shot.is_empty():
 		if _queue.is_empty():
@@ -66,7 +67,7 @@ func _sweep(cfg: Variant) -> void:
 	if not (cfg is Dictionary):
 		print("[client] human probe: go is not a JSON object")
 		return
-	_busy = true
+	_sweeping = true
 	var sw: Node = preload("res://features/previs/tracking/avatar_probe_sweep.gd").new()
 	sw.dir = dir
 	sw.cards = cards
@@ -74,7 +75,7 @@ func _sweep(cfg: Variant) -> void:
 	add_child(sw)
 	await sw.run()
 	sw.queue_free()
-	_busy = false
+	_sweeping = false
 
 
 func _start(name_: String) -> void:

@@ -1,120 +1,113 @@
 extends RefCounted
-## WO-1103 — the two human puppet bodies (owner 16.11: "try to create a woman and man avatars but try to make them as
-## much human like as possible"; "the hq avatars are for previz purposes only as a 'puppet'"). Built from the MakeHuman
-## CC0 system assets with MPFB (tools/people/: recipe, specs and the build scripts) and shipped as
-## godot/client/assets/people/<body>.glb (a skinned mesh on MPFB's 53-bone "game_engine" skeleton, two levels of
-## detail: lod0_* and lod1_* meshes, one material per part, no images inside) + <body>_<part>.webp textures. Licences:
-## assets/people/LICENSES.json, THIRD_PARTY_NOTICES.
+## WO-1103 — the human puppet bodies (owner 16.11: "try to create a woman and man avatars but try to make them as much
+## human like as possible"; "the hq avatars are for previz purposes only as a 'puppet'"). Shipped: two avatars of the
+## Microsoft Rocketbox library (MIT) — godot/client/assets/people/<body>.scn (a native scene: one skinned mesh with
+## LODs, surfaces body / head / opacity, on the 81-bone 3ds Max "Bip01" biped skeleton; no images, no animation inside),
+## <body>_<map>.webp textures
+## and <body>_moves.res (the Rocketbox motion-capture idle / walks / turns baked for that body:
+## tools/people/rocketbox_bake.gd). Licences: assets/people/LICENSES.json, THIRD_PARTY_NOTICES.
 ##
-## Both are read at RUN time (GLTFDocument + Image from raw bytes), never through the editor's import pipeline: the
-## operator client runs from the source tree with no import cache, and the files carry a "keep" .import so an export
-## packs them as they are. Loaded once per body (~10 ms each), then every puppet duplicates the template (meshes and
-## materials are shared). A missing or broken file → available() false and the puppet stays a pebble avatar.
+## Textures are read at RUN time (Image from raw bytes) — the operator client runs from the source tree with no import
+## cache; the .webp carry a "keep" .import so an export packs them as they are. One template per body, every
+## puppet duplicates it (mesh, materials and moves shared). A body may also be an absolute folder path + name
+## ("/x/y/woman": dev probes compare candidates). A missing or broken file → available() false: the pebble stays.
 
 const DIR := "res://assets/people/"
 const BODIES := ["woman", "man"]
 const SHADER := preload("res://features/previs/tracking/person_human.gdshader")
 const CARDS := preload("res://features/previs/tracking/person_human_cards.gdshader")
 const House := preload("res://features/previs/house_lights.gd")
-## Per part: the material's look. tex = <body>_<tex>.webp (skin: <body>_skin_<tone>), nrm = its normal map, if any.
+## Per surface (the material name the bake gives it): textures (<body>_<tex>.webp) and the look.
 const PARTS := {
-	"skin": {"rough": 0.52, "sheen": 0.35, "wrap": Vector3(0.32, 0.14, 0.08)},
-	"clothes": {"rough": 0.85, "sheen": 0.12, "wrap": Vector3(0.12, 0.12, 0.12), "nrm": "clothes_n", "depth": 1.0},
-	"shoes": {"rough": 0.4, "sheen": 0.7, "wrap": Vector3(0.05, 0.05, 0.05), "nrm": "shoes_n", "depth": 1.0},
-	"eyes": {"rough": 0.12, "sheen": 1.0, "wrap": Vector3(0.1, 0.1, 0.1)},
-	"hair": {"rough": 0.5, "sheen": 0.4, "wrap": Vector3(0.3, 0.3, 0.3), "cards": true, "cut": 0.42, "nrm": "hair_n", "depth": 0.6},
-	"eyebrows": {"rough": 0.8, "sheen": 0.0, "wrap": Vector3(0.3, 0.3, 0.3), "cards": true, "cut": 0.3},
-	"eyelashes": {"rough": 0.8, "sheen": 0.0, "wrap": Vector3(0.3, 0.3, 0.3), "cards": true, "cut": 0.3},
+	"body": {"tex": "body", "nrm": "body_n", "spec": "body_s", "rough": 0.75, "sheen": 0.3, "wrap": Vector3(0.12, 0.12, 0.12), "sss": 0.0},
+	"head": {"tex": "head", "nrm": "head_n", "spec": "head_s", "rough": 0.5, "sheen": 0.6, "wrap": Vector3(0.3, 0.14, 0.08), "sss": 0.25},
+	"opacity": {"tex": "hair", "rough": 0.55, "sheen": 0.35, "wrap": Vector3(0.3, 0.3, 0.3), "cards": true, "cut": 0.35},
 }
-const TONES := ["light", "mid", "dark"]
-## The skin textures' own lightness (mean sRGB luminance of the skin texels, measured when packed; mid = light + dark) — a puppet's skin trait
-## picks the nearest one.
-const TONE_LUMA := {"light": 0.67, "mid": 0.46, "dark": 0.25}
 
-static var _templates := {}  # body → {root: Node3D, height: float} | {} when it failed
-static var _mats := {}  # "body:part[:tone]" → ShaderMaterial
+static var _templates := {}  # body → {root, height, moves} | {} when it failed
+static var _mats := {}  # "body:part" → ShaderMaterial
 static var _house_hooked := false
 
 
 ## The body's files are there and load.
 static func available(body: String) -> bool:
-	return body in BODIES and not template(body).is_empty()
+	return (body in BODIES or body.begins_with("/")) and not template(body).is_empty()
 
 
-## The body as loaded (the template every instance copies): {root, height (m, soles to the top of the head/hair)}.
+static func _path(body: String) -> String:
+	return body if body.begins_with("/") else DIR + body
+
+
+## The body as loaded: {root (Node3D: the skeleton "Skeleton3D" under it), height (m, soles to the top of the head),
+## moves (AnimationLibrary)}.
 static func template(body: String) -> Dictionary:
 	if _templates.has(body):
 		return _templates[body]
 	var out := {}
-	var bytes := FileAccess.get_file_as_bytes(DIR + body + ".glb")
-	if not bytes.is_empty():
-		var doc := GLTFDocument.new()
-		var st := GLTFState.new()
-		if doc.append_from_buffer(bytes, DIR, st) == OK:
-			var root: Node = doc.generate_scene(st)
-			if root is Node3D and _skeleton(root) != null:
-				out = {"root": root, "height": _height(root)}
-			elif root != null:
-				root.free()
+	var p := _path(body)
+	var scene: Variant = _res(p + ".scn")
+	var moves: Variant = _res(p + "_moves.res")
+	if scene is PackedScene and moves is AnimationLibrary:
+		var root: Node = (scene as PackedScene).instantiate()
+		var sk := _skeleton(root) if root != null else null
+		if root is Node3D and sk != null and sk.get_parent() == root and sk.name == "Skeleton3D":
+			out = {"root": root, "height": _height(sk), "moves": moves}
+		elif root != null:
+			root.free()
 	if out.is_empty():
-		push_warning("[human_body] %s: %s missing or unreadable — the puppet stays a pebble avatar" % [body, DIR + body + ".glb"])
+		push_warning("[human_body] %s: %s.scn / _moves.res missing or unreadable — the puppet stays a pebble avatar" % [body, p])
 	_templates[body] = out
 	return out
 
 
-## A new copy of the body: {root (Node3D, feet at y 0, front +Z, the person's left +X, metres), skeleton, lod0 [],
-## lod1 [] (MeshInstance3D), height}. Materials are shared per body (skin per tone). {} when unavailable.
-static func instance(body: String, tone := "light") -> Dictionary:
+static func _res(path: String) -> Variant:
+	if path.begins_with("res://") and not ResourceLoader.exists(path):
+		return null
+	if not path.begins_with("res://") and not FileAccess.file_exists(path):
+		return null
+	return ResourceLoader.load(path)
+
+
+## A new copy of the body: {root (Node3D, feet at y 0, front +Z, the person's left +X, metres), skeleton, meshes [],
+## height, moves}. Materials are shared per body. {} when unavailable.
+static func instance(body: String) -> Dictionary:
 	var tpl := template(body)
 	if tpl.is_empty():
 		return {}
 	var root: Node3D = (tpl.root as Node3D).duplicate()
-	var out := {"root": root, "skeleton": _skeleton(root), "lod0": [], "lod1": [], "height": tpl.height}
-	for mi: MeshInstance3D in _meshes(root):
-		var part := part_of(mi)
-		mi.material_override = material(body, part, tone)
-		var lod := "lod1" if mi.name.begins_with("lod1") else "lod0"
-		(out[lod] as Array).append(mi)
-		var small := part in ["eyes", "eyebrows", "eyelashes"]
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if small else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	var out := {"root": root, "skeleton": _skeleton(root), "meshes": _meshes(root), "height": tpl.height, "moves": tpl.moves}
+	for mi: MeshInstance3D in out.meshes:
+		for i in mi.mesh.get_surface_count():
+			var m := mi.mesh.surface_get_material(i)
+			mi.set_surface_override_material(i, material(body, m.resource_name if m != null else "body"))
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	return out
 
 
-## "lod0_hair" → "hair" (the material name the build gives every part).
-static func part_of(mi: MeshInstance3D) -> String:
-	var n := str(mi.name)
-	return n.get_slice("_", 1) if n.contains("_") else n
-
-
-## The skin tone for a skin colour (a trait / palette Color): the nearest TONE_LUMA.
-static func tone_for(skin: Variant) -> String:
-	if not (skin is Color):
-		return "light"
-	var l := (skin as Color).get_luminance()
-	var best := "light"
-	for t in TONES:
-		if absf(l - TONE_LUMA[t]) < absf(l - TONE_LUMA[best]):
-			best = t
-	return best
-
-
-## The shared material of one part (skin: per tone).
-static func material(body: String, part: String, tone := "light") -> ShaderMaterial:
-	var key := "%s:%s" % [body, part] + (":" + tone if part == "skin" else "")
+## The shared material of one surface.
+static func material(body: String, part: String) -> ShaderMaterial:
+	var key := "%s:%s" % [body, part]
 	if _mats.has(key):
 		return _mats[key]
-	var spec: Dictionary = PARTS.get(part, PARTS.clothes)
+	var spec: Dictionary = PARTS.get(part, PARTS.body)
 	var m := ShaderMaterial.new()
 	m.shader = CARDS if spec.get("cards", false) else SHADER
-	m.set_shader_parameter("albedo_tex", texture("%s_skin_%s" % [body, tone] if part == "skin" else "%s_%s" % [body, part]))
+	var p := _path(body)
+	m.set_shader_parameter("albedo_tex", texture(p + "_" + str(spec.tex)))
 	if spec.has("nrm"):
-		var n: Variant = texture("%s_%s" % [body, spec.nrm])
+		var n: Variant = texture(p + "_" + str(spec.nrm))
 		if n != null:
 			m.set_shader_parameter("normal_tex", n)
-			m.set_shader_parameter("normal_depth", float(spec.depth))
+			m.set_shader_parameter("normal_depth", 1.0)
+	if spec.has("spec"):
+		var s: Variant = texture(p + "_" + str(spec.spec))
+		if s != null:
+			m.set_shader_parameter("spec_tex", s)
+			m.set_shader_parameter("spec_map", 1.0)
 	m.set_shader_parameter("roughness", float(spec.rough))
 	m.set_shader_parameter("sheen", float(spec.sheen))
 	m.set_shader_parameter("wrap", spec.wrap)
+	m.set_shader_parameter("sss", float(spec.get("sss", 0.0)))
 	m.set_shader_parameter("alpha_cut", float(spec.get("cut", 0.5)))
 	_mats[key] = m
 	if not _house_hooked:
@@ -137,9 +130,9 @@ static func house() -> void:
 		m.set_shader_parameter("self_light", sl)
 
 
-## <DIR><name>.webp as a mipmapped texture, or null.
-static func texture(name: String) -> Variant:
-	var bytes := FileAccess.get_file_as_bytes(DIR + name + ".webp")
+## <path>.webp as a mipmapped texture, or null.
+static func texture(path: String) -> Variant:
+	var bytes := FileAccess.get_file_as_bytes(path + ".webp")
 	if bytes.is_empty():
 		return null
 	var img := Image.new()
@@ -167,11 +160,9 @@ static func _meshes(n: Node, into: Array = []) -> Array:
 	return into
 
 
-## Soles to the top of the head (lod0 meshes' bind-pose bounds).
-static func _height(root: Node) -> float:
-	var top := 0.0
-	for mi: MeshInstance3D in _meshes(root):
-		if mi.name.begins_with("lod0") and mi.mesh != null:
-			var b := mi.mesh.get_aabb()
-			top = maxf(top, b.position.y + b.size.y)
-	return top if top > 0.5 else 1.7
+## Soles to the top of the head: the eyes' rest height + the skull above them (≈ 0.105 m on an adult).
+static func _height(sk: Skeleton3D) -> float:
+	var e := sk.find_bone("Bip01 LEye")
+	if e < 0:
+		return 1.7
+	return sk.get_bone_global_rest(e).origin.y + 0.105

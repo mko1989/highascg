@@ -4,7 +4,7 @@ extends VBoxContainer
 ## puppet. make sure the test puppet doesnt leave the stage". The server walks them inside the tracking stage
 ## (src/tracking/puppet-people.js) as world persons: the previs draws them as avatars (People: avatars) labelled
 ## "TEST puppet n", and the Auto director / spot handover follow them like detected people. Off at every server start.
-## WO-1103: Look — Cartoon (the pebble avatar, default) / Woman / Man / Mixed (realistic MakeHuman bodies, for previs
+## WO-1103: Look — Cartoon (the pebble avatar, default) / Woman / Man / Mixed (realistic Rocketbox bodies, for previs
 ## only) — and Walk (off: they stop where they are and stand, still turning to look round).
 
 const PM := preload("res://features/previs/tracking/puppet_model.gd")

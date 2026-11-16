@@ -334,17 +334,35 @@ UI icons (WO-1096 inventory) — every third-party icon in client/assets and god
   deleted three unused unlicensed files (two "Uploaded to: SVG Repo" cables, camera-icon.svg).
 
 ================================================================================
-MakeHuman system assets — godot/client/assets/people/ (woman.glb, man.glb, *.webp; WO-1103)
-https://static.makehumancommunity.org/about/license.html — makehuman_system_assets_cc0.zip and MPFB 2.0.18's data
-Copyright (C) 2020 Data Collection AB, Joel Palmius, Jonas Hauquier (released to the public domain)
-License: CC0 1.0 Universal — NOT under HighAsCG's AGPL. "All core assets are shared under Creative Commons, CC0. [...]
-You do not need to pay anything, include any copyright notices nor give attribution."
+Microsoft Rocketbox Avatar Library — godot/client/assets/people/ (woman.scn, man.scn, *_moves.res, *.webp; WO-1103)
+https://github.com/microsoft/Microsoft-Rocketbox (commit 0943055db6ec570bcef9f2c8b41c9e5467c808f9)
+License: MIT — NOT under HighAsCG's AGPL.
 
-  The previs test-puppet bodies (a woman and a man) are built only from MakeHuman CC0 assets: the base mesh and its
-  targets, the female1605 / male1591 proxies, the game_engine rig and weights, skins, eyes, eyebrows, eyelashes, hair
-  (ponytail01, short02) and clothes (female_elegantsuit01, shoes03, male_elegantsuit01, shoes04). Per-file sources
-  and quotes: godot/client/assets/people/LICENSES.json; recipe: tools/people/. Blender and MPFB's code (GPL) were
-  build tools only; none of their code is shipped.
+  The previs test-puppet bodies are the Rocketbox avatars Business_Female_04 (woman) and Business_Male_02 (man) with
+  the library's motion-capture idle / walk / turn clips, converted (Godot scene, AnimationLibrary, WebP textures) by
+  tools/people/rocketbox_build.sh. Per-file sources: godot/client/assets/people/LICENSES.json.
+
+  MIT License
+
+  Copyright (c) 2020 Microsoft
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
 
 ================================================================================
 npm runtime dependencies (node_modules/, shipped in the ISO and the server release tarball)

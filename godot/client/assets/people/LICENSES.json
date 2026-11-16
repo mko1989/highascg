@@ -1,406 +1,303 @@
 {
-	"about": "WO-1103 — the realistic human test-puppet bodies of the previs (godot/client/features/previs/tracking/human_body.gd). Every file is derived only from MakeHuman CC0 assets; none is HighAsCG's AGPL code. Checked by tools/smoke/smoke-wo1103-puppet-humans.test.js.",
-	"licence": "CC0-1.0",
-	"licenceUrl": "https://static.makehumancommunity.org/about/license.html",
-	"licenceQuote": "All core assets are shared under Creative Commons, CC0. [...] You do not need to pay anything, include any copyright notices nor give attribution.",
+	"about": "WO-1103 — the realistic human test-puppet bodies of the previs (godot/client/features/previs/tracking/human_body.gd): Microsoft Rocketbox avatars Business_Female_04 (woman) and Business_Male_02 (man) with Rocketbox motion-capture clips. Every file is derived only from the Microsoft Rocketbox library (MIT, artist-made characters); none is HighAsCG's AGPL code. Checked by tools/smoke/smoke-wo1103-puppet-humans.test.js.",
+	"licence": "MIT",
+	"licenceUrl": "https://github.com/microsoft/Microsoft-Rocketbox/blob/0943055db6ec570bcef9f2c8b41c9e5467c808f9/LICENSE.md",
+	"licenceQuote": "MIT License — Copyright (c) 2020 Microsoft — Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software [...] The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.",
 	"alsoRead": [
 		{
-			"url": "https://github.com/makehumancommunity/mpfb2/blob/master/LICENSE.md",
-			"quote": "These assets have been released under CC0 1.0 Universal (base mesh, proxies, targets, rigs); of exports: \"We regard these things as your data, which is yours to handle as you see fit.\""
+			"url": "https://github.com/microsoft/Microsoft-Rocketbox/blob/0943055db6ec570bcef9f2c8b41c9e5467c808f9/README.md",
+			"quote": "November 2020 License Update — The library of avatars is now released under MIT License. [...] 4/2022: Release of 417 animations compatible with the Microsoft Rocketbox Avatars (in Assets/Animations)"
 		},
 		{
-			"url": "https://static.makehumancommunity.org/oldsite/faq/what_changed_regarding_the_license_in_2020.html",
-			"quote": "Targets, proxies and the base mesh are considered graphical assets, covered by CC0"
-		},
-		{
-			"url": "https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html",
-			"quote": "the makehuman_system_assets pack: every asset listed with licence CC0"
-		},
-		{
-			"file": "each .mhclo / .mhmat / base.obj header",
-			"quote": "This asset was explicitly released as CC0 in september 2020. [...] Copyright (C) 2020 Data Collection AB, Joel Palmius, Jonas Hauquier"
+			"url": "https://api.github.com/repos/microsoft/Microsoft-Rocketbox",
+			"quote": "\"license\": {\"spdx_id\": \"MIT\"}, \"archived\": true (read 16.11.26; pinned commit 0943055db6ec570bcef9f2c8b41c9e5467c808f9)"
 		}
 	],
-	"notShipped": "Blender (GPL) and MPFB's code (GPL-3.0) are build tools only; nothing of their code is in these files.",
+	"notShipped": "The Rocketbox FBX / TGA sources (fetched by tools/people/rocketbox_build.sh into a scratch dir) and Godot used as the build tool. The licence text is in the repo-root THIRD_PARTY_NOTICES (the MIT condition: the notice travels with the files).",
 	"files": [
 		{
-			"file": "woman.glb",
-			"licence": "CC0-1.0",
-			"made": "tools/people/build_human.py (Blender 4.5.9 LTS + MPFB 2.0.18), tools/people/woman.json",
+			"file": "man.scn",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_bake.gd (Godot 4.7 FBXDocument → a native scene, LODs generated)",
 			"from": [
 				{
-					"asset": "base mesh hm08 (data/3dobjs/base.obj) + macro/proportion targets",
-					"author": "MakeHuman / MPFB2 data (Data Collection AB, Joel Palmius, Jonas Hauquier)",
-					"source": "https://extensions.blender.org/download/sha256:c075b3e9b94b8e5556a5f03f4653602d02ea306de08126e8f55ed6dee28a2dad/add-on-mpfb-v2.0.18.zip"
-				},
-				{
-					"asset": "game_engine rig + weights (data/rigs/standard/*.game_engine.json)",
-					"author": "MakeHuman / MPFB2 data (weights.game_engine.json: \"license\": \"CC0\")",
-					"source": "https://extensions.blender.org/download/sha256:c075b3e9b94b8e5556a5f03f4653602d02ea306de08126e8f55ed6dee28a2dad/add-on-mpfb-v2.0.18.zip"
-				},
-				{
-					"asset": "proxymeshes/female1605",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "eyes/high-poly",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "eyes/low-poly",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "eyebrows/eyebrow001",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "eyelashes/eyelashes02",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "hair/ponytail01",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "clothes/female_elegantsuit01",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "clothes/shoes03",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "Business_Male_02.fbx (mesh, skin weights, the Bip01 biped)",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Male_02/Export/Business_Male_02.fbx"
 				}
 			]
 		},
 		{
-			"file": "man.glb",
-			"licence": "CC0-1.0",
-			"made": "tools/people/build_human.py (Blender 4.5.9 LTS + MPFB 2.0.18), tools/people/man.json",
+			"file": "man_body.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
 			"from": [
 				{
-					"asset": "base mesh hm08 (data/3dobjs/base.obj) + macro/proportion targets",
-					"author": "MakeHuman / MPFB2 data (Data Collection AB, Joel Palmius, Jonas Hauquier)",
-					"source": "https://extensions.blender.org/download/sha256:c075b3e9b94b8e5556a5f03f4653602d02ea306de08126e8f55ed6dee28a2dad/add-on-mpfb-v2.0.18.zip"
-				},
-				{
-					"asset": "game_engine rig + weights (data/rigs/standard/*.game_engine.json)",
-					"author": "MakeHuman / MPFB2 data (weights.game_engine.json: \"license\": \"CC0\")",
-					"source": "https://extensions.blender.org/download/sha256:c075b3e9b94b8e5556a5f03f4653602d02ea306de08126e8f55ed6dee28a2dad/add-on-mpfb-v2.0.18.zip"
-				},
-				{
-					"asset": "proxymeshes/male1591",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "eyes/high-poly",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "eyes/low-poly",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "eyebrows/eyebrow002",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "eyelashes/eyelashes01",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "hair/short02",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "clothes/male_elegantsuit01",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "clothes/shoes04",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "m008_body_color.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Male_02/Textures/m008_body_color.tga"
 				}
 			]
 		},
 		{
-			"file": "woman_skin_light.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
+			"file": "man_body_n.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
 			"from": [
 				{
-					"asset": "skins/young_caucasian_female/young_lightskinned_female_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "m008_body_normal.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Male_02/Textures/m008_body_normal.tga"
 				}
 			]
 		},
 		{
-			"file": "woman_skin_dark.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
+			"file": "man_body_s.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
 			"from": [
 				{
-					"asset": "skins/young_african_female/young_darkskinned_female_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "woman_skin_mid.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP, 50/50 blend)",
-			"from": [
-				{
-					"asset": "skins/young_caucasian_female/young_lightskinned_female_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "skins/young_african_female/young_darkskinned_female_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "woman_clothes.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP, × 70 % ambient occlusion)",
-			"from": [
-				{
-					"asset": "clothes/female_elegantsuit01/female_elegantsuit01_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "clothes/female_elegantsuit01/female_elegantsuit01_ao.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "woman_clothes_n.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
-			"from": [
-				{
-					"asset": "clothes/female_elegantsuit01/female_elegantsuit01_normal.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "woman_hair.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
-			"from": [
-				{
-					"asset": "hair/ponytail01/ponytail01_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "woman_eyes.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
-			"from": [
-				{
-					"asset": "eyes/materials/brownlight_eye.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "woman_eyebrows.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
-			"from": [
-				{
-					"asset": "eyebrows/eyebrow001/eyebrow001.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "woman_eyelashes.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
-			"from": [
-				{
-					"asset": "eyelashes/eyelashes02/eyelashes02.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "woman_shoes.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
-			"from": [
-				{
-					"asset": "clothes/shoes03/shoes03_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "man_skin_light.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
-			"from": [
-				{
-					"asset": "skins/young_caucasian_male/young_lightskinned_male_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "man_skin_dark.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
-			"from": [
-				{
-					"asset": "skins/young_african_male/young_darkskinned_male_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "man_skin_mid.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP, 50/50 blend)",
-			"from": [
-				{
-					"asset": "skins/young_caucasian_male/young_lightskinned_male_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				},
-				{
-					"asset": "skins/young_african_male/young_darkskinned_male_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
-				}
-			]
-		},
-		{
-			"file": "man_clothes.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
-			"from": [
-				{
-					"asset": "clothes/male_elegantsuit01/male_elegantsuit01_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "m008_body_specular.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Male_02/Textures/m008_body_specular.tga"
 				}
 			]
 		},
 		{
 			"file": "man_hair.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
 			"from": [
 				{
-					"asset": "hair/short02/short02_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "m008_opacity_color.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Male_02/Textures/m008_opacity_color.tga"
 				}
 			]
 		},
 		{
-			"file": "man_hair_n.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
+			"file": "man_head.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
 			"from": [
 				{
-					"asset": "hair/short02/short02_normal.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "m008_head_color.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Male_02/Textures/m008_head_color.tga"
 				}
 			]
 		},
 		{
-			"file": "man_eyes.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
+			"file": "man_head_n.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
 			"from": [
 				{
-					"asset": "eyes/materials/bluegreen_eye.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "m008_head_normal.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Male_02/Textures/m008_head_normal.tga"
 				}
 			]
 		},
 		{
-			"file": "man_eyebrows.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
+			"file": "man_head_s.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
 			"from": [
 				{
-					"asset": "eyebrows/eyebrow002/eyebrow002.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "m008_head_specular.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Male_02/Textures/m008_head_specular.tga"
 				}
 			]
 		},
 		{
-			"file": "man_eyelashes.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
+			"file": "man_moves.res",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_bake.gd (root motion out, walks cut to a 1 s cycle; metadata speed / stride / yaw)",
 			"from": [
 				{
-					"asset": "eyelashes/eyelashes01/eyelashes01.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "motion capture walk_slow: m_walk_slow_01.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xy/m_walk_slow_01.max.fbx"
+				},
+				{
+					"asset": "motion capture walk: m_walk_neutral_01.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xy/m_walk_neutral_01.max.fbx"
+				},
+				{
+					"asset": "motion capture walk_fast: m_walk_fast_01.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xy/m_walk_fast_01.max.fbx"
+				},
+				{
+					"asset": "motion capture idle: m_idle_neutral_01.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_static/m_idle_neutral_01.max.fbx"
+				},
+				{
+					"asset": "motion capture turn_left_60: m_turn_left_60.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xyz/m_turn_left_60.max.fbx"
+				},
+				{
+					"asset": "motion capture turn_right_60: m_turn_right_60.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xyz/m_turn_right_60.max.fbx"
+				},
+				{
+					"asset": "motion capture turn_left_90: m_turn_left_90.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xyz/m_turn_left_90.max.fbx"
+				},
+				{
+					"asset": "motion capture turn_right_90: m_turn_right_90.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xyz/m_turn_right_90.max.fbx"
 				}
 			]
 		},
 		{
-			"file": "man_shoes.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
+			"file": "woman.scn",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_bake.gd (Godot 4.7 FBXDocument → a native scene, LODs generated)",
 			"from": [
 				{
-					"asset": "clothes/shoes04/shoes04_diffuse.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "Business_Female_04.fbx (mesh, skin weights, the Bip01 biped)",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Female_04/Export/Business_Female_04.fbx"
 				}
 			]
 		},
 		{
-			"file": "man_shoes_n.webp",
-			"licence": "CC0-1.0",
-			"made": "tools/people/pack_tex.py (resized, WebP)",
+			"file": "woman_body.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
 			"from": [
 				{
-					"asset": "clothes/shoes04/shoes04_normal.png",
-					"author": "MakeHuman system assets (Data Collection AB, Joel Palmius, Jonas Hauquier; makehuman_system)",
-					"source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip"
+					"asset": "f020_body_color.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Female_04/Textures/f020_body_color.tga"
+				}
+			]
+		},
+		{
+			"file": "woman_body_n.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
+			"from": [
+				{
+					"asset": "f020_body_normal.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Female_04/Textures/f020_body_normal.tga"
+				}
+			]
+		},
+		{
+			"file": "woman_body_s.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
+			"from": [
+				{
+					"asset": "f020_body_specular.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Female_04/Textures/f020_body_specular.tga"
+				}
+			]
+		},
+		{
+			"file": "woman_hair.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
+			"from": [
+				{
+					"asset": "f020_opacity_color.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Female_04/Textures/f020_opacity_color.tga"
+				}
+			]
+		},
+		{
+			"file": "woman_head.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
+			"from": [
+				{
+					"asset": "f020_head_color.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Female_04/Textures/f020_head_color.tga"
+				}
+			]
+		},
+		{
+			"file": "woman_head_n.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
+			"from": [
+				{
+					"asset": "f020_head_normal.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Female_04/Textures/f020_head_normal.tga"
+				}
+			]
+		},
+		{
+			"file": "woman_head_s.webp",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_tex.py (resized, WebP)",
+			"from": [
+				{
+					"asset": "f020_head_specular.tga",
+					"author": "Microsoft Rocketbox Avatar Library (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Avatars/Professions/Business_Female_04/Textures/f020_head_specular.tga"
+				}
+			]
+		},
+		{
+			"file": "woman_moves.res",
+			"licence": "MIT",
+			"made": "tools/people/rocketbox_bake.gd (root motion out, walks cut to a 1 s cycle; metadata speed / stride / yaw)",
+			"from": [
+				{
+					"asset": "motion capture walk_slow: f_walk_slow_01.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xy/f_walk_slow_01.max.fbx"
+				},
+				{
+					"asset": "motion capture walk: f_walk_neutral_01.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xy/f_walk_neutral_01.max.fbx"
+				},
+				{
+					"asset": "motion capture walk_fast: f_walk_fast_01.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xy/f_walk_fast_01.max.fbx"
+				},
+				{
+					"asset": "motion capture idle: f_idle_neutral_01.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_static/f_idle_neutral_01.max.fbx"
+				},
+				{
+					"asset": "motion capture turn_left_60: f_turn_left_60.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xyz/f_turn_left_60.max.fbx"
+				},
+				{
+					"asset": "motion capture turn_right_60: f_turn_right_60.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xyz/f_turn_right_60.max.fbx"
+				},
+				{
+					"asset": "motion capture turn_left_90: f_turn_left_90.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xyz/f_turn_left_90.max.fbx"
+				},
+				{
+					"asset": "motion capture turn_right_90: f_turn_right_90.max.fbx",
+					"author": "Microsoft Rocketbox Avatar Library animations (Copyright (c) 2020 Microsoft)",
+					"source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/0943055db6ec570bcef9f2c8b41c9e5467c808f9/Assets/Animations/all_animations_max_motextr_xyz/f_turn_right_90.max.fbx"
 				}
 			]
 		}

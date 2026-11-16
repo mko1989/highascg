@@ -24,7 +24,7 @@
  * each start draws a fresh one.
  *
  * WO-1103 (owner 16.11: "the hq avatars are for previz purposes only as a 'puppet'"): `body` picks what the previs draws
- * for them — "cartoon" (the WO-1086 pebble avatar, the default), "woman" / "man" (the realistic MakeHuman bodies,
+ * for them — "cartoon" (the WO-1086 pebble avatar, the default), "woman" / "man" (the realistic Rocketbox bodies,
  * godot/client/assets/people) or "mixed" (woman, man, woman by index). A human body gets a human height from the same
  * draw (WOMAN_M / MAN_M: the look's HEIGHT_M position mapped, so the random sequence is unchanged). `walk: false` stops
  * them where they are (standing, still turning to look round on their pauses' headings) until `walk: true`. Each person

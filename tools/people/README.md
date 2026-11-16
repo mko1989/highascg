@@ -1,32 +1,23 @@
 # Building the human puppet bodies (WO-1103)
 
-Output: `godot/client/assets/people/{woman,man}.glb` + `<body>_<part>.webp` (licences: that folder's `LICENSES.json`).
-Everything here runs on the box without root; the tools are build-time only and nothing of them is shipped.
+Output: `godot/client/assets/people/{woman,man}.scn`, `<body>_moves.res`, `<body>_<map>.webp` (licences: that
+folder's `LICENSES.json`; the MIT text: repo-root `THIRD_PARTY_NOTICES`). Build-time only, no root.
 
-1. **Blender 4.5.9 LTS**, portable: `https://download.blender.org/release/Blender4.5/blender-4.5.9-linux-x64.tar.xz`
-   (unpack anywhere).
-2. **MPFB 2.0.18** (GPL-3.0 code, CC0 data):
-   `https://extensions.blender.org/download/sha256:c075b3e9b94b8e5556a5f03f4653602d02ea306de08126e8f55ed6dee28a2dad/add-on-mpfb-v2.0.18.zip`
-   — install into an isolated user dir so the box's own Blender settings are untouched:
-   `export BLENDER_USER_RESOURCES=$PWD/bl_user` then
-   `blender -b --command extension install-file -r user_default mpfb.zip` (or unzip it into
-   `$BLENDER_USER_RESOURCES/extensions/user_default/mpfb`).
-3. **MakeHuman system assets (CC0)**:
-   `https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip`
-   (≈ 280 MB) — unzip and copy its folders (`skins`, `clothes`, `hair`, `eyes`, `eyebrows`, `eyelashes`,
-   `proxymeshes`, …) into MPFB's user data dir, `$BLENDER_USER_RESOURCES/extensions/.user/user_default/mpfb/data/`.
-4. Bodies (one Blender run each; `woman.json` / `man.json` hold the macros — gender, age, muscle, weight, proportions,
-   height, race mix —, the proxy, the parts, the clothes and the decimation per part and level of detail):
+    tools/people/rocketbox_build.sh <work dir> [--install]
 
-       blender -b --python tools/people/build_human.py -- tools/people/woman.json woman.glb
-       blender -b --python tools/people/build_human.py -- tools/people/man.json man.glb
+1. Fetches, at the pinned commit `0943055db6ec570bcef9f2c8b41c9e5467c808f9` of the Microsoft Rocketbox library (MIT),
+   the two avatars (`Assets/Avatars/Professions/Business_Female_04`, `…/Business_Male_02`: `Export/<name>.fbx` + the
+   seven `Textures/<id>_*.tga`) and eight motion-capture clips per gender from `Assets/Animations`
+   (`all_animations_max_motextr_xy/<g>_walk_{slow_01,neutral_01,fast_01}.max.fbx`,
+   `…_static/<g>_idle_neutral_01.max.fbx`, `…_xyz/<g>_turn_{left,right}_{60,90}.max.fbx`) into `<work dir>/src`.
+2. `rocketbox_bake.gd` (Godot 4.7, headless, in a throw-away project under `<work dir>/gp`): FBXDocument → the avatar as a
+   native scene with generated LODs (`<body>.scn`; not GLB — a glTF round trip turns the unweighted `Bip01` root bone
+   into a node and the clips lose it) and the clips → `<body>_moves.res` (root motion out, walks cut at the left heel
+   strike to a 1 s cycle with `speed` / `stride` metadata, turns with `yaw` / `yaw_curve` metadata; the root height
+   scaled from the clip actor's hips to the avatar's).
+3. `rocketbox_tex.py` (Pillow): the TGA maps → WebP (colour 2048², normal / specular 1024², the RGBA opacity sheet).
+4. `--install` copies the results into `godot/client/assets/people/`; the WO-1103 smoke checks `LICENSES.json` lists
+   every shipped file.
 
-   It builds LOD0 (the full base mesh, the clothes' hidden-skin groups deleted, decimated) and LOD1 (the CC0 proxy
-   mesh + lighter parts, low-poly eyes) on one `game_engine` skeleton, applies the shape keys, names the meshes
-   `lod<n>_<part>` with one material per part, and exports a GLB without images (+ `<out>.stats.json`: triangles,
-   height, bones, the texture files it used).
-5. Textures: `python3 -I tools/people/pack_tex.py <unzipped system assets dir> <out dir>` — resized WebP per part; the
-   "mid" skin is a 50/50 blend of the light and dark skins (same base-mesh UVs), the woman's suit has 70 % of its
-   baked occlusion multiplied in.
-6. Copy the `.glb` and `.webp` files into `godot/client/assets/people/` (each keeps its `importer="keep"` `.import`) and
-   update `LICENSES.json` if a part changed; `tools/smoke/smoke-wo1103-puppet-humans.test.js` checks the two agree.
+Other Rocketbox avatars can be tried by changing `AV` / `PRE` in the script (the texture prefix is the `<id>` of the
+avatar's `Textures/<id>_body_color.tga`).
