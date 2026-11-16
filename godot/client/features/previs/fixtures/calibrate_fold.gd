@@ -18,6 +18,7 @@ const T := preload("res://features/previs/tracking/tracking_model.gd")
 const PM := preload("res://features/previs/tracking/person_mark_model.gd")
 const RigFold := preload("res://features/previs/fixtures/rig_calibrate_fold.gd")  # WO-804
 const Desk := preload("res://features/previs/fixtures/desk_pose_model.gd")  # WO-764
+const HelpDialog := preload("res://app/help_dialog.gd")
 
 var sel: RefCounted = Sel.shared()
 var _list: ItemList
@@ -97,7 +98,7 @@ func _ready() -> void:
 	export.text = "Export calibrated rig…"
 	export.tooltip_text = "Every calibrated head where its marks put it — an .mvr the desk imports (or a .csv position table)"
 	export.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	add_child(export)
+	add_child(HelpDialog.beside(export, "calibrate-rig-to-desk"))
 	var export_status := _muted("")
 	export_status.visible = false  # no gap until there is something to say
 	export.pressed.connect(func() -> void:

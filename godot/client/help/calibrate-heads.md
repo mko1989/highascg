@@ -64,5 +64,6 @@ sent anything. **Clear** ends the session and drops this head's trim and every p
 - **"DMX output is off for this head's universe".** The head's universe is not on the wire, so the real head is
   not where the Programmer says. Turn on DMX output (or the console's feed).
 
-See also [Calibrate tracking cameras](calibrate-cameras.md) · [Calibrate a PTZ camera](calibrate-ptz.md) ·
+See also [Calibrate the rig and hand it to the desk](calibrate-rig-to-desk.md) ·
+[Calibrate tracking cameras](calibrate-cameras.md) · [Calibrate a PTZ camera](calibrate-ptz.md) ·
 [PSN output to a lighting desk](psn-output.md)
