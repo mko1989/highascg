@@ -4,7 +4,8 @@ extends Node
 ##   shots: {"name": "s", "quality": ["Low", "Ultra"], "house": [1, 0.35], "views": ["front", "three_quarter", "face"]}
 ##     every visible people-layer figure, per quality × house level × view → `<name>_<Quality>_<house %>_<n>_<body>_<view>.png`;
 ##     with "bodies": [...] (woman / man / an absolute "<dir>/<name>" of a baked body) and "centre": [x, y, z] (PSN)
-##     those are put up as local stand-ins in a row instead (facing the Front camera, standing; "blink": 0…1 holds the lids);
+##     those are put up as local stand-ins in a row instead (facing the Front camera, standing; "blink": 0…1 holds the lids;
+##     "cartoon" is the pebble avatar);
 ##   stride: {"name": "w", "stride": 8, "bodies": [...], "centre": [...], "speed": 1.2, "views": ["side", "front"]}
 ##     each body walks a straight line through `centre`; `stride` shots evenly over one walk cycle per view →
 ##     `<name>_<body>_<view>_<k>.png` and `<name>_<body>_feet.json` (the toes' floor points every frame for 4 s);
@@ -16,6 +17,7 @@ extends Node
 const Quality := preload("res://features/previs/previs_quality.gd")
 const House := preload("res://features/previs/house_lights.gd")
 const Human := preload("res://features/previs/tracking/person_human.gd")
+const Avatar := preload("res://features/previs/tracking/person_avatar.gd")
 const C := preload("res://features/previs/tracking/camera_model.gd")
 ## view → [yaw offset from the figure's facing, distance m, pitch, height share aimed at]
 const VIEWS := {"front": [0.0, 3.0, 0.1, 0.55], "three_quarter": [0.7, 3.0, 0.1, 0.55], "face": [0.3, 0.75, 0.03, 0.93],
@@ -82,11 +84,13 @@ func _row(bodies: Array, st: Node) -> void:
 	_clear()
 	var face := float(cfg.get("face_yaw", st._yaw))  # Godot yaw: the orbit camera's side (the audience, from Front)
 	for i in bodies.size():
-		var node := Human.new(str(bodies[i]))
+		var cartoon := str(bodies[i]) == "cartoon"  # the WO-1086 pebble avatar, for comparison
+		var node: Node3D = Avatar.new() if cartoon else Human.new(str(bodies[i]))
 		cards.avatars.add_child(node)
 		var w := {"node": node, "mode": "stand", "at": _centre + Vector3((i - (bodies.size() - 1) / 2.0) * 1.2, 0.0, 0.0), "h": _h(str(bodies[i]))}
-		node.set_heading(face - PI / 2.0)  # PSN heading h faces Godot yaw h + PI / 2 (person_human.set_heading)
-		if cfg.has("blink"):  # 0 open … 1 shut, held
+		if not cartoon:
+			node.set_heading(face - PI / 2.0)  # PSN heading h faces Godot yaw h + PI / 2 (person_human.set_heading)
+		if cfg.has("blink") and not cartoon:  # 0 open … 1 shut, held
 			node.blink.hold = float(cfg.blink)
 		_walkers.append(w)
 		_feed(w)

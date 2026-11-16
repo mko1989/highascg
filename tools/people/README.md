@@ -21,3 +21,18 @@ folder's `LICENSES.json`; the MIT text: repo-root `THIRD_PARTY_NOTICES`). Build-
 
 Other Rocketbox avatars can be tried by changing `AV` / `PRE` in the script (the texture prefix is the `<id>` of the
 avatar's `Textures/<id>_body_color.tga`).
+
+## Own characters and MetaHuman DNA (per machine, never shipped)
+
+An operator's own character lives in `~/.local/share/highascg/puppets/<name>/` (help page
+`godot/client/help/own-test-puppet.md`; loader `godot/client/features/previs/tracking/human_own.gd`). Nothing from
+there is ever copied into the repo, a release, the ISO, a stick, the bridge disk or a sync peer (eggs exclude lists +
+`verify-iso-detection-runtime.sh`, `exfat-sync-map.js`, `.stignore`, `.gitignore` all name it or `*.dna`).
+
+- `openriglogic_build.sh` — OWNER-RUN, once per machine: Epic's OpenRigLogic (MIT) at the pinned 5.8 commit, the
+  static DNA library + `dna` Python module → `~/.local/share/highascg/openriglogic/`. Needs
+  `sudo apt install git cmake g++ swig python3-dev`.
+- `dna_to_glb.py <folder>` — a head + body DNA (+ textures) → `<folder>/<name>.converted.glb` (neutral joints, one
+  LOD, skin weights, merged skeleton; progress in `<folder>/convert.json`). The Test people Look row starts it when a
+  DNA folder is picked. Tested only against a synthetic stand-in (`tools/smoke/fixtures/wo1103-fake-dna/`,
+  `tools/smoke/smoke-wo1103-dna-convert.test.js`) — never with an excerpt of a real MetaHuman.
