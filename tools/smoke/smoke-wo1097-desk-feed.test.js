@@ -35,11 +35,11 @@ const heads = (n = 8, extra = {}) =>
 		address: 1 + 10 * i, dest: '127.0.0.1:6455', follow: AUTO_MARKER_ID, pose: { x: -7 + 2 * i, y: 0, z: 6 }, ...extra }))
 
 /** An engine on the test rig; `feed` = project.fixtures.feed. Packets split into rig / feed by universe. */
-function rig({ feed = { enabled: true, dest: DESK }, handover = { mode: 'handover' }, output = { enabled: false }, dmx = { enabled: false }, patch = heads(), selfLoop = () => false, reachesSelf = () => false } = {}) {
+function rig({ feed = { enabled: true, dest: DESK }, handover = { mode: 'handover' }, output = { enabled: false }, dmx = { enabled: false }, patch = heads(), selfLoop = () => false, reachesSelf = () => false, consoleFrames } = {}) {
 	let t = 1000
 	const hub = new MarkerHub({ now: () => t })
 	const sent = []
-	const eng = new FollowEngine({ hub, now: () => t, send: (to, pkt) => sent.push({ to, t, pkt }), isSelfLoop: selfLoop, reachesSelf, resolveMode })
+	const eng = new FollowEngine({ hub, now: () => t, send: (to, pkt) => sent.push({ to, t, pkt }), isSelfLoop: selfLoop, reachesSelf, resolveMode, consoleFrames })
 	eng.resolveAuto = (fx, marks) => marks.get(AUTO_MARKER_ID) || null
 	eng.autoLanes = () => ({ lanes: hub.markers.has(AUTO_MARKER_ID) ? [{ id: 1, marker: AUTO_MARKER_ID }] : [], home: null })
 	const slice = { output: { protocol: 'artnet', ...output }, dmx, handover, feed, patch }
@@ -182,6 +182,25 @@ describe('WO-1097 engine', () => {
 		r.eng.program(r.eng.fixtures.map((f) => f.id), { Dimmer: 0.5 })
 		r.run(0.1, () => r.person(0, 3))
 		assert.equal(r.lastFeed()[10 + 4], 128)
+	})
+
+	it('the LD grant fader scales the fed dimmers (any desk); console lost → dark; pan / tilt untouched', () => {
+		const grant = { v: 255, on: true }
+		const cons = { frame: (pa) => (pa === 9 && grant.on ? Uint8Array.from({ length: 512 }, (_, i) => (i === 511 ? grant.v : 0)) : null) }
+		const r = rig({ handover: { mode: 'handover', grant: { enabled: true, universe: 9, address: 512 } }, consoleFrames: cons })
+		r.run(3, () => r.person(-1, 3))
+		const full = r.lastFeed()
+		assert.deepEqual([2, 3, 4].map((i) => full[10 * i + 5]), [255, 255, 255], 'grant full = the handover dimmers')
+		grant.v = 128
+		r.run(2, () => r.person(-1, 3))
+		const half = r.lastFeed()
+		assert.deepEqual([2, 3, 4].map((i) => half[10 * i + 5]), [128, 128, 128], 'grant 50 % = half')
+		assert.deepEqual([...half.slice(20, 24)], [...r.eng.frameOf(r.eng.fixtures[2]).slice(20, 24)], 'pan / tilt still the engine bytes')
+		grant.on = false
+		r.run(12, () => r.person(-1, 3))
+		const lost = r.lastFeed()
+		assert.deepEqual([2, 3, 4].map((i) => lost[10 * i + 5]), [0, 0, 0], 'console silent → dark (fail-safe)')
+		assert.match(r.eng.status().handover.grant.state, /lost/)
 	})
 
 	it('refresh: 1 packet a second when static, nothing when off; output master + DMX master untouched', () => {

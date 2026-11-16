@@ -12,6 +12,8 @@
  * the engine leaves a typed head's Dimmer to the programmer / GDTF default, so the feed applies the handover's own
  * dimmer writer (follow-handover.js dim) with level 1 while the head is aimed (following, home, calibrating) and 0
  * otherwise — the levels universe's rule.
+ * The LD's grant channel (follow-handover.js, the console → this box, slewed over fade_s, 0 once the console is lost)
+ * scales the fed dimmers like it scales the levels universe: one desk fader = HighAsCG's dimmer master on any desk.
  * Not fed (resting, no person, parked after leaving the pool): the last aim the feed sent is held, dimmer 0, active 0 —
  * never a snap to 0 / 0. Sent only while `feed.enabled`, independent of the follow output master and the rig DMX master
  * (the box never has to talk to the rig in this mode); through the engine's send (lighting duty). Refresh: on change
@@ -87,11 +89,15 @@ class DeskFeed {
 		const parked = this._parked.has(fx.id)
 		const hd = parked ? null : e.handover.decide(fx)
 		const active = !parked && (hd ? hd.phase !== 'rest' : AIMED.has(e._aim.get(fx.id)?.state))
-		const level = hd ? hd.level : active ? 1 : 0
+		const k = this._grantOf(fx)
+		const level = (hd ? hd.level : active ? 1 : 0) * k
 		let dimSrc = src
 		if (!hd) {
 			dimSrc = Uint8Array.from(src) // Split / parked: the handover's own dimmer writer at level 1 / 0
 			e.handover.dim(dimSrc, fx, { level }, null, 1)
+		} else if (k < 1) {
+			dimSrc = Uint8Array.from(src) // the LD's grant fader scales the final dimmer towards dark
+			e.handover.dim(dimSrc, fx, { level: k }, src, 1)
 		}
 		const base = fx.address - 1
 		const ptAbs = [fx.pan.ch, fx.pan.fine, fx.tilt.ch, fx.tilt.fine].filter(Boolean).map((c) => base + c - 1)
@@ -101,6 +107,13 @@ class DeskFeed {
 			this._held.set(fx.id, held)
 		}
 		return { byte: (abs) => (held.has(abs) ? held.get(abs) : dimSrc[abs]), active, level }
+	}
+
+	/** The LD's grant (WO-1085 grant channel, slewed, 0 once lost) for this head: 1 when no grant is configured. */
+	_grantOf(fx) {
+		const h = this.engine.handover
+		if (!h._applied) return 1
+		return h._applied[h.cfg.grant.per_head ? h._pool().indexOf(fx) : 0] ?? 0
 	}
 
 	/** Build the feed universes after the engine's tick and send what changed / is due. → packets sent. */
