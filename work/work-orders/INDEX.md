@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-998 live WOs (35 open, 156 in progress, 807 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+999 live WOs (35 open, 156 in progress, 808 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -603,7 +603,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1079 IN PROGRESS [godot-client] Firefox opened from the dock closes by itself → 1079_WO_dock_firefox_closes_by_itself.md
 - 1088 DONE [godot-client+engine] "Client at 100 fps?" + one clear "keeping up" signal (header pulse turns amber… → 1088_WO_client_fps_target_and_keeping_up_signal.md
 
-## web-client — Web client (87)
+## web-client — Web client (88)
 
 - 05 DONE [web-client+video-io] Live Video Preview (go2rtc) + Settings Modal + Audio Monitoring → 05_WO_LIVE_PREVIEW_SETTINGS.md
 - 14 DONE [web-client+devices-config] Offline Preparation Mode → 14_WO_OFFLINE_PREPARATION_MODE.md
@@ -692,6 +692,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1082 DONE [web-client+engine] Games draw the real venue models (the venue .glb, textures, the carpet) → 1082_WO_games_draw_the_real_venue_models.md
 - 1083 DONE [web-client] Stage Skirmish: bots see no farther than a player (no more cross-map shots); fl… → 1083_WO_skirmish_bots_fair_sight_and_spotlight_mode.md
 - 1089 DONE [web-client+engine] Stage Salad: slingshot vegetables at the presenter's avatar (third opt-in brows… → 1089_WO_stage_salad_vegetable_slingshot.md
+- 1090 DONE [web-client+engine] Game scenes keep the MVR meshes' own pictures; patched heads are their real GDT… → 1090_WO_game_scene_mvr_materials_and_real_heads.md
 
 ## companion — Companion integration (23)
 
