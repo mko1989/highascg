@@ -122,17 +122,23 @@ export function roomCam(scene, t = 0) {
 	const L = Math.hypot(dx, dz)
 	if (L < 0.5) (dx = 0), (dz = 1)
 	else (dx /= L), (dz /= L)
-	const w = hall.rect[2] - hall.rect[0]
-	const d = hall.rect[3] - hall.rect[1]
-	const half = (Math.abs(dx) * w + Math.abs(dz) * d) / 2
-	const tgt = [(hc[0] + sc[0]) / 2, hall.y + 0.6, (hc[1] + sc[1]) / 2]
-	const dist = clamp(half + Math.hypot(tgt[0] - hc[0], tgt[2] - hc[1]) - 1, 6, 30)
+	/* the games play on and around the stage: frame the stage edge (a ballroom is 30 × 60 m — the whole hall from a
+	   wall makes every toy a pixel, box finding WO-1101), never higher than 1 m under the ceiling, never outside the hall */
+	const sr = stage ? stage.rect : null
+	const span = sr ? Math.max(sr[2] - sr[0], sr[3] - sr[1]) : Math.min(hall.rect[2] - hall.rect[0], hall.rect[3] - hall.rect[1]) / 2
+	const edge = sr ? [sc[0] + dx * Math.abs(dx) * (sr[2] - sr[0]) / 2, sc[1] + dz * Math.abs(dz) * (sr[3] - sr[1]) / 2] : hc
+	const tgt = [edge[0] + dx * 1.5, (stage ? stage.y : hall.y) + 0.3, edge[1] + dz * 1.5]
+	const dist = clamp(span * 0.8, 6, 14)
+	const top = fin(scene?.bounds?.max?.[1]) ? scene.bounds.max[1] - 1 : hall.y + 6
 	const a = Math.sin(t * 0.05) * DRIFT
 	const ca = Math.cos(a)
 	const sa = Math.sin(a)
 	const ex = dx * ca - dz * sa
 	const ez = dx * sa + dz * ca
-	return { eye: [tgt[0] + ex * dist, hall.y + clamp(dist * 0.4, 3, 7), tgt[2] + ez * dist], target: tgt }
+	const m = 1
+	const r = hall.rect
+	const eye = [clamp(tgt[0] + ex * dist, r[0] + m, r[2] - m), clamp(hall.y + dist * 0.45, hall.y + 2.5, Math.max(hall.y + 2.5, top)), clamp(tgt[2] + ez * dist, r[1] + m, r[3] - m)]
+	return { eye, target: tgt }
 }
 
 const NOUN = { rc: 'car', sk: 'soldier', salad: 'slingshot' }

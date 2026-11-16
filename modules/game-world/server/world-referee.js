@@ -159,7 +159,7 @@ function createReferee(opts = {}) {
 		for (const [kind, ms, c] of o.fx || []) out.fx.push({ g: tg.g, k: tg.k, id: tg.id, kind, ms, c: c || '' })
 		if (!o.quiet) {
 			counts[o.rule] = (counts[o.rule] || 0) + 1
-			out.events.push({ k: o.rule, by, to: { g: tg.g, name: String(tg.n || '') }, p: p3(tg.p), at: t })
+			out.events.push({ k: o.rule, by, to: { g: tg.g, name: String(tg.n || '') }, p: p3(tg.p), at: t, dur: o.dur, soft }) // dur / soft: the soak table
 		}
 		if (o.bonus && sk && !soft) giveBonus(o.src, o.bonus, out)
 		return effect

@@ -430,4 +430,8 @@ module.exports = [
 	'tools/smoke/smoke-wo1101-world-client-static.test.js', // WO-1101: world client owner rules (URLs, CSP, no innerHTML), MODEL_SIGS vs the games
 	'tools/smoke/smoke-wo1102-referee-rules.test.js', // WO-1102: rules R1–R9 (trigger / none / soft / off / safe)
 	'tools/smoke/smoke-wo1102-referee-props.test.js', // WO-1102: seeded property scripts — caps, immunity, determinism
+	'tools/smoke/smoke-wo1101-game-rc-world.test.js', // WO-1101 RC in the world: alone byte-identical, pause (laps / grace), adapter, bonus gap
+	'tools/smoke/smoke-wo1101-game-rc-world-2.test.js', // WO-1102 RC client: world-fx hop / bump / boost / wobble, world slick, bot-brain xfx + pause
+	'tools/smoke/smoke-wo1101-game-sk-world.test.js', // WO-1101/1102 Skirmish: alone, pause, stun drops fire, bonus ≤ +2 per match, shot → hub
+	'tools/smoke/smoke-wo1101-game-salad-world.test.js', // WO-1101/1102 Salad: alone, world colliders (xb bounce / car splat), landed, make way
 ]

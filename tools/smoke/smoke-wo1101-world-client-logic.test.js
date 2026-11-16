@@ -236,9 +236,18 @@ describe('WO-1101 URLs, world pages', () => {
 		const sc = { floors: [{ id: 'hall', y: 0, rect: [-10, -8, 10, 8] }, { id: 'stage', y: 1, rect: [-4, -8, 4, -5] }] }
 		const a = W.roomCam(sc, 0)
 		assert.ok(a.eye[2] > a.target[2], 'from the hall side opposite the stage')
-		assert.ok(a.eye[1] >= 3 && a.eye[1] <= 7)
+		assert.ok(a.eye[1] >= 2.5 && a.eye[1] <= 7, '2.5 m up at least (the stage-framing camera)')
 		const b = W.roomCam(sc, 20)
 		assert.ok(Math.hypot(a.eye[0] - b.eye[0], a.eye[2] - b.eye[2]) > 0.1, 'drifts')
+		for (const k of [0, 10, 31, 63]) {
+			const q = W.roomCam(sc, k)
+			assert.ok(q.eye[0] > -10 && q.eye[0] < 10 && q.eye[2] > -8 && q.eye[2] < 8, `inside the hall at t ${k}`)
+		}
+		const ball = { bounds: { min: [-15, 0, -28], max: [15, 7, 35] }, floors: [{ id: 'hall', y: 0.24, rect: [-15.3, -27.7, 15, 34.5] }, { id: 'stage', y: 0.64, rect: [9.55, -4, 12.55, 11] }] }
+		const v = W.roomCam(ball, 0)
+		assert.ok(v.eye[1] <= 6, 'a metre under the ceiling (the box ballroom: 7 m) — not in it')
+		assert.ok(Math.hypot(v.eye[0] - v.target[0], v.eye[2] - v.target[2]) <= 14, 'frames the stage, not the far wall')
+		assert.ok(v.eye[0] < 9.55 && v.eye[0] > -15.3, 'from the hall in front of the stage')
 		const none = W.roomCam(null, 0)
 		assert.ok(none.eye.every(Number.isFinite))
 		const fl = W.floorFn(sc)

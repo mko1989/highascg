@@ -80,7 +80,11 @@ function createHub(opts = {}) {
 			return undefined
 		}
 	}
-	const vkey = (g, key) => `${g}\0${key}`
+	/* a viewer key is the game's own socket object (or a string / number in tests): objects get a stable serial */
+	const keyIds = new WeakMap()
+	let keySeq = 0
+	const keyId = (key) => (key && typeof key === 'object' ? keyIds.get(key) ?? (keyIds.set(key, `o${++keySeq}`), `o${keySeq}`) : key)
+	const vkey = (g, key) => `${g}\0${keyId(key)}`
 	const addBytes = (g, n) => {
 		stats.bytes[g] = (stats.bytes[g] || 0) + n
 		stats.msgs++
@@ -154,8 +158,12 @@ function createHub(opts = {}) {
 		}
 		return m
 	}
+	/** The toy scale (cars, soldiers): a game that brings a car or soldier model — never Salad's life-size 1 (box finding). */
 	function scale() {
-		for (const d of reg.games.values()) if (d && Number.isFinite(d.scale) && d.scale > 0 && d.scale <= 1) return d.scale
+		for (const d of reg.games.values()) {
+			const toy = d?.models && (d.models.car || d.models.soldier)
+			if (toy && Number.isFinite(d.scale) && d.scale > 0 && d.scale < 1) return d.scale
+		}
 		return 0.1
 	}
 	function gamesList() {
@@ -212,7 +220,7 @@ function createHub(opts = {}) {
 			const list = call(() => a.viewers())
 			const seen = new Set()
 			for (const v of Array.isArray(list) ? list : []) {
-				if (!v || (typeof v.key !== 'string' && typeof v.key !== 'number')) continue
+				if (!v || (typeof v.key !== 'string' && typeof v.key !== 'number' && !(v.key && typeof v.key === 'object'))) continue
 				const k = vkey(g, v.key)
 				seen.add(k)
 				let vs = views.get(k)

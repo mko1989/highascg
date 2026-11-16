@@ -327,3 +327,43 @@ test('world pages: ≤ 20, cap 80, all games (no exclusion), board every 5th tic
 	hub.dispose()
 	assert.equal(hub.running(), false)
 })
+
+test('viewer keys are the games\' own socket objects: fed, wq honoured, forgotten when gone (box finding)', () => {
+	const { hub, step } = setup()
+	const wsA = { name: 'socket A' } // the games pass their ws objects as viewer keys
+	const rc = fakeRoom('rc', { ents: [car(1, 0, 0)], viewers: [{ key: wsA, kind: 'player', p: [0, 0, 0.5], cap: 12 }] })
+	const sk = fakeRoom('sk', { ents: [soldier(1, 0.5, 0)] })
+	hub.attach(rc)
+	hub.attach(sk)
+	assert.equal(hub.quality('rc', wsA, 6), true)
+	step(2)
+	const got = msgs(rc, wsA)
+	assert.ok(got.some((m) => m.t === 'wst' && m.on === true), 'the object-keyed viewer gets wst')
+	const wv = got.filter((m) => m.t === 'wv')
+	assert.ok(wv.length >= 1 && wv[0].add.some((a) => a[1] === 'soldier'), 'and the soldier')
+	assert.equal(wv[0].add[0][4], '', 'the wq 6 cap (Low: no name tags) reached the object key')
+	rc.vs = []
+	step(1)
+	rc.vs = [{ key: { name: 'socket B' }, kind: 'player', p: [0, 0, 0.5], cap: 12 }]
+	step(1)
+	assert.equal(msgs(rc, wsA, 'wst').length, 1, 'the gone socket is forgotten (no second wst)')
+	hub.dispose()
+})
+
+test('wst.scale is the toy scale whatever the registry order (Salad, life size, registered first: box finding)', () => {
+	const { hub, reg, step } = setup()
+	const salad = reg.games.get('salad')
+	reg.games.delete('salad')
+	const rest = [...reg.games]
+	reg.games.clear()
+	reg.games.set('salad', { ...salad, scale: 1 })
+	for (const [k, v] of rest) reg.games.set(k, v)
+	const rc = fakeRoom('rc', { ents: [car(1, 0, 0)], viewers: [{ key: 'v1', kind: 'player', p: [0, 0, 0.5], cap: 12 }] })
+	const sk = fakeRoom('sk', { ents: [soldier(1, 0.5, 0)] })
+	hub.attach(rc)
+	hub.attach(sk)
+	step(1)
+	const w = msgs(rc, 'v1', 'wst')[0]
+	assert.equal(w.scale, 0.1)
+	hub.dispose()
+})
