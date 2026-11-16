@@ -15,7 +15,7 @@ const { poseFromMatrix, matrixFromPose } = require('../../src/stage/mvr-patch')
 const { parseScene } = require('../../src/stage/mvr-scene')
 const { buildRigExport, unplace, invAffine } = require('../../src/stage/mvr-rig-export')
 const { scanScene } = require('../../src/stage/mvr-xml-spans')
-const { rigCsv, eulerZYX, rotationOf } = require('../../src/stage/rig-csv')
+const { rigCsv, eulerZYX, eulerYXZ, rotationOf } = require('../../src/stage/rig-csv')
 const { handleRigExport } = require('../../src/api/routes-rig-export')
 const { mul } = require('../../src/stage/mvr-math')
 const { buildZipStore } = require('../../src/support/zip-store')
@@ -199,6 +199,23 @@ describe('WO-765 position table (CSV)', () => {
 		assert.equal(rows[0], 'Head no,Head name,DMX,X,Y,Z,RotX,RotY,RotZ,')
 		assert.equal(rows[1], '1,hang,1-041,1,5,-2,0,0,0,')
 		assert.equal(rows[2], '1,yaw,1-041,1,5,-2,0,-30,0,', 'console-match.js consoleRotation: RotY = −yaw')
+	})
+	it('MagicQ rotations in its own order, R = Ry · Rx · Rz: what MagicQ 1.9.8.3 showed for the Hilton heads 6 / 8', () => {
+		// WO-765 MagicQ test: the MVR import listed head 6 as X rot 0.1 / Y rot −3.6 / Z rot −4.9 and head 8 as −3.6 / −4.5 / 1.5
+		const rows = rigCsv([head('h6', { yaw: 3.56, pitch: 0.1, roll: -4.89 }), head('h8', { yaw: 4.54, pitch: -3.57, roll: 1.46 }),
+			head('floor', { hang: 'floor', z: 0, yaw: 20 })], { desk: 'magicq' }).trim().split('\r\n')
+		assert.equal(rows[1], '1,h6,,1,5,-2,0.1,-3.56,-4.89,')
+		assert.equal(rows[2], '1,h8,,1,5,-2,-3.57,-4.54,1.46,')
+		assert.equal(rows[3], '1,floor,,1,0,-2,0,-20,180,', 'console-match.js consoleRotation: RotZ = roll + 180 on the floor')
+		const R = rotationOf(matrixFromPose({ yaw: 33, pitch: 7, roll: -5 }))
+		const mm = (A, B) => A.map((r) => B[0].map((_, j) => r.reduce((s, v, k) => s + v * B[k][j], 0)))
+		const C = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
+		const Rq = mm(mm(C, R), C[0].map((_, i) => C.map((r) => r[i]))) // the MagicQ frame
+		const [a, b, c] = eulerYXZ(Rq).map((v) => (v * Math.PI) / 180)
+		const Rx = [[1, 0, 0], [0, Math.cos(a), -Math.sin(a)], [0, Math.sin(a), Math.cos(a)]]
+		const Ry = [[Math.cos(b), 0, Math.sin(b)], [0, 1, 0], [-Math.sin(b), 0, Math.cos(b)]]
+		const Rz = [[Math.cos(c), -Math.sin(c), 0], [Math.sin(c), Math.cos(c), 0], [0, 0, 1]]
+		mm(mm(Ry, Rx), Rz).flat().forEach((v, i) => assert.ok(Math.abs(v - Rq.flat()[i]) < 1e-9))
 	})
 })
 

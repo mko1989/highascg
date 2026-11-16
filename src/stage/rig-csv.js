@@ -20,6 +20,10 @@
  *        (console-match.js exportCsv) proved on MagicQ PC 1.9.8.3: DMX as "<universe>-<address>" with Art-Net
  *        universes +1, and every row ends with a comma (MagicQ drops the last character of a line's last field).
  *        Load it with Patch → Import Heads, option "Vis data only" (positions + rotations, matched by DMX address).
+ *        Rotations: MagicQ documents no order; its own MVR import (MagicQ PC 1.9.8.3, WO-765 test, Patch → View Vis)
+ *        shows every head's matrix as R = Ry(RotY) · Rx(RotX) · Rz(RotZ) in its frame — eight calibrated heads with
+ *        up to 5° pitch / roll matched that to the 0.1° it displays, and Rz · Ry · Rx missed head 6 by 0.3°. So this
+ *        table writes that order: a hung head 0 / 0 / 0, RotY = −yaw, RotX = pitch, RotZ = roll (floor + 180).
  */
 
 const r3 = (v) => Math.round(v * 1000) / 1000 || 0
@@ -33,6 +37,16 @@ function eulerZYX(R) {
 	const e = [Math.atan2(R[2][1], R[2][2]) * DEG, ry * DEG, Math.atan2(R[1][0], R[0][0]) * DEG]
 	// the same turn written the other way round (rx ± 180, 180 − ry, rz ± 180): keep the smaller one (floor = 0 / 180 / 0)
 	const alt = [e[0] - Math.sign(e[0] || 1) * 180, Math.sign(e[1] || 1) * 180 - e[1], e[2] - Math.sign(e[2] || 1) * 180]
+	const size = (v) => Math.abs(v[0]) + Math.abs(v[1]) + Math.abs(v[2])
+	return (size(alt) < size(e) - 1e-9 ? alt : e).map((v) => (Math.abs(v + 180) < 1e-9 ? 180 : v))
+}
+
+/** Rotation → [rx, ry, rz] degrees with R = Ry(ry) · Rx(rx) · Rz(rz) (MagicQ's order). */
+function eulerYXZ(R) {
+	const rx = Math.asin(Math.max(-1, Math.min(1, -R[1][2])))
+	if (Math.abs(R[1][2]) > 0.99999) return [rx * DEG, Math.atan2(-R[2][0], R[0][0]) * DEG, 0] // gimbal: rz folded into ry
+	const e = [rx * DEG, Math.atan2(R[0][2], R[2][2]) * DEG, Math.atan2(R[1][0], R[1][1]) * DEG]
+	const alt = [Math.sign(e[0] || 1) * 180 - e[0], e[1] - Math.sign(e[1] || 1) * 180, e[2] - Math.sign(e[2] || 1) * 180]
 	const size = (v) => Math.abs(v[0]) + Math.abs(v[1]) + Math.abs(v[2])
 	return (size(alt) < size(e) - 1e-9 ? alt : e).map((v) => (Math.abs(v + 180) < 1e-9 ? 180 : v))
 }
@@ -76,7 +90,7 @@ function rigCsv(heads, opts = {}) {
 			// MagicQ frame: X = MVR X, Y = MVR Z (up), Z = −MVR Y (towards the audience); same change for the rotation
 			const C = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
 			const Rq = C.map((row) => [0, 1, 2].map((c) => row.reduce((s, v, k) => s + v * [0, 1, 2].reduce((t, j) => t + R[k][j] * C[c][j], 0), 0)))
-			const [rx, ry, rz] = eulerZYX(Rq)
+			const [rx, ry, rz] = eulerYXZ(Rq)
 			const dmx = a ? `${a.universe + (a.protocol === 'sacn' ? 0 : 1)}-${String(a.address).padStart(3, '0')}` : ''
 			rows.push([h.fid ?? '', h.name, dmx, r3(m[12]), r3(m[14]), r3(-m[13]), r2(rx), r2(ry), r2(rz), ''])
 		} else {
@@ -88,4 +102,4 @@ function rigCsv(heads, opts = {}) {
 	return `${rows.map((r) => r.map(cell).join(',')).join('\r\n')}\r\n`
 }
 
-module.exports = { rigCsv, eulerZYX, rotationOf }
+module.exports = { rigCsv, eulerZYX, eulerYXZ, rotationOf }

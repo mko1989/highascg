@@ -99,7 +99,10 @@ func _ready() -> void:
 	export.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	add_child(export)
 	var export_status := _muted("")
-	export.pressed.connect(func() -> void: preload("res://features/previs/rig_export.gd").run(self, export_status))
+	export_status.visible = false  # no gap until there is something to say
+	export.pressed.connect(func() -> void:
+		export_status.visible = true
+		preload("res://features/previs/rig_export.gd").run(self, export_status))
 	_head = _muted("")
 	_build_trim()
 	_desk = _muted("")
