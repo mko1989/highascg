@@ -20,6 +20,7 @@ import { ItemState } from './items.js'
 import { fxFlags } from './drive-rules.js'
 import { stateMsg } from './protocol.js'
 import { onItemMessage, ownCarItems, launchTick } from './item-play.js'
+import { applyWorldFx, stepWorldFx } from './world-fx.js'
 
 export const SEND_MS = 66 // ≈ 15 Hz while driving (the room drops a player's states over 20 a second)
 export const PARK_MS = 1000 // parked (lobby / results / waiting): one state a second keeps the bot from going silent
@@ -81,6 +82,7 @@ export function createBot(o = {}) {
 	const out = []
 	G.net = { status: 'joined', sendEvent: (m) => (out.push(m), true) }
 	let trackId = null
+	const wfx = [] // WO-1102 Game World effects on this car, applied at the next step (the env's toy-scale P)
 	let placedFor = null // `${trackId}|${startAt}`: the grid placement that was done
 	let hint = -1
 	let sentAt = -Infinity
@@ -168,6 +170,7 @@ export function createBot(o = {}) {
 				}
 			}
 			stepCar(G.car, b.input, world.env, others, dt)
+			stepWorldFx(G.car, dt) // WO-1102: a Game World wobble / hop in progress
 			G.car.ev.length = 0
 			ownCarItems(G, b.input, t)
 			if (racing) G.race.move(G.meId, G.car.x, G.car.z, t, false, G.car.y)
@@ -214,6 +217,9 @@ export function createBot(o = {}) {
 				case 'lap':
 					if (m.id === G.meId) G.race.serverLap(m.id, m.lap)
 					break
+				case 'xfx': // WO-1102 Game World: an effect on this bot's car (the referee decided)
+					if (m.id === G.meId && wfx.length < 4) wfx.push(m)
+					break
 			}
 		},
 		step(world, sNow, steps = 2) {
@@ -226,7 +232,8 @@ export function createBot(o = {}) {
 			}
 			/* a bot that joined during a race waits for the next one; one that finished drives on (like a player) */
 			const listed = G.state?.players?.find((p) => p.id === G.meId)
-			const driving = (G.phase === 'race' || G.phase === 'countdown') && listed?.racing !== false
+			const driving = (G.phase === 'race' || G.phase === 'countdown') && listed?.racing !== false && !G.state?.paused // WO-1101 pause
+			if (G.car) for (const x of wfx.splice(0)) applyWorldFx(G.car, x, world.env?.P || PHYS)
 			if (driving) drive(world, sNow, steps)
 			sendState(sNow, driving && G.phase === 'race' ? SEND_MS : PARK_MS)
 			return out.slice()

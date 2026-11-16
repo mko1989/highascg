@@ -24,6 +24,7 @@ import { prepareOcc } from './occ.js'
 import { cutSegments } from './tunnel.js'
 import { RaceTracker } from './standings.js'
 import { Director } from './cameras.js'
+import { createWorldJoin } from './world-join.js'
 import { RcNet, wsUrlFor } from './net.js'
 import { ItemState } from './items.js'
 import { onMessage, mySlot } from './session.js'
@@ -81,6 +82,7 @@ export async function startGame({ spectator = false } = {}) {
 	/* §2.6 live lights + wall pictures: before the scene loads (lxfull arrives as soon as the socket opens) */
 	G.fx = createStageFx({ THREE, scene: G.world.scene, quality, send: (m) => G.net?._sendRaw(m) ?? false,
 		onHouse: (level) => G.world.setHouse(level) }) // WO-1099 house lights (players and spectators alike)
+	G.wj = createWorldJoin(G, { send: (m) => G.net?._sendRaw(m) ?? false }) // WO-1101 Game World (idle without the world module)
 	document.addEventListener('visibilitychange', () => G.fx?.setEnabled(!document.hidden)) // hidden tab: no pictures
 	window.addEventListener('pagehide', () => G.fx?.dispose())
 	window.addEventListener('resize', () => G.world.resize())
@@ -104,6 +106,7 @@ export async function startGame({ spectator = false } = {}) {
 		const q = G.world.quality === 'low' ? 'high' : 'low'
 		G.world.setQuality(q)
 		G.fx?.setQuality(q)
+		G.wj?.setQuality(q)
 		storeSet('quality', q)
 		el.textContent = q === 'low' ? 'LQ' : 'HQ'
 	})

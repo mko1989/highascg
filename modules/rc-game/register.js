@@ -11,7 +11,9 @@ module.exports = (h) => {
 	const { attachRcGameWs } = require('./server/rc-ws')
 	const { serveRcStatic, isRcStaticPath } = require('./server/rc-static')
 	const { isRcPublicPath, setRcGameEnabled } = require('./server/rc-public')
+	const world = require('./server/rc-world') // WO-1101 Game World: a descriptor in the process-global registry (no require of the world module)
 	let bootCtx = null
+	world.register(() => require('./server/rc-game').getRcGame(bootCtx))
 	return {
 		name: 'rc-game',
 		apiPathPrefixes: ['/api/game/rc'],
@@ -29,6 +31,7 @@ module.exports = (h) => {
 				if (bootCtx) require('./server/rc-game').getRcGame(bootCtx).disable()
 			} catch {}
 			setRcGameEnabled(false)
+			world.unregister()
 		},
 	}
 }

@@ -17,6 +17,7 @@ const { parseMessage } = require('./rc-sanitize')
 const { setRcGameEnabled } = require('./rc-public')
 const { createRcLights, rcLightsDeps, withLiveScene } = require('./rc-lights')
 const { createRcVideo, rcVideoDeps } = require('./rc-video')
+const { createRcWorld } = require('./rc-world')
 
 const MAX_PLAYERS = 10
 const MAX_SPECTATORS = 20
@@ -38,6 +39,7 @@ function createRcGame(deps = {}) {
 	const baker = deps.baker || createSceneBaker({ log, ...(deps.bakerDeps || {}) })
 	let room = null
 	let bots = null // WO-1082: rc-room-bots.js while enabled
+	let world = null // WO-1101 Game World link while enabled (does nothing without the world module)
 	const sockets = new Set()
 	let lastRev = null
 	const text = new WeakMap() // message object → its JSON (a broadcast is stringified once)
@@ -101,14 +103,18 @@ function createRcGame(deps = {}) {
 		bots = createRoomBots({ now, timers: deps.timers, log, load: deps.loadBots,
 			connect: (c) => r.connect(c), handle: (c, m) => r.handle(c, m), disconnect: (c) => r.disconnect(c) })
 		bots.preload()
+		world = createRcWorld({ room: () => room, send: sendTo, lights, now })
 		setRcGameEnabled(true)
 		lastRev = baker.rev()
 		refreshScene().catch((e) => log('warn', `[rc-game] scene bake failed: ${e.message}`))
+		world.attach()
 		log('info', '[rc-game] enabled')
 	}
 
 	function disable() {
 		if (!room) return
+		world?.detach()
+		world = null
 		setRcGameEnabled(false)
 		for (const ws of sockets) {
 			sendTo(ws, { t: 'off' })
@@ -193,6 +199,7 @@ function createRcGame(deps = {}) {
 				if (room) video?.subscribe(ws, m.on === true) // never re-subscribe a socket the disable is closing
 				return
 			}
+			if (m.t === 'wq') return world?.quality(ws, m) // WO-1101: the visitor cap of the client's quality tier
 			if (room) room.handle(ws, m)
 		})
 		ws.on('close', () => {
@@ -218,6 +225,8 @@ function createRcGame(deps = {}) {
 		attach,
 		socketCount: () => sockets.size,
 		room: () => room,
+		/** WO-1101 Game World: the room adapter while enabled (rc-world.js). */
+		worldAdapter: () => world?.adapter || null,
 		baker,
 		/** §2.6 smokes / probes. */
 		live: () => ({ lights, video }),

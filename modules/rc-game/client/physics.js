@@ -18,6 +18,8 @@ import { groundOf, moveHorizontal, collideObstacles, collideCars, padUnder, unst
 import { giveBoost, miniBoostFor, spinAngle, driftStage } from './drive-rules.js'
 
 export { PHYS }
+const WSLICK_GRIP = 0.55 // WO-1102 R2 (work/notes/game-world-contract.md §6): grip and top speed on a world splat patch
+const WSLICK_TOP = 0.85
 export { createEnv, groundOf, ceilingOf, eyeBlockedOf, tunnelOf } from './physics-world.js'
 
 /** A fresh car at a pose (y: the pose's, else the argument). */
@@ -99,7 +101,7 @@ function wrap(a) {
 /** Current top speed (boost / ribbon / off), with the catch-up bonus. P: the env's PHYS (toy scale). */
 export function topSpeed(car, P = PHYS) {
 	const base = car.boost > 0 ? P.TOP_BOOST : car.onTrack ? P.TOP_ON : P.TOP_OFF
-	return base * (1 + (car.catchup || 0))
+	return base * (1 + (car.catchup || 0)) * (car.wslick ? WSLICK_TOP : 1) // WO-1102 R2: a Game World splat patch under the car
 }
 
 function timers(car, dt) {
@@ -211,7 +213,7 @@ export function stepCar(car, input, env, others, dt = PHYS.DT) {
 		if (f < -P.REV_TOP) f = Math.min(-P.REV_TOP, f + P.OVER_DECEL * dt)
 		/* grip: the sideways slide decays, and most of it turns into forward speed (arcade: corners and drifts
 		 * barely scrub speed) */
-		const grip = car.drift ? P.GRIP_DRIFT : car.onTrack ? P.GRIP : P.GRIP_OFF
+		const grip = (car.drift ? P.GRIP_DRIFT : car.onTrack ? P.GRIP : P.GRIP_OFF) * (car.wslick ? WSLICK_GRIP : 1)
 		const l2 = l * Math.exp(-grip * dt)
 		if (f > 0)
 			f = Math.min(Math.max(f, top), Math.sqrt(f * f + (l * l - l2 * l2) * (car.drift ? 0.95 : car.onTrack ? 0.85 : 0.6)))

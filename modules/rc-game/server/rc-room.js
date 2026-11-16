@@ -49,6 +49,9 @@ function createRcRoom(deps) {
 	let firstFinish = null
 	const timer = { phase: null, house: null, world: null, worldIdle: 0 }
 	let dirty = false
+	let phaseFn = null // the pending phase step and when it is due (WO-1101: a world pause holds it)
+	let phaseDue = 0
+	let paused = null // WO-1101 Game World pause: { at, fn, rem } while paused
 	const items = createRoomItems({
 		now, timers: T, rng: deps.rng, toAll: (msg) => toAll(msg),
 		toPlayer: (pid, msg) => {
@@ -73,6 +76,7 @@ function createRcRoom(deps) {
 				connected: p.connected, slot: p.slot, racing: p.racing, ...(p.bot ? { bot: true } : {}) })),
 			spectators: spectators(),
 			...items.snapshot(),
+			...(paused ? { paused: true } : {}), // only while paused: a game alone sends the very same state
 		}
 	}
 	const state = () => decorate(snapshot())
@@ -84,6 +88,32 @@ function createRcRoom(deps) {
 	function clearPhaseTimer() {
 		if (timer.phase) T.clearTimeout(timer.phase)
 		timer.phase = null
+		phaseFn = null
+	}
+	function phaseTimer(fn, ms) {
+		clearPhaseTimer()
+		phaseFn = fn
+		phaseDue = now() + ms
+		timer.phase = T.setTimeout(() => ((timer.phase = null), (phaseFn = null), fn()), ms)
+	}
+
+	/** WO-1101 world pause: actions and car states are dropped, the phase step waits, clocks shift by the paused time. */
+	function pause(on) {
+		if (on && !paused) {
+			paused = { at: now(), fn: phaseFn, rem: Math.max(0, phaseDue - now()) }
+			if (timer.phase) T.clearTimeout(timer.phase)
+			timer.phase = null
+		} else if (!on && paused) {
+			const d = now() - paused.at
+			const { fn, rem } = paused
+			paused = null
+			if (startAt != null) startAt += d
+			if (firstFinish != null) firstFinish += d
+			for (const p of players.values()) if (p.race && !p.race.finished) p.race.lapStart += d
+			if (fn) phaseTimer(fn, rem)
+			if (phase === 'countdown') toAll({ t: 'countdown', startAt })
+		} else return
+		broadcastState()
 	}
 
 	function housekeeping() {
@@ -198,8 +228,7 @@ function createRcRoom(deps) {
 			r.total = t - startAt
 			if (firstFinish == null) {
 				firstFinish = t
-				clearPhaseTimer()
-				timer.phase = T.setTimeout(finishRace, GRACE_MS)
+				phaseTimer(finishRace, GRACE_MS)
 			}
 			checkAllFinished()
 		}
@@ -288,8 +317,7 @@ function createRcRoom(deps) {
 			p.race = { cp: 0, lap: 0, lapStart: startAt, best: null, total: null, finished: false }
 		}
 		phase = 'countdown'
-		timer.phase = T.setTimeout(() => {
-			timer.phase = null
+		phaseTimer(() => {
 			phase = 'race'
 			broadcastState()
 		}, COUNTDOWN_MS)
@@ -320,11 +348,17 @@ function createRcRoom(deps) {
 			}
 			case 'start': {
 				if (!idle) return { ok: false, status: 409, error: 'a race is running' }
+				if (paused) return { ok: false, status: 409, error: 'paused' }
 				return start()
 			}
 			case 'stop':
 				toLobby()
+				if (paused) paused.fn = null
 				break
+			case 'pause': // WO-1101 Game World: presenter safe / pause everything
+				if (typeof a.on !== 'boolean') return { ok: false, status: 400, error: '`on` must be true or false' }
+				pause(a.on)
+				return { ok: true }
 			case 'kick': {
 				const id = Number(a.id)
 				const c = [...conns.values()].find((x) => x.pid === id)
@@ -375,7 +409,7 @@ function createRcRoom(deps) {
 			c.last = now()
 			if (m.t === 'join') return join(c, m)
 			if (m.t === 'ping') return send(conn, { t: 'pong', c: Number.isFinite(m.c) ? m.c : null, s: now() })
-			if (!c.joined) return
+			if (!c.joined || paused) return
 			if (m.t === 's') return carState(c, m)
 			if ((m.t === 'box' || m.t === 'use' || m.t === 'hit') && !c.spectator && players.has(c.pid) && (phase === 'lobby' || phase === 'race')) {
 				return items.handle(c.pid, m)
@@ -395,11 +429,17 @@ function createRcRoom(deps) {
 			clearPhaseTimer()
 			for (const k of ['house', 'world']) if (timer[k]) T.clearInterval(timer[k])
 			timer.house = timer.world = null
+			paused = null
 			conns.clear()
 			players.clear()
 			toLobby()
 			items.clear()
 		},
+		/** WO-1101 Game World (rc-world.js): joined sockets, players, the track in play, a send to all, the standings. */
+		world: () => ({ phase, startAt, paused: !!paused, conns: [...conns.values()].filter((c) => c.joined), players,
+			track: raceTrack || tracks.find((t) => t.id === trackId) || null, scale }),
+		toAll: (msg) => toAll(msg),
+		order: () => (phase === 'lobby' ? [] : order()),
 		/** Diagnostics for the smokes: which timers run. */
 		timers: () => ({ phase: !!timer.phase, house: !!timer.house, world: !!timer.world }),
 		connections: () => conns.size,

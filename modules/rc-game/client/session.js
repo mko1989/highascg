@@ -115,6 +115,7 @@ function applyState(G, state) {
 
 export function onMessage(G, m) {
 	if (G.fx?.onMessage(m)) return // §2.6 lx / lxfull; it only peeks at welcome / state (lights / wall switches)
+	if (G.wj?.onMessage(m)) return // WO-1101 Game World: wst / wv / xfx / xbonus (it only peeks at welcome / state)
 	const sNow = G.net ? G.net.serverNow() : 0
 	if (onItemMessage(G, m, sNow)) return
 	switch (m.t) {

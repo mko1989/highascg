@@ -149,7 +149,7 @@ describe('WO-1074 game/rc static checks', () => {
 	})
 
 	it('owner rule: the client reaches only /api/game/rc/* and /vendor/three/* — never AMCP, looks or other APIs', () => {
-		const ALLOWED = ['/api/game/rc', '/vendor/three/', '/game/rc/']
+		const ALLOWED = ['/api/game/rc', '/vendor/three/', '/game/rc/', '/game/world/'] // WO-1101: world-join.js accepts only a /game/world/ renderer URL
 		for (const f of files) {
 			if (f === 'README.md') continue
 			const src = read(f)

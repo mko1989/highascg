@@ -45,7 +45,8 @@ export function startLoop(G) {
 		let v = 0
 		if (G.car && G.T) {
 			const input = G.input.read()
-			const frozen = G.phase === 'countdown' && (G.startAt == null || sNow < G.startAt)
+			const frozen = (G.phase === 'countdown' && (G.startAt == null || sNow < G.startAt)) || !!G.wj?.paused // WO-1101 world pause
+			G.wj?.beforeStep(G.env?.P)
 			launchTick(G, input.throttle, sNow, frozen)
 			let useLeft = input.use
 			const alpha = G.stepper.advance(dt, (h) => {
@@ -55,6 +56,7 @@ export function startLoop(G) {
 				prev.yaw = G.car.yaw
 				if (frozen) return
 				stepCar(G.car, input, G.env, others, h)
+				G.wj?.step(G.car, h)
 				ownCarItems(G, { ...input, use: useLeft }, sNow)
 				useLeft = false
 				const ev = G.race.move(G.meId, G.car.x, G.car.z, sNow, false, G.car.y)
@@ -151,6 +153,7 @@ export function startLoop(G) {
 		}
 
 		G.fx?.update(dt) // §2.6 beams / pools / glows and the wall pictures
+		G.wj?.frame(sNow, dt) // WO-1101 Game World visitors (nothing without the world)
 		G.world.render()
 	}
 	window.requestAnimationFrame(frame)

@@ -181,6 +181,25 @@ function createRcLights(deps) {
 			startTimer()
 		},
 		isOn: () => on,
+		/**
+		 * WO-1102 Game World (spotlight bonus): the pools the lit beams (intensity ≥ 0.3, pointing down) make on a floor at
+		 * height y — [{ x, z, y, r }] (r = the beam's radius there from its zoom), ≤ 64; [] while off.
+		 */
+		pools(y) {
+			if (!on || !Number.isFinite(y)) return []
+			refreshList()
+			const at = new Map(publicList().map((l) => [l.i, l.p]))
+			const out = []
+			for (const [i, dx, dy, dz, , , , a, zoom] of frame().values()) {
+				const p = at.get(i)
+				if (!p || !(a >= 0.3) || !(dy < -0.2)) continue
+				const k = (p[1] - y) / -dy
+				if (!(k > 0 && k < 40)) continue
+				out.push({ x: p[0] + dx * k, z: p[2] + dz * k, y, r: Math.max(0.15, k * Math.tan(((zoom || 20) * Math.PI) / 360)) })
+				if (out.length >= 64) break
+			}
+			return out
+		},
 		stop() {
 			subs.clear()
 			stopTimer()
