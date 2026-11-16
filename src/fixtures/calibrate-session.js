@@ -15,6 +15,7 @@
  *   {action: 'point', id, marker}              the beam spot is where `marker` stands → one (pan, tilt) ↔ point pair
  *   {action: 'point', id, at: [x, y, z]}       … or the floor spot the operator clicked in a camera picture
  *                                              (WO-630 F1: no marker to place first; PSN metres)
+ *   … name: '<mark name>'                     WO-764: kept with the point / pin, for the fit report
  *   … height: 0–3 | 'aim' | true               WO-713 R1: the beam is on a person standing there — the pair is taken
  *                                              that many metres above the mark ('aim' / true: the head's own aim_z,
  *                                              the height it follows at), so the pin lands where following aims
@@ -25,6 +26,7 @@
  */
 
 const { solveFixturePose, solveOffsets } = require('./calibrate-solve')
+const { solveHeadPose } = require('./calibrate-pose')
 const { axisFn, beamOf } = require('./gdtf-ik')
 const { addPin, normalizeMap } = require('./beam-offset')
 
@@ -50,9 +52,22 @@ function heightOf(v, fx) {
 function liveSolve(s, pts, lm, fx) {
 	if (!pts.length) return { ok: false, need: 1 }
 	let map = s.map0
-	for (const p of pts) map = addPin(map, { pan: p.pan, tilt: p.tilt, dpan: p.dpan, dtilt: p.dtilt })
+	for (const p of pts) {
+		map = addPin(map, { pan: p.pan, tilt: p.tilt, dpan: p.dpan, dtilt: p.dtilt, at: [p.x, p.y, p.z], ...(p.name ? { name: p.name } : {}) })
+	}
 	const one = solveOffsets(pts, lm.forward, { pose: fx.pose })
-	return { ok: true, map, pinned: pts.length, rms_deg: one.rms_deg, warning: one.warning }
+	return { ok: true, map, pinned: pts.length, rms_deg: one.rms_deg, warning: one.warning, pose_fit: poseFit(map, lm, fx) }
+}
+
+/**
+ * WO-764: the head's real pose from every pin that knows its mark (this session's and earlier ones' — the pins are
+ * the head's marks; the same mark again replaces its pin) — calibrate-pose.js solveHeadPose; `{ ok: false, need }` with
+ * fewer than 3. The client stores it as the head's calibrated_pose (the desk's pose, WO-765); the previs keeps the
+ * patch pose (WO-700 R6).
+ */
+function poseFit(map, lm, fx) {
+	const pts = map.filter((p) => Array.isArray(p.at)).map((p) => ({ pan: p.pan, tilt: p.tilt, x: p.at[0], y: p.at[1], z: p.at[2], name: p.name }))
+	return solveHeadPose(pts, lm.forward, { pose: fx.pose, mirrorPan: lm.mirrorPan })
 }
 
 /**
@@ -73,9 +88,12 @@ function liveModel(fx) {
 		const t = f.to === f.from ? 0 : Math.max(0, Math.min(1, (dmx - f.from) / (f.to - f.from)))
 		return f.physFrom + t * (f.physTo - f.physFrom)
 	}
+	const pf = axes[0].functions[axes[0].initial] || axes[0].functions[0]
 	return {
 		read: (buf) => (buf ? { pan: phys(axes[0], buf), tilt: phys(axes[1], buf), inv: null } : null),
 		forward: (pan, tilt, pose = fx.pose) => beamOf(chain, pose, pan, tilt),
+		/** WO-764: the same DMX read with the pan running the other way (a desk patch inverted against the file) */
+		mirrorPan: (pan) => pf.physFrom + pf.physTo - pan,
 	}
 }
 
@@ -165,7 +183,8 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 				: (hub.list(hub.now()) || []).find((k) => k.id === Number(data.marker))
 			if (!mk) return { status: 404, body: { error: `no marker ${data.marker} — place one on the beam spot` } }
 			// WO-713 R1: a person on the mark — the beam is on them at `height`, not on the floor ({x, y, z, height?})
-			const m = { x: mk.x, y: mk.y, z: mk.z + height, ...(height ? { height } : {}) }
+			const name = typeof data.name === 'string' && data.name.trim() ? data.name.trim().slice(0, 64) : null
+			const m = { x: mk.x, y: mk.y, z: mk.z + height, ...(height ? { height } : {}), ...(name ? { name } : {}) }
 			// a stale marker still stands where the operator dropped it — its position is all a pair needs
 			if (s.live) {
 				const a = liveModel(fx)?.read(frame(fx))

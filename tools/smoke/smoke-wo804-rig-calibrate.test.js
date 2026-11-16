@@ -66,9 +66,9 @@ describe('WO-804 anchor choice on the MHP rig', () => {
 		const area = Math.abs((P[1].x - P[0].x) * (P[2].y - P[0].y) - (P[2].x - P[0].x) * (P[1].y - P[0].y)) / 2
 		assert.ok(area > 20, `first three anchors span ${area.toFixed(1)} m² of plan`)
 	})
-	it('3 spread marks per anchor, the one under the head first; max caps the count', () => {
+	it('4 spread marks per anchor (WO-764: 3 cannot show a head that is not level), the one under the head first; max caps the count', () => {
 		for (const a of plan.anchors) {
-			assert.equal(new Set(a.marks).size, 3)
+			assert.equal(new Set(a.marks).size, 4)
 			const h = RIG.find((x) => x.id === a.id).pose
 			const d = (m) => Math.hypot(m.x - h.x, m.y - h.y)
 			assert.equal(d(MARKS[a.marks[0] - 1]), Math.min(...MARKS.map(d)))
@@ -169,7 +169,7 @@ describe('WO-804 the operator flow over the live session (real GDTF head model)'
 			aims++
 		}
 		assert.equal(v.done, true)
-		assert.equal(aims, plan.anchors.length * 3)
+		assert.equal(aims, plan.anchors.length * 4)
 		assert.equal(calib.list().length, 0, 'every head released')
 		for (const a of v.anchors) assert.equal(a.status, 'solved', `${a.name}: ${a.warning}`)
 		const out = v.result
@@ -208,7 +208,7 @@ describe('WO-804 the operator flow over the live session (real GDTF head model)'
 		assert.equal(v.prompt.n, 2)
 		v = rig.handle({ action: 'undo' }).body
 		assert.equal(v.prompt.n, 1)
-		for (let i = 0; i < 6; i++) {
+		for (let i = 0; i < 8; i++) {
 			aimAt()
 			v = rig.handle({ action: 'point' }).body
 		}

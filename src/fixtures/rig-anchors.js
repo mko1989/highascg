@@ -24,7 +24,9 @@ const ROW_TOL_M = 0.25
 const ROW_GAP_M = 4
 const LONG_ROW_M = 6
 const MIN_ANCHORS = 3
-const MARKS_PER_ANCHOR = 3
+/** WO-764: 4 — three marks fit x, y, z, yaw but cannot show a head that is not level (grandMA3's own position
+ * calibration recommends four points too); fewer marks in the project → all of them. */
+const MARKS_PER_ANCHOR = 4
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]

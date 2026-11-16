@@ -7,9 +7,10 @@
  * and the head must not move — so the correction depends on where the head points:
  *
  *   offset      { pan, tilt } °  the operator's trim (Calibrate heads → Beam offset), added everywhere
- *   offset_map  [{ pan, tilt, dpan, dtilt }]  one pin per "Beam is on <mark>": at those physical angles the beam
- *               is exactly on the mark (dpan / dtilt on top of the trim at the time); in between, the pins are
- *               blended by inverse distance² in (pan, tilt) — exact at every pin, the nearest pins win
+ *   offset_map  [{ pan, tilt, dpan, dtilt, at?, name? }]  one pin per "Beam is on <mark>": at those physical angles
+ *               the beam is exactly on the mark (dpan / dtilt on top of the trim at the time); in between, the pins are
+ *               blended by inverse distance² in (pan, tilt) — exact at every pin, the nearest pins win. WO-764: `at`
+ *               [x, y, z] (PSN m) and `name` = the mark — the head's real pose is solved from them (calibrate-pose.js)
  *
  * The real head is never touched: the previs draws axes at sent + offsetAt(), and Point at sends the angle whose
  * sent + offsetAt() is the geometric one (gdtf-ik.js aimChain).
@@ -30,7 +31,12 @@ function normalizeMap(raw) {
 	for (const p of raw) {
 		const v = [num(p?.pan, -720, 720), num(p?.tilt, -360, 360), num(p?.dpan, -180, 180), num(p?.dtilt, -180, 180)]
 		if (v.some((x) => x === null)) continue
-		out.push({ pan: v[0], tilt: v[1], dpan: v[2], dtilt: v[3] })
+		const pin = { pan: v[0], tilt: v[1], dpan: v[2], dtilt: v[3] }
+		// WO-764: the mark the pin was taken on (PSN m) — the pose solve's input; its name for the fit report
+		const at = Array.isArray(p.at) && p.at.length === 3 ? p.at.map((x) => num(x, -500, 500)) : null
+		if (at && at.every((x) => x !== null)) pin.at = at
+		if (pin.at && typeof p.name === 'string' && p.name.trim()) pin.name = p.name.trim().slice(0, 64)
+		out.push(pin)
 	}
 	return out.slice(-MAX_PINS)
 }

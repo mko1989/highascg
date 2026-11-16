@@ -5,7 +5,8 @@
  * The app picks the anchor heads (rig-anchors.js), the operator puts each one's real beam on its marks in order — one
  * prompt at a time, "aim <head> at <mark>" — through the WO-700 live calibration session (calibrate-session.js
  * `point` with the mark's `at`: the angles the real head gets, from DMX), each anchor is solved
- * (calibrate-solve.js solvePoseForward) and every other head is inferred (rig-infer.js).
+ * (WO-764 calibrate-pose.js solveHeadPose: x, y, z, yaw, and pitch / roll when its marks show them) and every other
+ * head is inferred (rig-infer.js).
  *
  *   {action: 'start', max?}   plan the anchors and open the first; 409 without 3 marks or 2 heads
  *   {action: 'point'}         the beam of the prompted head is on the prompted mark
@@ -22,7 +23,7 @@
 
 const { chooseAnchors, normalizeMarks, marksFor } = require('./rig-anchors')
 const { inferRig } = require('./rig-infer')
-const { solvePoseForward } = require('./calibrate-solve')
+const { solveHeadPose } = require('./calibrate-pose')
 const { liveModel } = require('./calibrate-session')
 
 /** @param {{ engine, calib, project?: () => object | null }} deps calib: calibrate-session.js createCalibration() */
@@ -64,7 +65,7 @@ function createRigCalibration({ engine, calib, project = () => null }) {
 		const a = s.anchors[s.cur]
 		const fx = fxOf(a.id)
 		const lm = fx ? liveModel(fx) : null
-		a.solve = lm ? solvePoseForward(points, lm.forward, { pose: fx.pose }) : { ok: false, need: 3 }
+		a.solve = lm ? solveHeadPose(points, lm.forward, { pose: fx.pose, mirrorPan: lm.mirrorPan }) : { ok: false, need: 3 }
 		if (a.solve.ok) s.solved[a.id] = a.solve
 		closeCur(a.solve.ok ? 'solved' : 'skipped')
 		openCur()
@@ -87,6 +88,8 @@ function createRigCalibration({ engine, calib, project = () => null }) {
 				marks: x.marks.map((id) => ({ id, name: names.get(id) || `Mark ${id}` })),
 				taken: x.taken,
 				rms_deg: x.solve?.ok ? x.solve.rms_deg : null,
+				verdict: x.solve?.ok ? x.solve.verdict : null,
+				note: x.solve?.ok ? x.solve.note : null,
 				warning: x.solve?.warning || x.error || null,
 			})),
 			prompt: a
@@ -146,7 +149,7 @@ function createRigCalibration({ engine, calib, project = () => null }) {
 		if (action === 'point') {
 			const m = markOf(a.marks[a.taken])
 			if (!m) return { status: 409, body: { error: 'the prompted mark was removed — skip it' } }
-			const r = calib.handle({ action: 'point', id: a.id, at: [m.x, m.y, m.z] })
+			const r = calib.handle({ action: 'point', id: a.id, at: [m.x, m.y, m.z], name: m.name })
 			if (r.status !== 200) return r
 			a.taken++
 			if (a.taken >= a.marks.length) solveCur(r.body.points)

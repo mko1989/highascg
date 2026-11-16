@@ -10,7 +10,8 @@
  *             a shift); two or more spread ≥ ROW_SPREAD_M along the row → a straight line through them (the row's
  *             turn and rake). A row without an anchor gets the rig fit alone.
  *   yaw       patched yaw − the rig turn (pose.yaw runs clockwise seen from above: 90 = stage left) + the mean yaw the
- *             row's anchors are off by. Hang, pitch and roll stay as patched.
+ *             row's anchors are off by. Hang stays as patched; pitch / roll too, unless anchors of the row had them
+ *             solved (WO-764, dof 6) — then the row's mean change (a raked pipe rakes every head on it).
  *
  * Residuals (what the operator reads): a measured head — its solve fit (rms_deg) and `loo_m`, how far the model misses
  * it when it is left out. An inferred head — `residual_m`, leave-one-out misses of heads predicted the way it is: on a
@@ -71,6 +72,8 @@ function predict(head, anchors, rowOf) {
 	const err = own.map((a) => sub(a.s, fit.apply(a.p)))
 	const dyaw = own.reduce((s, a) => s + wrap(a.yaw - (a.yaw0 - fit.turn * DEG)), 0) / own.length
 	out.yaw += dyaw
+	const tilted = own.filter((a) => a.tilt)
+	if (tilted.length) out.tilt = [0, 1].map((i) => tilted.reduce((s, a) => s + a.tilt[i], 0) / tilted.length)
 	const along = (q) => (row.dir ? q[0] * row.dir[0] + q[1] * row.dir[1] + q[2] * row.dir[2] : 0)
 	const u = own.map((a) => along(a.p))
 	const lo = u.indexOf(Math.min(...u))
@@ -106,6 +109,10 @@ function inferRig(heads, solved, rows) {
 			s: posOf(solved[h.id].pose),
 			yaw0: Number(h.pose.yaw) || 0,
 			yaw: Number(solved[h.id].pose.yaw) || 0,
+			// WO-764: an anchor whose marks solved its pitch / roll (dof 6) tells its row how the pipe is raked
+			tilt: solved[h.id].dof === 6
+				? [wrap((Number(solved[h.id].pose.pitch) || 0) - (Number(h.pose.pitch) || 0)), wrap((Number(solved[h.id].pose.roll) || 0) - (Number(h.pose.roll) || 0))]
+				: null,
 		}))
 	const loo = new Map()
 	if (anchors.length >= 2) {
@@ -130,7 +137,8 @@ function inferRig(heads, solved, rows) {
 		if (s?.pose) {
 			const l = loo.get(id)
 			return { id, name: h.name || id, source: 'measured', pose: { ...keep, ...s.pose }, rms_deg: s.rms_deg ?? null,
-				max_deg: s.max_deg ?? null, warning: s.warning || null, loo_m: l ? r3(l.m) : null, residual_m: l ? r3(l.m) : null }
+				max_deg: s.max_deg ?? null, warning: s.warning || null, loo_m: l ? r3(l.m) : null, residual_m: l ? r3(l.m) : null,
+				...(s.verdict ? { verdict: s.verdict, note: s.note, dof: s.dof, marks: s.errors_deg?.length ?? null } : {}) }
 		}
 		const pr = predict(h, anchors, rowOf)
 		const own = anchors.filter((a) => a.row && a.row === rowOf.get(id)?.id)
@@ -141,7 +149,8 @@ function inferRig(heads, solved, rows) {
 			name: h.name || id,
 			source: 'inferred',
 			basis: pr.basis,
-			pose: { x: r3(pr.pos[0]), y: r3(pr.pos[1]), z: r3(pr.pos[2]), yaw: r2(wrap(pr.yaw)), ...keep },
+			pose: { x: r3(pr.pos[0]), y: r3(pr.pos[1]), z: r3(pr.pos[2]), yaw: r2(wrap(pr.yaw)), ...keep,
+				...(pr.tilt ? { pitch: r2(wrap(keep.pitch + pr.tilt[0])), roll: r2(wrap(keep.roll + pr.tilt[1])) } : {}) },
 			moved_m: r3(dist(pr.pos, posOf(h.pose))),
 			residual_m: res === null || res === undefined ? null : r3(res),
 		}

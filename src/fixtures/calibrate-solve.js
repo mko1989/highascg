@@ -386,4 +386,4 @@ function solvePoseForward(pts, forward, opts = {}) {
 	}
 }
 
-module.exports = { solveFixturePose, solveOffsets, solvePoseForward, MIN_POINTS, errors, spread }
+module.exports = { solveFixturePose, solveOffsets, solvePoseForward, MIN_POINTS, errors, spread, lm, solveLinear }
