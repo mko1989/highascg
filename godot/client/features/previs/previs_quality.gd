@@ -131,13 +131,36 @@ static func apply_floor(mat: StandardMaterial3D, p: Dictionary) -> void:
 		mat.roughness = float(p.floor_rough)  # a glossy floor shows the LED walls and the beams' pools (with SSR)
 
 
-static func apply_sun(sun: DirectionalLight3D, p: Dictionary) -> void:
+## `roofed`: the scene has a ceiling (roofed()). Under a roof the "sun" stands for the room's house lights; lit from
+## above the ceiling it threw the ceiling's own shadow (coffers, chandeliers, truss) onto the floor — so no sun shadow
+## indoors. The rig's spot lights keep their shadows.
+static func apply_sun(sun: DirectionalLight3D, p: Dictionary, roofed := false) -> void:
 	if sun == null:
 		return
-	sun.shadow_enabled = int(p.sun_splits) > 0
+	sun.shadow_enabled = int(p.sun_splits) > 0 and not roofed
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_max_distance = 60.0
 	sun.directional_shadow_blend_splits = true
+
+
+const ROOF_MIN_Y := 2.2  ## m: a mesh that starts above head height …
+const ROOF_MIN_AREA := 30.0  ## m²: … and spans this much plan area is a ceiling (a truss or a chandelier is not)
+
+
+## Does a visible mesh under `root` roof the scene (a venue's ceiling)?
+static func roofed(root: Node) -> bool:
+	for n in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		var in_tree := mi.is_inside_tree()
+		if mi.mesh == null or not (mi.is_visible_in_tree() if in_tree else mi.visible):
+			continue
+		if is_roof((mi.global_transform if in_tree else mi.transform) * mi.get_aabb()):
+			return true
+	return false
+
+
+static func is_roof(box: AABB) -> bool:
+	return box.position.y >= ROOF_MIN_Y and box.size.x * box.size.z >= ROOF_MIN_AREA
 
 
 ## How many spot lights of the rig cast a shadow (gobo spots always do — their projection needs one).

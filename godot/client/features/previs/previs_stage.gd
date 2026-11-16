@@ -76,7 +76,7 @@ func _ready() -> void:
 func _on_quality(_level := 0) -> void:
 	var p: Dictionary = Quality.shared().current()
 	Quality.apply_env(environment, p)
-	Quality.apply_sun(sun, p)
+	Quality.apply_sun(sun, p, _roofed)
 	Quality.apply_floor(floor_mat, p)
 	var vp := get_viewport()
 	if vp is SubViewport:
@@ -88,6 +88,7 @@ func _on_quality(_level := 0) -> void:
 ## glow list is collected once per change of the tree (a venue / model load), so a slider step only writes numbers.
 var _glow: Array = []
 var _glow_stale := true
+var _roofed := false  # a ceiling over the scene: the sun is house light there and casts no shadow
 
 
 func _on_house(h: float) -> void:
@@ -95,6 +96,10 @@ func _on_house(h: float) -> void:
 	if _glow_stale:
 		_glow_stale = false
 		_glow = House.collect(self)
+		var roofed := Quality.roofed(self)  # owner 16.11: the sun shone "from over the ceiling", its parts shadowed on the floor
+		if roofed != _roofed:
+			_roofed = roofed
+			Quality.apply_sun(sun, Quality.shared().current(), _roofed)
 	House.dim(_glow, h)
 
 
