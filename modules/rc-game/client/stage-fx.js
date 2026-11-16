@@ -4,7 +4,8 @@
  *
  *   const fx = createStageFx({ THREE, scene, send, quality })   once, as soon as the world exists (before the scene loads:
  *                                                              `lxfull` arrives right after the socket opens)
- *   fx.load(sceneJson)          a scene was (re)loaded: floors, `lights`, `screens`
+ *   fx.load(sceneJson)          a scene was (re)loaded: floors, `lights`, `screens`, `heads` (WO-1090: the patched heads'
+ *                               own models in the scene GLB turn with their beams — head-follow.js)
  *   fx.onMessage(m)             every decoded JSON message; → true when it was ours (`lx`, `lxfull`) — it also peeks at
  *                               `welcome` / `state` (host switches `lights` / `wall`) and returns false for them
  *   fx.onBinary(data)           every binary socket message (ArrayBuffer or Blob) → true when it was a wall picture
@@ -18,6 +19,7 @@
 import { parseEntry, parseFrame, smoothK, stepLight } from './stage-fx-math.js'
 import { createBeamMeshes } from './stage-fx-beams.js'
 import { createWall } from './stage-fx-wall.js'
+import { createHeadFollow } from './head-follow.js'
 
 const MAX_LIGHTS = 150
 
@@ -33,6 +35,7 @@ export function createStageFx(o) {
 	o.scene.add(root)
 	const beams = createBeamMeshes(THREE, MAX_LIGHTS)
 	const wall = createWall(THREE, { createImageBitmap: o.createImageBitmap, Blob: o.Blob })
+	const follow = createHeadFollow(THREE, o.scene)
 	root.add(beams.group)
 	root.add(wall.group)
 	let lights = [] // [{ i, p, kind, cur, tgt, moving }]
@@ -160,11 +163,13 @@ export function createStageFx(o) {
 		if (disposed || !enabled) return
 		const k = smoothK(Math.min(0.25, Math.max(0, dt || 0)))
 		let dirty = false
+		follow.tick(Date.now())
 		for (let slot = 0; slot < lights.length; slot++) {
 			const l = lights[slot]
 			if (!l.moving) continue
 			l.moving = stepLight(l.cur, l.tgt, k)
 			beams.write(slot, l, l.cur)
+			follow.turn(l.id, l.cur.d)
 			dirty = true
 		}
 		if (dirty) beams.flush()
@@ -177,6 +182,7 @@ export function createStageFx(o) {
 			const s = sceneJson && typeof sceneJson === 'object' ? sceneJson : {}
 			beams.setFloors(s.floors)
 			if (Array.isArray(s.lights) && (!lights.length || s.lights.length !== lights.length)) setLights(s.lights)
+			follow.load(s.heads)
 			for (const l of lights) l.moving = true // floors changed: recompute lengths and pools
 			wall.load(s.screens)
 			wall.setVisible(enabled && wallOn)
@@ -209,6 +215,7 @@ export function createStageFx(o) {
 			lit: lights.filter((l) => l.cur.a > 0.002).length,
 			video: videoAsked,
 			wall: wall.stats(),
+			heads: follow.stats(),
 		}),
 	}
 }

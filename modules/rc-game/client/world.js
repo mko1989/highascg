@@ -154,6 +154,7 @@ function cheapMaterials(root, low) {
 				transparent: m.transparent,
 				opacity: m.opacity,
 				emissive: m.emissive,
+				emissiveMap: m.emissiveMap, // WO-1090: Hilton's curtains and coffered ceiling glow through their own picture
 			})
 		} else if (o.userData.rcOrigMat) {
 			o.material.dispose()

@@ -4,7 +4,8 @@
  * WO-1074 — RC car game: the merged scene mesh. Template GLBs (one per MVR mesh key) are read into flat triangle
  * lists, simplified by vertex clustering when the scene is over the phone budget, instanced per visible part into one
  * position-only primitive per colour and written as ONE GLB (src/stage/glb-write.js, no normals → flat shading).
- * Budget order: weld only → drop fixtures → coarser clustering (1 → 8 cm) → drop the smallest objects.
+ * Budget order: weld only → drop fixtures → coarser clustering (1 → 8 cm) → drop the smallest objects. WO-1090: the
+ * fixtures are planned apart, in what the room left (planFixtures).
  */
 
 const { core } = require('./host')
@@ -132,7 +133,8 @@ function cluster(prim, cell) {
 		seen.add(s)
 		idx.push(a, b, c)
 	}
-	return { pos: new Float32Array(pos), idx: new Uint32Array(idx), color: prim.color, ...(uv ? { uv: new Float32Array(uv), mat: prim.mat } : {}) }
+	return { pos: new Float32Array(pos), idx: new Uint32Array(idx), color: prim.color, ...(uv ? { uv: new Float32Array(uv), mat: prim.mat } : {}),
+		...(prim.rich != null ? { rich: prim.rich } : {}) }
 }
 
 /** A template simplified at world `cell` (template used at most at `scale`) → { prims, tris, verts } (cached). */
@@ -201,13 +203,80 @@ async function planBudget(parts, templates, pause = async () => {}, budget = {})
 	return { cell, keep, ...over, dropped: { ...dropped, objects: gone.size, cell } }
 }
 
+const det3 = (m) => m[0] * (m[4] * m[8] - m[5] * m[7]) - m[3] * (m[1] * m[8] - m[2] * m[7]) + m[6] * (m[1] * m[5] - m[2] * m[4])
+
+const FIX_MAX_TRIS = 1500 // WO-1090: one fixture's body at most (a Focus Profile is 1086, a MAC Quantum 2337, an X-DOT 5888)
+const FIX_CELLS = [0.002, 0.005, 0.01, 0.02, 0.04, 0.08]
+
+/**
+ * WO-1090 — the fixtures' share of the budget, planned after the room (planBudget over every other part, so the room's
+ * plan — and its obstacles — never depend on the rig). Each fixture (its parts, by uuid) is simplified on its own, at
+ * the finest FIX_CELLS cell that brings it under its share: the fixtures cheapest at the coarsest cell go first, each
+ * taking at most min(FIX_MAX_TRIS, what is left / fixtures left) — a 12-triangle LED bar leaves its share to the moving
+ * heads. What the room left is `room` ({ tris, bytes }); a fixture that does not fit its share even at 8 cm is left out.
+ * parts: fixture parts only. → { keep: boolean[], cells: number[], tris, bytes, perFix (the first share), dropped }
+ */
+async function planFixtures(parts, templates, room, pause = async () => {}) {
+	const scale = new Map()
+	for (const p of parts) scale.set(p.key, Math.max(scale.get(p.key) || 0, scaleOf(p.xf)))
+	const groups = new Map()
+	parts.forEach((p, i) => {
+		const k = p.uuid || `part${i}`
+		if (!groups.has(k)) groups.set(k, [])
+		groups.get(k).push(i)
+	})
+	let k = 0
+	const costs = []
+	for (const idx of groups.values()) {
+		const at = []
+		for (const cell of FIX_CELLS) {
+			const c = { cell, tris: 0, bytes: 0 }
+			for (const i of idx) {
+				const t = templates.get(parts[i].key)
+				if (!t) continue
+				if (!t.simple.has(`${cell}`) && ++k % 8 === 0) await pause()
+				const s = simplified(t, cell, scale.get(parts[i].key))
+				c.tris += s.tris
+				c.bytes += s.tris * 12 + s.verts * 12 + (s.uvVerts || 0) * 8
+			}
+			at.push(c)
+		}
+		costs.push({ idx, at })
+	}
+	const keep = parts.map(() => false)
+	const cells = parts.map(() => FIX_CELLS[0])
+	const share = (t, n) => Math.max(0, Math.min(FIX_MAX_TRIS, Math.floor(t / Math.max(1, n))))
+	const perFix = share(room.tris, costs.length)
+	let left = costs.length, tris = 0, bytes = 0, dropped = 0
+	for (const f of [...costs].sort((a, b) => a.at[a.at.length - 1].tris - b.at[b.at.length - 1].tris)) {
+		const cap = share(room.tris - tris, left--)
+		const byteCap = Math.max(0, room.bytes - bytes) / (left + 1)
+		const c = f.at.find((x) => x.tris <= cap && x.bytes <= byteCap)
+		if (!c || !c.tris) {
+			dropped++
+			continue
+		}
+		for (const i of f.idx) {
+			keep[i] = true
+			cells[i] = c.cell
+		}
+		tris += c.tris
+		bytes += c.bytes
+	}
+	return { keep, cells, tris, bytes, perFix, dropped }
+}
+
 /** Colour → bucket key (linear, 1/64 steps; keeps the material count small). */
 const colorKey = (c) => c.slice(0, 3).map((v) => Math.round(Math.max(0, Math.min(1, v)) * 64)).join(',')
 
 /**
  * Instance the kept parts into one primitive per colour (glb-write Prims, flat) — and, WO-1082, one per textured venue
  * material (`tex` = its index in the venue's materials, with UVs; a layer colour never repaints a venue part: its
- * `color` is null); `onTri(9 floats)` sees every world triangle (obstacles). → { primitives, tris }.
+ * `color` is null) and, WO-1090, one per material of an MVR mesh drawn with its own materials (`tex` = the prim's
+ * `rich` key, with UVs when it has them; a layer colour does repaint it, as the previs tints it). `plan.cells[i]`
+ * (optional) is part i's own simplification cell; a part with `node` (a moving head) goes into primitives of that node.
+ * `onTri(9 floats)` sees every world triangle of the kept parts except a `ghost`'s (WO-1090: drawn only — a GDTF rig's
+ * head hangs above the cars and moves; see rc-scene.js planAll). → { primitives, tris }.
  */
 async function instanceParts(parts, templates, plan, onTri, pause = async () => {}) {
 	const scale = new Map()
@@ -219,29 +288,42 @@ async function instanceParts(parts, templates, plan, onTri, pause = async () => 
 		const p = parts[i]
 		const t = templates.get(p.key)
 		if (!t) continue
-		const s = simplified(t, plan.cell, scale.get(p.key))
+		const s = simplified(t, plan.cells?.[i] ?? plan.cell, scale.get(p.key))
+		const tri = onTri && !p.ghost ? onTri : null
+		const node = p.node || ''
+		const mirrored = det3(p.xf) < 0
 		for (const pr of s.prims) {
-			const textured = !p.color && pr.uv && pr.mat != null
+			const tex = p.color ? null : pr.rich != null ? pr.rich : pr.uv && pr.mat != null ? pr.mat : null
+			const withUv = tex != null && !!pr.uv
 			const color = p.color || pr.color || DEFAULT_COLOR
-			const key = textured ? `t${pr.mat}` : colorKey(color)
+			const key = `${node}|${tex != null ? `t${tex}${withUv ? '' : '~'}` : colorKey(color)}`
 			if (!buckets.has(key)) {
-				buckets.set(key, textured ? { color: color.slice(0, 4), tex: pr.mat, pos: [], idx: [], uv: [] }
-					: { color: key.split(',').map((v) => Number(v) / 64).concat(1), pos: [], idx: [] })
+				buckets.set(key, tex != null ? { color: color.slice(0, 4), tex, pos: [], idx: [], ...(withUv ? { uv: [] } : {}), node }
+					: { color: colorKey(color).split(',').map((v) => Number(v) / 64).concat(1), pos: [], idx: [], node })
 			}
 			const b = buckets.get(key)
+			const flip = mirrored && pr.rich != null // a one-sided material keeps its front face under a mirroring placement
+			// WO-1090: only the vertices a triangle still uses are written (clustering keeps the ones whose triangles all
+			// collapsed: an X-DOT at 8 cm wrote 121 B per triangle). The plan's byte estimate is untouched.
 			const base = b.pos.length / 3
+			const at = new Int32Array(pr.pos.length / 3).fill(-1)
 			const w = []
-			for (let v = 0; v < pr.pos.length; v += 3) {
-				const q = apply(p.xf, pr.pos[v], pr.pos[v + 1], pr.pos[v + 2])
-				b.pos.push(q[0], q[1], q[2])
-				w.push(q)
+			const vert = (v) => {
+				if (at[v] < 0) {
+					const q = apply(p.xf, pr.pos[3 * v], pr.pos[3 * v + 1], pr.pos[3 * v + 2])
+					at[v] = w.push(q) - 1
+					b.pos.push(q[0], q[1], q[2])
+					if (b.uv) b.uv.push(pr.uv[2 * v], pr.uv[2 * v + 1])
+				}
+				return at[v]
 			}
-			if (b.uv) for (let v = 0; v < pr.uv.length; v++) b.uv.push(pr.uv[v])
 			for (let k = 0; k < pr.idx.length; k += 3) {
-				b.idx.push(base + pr.idx[k], base + pr.idx[k + 1], base + pr.idx[k + 2])
-				if (onTri) {
-					const A = w[pr.idx[k]], B = w[pr.idx[k + 1]], C = w[pr.idx[k + 2]]
-					onTri(A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2])
+				const ia = vert(pr.idx[k]), ib = vert(pr.idx[k + 1]), ic = vert(pr.idx[k + 2])
+				if (flip) b.idx.push(base + ia, base + ic, base + ib)
+				else b.idx.push(base + ia, base + ib, base + ic)
+				if (tri) {
+					const A = w[ia], B = w[ib], C = w[ic]
+					tri(A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2])
 				}
 			}
 			tris += pr.idx.length / 3
@@ -253,11 +335,11 @@ async function instanceParts(parts, templates, plan, onTri, pause = async () => 
 		}
 	}
 	const primitives = [...buckets.values()].map((b) => ({ positions: new Float32Array(b.pos), indices: new Uint32Array(b.idx), color: b.color, flat: true,
-		...(b.uv ? { uvs: new Float32Array(b.uv), tex: b.tex } : {}) }))
+		...(b.tex != null ? { tex: b.tex } : {}), ...(b.uv ? { uvs: new Float32Array(b.uv) } : {}), ...(b.node ? { node: b.node } : {}) }))
 	return { primitives, tris }
 }
 
 /** Primitives → ONE GLB (one mesh, one node). */
 const sceneGlb = (primitives) => writeGlb([{ name: 'rc-scene', primitives }])
 
-module.exports = { MAX_TRIS, MAX_BYTES, accessor, nodeXf, readTemplate, boxTemplate, cluster, planBudget, instanceParts, sceneGlb }
+module.exports = { CELLS, MAX_TRIS, MAX_BYTES, FIX_MAX_TRIS, accessor, nodeXf, readTemplate, boxTemplate, cluster, planBudget, planFixtures, instanceParts, sceneGlb }

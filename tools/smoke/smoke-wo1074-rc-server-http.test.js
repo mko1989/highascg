@@ -359,7 +359,10 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 		[`${DIR}/rc-lights.js`]: ['src/fixtures/gdtf-store', 'src/fixtures/follow-patch'],
 		[`${DIR}/rc-video.js`]: ['events', 'src/fixtures/pixel-map-service', 'src/system/video-surfaces'],
 		/* WO-1082: the venue .glb is found in the open project's folder (read-only resolve) */
-		[`${DIR}/rc-scene.js`]: ['src/media/project-files'],
+		[`${DIR}/rc-scene.js`]: ['src/media/project-files', 'src/fixtures/gdtf-store'],
+		/* WO-1090: the patched heads from their GDTF rigs (read-only: the patch normaliser, the previs pose maths, the
+		   mesh readers the fixture-type model route uses) */
+		[`${DIR}/rc-scene-fixtures.js`]: ['src/fixtures/follow-patch', 'src/fixtures/gdtf-ik', 'src/stage/glb-units', 'src/stage/mvr-3ds'],
 		[`${DIR}/rc-scene-tex.js`]: ['child_process'],
 		/* WO-1082: the race bots import() the client's own pure modules (bot-brain.js, physics) by file URL */
 		[`${DIR}/rc-room-bots.js`]: ['url'],

@@ -6,13 +6,21 @@
  * a primitive with TEXCOORD_0 and its shrunk image (rc-scene-tex.js) as baseColorTexture (REPEAT: Capture tiles its
  * floor textures). A textured primitive whose image was left out keeps its colour and drops its UVs.
  *
- *   sceneGlb(primitives, mats?) → Buffer
- *     primitives: [{ positions, indices, color, uvs?, tex?, mode? (1 = LINES: the venue's line work) }]   mats: Map tex → { name, image: { data, mime, key } | null }
+ * WO-1090: a material record may also carry what an MVR mesh drawn with its own materials keeps (rc-scene-rich.js):
+ * `doubleSided` (default true — Hilton's walls and ceiling are one-sided, facing in, so a camera outside sees in),
+ * `emissive` [r, g, b] + `emissiveImage`, `roughness`, `metallic`; without its picture (no UVs, or left out) it is a flat
+ * material of its own that keeps them. A primitive with `node` goes into a node of its own (a moving head, rc-scene-
+ * fixtures.js): one mesh per node, the node named `rc-head` with `extras` from `nodeExtras` (three.js: userData).
+ *
+ *   sceneGlb(primitives, mats?, nodeExtras?) → Buffer
+ *     primitives: [{ positions, indices, color, uvs?, tex?, node?, mode? (1 = LINES: the venue's line work) }]
+ *     mats: Map tex → { name, image: { data, mime, key } | null, emissiveImage?, emissive?, doubleSided?, roughness?, metallic? }
+ *     nodeExtras: Map node → object
  */
 
 const pad4 = (n) => (n + 3) & ~3
 
-function sceneGlb(primitives, mats = new Map()) {
+function sceneGlb(primitives, mats = new Map(), nodeExtras = new Map()) {
 	const chunks = []
 	let offset = 0
 	const json = { asset: { version: '2.0', generator: 'HighAsCG rc-game' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ name: 'rc-scene', mesh: 0 }],
@@ -27,14 +35,28 @@ function sceneGlb(primitives, mats = new Map()) {
 		return json.bufferViews.length - 1
 	}
 	const flatMats = new Map()
-	const flatMaterial = (color) => {
-		const c = (color || [0.7, 0.7, 0.7, 1]).slice(0, 4).map((v) => Math.round(v * 1000) / 1000)
-		const key = c.join(',')
+	const r3 = (v) => Math.round(v * 1000) / 1000
+	const flatMaterial = (color, m = null) => {
+		const c = (color || [0.7, 0.7, 0.7, 1]).slice(0, 4).map(r3)
+		const own = m ? { ds: m.doubleSided !== false, e: m.emissive ? m.emissive.map(r3) : null, r: r3(m.roughness ?? 0.8), mt: r3(m.metallic ?? 0) } : null
+		const key = own ? `${c.join(',')}|${JSON.stringify(own)}` : c.join(',')
 		if (!flatMats.has(key)) {
-			json.materials.push({ pbrMetallicRoughness: { baseColorFactor: c, metallicFactor: 0, roughnessFactor: 0.8 }, doubleSided: true })
+			json.materials.push(own ? { pbrMetallicRoughness: { baseColorFactor: c, metallicFactor: own.mt, roughnessFactor: own.r }, doubleSided: own.ds,
+				...(own.e ? { emissiveFactor: own.e } : {}) }
+				: { pbrMetallicRoughness: { baseColorFactor: c, metallicFactor: 0, roughnessFactor: 0.8 }, doubleSided: true })
 			flatMats.set(key, json.materials.length - 1)
 		}
 		return flatMats.get(key)
+	}
+	const meshOf = new Map([['', 0]]) // node → mesh index
+	const meshFor = (node) => {
+		if (!meshOf.has(node)) {
+			json.meshes.push({ name: 'rc-head', primitives: [] })
+			json.nodes.push({ name: 'rc-head', mesh: json.meshes.length - 1, ...(nodeExtras.get(node) ? { extras: nodeExtras.get(node) } : {}) })
+			json.scenes[0].nodes.push(json.nodes.length - 1)
+			meshOf.set(node, json.meshes.length - 1)
+		}
+		return json.meshes[meshOf.get(node)]
 	}
 	const images = new Map() // image key → texture index
 	const texture = (img) => {
@@ -66,15 +88,23 @@ function sceneGlb(primitives, mats = new Map()) {
 		if (textured) {
 			json.accessors.push({ bufferView: view(p.uvs, 34962), componentType: 5126, count, type: 'VEC2' })
 			attributes.TEXCOORD_0 = json.accessors.length - 1
-			const c = (p.color || [1, 1, 1, 1]).slice(0, 4).map((v) => Math.round(v * 1000) / 1000)
-			json.materials.push({ ...(m.name ? { name: m.name } : {}), doubleSided: true,
-				pbrMetallicRoughness: { baseColorFactor: c, baseColorTexture: { index: texture(m.image) }, metallicFactor: 0, roughnessFactor: 0.8 } })
+			const c = (p.color || [1, 1, 1, 1]).slice(0, 4).map(r3)
+			json.materials.push({ ...(m.name ? { name: m.name } : {}), doubleSided: m.doubleSided !== false,
+				pbrMetallicRoughness: { baseColorFactor: c, baseColorTexture: { index: texture(m.image) }, metallicFactor: r3(m.metallic ?? 0), roughnessFactor: r3(m.roughness ?? 0.8) },
+				...(m.emissive ? { emissiveFactor: m.emissive.map(r3) } : {}), ...(m.emissive && m.emissiveImage ? { emissiveTexture: { index: texture(m.emissiveImage) } } : {}) })
 			material = json.materials.length - 1
-		} else material = flatMaterial(p.color)
+		} else material = flatMaterial(p.color, m && (m.emissive || m.doubleSided === false || m.roughness != null) ? m : null)
 		json.accessors.push({ bufferView: view(p.indices, 34963), componentType: 5125, count: p.indices.length, type: 'SCALAR' })
-		json.meshes[0].primitives.push({ attributes, indices: json.accessors.length - 1, material, mode: p.mode === 1 ? 1 : 4 })
+		meshFor(p.node || '').primitives.push({ attributes, indices: json.accessors.length - 1, material, mode: p.mode === 1 ? 1 : 4 })
 	}
-	if (!json.meshes[0].primitives.length) {
+	if (!json.meshes[0].primitives.length && json.meshes.length > 1) {
+		// only heads: the room node stays, without a mesh (a mesh needs a primitive); the head meshes keep their indices
+		delete json.nodes[0].mesh
+		json.meshes[0].primitives.push(...json.meshes.splice(1, 1)[0].primitives)
+		json.nodes[1].mesh = 0
+		for (const n of json.nodes.slice(2)) n.mesh -= 1
+	}
+	if (!json.meshes[0].primitives.length && json.meshes.length === 1) {
 		json.meshes = []
 		json.nodes = []
 		json.scenes[0].nodes = []

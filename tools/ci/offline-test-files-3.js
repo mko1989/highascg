@@ -413,4 +413,6 @@ module.exports = [
 	'tools/smoke/smoke-wo1088-keeping-up-model.test.js',
 	'tools/smoke/smoke-wo1088-keeping-up-checks.test.js',
 	'tools/smoke/smoke-wo1088-keeping-up-service.test.js',
+	'tools/smoke/smoke-wo1090-rc-mvr-materials.test.js', // WO-1090 game scene: MVR meshes keep their pictures; patched heads are their rigs
+	'tools/smoke/smoke-wo1090-rc-rig-heads.test.js',
 ]

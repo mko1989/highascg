@@ -75,8 +75,15 @@ function parseVenue(buf) {
 		const ti = pbr.baseColorTexture
 		const src = ti && textures[ti.index] ? textures[ti.index].source : null
 		const image = src != null && images[src] ? src : null
+		const ei = m?.emissiveTexture
+		const esrc = ei && textures[ei.index] ? textures[ei.index].source : null
+		const e = Array.isArray(m?.emissiveFactor) ? m.emissiveFactor.slice(0, 3).map(Number) : null
 		return { name: String(m?.name || ''), color: [f[0], f[1], f[2], 1], image, uvSet: Number(ti?.texCoord) || 0, uvXf: image != null ? uvTransform(ti) : null,
-			flat: null } // flat = [r, g, b] (linear): drawn in its picture's mean colour, no UVs (heavyTextures)
+			flat: null, // flat = [r, g, b] (linear): drawn in its picture's mean colour, no UVs (heavyTextures)
+			// the rest of the material, for MVR-archive meshes drawn with their own materials (rc-scene-rich.js)
+			emissive: e && e.some((v) => v > 0) ? e : null, emissiveImage: esrc != null && images[esrc] ? esrc : null,
+			doubleSided: m?.doubleSided === true, roughness: Number.isFinite(pbr.roughnessFactor) ? pbr.roughnessFactor : 1,
+			metallic: Number.isFinite(pbr.metallicFactor) ? pbr.metallicFactor : 1 }
 	})
 	const primsOf = (mi) => (Array.isArray(json.meshes?.[mi]?.primitives) ? json.meshes[mi].primitives : [])
 	const cache = new Map()
@@ -99,7 +106,7 @@ function parseVenue(buf) {
 				}
 			}
 			const color = mat ? (mat.flat ? mat.flat.map((v, k) => v * mat.color[k]).concat(1) : mat.color) : null
-			prims.push({ pos, idx: idx.subarray(0, idx.length - (idx.length % 3)), color, ...(uv ? { uv, mat: p.material } : {}) })
+			prims.push({ pos, idx: idx.subarray(0, idx.length - (idx.length % 3)), color, ...(uv ? { uv, mat: p.material } : {}), mi: p.material ?? null })
 		}
 		let t = null
 		if (prims.length) {
