@@ -26,9 +26,15 @@ const DEFAULT_VOLUMES = {
 	},
 }
 
+/* WO-1094: never synced whatever a map says — a person-detection runtime bundle (AGPL-3.0 YOLO26 weights, research-trained
+ * face models) and model weights are the operator's own per-machine copy: no pair may seed them onto another box. */
+const ALWAYS_EXCLUDED = ['highascg-detection-runtime']
+const ALWAYS_EXCLUDED_EXT = /\.(onnx|pt)$/i
+
 function isExcluded(rel, excludes) {
 	const norm = rel.replace(/\\/g, '/').replace(/^\/+/, '')
 	const parts = norm.split('/').filter(Boolean)
+	if (parts.some((x) => ALWAYS_EXCLUDED.includes(x)) || ALWAYS_EXCLUDED_EXT.test(norm)) return true
 	for (const rule of excludes || []) {
 		const r = String(rule || '').replace(/\\/g, '/').replace(/^\/+/, '')
 		if (!r) continue

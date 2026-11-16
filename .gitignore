@@ -155,3 +155,8 @@ godot/**/addons/hshm/bin/
 # WO-745: godot/retro/install.sh copies the per-machine RetroHost + HshmSink builds into the retro project
 godot/retro/addons/
 godot/retro/**/*.uid
+
+# WO-1094: person-detection weights and runtime bundles never belong in the repo (each machine installs its own)
+*.onnx
+*.pt
+highascg-detection-runtime/

@@ -22,7 +22,8 @@ const REPO = path.resolve(__dirname, '../..')
 const read = (p) => fs.readFileSync(path.join(REPO, p), 'utf8')
 
 /** Any-depth matching is deliberate for these two: never sync a dep tree or a git dir. */
-const INTENTIONALLY_UNANCHORED = new Set(['node_modules/', '.git/'])
+// WO-1094: detection weights / runtime bundles are excluded at any depth on purpose (never carried onto a box)
+const INTENTIONALLY_UNANCHORED = new Set(['node_modules/', '.git/', 'highascg-detection-runtime/', '*.onnx', '*.pt'])
 
 function excludeLines() {
 	return read('config/server-update-rsync-excludes.txt')

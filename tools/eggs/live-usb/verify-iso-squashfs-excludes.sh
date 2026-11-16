@@ -20,6 +20,7 @@ source "${HERE_VERIFY}/iso-read-lib.sh"
 source "${HERE_VERIFY}/eggs-cli-lib.sh"
 # shellcheck source=verify-iso-squashfs-calamares.sh
 source "${HERE_VERIFY}/verify-iso-squashfs-calamares.sh"
+source "${HERE_VERIFY}/verify-iso-detection-runtime.sh" # WO-1094: detection_runtime_check
 command -v unsquashfs >/dev/null 2>&1 || {
 	echo "missing tool: unsquashfs (sudo apt install squashfs-tools)" >&2
 	exit 1
@@ -70,7 +71,6 @@ ok() {
 warn() {
 	echo "WARN: $*" >&2
 }
-
 echo "==> verify squashfs excludes: ${SQ}${SQ_OFF:+ (squashfs at byte ${SQ_OFF})} (layout ${LAYOUT})"
 
 # WO-168 T168.5: directory-name constants shared with write-iso-default-config.js
@@ -465,6 +465,7 @@ for needle in 'opt/magicq' 'home/casparcg/Documents/MagicQ' 'home/casparcg/show'
 	fi
 done
 
+detection_runtime_check # WO-1094: no detection weights / venv / bundles (not ours to distribute)
 if squash_grep_list '^squashfs-root/usr_[0-9]/'; then
 	bad "squashfs has usr_N duplicate trees (~+1 GiB bloat) — reboot and rerun the full build (never rm /home/eggs)"
 fi

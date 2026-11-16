@@ -9,3 +9,8 @@ data/
 node_modules/
 .git/
 .gitignore
+# WO-1094: person-detection weights and runtime bundles are each machine's own install (AGPL-3.0 YOLO26,
+# research-trained face models) — never seeded from a stick
+highascg-detection-runtime/
+*.onnx
+*.pt

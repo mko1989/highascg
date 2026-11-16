@@ -8,7 +8,7 @@
 # manual procedure (`--exclude 'config/'`, which also matched `src/config/`) took the box down: a new
 # `src/api/` file landed while the `src/config/` module it required did not.
 #
-# Two deliberate exceptions below keep their any-depth behaviour: `node_modules/` and `.git/`.
+# Deliberate exceptions below keep their any-depth behaviour: `node_modules/`, `.git/` and (WO-1094) the detection weights.
 /client/
 /audio_testing/
 /for_client/
@@ -17,6 +17,11 @@
 node_modules/
 # any-depth ON PURPOSE — never sync a git dir
 .git/
+# any-depth ON PURPOSE (WO-1094) — person-detection weights and runtime bundles are each machine's own install
+# (AGPL-3.0 YOLO26, research-trained face models): never carried from a stick onto a box
+highascg-detection-runtime/
+*.onnx
+*.pt
 /bin/
 /lib/
 /media/

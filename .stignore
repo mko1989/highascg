@@ -2,6 +2,10 @@
 // Edit on both sides (same file should exist in the shared folder root).
 
 // Large / machine-local runtime (never sync)
+// WO-1094: person-detection weights + runtime bundles — each machine's own install (AGPL-3.0 / research-trained)
+highascg-detection-runtime
+*.onnx
+*.pt
 BUILD_STAMP
 media
 bin

@@ -205,6 +205,23 @@ home/casparcg/.local/state
 home/casparcg/.local/state/*
 # share/: Claude Code, Godot editor data, tracking venv + models (provisioned by tools/tracking-detect/, owner call)
 home/casparcg/.local/share/*
+# WO-1094 (owner 16.11: "we cant bake anything into iso that i have no right to distribute"): the person-detection
+# runtime never ships — AGPL-3.0 YOLO26 weights, research-trained face models, the venv, the wheels, the install job's
+# downloads (install-work/), pip / Ultralytics caches and any export bundle — even if the share/* line above is narrowed.
+# Home paths only (no lib/ prefix, so no usr/ twin is needed); verify-iso-detection-runtime.sh fails the build if any of it,
+# or any *.onnx / weight *.pt, is in the squashfs.
+home/*/.local/share/highascg
+home/*/.local/share/highascg/*
+root/.local/share/highascg
+root/.local/share/highascg/*
+home/*/.cache/pip
+home/*/.cache/pip/*
+root/.cache/pip
+root/.cache/pip/*
+home/*/.config/Ultralytics
+home/*/.config/Ultralytics/*
+home/*/highascg-detection-runtime
+home/*/highascg-detection-runtime/*
 # the Godot download archive (the binary beside it ships)
 home/casparcg/.local/opt/godot/dl
 home/casparcg/.local/opt/godot/dl/*
