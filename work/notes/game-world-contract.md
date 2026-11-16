@@ -300,3 +300,15 @@ Visitor visuals come in `wv.fx` (`[w, kind, ms, c]`: `splat`, `sparks`, `stun`, 
 - Game wiring (lead): each game's `register.js` (descriptor), a new adapter file per game, small hooks in the rooms /
   services / clients; their own contracts get a "§ Game World" paragraph.
 - Nothing under `src/` changes. A side that needs this contract changed says so — it does not silently diverge.
+
+## 8. As built (16.11.26) — where the code differs from the text above
+
+- World pages are always served (they say "no game is running" until one is); the world feed is public only while a
+  game runs.
+- Bonuses are paid only for control-loss effects (hop / stun / scatter / wobble / bowl), never for a soft effect.
+- Rain (R8) and spotlight (R9) need the world tick, i.e. ≥ 2 attached rooms or an open world page.
+- Interest: avatars are always placed first; name tags are blank at Low (cap 6); fade applies only to moving visitors;
+  a splat's `until` on the client = first seen + 8 s. The spectator has no live light beams.
+- Viewer keys may be the games' socket objects (the hub serialises them); `wst.scale` is the toy scale of a game that
+  brings a car / soldier model (never Salad's life-size 1); Salad's client draws visitors at `wst.scale`.
+- The spectator camera frames the stage edge from ≤ 14 m, 1 m under the ceiling, inside the hall (not the whole room).

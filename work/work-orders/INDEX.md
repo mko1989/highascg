@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1010 live WOs (34 open, 157 in progress, 819 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1010 live WOs (34 open, 155 in progress, 821 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -697,8 +697,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1083 DONE [web-client] Stage Skirmish: bots see no farther than a player (no more cross-map shots); fl… → 1083_WO_skirmish_bots_fair_sight_and_spotlight_mode.md
 - 1089 DONE [web-client+engine] Stage Salad: slingshot vegetables at the presenter's avatar (third opt-in brows… → 1089_WO_stage_salad_vegetable_slingshot.md
 - 1090 DONE [web-client+engine] Game scenes keep the MVR meshes' own pictures; patched heads are their real GDT… → 1090_WO_game_scene_mvr_materials_and_real_heads.md
-- 1101 IN PROGRESS [web-client+engine] Game World step 1: one shared room — the three browser games see each other → 1101_WO_game_world_shared_room.md
-- 1102 IN PROGRESS [web-client+engine] Game World step 2: the games affect each other (server-refereed, capped, never… → 1102_WO_game_world_cross_game_effects.md
+- 1101 DONE [web-client+engine] Game World step 1: one shared room — the three browser games see each other → 1101_WO_game_world_shared_room.md
+- 1102 DONE [web-client+engine] Game World step 2: the games affect each other (server-refereed, capped, never… → 1102_WO_game_world_cross_game_effects.md
 
 ## companion — Companion integration (23)
 
