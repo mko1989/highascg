@@ -64,13 +64,13 @@
         </div>
     </main>
     <canvas id="confetti" width="1920" height="1080"></canvas>
-    <script src="vendor/gsap.min.js"></script>
+    <script src="lt-tween.js"></script>
     <script src="lt-engine.js"></script>
     <script src="lt-engine-controls.js"></script>
     <script>
         /*
-         * Confetti burst — closed-form physics (linear drag + gravity) driven by a GSAP tween, so it
-         * follows the engine's `speed` (globalTimeline timeScale) and the studio hold-in's instant
+         * Confetti burst — closed-form physics (linear drag + gravity) driven by an LTTween tween, so it
+         * follows the engine's `speed` (LTTween.timeScale) and the studio hold-in's instant
          * jump lands on the settled, confetti-free end frame.
          */
         var Confetti = (function () {
@@ -168,7 +168,7 @@
                 fitCanvas();
                 spawn(originEl.getBoundingClientRect());
                 clock.t = 0;
-                tween = gsap.to(clock, {
+                tween = LTTween.to(clock, {
                     t: LIFE_MAX,
                     duration: LIFE_MAX,
                     ease: 'none',
@@ -199,7 +199,7 @@
                     var h1 = g.querySelector('h1');
                     var p = g.querySelector('p');
                     Confetti.clear();
-                    var tl = new gsap.timeline({ onComplete: resolve });
+                    var tl = LTTween.timeline({ onComplete: resolve });
                     tl.set(g, { opacity: 1, scale: 1, y: 0 })
                       .set([h1, p], { opacity: 0 })
                       .addLabel('reveal')
@@ -211,7 +211,7 @@
             animateOut: function() {
                 return new Promise(function(resolve) {
                     var g = document.querySelector('.lt-confetti-center .graphic');
-                    var tl = new gsap.timeline({ defaults: { ease: 'power2.in' }, onComplete: function () {
+                    var tl = LTTween.timeline({ defaults: { ease: 'power2.in' }, onComplete: function () {
                         Confetti.clear();
                         resolve();
                     } });

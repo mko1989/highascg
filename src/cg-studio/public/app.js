@@ -320,7 +320,7 @@ function setInspectorValue(section, key, value) {
  * Placement cache: studioGetPlacement is a cross-frame querySelector + getBoundingClientRect
  * (forced layout inside the template iframe), far too heavy to run on every pointermove.
  * Every mutation path in this file invalidates the cache; the short TTL covers async moves
- * we can't observe (GSAP play/stop/replay animations finishing inside the template).
+ * we can't observe (LTTween play/stop/replay animations finishing inside the template).
  */
 const PLACEMENT_CACHE_TTL_MS = 200
 let placementCache = null // { win, at, placement }

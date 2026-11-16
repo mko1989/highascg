@@ -36,10 +36,10 @@ const LTEngine = (function () {
         syncStyleFromActiveData();
         S.applyData();
         S.applyStyles();
-        const prevScale = window.gsap && gsap.globalTimeline ? gsap.globalTimeline.timeScale() : 1;
-        if (window.gsap && gsap.globalTimeline) gsap.globalTimeline.timeScale(1000);
+        const prevScale = window.LTTween ? LTTween.timeScale() : 1;
+        if (window.LTTween) LTTween.timeScale(1000);
         return Promise.resolve(cfg.animateIn(data[activeStep], style)).then(function () {
-            if (window.gsap && gsap.globalTimeline) gsap.globalTimeline.timeScale(prevScale);
+            if (window.LTTween) LTTween.timeScale(prevScale);
             state = 2;
             clearDisplayTimer();
         }).catch(handleError);

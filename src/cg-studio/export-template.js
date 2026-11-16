@@ -14,7 +14,7 @@ const EXPORT_ID_RE = /^lt-[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
 
 function fixStudioAssetPaths(html) {
 	return html
-		.replace(/src="vendor\//g, 'src="../lower-thirds/vendor/')
+		.replace(/src="lt-tween\.js"/g, 'src="../lower-thirds/lt-tween.js"')
 		.replace(/src="lt-engine\.js"/g, 'src="../lower-thirds/lt-engine.js"')
 		.replace(/src="lt-engine-controls\.js"/g, 'src="../lower-thirds/lt-engine-controls.js"')
 }

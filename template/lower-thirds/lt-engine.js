@@ -209,9 +209,9 @@
             document.body.style.fontFamily = "'Arial', 'Helvetica Neue', sans-serif";
         }
 
-        // Apply global animation speed if gsap is available
-        if (window.gsap && window.gsap.globalTimeline) {
-            gsap.globalTimeline.timeScale(CORE.style.speed ? Number(CORE.style.speed) : 1);
+        // Apply global animation speed (lt-tween.js)
+        if (window.LTTween) {
+            LTTween.timeScale(CORE.style.speed ? Number(CORE.style.speed) : 1);
         }
 
         // Apply position positioning on the main container

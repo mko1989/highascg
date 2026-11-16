@@ -135,8 +135,7 @@ async function waitForCgThumbSettle(page, speed) {
 	await page.evaluate(async () => {
 		const deadline = Date.now() + 1500
 		while (Date.now() < deadline) {
-			const tl = window.gsap?.globalTimeline
-			if (!tl?.isActive?.()) return
+			if (!window.LTTween?.isActive?.()) return // lt-tween.js (WO-1096); other templates: just the min wait
 			await new Promise((r) => setTimeout(r, 40))
 		}
 	})

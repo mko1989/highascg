@@ -59,7 +59,7 @@
             <div class="right-panel"><p>Title</p></div>
         </div>
     </main>
-    <script src="vendor/gsap.min.js"></script>
+    <script src="lt-tween.js"></script>
     <script src="lt-engine.js"></script>
     <script src="lt-engine-controls.js"></script>
     <script>
@@ -78,7 +78,7 @@
                     var g = document.querySelector('.lt-split-color .graphic');
                     var left = g.querySelector('.left-panel');
                     var right = g.querySelector('.right-panel');
-                    var tl = new gsap.timeline({ ease: 'power3.out', onComplete: resolve });
+                    var tl = LTTween.timeline({ onComplete: resolve });
                     tl.set(g, { opacity: 1 })
                       .fromTo(left, { x: '-110%' }, { x: '0%', duration: 0.6 })
                       .fromTo(right, { x: '110%' }, { x: '0%', duration: 0.6 }, '-=0.4');
@@ -89,7 +89,7 @@
                     var g = document.querySelector('.lt-split-color .graphic');
                     var left = g.querySelector('.left-panel');
                     var right = g.querySelector('.right-panel');
-                    var tl = new gsap.timeline({ ease: 'power3.in', onComplete: resolve });
+                    var tl = LTTween.timeline({ onComplete: resolve });
                     tl.to(right, { x: '110%', duration: 0.5 })
                       .to(left, { x: '-110%', duration: 0.5 }, '-=0.3')
                       .set(g, { opacity: 0 });

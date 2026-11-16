@@ -16,6 +16,7 @@
 const path = require('path')
 const context = require('./cg-studio-context')
 const { handleStudioApi } = require('./routes')
+const { migrateLegacyTweenDir } = require('./legacy-tween-migrate')
 
 /**
  * Historically synced verbatim into the electron launcher (mirror removed in
@@ -64,8 +65,11 @@ module.exports = {
 	},
 
 	onBoot(ctx) {
-		if (ctx && typeof ctx.log === 'function') {
-			ctx.log('info', '[cg-studio] mounted on playout server — UI at /cg-studio/index.html, API at /api/cg-studio')
-		}
+		const log = ctx && typeof ctx.log === 'function' ? ctx.log : null
+		if (log) log('info', '[cg-studio] mounted on playout server — UI at /cg-studio/index.html, API at /api/cg-studio')
+		// WO-1096: studio exports written before the vendored tween library was removed load lt-tween.js instead.
+		const upgraded = migrateLegacyTweenDir(context.getStudioDir())
+		if (upgraded.length && log)
+			log('info', `[cg-studio] upgraded ${upgraded.length} studio template(s) to lt-tween.js: ${upgraded.join(', ')}`)
 	},
 }

@@ -70,7 +70,7 @@
             <div class="subtitle"><p>Title</p></div>
         </div>
     </main>
-    <script src="vendor/gsap.min.js"></script>
+    <script src="lt-tween.js"></script>
     <script src="lt-engine.js"></script>
     <script src="lt-engine-controls.js"></script>
     <script>
@@ -92,8 +92,9 @@
                     const subtitle = subtitleCon.querySelector('p');
                     const w = LTEngine.getComputedStyle(graphic, 'width')[0];
                     const pathLen = w * 2;
-                    var tl = new gsap.timeline({ duration: 1, ease: 'power1.out', onComplete: resolve });
-                    tl.set(paths, { strokeDashoffset: pathLen, strokeDasharray: pathLen })
+                    // 1 s lead-in before the box draws (the timing this template has always had)
+                    var tl = LTTween.timeline({ onComplete: resolve });
+                    tl.set(paths, { strokeDashoffset: pathLen, strokeDasharray: pathLen }, 1)
                       .set(title, { y: '162px' })
                       .set(subtitleCon, { y: '108px' })
                       .set(subtitle, { y: '216px' })
@@ -113,8 +114,8 @@
                     var subtitle = subtitleCon.querySelector('p');
                     var w = LTEngine.getComputedStyle(graphic, 'width')[0];
                     var pathLen = w * 2;
-                    var tl = new gsap.timeline({ duration: 1, ease: 'power1.in', onComplete: resolve });
-                    tl.to(title, { y: '162px' })
+                    var tl = LTTween.timeline({ onComplete: resolve });
+                    tl.to(title, { y: '162px' }, 1)
                       .to(subtitleCon, { y: '108px' }, '-=.75')
                       .to(subtitle, { y: '216px' }, '-=.55')
                       .to(paths, { strokeDashoffset: pathLen, ease: 'power1.inOut', duration: 2 }, '-=1')

@@ -193,9 +193,9 @@ window.LTEngineStyles = (function () {
             document.body.style.fontFamily = "'Arial', 'Helvetica Neue', sans-serif";
         }
 
-        // Apply global animation speed if gsap is available
-        if (window.gsap && window.gsap.globalTimeline) {
-            gsap.globalTimeline.timeScale(C().style.speed ? Number(C().style.speed) : 1);
+        // Apply global animation speed (lt-tween.js)
+        if (window.LTTween) {
+            LTTween.timeScale(C().style.speed ? Number(C().style.speed) : 1);
         }
 
         // Apply position positioning on the main container

@@ -28,6 +28,7 @@ REDIST_NEEDLES=(
 	'^home/[^/]+/highascg/template/mario(/|$)|Nintendo-derived template (WO-1096 A)'
 	'^home/[^/]+/highascg/node_modules/wetransfert(/|$)|unlicensed npm package wetransfert (WO-1096 C)'
 	'^home/[^/]+/highascg/template/shaders/sh-(mario|balatro|audio-visualiser-v0-1-sadeghi|blue-thunder|closer-to-god|dot-globe|shader-equalizor)\.html$|retired shaders: Nintendo IP / no licence / all rights reserved / unknown origin (WO-1096 B)'
+	'^home/[^/]+/highascg/template/lower-thirds/vendor/gsap|GreenSock GSAP (proprietary standard licence; replaced by lt-tween.js, WO-1096 D)'
 )
 
 # WO-1096 F — what MUST ship: licence texts + the source offer. <if-ERE (empty = always)>|<required ERE>|<what>

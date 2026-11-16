@@ -75,7 +75,7 @@
             </div>
         </div>
     </main>
-    <script src="vendor/gsap.min.js"></script>
+    <script src="lt-tween.js"></script>
     <script src="lt-engine.js"></script>
     <script src="lt-engine-controls.js"></script>
     <script>
@@ -93,7 +93,7 @@
                     var g = document.querySelector('.lt-frosted-glass .graphic');
                     var h1 = g.querySelector('h1');
                     var sub = g.querySelector('.subtitle-row');
-                    var tl = new gsap.timeline({ ease: 'power2.out', onComplete: resolve });
+                    var tl = LTTween.timeline({ onComplete: resolve });
                     tl.set(g, { opacity: 0, scale: 0.92 })
                       .to(g, { opacity: 1, scale: 1, duration: 0.5 })
                       .fromTo(h1, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5 }, '-=0.25')
@@ -103,7 +103,7 @@
             animateOut: function() {
                 return new Promise(function(resolve) {
                     var g = document.querySelector('.lt-frosted-glass .graphic');
-                    var tl = new gsap.timeline({ ease: 'power2.in', onComplete: resolve });
+                    var tl = LTTween.timeline({ onComplete: resolve });
                     tl.to(g, { opacity: 0, scale: 0.92, duration: 0.45 });
                 });
             }

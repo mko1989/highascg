@@ -120,7 +120,7 @@ test('WO-951: the template — lt-engine contract the studio readers understand'
 	assert.deepEqual(fields, { title: 'Headline', subtitle: 'Description' }, 'the largest text is the title')
 	assert.match(html, /LTEngine\.init\(/)
 	assert.match(html, /src="\.\.\/lower-thirds\/lt-engine\.js"/)
-	assert.match(html, /src="\.\.\/lower-thirds\/vendor\/gsap\.min\.js"/)
+	assert.match(html, /src="\.\.\/lower-thirds\/lt-tween\.js"/) // WO-1096: own tweens, GSAP removed
 	assert.match(html, /src="assets\/lt-x\/image1\.gif"/)
 	assert.equal(parseInitSelectors(html).titleSel, '#gt-headline h1')
 	const d = studioLtDefaultsFromHtml(html)

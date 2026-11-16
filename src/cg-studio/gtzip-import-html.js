@@ -5,7 +5,7 @@
  *    export-template.js read and bake these two), any other text static;
  *  - the accent colour (the most used saturated fill) and the text colour are `--primary` / `--text` (`:root`), so the
  *    inspector's Primary / Text colour re-colour the import — the colour still has to be matched to a brand;
- *  - "Shrink" text shrinks to its box on every play; Skew is a GSAP skew (GSAP owns every transform);
+ *  - "Shrink" text shrinks to its box on every play; Skew is an LTTween skew (lt-tween.js owns every transform);
  *  - the default storyboard plays in (animateIn), TransitionOut plays out (animateOut; none = a fade).
  */
 'use strict'
@@ -117,7 +117,7 @@ function buildHtml(model, opts) {
     <main class="gt-root">
         ${body.join('\n        ')}
     </main>
-    <script src="../lower-thirds/vendor/gsap.min.js"></script>
+    <script src="../lower-thirds/lt-tween.js"></script>
     <script src="../lower-thirds/lt-engine.js"></script>
     <script src="../lower-thirds/lt-engine-controls.js"></script>
     <script>
@@ -150,7 +150,7 @@ function buildHtml(model, opts) {
                 else tl.to(el, Object.assign(off, t), a.delay);
             } else if (a.type === 'Expand') {
                 var o = gtOrigin(a.direction);
-                gsap.set(el, { transformOrigin: o.origin });
+                LTTween.set(el, { transformOrigin: o.origin });
                 if (into) tl.fromTo(el, { opacity: 1, scaleX: o.sx, scaleY: o.sy }, Object.assign({ scaleX: 1, scaleY: 1 }, t), a.delay);
                 else tl.to(el, Object.assign({ scaleX: o.sx, scaleY: o.sy }, t), a.delay);
             } else if (a.type === 'Rotate') {
@@ -163,7 +163,7 @@ function buildHtml(model, opts) {
         function gtReset() {
             Object.keys(GT.GEOM).forEach(function (id) {
                 var g = GT.GEOM[id], el = document.getElementById(id);
-                gsap.set(el, { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1, skewX: g.skew ? -g.skew[0] : 0, skewY: g.skew ? -g.skew[1] : 0 });
+                LTTween.set(el, { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1, skewX: g.skew ? -g.skew[0] : 0, skewY: g.skew ? -g.skew[1] : 0 });
             });
         }
         gtReset();
@@ -181,15 +181,15 @@ function buildHtml(model, opts) {
                 return new Promise(function (resolve) {
                     gtReset();
                     gtFit();
-                    GT.IN.forEach(function (a) { gtEls(a.object).forEach(function (el) { gsap.set(el, { opacity: 0 }); }); });
-                    var tl = gsap.timeline({ onComplete: resolve });
+                    GT.IN.forEach(function (a) { gtEls(a.object).forEach(function (el) { LTTween.set(el, { opacity: 0 }); }); });
+                    var tl = LTTween.timeline({ onComplete: resolve });
                     tl.set('.gt-root', { opacity: 1 }, 0);
                     GT.IN.forEach(function (a) { gtEls(a.object).forEach(function (el) { gtAdd(tl, a, el, true); }); });
                 });
             },
             animateOut: function () {
                 return new Promise(function (resolve) {
-                    var tl = gsap.timeline({ onComplete: function () { gsap.set('.gt-root', { opacity: 0 }); gtReset(); resolve(); } });
+                    var tl = LTTween.timeline({ onComplete: function () { LTTween.set('.gt-root', { opacity: 0 }); gtReset(); resolve(); } });
                     if (!GT.OUT.length) tl.to('.gt-root', { opacity: 0, duration: 0.4 });
                     GT.OUT.forEach(function (a) { gtEls(a.object).forEach(function (el) { gtAdd(tl, a, el, false); }); });
                 });

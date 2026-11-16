@@ -63,7 +63,7 @@
             </div>
         </div>
     </main>
-    <script src="vendor/gsap.min.js"></script>
+    <script src="lt-tween.js"></script>
     <script src="lt-engine.js"></script>
     <script src="lt-engine-controls.js"></script>
     <script>
@@ -82,7 +82,7 @@
                     var bar = g.querySelector('.accent-bar');
                     var h1 = g.querySelector('h1');
                     var p = g.querySelector('p');
-                    var tl = new gsap.timeline({ ease: 'power2.out', onComplete: resolve });
+                    var tl = LTTween.timeline({ onComplete: resolve });
                     tl.set(g, { opacity: 1 })
                       .fromTo(bar, { scaleY: 0, transformOrigin: 'bottom' }, { scaleY: 1, duration: 0.5 })
                       .fromTo(h1, { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.6 }, '-=0.2')
@@ -92,7 +92,7 @@
             animateOut: function() {
                 return new Promise(function(resolve) {
                     var g = document.querySelector('.lt-minimal-fade .graphic');
-                    var tl = new gsap.timeline({ ease: 'power2.in', onComplete: resolve });
+                    var tl = LTTween.timeline({ onComplete: resolve });
                     tl.to(g, { opacity: 0, y: 10, duration: 0.6 })
                       .set(g, { y: 0 });
                 });

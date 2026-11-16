@@ -62,7 +62,7 @@
             <div class="title-row"><p>Title</p></div>
         </div>
     </main>
-    <script src="vendor/gsap.min.js"></script>
+    <script src="lt-tween.js"></script>
     <script src="lt-engine.js"></script>
     <script src="lt-engine-controls.js"></script>
     <script>
@@ -81,7 +81,7 @@
                     var accent = g.querySelector('.accent-line');
                     var nameRow = g.querySelector('.name-row');
                     var titleRow = g.querySelector('.title-row');
-                    var tl = new gsap.timeline({ ease: 'power2.out', onComplete: resolve });
+                    var tl = LTTween.timeline({ onComplete: resolve });
                     tl.set(g, { opacity: 1 })
                       .fromTo(accent, { scaleX: 0 }, { scaleX: 1, duration: 0.6 })
                       .fromTo(nameRow, { x: '-110%', opacity: 0 }, { x: '0%', opacity: 1, duration: 0.7 }, '-=0.3')
@@ -94,7 +94,7 @@
                     var accent = g.querySelector('.accent-line');
                     var nameRow = g.querySelector('.name-row');
                     var titleRow = g.querySelector('.title-row');
-                    var tl = new gsap.timeline({ ease: 'power2.in', onComplete: resolve });
+                    var tl = LTTween.timeline({ onComplete: resolve });
                     tl.to(titleRow, { x: '-110%', opacity: 0, duration: 0.4 })
                       .to(nameRow, { x: '-110%', opacity: 0, duration: 0.5 }, '-=0.2')
                       .to(accent, { scaleX: 0, duration: 0.4 }, '-=0.2')

@@ -6,7 +6,7 @@
  * Composition of Rectangle / Image / TextBlock / Ellipse, plus `<Storyboard>`s: the default one plays in,
  * Type="TransitionOut" plays out), resources.xml (image file name → the ZIP entry holding it), the image entries and a
  * thumbnail. The import writes `template/studio/lt-<name>.html` on the lt-engine contract the CG Studio exports use
- * (`LTEngine.init({ titleSel, subtitleSel, animateIn, animateOut })`, GSAP from ../lower-thirds/vendor), with the
+ * (`LTEngine.init({ titleSel, subtitleSel, animateIn, animateOut })`, tweens from ../lower-thirds/lt-tween.js), with the
  * images under `template/studio/assets/lt-<name>/` — so it is listed, taken and edited like any studio lower third:
  * the largest text is the title (h1), the next the subtitle (div.subtitle p), the inspector fills them.
  *
