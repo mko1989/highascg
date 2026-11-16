@@ -9,8 +9,8 @@ extends RefCounted
 ## camera sits at target + (sin yaw · cos pitch, sin pitch, cos yaw · cos pitch) · dist, yaw 0 = from +Z.
 ##   Front — from the audience, level (a slight look down), the stage + screens across the frame with a margin;
 ##   Top   — from high above with the audience at the bottom of the picture (upstage = up), the stage's plan in frame;
-##   ISO   — a three-quarter view from the audience's side, the whole stage box in frame (inside a venue: under its
-##           ceiling — from above, the coffers and chandeliers stand between the camera and the stage).
+##   ISO   — a three-quarter view from the audience's side, the whole stage box in frame (inside a venue: a metre under
+##           its ceiling — from above, the coffers and chandeliers stand between the camera and the stage).
 ## No stage objects and no tracking grid: the old fixed poses (around the venue box's centre when there is a venue).
 
 const Aim := preload("res://features/previs/tracking/aim_model.gd")
@@ -22,7 +22,7 @@ const HEAD := 1.8  # a person standing on the grid stays in the picture
 const MARGIN := 1.15  # 15 % air around the framed box
 const MIN_DIST := 4.0
 const FOV := 50.0  # previs_stage.gd Camera3D.fov (vertical)
-const ROOM_HEIGHT := 0.8  # ISO inside a venue: the camera at most this far up the room's height
+const CEILING_GAP := 1.0  # ISO inside a venue: the camera this far (m) under the room's top (owner 16.11: "like a meter from the ceiling")
 
 
 ## The stage box in the Godot frame (visible stage objects + the tracking grid with HEAD on it); AABB() = no stage data.
@@ -96,9 +96,8 @@ static func pose(name: String, project: Dictionary, aspect := 16.0 / 9.0, room :
 	var c := box.get_center()
 	if name == "ISO" and room.size.y > 0.0 and room.has_point(Vector3(c.x, room.get_center().y, c.z)):
 		# inside a venue the three-quarter view stays under its ceiling (chandeliers, coffers), like a person in the room
-		var cap := room.position.y + ROOM_HEIGHT * room.size.y - c.y
-		if c.y + dist * sin(pitch) > room.position.y + ROOM_HEIGHT * room.size.y:
-			pitch = maxf(LEGACY["Front"].y, asin(clampf(cap / dist, -1.0, 1.0)))
+		var rise := room.position.y + room.size.y - CEILING_GAP - c.y  # camera height above the orbit point
+		pitch = maxf(LEGACY["Front"].y, asin(clampf(rise / dist, -1.0, 1.0)))
 	return {"yaw": wrapf(yaw, -PI, PI), "pitch": pitch, "dist": dist, "target": c, "from": aud.from}
 
 

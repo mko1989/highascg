@@ -66,7 +66,7 @@ func test_hilton_front_looks_from_the_audience_at_the_stage() -> void:
 	t.ok(absf(wrapf(iso.yaw - (-PI / 2.0 - 0.75), -PI, PI)) < 1e-4, "ISO: three-quarter from the audience side")
 	t.ok(_frames(iso, box, 1.19), "ISO: the stage in frame")
 	var ic := _cam(iso).origin
-	t.ok(ic.y < room.position.y + 0.8 * room.size.y + 0.01 and room.has_point(ic), "ISO: in the room, under its ceiling (y %.1f)" % ic.y)
+	t.ok(absf(ic.y - (room.position.y + room.size.y - 1.0)) < 0.02 and room.has_point(ic), "ISO: in the room, a metre under its ceiling (y %.2f)" % ic.y)
 	t.ok(is_equal_approx(V.pose("ISO", pr, 1.19).pitch, 0.45), "ISO without a venue: the old pitch")
 
 
