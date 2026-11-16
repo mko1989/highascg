@@ -29,6 +29,7 @@ const InspectorPanel := preload("res://app/inspector_panel.gd")
 const GlbScreens := preload("res://features/previs/glb_screens_model.gd")
 const Fold := preload("res://features/previs/fold_section.gd")
 const UI := preload("res://features/previs/previs_ui.gd")
+const ViewPresets := preload("res://features/previs/view_presets.gd")  # WO-1098
 const UI_CFG := "user://ui.cfg"
 const MODES := ["3d", "camera"]
 
@@ -212,6 +213,12 @@ func _on_tracking_changed() -> void:
 	_push_masks()
 	_apply_drive()
 	_refresh_coverage()
+
+
+## WO-1098: a View preset framed on this project's stage from its audience side (view_presets.gd).
+func _view_pose(name: String) -> Dictionary:
+	var vs := stage.get_viewport().get_visible_rect().size if stage.get_viewport() != null else Vector2(16, 9)
+	return ViewPresets.pose(name, Store.project, vs.x / maxf(1.0, vs.y), mvr.bounds())
 
 
 ## Fit / F: the stage objects, the MVR scene and the GDTF fixtures, plus the tracking cameras and grid while they are
@@ -463,7 +470,7 @@ func _build_panel() -> Control:
 	for p in ["Front", "Top", "ISO"]:
 		var b := Button.new()
 		b.text = p
-		b.pressed.connect(func() -> void: stage.fly_to_preset(p))
+		b.pressed.connect(func() -> void: stage.fly_to_preset(p, _view_pose(p)))
 		cams.add_child(b)
 	v.add_child(Fold.new("View", [UI.caption("Camera"), cams, UI.caption("Live picture on the screens"), _source]))
 	stage_panel = StagePanel.new()

@@ -130,16 +130,25 @@ func set_live_texture(tex: Texture2D) -> void:
 		(mi as MeshInstance3D).material_override = led_material(tex)
 
 
-func fly_to_preset(name: String) -> void:
+## WO-1098: `pose` (view_presets.gd: yaw, pitch, dist, target | null) frames the stage from its audience; without one
+## the fixed PRESETS pose around the current orbit point.
+func fly_to_preset(name: String, pose := {}) -> void:
 	var p: Vector3 = PRESETS.get(name, PRESETS["Front"])
+	if not pose.is_empty():
+		p = Vector3(_yaw + wrapf(float(pose.yaw) - _yaw, -PI, PI), float(pose.pitch), float(pose.dist))
+	var t0 := _target
+	var t1: Vector3 = pose.target if pose.get("target") is Vector3 else _target
 	if _fly_tween != null:
 		_fly_tween.kill()
 	_fly_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	_fly_tween.tween_method(func(v: Vector3) -> void:
+	var from := Vector3(_yaw, _pitch, _dist)
+	_fly_tween.tween_method(func(k: float) -> void:
+		var v := from.lerp(p, k)
 		_yaw = v.x
 		_pitch = v.y
 		_dist = v.z
-		_update_camera(), Vector3(_yaw, _pitch, _dist), p, 0.5)  # 500 ms, as WO-17 T4.1
+		_target = t0.lerp(t1, k)
+		_update_camera(), 0.0, 1.0, 0.5)  # 500 ms, as WO-17 T4.1
 
 
 static func led_material(tex: Texture2D) -> StandardMaterial3D:
