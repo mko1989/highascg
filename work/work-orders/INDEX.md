@@ -1003,7 +1003,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1091 DONE [tracking-vr+godot-client] Tracking camera: a new camera sees the stage, rough aim in the Camera view, zoo… → 1091_WO_tracking_camera_aim_at_stage_and_view_nav.md
 - 1094 DONE [tracking-vr+godot-client,os-iso] Person detection runtime: status, install / repair / remove and offline provisi… → 1094_WO_detection_runtime_install_from_gui.md
 - 1098 DONE [tracking-vr+godot-client,media] OBJ venue importer (SketchUp export → venue .glb) and the real Hilton ballroom → 1098_WO_obj_venue_importer_and_real_hilton_hall.md
-- 1103 DONE [tracking-vr+godot-client] Realistic woman / man test puppets (previs "puppet" bodies: MakeHuman CC0, plan… → 1103_WO_realistic_human_test_puppets.md
+- 1103 DONE [tracking-vr+godot-client] Realistic woman / man test puppets (Rocketbox MIT bodies + motion capture; brin… → 1103_WO_realistic_human_test_puppets.md
 
 ## testing-ci — Tests and CI (28)
 
