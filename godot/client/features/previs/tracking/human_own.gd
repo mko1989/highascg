@@ -20,7 +20,7 @@ const EXT := ["glb", "gltf", "fbx"]
 const MAX_TEX := 2048
 const WARN_TRIS := 150000
 const MAX_TRIS := 1000000
-const CARDS_RE := "hair|lash|brow|fuzz|card|beard|groom"
+const CARDS_RE := "hair|lash|brow|fuzz|card|beard|groom|opacity|alpha"
 const HIDE_RE := "eyeedge|eye_edge|eyeshell|eye_shell|occlusion|cartilage|tearline|tear_line|eyelashes_?shadow"
 const SKIN_RE := "skin|head|face|body|torso|arm|leg"
 
@@ -292,7 +292,9 @@ static func _materials(root: Node, rep: Dictionary) -> void:
 	for mi: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		for s in mi.mesh.get_surface_count():
-			var m := mi.mesh.surface_get_material(s)
+			var m := mi.get_surface_override_material(s)  # Tex.fill's, if it gave the surface its maps
+			if m == null:
+				m = mi.mesh.surface_get_material(s)
 			var name := (m.resource_name if m != null else "") + " " + mi.name
 			if hider.search(name) != null:
 				var off := StandardMaterial3D.new()

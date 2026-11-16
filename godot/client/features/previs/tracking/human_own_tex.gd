@@ -3,7 +3,8 @@ extends RefCounted
 ## images (they go through the resource loader, which has no runtime loader for loose .png / .tga files, or through
 ## the absolute path on the author's machine), so a material left without a colour map gets one from the model's
 ## folder by file name: the image whose name shares the most words with the material's, with a colour word
-## (basecolor / albedo / diffuse / color / _d) for the colour map and a normal word for the normal map. A GLB embeds
+## (basecolor / albedo / diffuse / color / _d) for the colour map and a normal word for the normal map; words every
+## image shares (the model's prefix) do not count, so the hair never borrows the body's normal map. A GLB embeds
 ## its images and needs none of this.
 
 const IMG := ["png", "jpg", "jpeg", "tga", "webp", "bmp"]
@@ -52,7 +53,8 @@ static func _images(folder: String, into: Array = []) -> Array:
 
 ## The best file for material `mat` among those with one of `kind`'s words; "" if none shares a word with it.
 static func _pick(files: Array, mat: String, kind: Array) -> String:
-	var words := _words(mat)
+	var words := _words(mat).filter(func(w: String) -> bool:  # a word every image has (the model's prefix) tells nothing
+		return not files.all(func(f: String) -> bool: return f.get_file().to_lower().contains(w)))
 	var best := ""
 	var score := 0
 	for f: String in files:

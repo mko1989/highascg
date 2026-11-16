@@ -169,3 +169,39 @@ func test_own_synthetic_humanoid_is_placed_and_walks() -> void:
 	t.ok(drift < 0.08, "a planted toe drifts %.3f m at most (other proportions than the clips' actor)" % drift)
 	h.free()
 	Body._templates.erase("own:synth")
+
+
+## FBX: a material without a colour map gets the folder's image by name, and the look pass keeps it (hair cards cut).
+func test_fbx_textures_by_name_survive_the_look_pass() -> void:
+	const Tex := preload("res://features/previs/tracking/human_own_tex.gd")
+	var dir := OS.get_user_data_dir().path_join("wo1103_tex")
+	DirAccess.make_dir_recursive_absolute(dir.path_join("Textures"))
+	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0.8, 0.5, 0.4))
+	img.save_png(dir.path_join("Textures/x01_body_color.png"))
+	img.save_png(dir.path_join("Textures/x01_body_normal.png"))
+	img.save_png(dir.path_join("Textures/x01_hair_color.png"))
+	var root := Node3D.new()
+	var mi := MeshInstance3D.new()
+	var mesh := ArrayMesh.new()
+	for n in ["x01_body", "x01_hair"]:
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for v in [Vector3.ZERO, Vector3.RIGHT, Vector3.UP]:
+			st.add_vertex(v)
+		var m := StandardMaterial3D.new()
+		m.resource_name = n
+		st.set_material(m)
+		st.commit(mesh)
+	mi.mesh = mesh
+	root.add_child(mi)
+	t.eq(Tex.fill(root, dir), 3, "body colour + normal, hair colour")
+	var rep := {"warnings": []}
+	Own._materials(root, rep)
+	var body := mi.get_surface_override_material(0) as BaseMaterial3D
+	var hair := mi.get_surface_override_material(1) as BaseMaterial3D
+	t.ok(body.albedo_texture != null and body.normal_texture != null, "the body keeps its colour and normal maps")
+	t.ok(body.subsurf_scatter_enabled, "skin: a little subsurface scattering")
+	t.ok(hair.albedo_texture != null and hair.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		and hair.alpha_antialiasing_mode == BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE, "hair: textured, alpha-cut cards with A2C")
+	root.free()
