@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1000 live WOs (36 open, 155 in progress, 809 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1001 live WOs (36 open, 155 in progress, 810 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -240,7 +240,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1022 IN PROGRESS [caspar-build+os-iso] Server releases carry the hand-built Caspar (and point at its complete source) → 1022_WO_releases_carry_hand_built_caspar.md
 - 1033 OPEN [caspar-build+video-io,engine] Zero-copy GPU frames in the Caspar build: future work for headroom → 1033_WO_zero_copy_gpu_frames_future_work.md
 
-## audio — Audio routing, devices, meters (54)
+## audio — Audio routing, devices, meters (55)
 
 - 06 DONE [audio] Multi-Channel Audio Playout Architecture (CasparCG on Ubuntu) → 06_WO_AUDIO_PLAYOUT.md
 - 16 DONE [audio] Yamaha DM3 Audio Integration → 16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md
@@ -296,6 +296,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1056 OPEN [audio] LTC out on its own channel pair of a multichannel interface that also carries p… → 1056_WO_ltc_on_a_pair_of_a_shared_multichannel_device.md
 - 1058 DONE [audio+engine] LTC out to ALSA re-located ~3×/s (never ran clean); stuck 2 frames behind after… → 1058_WO_ltc_out_relocates_constantly.md
 - 1071 DONE [audio] Live audio input dead after the USB interface re-enumerated; could not be resta… → 1071_WO_live_audio_input_follows_usb_card.md
+- 1092 DONE [audio+engine,godot-client] LTC out: on time at the card, real settings, LTC on its own channel (pair) of a… → 1092_WO_ltc_out_settings_and_channel_pair.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (36)
 
