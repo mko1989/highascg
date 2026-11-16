@@ -9,7 +9,7 @@ render_mode cull_back;
 uniform vec4 albedo : source_color = vec4(0.7, 0.7, 0.7, 1.0);
 uniform float self_light = 0.3;
 uniform float rim = 0.2;
-const float LIGHT_MAX = 0.75;  // direct light ceiling (+ self_light + rim ≈ 1.1 × colour at most)
+#include "res://features/previs/tracking/person_light.gdshaderinc"  // WO-1103: shared with the human puppets
 
 void fragment() {
 	ALBEDO = albedo.rgb;
@@ -18,9 +18,6 @@ void fragment() {
 	EMISSION = albedo.rgb * (self_light + rim * r);
 }
 
-void light() {
-	float wrap = clamp((dot(NORMAL, LIGHT) + 0.4) / 1.4, 0.0, 1.0);  // lambert wrap: no hard terminator
-	vec3 l = LIGHT_COLOR * ATTENUATION * wrap / PI;
-	vec3 room = max(vec3(LIGHT_MAX) - DIFFUSE_LIGHT, vec3(0.0));
-	DIFFUSE_LIGHT += room * l / (vec3(0.5) + l);  // a fraction of the headroom: the sum tends to LIGHT_MAX, never past
+void light() {  // lambert wrap 0.4 (no hard terminator), saturating under PERSON_LIGHT_MAX (+ self_light + rim ≈ 1.1 × colour)
+	person_diffuse(NORMAL, LIGHT, LIGHT_COLOR, ATTENUATION, vec3(0.4), DIFFUSE_LIGHT);
 }

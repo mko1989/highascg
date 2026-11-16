@@ -6,8 +6,12 @@ extends Node3D
 ## A world person that vanishes leaves its avatar standing HOLD_S; a new world id that carries one of its camera keys
 ## ("cam:tid" — the tracker revives a remembered person under the same tid, WO-1080) takes that avatar over, so a
 ## brief loss or a fusion re-number does not pop the figure or change its look.
+##
+## WO-1103: a test puppet card with body "woman" / "man" gets a realistic human (person_human.gd) instead of the pebble;
+## a body change swaps the node in place (same id, same look memo).
 
 const Avatar := preload("res://features/previs/tracking/person_avatar.gd")
+const Human := preload("res://features/previs/tracking/person_human.gd")  # WO-1103
 const AV := preload("res://features/previs/tracking/person_avatar_model.gd")
 const C := preload("res://features/previs/tracking/camera_model.gd")
 
@@ -34,13 +38,20 @@ func show_cards(cards: Array, now: float) -> void:
 		if e == null:
 			e = _adopt(c.get("keys", []))
 			if e == null:
-				var n := Avatar.new()
-				add_child(n)
-				e = {"node": n, "memo": {}}
+				e = {"node": null, "memo": {}, "body": ""}
 			_live[id] = e
+		var body := str(c.get("body", "")) if Human.wants(c.get("body", "")) else ""  # WO-1103: "" = the pebble
+		if e.node == null or str(e.get("body", "")) != body:
+			if e.node != null:
+				_drop(e.node)
+			e.node = Human.new(body) if body != "" else Avatar.new()
+			e.body = body
+			add_child(e.node)
 		e.keys = c.get("keys", [])
 		var look := AV.look(AV.pick(c.get("looks", []), e.memo))
 		(e.node as Node3D).visible = true
+		if e.node is Human:
+			e.node.set_heading(c.get("heading"))
 		e.node.set_target(C.psn_to_godot(c.feet), float(c.height), look, c.get("joints"), now)
 		e.node.set_tag(str(c.get("tag", "")))  # WO-1087: test puppet people are labelled
 	for g in _gone.duplicate():

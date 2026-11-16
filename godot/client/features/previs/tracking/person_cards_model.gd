@@ -65,6 +65,7 @@ static func cards(snap: Variant, cams: Array, pick := {}, now := NAN) -> Array:
 
 ## WO-1087: the test puppet people (src/tracking/puppet-people.js) — world persons flagged `puppet` that no camera
 ## sees: no box, so only the avatars style draws them, from their own `traits`, labelled with their `name`.
+## WO-1103: + `body` (cartoon / woman / man: person_avatars.gd picks the pebble or the human) and `heading` (rad, PSN).
 static func puppet_cards(snap: Variant) -> Array:
 	var out := []
 	if not (snap is Dictionary) or not (snap.get("world") is Dictionary):
@@ -78,7 +79,8 @@ static func puppet_cards(snap: Variant) -> Array:
 		out.append({"id": int(wp.id), "feet": [float(wp.x), float(wp.y), plane_z], "joints": null, "keys": [key],
 			"height": clampf(h, MIN_HEIGHT, MAX_HEIGHT) if is_finite(h) and h > 0.0 else DEFAULT_HEIGHT,
 			"looks": [{"key": key, "traits": wp.traits}] if wp.get("traits") is Dictionary else [],
-			"tag": str(wp.get("name", "TEST puppet"))})
+			"tag": str(wp.get("name", "TEST puppet")),
+			"body": str(wp.get("body", "cartoon")), "heading": wp.get("heading")})  # WO-1103: the operator's Look, facing
 	return out
 
 

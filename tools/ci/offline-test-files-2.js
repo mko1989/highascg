@@ -103,4 +103,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1096-shader-licences.test.js', // WO-1096 B: every shipped shader carries author/source/licence; manifest; retired ids stay out
 	'tools/smoke/smoke-wo1096-lower-thirds-no-gsap.test.js', // WO-1096 D: GSAP removed; lt-tween.js eases/timeline maths, legacy studio-export upgrade
 	'tools/smoke/smoke-wo1097-desk-feed.test.js', // WO-1097 desk feed: final fronts' pan/tilt/dimmer to the LD's desk (mirror byte-for-byte, hold, refusals, CSV)
+	'tools/smoke/smoke-wo1103-puppet-humans.test.js', // WO-1103 human test puppets: body / walk API, CC0 asset manifest + notices + recipe, Godot wiring
 ]

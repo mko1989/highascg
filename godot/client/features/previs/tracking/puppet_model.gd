@@ -53,5 +53,7 @@ static func people_summary(s: Variant) -> String:
 		return ("Off — switched itself off (time limit). " if d.get("stopped") == "ttl" else "Off. ") + "Test people for the previs avatars and Auto follow."
 	var st: Dictionary = d.get("stage") if d.get("stage") is Dictionary else {}
 	var where := "standing in the stage centre (stage too small)" if st.get("degenerate") == true else "walking the stage"
+	if d.get("walk") == false and st.get("degenerate") != true:  # WO-1103
+		where = "standing where they stopped (Walk off)"
 	return "ON — %d test %s %s · off by itself in %d min" % [int(d.get("count", 1)), "person" if int(d.get("count", 1)) == 1 else "people",
 		where, ceili(float(d.get("ends_in_s", 0.0)) / 60.0)]

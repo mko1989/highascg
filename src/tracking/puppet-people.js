@@ -20,8 +20,15 @@
  * "TEST puppet n" and flagged `puppet: true`, world ids from ID_BASE (never a fused id).
  *
  * HTTP (routed by register.js): GET /api/tracking/puppet/people → status · POST {enabled?, count? 1–3, seed?,
- * new_look?: true, ttl_min?} → status. A seed makes the walk and the looks repeatable (tests); without one each start
- * draws a fresh one.
+ * new_look?: true, ttl_min?, body?, walk?} → status. A seed makes the walk and the looks repeatable (tests); without one
+ * each start draws a fresh one.
+ *
+ * WO-1103 (owner 16.11: "the hq avatars are for previz purposes only as a 'puppet'"): `body` picks what the previs draws
+ * for them — "cartoon" (the WO-1086 pebble avatar, the default), "woman" / "man" (the realistic MakeHuman bodies,
+ * godot/client/assets/people) or "mixed" (woman, man, woman by index). A human body gets a human height from the same
+ * draw (WOMAN_M / MAN_M: the look's HEIGHT_M position mapped, so the random sequence is unchanged). `walk: false` stops
+ * them where they are (standing, still turning to look round on their pauses' headings) until `walk: true`. Each person
+ * carries `body` and `heading` (rad, PSN: atan2(y, x) of where they face), so a figure turns on the spot too.
  */
 
 const { JSON_HEADERS, parseBodyStrict } = require('../api/response')
@@ -32,7 +39,10 @@ const ID_BASE = 900000 // world ids 900001…900003: far above fusion's (from 1 
 const HZ = 30
 const STAGE_MS = 500 // the stage (project grid) is re-read this often while they walk
 const AREA = 0.05 // the "box area" the Auto director ranks people by (fusion.js: largest normalised box)
-const DEFAULTS = { count: 1, ttl_min: 120 }
+const DEFAULTS = { count: 1, ttl_min: 120, body: 'cartoon', walk: true }
+const BODIES = ['cartoon', 'woman', 'man', 'mixed'] // WO-1103
+const WOMAN_M = [1.6, 1.76] // m — a human body's height range (the look's HEIGHT_M draw mapped onto it)
+const MAN_M = [1.72, 1.88]
 
 const r3 = (v) => Math.round(v * 1000) / 1000
 
@@ -72,13 +82,27 @@ function createPuppetPeople({ stage = () => null, now = Date.now, timers = { set
 		while (people.length < n) people.push(person(people.length))
 	}
 
+	/** WO-1103: the body the k-th person (0-based) wears. */
+	const bodyOf = (k) => (cfg.body === 'mixed' ? (k % 2 === 0 ? 'woman' : 'man') : cfg.body)
+
+	/** WO-1103: a human body's height — the look's draw (HEIGHT_M) mapped onto WOMAN_M / MAN_M; cartoon: as drawn. */
+	function heightOf(p, k) {
+		const b = bodyOf(k)
+		if (b !== 'woman' && b !== 'man') return p.look.height
+		const [lo, hi] = W.HEIGHT_M, [a, z] = b === 'woman' ? WOMAN_M : MAN_M
+		return r3(a + ((z - a) * (p.look.height - lo)) / (hi - lo))
+	}
+
 	/** One step at time `t` (ms) — the timer's, or a test's. */
 	function step(t = now()) {
 		if (t - startedAt >= cfg.ttl_min * 60000) return stop('ttl')
 		readStage(t)
 		const dt = Math.max(0, t - last) / 1000
 		last = t
-		for (const p of people) W.stepWalker(p.walker, walkRng, rect, dt)
+		for (const p of people) {
+			if (cfg.walk) W.stepWalker(p.walker, walkRng, rect, dt)
+			else Object.assign(p.walker, { v: 0, vx: 0, vy: 0 }) // WO-1103 "stand here": stopped where they are
+		}
 		W.keepApart(people.map((p) => p.walker), rect)
 		steps++
 	}
@@ -115,6 +139,10 @@ function createPuppetPeople({ stage = () => null, now = Date.now, timers = { set
 		const ttl = Number(b.ttl_min)
 		if (b.ttl_min != null && !(Number.isFinite(ttl) && ttl >= 1 && ttl <= 720)) return { ok: false, error: 'ttl_min must be 1–720' }
 		if (b.seed != null && !Number.isInteger(b.seed)) return { ok: false, error: 'seed must be an integer' }
+		if (b.body != null && !BODIES.includes(b.body)) return { ok: false, error: `body must be one of ${BODIES.join(', ')}` }
+		if (b.walk != null && typeof b.walk !== 'boolean') return { ok: false, error: 'walk must be true or false' }
+		if (b.body != null) cfg.body = b.body
+		if (b.walk != null) cfg.walk = b.walk
 		if (b.count != null) cfg.count = n
 		if (b.ttl_min != null) cfg.ttl_min = ttl
 		const want = b.enabled == null ? live() : b.enabled === true
@@ -125,10 +153,11 @@ function createPuppetPeople({ stage = () => null, now = Date.now, timers = { set
 		return { ok: true }
 	}
 
-	/** World persons (fusion.js persons() shape + puppet, name, traits) for the WS snapshot. */
+	/** World persons (fusion.js persons() shape + puppet, name, traits; WO-1103 body, heading) for the WS snapshot. */
 	function persons() {
-		return people.map((p) => ({ id: p.id, x: r3(p.walker.x), y: r3(p.walker.y), vx: r3(p.walker.vx), vy: r3(p.walker.vy), height: p.look.height,
-			source: 'puppet', cameras: [], keys: [], score: 1, area: AREA, age_s: 0, puppet: true, name: p.name, traits: { ...p.look.traits } }))
+		return people.map((p, k) => ({ id: p.id, x: r3(p.walker.x), y: r3(p.walker.y), vx: r3(p.walker.vx), vy: r3(p.walker.vy), height: heightOf(p, k),
+			source: 'puppet', cameras: [], keys: [], score: 1, area: AREA, age_s: 0, puppet: true, name: p.name, traits: { ...p.look.traits },
+			body: bodyOf(k), heading: r3(p.walker.h) }))
 	}
 
 	/** The detect pin / Auto director's person shape (register.js worldPersons). */
@@ -139,9 +168,9 @@ function createPuppetPeople({ stage = () => null, now = Date.now, timers = { set
 	function status() {
 		const t = now()
 		if (!live()) readStage(t, true) // idle: the stage they would walk now
-		return { enabled: live(), count: cfg.count, seed: live() ? cfg.seed : null, ttl_min: cfg.ttl_min,
+		return { enabled: live(), count: cfg.count, seed: live() ? cfg.seed : null, ttl_min: cfg.ttl_min, body: cfg.body, walk: cfg.walk,
 			stage: { lo: rect.lo.map(r3), hi: rect.hi.map(r3), z: rect.z, margin_m: W.MARGIN, degenerate: rect.degenerate },
-			people: persons().map(({ id, name, x, y, height, traits }) => ({ id, name, x, y, z: rect.z, height, traits })),
+			people: persons().map(({ id, name, x, y, height, traits, body }) => ({ id, name, x, y, z: rect.z, height, traits, body })),
 			steps, ends_in_s: live() ? Math.max(0, Math.round((startedAt + cfg.ttl_min * 60000 - t) / 1000)) : null, stopped: live() ? null : stopReason }
 	}
 
@@ -164,4 +193,4 @@ function createPuppetPeople({ stage = () => null, now = Date.now, timers = { set
 	return { configure, step, stop, status, handle, persons, pinPersons, get live() { return live() } }
 }
 
-module.exports = { createPuppetPeople, ID_BASE, PATH }
+module.exports = { createPuppetPeople, ID_BASE, PATH, BODIES, WOMAN_M, MAN_M }

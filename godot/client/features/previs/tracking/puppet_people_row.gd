@@ -4,14 +4,19 @@ extends VBoxContainer
 ## puppet. make sure the test puppet doesnt leave the stage". The server walks them inside the tracking stage
 ## (src/tracking/puppet-people.js) as world persons: the previs draws them as avatars (People: avatars) labelled
 ## "TEST puppet n", and the Auto director / spot handover follow them like detected people. Off at every server start.
+## WO-1103: Look — Cartoon (the pebble avatar, default) / Woman / Man / Mixed (realistic MakeHuman bodies, for previs
+## only) — and Walk (off: they stop where they are and stand, still turning to look round).
 
 const PM := preload("res://features/previs/tracking/puppet_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const PATH := "/api/tracking/puppet/people"
+const LOOKS := ["Cartoon", "Woman", "Man", "Mixed"]  # WO-1103 → body cartoon / woman / man / mixed
 
 var _on: CheckButton
 var _count: OptionButton
 var _state: Label
+var _look: OptionButton
+var _walk: CheckBox
 
 
 func _ready() -> void:
@@ -36,6 +41,23 @@ func _ready() -> void:
 	look.pressed.connect(func() -> void: _post({"new_look": true}))
 	row.add_child(look)
 	add_child(row)
+	var row2 := HBoxContainer.new()  # WO-1103
+	var ll := Label.new()
+	ll.text = "Look"
+	row2.add_child(ll)
+	_look = OptionButton.new()
+	for n in LOOKS:
+		_look.add_item(n)
+	_look.tooltip_text = "What the previs draws for the test people: the cartoon figure, or a realistic woman / man (Mixed: woman, man, woman).\nPrevis only — a puppet's look, never a tracked person's."
+	_look.item_selected.connect(func(i: int) -> void: _post({"body": LOOKS[i].to_lower()}))
+	row2.add_child(_look)
+	_walk = CheckBox.new()
+	_walk.text = "Walk"
+	_walk.button_pressed = true
+	_walk.tooltip_text = "Off: the test people stop where they are and stand (they still turn to look round)"
+	_walk.toggled.connect(func(v: bool) -> void: _post({"walk": v}))
+	row2.add_child(_walk)
+	add_child(row2)
 	_state = Label.new()
 	_state.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_state.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -65,4 +87,6 @@ func _adopt(d: Variant) -> void:
 	if d is Dictionary:
 		_on.set_pressed_no_signal(d.get("enabled") == true)
 		_count.select(clampi(int(d.get("count", 1)) - 1, 0, 2))
+		_look.select(maxi(LOOKS.find(str(d.get("body", "cartoon")).capitalize()), 0))
+		_walk.set_pressed_no_signal(d.get("walk") != false)
 
