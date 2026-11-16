@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1011 live WOs (34 open, 156 in progress, 821 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1011 live WOs (34 open, 155 in progress, 822 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -606,7 +606,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1093 DONE [godot-client+audio,devices-config] Settings menu review: one place per setting, 17 panes → 7 → 1093_WO_settings_menu_review_and_compaction.md
 - 1099 DONE [godot-client+tracking-vr,lighting] House lights: a 0–100 % slider that dims the room so only the rig lights it (pr… → 1099_WO_previs_house_lights_slider.md
 - 1100 DONE [godot-client+tracking-vr] Previs: deselect with Esc or a click on empty space (one selection in the 3D vi… → 1100_WO_previs_deselect_esc_and_empty_click.md
-- 1104 IN PROGRESS [godot-client+mapping,web-client] Previs: "Drape" (kotara) as a stage object type — procedural pleats, skirt unde… → 1104_WO_previs_stage_drape_object.md
+- 1104 DONE [godot-client+mapping,web-client] Previs: "Drape" (kotara) as a stage object type — procedural pleats, skirt unde… → 1104_WO_previs_stage_drape_object.md
 
 ## web-client — Web client (90)
 
