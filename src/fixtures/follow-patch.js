@@ -12,6 +12,7 @@
  *                         through: { enabled, offset, fade_s } },  ← WO-632 Art-Net read-through (backup only)
  *     dmx: { enabled: false, priority, universes: ["artnet:0", "sacn:1"] },  ← WO-615 T4 master for typed fixtures
  *     handover: { mode "split" | "handover", heads, margin_m, fade_s, idle, levels {…}, grant {…} },  ← WO-1085 (follow-handover.js)
+ *     feed: { enabled, protocol, universe, dest, priority, layout "mirror" | "compact", address },  ← WO-1097 (desk-feed-layout.js)
  *     patch: [{ id, name, enabled, protocol: "artnet" | "sacn", universe (Art-Net port-address 0–32767 | sACN
  *               1–63999), address 1–512, dest "a.b.c.d[:port]" ("" with sACN = the universe's multicast group),
  *               typeId, mode (WO-615 T3: a GDTF type from gdtf-store.js — pan / tilt / channels come from it), pan / tilt { ch (1-based offset), fine (0 = 8-bit), range °, invert },
@@ -29,6 +30,7 @@ const { sacnDest, MAX_UNIVERSE } = require('./sacn')
 const { applyType, gdtfFootprint, normalizeDmx } = require('./gdtf-patch')
 const { normalizeMap } = require('./beam-offset')
 const { normalizeHandover } = require('./follow-handover')
+const { normalizeFeed } = require('./desk-feed-layout')
 
 const DEFAULT_DEST = '255.255.255.255'
 const PROTOCOLS = ['psn', 'artnet']
@@ -158,7 +160,8 @@ function normalizePatch(slice, { resolveMode } = {}) {
 	})
 	const protocol = PROTOCOLS.includes(s.output?.protocol) ? s.output.protocol : 'psn'
 	return { enabled: s.output?.enabled === true, protocol, psn: normalizePsn(s.output?.psn),
-		through: normalizeThrough(s.output?.through), dmx: normalizeDmx(s.dmx), handover: normalizeHandover(s.handover), fixtures }
+		through: normalizeThrough(s.output?.through), dmx: normalizeDmx(s.dmx), handover: normalizeHandover(s.handover),
+		feed: normalizeFeed(s.feed), fixtures } // WO-1097 the desk feed (desk-feed.js)
 }
 
 module.exports = { DEFAULT_DEST, PROTOCOLS, normalizePsn, normalizeFixture, normalizePatch, parseFixed, footprint }

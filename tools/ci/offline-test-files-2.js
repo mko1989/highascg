@@ -100,4 +100,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1096-licence-tree.test.js', // WO-1096 F: COMPLIANCE-ISO truth, stack licence texts, SOURCES.md source offer, verifier + NDI attribution
 	'tools/smoke/smoke-wo1096-shader-licences.test.js', // WO-1096 B: every shipped shader carries author/source/licence; manifest; retired ids stay out
 	'tools/smoke/smoke-wo1096-lower-thirds-no-gsap.test.js', // WO-1096 D: GSAP removed; lt-tween.js eases/timeline maths, legacy studio-export upgrade
+	'tools/smoke/smoke-wo1097-desk-feed.test.js', // WO-1097 desk feed: final fronts' pan/tilt/dimmer to the LD's desk (mirror byte-for-byte, hold, refusals, CSV)
 ]

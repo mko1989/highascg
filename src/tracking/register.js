@@ -55,6 +55,8 @@ const { createDetectService } = require('./detect-service')
 const { DetectPin } = require('./detect-pin')
 const { createAutoDirector } = require('./auto-director')
 const { handleAuto, createAutoBroadcast, followProject, reply } = require('./auto-routes')
+const { tableCsv } = require('../fixtures/desk-feed-layout') // WO-1097: the LD's channel table
+const CSV_HEADERS = { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="highascg-desk-feed.csv"' }
 const { createAutoPtz } = require('./auto-ptz')
 const duties = require('../cluster/server-duties') // WO-723: what this server does, resolved from config + the linked servers
 const { Fusion } = require('./fusion')
@@ -335,8 +337,9 @@ async function handleApi({ method, path, body, req }) {
 			see: 'work/work-orders/616_WO_previs_tracking_openfollow_cameras.md',
 		})
 	}
-	if (method === 'GET' && path === '/api/tracking/follow') {
-		return _follow ? reply(200, _follow.status()) : reply(503, { error: 'follow engine not running' })
+	if (method === 'GET' && (path === '/api/tracking/follow' || path === '/api/tracking/follow/feed.csv')) {
+		if (!_follow) return reply(503, { error: 'follow engine not running' })
+		return path.endsWith('.csv') ? { status: 200, headers: CSV_HEADERS, body: tableCsv(_follow.engine.feed.table()) } : reply(200, _follow.status())
 	}
 	if (method === 'GET' && path === '/api/tracking/fixtures') {
 		return _follow?.visual ? reply(200, _follow.visual()) : reply(503, { error: 'follow engine not running' })

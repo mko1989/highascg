@@ -30,6 +30,8 @@
  * WO-1085 spot handover (follow-handover.js, `fixtures.handover.mode` "handover"): `autoLanes` (the director's lanes) feed
  * the handover core; an Auto head then aims / rests and gets its Dimmer from its level, and is "tracking" (read-through
  * weight) while the LD's grant allows it. The levels universe goes out after the rig's. Split mode: unchanged.
+ * WO-1097 desk feed (desk-feed.js, `fixtures.feed`): after the tick, the fed heads' pan / tilt / dimmer bytes are copied
+ * from these frames into the feed universe(s) for the lighting desk — on its own switch, never through the rig masters.
  */
 
 const { performance } = require('perf_hooks')
@@ -43,6 +45,7 @@ const { encodeE131, boxCid } = require('./sacn')
 const { snapshotChannels, blendChannels } = require('./fixture-looks')
 const { AUTO_MARKER_ID } = require('../tracking/auto-follow')
 const { FollowHandover } = require('./follow-handover')
+const { DeskFeed } = require('./desk-feed')
 
 // WO-897: the engine's own clock, 23 ms ≈ 43.5 Hz (under the DMX512 line rate) — it was "44 Hz" in the comments. A pixel
 // map kicks a tick per new Caspar frame (kick()): every 50 fps frame is sampled and sent once (the 23 ms clock skipped ~6.5
@@ -89,6 +92,7 @@ class FollowEngine {
 		/** @type {null | ((headsOf: Function|null) => { lanes: { id, marker }[], home: Map|null })} WO-1085: the director's lanes */
 		this.autoLanes = null
 		this.handover = new FollowHandover(this)
+		this.feed = new DeskFeed(this) // WO-1097: the fronts' final values to the lighting desk
 	}
 
 	/** project.fixtures slice → patch (keeps each fixture's last aim, so a re-patch does not snap heads). */
@@ -115,6 +119,7 @@ class FollowEngine {
 		this.through = p.through
 		this.fixtures = p.fixtures
 		this.handover.configure(p.handover) // WO-1085
+		this.feed.configure(p.feed) // WO-1097
 		const live = new Set(p.fixtures.map((f) => f.id))
 		for (const id of [...this._aim.keys()]) if (!live.has(id)) this._aim.delete(id)
 		for (const id of [...this._hold.keys()]) if (!live.has(id)) this._hold.delete(id)
@@ -356,7 +361,7 @@ class FollowEngine {
 			u.packets++
 			sent++
 		}
-		return sent + this.handover.send(now, marks)
+		return sent + this.handover.send(now, marks) + this.feed.send(now) // WO-1097: tapped after every head is written
 	}
 
 	status() {
@@ -382,6 +387,7 @@ class FollowEngine {
 					...(this.handover.decide(fx) ? { level: Math.round(this.handover.decide(fx).level * 100) / 100 } : {}) }
 			}),
 			handover: this.handover.status(), // WO-1085
+			feed: this.feed.status(), // WO-1097
 			dmx: { enabled: this.dmx.enabled, priority: this.dmx.priority, universes: [...this.dmx.universes],
 				visualise: this.dmx.visualise, sacn_port: this.dmx.sacn_port, iface: this.dmx.iface },
 			universes: [...this._uni.values()].map((u) => ({ protocol: u.protocol, dest: `${u.to.host}:${u.to.port}`,
