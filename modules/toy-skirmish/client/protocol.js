@@ -187,11 +187,36 @@ export function decode(text) {
 			// RC §2.6 live lights (the kit's stage-fx validates the entries); `lxfull` may also be { on: false }
 			return Array.isArray(m.f) || (m.t === 'lxfull' && (m.on === false || Array.isArray(m.lights))) ? m : null
 		default:
-			return null
+			return decodeWorld(m)
 	}
 }
 
 /** A phase name from a state (unknown → lobby). */
 export function phaseOf(state) {
 	return PHASES.includes(state?.phase) ? state.phase : 'lobby'
+}
+
+/* WO-1101 / WO-1102 Game World (sent only while the world module is on; world-join.js uses them) */
+const WORLD_FX = ['hop', 'bump', 'boost', 'wobble', 'stun', 'scatter', 'step']
+const fin3 = (p) => Array.isArray(p) && p.length >= 3 && p.slice(0, 3).every((x) => typeof x === 'number' && Number.isFinite(x))
+const short = (s) => String(s ?? '').slice(0, 16)
+
+/** wst / wv (the visitors renderer validates them), xfx, xbonus, xb → the message or null. */
+export function decodeWorld(m) {
+	const fin = (v) => typeof v === 'number' && Number.isFinite(v)
+	switch (m.t) {
+		case 'wst':
+		case 'wv':
+			return m.v === 1 ? m : null
+		case 'xfx':
+			if (m.id == null || !WORLD_FX.includes(m.k) || !fin(m.dur)) return null
+			return { t: 'xfx', id: m.id, k: m.k, dur: Math.max(0, Math.min(2, m.dur)), dir: Array.isArray(m.dir) && fin(m.dir[0]) && fin(m.dir[1]) ? [m.dir[0], m.dir[1]] : null,
+				soft: m.soft === true, by: m.by && typeof m.by === 'object' ? { g: short(m.by.g), n: short(m.by.n) } : null }
+		case 'xbonus':
+			return { t: 'xbonus', kind: short(m.kind), pts: fin(m.pts) ? m.pts : 0 }
+		case 'xb':
+			return m.id != null && fin(m.n) && fin(m.i) && fin3(m.p) && fin3(m.v) && fin(m.at) ? { t: 'xb', id: m.id, n: m.n, i: m.i, p: m.p.slice(0, 3), v: m.v.slice(0, 3), at: m.at } : null
+		default:
+			return null
+	}
 }

@@ -15,12 +15,15 @@ module.exports = (h) => {
 	const { attachSkWs } = require('./server/sk-ws')
 	const { serveSkStatic, isSkStaticPath } = require('./server/sk-static')
 	const { isSkPublicPath, setSkGameEnabled } = require('./server/sk-public')
+	const world = require('./server/sk-world') // WO-1101 Game World: a descriptor in the process-global registry (no require of the world module)
+	let bootCtx = null
+	world.register(() => require('./server/sk-game').getSkGame(bootCtx))
 	return {
 		name: 'toy-skirmish',
 		apiPathPrefixes: ['/api/game/sk'],
 		registerRoutes: (routes) => require('./server/routes-sk').register(routes),
 		publicPaths: (m, p) => isSkPublicPath(m, p),
-		onHttpServer: (server, ctx) => attachSkWs(server, ctx),
+		onHttpServer: (server, ctx) => ((bootCtx = ctx), attachSkWs(server, ctx)),
 		handleStatic: ({ method, path, search }) => (isSkStaticPath(path) ? serveSkStatic(path, { method, query: search }) : null),
 		/** Module disabled / server stopping: end the running session (sockets, lights, wall feed), close the public paths. */
 		async onShutdown() {
@@ -28,6 +31,7 @@ module.exports = (h) => {
 				require('./server/sk-game').shutdownSkGame()
 			} catch {}
 			setSkGameEnabled(false)
+			world.unregister()
 			kitHost.release()
 		},
 	}

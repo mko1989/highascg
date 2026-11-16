@@ -15,7 +15,7 @@
 const { kit } = require('./sk-kit')
 const { WEAPONS } = require('./sk-rules')
 
-const TYPES = new Set(['join', 's', 'fire', 'hit', 'boom', 'pick', 'ping', 'video'])
+const TYPES = new Set(['join', 's', 'fire', 'hit', 'boom', 'pick', 'ping', 'video', 'wq']) // wq: WO-1101 Game World visitor cap
 const MAX_N = 2 ** 31 - 1
 
 const fin = (v) => typeof v === 'number' && Number.isFinite(v)

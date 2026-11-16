@@ -223,6 +223,7 @@ function onPk(G, m) {
 
 export function onMessage(G, m) {
 	if (G.fx?.onMessage(m)) return
+	if (G.wj?.onMessage(m)) return // WO-1101 Game World: wst / wv / xfx / xbonus (it only peeks at welcome / state)
 	switch (m.t) {
 		case 'welcome':
 			G.meId = m.id

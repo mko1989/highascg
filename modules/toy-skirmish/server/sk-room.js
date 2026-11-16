@@ -53,10 +53,14 @@ function createSkRoom(deps) {
 	let endsAt = null
 	const timer = { phase: null, house: null, world: null, spot: null }
 	let dirty = false
+	let phaseFn = null // the pending phase step and when it is due (WO-1101: a world pause holds it)
+	let phaseDue = 0
+	let matchNo = 0 // WO-1102: a match serial (sk-world.js bonus cap per match; a pause shifts startAt, never this)
+	let paused = null // WO-1101 Game World pause: { at, fn, rem } while paused — X.phase() says 'paused' (nobody acts)
 
 	const X = {
 		now, T, rng: deps.rng || Math.random, players: new Map(), teams: [0, 0], arena: null, grid: null, mask: null, u: 1,
-		phase: () => phase, mode: () => mode,
+		phase: () => (paused ? 'paused' : phase), mode: () => mode,
 		toAll: (msg) => toAll(msg),
 		toPlayer: (p, msg) => p.conn && send(p.conn, msg),
 		dirty: () => {
@@ -99,11 +103,13 @@ function createSkRoom(deps) {
 			players: [...players.values()].sort((a, b) => a.id - b.id).map((p) => ({ id: p.id, name: p.name, color: p.color, team: p.team, bot: p.bot,
 				connected: p.connected || p.bot, kills: p.kills, deaths: p.deaths, score: p.score })),
 			teams: X.teams.slice(), pk: combat.pkList(), spectators: spectators(), spot: X.spot(),
+			...(paused ? { paused: true } : {}), // only while paused: a game alone sends the very same state
 		}
 	}
 	const state = () => decorate(snapshot())
 	function toAll(msg) {
 		for (const c of conns.values()) if (c.joined) send(c.conn, msg)
+		if (deps.tap && msg.t === 'shot') deps.tap(msg) // WO-1102 Game World: an accepted shot (sk-world.js)
 	}
 	const broadcastState = () => toAll({ t: 'state', state: state() })
 
@@ -238,6 +244,34 @@ function createSkRoom(deps) {
 	function clearPhaseTimer() {
 		if (timer.phase) T.clearTimeout(timer.phase)
 		timer.phase = null
+		phaseFn = null
+	}
+	function phaseTimer(fn, ms) {
+		clearPhaseTimer()
+		phaseFn = fn
+		phaseDue = now() + ms
+		timer.phase = T.setTimeout(() => ((timer.phase = null), (phaseFn = null), fn()), ms)
+	}
+
+	/** WO-1101 world pause: nobody moves, fires or scores; the phase step waits; the clocks shift by the paused time. */
+	function pause(on) {
+		if (on && !paused) {
+			paused = { at: now(), fn: phaseFn, rem: Math.max(0, phaseDue - now()) }
+			if (timer.phase) T.clearTimeout(timer.phase)
+			timer.phase = null
+			for (const p of players.values()) p.mv = 0
+		} else if (!on && paused) {
+			const d = now() - paused.at
+			const { fn, rem } = paused
+			paused = null
+			if (startAt != null) startAt += d
+			if (endsAt != null) endsAt += d
+			if (fn) phaseTimer(fn, rem)
+			if (phase === 'countdown') toAll({ t: 'countdown', startAt })
+			for (const p of players.values()) if ((p.connected || p.bot) && !p.alive && !p.respawnTimer && (phase === 'lobby' || phase === 'match')) combat.spawn(p)
+		} else return
+		X.dirty()
+		broadcastState()
 	}
 
 	function order() {
@@ -258,8 +292,7 @@ function createSkRoom(deps) {
 		for (const p of players.values()) combat.clearRespawn(p), (p.mv = 0)
 		endsAt = now() + RULES.resultsMs
 		toAll({ t: 'results', mode, order: order(), teams: X.teams.slice(), final: true })
-		timer.phase = T.setTimeout(() => {
-			timer.phase = null
+		phaseTimer(() => {
 			toLobby()
 			broadcastState()
 		}, RULES.resultsMs)
@@ -283,15 +316,16 @@ function createSkRoom(deps) {
 		if (!X.arena) return { ok: false, status: 409, error: 'no arena' }
 		if (!players.size) return { ok: false, status: 409, error: 'no players' }
 		toLobby(false)
+		matchNo++
 		for (const p of players.values()) Object.assign(p, { kills: 0, deaths: 0, suicides: 0, score: 0 })
 		X.teams = [0, 0]
 		phase = 'countdown'
 		startAt = now() + RULES.countdownMs
 		endsAt = startAt + limits.minutes * 60000
 		combat.spawnAll({ until: startAt + RULES.protectMs, spread: true })
-		timer.phase = T.setTimeout(() => {
+		phaseTimer(() => {
 			phase = 'match'
-			timer.phase = T.setTimeout(endMatch, limits.minutes * 60000)
+			phaseTimer(endMatch, limits.minutes * 60000)
 			broadcastState()
 		}, RULES.countdownMs)
 		toAll({ t: 'countdown', startAt })
@@ -352,10 +386,16 @@ function createSkRoom(deps) {
 				break
 			case 'start':
 				if (!idle) return busy
+				if (paused) return { ok: false, status: 409, error: 'paused' }
 				return start()
 			case 'stop':
 				toLobby()
+				if (paused) paused.fn = null
 				break
+			case 'pause': // WO-1101 Game World: presenter safe / pause everything
+				if (typeof a.on !== 'boolean') return { ok: false, status: 400, error: '`on` must be true or false' }
+				pause(a.on)
+				return { ok: true }
 			case 'kick': {
 				const id = Number(a.id)
 				const c = [...conns.values()].find((x) => x.pid === id)
@@ -415,7 +455,7 @@ function createSkRoom(deps) {
 			if (m.t === 'join') return join(c, m)
 			if (m.t === 'ping') return send(conn, { t: 'pong', c: Number.isFinite(m.c) ? m.c : null, s: now() })
 			const p = c.joined && !c.spectator ? players.get(c.pid) : null
-			if (!p) return
+			if (!p || paused || (m.t === 'fire' && p.stunUntil > now())) return // WO-1101 pause; WO-1102 a stunned soldier cannot fire
 			if (m.t === 's') return move(c, m)
 			const v = m.t === 'fire' ? S.cleanFire(m) : m.t === 'hit' ? S.cleanHit(m) : m.t === 'boom' ? S.cleanBoom(m) : m.t === 'pick' ? S.cleanPick(m) : null
 			if (v) combat[m.t](p, v)
@@ -432,9 +472,14 @@ function createSkRoom(deps) {
 			timer.house = timer.world = timer.spot = null
 			for (const p of players.values()) combat.clearRespawn(p)
 			bots.dispose()
+			paused = null
 			conns.clear()
 			players.clear()
 		},
+		/** WO-1101 Game World (sk-world.js): joined sockets, players, the arena, a send to all, the standings. */
+		world: () => ({ phase, mode, startAt, matchNo, paused: !!paused, conns: [...conns.values()].filter((c) => c.joined), players, arena: X.arena, grid: X.grid, u: X.u }),
+		toAll: (msg) => toAll(msg),
+		order: () => order(),
 		/** Diagnostics for the smokes. */
 		timers: () => ({ phase: !!timer.phase, house: !!timer.house, world: !!timer.world, spot: !!timer.spot, bots: bots.running() }),
 		connections: () => conns.size,

@@ -69,8 +69,8 @@ export function startLoop(G) {
 			if (w) G.ctl.hold(w)
 		}
 		if (input.cycle) G.ctl.hold(cycleWeapon(G.me?.w, G.held, input.cycle))
-		const frozen = G.phase === 'countdown' || G.phase === 'results' || !G.alive || !G.arena
-		const wish = frozen ? { mx: 0, mz: 0 } : input
+		const frozen = G.phase === 'countdown' || G.phase === 'results' || !G.alive || !G.arena || !!G.wj?.paused // WO-1101 world pause
+		const wish = frozen ? { mx: 0, mz: 0 } : G.wj ? G.wj.wish(input, sNow) : input // WO-1102 stun / slick splat
 		G.stepper.advance(dt, (h) => stepSoldier(G.my, wish, h, G.grid, G.s))
 		/* aim */
 		if (!frozen && input.aim) {
@@ -81,7 +81,12 @@ export function startLoop(G) {
 				if (p && Math.hypot(p[0] - G.my.x, p[1] - G.my.z) > 0.05 * G.s) G.my.yaw = yawOf(p[0] - G.my.x, p[1] - G.my.z)
 			}
 		}
-		if (!frozen) tryFire(G, input.fire, now)
+		if (!frozen && !G.wj?.held(sNow)) {
+			const aim = G.my.yaw
+			G.my.yaw += G.wj?.jitter(sNow) || 0 // WO-1102 R5 pea scatter: a wider cone while it lasts
+			tryFire(G, input.fire, now)
+			G.my.yaw = aim
+		}
 		checkPickups(G, sNow)
 		const m = G.myModel
 		if (m) {
@@ -188,6 +193,7 @@ export function startLoop(G) {
 		G.arenaView?.update(t, sNow)
 		spotlight(t, sNow)
 		camera(dt, t)
+		G.wj?.frame(sNow, dt) // WO-1101 Game World visitors (nothing without the world)
 		if (now - hudAt > HUD_EVERY_MS) {
 			hudAt = now
 			hud(sNow)

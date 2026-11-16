@@ -17,6 +17,7 @@ const { createSkScene } = require('./sk-scene')
 const { parseMessage } = require('./sk-sanitize')
 const { setSkGameEnabled } = require('./sk-public')
 const { RULES } = require('./sk-rules')
+const { createSkWorld } = require('./sk-world')
 
 const MAX_SOCKETS = RULES.maxPlayers + RULES.maxSpectators
 const MSG_RATE = 60 // messages / s per socket (20 states + automatic fire + its hits + pings), burst the same
@@ -39,6 +40,7 @@ function createSkGame(deps = {}) {
 	const baker = deps.baker || K.createSceneBaker({ log, ...(deps.bakerDeps || {}) })
 	const scene = createSkScene({ baker, log, pause: deps.pause })
 	let room = null
+	let world = null // WO-1101 Game World link while enabled (does nothing without the world module)
 	const sockets = new Set()
 	let lastRev = null
 	const text = new WeakMap() // message object → its JSON (a broadcast is stringified once)
@@ -90,7 +92,10 @@ function createSkGame(deps = {}) {
 
 	function enable() {
 		if (room) return
+		world = createSkWorld({ room: () => room, send: sendTo, lights, now })
+		const w = world
 		room = createSkRoom({ now, timers: deps.timers, rng: deps.rng, send: sendTo, decorate, maxPlayers: RULES.maxPlayers, maxSpectators: RULES.maxSpectators,
+			tap: (m) => w.onShot(m),
 			close: (ws, code, reason) => {
 				try {
 					ws.close(code, reason)
@@ -101,11 +106,14 @@ function createSkGame(deps = {}) {
 		setSkGameEnabled(true)
 		lastRev = scene.rev()
 		refreshScene().catch((e) => log('warn', `[toy-skirmish] scene failed: ${e.message}`))
+		world.attach()
 		log('info', '[toy-skirmish] enabled')
 	}
 
 	function disable() {
 		if (!room) return
+		world?.detach()
+		world = null
 		setSkGameEnabled(false)
 		for (const ws of sockets) {
 			sendTo(ws, { t: 'off' })
@@ -179,6 +187,7 @@ function createSkGame(deps = {}) {
 				if (room) video?.subscribe(ws, m.on === true) // never re-subscribe a socket the disable is closing
 				return
 			}
+			if (m.t === 'wq') return world?.quality(ws, m) // WO-1101: the visitor cap of the client's quality tier
 			if (room) room.handle(ws, m)
 		})
 		ws.on('close', () => {
@@ -204,6 +213,8 @@ function createSkGame(deps = {}) {
 		attach,
 		socketCount: () => sockets.size,
 		room: () => room,
+		/** WO-1101 Game World: the room adapter while enabled (sk-world.js). */
+		worldAdapter: () => world?.adapter || null,
 		baker,
 		live: () => ({ lights, video }),
 		MAX_SOCKETS,
