@@ -234,6 +234,11 @@ home/*/.config/Ultralytics
 home/*/.config/Ultralytics/*
 home/*/highascg-detection-runtime
 home/*/highascg-detection-runtime/*
+# WO-1103: an operator's own test-puppet character (e.g. Fab "OpenRigLogic Sample Content": Fab Standard License, no
+# standalone redistribution) and every file converted from it live in ~/.local/share/highascg/puppets — inside the
+# exclude above; named here so narrowing it can never ship them. The verifier also fails on any *.dna (a MetaHuman rig).
+home/*/.local/share/highascg/puppets
+home/*/.local/share/highascg/puppets/*
 # the Godot download archive (the binary beside it ships)
 home/casparcg/.local/opt/godot/dl
 home/casparcg/.local/opt/godot/dl/*

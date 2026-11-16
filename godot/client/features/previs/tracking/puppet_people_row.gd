@@ -5,10 +5,13 @@ extends VBoxContainer
 ## (src/tracking/puppet-people.js) as world persons: the previs draws them as avatars (People: avatars) labelled
 ## "TEST puppet n", and the Auto director / spot handover follow them like detected people. Off at every server start.
 ## WO-1103: Look — Cartoon (the pebble avatar, default) / Woman / Man / Mixed (realistic Rocketbox bodies, for previs
-## only) — and Walk (off: they stop where they are and stand, still turning to look round).
+## only) — and Walk (off: they stop where they are and stand, still turning to look round). Below the four, one
+## "Own: <name>" per character in this machine's ~/.local/share/highascg/puppets (human_own.gd; never shipped), with
+## its import report under the row once the previs has loaded it.
 
 const PM := preload("res://features/previs/tracking/puppet_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const Own := preload("res://features/previs/tracking/human_own.gd")
 const PATH := "/api/tracking/puppet/people"
 const LOOKS := ["Cartoon", "Woman", "Man", "Mixed"]  # WO-1103 → body cartoon / woman / man / mixed
 
@@ -17,6 +20,8 @@ var _count: OptionButton
 var _state: Label
 var _look: OptionButton
 var _walk: CheckBox
+var _bodies := []  # the Look items' body names
+var _own_note: Label
 
 
 func _ready() -> void:
@@ -46,10 +51,9 @@ func _ready() -> void:
 	ll.text = "Look"
 	row2.add_child(ll)
 	_look = OptionButton.new()
-	for n in LOOKS:
-		_look.add_item(n)
-	_look.tooltip_text = "What the previs draws for the test people: the cartoon figure, or a realistic woman / man (Mixed: woman, man, woman).\nPrevis only — a puppet's look, never a tracked person's."
-	_look.item_selected.connect(func(i: int) -> void: _post({"body": LOOKS[i].to_lower()}))
+	_fill_looks("")
+	_look.tooltip_text = "What the previs draws for the test people: the cartoon figure, or a realistic woman / man (Mixed: woman, man, woman),\nor your own character (Own: … — a model in ~/.local/share/highascg/puppets on this machine; see the help page).\nPrevis only — a puppet's look, never a tracked person's."
+	_look.item_selected.connect(func(i: int) -> void: _post({"body": _bodies[i]}))
 	row2.add_child(_look)
 	_walk = CheckBox.new()
 	_walk.text = "Walk"
@@ -58,6 +62,11 @@ func _ready() -> void:
 	_walk.toggled.connect(func(v: bool) -> void: _post({"walk": v}))
 	row2.add_child(_walk)
 	add_child(row2)
+	_own_note = Label.new()
+	_own_note.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_own_note.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+	_own_note.visible = false
+	add_child(_own_note)
 	_state = Label.new()
 	_state.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_state.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -87,6 +96,39 @@ func _adopt(d: Variant) -> void:
 	if d is Dictionary:
 		_on.set_pressed_no_signal(d.get("enabled") == true)
 		_count.select(clampi(int(d.get("count", 1)) - 1, 0, 2))
-		_look.select(maxi(LOOKS.find(str(d.get("body", "cartoon")).capitalize()), 0))
+		var body := str(d.get("body", "cartoon"))
+		_fill_looks(body)
+		_look.select(maxi(_bodies.find(body), 0))
+		_note(body)
 		_walk.set_pressed_no_signal(d.get("walk") != false)
 
+
+## The Look items: the four, then this machine's own characters (+ the server's own body if this machine lacks it).
+func _fill_looks(current: String) -> void:
+	var want := LOOKS.map(func(n: String) -> String: return n.to_lower())
+	var names := LOOKS.duplicate()
+	for e: Dictionary in Own.list():
+		want.append("own:" + str(e.slug))
+		names.append("Own: " + str(e.name))
+	if current.begins_with("own:") and not want.has(current):
+		want.append(current)
+		names.append("Own: %s (not on this machine)" % current.substr(4))
+	if want == _bodies:
+		return
+	_bodies = want
+	_look.clear()
+	for n in names:
+		_look.add_item(n)
+
+
+## An own character's import report (human_own.gd), once the previs has loaded it.
+func _note(body: String) -> void:
+	var r: Dictionary = Own.report(body.substr(4)) if body.begins_with("own:") else {}
+	_own_note.visible = not r.is_empty()
+	if r.is_empty():
+		return
+	if not r.get("ok", false):
+		_own_note.text = "Own model not used: %s" % r.get("error", "?")
+		return
+	_own_note.text = "Own model: %s — %d triangles, %d / %d bones mapped, %.2f m, moves of the %s%s" % [str(r.file).get_file(), int(r.tris),
+		(r.mapped as Array).size(), int(r.bones), float(r.height), r.moves, ("\n" + "\n".join(r.warnings)) if not (r.warnings as Array).is_empty() else ""]

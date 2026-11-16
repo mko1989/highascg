@@ -21,7 +21,7 @@ const path = require('node:path')
 const ROOT = path.join(__dirname, '..', '..')
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8')
 const W = require(path.join(ROOT, 'src', 'tracking', 'puppet-wander'))
-const { createPuppetPeople, PATH, BODIES, WOMAN_M, MAN_M } = require(path.join(ROOT, 'src', 'tracking', 'puppet-people'))
+const { createPuppetPeople, PATH, BODIES, WOMAN_M, MAN_M, OWN_RE, OWN_M } = require(path.join(ROOT, 'src', 'tracking', 'puppet-people'))
 
 const GRID = { width: 3, depth: 15, spacing: 1, x_offset: 11.05, y_offset: -3.5, z_offset: 0.639 }
 const PEOPLE = 'godot/client/assets/people'
@@ -70,6 +70,53 @@ describe('WO-1103 human test puppets', () => {
 		assert.equal(post({ body: 'man' }).status, 200, 'set while off: kept for the next start')
 		post({ enabled: true, count: 1, seed: 3 })
 		assert.deepEqual([p.status().body, p.persons()[0].body, p.status().people[0].body], ['man', 'man', 'man'])
+	})
+
+	it('own:<slug>: an own character is a body name (the server never sees the model), heights in OWN_M', () => {
+		const { p, post, walk } = mk()
+		for (const bad of ['own:', 'own:../x', 'own:A', 'own:a/b', `own:${'a'.repeat(49)}`, 'own: x'])
+			assert.equal(post({ body: bad }).status, 400, `${bad} refused`)
+		assert.ok(OWN_RE.test('own:rb_f01') && OWN_RE.test(`own:${'a'.repeat(48)}`))
+		assert.equal(post({ enabled: true, count: 3, seed: 11, body: 'own:rb_f01' }).status, 200)
+		walk(100)
+		for (const q of p.persons()) {
+			assert.equal(q.body, 'own:rb_f01')
+			assert.ok(q.height >= OWN_M[0] && q.height <= OWN_M[1], `${q.height} in OWN_M`)
+		}
+		const row = read('godot/client/features/previs/tracking/puppet_people_row.gd')
+		assert.match(row, /Own\.list\(\)/, 'the Look list offers this machine\'s own characters')
+		const own = read('godot/client/features/previs/tracking/human_own.gd')
+		assert.match(own, /\.local\/share/, 'own characters live in the per-machine data folder')
+		for (const f of ['human_own.gd', 'human_own_tex.gd', 'human_retarget.gd', 'human_rig_map.gd']) {
+			const src = read(`godot/client/features/previs/tracking/${f}`)
+			assert.doesNotMatch(src, /FileAccess\.WRITE|make_dir|ResourceSaver|save_png|write_to_filesystem/, `${f}: reads the model, writes nothing (no derivative in the repo, a project or media/)`)
+		}
+	})
+
+	it('an own puppet is never distributed: ISO excludes + verifier, sync pairs, Syncthing, git', () => {
+		const { spawnSync } = require('node:child_process')
+		const os = require('node:os')
+		for (const l of ['penguins-eggs-exclude-highascg-fragment.list', 'penguins-eggs-exclude-highascg-embed-server.list']) {
+			const lines = read(`tools/eggs/live-usb/${l}`).split('\n')
+			for (const w of ['home/*/.local/share/highascg/puppets', 'home/*/.local/share/highascg/puppets/*', 'home/*/.local/share/highascg'])
+				assert.ok(lines.includes(w), `${l}: ${w}`)
+		}
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wo1103-'))
+		const verify = (lines) => {
+			const f = path.join(tmp, `l${Math.random()}.txt`)
+			fs.writeFileSync(f, lines.join('\n') + '\n')
+			return spawnSync('bash', [path.join(ROOT, 'tools/eggs/live-usb/verify-iso-detection-runtime.sh'), f], { encoding: 'utf8' })
+		}
+		const clean = ['squashfs-root/home/casparcg/highascg/godot/client/assets/people/woman.scn']
+		assert.equal(verify(clean).status, 0, 'the shipped MIT bodies pass')
+		for (const bad of ['squashfs-root/home/casparcg/.local/share/highascg/puppets/ada/ada.glb',
+			'squashfs-root/home/casparcg/.local/share/highascg/puppets/ada/.converted/ada.glb', 'squashfs-root/home/casparcg/Downloads/x/head.dna'])
+			assert.equal(verify([...clean, bad]).status, 1, `${bad}: the ISO build fails`)
+		fs.rmSync(tmp, { recursive: true, force: true })
+		const { isExcluded } = require(path.join(ROOT, 'src', 'system', 'exfat-sync-map'))
+		assert.ok(isExcluded('projects/show/rig/head.dna', []) && !isExcluded('projects/show/look.json', []), 'no stick / bridge pair copies a rig')
+		assert.ok(read('.stignore').split('\n').includes('*.dna'), 'Syncthing')
+		assert.ok(read('.gitignore').split('\n').includes('*.dna'), 'git')
 	})
 
 	it('walk: false stands them where they are, walk: true walks on', () => {

@@ -27,6 +27,8 @@ var motion := Motion.new()
 var _root: Node3D
 var _sk: Skeleton3D
 var _model_h := 1.7
+var _toes := []  # the toe bones (shown(): the drawn feet)
+var _sk_space := Transform3D.IDENTITY  # skeleton → model root (an own model's skeleton sits deeper)
 var _target := {}
 var _pos := Vector3.ZERO
 var _height := 1.7
@@ -49,15 +51,20 @@ func _init(body_ := "woman") -> void:
 	_root = inst.root
 	_sk = inst.skeleton
 	_model_h = float(inst.height)
+	_toes = inst.toes
+	var n: Node = _sk
+	while n != null and n != _root:
+		_sk_space = (n as Node3D).transform * _sk_space if n is Node3D else _sk_space
+		n = n.get_parent()
 	add_child(_root)
 	if not motion.setup(_root, inst.moves):
 		_root.free()
 		_root = null
 
 
-## The people layer: does a card with this body get a human node? (only woman / man, and only if the files load)
+## The people layer: does a card with this body get a human node? (woman / man / own:<slug>, and only if it loads)
 static func wants(body_: Variant) -> bool:
-	return str(body_) in Body.BODIES and Body.available(str(body_))
+	return Body.is_body(str(body_)) and Body.available(str(body_))
 
 
 func ok() -> bool:
@@ -142,7 +149,7 @@ func set_tag(text: String) -> void:
 func shown() -> Dictionary:
 	var feet := []
 	if _sk != null:
-		for n in ["Bip01 L Toe0", "Bip01 R Toe0"]:
+		for n in _toes:
 			var b := _sk.find_bone(n)
 			feet.append(_sk.global_transform * _sk.get_bone_global_pose(b).origin if _sk.is_inside_tree() else transform * _root.transform * _bone_global(b).origin)
 	var s := _height / _model_h
@@ -158,4 +165,4 @@ func _bone_global(b: int) -> Transform3D:
 	while p >= 0:
 		tr = _sk.get_bone_pose(p) * tr
 		p = _sk.get_bone_parent(p)
-	return _sk.transform * tr
+	return _sk_space * tr

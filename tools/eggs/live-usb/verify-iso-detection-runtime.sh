@@ -10,7 +10,7 @@
 # Exit 1 and the offending paths when anything is there. Not matched on purpose: *.pt outside home/ and root/ that is
 # not a YOLO weight (the ISO has usr/share/mc/hints/mc.hint.pt, Midnight Commander's Portuguese hints).
 
-DETECTION_RUNTIME_RE='(\.onnx$|^(squashfs-root/)?(home/[^/]+|root)/.*\.pt$|/yolo[^/]*\.pt$|/\.local/share/highascg(/|$)|/tracking-venv(/|$)|/highascg-detection-runtime(/|$)|/\.cache/pip(/|$)|/\.config/Ultralytics(/|$))'
+DETECTION_RUNTIME_RE='(\.onnx$|^(squashfs-root/)?(home/[^/]+|root)/.*\.pt$|/yolo[^/]*\.pt$|/\.local/share/highascg(/|$)|/tracking-venv(/|$)|/highascg-detection-runtime(/|$)|/\.cache/pip(/|$)|/\.config/Ultralytics(/|$)|\.dna$)'
 
 # stdin: one path per line → the offending ones on stdout
 detection_runtime_offenders() {
@@ -25,7 +25,7 @@ detection_runtime_check() {
 		n="$(printf '%s\n' "$hits" | wc -l)"
 		bad "person-detection runtime in squashfs (WO-1094: weights / venv / bundles are not ours to distribute): ${n} path(s), e.g. $(printf '%s\n' "$hits" | head -3 | tr '\n' ' ')— re-apply install-eggs-config.sh (WO-1094 excludes)"
 	else
-		ok "absent (WO-1094): *.onnx, weight *.pt, tracking venv, .local/share/highascg, export bundles, pip / Ultralytics caches"
+		ok "absent (WO-1094): *.onnx, weight *.pt, tracking venv, .local/share/highascg, export bundles, pip / Ultralytics caches; WO-1103: own puppets (.local/share/highascg/puppets), *.dna"
 	fi
 }
 

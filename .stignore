@@ -6,6 +6,8 @@
 highascg-detection-runtime
 *.onnx
 *.pt
+// WO-1103: an own test puppet's MetaHuman rig (Fab licence: never redistributed); the puppets live outside the repo
+*.dna
 BUILD_STAMP
 media
 bin

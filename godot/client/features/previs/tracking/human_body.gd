@@ -17,6 +17,8 @@ const BODIES := ["woman", "man"]
 const SHADER := preload("res://features/previs/tracking/person_human.gdshader")
 const CARDS := preload("res://features/previs/tracking/person_human_cards.gdshader")
 const House := preload("res://features/previs/house_lights.gd")
+const Own := preload("res://features/previs/tracking/human_own.gd")
+const TOES := ["Bip01 L Toe0", "Bip01 R Toe0"]
 ## Per surface (the material name the bake gives it): textures (<body>_<tex>.webp) and the look.
 const PARTS := {
 	"body": {"tex": "body", "nrm": "body_n", "spec": "body_s", "rough": 0.75, "sheen": 0.3, "wrap": Vector3(0.12, 0.12, 0.12), "sss": 0.0},
@@ -29,9 +31,15 @@ static var _mats := {}  # "body:part" → ShaderMaterial
 static var _house_hooked := false
 
 
+## A body name the human node takes: woman / man, "own:<slug>" (an operator's own model, human_own.gd), or an
+## absolute "<dir>/<name>" of a baked body (dev probes).
+static func is_body(body: String) -> bool:
+	return body in BODIES or body.begins_with("/") or (body.begins_with("own:") and body.length() > 4)
+
+
 ## The body's files are there and load.
 static func available(body: String) -> bool:
-	return (body in BODIES or body.begins_with("/")) and not template(body).is_empty()
+	return is_body(body) and not template(body).is_empty()
 
 
 static func _path(body: String) -> String:
@@ -43,6 +51,10 @@ static func _path(body: String) -> String:
 static func template(body: String) -> Dictionary:
 	if _templates.has(body):
 		return _templates[body]
+	if body.begins_with("own:"):
+		_templates[body] = {}  # a failed import is not retried every frame
+		_templates[body] = Own.template(body.substr(4), func(n: String) -> Dictionary: return template(n))
+		return _templates[body]
 	var out := {}
 	var p := _path(body)
 	var scene: Variant = _res(p + ".scn")
@@ -51,7 +63,7 @@ static func template(body: String) -> Dictionary:
 		var root: Node = (scene as PackedScene).instantiate()
 		var sk := _skeleton(root) if root != null else null
 		if root is Node3D and sk != null and sk.get_parent() == root and sk.name == "Skeleton3D":
-			out = {"root": root, "height": _height(sk), "moves": moves}
+			out = {"root": root, "height": _height(sk), "moves": moves, "toes": TOES}
 		elif root != null:
 			root.free()
 	if out.is_empty():
@@ -75,7 +87,10 @@ static func instance(body: String) -> Dictionary:
 	if tpl.is_empty():
 		return {}
 	var root: Node3D = (tpl.root as Node3D).duplicate()
-	var out := {"root": root, "skeleton": _skeleton(root), "meshes": _meshes(root), "height": tpl.height, "moves": tpl.moves}
+	var sk: Skeleton3D = root.get_node(tpl.skeleton_path) if tpl.has("skeleton_path") else _skeleton(root)
+	var out := {"root": root, "skeleton": sk, "meshes": _meshes(root), "height": tpl.height, "moves": tpl.moves, "toes": tpl.toes}
+	if tpl.get("own", false):
+		return out  # its own materials (human_own.gd)
 	for mi: MeshInstance3D in out.meshes:
 		for i in mi.mesh.get_surface_count():
 			var m := mi.mesh.surface_get_material(i)

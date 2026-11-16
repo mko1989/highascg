@@ -29,7 +29,7 @@ const DEFAULT_VOLUMES = {
 /* WO-1094: never synced whatever a map says — a person-detection runtime bundle (AGPL-3.0 YOLO26 weights, research-trained
  * face models) and model weights are the operator's own per-machine copy: no pair may seed them onto another box. */
 const ALWAYS_EXCLUDED = ['highascg-detection-runtime']
-const ALWAYS_EXCLUDED_EXT = /\.(onnx|pt)$/i
+const ALWAYS_EXCLUDED_EXT = /\.(onnx|pt|dna)$/i // WO-1103: *.dna — a MetaHuman rig (Fab licence: never redistributed)
 
 function isExcluded(rel, excludes) {
 	const norm = rel.replace(/\\/g, '/').replace(/^\/+/, '')
