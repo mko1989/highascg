@@ -421,4 +421,13 @@ module.exports = [
 	'tools/smoke/smoke-wo1094-detection-runtime.test.js', // WO-1094: detection runtime status / install job / never distributed (ISO, sticks, sync)
 	'tools/smoke/smoke-wo1098-obj-parse.test.js', // WO-1098 OBJ venue importer: parser, MTL, textures, room sort, budget, GLB writer
 	'tools/smoke/smoke-wo1098-venue-import.test.js', // WO-1098: convert, .skp pictures, job (progress / cancel), worker + API
+	'tools/smoke/smoke-wo1101-world-server-hub.test.js', // WO-1101 Game World: hub idle cost, wst / wv round trip, safe pause, sync, deliveries
+	'tools/smoke/smoke-wo1101-world-server-interest.test.js', // WO-1101: interest management (weights, radius, caps, near / far rate, bytes)
+	'tools/smoke/smoke-wo1101-world-server-service.test.js', // WO-1101: world host / state API through the core router (auth, public only while a game runs)
+	'tools/smoke/smoke-wo1101-world-server-static.test.js', // WO-1101: world pages, socket (origin, caps), module boundary, 500 lines
+	'tools/smoke/smoke-wo1101-world-client-logic.test.js', // WO-1101: visitors logic (interpolation, fade, caps, tags, cut-away), world pages logic
+	'tools/smoke/smoke-wo1101-world-client-visitors.test.js', // WO-1101: visitors in a real three scene (stand-ins, cut-away, fuzz, the games' models)
+	'tools/smoke/smoke-wo1101-world-client-static.test.js', // WO-1101: world client owner rules (URLs, CSP, no innerHTML), MODEL_SIGS vs the games
+	'tools/smoke/smoke-wo1102-referee-rules.test.js', // WO-1102: rules R1–R9 (trigger / none / soft / off / safe)
+	'tools/smoke/smoke-wo1102-referee-props.test.js', // WO-1102: seeded property scripts — caps, immunity, determinism
 ]

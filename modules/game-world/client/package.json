@@ -1,0 +1,6 @@
+{
+	"//": "Scope marker (WO-1101) — tells Node.js (the server and the smoke tests) to parse the ES module .js files of the Game World client as ESM, like the browser does. Do not add dependencies here.",
+	"name": "highascg-game-world",
+	"private": true,
+	"type": "module"
+}

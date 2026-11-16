@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-623 routes.
+625 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -192,6 +192,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/game/sk/scene` | registry | `modules/toy-skirmish/server/routes-sk.js` |
 | GET | `/api/game/sk/scene.glb` | registry | `modules/toy-skirmish/server/routes-sk.js` |
 | GET | `/api/game/sk/state` | registry | `modules/toy-skirmish/server/routes-sk.js` |
+| POST | `/api/game/world/host` | registry | `modules/game-world/server/routes-world.js` |
+| GET | `/api/game/world/state` | registry | `modules/game-world/server/routes-world.js` |
 | GET | `/api/hardware/displays` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | GET | `/api/hardware/modeline-preview` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | * | `/api/health` | handler | `src/cg-studio/routes.js` |
@@ -639,6 +641,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 
 | Module | What it is |
 |---|---|
+| `modules/game-world/server/routes-world.js` | WO-1101 — Game World API routes (work/notes/game-world-contract.md §3). |
 | `modules/rc-game/server/routes-rc-game.js` | WO-1074 — RC car game (work/notes/rc-game-contract.md). |
 | `modules/stage-salad/server/routes-salad.js` | WO-1089 — Stage Salad (work/notes/stage-salad-contract.md §2). |
 | `modules/toy-skirmish/server/routes-sk.js` | WO-1081 — Stage Skirmish (work/notes/skirmish-game-contract.md §2). |

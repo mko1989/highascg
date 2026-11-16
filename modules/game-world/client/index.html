@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+		/>
+		<meta name="theme-color" content="#141821" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="format-detection" content="telephone=no" />
+		<title>Game World</title>
+		<link rel="stylesheet" href="/game/world/world.css" />
+		<!-- The only inline script: the import map (data, not code). Everything else is an external module. -->
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "/vendor/three/build/three.module.js",
+					"three/addons/": "/vendor/three/examples/jsm/"
+				}
+			}
+		</script>
+		<script type="module" src="/game/world/world.js"></script>
+	</head>
+	<body>
+		<canvas id="view" aria-label="Room view" hidden></canvas>
+		<main id="app"></main>
+	</body>
+</html>

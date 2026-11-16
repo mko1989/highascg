@@ -1,0 +1,8 @@
+{
+	"name": "game-world",
+	"version": "1.0.0",
+	"title": "Game World",
+	"description": "One shared room for the browser games (RC cars, Stage Skirmish, Stage Salad): each game sees the others' cars, soldiers, vegetables and slingshots in the same venue, they affect each other (server-refereed, capped, never griefing), a world host page (start / stop all, one presenter-safe pause, join codes side by side) and a world spectator page. Needs no game; does nothing until a game session runs. Never puts anything on a screen.",
+	"main": "register.js",
+	"requiresCore": ">=2026.5.20"
+}
