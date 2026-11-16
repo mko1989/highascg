@@ -7,7 +7,7 @@ render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform vec4 albedo : source_color = vec4(0.08, 0.08, 0.08, 1.0);
 uniform float sheen = 0.35;
-uniform float fold_ao = 0.55; // how dark the back of a fold gets in ambient light
+uniform float fold_ao = 0.75; // how dark the back of a fold gets in ambient light
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -25,11 +25,11 @@ void fragment() {
 	float g = vnoise(UV * vec2(9.0, 0.8)) * 0.6 + vnoise(UV * vec2(37.0, 3.0)) * 0.4;
 	float front = FRONT_FACING ? COLOR.r : 1.0 - COLOR.r;
 	ALBEDO = albedo.rgb * (0.92 + 0.12 * g);
-	ROUGHNESS = 1.0;
-	SPECULAR = 0.12;
+	ROUGHNESS = 0.9;
+	SPECULAR = 0.2;
 	METALLIC = 0.0;
 	RIM = sheen;
 	RIM_TINT = 0.65;
-	AO = mix(1.0 - fold_ao, 1.0, front);
-	AO_LIGHT_AFFECT = 0.25;
+	AO = mix(1.0 - fold_ao, 1.0, smoothstep(0.0, 1.0, front));
+	AO_LIGHT_AFFECT = 0.4;
 }

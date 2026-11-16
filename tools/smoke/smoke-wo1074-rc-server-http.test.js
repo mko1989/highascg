@@ -365,6 +365,8 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 		[`${DIR}/rc-scene-fixtures.js`]: ['src/fixtures/follow-patch', 'src/fixtures/gdtf-ik', 'src/stage/glb-units', 'src/stage/mvr-3ds'],
 		/* WO-1098: the texture shrinker moved into the core (shared with the venue importer) */
 		[`${DIR}/rc-scene-tex.js`]: ['src/stage/scene-tex'],
+		/* WO-1104: a stage drape's pleats — the same pure geometry the MVR export draws (no I/O) */
+		[`${DIR}/rc-scene-drape.js`]: ['src/stage/drape-geometry'],
 		/* WO-1082: the race bots import() the client's own pure modules (bot-brain.js, physics) by file URL */
 		[`${DIR}/rc-room-bots.js`]: ['url'],
 	}

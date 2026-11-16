@@ -175,3 +175,26 @@ func test_pick_tests_the_object_frame() -> void:
 	t.eq(b.pick_ray(Vector3(2, 5, -2), Vector3.DOWN), "drape_1", "a ray onto the cloth picks it")
 	t.eq(b.pick_ray(Vector3(2, 5, 2), Vector3.DOWN), "", "a ray inside the world box but 2.8 m off the cloth does not")
 	b.free()
+
+
+func test_delete_takes_the_selection_box_with_it() -> void:
+	var panel := FileAccess.get_file_as_string("res://features/previs/stage_panel.gd")
+	t.ok(panel.contains("\tbuilder.remove(_selected)\n\t_selected = \"\"\n\tselection_changed.emit(\"\")"), "Delete clears the 3D selection box")
+
+
+func test_floor_under_a_skirt_goes_through_legs_not_decks() -> void:
+	var U := preload("res://features/previs/drape_ui.gd")
+	t.ok(is_nan(U.floor_from_hits([])), "no hit")
+	# Hilton: the wall's legs (a 4 cm brace at 0.32, a 1 cm foot plate at 0.24) over a floor nothing draws → the plate's bottom
+	var legs := [{"y": 0.319, "ny": 1.0}, {"y": 0.279, "ny": -1.0}, {"y": 0.249, "ny": 1.0}, {"y": 0.239, "ny": -1.0}, {"y": 0.8, "ny": 0.0}]
+	t.ok(absf(U.floor_from_hits(legs) - 0.239) < 1e-6, "through the legs to their feet")
+	t.ok(absf(U.floor_from_hits(legs + [{"y": 0.239, "ny": 1.0}]) - 0.239) < 1e-6, "the hall floor under them")
+	t.ok(absf(U.floor_from_hits([{"y": 0.239, "ny": 1.0}] + legs) - 0.239) < 1e-6, "whatever order the meshes answer in")
+	t.ok(absf(U.floor_from_hits([{"y": 0.639, "ny": 1.0}, {"y": 0.239, "ny": -1.0}, {"y": 0.239, "ny": 1.0}]) - 0.639) < 1e-6, "a 40 cm deck is a floor")
+	t.ok(absf(U.floor_from_hits([{"y": 0.0, "ny": 1.0}]) - 0.0) < 1e-6, "a one-sided floor")
+	# the real Hilton legs (nogi.glb): a base rail 0.239..0.319 drawn without its underside, nothing under it
+	t.ok(absf(U.floor_from_hits([{"y": 0.319, "ny": 1.0, "bottom": 0.239}]) - 0.239) < 1e-6, "an open-bottomed rail: its mesh's bottom")
+	t.ok(absf(U.floor_from_hits([{"y": 0.639, "ny": 1.0, "bottom": 0.239}]) - 0.639) < 1e-6, "an open-bottomed deck is still a deck")
+	t.ok(absf(U.floor_from_hits([{"y": 0.647, "ny": 1.0, "bottom": 0.639}, {"y": 0.639, "ny": 1.0, "bottom": 0.239}]) - 0.639) < 1e-6, "carpet on a deck")
+	var mvr := FileAccess.get_file_as_string("res://features/previs/mvr_scene.gd")
+	t.ok(mvr.contains("return DrapeUi.floor_from_hits(hits)"), "the MVR probe collects every face the ray meets")

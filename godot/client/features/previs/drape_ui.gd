@@ -6,6 +6,7 @@ const S := preload("res://features/previs/stage_objects.gd")
 const D := preload("res://features/previs/drape_geometry.gd")
 const TM := preload("res://features/previs/tracking/tracking_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const THIN := 0.12  ## m — a piece this thin between its top and bottom faces is not a floor (floor_from_hits)
 
 
 ## Swatches for the presets and a picker; `set_color(hex, done)` gets "#rrggbb" — done = a swatch click (the row may be
@@ -62,3 +63,29 @@ static func grid_floor(project: Dictionary, p: Vector3) -> float:
 	var g := TM.normalize_grid(g0)
 	var over := absf(p.x - float(g.x_offset)) <= float(g.width) / 2.0 and absf(-p.z - float(g.y_offset)) <= float(g.depth) / 2.0
 	return float(g.z_offset) if over else 0.0
+
+
+## The floor a skirt stands on, from everything a downward ray meets (`hits`: [{y, ny (the surface normal's up part),
+## bottom (the lowest point of the mesh it belongs to)}], any order): the first top face whose solid goes on down for at
+## least THIN — a deck, the floor. A thin piece (a leg's brace or base rail, a carpet: its bottom face, or else its
+## mesh's bottom, ≤ THIN under its top) is what a skirt hides or stands on, so the ray goes on below it, and when nothing
+## else is below, the lowest such bottom is the floor. Walls (|ny| small) are skipped. NAN = no hit.
+static func floor_from_hits(hits: Array) -> float:
+	var h := hits.filter(func(x: Dictionary) -> bool: return absf(float(x.ny)) > 0.3)
+	h.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:  # top down; at one height a bottom face before a top face
+		return float(a.y) > float(b.y) + 1e-4 or (absf(float(a.y) - float(b.y)) <= 1e-4 and float(a.ny) < float(b.ny)))
+	var low := NAN
+	var i := 0
+	while i < h.size():
+		var y := float(h[i].y)
+		if float(h[i].ny) < 0.0:
+			low = y  # a bottom face first: the ray began inside a piece
+		elif i + 1 < h.size() and float(h[i + 1].ny) < 0.0 and y - float(h[i + 1].y) < THIN:
+			low = float(h[i + 1].y)
+			i += 1
+		elif y - float(h[i].get("bottom", -INF)) < THIN:
+			low = float(h[i].bottom)  # an open-bottomed thin piece (a base rail drawn without its underside)
+		else:
+			return y
+		i += 1
+	return low

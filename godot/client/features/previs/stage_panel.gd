@@ -264,6 +264,7 @@ func _delete() -> void:
 		return
 	builder.remove(_selected)
 	_selected = ""
+	selection_changed.emit("")  # WO-1104: the selection box goes with the object (it stayed behind on glass)
 	_persist()
 	_refresh_list()
 	_build_inspector()

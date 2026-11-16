@@ -11,6 +11,7 @@ const Tint := preload("res://features/previs/model_tint.gd")
 const LED_SHADER := preload("res://features/previs/led_screen.gdshader")
 const MoveModel := preload("res://features/previs/move/move_model.gd")
 const W := preload("res://features/previs/mvr_screen_model.gd")
+const DrapeUi := preload("res://features/previs/drape_ui.gd")
 const Venue := preload("res://features/previs/mvr_venue.gd")
 
 signal layer_colors_changed(cols: Dictionary)  ## WO-678: the patched heads (fixtures_3d.gd) follow their layer
@@ -302,11 +303,28 @@ func floor_below(p: Vector3) -> float:
 	var to_world := inv.affine_inverse()
 	var from := to_world * p
 	var dir := (to_world.basis * Vector3.DOWN).normalized()
-	var best := INF
+	var hits := []  # every face the ray meets: a leg's brace above the floor must not end it (drape_ui.floor_from_hits)
 	for n in _objects():
-		for mi in (n as Node).find_children("*", "MeshInstance3D", true, false):
-			best = minf(best, W.ray_distance(mi as MeshInstance3D, from, dir, _tris))
-	return (inv * (from + dir * best)).y if best < INF else NAN
+		for mi: MeshInstance3D in (n as Node).find_children("*", "MeshInstance3D", true, false):
+			if mi.mesh == null or (mi.global_transform * mi.get_aabb()).intersects_ray(from, dir) == null:
+				continue
+			var id := mi.mesh.get_instance_id()
+			if not _tris.has(id):
+				_tris[id] = mi.mesh.generate_triangle_mesh()
+			var tm: TriangleMesh = _tris[id]
+			var li := mi.global_transform.affine_inverse()
+			var at := li * from
+			var ld := (li.basis * dir).normalized()
+			var bottom := (inv * mi.global_transform * mi.get_aabb()).position.y
+			for k in 32:
+				var hit: Dictionary = tm.intersect_ray(at, ld) if tm != null else {}
+				if hit.is_empty():
+					break
+				var nw: Vector3 = (li.basis.transposed() * (hit.normal as Vector3)).normalized()
+				hits.append({"y": (inv * (mi.global_transform * (hit.position as Vector3))).y, "ny": (inv.basis * nw).normalized().y,
+					"bottom": bottom})
+				at = (hit.position as Vector3) + ld * 0.001
+	return DrapeUi.floor_from_hits(hits)
 
 
 ## Visible objects as mvr_screen_model.cluster items: {uuid, key (model), box (world AABB)}.
