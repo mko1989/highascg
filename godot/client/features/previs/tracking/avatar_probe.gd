@@ -4,6 +4,8 @@ extends Node
 ## front / three-quarter / both sides / back / face / wide shots of the avatar as it walks, saved as `<dir>/<name>_<view>.png`,
 ## plus `<dir>/<name>_motion.json` (its feet and yaw every frame for 6 s: floor height, smoothness). The orbit camera
 ## is put back where it was after each round. Nothing runs without the flag.
+## WO-1103: a `go` whose text is JSON runs avatar_probe_sweep.gd instead (quality × house × view shots of every figure,
+## or the frame cost of n human puppets); a human's motion rows also carry its feet and the drawn balls of its feet.
 
 const VIEWS := [["front", 0.0, 3.2, 0.12], ["three_quarter", 0.75, 3.2, 0.12], ["side", PI / 2.0, 1.6, 0.1],
 	["side_l", -PI / 2.0, 1.6, 0.1], ["back", PI, 3.2, 0.12], ["face", 0.25, 1.3, 0.05], ["wide", 0.5, 7.0, 0.45]]
@@ -27,6 +29,9 @@ func _process(dt: float) -> void:
 		if FileAccess.file_exists(dir + "/go"):
 			var name_ := FileAccess.get_file_as_string(dir + "/go").strip_edges()
 			DirAccess.remove_absolute(dir + "/go")
+			if name_.begins_with("{"):
+				_sweep(JSON.parse_string(name_))
+				return
 			_start(name_ if name_ != "" else "probe")
 	if not _busy:
 		return
@@ -34,7 +39,14 @@ func _process(dt: float) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	if a != null and now < _motion_until:
 		var sh: Dictionary = a.shown()
-		_motion.append([now, sh.pos.x, sh.pos.y, sh.pos.z, sh.yaw])
+		var row := [now, sh.pos.x, sh.pos.y, sh.pos.z, sh.yaw]
+		if sh.has("feet"):  # WO-1103: [air, planted x, z, drawn ball x, y, z] per foot
+			for i in 2:
+				var f: Dictionary = sh.feet[i]
+				var b: Vector3 = sh.balls[i]
+				var at: Vector3 = f.at if f.at is Vector3 else Vector3.ZERO
+				row.append_array([f.air, at.x, at.z, b.x, b.y, b.z])
+		_motion.append(row)
 	if _shot.is_empty():
 		if _queue.is_empty():
 			if now >= _motion_until:
@@ -47,6 +59,22 @@ func _process(dt: float) -> void:
 		var img := get_viewport().get_texture().get_image()
 		img.save_png("%s/%s_%s.png" % [dir, _saved.name, _shot.view[0]])
 		_shot = {}
+
+
+## WO-1103: the JSON sweep (avatar_probe_sweep.gd), one at a time.
+func _sweep(cfg: Variant) -> void:
+	if not (cfg is Dictionary):
+		print("[client] human probe: go is not a JSON object")
+		return
+	_busy = true
+	var sw: Node = preload("res://features/previs/tracking/avatar_probe_sweep.gd").new()
+	sw.dir = dir
+	sw.cards = cards
+	sw.cfg = cfg
+	add_child(sw)
+	await sw.run()
+	sw.queue_free()
+	_busy = false
 
 
 func _start(name_: String) -> void:

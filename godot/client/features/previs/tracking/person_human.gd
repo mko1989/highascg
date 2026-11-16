@@ -181,10 +181,14 @@ func set_tag(text: String) -> void:
 		tag.visible = text != ""
 
 
-## What the puppet shows now (tests, avatar_probe.gd): body, tone, height, yaw, position, feet (planted / in the air).
+## What the puppet shows now (tests, avatar_probe.gd): body, tone, height, yaw, position, feet (planted / in the air),
+## the drawn balls of the feet.
 func shown() -> Dictionary:
 	var feet := []
 	for i in 2:
 		var f: Dictionary = _gait.feet[i]
 		feet.append({"at": f.get("at"), "air": f.get("air", false), "yaw": f.get("yaw")})
-	return {"body": body, "tone": tone, "height": _height, "yaw": _yaw, "pos": _pos, "walk": _walk, "feet": feet, "colours": {}}
+	var balls := []  # the drawn balls of the feet (global; the probe checks they stay on their planted points)
+	for n in ["ball_l", "ball_r"]:
+		balls.append(_sk.global_transform * _sk.get_bone_global_pose(_sk.find_bone(n)).origin if _sk != null and _sk.is_inside_tree() else Vector3.ZERO)
+	return {"body": body, "tone": tone, "height": _height, "yaw": _yaw, "pos": _pos, "walk": _walk, "feet": feet, "balls": balls, "colours": {}}
