@@ -1,0 +1,39 @@
+# Corresponding source — HighAsCG live image
+
+Generated @GENERATED_AT@ by `tools/release/collect-third-party-licenses.sh` from `tools/release/licenses/SOURCES.md.in`.
+
+Parts of this image are free software under the GNU GPL (v2 and v3), the LGPL and the MPL. Their licences entitle
+you to the complete corresponding source. Below are directions to that source, at the exact versions on this image.
+
+## Written offer
+
+For at least three years after the date above, and for as long as this image is offered for download, anyone who
+received the image can get the complete corresponding source of any GPL- or LGPL-licensed component on it, at no
+charge. Ask through https://github.com/mko1989/highascg/issues and name the image file and the component. The
+directions below are given first so that most sources need no request.
+
+## Components
+
+| Component | Version on this image | Licence | Source |
+|-----------|-----------------------|---------|--------|
+| HighAsCG (this application) | `@HIGHASCG_COMMIT@` | AGPL-3.0-or-later | https://github.com/mko1989/highascg/tree/@HIGHASCG_COMMIT@ |
+| CasparCG Server (`~/highascg/bin/casparcg`) | `@CASPAR_VERSION@` | GPL-3.0-or-later | tag `highascg-@CASPAR_SHA9@`: https://github.com/mko1989/casparcg-server/tree/highascg-@CASPAR_SHA9@ (`@CASPAR_SOURCE_NOTE@`) |
+| Chromium Embedded Framework (`~/highascg/lib/libcef.so`) | @CEF_VERSION@ | BSD-3-Clause; the Chromium parts are under the licences in `third-party/chromium-142.0.7444-LICENSES.html` (LGPL components included) | CEF https://github.com/chromiumembedded/cef (branch 7444); Chromium https://chromium.googlesource.com/chromium/src/+/refs/tags/142.0.7444.176 |
+| casparcg-scanner | @SCANNER_VERSION@ | LGPL-3.0-or-later (packaging GPL-3.0-or-later) | https://github.com/CasparCG/media-scanner/tree/v@SCANNER_UPSTREAM@ |
+| penguins-eggs (installer tooling) | @EGGS_VERSION@ | MIT or GPL-2.0 | upstream https://github.com/pieroproietti/penguins-eggs (tag `v26.10.30`); our patch: `scripts/eggs/patches/` and `scripts/eggs/build-patched-coa.sh` in the HighAsCG repo at the commit above |
+| WayVR AppImage | @WAYVR_VERSION@ | GPL-3.0 | https://github.com/wlx-team/wayvr/tree/@WAYVR_VERSION@ |
+| Godot Engine (operator client + editor) | @GODOT_VERSION@ | MIT (`third-party/godot-*-LICENSE.txt`, `-COPYRIGHT.txt`) | https://github.com/godotengine/godot/tree/@GODOT_VERSION@-stable |
+| Bitfocus Companion (`~/companion`) | @COMPANION_VERSION@ | MIT (`third-party/companion-*-LICENSE.md`); bundled Electron/Chromium notices in `~/companion/LICENSE.electron.txt`, `LICENSES.chromium.html` | https://github.com/bitfocus/companion |
+| libretro cores (`~/.highascg/retro/cores`) | see below | per core (`third-party/libretro-*.copyright`) | Ubuntu source packages, see below |
+| npm packages (`~/highascg/node_modules`) | `package-lock.json` at the commit above | per package (`third-party/highascg-npm-deps.json`) | https://www.npmjs.com/ at the locked versions |
+
+### libretro cores
+
+@CORES_TABLE@
+
+### Ubuntu packages
+
+Every package installed from the Ubuntu archive or from a PPA is listed with its exact source package and version in
+`third-party/ubuntu-packages.tsv`. Get the source of one with `apt-get source <source>=<version>`, or download it from
+https://launchpad.net/ubuntu/+source/<source>/<version> (older versions also via https://snapshot.ubuntu.com/).
+Each package's licence is in `/usr/share/doc/<package>/copyright` on this image.

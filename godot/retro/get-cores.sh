@@ -19,6 +19,12 @@ apt-get download "${PKGS[@]}"
 for deb in ./*.deb; do dpkg-deb -x "$deb" root; done
 mkdir -p "$DEST" "$HOME/.highascg/retro/games"
 find root -name '*_libretro.so' -exec install -m 0644 {} "$DEST/" \;
+# WO-1096: each core's licence (and the version, for the source offer) ships next to it; the licence collector reads them.
+for deb in ./*.deb; do
+	pkg="$(dpkg-deb -f "$deb" Package)"
+	install -m 0644 "root/usr/share/doc/${pkg}/copyright" "$DEST/${pkg}.copyright"
+	dpkg-deb -f "$deb" Version >"$DEST/${pkg}.version"
+done
 echo "cores in $DEST:"
 ls -1 "$DEST"
 echo "ROMs go in $HOME/.highascg/retro/games"

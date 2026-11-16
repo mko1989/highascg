@@ -9,13 +9,15 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../.." && pwd)"
-LIC="${REPO_ROOT}/licenses"
+LIC="${HIGHASCG_LICENSES_OUT:-${REPO_ROOT}/licenses}" # WO-1096: tests write elsewhere
 TP="${LIC}/third-party"
 MANIFEST="${LIC}/manifest.json"
 NDI_PDF_URL='https://downloads.ndi.tv/SDK/NDI_SDK/NDI%20License%20Agreement.pdf'
 GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 mkdir -p "${TP}"
+# shellcheck source=collect-licenses-stack.sh
+source "${HERE}/collect-licenses-stack.sh"
 
 log() { echo "[collect-licenses] $*"; }
 
@@ -92,7 +94,8 @@ build_bmd_eula() {
 		echo "Blackmagic Design Desktop Video — License Agreement"
 		echo "Copyright Blackmagic Design Pty. Ltd. All rights reserved."
 		echo ""
-		echo "This file is shipped with HighAsCG live ISO images. Source: desktopvideo"
+		echo "Desktop Video is NOT on HighAsCG ISO images (the EULA forbids copying; WO-1096). It is installed per box"
+		echo "from the stick's exFAT partition. This text is kept for reference. Source: desktopvideo"
 		echo "Debian package /usr/share/doc/desktopvideo/copyright"
 		echo ""
 		if [[ -f "${TP}/blackmagic-desktopvideo.NOTICE" ]]; then
@@ -112,9 +115,13 @@ fi
 
 # --- NDI ---
 NDI_VER=""
-if [[ -f /usr/lib/x86_64-linux-gnu/libndi.so.6 ]]; then
-	NDI_VER="$(readlink -f /usr/lib/x86_64-linux-gnu/libndi.so.6 | sed 's/.*libndi\.so\.//')"
-fi
+# WO-1096: the ISO ships only Caspar's copy in lib/ (the system-path copy is excluded) — read that one first.
+for f in "${REPO_ROOT}/lib/libndi.so.6" /usr/lib/x86_64-linux-gnu/libndi.so.6; do
+	if [[ -f "$f" ]]; then
+		NDI_VER="$(ls -1 "$(readlink -f "$f")" "${f}".* 2>/dev/null | sed 's/.*libndi\.so\.//' | sort -V | tail -1)"
+		break
+	fi
+done
 if [[ ! -f "${TP}/ndi-sdk-license-agreement.pdf" ]] || [[ ! -s "${TP}/ndi-sdk-license-agreement.pdf" ]]; then
 	log "downloading NDI SDK License Agreement"
 	curl -fsSL -o "${TP}/ndi-sdk-license-agreement.pdf" "$NDI_PDF_URL" || {
@@ -136,6 +143,7 @@ done
 # --- Other common stack packages (best-effort) ---
 for pair in \
 	"casparcg-server-2.5:casparcg-server.NOTICE" \
+	"casparcg-scanner:casparcg-scanner.NOTICE" \
 	"ffmpeg:ffmpeg.NOTICE" \
 	"tailscale:tailscale.NOTICE" \
 	"syncthing:syncthing.NOTICE" \
@@ -158,15 +166,18 @@ if command -v npx &>/dev/null && [[ -f "${REPO_ROOT}/package-lock.json" ]]; then
 	) || true
 fi
 
+# --- WO-1096: Caspar, CEF/Chromium, Godot, Companion, eggs, WayVR, libretro cores, SOURCES.md ---
+EXTRA_TSV="$(mktemp)"
+collect_stack_licenses "$EXTRA_TSV"
+
 # --- manifest.json ---
 python3 - "${MANIFEST}" "${GENERATED_AT}" "${NV_PKG}" "${NV_VER}" "${NV_ISO_STAMP}" \
-	"${BMD_VER}" "${NDI_VER}" <<'PY'
+	"${BMD_VER}" "${NDI_VER}" "${EXTRA_TSV}" <<'PY'
 import json, os, sys
 from pathlib import Path
 
-manifest_path, generated_at, nv_pkg, nv_ver, nv_iso, bmd_ver, ndi_ver = sys.argv[1:8]
-repo = Path(manifest_path).resolve().parents[1]
-tp = repo / "licenses" / "third-party"
+manifest_path, generated_at, nv_pkg, nv_ver, nv_iso, bmd_ver, ndi_ver, extra_tsv = sys.argv[1:9]
+tp = Path(manifest_path).resolve().parent / "third-party"
 
 def has_file(name):
     return (tp / name).is_file()
@@ -218,9 +229,9 @@ if bmd_ver:
         "version": bmd_ver,
         "licenseId": "Proprietary",
         "category": "capture-playback",
-        "isoShipStatus": "allowed",
+        "isoShipStatus": "not-on-iso",
         "licenseFile": "third-party/blackmagic-desktopvideo-EULA.txt",
-        "complianceNotes": "Embedded in HighAsCG ISO. Full BMD Desktop Video License Agreement shipped with image.",
+        "complianceNotes": "NOT on the ISO: excluded since WO-92/430, the EULA forbids copying (WO-1096). Installed per box from the stick's exFAT partition; EULA text kept for reference.",
         "vendorUrl": "https://www.blackmagicdesign.com/",
     })
 
@@ -233,12 +244,13 @@ if ndi_ver or has_file("ndi-sdk-license-agreement.pdf"):
         "category": "av-network",
         "isoShipStatus": "allowed",
         "licenseFile": "third-party/ndi-sdk-license-agreement.pdf",
-        "complianceNotes": "Include PDF; link https://ndi.video/ near NDI UI; NDI® trademark notice required.",
+        "complianceNotes": "Only ~/highascg/lib/libndi.so.6 ships (no system-path copy). Include PDF; link https://ndi.video/ near NDI UI; NDI® trademark notice; SDK < 30 days old at release if a newer one exists (§2(b)); no NDI Tools.",
         "attributionUrl": "https://ndi.video/",
     })
 
 for extra in [
     ("casparcg-server", "casparcg-server.NOTICE", "CasparCG Server", "playout"),
+    ("casparcg-scanner", "casparcg-scanner.NOTICE", "CasparCG media scanner", "playout"),
     ("ffmpeg", "ffmpeg.NOTICE", "FFmpeg", "multimedia"),
     ("tailscale", "tailscale.NOTICE", "Tailscale", "network"),
     ("syncthing", "syncthing.NOTICE", "Syncthing", "sync"),
@@ -256,12 +268,21 @@ for extra in [
             "complianceNotes": "Debian copyright file from build host package.",
         })
 
+# WO-1096 rows from collect-licenses-stack.sh
+for line in Path(extra_tsv).read_text(encoding="utf-8").splitlines():
+    f = line.split("\t")
+    if len(f) != 8 or not has_file(f[5].split("/", 1)[-1]):
+        continue
+    components.append({"id": f[0], "name": f[1], "version": f[2] or None, "licenseId": f[3], "category": f[4],
+                       "isoShipStatus": "allowed", "licenseFile": f[5], "complianceNotes": f[6], "attributionUrl": f[7]})
+
 data = {
     "schemaVersion": 1,
     "generatedAt": generated_at,
     "generator": "tools/release/collect-third-party-licenses.sh",
     "highascgLicense": "AGPL-3.0-or-later",
     "complianceDoc": "licenses/COMPLIANCE-ISO.md",
+    "sourceOffer": "licenses/SOURCES.md",
     "components": components,
 }
 
@@ -283,12 +304,12 @@ lines = [
     "",
     "HighAsCG application: **AGPL-3.0-or-later** — see [`LICENSE`](../LICENSE).",
     "",
-    "**ISO shipping (NVIDIA / BMD / NDI):** read [`COMPLIANCE-ISO.md`](COMPLIANCE-ISO.md) before distributing images.",
+    "**ISO shipping:** read [`COMPLIANCE-ISO.md`](COMPLIANCE-ISO.md) before distributing images. Corresponding source: [`SOURCES.md`](SOURCES.md).",
     "",
     "| Component | Version | License | ISO ship | Notice file |",
     "|-----------|---------|---------|----------|-------------|",
 ]
-status_emoji = {"allowed": "OK", "caution": "CAUTION", "see-notice": "see notice"}
+status_emoji = {"allowed": "OK", "caution": "CAUTION", "see-notice": "see notice", "not-on-iso": "NOT on ISO"}
 for c in data["components"]:
     ver = c.get("version") or "—"
     ship = status_emoji.get(c.get("isoShipStatus"), c.get("isoShipStatus", ""))
@@ -309,4 +330,5 @@ Path(index_path).write_text("\n".join(lines), encoding="utf-8")
 print(f"Wrote {index_path}")
 PY
 
+rm -f "$EXTRA_TSV"
 log "done — see ${LIC}/INDEX.md and ${LIC}/COMPLIANCE-ISO.md"

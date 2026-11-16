@@ -12,6 +12,26 @@ Single file to replace **`/etc/penguins-eggs.d/exclude.list`** on the eggs build
 | [`penguins-eggs-exclude-highascg-embed-server.list`](penguins-eggs-exclude-highascg-embed-server.list) | HighAsCG lines, default embed-server ISO (`HIGHASCG_ISO_EMBED_SERVER=1`) — merge script appends this |
 | [`penguins-eggs-exclude-highascg-fragment.list`](penguins-eggs-exclude-highascg-fragment.list) | HighAsCG lines, WO-47 exFAT-only mode (`HIGHASCG_ISO_EMBED_SERVER=0`) |
 | [`penguins-eggs-exclude-decklink.list`](penguins-eggs-exclude-decklink.list) | DeckLink/Blackmagic lines (WO-92), always merged |
+| [`penguins-eggs-exclude-redistribution.list`](penguins-eggs-exclude-redistribution.list) | WO-1096: what we have no right to distribute, or that is private to the build host — always merged (coa `custom.exclude.list`); asserted by `verify-iso-redistribution.sh` |
+
+> **WO-1096 — redistribution (owner 16.11.26: "we cant bake anything into iso that i have no right to distribute").**
+> - **Excluded, both embed modes:**
+>   - client `Documents/` and `highascg-backups/`;
+>   - `root/*` **and** `root/.*`. coa's `mksquashfs -wildcards` matches with FNM_PERIOD, so `*` never matches a leading dot and `root/*` alone kept `root/.ssh/known_hosts`;
+>   - Shutter Encoder;
+>   - Blackmagic, MagicQ, NoMachine and Zoom leftovers (icons, `/etc/blackmagic`, rc/systemd links, udev, mime, polkit, dpkg info);
+>   - NetworkManager `seen-bssids`/leases/timestamps;
+>   - the PulseAudio cookie;
+>   - `exfat-sync.json.bak.*`;
+>   - the system-path `libndi.so*`;
+>   - the unused `/usr/lib/cef` duplicate;
+>   - the 71 noble compat libs.
+> - **Offline model:** `exclude-match.js` models the matching. It agreed with a real `mksquashfs` run path for path (188,343 kept entries).
+> - **Licence texts:** the verifier also requires them (`licence_tree_check`): `SOURCES.md`, the NVIDIA agreement, the NDI PDF, Caspar/CEF/Chromium/Godot/Companion/cores/eggs.
+> - **Deliberately NOT excluded (owner decision, 16.11.26):** `home/casparcg/.highascg/gdtf-share.json`, the project's GDTF Share login.
+>   - It ships so that getting GDTF files is streamlined. Owner: *"i wanted to leave the highascg login, so getting the gdtf files would be easier, streamlined"* (first decided 22.10).
+>   - For the record: GDTF Share's terms (§5) ask users to keep their login details confidential.
+>   - The downloaded GDTF files stay out (`projects/_gdtf` reset, `.highascg/cache` excluded).
 
 > **WO-168 T168.1 — owner action needed.** Before this fix, `home/casparcg/highascg/.private/` (Syncthing device ID, Tailscale status, replication pairing manifest) had **zero** exclude/reset/verify coverage and shipped in every produced ISO/clone. **Any ISO already produced from this box before 2026-07-13 contains this box's device identity/auth material.** Consider rotating Syncthing/Tailscale identities on boxes cloned from those ISOs, and re-producing the ISO after this fix before distributing further.
 
@@ -139,7 +159,7 @@ Typical squashfs contents:
 |-----------|------------|--------------|
 | Ubuntu userland + `linux-modules` + `linux-firmware` | ~2–3 GiB compressed | Yes (the OS) |
 | **`/opt/nvidia-pool`** | ~1.5 GiB if present on host | **No** — excluded + purged before build (`HIGHASCG_PURGE_NVIDIA_POOL=1`) |
-| Caspar + **`~/highascg/lib`** (NDI, etc.) | ~0.7 GiB+ | Yes (playout) |
+| Caspar + **`~/highascg/lib`** (NDI, CEF, …) | ~0.7 GiB+ | Yes (playout). **NDI** (`lib/libndi.so.6` only) ships under the NDI SDK License Agreement:<br>• §2(a): only the SDK's object code, as used by HighAsCG;<br>• the PDF is in the licence tree;<br>• "NDI® is a registered trademark of Vizrt NDI AB" plus a link to https://ndi.video/ next to NDI in both clients;<br>• no system-path copy (`usr/lib/x86_64-linux-gnu/libndi.so*` is excluded, WO-1096);<br>• no NDI Tools;<br>• §2(b): an SDK less than 30 days old at release if a newer one exists (6.3.2 is the newest as of 16.11.26).<br>The noble compat libs are excluded (WO-1096) |
 | One baked NVIDIA branch (535/580/595) | varies | Yes |
 | `src/`, `node_modules`, `.cache`, `/swapfile` | large on disk | **No** — exclude.list + `strip-host-swap` |
 | **`/run`**, **`/tmp`**, **`/proc`**, **`/dev`** | tmpfs at runtime | **No** — eggs master `run/*`, `tmp/*`, … |

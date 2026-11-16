@@ -291,7 +291,9 @@ Libraries the binary uses, not part of this repository:
   Chromium Embedded Framework (CEF) 142.0.17 — https://bitbucket.org/chromiumembedded/cef — Copyright The Chromium
     Embedded Framework Authors. License: BSD-3-Clause (LICENSE-CEF.txt next to the binary). libcef_dll_wrapper is
     linked statically; libcef.so (the owner's no-root build, WO-234) is loaded from the box's lib/ and is not in the
-    release tarball. Chromium inside libcef.so carries its own third-party notices (about:credits).
+    release tarball. Chromium inside libcef.so carries its own third-party licences: the minimal CEF distribution has
+    only a placeholder CREDITS.html, so the ISO ships Chromium 142.0.7444's LICENSES.chromium.html (from Electron
+    v39.2.4) in the licence tree (WO-1096; tools/release/licenses/README.md).
   FFmpeg — https://ffmpeg.org — linked dynamically against the Ubuntu 26.04 system packages (libavcodec62 …), which
     are built with --enable-gpl (libx264, libx265), so that combination is GPL; installed by apt, not shipped by us.
 
@@ -343,3 +345,28 @@ npm runtime dependencies (node_modules/, shipped in the ISO and the server relea
   The web UI bundle (dist-web/) contains three (MIT), exceljs (MIT), html-to-image (MIT) and jszip (MIT, as above);
   their licence texts are in node_modules/<name>/.
   The former dependency "wetransfert" (no licence) was removed in WO-1096 together with the WeTransfer ingest branch.
+
+================================================================================
+ISO image components (WO-1096) — besides the above, the live ISO carries these. Their licence texts are in the
+generated licence tree /usr/share/doc/highascg/licenses/ (tools/release/collect-third-party-licenses.sh; vendored
+texts in tools/release/licenses/), and SOURCES.md there is the written source offer for every GPL/LGPL/MPL part.
+
+  Godot Engine 4.7.2 (operator client export + editor) — https://godotengine.org — MIT, (c) 2014-present Godot Engine
+    contributors, (c) 2007-2014 Juan Linietsky, Ariel Manzur; its third-party components (FreeType, ENet, mbedTLS, …)
+    are listed in COPYRIGHT.txt (licence tree: godot-LICENSE.txt, godot-COPYRIGHT.txt).
+  Bitfocus Companion 5.0.2 (~/companion) — https://github.com/bitfocus/companion — MIT, (c) 2018 Bitfocus AS
+    (companion-LICENSE.md, also ~/companion/LICENSE.md); its Electron/Chromium notices ship in ~/companion.
+  libretro cores (~/.highascg/retro/cores, from Ubuntu packages via godot/retro/get-cores.sh) — Nestopia (GPL-2.0),
+    bsnes-mercury (GPL-3.0), mGBA (MPL-2.0); each core's Debian copyright file ships next to it and in the licence
+    tree. The non-commercial cores (Genesis Plus GX, Snes9x) are not installed; no ROMs ship.
+  WayVR v26.8.0 AppImage — https://github.com/wlx-team/wayvr — GPL-3.0 (source: tag v26.8.0).
+  casparcg-scanner 1.4.0 — https://github.com/CasparCG/media-scanner — LGPL-3.0-or-later, (c) 2018 Sveriges
+    Television AB.
+  penguins-eggs 26.10.30 (patched: scripts/eggs/patches) — https://github.com/pieroproietti/penguins-eggs — MIT OR
+    GPL-2.0, (c) 2017-2025 Piero Proietti.
+  NVIDIA Linux driver — NVIDIA Driver License Agreement (licence tree: nvidia-driver.NOTICE); unmodified binaries.
+  NDI runtime (lib/libndi.so.6) — NDI SDK License Agreement (licence tree: ndi-sdk-license-agreement.pdf).
+    NDI® is a registered trademark of Vizrt NDI AB. https://ndi.video/
+  Ubuntu 26.04 packages — each under the licence in /usr/share/doc/<package>/copyright; versions and source packages
+    in the licence tree's ubuntu-packages.tsv.
+  Not on the ISO (excluded, installed per box): Blackmagic Desktop Video, ChamSys MagicQ.

@@ -97,4 +97,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1096-npm-licenses.test.js', // WO-1096 npm licence allowlist gate (wetransfert "none" fails)
 	'tools/smoke/smoke-wo1096-no-nintendo-template.test.js', // WO-1096: template/mario (Nintendo sprites/sounds) dropped; guard by path and asset hash
 	'tools/smoke/smoke-wo1096-iso-redistribution-excludes.test.js', // WO-1096: ISO excludes for what is not ours to ship / host-private + verifier
+	'tools/smoke/smoke-wo1096-licence-tree.test.js', // WO-1096 F: COMPLIANCE-ISO truth, stack licence texts, SOURCES.md source offer, verifier + NDI attribution
 ]

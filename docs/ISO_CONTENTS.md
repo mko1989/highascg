@@ -32,8 +32,8 @@ The image is a **`eggs produce --clone --max --excludes static`** snapshot of th
 │  X11 :0 — nodm → openbox-session (user casparcg)            │
 ├─────────────────────────────────────────────────────────────┤
 │  Drivers: NVIDIA (one branch per ISO — 535 / 580 / 595)     │
-│           DeckLink desktopvideo (DKMS blackmagic_io)        │
-│           NDI (libndi in tree + ~/highascg/lib copies)     │
+│           DeckLink: NOT on the ISO — per box from exFAT     │
+│           NDI (~/highascg/lib/libndi.so.6 only, WO-1096)   │
 ├─────────────────────────────────────────────────────────────┤
 │  FFmpeg, systemd-networkd, optional NetworkManager stack    │
 │  v4l-utils (`v4l2-ctl`) — USB/V4L2 webcam enumeration       │
@@ -113,9 +113,8 @@ Settings UI: **Application Settings → system** can apply another branch from t
 
 | Item | Notes |
 |------|------|
-| **Packages** | **`desktopvideo`** + **`desktopvideo-gui`** (from Blackmagic Desktop Video `.deb` on build host — **required** for ISO) |
-| **License on ISO** | `licenses/third-party/blackmagic-desktopvideo-EULA.txt` → `/usr/share/doc/highascg/licenses/` |
-| **Kernel module** | **DKMS `blackmagic_io`** (must be present on build host at clone time) |
+| **On the ISO?** | **No.** The Blackmagic EULA forbids copying, so `desktopvideo`, `desktopvideo-gui`, DKMS `blackmagic_io` and every leftover are excluded (WO-92/430/1096; both verifiers assert it). The operator copies Blackmagic's installer to the stick's exFAT `decklink/` and `decklink-install-from-exfat.sh` installs it per box |
+| **License text** | `licenses/third-party/blackmagic-desktopvideo-EULA.txt` — reference copy only |
 | **Setup GUI** | `desktopvideo_setup` — autostart in **`x11-only`** mode; optional in normal mode after delay |
 | **Build warning** | `build-operator-stick.sh` / docs warn if **`desktopvideo*`** missing on clone source |
 
@@ -233,7 +232,7 @@ Kept under **`/home/casparcg/highascg`** for Caspar + mounts:
 |------|------|
 | **`/usr/share/doc/highascg/licenses/`** | NVIDIA, NDI, Blackmagic, FFmpeg, … notices + `manifest.json` |
 | **`~/highascg/licenses`** | Symlink to system path when `15-licenses-install.sh` ran |
-| **`licenses/COMPLIANCE-ISO.md`** (in repo) | **Read before shipping ISO** — NVIDIA (OK with notice), NDI (OK with EULA + UI attribution), DeckLink (**caution**) |
+| **`licenses/COMPLIANCE-ISO.md`** (source: `tools/release/licenses/COMPLIANCE-ISO.md`) | **Read before shipping ISO** — NVIDIA (OK with notice), NDI (OK with EULA + UI attribution), DeckLink (**not on the ISO**); `SOURCES.md` = written source offer (WO-1096) |
 
 Regenerate before `eggs produce`:
 
@@ -281,7 +280,7 @@ sudo bash deprecated/tools/release/make-dev-github-release-iso-quick.sh
 | Ubuntu + kernel + systemd? | **Yes** (clone of build host) |
 | nodm + Openbox + X? | **Yes**, if install.sh ran |
 | NVIDIA driver per ISO? | Set **`HIGHASCG_NVIDIA_DRIVER`** on build host; **`npm run eggs:build`** |
-| DeckLink **desktopvideo**? | **Yes**, if installed on build host before produce |
+| DeckLink **desktopvideo**? | **No** — excluded (EULA); installed per box from exFAT (WO-92/430/1096) |
 | Caspar + scanner binaries? | **Yes**, if install.sh ran |
 | **`~/highascg/config/casparcg.config`** stub? | **Yes** (minimal shell) |
 | Full HighAsCG **`src/` / `node_modules`?** | **Yes** when **`HIGHASCG_ISO_EMBED_SERVER=1`** (default). **`client/`** sources excluded from ISO; **`dist-web/`** via **`drop-update/`** (WO-52) |

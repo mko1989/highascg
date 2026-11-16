@@ -87,11 +87,25 @@ const KEEPS = [
 	'home/casparcg/highascg/bin/casparcg',
 	'usr/lib/x86_64-linux-gnu/libavcodec.so.62',
 	'usr/lib/x86_64-linux-gnu/libnvidia-gl.so.615',
-	'usr/share/doc/libnvidia-gl-615/copyright',
 	'etc/udev/rules.d/99-highascg-exfat-arrive.rules',
 	'usr/share/applications/firefox-esr.desktop',
 	'var/lib/NetworkManager/NetworkManager.state',
 	'usr/lib/7zip/Codecs/Rar.so', // unRAR licence: free distribution allowed (no fee) — ships
+]
+
+/** Licence texts verify-iso-redistribution.sh requires once their component is on the image (WO-1096 F). */
+const LICENCES = [
+	'usr/share/doc/highascg/licenses/SOURCES.md',
+	'usr/share/doc/highascg/licenses/COMPLIANCE-ISO.md',
+	'usr/share/doc/highascg/licenses/third-party/nvidia-driver.NOTICE',
+	'usr/share/doc/highascg/licenses/third-party/ndi-sdk-license-agreement.pdf',
+	'usr/share/doc/highascg/licenses/third-party/casparcg-server-GPL-3.0.txt',
+	'usr/share/doc/highascg/licenses/third-party/chromium-142.0.7444-LICENSES.html',
+	'usr/share/doc/highascg/licenses/third-party/godot-COPYRIGHT.txt',
+	'usr/share/doc/libnvidia-gl-615/copyright',
+	'home/casparcg/highascg/bin/LICENSE',
+	'home/casparcg/highascg/bin/SOURCE.txt',
+	'home/casparcg/highascg/lib/LICENSE-CEF.txt',
 ]
 
 describe('WO-1096 E: redistribution fragment in custom.exclude.list', () => {
@@ -140,7 +154,7 @@ describe('WO-1096 E: redistribution fragment in custom.exclude.list', () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wo1096-'))
 		try {
 			const tree = path.join(dir, 'tree')
-			for (const p of [...LEAKS, ...KEEPS.filter((k) => k !== 'root')]) {
+			for (const p of [...LEAKS, ...LICENCES, ...KEEPS.filter((k) => k !== 'root')]) {
 				fs.mkdirSync(path.dirname(path.join(tree, p)), { recursive: true })
 				fs.writeFileSync(path.join(tree, p), '')
 			}
@@ -157,6 +171,13 @@ describe('WO-1096 E: redistribution fragment in custom.exclude.list', () => {
 			assert.equal(badRun.status, 1)
 			assert.match(badRun.stderr, /Blackmagic Desktop Video leftovers/)
 			assert.match(badRun.stderr, /root home contents/)
+			// licence texts are required, not just tolerated
+			fs.rmSync(path.join(tree, 'usr/share/doc/highascg/licenses/SOURCES.md'))
+			const noOffer = path.join(dir, 'nooffer.sq')
+			sq(noOffer, ['-wildcards', '-ef', list])
+			const noOfferRun = spawnSync('bash', [VERIFY, noOffer], { encoding: 'utf8' })
+			assert.equal(noOfferRun.status, 1)
+			assert.match(noOfferRun.stderr, /licence text missing \(WO-1096\): written source offer/)
 			// the model and mksquashfs agree on every path
 			const real = execFileSync('unsquashfs', ['-l', good], { encoding: 'utf8' }).split('\n').map(listingPath).filter(Boolean)
 			const all = execFileSync('unsquashfs', ['-l', bad], { encoding: 'utf8' }).split('\n').map(listingPath).filter(Boolean)
