@@ -67,6 +67,10 @@ jobs:
       - name: npm audit
         run: node tools/ci/npm-audit-ci.js
 
+      # WO-1096 — every production dependency must carry an allowlisted licence (wetransfert shipped with "none")
+      - name: npm licences
+        run: npm run verify:npm-licenses
+
   # WO-593/594/599 — the Godot operator client + the shm frame transport. No GPU on the runner:
   # GDScript logic tests run headless; the GPU upload path is verified on the box (WO-595).
   godot:

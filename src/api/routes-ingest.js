@@ -1,5 +1,5 @@
 /**
- * Media Ingest: Streaming uploads (busboy) and URL downloads (fetch + unzipper).
+ * Media Ingest: Streaming uploads (busboy) and plain http(s) URL downloads (fetch + safe unzip).
  * Supports 200GB+ files by avoiding RAM buffering.
  */
 
@@ -105,31 +105,6 @@ function handleGetDownloadStatus(ctx) {
 			message: s.message || '',
 			error: s.error || null,
 		}),
-	}
-}
-
-let _wetransfert = null
-function getWetransfert() {
-	if (_wetransfert !== null) return _wetransfert
-	try {
-		_wetransfert = require('wetransfert')
-	} catch {
-		_wetransfert = false
-	}
-	return _wetransfert
-}
-
-/**
- * @param {string} urlStr
- * @returns {boolean}
- */
-function isWeTransferUrl(urlStr) {
-	const wt = getWetransfert()
-	if (!wt || !wt.isValidWetransfertUrl) return false
-	try {
-		return !!wt.isValidWetransfertUrl(urlStr)
-	} catch {
-		return false
 	}
 }
 
@@ -278,79 +253,6 @@ async function handleDownload(body, ctx) {
 	const config = ctx.config || {}
 	const downloadSubdir = typeof parsedBody.path === 'string' ? parsedBody.path : ''
 	const downloadBase = getIngestEffectiveBase(config, downloadSubdir, persistence)
-
-	if (isWeTransferUrl(url)) {
-		const wt = getWetransfert()
-		if (!wt || !wt.download) {
-			return {
-				status: 503,
-				headers: JSON_HEADERS,
-				body: jsonBody({ error: 'WeTransfer support is not available (missing wetransfert module)' }),
-			}
-		}
-		if (!fs.existsSync(downloadBase)) {
-			try {
-				fs.mkdirSync(downloadBase, { recursive: true })
-			} catch (e) {
-				return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: `Could not create media folder: ${e.message}` }) }
-			}
-		}
-		setDownloadState(ctx, {
-			active: true,
-			phase: 'queued',
-			kind: 'wetransfer',
-			progress: null,
-			message: 'Queued: WeTransfer download…',
-			error: null,
-		})
-		ingestLog(ctx, 'info', `WeTransfer download starting → ${downloadBase}`)
-		;(async () => {
-			try {
-				setDownloadState(ctx, {
-					active: true,
-					phase: 'connecting',
-					message: 'Connecting to WeTransfer (resolving link)…',
-					progress: null,
-				})
-				await wt.download(url, downloadBase).onProgress((p) => {
-					const n = parseFloat(p)
-					const pct = Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n * 100))) : null
-					setDownloadState(ctx, {
-						active: true,
-						phase: 'downloading',
-						progress: pct,
-						message: 'Downloading from WeTransfer…',
-					})
-				})
-				setDownloadState(ctx, {
-					active: false,
-					phase: 'complete',
-					kind: 'wetransfer',
-					progress: 100,
-					message: 'WeTransfer download finished',
-					error: null,
-				})
-				ingestLog(ctx, 'info', 'WeTransfer download complete')
-				if (ctx.runMediaLibraryQueryCycle) ctx.runMediaLibraryQueryCycle()
-			} catch (e) {
-				const errMsg = e?.message || String(e)
-				setDownloadState(ctx, {
-					active: false,
-					phase: 'error',
-					kind: 'wetransfer',
-					progress: null,
-					message: 'WeTransfer download failed',
-					error: errMsg,
-				})
-				ingestLog(ctx, 'error', `WeTransfer download failed: ${errMsg}`)
-			}
-		})()
-		return {
-			status: 202,
-			headers: JSON_HEADERS,
-			body: jsonBody({ ok: true, message: 'WeTransfer download started', poll: '/api/ingest/download-status' }),
-		}
-	}
 
 	let filename
 	try {

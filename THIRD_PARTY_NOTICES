@@ -330,3 +330,16 @@ UI icons (WO-1096 inventory) — every third-party icon in client/assets and god
   redrew the port icons (hdmi/display-port/ethernet), the save/arrow/alignment icons and Godot's save/load, whose
   origin (uxwing-style exports, IcoMoon, embedded rasters) could not be placed under a redistributable licence, and
   deleted three unused unlicensed files (two "Uploaded to: SVG Repo" cables, camera-icon.svg).
+
+================================================================================
+npm runtime dependencies (node_modules/, shipped in the ISO and the server release tarball)
+  Every package keeps its own licence file in node_modules/<name>/. CI (tools/ci/check-npm-licenses.js, WO-1096) fails
+  the build on any production dependency whose licence is missing, "none", UNLICENSED or not on the allowlist.
+  Dual-licensed packages are used under the permissive option:
+    osc 2.4.5, slip 1.0.2 ........ (MIT OR GPL-2.0)            -> used under MIT
+    jszip 3.10.1 .................. (MIT OR GPL-3.0-or-later)   -> used under MIT
+  pako 1.0.11 ..................... MIT AND Zlib
+  jspack 0.0.4 .................... BSD-3-Clause (LICENSE file; package.json declares none), (c) 2008 Fair Oaks Labs, Inc.
+  The web UI bundle (dist-web/) contains three (MIT), exceljs (MIT), html-to-image (MIT) and jszip (MIT, as above);
+  their licence texts are in node_modules/<name>/.
+  The former dependency "wetransfert" (no licence) was removed in WO-1096 together with the WeTransfer ingest branch.

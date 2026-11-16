@@ -43,7 +43,7 @@ func test_upload_plan_walks_folders_like_the_server() -> void:
 
 func test_upload_and_download_lines() -> void:
 	t.eq(I.upload_text(1, 5, 40, 100, "/x/clip.mov"), "Uploading 2/5 · 40%  clip.mov")
-	t.eq(I.download_text({"active": true, "message": "Downloading from WeTransfer…", "progress": 41.6}), "Downloading from WeTransfer… 42%", "web poller line")
+	t.eq(I.download_text({"active": true, "message": "Downloading clip.mov…", "progress": 41.6}), "Downloading clip.mov… 42%", "web poller line")
 	t.eq(I.download_text({"active": true, "message": "", "progress": null}), "Working…")
 	t.eq(I.download_text({"active": false, "error": "HTTP 404", "message": "Download failed"}), "✗ HTTP 404")
 	t.eq(I.download_text({"active": false, "error": null, "message": "Downloaded clip.mov"}), "✓ Downloaded clip.mov")

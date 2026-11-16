@@ -94,4 +94,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1084-next-show-setup.test.js', // WO-1084 screens not plugged in are not started
 	'tools/smoke/smoke-wo1085-handover-core.test.js', // WO-1085 Auto follow spot handover
 	'tools/smoke/smoke-wo1085-handover-engine.test.js',
+	'tools/smoke/smoke-wo1096-npm-licenses.test.js', // WO-1096 npm licence allowlist gate (wetransfert "none" fails)
 ]

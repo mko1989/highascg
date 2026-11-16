@@ -104,7 +104,7 @@ func _ask_url() -> void:
 	dlg.title = "Download from URL"
 	dlg.ok_button_text = "Download"
 	var field := LineEdit.new()
-	field.placeholder_text = "Paste URL… (http(s) file or WeTransfer link)"
+	field.placeholder_text = "Paste URL… (http(s) file)"
 	field.custom_minimum_size.x = 480
 	dlg.add_child(field)
 	dlg.register_text_enter(field)
