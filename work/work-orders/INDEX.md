@@ -1,11 +1,11 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1001 live WOs (36 open, 156 in progress, 809 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1000 live WOs (36 open, 155 in progress, 809 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
 
-## engine — Looks, takes, timeline, playback (186)
+## engine — Looks, takes, timeline, playback (185)
 
 - 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
 - 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
@@ -58,7 +58,6 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 218 DONE [engine+mapping] Bank drift: visually-equal layers skip re-staging while the bank flips → produc… → 218_WO_BANK_DRIFT_SKIPPED_LAYERS_MIXER_STATE.md
 - 220 DONE [engine] Drop Shadow PIP overlay doesn't render (delivery pipeline verified good; fault… → 220_WO_PIP_SHADOW_NOT_RENDERING.md
 - 224 DONE [engine] Playlist: list-loop doesn't wrap; manual-advance mode has no Next trigger → 224_WO_PLAYLIST_LOOP_WRAP_AND_MANUAL_NEXT.md
-- 232 IN PROGRESS [engine+web-client] Mario game as a transparent-background HTML producer, puppeteer-controlled (CEF… → 232_WO_MARIO_HTML_PRODUCER.md
 - 251 DONE [engine] Playlist OSC advance handler was never subscribed (root cause of "doesn't loop") → 251_WO_PLAYLIST_OSC_HANDLER_NEVER_WIRED.md
 - 259 DONE [engine+amcp] Two-phase batched take: kill the per-command AMCP stagger in transitions → 259_WO_TWO_PHASE_BATCHED_TAKE.md
 - 268 DONE [engine+caspar-build] Shader templates crash in Caspar CEF (no WebGL2) + stray CG UPDATE 403 → 268_WO_SHADER_CEF_WEBGL_AND_CG_CONTINUITY.md
@@ -1057,7 +1056,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 923 DONE [process+godot-client,amcp] Full test run 01.11: test:live hung forever, stale live probes, two GUI e2e fai… → 923_WO_full_test_run_fixes.md
 - 995 DONE [process+testing-ci] Sanitization sweep: delete dead and deprecated code (Electron launcher, kiosk l… → 995_WO_dead_and_deprecated_code_sweep.md
 
-## Deprecated (50)
+## Deprecated (51)
 
 - 11 DEPRECATED [os-iso+devices-config] Boot Orchestrator & OS Setup → deprecated/11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md
 - 19 DEPRECATED [tracking-vr] Person Tracking — Stage Performer Detection from Camera Inputs & 3D Previs → deprecated/19_WO_PERSON_TRACKING.md
@@ -1069,6 +1068,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 89 DEPRECATED [video-io+web-client] CEF operator control (X11 bridge, host-target CDP, HTTP API) → deprecated/89_WO_CEF_OPERATOR_CONTROL.md
 - 149 DEPRECATED [web-client+engine] Operator GUI on live CasparCG output (design exploration) → deprecated/149_WO_OPERATOR_GUI_ON_LIVE_OUTPUT_DESIGN.md
 - 208 DEPRECATED [engine+web-client] Subtimers: using a timer creates a named, reusable instance under the countdown… → deprecated/208_WO_SUBTIMERS_IN_TEMPLATES.md
+- 232 DEPRECATED [engine+web-client] Mario game as a transparent-background HTML producer, puppeteer-controlled (CEF… → deprecated/232_WO_MARIO_HTML_PRODUCER.md
 - 238 DEPRECATED [engine+web-client] "Adjust to screen" fill must not count crop values in → deprecated/238_WO_ADJUST_FILL_IGNORES_CROP.md
 - 243 DEPRECATED [web-client+engine] Operator GUI channel: CEF web-UI layer over routed preview channels, own screen… → deprecated/243_WO_OPERATOR_GUI_CEF_CHANNEL.md
 - 247 DEPRECATED [web-client] Replace puppeteer with a raw CDP client for CEF interactive input → deprecated/247_WO_RAW_CDP_NO_PUPPETEER.md

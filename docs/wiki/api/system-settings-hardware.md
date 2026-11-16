@@ -163,7 +163,7 @@ WO-257 removed the CEF interactive bridge (`/api/cef-interactive/*`, `/api/cef/a
 `/api/cef/release-input`) and its keyboard/mouse/eval forwarding into embedded CEF HTML. Operator
 fullscreen still routes a webpage host source onto the operator display (multiview or an
 interactive-enabled screen consumer) — it just doesn't forward input into it anymore. Templates
-that expected input (e.g. `template/mario`) still play; they no longer receive clicks/keys.
+that expected input still play; they no longer receive clicks/keys.
 
 ## Tailscale
 

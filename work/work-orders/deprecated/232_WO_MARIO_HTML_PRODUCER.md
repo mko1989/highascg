@@ -1,7 +1,7 @@
 # WO-232 — Mario game as a transparent-background HTML producer, puppeteer-controlled (CEF interactive bridge)
 
 **Area:** engine, web-client
-**Status: IN PROGRESS — PARTIALLY DEPRECATED (2026-07-27) — the interactive input path (T232.3/T232.6, CEF bridge) was removed by WO-257 after production instability; mario vendoring/transparency (T232.1-2) and the template picker (T232.7) still stand. Do not treat the input path as source of truth.**
+**Status: DEPRECATED (2026-11-16 — template/mario removed from the tree: its sprites, sounds and World 1-1 level data are Nintendo's (the MIT licence covered only the engine code); owner 16.11 "Mario template: drop"; successor WO-1096)**
 
 **Status:** Planned | **Date:** 2026-07-15
 
@@ -14,8 +14,8 @@ below is entirely unaffected — but they no longer receive keyboard/mouse input
 "Interactive input" arm/release path (`POST /api/cef/arm-input`, `src/api/routes-cef-arm-input.js`,
 `smoke-wo232-arm-input.test.js`, the inspector arm/release toggle) is deleted, and
 `cef-interactive-cdp.js`/`cef-interactive-bridge-events.js` cited under T232.3 below no longer
-exist. See [work/work-orders/257_WO_REMOVE_CEF_INTERACTIVE.md](257_WO_REMOVE_CEF_INTERACTIVE.md)
-and [docs/reference/cef-interactive-bridge.md](../../docs/reference/cef-interactive-bridge.md).
+exist. See [work/work-orders/257_WO_REMOVE_CEF_INTERACTIVE.md](../257_WO_REMOVE_CEF_INTERACTIVE.md)
+and [docs/reference/cef-interactive-bridge.md](../../../docs/reference/cef-interactive-bridge.md).
 
 **Source:** owner todos15.07.26 ***mario-game***: "id like to be able to add a mario game via an html producer but with transparent background instead of the sky. controlled via pupeteer the same as before." Candidate sources given: github.com/tylerreichle/mario_js, codepen.io/yananas/pen/xrjaGX, github.com/reruns/mario (JS), github.com/axonyxquantum/desktop_mario (python — NOT usable in an html producer; ignore).
 

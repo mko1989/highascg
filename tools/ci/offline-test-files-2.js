@@ -95,4 +95,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1085-handover-core.test.js', // WO-1085 Auto follow spot handover
 	'tools/smoke/smoke-wo1085-handover-engine.test.js',
 	'tools/smoke/smoke-wo1096-npm-licenses.test.js', // WO-1096 npm licence allowlist gate (wetransfert "none" fails)
+	'tools/smoke/smoke-wo1096-no-nintendo-template.test.js', // WO-1096: template/mario (Nintendo sprites/sounds) dropped; guard by path and asset hash
 ]

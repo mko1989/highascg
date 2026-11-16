@@ -280,7 +280,6 @@ module.exports = [
 	'tools/smoke/smoke-wo223-route-labels.test.js',
 	'tools/smoke/smoke-wo226-timer-overlay.test.js',
 	'tools/smoke/smoke-wo227-mixer-dense.test.js',
-	'tools/smoke/smoke-wo232-mario-static.test.js',
 	'tools/smoke/smoke-wo232-template-tick.test.js',
 	'tools/smoke/smoke-wo235-osc-compat.test.js',
 	'tools/smoke/smoke-wo239-osc-variables.test.js',
