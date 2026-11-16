@@ -140,6 +140,7 @@ page" opens them in the box browser.
   `test_settings_layout_wo1093.gd` now lists the Games pane.
 - Whole Godot suite: 29439 passed, 0 failed. The run exits 134 on quit (glibc "corrupted size"). That happens on a
   clean HEAD too (WO-676, also noted in WO-1104).
+  **Correction (16.11, WO-1103):** the exit 134 was NOT pre-existing and not WO-676 — it was introduced by 5e9c8fb2 (WO-1103: a lambda made in static `human_body.gd material()` connected to the static `House.shared()` singleton, freed in the wrong order at teardown) and is fixed in WO-1103's follow-up commit (static-method hook); the suite exits 0.
 - Gate loop: script-paths, max-file-lines, unwired-exports, `index.js --no-http`, lint, format, npm audit and licenses
   all exit 0. Offline suite: 7104 / 7112 pass. The 1 failure was smoke-wo846 (WO index) racing another agent's
   WO edit; re-run alone it gives 3 / 0 and `check-wos` is OK.

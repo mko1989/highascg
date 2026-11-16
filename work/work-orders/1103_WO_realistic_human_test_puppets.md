@@ -1,7 +1,7 @@
 # WO-1103 — Realistic woman / man test puppets (Rocketbox MIT bodies + motion capture; bring-your-own / MetaHuman DNA slot)
 
 **Area:** tracking-vr, godot-client
-**Status: DONE (16.11.26 — Godot human tests 147/147, smokes 9/9 (puppet 6 + DNA converter 3); on glass in the running GUI: contact + comparison sheets Low / Ultra × house 100 / 35 %, stride feet metrics, frame times 0 / 1 / 3 / 9 humans, own FBX puppet live; MetaHuman DNA route built against the format — NOT tested with a real DNA file, none on the box)**
+**Status: DONE (16.11.26 — exit-134 heap corruption from 5e9c8fb2 fixed, full Godot suite exit 0 ×5; Godot human tests 147/147, smokes 9/9 (puppet 6 + DNA converter 3); on glass in the running GUI: contact + comparison sheets Low / Ultra × house 100 / 35 %, stride feet metrics, frame times 0 / 1 / 3 / 9 humans, own FBX puppet live; MetaHuman DNA route built against the format — NOT tested with a real DNA file, none on the box)**
 
 Owner 16.11: *"try to create a woman and man avatars but try to make them as much human like as possible. just one per
 gender is fine."* — *"the hq avatars are for previz purposes only as a 'puppet'"* — then, on the first version: *"the
@@ -198,3 +198,42 @@ the owner downloads the sample's Additional files and runs the build script — 
 
 **Switch:** Tracking → Markers → Test people → Look; or `POST /api/tracking/puppet/people
 {"body":"cartoon"|"woman"|"man"|"mixed"|"own:<name>","walk":true}`.
+
+## Follow-up: exit 134 at the end of the Godot test run (introduced here, fixed 16.11)
+
+**Investigation.** CI on main went red after the push (run 43926522432, job godot: `[tests] 29422 passed, 0 failed`,
+then glibc `corrupted size vs. prev_size while consolidating` → `Aborted` → exit 134). I had reported this as
+"pre-existing (clean HEAD too, WO-676)" — **wrong**: the coordinator's bisect over today's commits puts the first bad
+commit at **5e9c8fb2** (this WO; 3af59570 and earlier exit 0). Narrowed on the box with a copy of the runner that runs
+chosen files / methods (13 s per full run):
+- full suite without `test_human_*` → exit 0; without `test_human_own_wo1103` → 134; without `test_human_puppet_wo1103` → no abort;
+- bisecting the other 303 files against `test_human_puppet_wo1103`: `test_camera_overlay.gd` + it → 134 every time —
+  even with none of the overlay's methods run (only its preloads): the overlay only shifts the heap layout, it is not
+  the cause; alone, the puppet file exits 0 (why "only my files" looked clean);
+- inside the puppet file every test that builds a body instance aborts; a scratch test narrowed it to
+  `Body.material()` → to its one-time `House.shared().changed.connect(func(_h): house())`: setting `_house_hooked`
+  first → exit 0; a static func that only connects a lambda to `House.shared().changed` → 134; the same with a
+  static-method Callable → exit 0 (3/3).
+- **Root cause:** a GDScript lambda created inside a **static** function, left connected to the signal of a
+  **static-held RefCounted singleton** (`house_lights.gd` `_shared`). Both live until script teardown at exit, where
+  the lambda (owned by the static context of `human_body.gd`) and the singleton are released in an order that frees
+  the lambda's memory twice → glibc abort. No valgrind on the box (`sudo apt install valgrind` if wanted); gdb's
+  backtrace (stripped binary) only showed `_int_free` under `main` teardown; found by elimination.
+- **Live GUI exposure:** same code in the GUI (any human puppet shown makes the material and the hook). Teardown-only:
+  while the process runs the lambda is valid. A clean quit (window close) after humans were shown could abort / corrupt
+  on the way out; a TERM (how the run loop / relaunches stop it) ends without script teardown — no crash in
+  gui.log … gui6.log. Not exposed mid-show.
+
+**Done.** `human_body.gd`: the hook is the static method `_on_house(_h)` → `house()` (a plain Callable on the script,
+which the engine disconnects safely), with a comment why never a lambda there. Test `test_house_relights_through_a_static_hook`
+(`test_human_puppet_wo1103.gd`): the connection is `_on_house` and not a custom (lambda) Callable, house down → the
+readability floor on the shared material, back again. Also `test_dna_folder_converts_then_loads` now clears its
+`user://wo1103_dna` scratch folder before and after (the direct CI command on the box uses the real user dir, where a
+leftover converted GLB failed 3 asserts) and frees the template it loads.
+
+**Verified.** Pair `test_camera_overlay` + `test_human_puppet_wo1103`: 134 → 0. `run-client.sh --check` boot OK.
+Full suite `run-client.sh --test` five times in a row: exit 0 / 0 / 0 / 0 / 0, `[tests] 29442 passed, 0 failed`, no
+glibc message. The exact CI command from the repo root (`godot --headless --path godot/client --script
+res://tests/run_tests.gd`) twice: exit 0, 29442 passed. WO-1104 and WO-1105 carried the same wrong "clean HEAD /
+WO-676" note — corrected there. Other static-func lambdas on static singletons exist (e.g. `previs_quality.gd:251`
+on `Haze.shared().changed`) — not exercised by the suite, not changed here.

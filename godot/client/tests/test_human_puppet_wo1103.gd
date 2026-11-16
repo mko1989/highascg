@@ -254,3 +254,23 @@ func test_blink() -> void:
 		var lid: Vector3 = h._bone_global(top).origin
 		t.ok(lid.y < up.y - 0.008 and lid.z > eye.z, "%s: shut, the top lid %.3f m lower and still in front of the eye" % [b, up.y - lid.y])
 		h.free()
+
+
+## The house slider re-lights the shared materials through a static-method hook — a lambda made in the static
+## material() and left on the static House singleton corrupted the heap at exit (CI exit 134 from 5e9c8fb2).
+func test_house_relights_through_a_static_hook() -> void:
+	var House := preload("res://features/previs/house_lights.gd")
+	var m := Body.material("woman", "body")
+	var hs: RefCounted = House.shared()
+	var was: float = hs.level
+	var ok_hook := false
+	for c in hs.changed.get_connections():
+		var cb: Callable = c.callable
+		ok_hook = ok_hook or (cb.get_method() == &"_on_house" and not cb.is_custom())
+	t.ok(ok_hook, "hooked by the static _on_house, not a lambda")
+	hs.level = 0.0
+	hs.changed.emit(0.0)
+	t.ok(absf(float(m.get_shader_parameter("self_light")) - Body.self_light()) < 1e-6 and Body.self_light() > 0.0, "house down → the readability floor")
+	hs.level = was
+	hs.changed.emit(was)
+	t.ok(absf(float(m.get_shader_parameter("self_light")) - Body.self_light()) < 1e-6, "back as it was")

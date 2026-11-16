@@ -111,6 +111,7 @@ untouched. Revert: delete the skirt and show "Kotara" again in the GUI, or copy 
   duplicate / array / template, audience + view presets, builder draws a drape without a surface, pick in the object
   frame, Delete clears the box, floor through legs / rail / carpet but not a deck. Full suite **29337 passed, 0 failed**
   (the run exits 134 on quit — glibc "corrupted size" — also on a clean HEAD export: not this WO, see WO-676).
+  **Correction (16.11, WO-1103):** the exit 134 was NOT pre-existing and not WO-676 — it was introduced by 5e9c8fb2 (WO-1103: a lambda made in static `human_body.gd material()` connected to the static `House.shared()` singleton, freed in the wrong order at teardown) and is fixed in WO-1103's follow-up commit (static-method hook); the suite exits 0.
 - **Node**: `tools/smoke/smoke-wo1104-drape.test.js` 5 / 5 (twin numbers; a web save without previs keeps the drape; MVR
   export → re-import as a SceneObject on "Drapes", matrix round trip < 1e-4, mesh served; bake parts = pleats not a box,
   placed like the previs; bake: exactly the drape's triangles added, an obstacle where it stands, the toy occupancy

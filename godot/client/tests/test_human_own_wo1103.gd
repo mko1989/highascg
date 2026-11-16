@@ -213,6 +213,7 @@ func test_dna_folder_converts_then_loads() -> void:
 	const Dna := preload("res://features/previs/tracking/human_own_dna.gd")
 	var dir := OS.get_user_data_dir().path_join("wo1103_dna")
 	var folder := dir.path_join("ada")
+	_rm_tree(dir)  # a run that died half-way left its converted GLB behind
 	DirAccess.make_dir_recursive_absolute(folder.path_join("Head"))
 	FileAccess.open(folder.path_join("Head/head.dna"), FileAccess.WRITE).store_string("not a real DNA")
 	t.eq(Dna.files(folder), [folder.path_join("Head/head.dna")], "DNA found in sub-folders")
@@ -235,3 +236,18 @@ func test_dna_folder_converts_then_loads() -> void:
 	t.ok(Own.stale("ada"), "converted: load it again")
 	var tpl2 := Own.template("ada", func(n: String) -> Dictionary: return Body.template(n), dir)
 	t.ok(not tpl2.is_empty() and Own.report("ada").get("ok", false), "the converted GLB loads as the own puppet")
+	if not tpl2.is_empty():
+		(tpl2.root as Node).free()
+	Own._reports.erase("ada")
+	_rm_tree(dir)
+
+
+## Removes one of this file's own scratch folders under user:// (never anything else).
+func _rm_tree(path: String) -> void:
+	if not path.begins_with(OS.get_user_data_dir().path_join("wo1103_")):
+		return
+	for d in DirAccess.get_directories_at(path):
+		_rm_tree(path.path_join(d))
+	for f in DirAccess.get_files_at(path):
+		DirAccess.remove_absolute(path.path_join(f))
+	DirAccess.remove_absolute(path)

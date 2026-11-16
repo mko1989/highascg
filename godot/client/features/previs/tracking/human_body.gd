@@ -127,7 +127,9 @@ static func material(body: String, part: String) -> ShaderMaterial:
 	_mats[key] = m
 	if not _house_hooked:
 		_house_hooked = true
-		House.shared().changed.connect(func(_h: float) -> void: house())
+		# a static method, never a lambda: a lambda made in a static func and left on the static House singleton
+		# corrupted the heap at exit (CI exit 134 from 5e9c8fb2; WO-1103)
+		House.shared().changed.connect(_on_house)
 	m.set_shader_parameter("self_light", self_light())
 	return m
 
@@ -137,6 +139,10 @@ static func material(body: String, part: String) -> ShaderMaterial:
 static func self_light() -> float:
 	var hs: RefCounted = House.shared()
 	return float(hs.avatar_floor) * (1.0 - House.gain(float(hs.level)))
+
+
+static func _on_house(_h: float) -> void:
+	house()
 
 
 static func house() -> void:
