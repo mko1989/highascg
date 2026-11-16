@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-999 live WOs (35 open, 156 in progress, 808 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1000 live WOs (35 open, 157 in progress, 808 done) and 50 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -429,7 +429,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1072 IN PROGRESS [lighting+tracking-vr,godot-client] Match the project to the lighting console's head positions (MagicQ CSV) → 1072_WO_match_project_to_console_head_positions.md
 - 1078 IN PROGRESS [lighting] visualiser: the sACN-driven part of the rig stays dark → 1078_WO_visualiser_sacn_part_of_rig_dark.md
 
-## godot-client — Godot client (171)
+## godot-client — Godot client (172)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -602,6 +602,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1077 IN PROGRESS [godot-client] Operator dock: a click on the Firefox icon did nothing (14.11 evening) → 1077_WO_dock_firefox_click_did_nothing.md
 - 1079 IN PROGRESS [godot-client] Firefox opened from the dock closes by itself → 1079_WO_dock_firefox_closes_by_itself.md
 - 1088 DONE [godot-client+engine] "Client at 100 fps?" + one clear "keeping up" signal (header pulse turns amber… → 1088_WO_client_fps_target_and_keeping_up_signal.md
+- 1093 IN PROGRESS [godot-client+audio,devices-config] Settings menu review: one place per setting, 17 panes → 7 → 1093_WO_settings_menu_review_and_compaction.md
 
 ## web-client — Web client (88)
 
