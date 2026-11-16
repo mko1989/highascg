@@ -434,4 +434,6 @@ module.exports = [
 	'tools/smoke/smoke-wo1101-game-rc-world-2.test.js', // WO-1102 RC client: world-fx hop / bump / boost / wobble, world slick, bot-brain xfx + pause
 	'tools/smoke/smoke-wo1101-game-sk-world.test.js', // WO-1101/1102 Skirmish: alone, pause, stun drops fire, bonus ≤ +2 per match, shot → hub
 	'tools/smoke/smoke-wo1101-game-salad-world.test.js', // WO-1101/1102 Salad: alone, world colliders (xb bounce / car splat), landed, make way
+	'tools/smoke/smoke-wo1105-games-hosting.test.js', // WO-1105 Settings ▸ Games: aggregated state + host over the 3 real games, routes, broadcast
+	'tools/smoke/smoke-wo1105-games-join-qr-settings.test.js', // WO-1105 join address pick + warnings, QR rows, games settings through a restart
 ]

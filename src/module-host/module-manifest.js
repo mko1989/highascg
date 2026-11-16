@@ -11,6 +11,8 @@
  *     "main": "register.js",             optional; a relative .js path inside the module dir
  *     "requiresCore": ">=2026.11.01",    optional; see satisfiesCore()
  *     "defaultEnabled": false            optional; enabled when modules.json has no entry (default false: opt-in)
+ *     "game": "rc"                       optional; WO-1105: the module is a game (or "world"): its game id, so Settings ▸ Games
+ *                                        lists it while disabled and finds its descriptor once loaded
  *   }
  *
  * Versions compare as dotted numbers: every digit run is one component, so the core's `2026.05.20` (package.json) and
@@ -54,6 +56,7 @@ function validateManifest(raw) {
 		return { ok: false, error: 'module.json requiresCore is not a version range (e.g. ">=2026.11.01")' }
 	}
 	if (m.defaultEnabled !== undefined && typeof m.defaultEnabled !== 'boolean') return { ok: false, error: 'module.json defaultEnabled must be a boolean' }
+	if (m.game !== undefined && (typeof m.game !== 'string' || !/^[a-z][a-z0-9-]{0,15}$/.test(m.game))) return { ok: false, error: 'module.json game must be a game id ([a-z][a-z0-9-]{0,15})' }
 	return {
 		ok: true,
 		manifest: {
@@ -64,6 +67,7 @@ function validateManifest(raw) {
 			main,
 			requiresCore: typeof m.requiresCore === 'string' ? m.requiresCore.trim() : '',
 			defaultEnabled: m.defaultEnabled === true,
+			...(typeof m.game === 'string' ? { game: m.game } : {}),
 		},
 	}
 }

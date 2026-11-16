@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-625 routes.
+627 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -194,6 +194,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/game/sk/state` | registry | `modules/toy-skirmish/server/routes-sk.js` |
 | POST | `/api/game/world/host` | registry | `modules/game-world/server/routes-world.js` |
 | GET | `/api/game/world/state` | registry | `modules/game-world/server/routes-world.js` |
+| GET | `/api/games/hosting` | registry | `src/games/register.js` |
+| POST | `/api/games/hosting` | registry | `src/games/register.js` |
 | GET | `/api/hardware/displays` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | GET | `/api/hardware/modeline-preview` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | * | `/api/health` | handler | `src/cg-studio/routes.js` |
@@ -721,6 +723,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/system-network-wifi.js` | WO-692 — Wi-Fi from the GUI: status (radio, adapters, last scan), rescan, connect (WPA passphrase), disconnect, radio on / off. |
 | `src/autofollow/register.js` | Stage auto-follow module registration (WO-31 / WO-30). |
 | `src/cg-studio/routes.js` | CG Studio HTTP handlers (runs on Electron launcher, not playout server). |
+| `src/games/register.js` | WO-1105 — Settings ▸ Games, the one global place to host the browser games and the Game World (always loaded; it holds nothing while no game module is installed |
 | `src/health/routes-keeping-up.js` | WO-1088 — GET /api/health/keeping-up: the keeping-up summary (worst offender label, every check with target vs measured, the last incidents); POST /api/health/k |
 | `src/previs/register.js` | Previs module registration (WO-17 / WO-30). |
 | `src/server/auth.js` |  |

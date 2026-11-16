@@ -16,6 +16,7 @@ const IGNORES = [
 	'vendor/**',
 	'modules/**/vendor/**',
 	'src/pixelhue/vendor/**',
+	'src/games/vendor/**', // WO-1105: qrcode-generator, the games' copy unchanged
 	'docs/**',
 	'work/references/**',
 	'.reference/**',

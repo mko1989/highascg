@@ -303,8 +303,10 @@ Copyright (c) 2009 Kazuhiko Arase
 License: MIT (http://www.opensource.org/licenses/mit-license.php; the notice is kept in the file).
 
   modules/rc-game/client/vendor/qrcode-generator.mjs  ← dist/qrcode.mjs of the npm package, unchanged
+  src/games/vendor/qrcode-generator.mjs                ← the same file, unchanged (WO-1105: Settings ▸ Games join codes)
 
-Used by the RC game module's host panel to draw the join address as a QR code (WO-1074). "QR Code" is a registered
+Used by the RC game module's host panel to draw the join address as a QR code (WO-1074), and by the server for the
+join codes of Settings ▸ Games and the join_qr CG template (WO-1105). "QR Code" is a registered
 trademark of DENSO WAVE INCORPORATED.
 
 ================================================================================

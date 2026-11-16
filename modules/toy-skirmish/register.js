@@ -20,6 +20,7 @@ module.exports = (h) => {
 	world.register(() => require('./server/sk-game').getSkGame(bootCtx))
 	return {
 		name: 'toy-skirmish',
+		gameDescriptor: () => world.descriptor(), // WO-1105 Settings ▸ Games (the core never reads the Game World registry)
 		apiPathPrefixes: ['/api/game/sk'],
 		registerRoutes: (routes) => require('./server/routes-sk').register(routes),
 		publicPaths: (m, p) => isSkPublicPath(m, p),

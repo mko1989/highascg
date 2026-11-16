@@ -21,6 +21,7 @@ module.exports = (h) => {
 	world.register(() => require('./server/salad-game').getSaladGame(bootCtx))
 	return {
 		name: 'stage-salad',
+		gameDescriptor: () => world.descriptor(), // WO-1105 Settings ▸ Games (the core never reads the Game World registry)
 		apiPathPrefixes: ['/api/game/salad'],
 		registerRoutes: (routes) => require('./server/routes-salad').register(routes),
 		publicPaths: (m, p) => isSaladPublicPath(m, p),

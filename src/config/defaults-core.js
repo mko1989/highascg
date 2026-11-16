@@ -41,6 +41,9 @@ function coreDefaults() {
 		// WO-645: what a boot starts. 'ask' = the desktop with "Start operator here / Run headless" on every screen
 		// (Caspar waits); 'gui' / 'headless' = autostart Caspar with / without the operator GUI (opt-in).
 		startup: { mode: 'ask' },
+		// WO-1105 Settings ▸ Games: join address ('' = automatic), open the game sessions at start (never by default), per-game
+		// defaults applied when a session opens (src/games/games-settings.js). Sessions themselves are never stored.
+		games: { joinAddress: '', autoOpen: false, defaults: {} },
 		operatorTools: {
 			pointerConfineMultiview: false,
 			// WO-308: 'auto' (default) keeps the pre-existing rule — confine follows whatever

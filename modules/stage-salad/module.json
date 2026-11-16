@@ -4,5 +4,6 @@
 	"title": "Stage Salad",
 	"description": "Fire vegetables from big slingshots at the presenter's friendly avatar on the show's stage (browser, up to 20 players, rounds, teams, bots). The avatar follows the tracked presenter; a stand-in when nobody is tracked. Needs the rc-game module installed. Never puts anything on a screen.",
 	"main": "register.js",
+	"game": "salad",
 	"requiresCore": ">=2026.5.20"
 }

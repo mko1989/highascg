@@ -35,6 +35,9 @@ function register(getGame) {
 		host: (body) => getGame().host(body),
 		state: () => getGame().state(),
 		room: () => getGame().worldAdapter() || null,
+		get hosting() {
+			return require('./rc-hosting') // WO-1105 Settings ▸ Games: this game's main number, bots, pause in its own host bodies
+		},
 	}
 	registry().games.set(ID, mine)
 }
@@ -168,4 +171,4 @@ function createRcWorld(deps) {
 	}
 }
 
-module.exports = { register, unregister, createRcWorld, xfxMsg, ID }
+module.exports = { register, unregister, descriptor: () => mine, createRcWorld, xfxMsg, ID }

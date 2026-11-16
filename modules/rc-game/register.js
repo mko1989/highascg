@@ -16,6 +16,7 @@ module.exports = (h) => {
 	world.register(() => require('./server/rc-game').getRcGame(bootCtx))
 	return {
 		name: 'rc-game',
+		gameDescriptor: () => world.descriptor(), // WO-1105 Settings ▸ Games (the core never reads the Game World registry)
 		apiPathPrefixes: ['/api/game/rc'],
 		registerRoutes: (routes) => require('./server/routes-rc-game').register(routes),
 		publicPaths: (m, p) => isRcPublicPath(m, p),

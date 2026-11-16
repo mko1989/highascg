@@ -446,4 +446,4 @@ function createRcRoom(deps) {
 	}
 }
 
-module.exports = { createRcRoom, COUNTDOWN_MS, GRACE_MS, WORLD_MS }
+module.exports = { createRcRoom, COUNTDOWN_MS, GRACE_MS, WORLD_MS, MAX_LAPS }

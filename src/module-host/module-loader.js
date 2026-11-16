@@ -107,6 +107,7 @@ function listAvailable() {
 			title: m?.title || e.name,
 			version: m?.version || '',
 			description: m?.description || '',
+			...(m?.game ? { game: m.game } : {}), // WO-1105
 			source: e.kind,
 			enabled: isEnabledEntry(e, state),
 			loaded: moduleRegistry.isLoaded(e.name) && !!moduleRegistry.externalInfo(e.name),

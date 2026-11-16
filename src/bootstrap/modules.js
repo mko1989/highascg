@@ -13,6 +13,7 @@ function loadOptionalModules(config, log) {
 	pluginManager.loadEnabledPlugins(config, log)
 	// WO-1076: installed + enabled external modules (repo modules/, ~/.highascg/modules); disabled ones are never required
 	require('../module-host/module-loader').loadEnabledExternalModules(log)
+	moduleRegistry.register(require('../games/register')) // WO-1105 Settings ▸ Games (core: names no game, idle without one)
 }
 
 function buildVendorDirs(logger) {

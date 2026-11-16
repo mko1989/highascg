@@ -4,5 +4,6 @@
 	"title": "RC car game",
 	"description": "Toy RC cars race through the show's 3D scene in the browser (laptops and phones, up to 10 players). Shows the live lights and LED wall pictures. Never puts anything on a screen.",
 	"main": "register.js",
+	"game": "rc",
 	"requiresCore": ">=2026.5.20"
 }

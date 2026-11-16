@@ -15,6 +15,7 @@ const { buildChannelMap } = require('../config/channel-map-from-ctx')
 const { normalizeEditorDefaults } = require('../config/editor-defaults')
 const { resolveEffectiveProgramLayout } = require('../config/program-audio-layouts')
 const { normalizeNetworkSettings } = require('../config/network-settings')
+const { normalizeGamesSettings } = require('../games/games-settings') // WO-1105
 const { resolveProjectFps } = require('../config/project-fps')
 const { redactObject } = require('../support/redact-settings')
 const { getExpectedApiToken } = require('../server/auth')
@@ -101,6 +102,7 @@ async function handleGet(path, ctx) {
 				defaultProjectFps: resolveProjectFps(cfg),
 			},
 			network: normalizeNetworkSettings(cfg.network, defaults.network),
+			games: normalizeGamesSettings(cfg.games), // WO-1105 Settings ▸ Games (join address, auto-open, per-game defaults)
 			security: {
 				enforceAuth: !!(cfg.security && cfg.security.enforceAuth),
 				exposeToNetwork: cfg.security?.exposeToNetwork !== false,

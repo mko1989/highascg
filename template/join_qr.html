@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<!--
+  HighAsCG WO-1105 — the join QR card of a browser game (Settings ▸ Games ▸ Show QR ▸ "Send to preview").
+  A look layer { type: 'template', value: 'join_qr', data: { title, url, n, rows, hint? } }: CG ADD / UPDATE data.
+  rows: the QR matrix as hex rows (bit 1 = dark, first module in the top bit), built by src/games/games-qr.js with the
+  games' own encoder — this page only draws it. Transparent around a dark card, so it sits over any content.
+-->
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Join QR</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+		#wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+		#card { display: none; flex-direction: column; align-items: center; gap: 2.2vmin; padding: 4vmin 5vmin; border-radius: 3vmin;
+			background: rgba(10, 12, 16, 0.92); color: #fff; text-align: center; box-shadow: 0 1vmin 6vmin rgba(0, 0, 0, 0.6); }
+		#title { font-size: 6vmin; font-weight: 700; letter-spacing: 0.02em; }
+		#hint { font-size: 3vmin; color: #c8cdd6; }
+		canvas { width: 52vmin; height: 52vmin; image-rendering: pixelated; border-radius: 1.2vmin; background: #fff; }
+		#url { font-size: 3.6vmin; font-weight: 600; color: #ffd36b; word-break: break-all; max-width: 80vw; }
+	</style>
+</head>
+<body>
+	<div id="wrap"><div id="card">
+		<div id="title"></div>
+		<canvas id="qr" width="10" height="10"></canvas>
+		<div id="hint"></div>
+		<div id="url"></div>
+	</div></div>
+	<script>
+		var QUIET = 4
+		function draw(n, rows) {
+			var c = document.getElementById('qr')
+			var px = Math.max(1, Math.floor(1024 / (n + QUIET * 2)))
+			var size = (n + QUIET * 2) * px
+			c.width = c.height = size
+			var g = c.getContext('2d')
+			g.fillStyle = '#fff'
+			g.fillRect(0, 0, size, size)
+			g.fillStyle = '#000'
+			for (var r = 0; r < n; r++) {
+				var h = String(rows[r] || '')
+				for (var col = 0; col < n; col++) {
+					var d = parseInt(h.charAt(col >> 2), 16) || 0
+					if ((d >> (3 - (col & 3))) & 1) g.fillRect((col + QUIET) * px, (r + QUIET) * px, px, px)
+				}
+			}
+		}
+		function update(raw) {
+			var o
+			try {
+				o = typeof raw === 'string' ? JSON.parse(raw) : raw
+			} catch (e) {
+				return
+			}
+			if (!o || typeof o !== 'object') return
+			var n = Number(o.n) || 0
+			if (n < 21 || n > 177 || !Array.isArray(o.rows) || o.rows.length !== n) return
+			document.getElementById('title').textContent = String(o.title || 'Join the game')
+			document.getElementById('hint').textContent = String(o.hint || 'Scan with your phone camera to join')
+			document.getElementById('url').textContent = String(o.url || '')
+			draw(n, o.rows)
+			document.getElementById('card').style.display = 'flex'
+		}
+		window.update = update
+		window.play = function (s) {
+			if (s != null && String(s).trim() !== '') update(s)
+		}
+		window.stop = function () {
+			document.getElementById('card').style.display = 'none'
+		}
+	</script>
+</body>
+</html>
