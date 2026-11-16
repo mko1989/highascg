@@ -31,8 +31,8 @@ static func _matches(src: String, pattern: String) -> Array:
 func test_pane_list_most_used_first() -> void:
 	var tab := _src("res://features/settings/settings_tab.gd")
 	t.eq(_matches(tab, "_pane\\(\"([^\"]+)\"\\)"),
-		["Defaults", "Media / USB", "This screen", "Companion", "System", "Timecode", "Nuclear", "About"],
-		"7 panes + Timecode (WO-1092 moves it to the Audio tab)")
+		["Defaults", "Media / USB", "This screen", "Companion", "System", "Nuclear", "About"],
+		"7 panes (WO-1092 moved Timecode to the Audio tab: features/audio/ltc_fold.gd)")
 	for gone in ["Live audio", "Network", "Updates", "GDTF library", "DeckLink", "Diagnostics", "Tailscale",
 			"Controllers", "Variables", "Lockscreen"]:
 		t.ok(not tab.contains("_pane(\"%s\")" % gone), gone + " is no longer a pane of its own")

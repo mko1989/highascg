@@ -30,7 +30,8 @@ func test_top_pane_keeps_its_minimum_height() -> void:
 
 func test_audio_tab_docks_alsa_under_the_casparcg_mixer() -> void:
 	var src := FileAccess.get_file_as_string("res://features/audio/audio_tab.gd")
-	t.ok(src.contains("Split.dock(bays, _alsa)"), "audio_tab.gd docks the CasparCG body and the ALSA panel")
+	t.ok(src.contains("Split.dock(bays, bottom)") and src.contains("bottom.add_child(_alsa)"),
+		"audio_tab.gd docks the CasparCG body and the ALSA panel (WO-1092: under the LTC fold)")
 	t.ok(src.contains("AlsaMixer.new()"), "the ALSA panel is instantiated with AlsaMixer.new()")
 	t.ok(src.contains("_alsa.load_mixer(false)"), "the ALSA panel loads on first show")
 	t.ok(src.contains("add_child(foot)"), "the status line and + button stay below the split")

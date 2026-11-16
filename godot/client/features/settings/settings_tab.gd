@@ -24,7 +24,6 @@ const DecklinkPane := preload("res://features/settings/decklink_pane.gd")
 const VariablesPane := preload("res://features/settings/variables_pane.gd")
 const LibraryPane := preload("res://features/settings/library_pane.gd")  # WO-825
 const LockscreenPane := preload("res://features/settings/lockscreen_pane.gd")
-const LtcPane := preload("res://features/settings/ltc_pane.gd")  # WO-974
 const ControllersPane := preload("res://features/settings/controllers_pane.gd")  # WO-1066
 
 signal logs_requested
@@ -72,7 +71,6 @@ func _ready() -> void:
 	K.fold_pane(sys, "Blackmagic DeckLink", DecklinkPane.new())
 	K.fold_pane(sys, "GDTF library", LibraryPane.new())  # WO-825
 	K.fold_pane(sys, "Hardware", HardwarePane.new())
-	LtcPane.build(_pane("Timecode"))  # WO-974 LTC in / out
 	var nuclear := _pane("Nuclear")
 	Panes.nuclear(nuclear)
 	nuclear.add_child(NuclearPane.new())

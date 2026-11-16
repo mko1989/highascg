@@ -21,6 +21,7 @@ const AlsaMixer := preload("res://features/settings/alsa_mixer_panel.gd")
 const Split := preload("res://features/audio/audio_tab_split.gd")
 const LiveInputDialog := preload("res://features/devices/live_input_dialog.gd")
 const Ctl := preload("res://features/audio/audio_console_ctl.gd")
+const LtcFold := preload("res://features/audio/ltc_fold.gd")  # WO-1092: LTC in / out (was Settings → Timecode)
 const EMPTY := "No active program inputs playing audio. Play a scene look with audio/video media to see channel strips here."
 
 signal inspect_destination(id: String)  ## a live-audio strip → its host-channel page in Devices
@@ -61,7 +62,11 @@ func _ready() -> void:
 	_masters.add_theme_constant_override("separation", 6)
 	bays.add_child(_masters)
 	_alsa = AlsaMixer.new()  # WO-799: bottom pane; the panel loads its card on the first show (_on_visible)
-	add_child(Split.dock(bays, _alsa))
+	var bottom := VBoxContainer.new()  # WO-1092: the LTC fold heads the hardware pane (one line while closed)
+	bottom.add_theme_constant_override("separation", 6)
+	bottom.add_child(LtcFold.new())
+	bottom.add_child(_alsa)
+	add_child(Split.dock(bays, bottom))
 	var foot := HBoxContainer.new()
 	add_child(foot)
 	_status = Label.new()

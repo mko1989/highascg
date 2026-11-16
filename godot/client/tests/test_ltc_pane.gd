@@ -1,6 +1,7 @@
 extends RefCounted
-## WO-974 — Settings → Timecode: the LTC status line from GET /api/ltc (ltc_model.gd). The pane itself (ltc_pane.gd)
-## uses the Settings / Api autoloads, which the headless runner does not load — it is covered by `run-client.sh --check`.
+## WO-974 — the LTC status line from GET /api/ltc (ltc_model.gd). WO-1092: the LTC fold moved from Settings → Timecode
+## to the Audio tab (features/audio/ltc_fold.gd); it uses the Settings / Api autoloads, which the headless runner does not
+## load — it is covered by `run-client.sh --check`. The pickers' pure parts are tested here.
 
 const LM := preload("res://features/settings/ltc_model.gd")
 var t
@@ -67,3 +68,37 @@ func test_transport_readout() -> void:  # WO-1059
 	var unchosen: Dictionary = LM.readout(_st(false, true, cfg.merged({"output": {"running": true, "tc": "00:01:02:03"}})), false)  # WO-1060
 	t.eq(unchosen.text, "LTC off", "a timeline that was not chosen shows no timecode")
 	t.eq(unchosen.state, "off")
+
+
+func test_out_status_words_wo1092() -> void:
+	var miss := _st(false, true, {"output": {"state": "missing", "running": false, "error": "plughw:CARD=Pro,DEV=0: not connected"}})
+	t.eq(LM.status_line(miss), "Out device not connected (plughw:CARD=Pro,DEV=0: not connected)")
+	var busy := _st(false, true, {"output": {"state": "busy", "running": false, "error": "hw in use"}})
+	t.eq(LM.status_line(busy), "Out device in use by another program (hw in use)")
+	var run := {"state": "running", "running": true, "tc": "01:00:00:00", "device": "HDA NVidia — HDMI 2", "channels": [7, 8],
+		"rate": 48000, "delayMs": 31.4, "driftMs": 0.42, "underruns": 0}
+	t.eq(LM.out_detail(run), "→ HDA NVidia — HDMI 2 · ch 7+8 · 48 kHz · device 31 ms · drift 0.4 ms · 0 under-runs")
+	t.eq(LM.out_detail({"state": "off"}), "")
+	t.eq(LM.out_detail(null), "")
+
+
+func test_out_device_and_channel_pickers_wo1092() -> void:
+	var devs := [{"value": "program", "label": "Program audio output (Audio 1)", "channels": 6, "usedBy": ["Audio 1"], "program": true},
+		{"value": "plughw:CARD=NVidia,DEV=8", "label": "HDA NVidia — HDMI 2", "channels": 8, "usedBy": []},
+		{"value": "plughw:CARD=PCH,DEV=0", "label": "HDA Intel PCH — ALC1220 Analog", "channels": 6, "usedBy": ["Audio 1"]}]
+	var it := LM.out_device_items(devs, "plughw:CARD=Pro,DEV=0")
+	t.eq(it[0], ["", "None"])
+	t.eq(it[1], ["program", "Program audio output (Audio 1) · 6 ch"])
+	t.eq(it[2], ["plughw:CARD=NVidia,DEV=8", "HDA NVidia — HDMI 2 · 8 ch"])
+	t.eq(it[3], ["plughw:CARD=PCH,DEV=0", "HDA Intel PCH — ALC1220 Analog · 6 ch · Audio 1"], "who uses the card")
+	t.eq(it[-1], ["plughw:CARD=Pro,DEV=0", "plughw:CARD=Pro,DEV=0 (not connected)"], "the owner's unplugged box stays listed")
+	t.eq(LM.device_channels(devs, "plughw:CARD=NVidia,DEV=8", 2), 8)
+	t.eq(LM.device_channels(devs, "plughw:CARD=Pro,DEV=0", 1), 1, "not listed: the stored count")
+	var ch := LM.channel_items(4)
+	t.eq(ch.map(func(x: Array) -> String: return str(x[1])), ["Ch 1", "Ch 2", "Ch 3", "Ch 4", "Ch 1+2", "Ch 3+4"])
+	t.eq(LM.channel_items(1).size(), 1, "mono device: no pair")
+	t.eq(LM.channel_value(7, true), "7+8")
+	t.eq(LM.channel_value(3, false), "3")
+	t.eq(LM.parse_channel("7+8"), {"channel": 7, "pair": true})
+	t.eq(LM.parse_channel("3"), {"channel": 3, "pair": false})
+	t.eq(LM.index_of(LM.channel_items(8), LM.channel_value(7, true)), 11, "Ch 7+8 is the 4th pair after 8 singles")
