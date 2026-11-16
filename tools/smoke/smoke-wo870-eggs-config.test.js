@@ -83,7 +83,7 @@ describe('WO-870 generate-eggs-config: custom.exclude.list', () => {
 	it('every vendored fragment line survives (nothing silently dropped)', () => {
 		for (const f of fs
 			.readdirSync(LIVE_USB)
-			.filter((n) => /^penguins-eggs-exclude-(stock-custom|old-template|decklink|highascg-embed-server)\.list$/.test(n))) {
+			.filter((n) => /^penguins-eggs-exclude-(stock-custom|old-template|decklink|highascg-embed-server|redistribution)\.list$/.test(n))) {
 			for (const raw of fs.readFileSync(path.join(LIVE_USB, f), 'utf8').split('\n')) {
 				const l = gen.cleanLine(raw)
 				if (l) assert.ok(pats.includes(l), `${f}: ${l} missing from output`)

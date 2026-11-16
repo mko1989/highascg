@@ -20,6 +20,7 @@ source "${HERE_VERIFY}/iso-read-lib.sh"
 source "${HERE_VERIFY}/eggs-cli-lib.sh"
 # shellcheck source=verify-iso-squashfs-calamares.sh
 source "${HERE_VERIFY}/verify-iso-squashfs-calamares.sh"
+source "${HERE_VERIFY}/verify-iso-redistribution.sh" # WO-1096: redistribution_check
 source "${HERE_VERIFY}/verify-iso-detection-runtime.sh" # WO-1094: detection_runtime_check
 command -v unsquashfs >/dev/null 2>&1 || {
 	echo "missing tool: unsquashfs (sudo apt install squashfs-tools)" >&2
@@ -453,17 +454,7 @@ else
 	ok "HIGHASCG_ISO_FORBID_DECKLINK=0 — skip DeckLink squashfs absence checks"
 fi
 
-# WO-870 30.10 (owner): dev-box tools and data stay off the ISO — MagicQ and its shows, Godot exports for other OSes;
-# 31.10: the WO-868 switch backups in ~/.highascg/backup, and the owner's game ROMs (WO-876).
-for needle in 'opt/magicq' 'home/casparcg/Documents/MagicQ' 'home/casparcg/show' \
-	'home/casparcg/highascg/godot/export/windows' 'home/casparcg/highascg/godot/export/web-demo' \
-	'home/casparcg/.highascg/backup' 'home/casparcg/.highascg/retro/games'; do
-	if squash_has_tree "$needle"; then
-		bad "dev-box path in squashfs: ${needle} — re-apply install-eggs-config.sh (WO-870 excludes)"
-	else
-		ok "absent (dev box): ${needle}"
-	fi
-done
+redistribution_check # WO-1096: not ours to distribute / host-private / dev-box (verify-iso-redistribution.sh)
 
 detection_runtime_check # WO-1094: no detection weights / venv / bundles (not ours to distribute)
 if squash_grep_list '^squashfs-root/usr_[0-9]/'; then

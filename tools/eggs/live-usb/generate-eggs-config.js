@@ -24,6 +24,7 @@ const SOURCES = {
 	oldTemplate: 'penguins-eggs-exclude-old-template.list',
 	embedServer: 'penguins-eggs-exclude-highascg-embed-server.list',
 	wo47: 'penguins-eggs-exclude-highascg-fragment.list',
+	redistribution: 'penguins-eggs-exclude-redistribution.list',
 	decklink: 'penguins-eggs-exclude-decklink.list',
 }
 
@@ -67,6 +68,7 @@ function buildExcludeList({ embedServer = true } = {}) {
 		['old exclude.list template items the built-ins do not cover (WO-870 1.3)', SOURCES.oldTemplate, readFragment(SOURCES.oldTemplate)],
 		['old nest remnants under /home/eggs (WO-870 F8)', 'generate-eggs-config.js', ['home/eggs']],
 		['HighAsCG ISO excludes incl. home/casparcg/highascg/media/* (the space check subtracts it)', server, readFragment(server)],
+		['not ours to distribute / build-host private (WO-1096)', SOURCES.redistribution, readFragment(SOURCES.redistribution)],
 		['DeckLink / Blackmagic (WO-92)', SOURCES.decklink, readFragment(SOURCES.decklink)],
 	]
 	const all = withTwinsAndDedupe(parts.flatMap((p) => p[2]))

@@ -1,0 +1,132 @@
+# WO-1096 — things the ISO has no right to distribute, or that are private to the build host (WO-1095 audit).
+# Owner 16.11: "we cant bake anything into iso that i have no right to distribute".
+#
+# Merged into custom.exclude.list in BOTH embed modes by generate-eggs-config.js (after the server fragment, before
+# the DeckLink one). verify-iso-redistribution.sh fails a build that still carries any of it.
+#
+# coa hands this to `mksquashfs -wildcards -ef`: anchored at the liveroot, per-component fnmatch with FNM_PATHNAME |
+# FNM_PERIOD — `*` does NOT match a leading dot, so dot entries need their own `.*` line (root/.ssh is not matched by
+# root/*). A matched directory drops its subtree. `?` stands for the space in "Blackmagic Design". Paths under lib/,
+# bin/, sbin/ would need a usr/ twin (the generator adds it); every line below is already a real usr/… path.
+#
+# NOT here on purpose: home/casparcg/.highascg/gdtf-share.json — the project's shared GDTF Share login ships by owner
+# decision (22.10, confirmed 16.11.26: "i wanted to leave the highascg login, so getting the gdtf files would be
+# easier, streamlined"). The downloaded GDTF files stay out (projects/_gdtf reset, .highascg/cache excluded).
+# 7zip-rar ships (unRAR licence: free distribution allowed, no fee may be charged — the ISO is free); nothing uses it.
+
+# Client show data and the owner's project backups (client property)
+home/*/Documents
+home/*/Documents/*
+home/*/Documents/.*
+home/*/highascg-backups
+home/*/highascg-backups/*
+
+# root's home: known_hosts, mc history, npm logs, launchpadlib … (coa does not drop root/* in clone mode)
+root/*
+root/.*
+
+# Shutter Encoder (local .deb; bundles GPL ffmpeg + AI models of unstated licence; HighAsCG does not use it)
+opt/shutter-encoder
+opt/shutter-encoder/*
+usr/share/applications/shutter-encoder-*.desktop
+var/lib/dpkg/info/shutter-encoder.*
+
+# Blackmagic Desktop Video leftovers (EULA: "You may not … copy the Software"; icons are BMD artwork). The per-box
+# exFAT install (decklink-install-from-exfat.sh → dpkg -i) recreates all of it; its phantom-install gate checks
+# usr/lib/blackmagic/DesktopVideo/DesktopVideoHelper, not these.
+usr/share/icons/hicolor/*/apps/BlackmagicDesktopVideoSetup.png
+usr/share/icons/hicolor/*/apps/DesktopVideoUpdater.png
+usr/share/man/man1/Blackmagic*
+usr/share/man/man1/DesktopVideo*
+etc/blackmagic
+etc/blackmagic/*
+etc/dracut.conf.d/dracut-blackmagic.conf
+usr/share/lintian/overrides/desktopvideo
+usr/share/lintian/overrides/desktopvideo-gui
+etc/rc?.d/*DesktopVideoHelper
+etc/systemd/system/multi-user.target.wants/DesktopVideoHelper.service
+home/*/.config/Blackmagic?Design
+home/*/.config/Blackmagic?Design/*
+
+# ChamSys MagicQ leftovers (EULA: one copy on a single computer; icons are ChamSys artwork). Installed per box.
+usr/share/applications/magicq.desktop
+usr/share/applications/magichd.desktop
+usr/share/applications/magicvis.desktop
+usr/share/applications/magicmultiwin.desktop
+usr/share/pixmaps/magicq.png
+usr/share/pixmaps/magichd.png
+usr/share/pixmaps/magicvis.png
+etc/udev/rules.d/99-chamsys-usb.rules
+usr/share/mime/packages/magicq.xml
+usr/share/mime/application/x-magicq-*.xml
+var/lib/dpkg/info/magicq.*
+
+# NoMachine + Zoom empty leftovers (the products themselves are excluded in the server fragment)
+usr/share/NX
+usr/share/NX/*
+usr/share/doc/nomachine
+usr/share/doc/nomachine/*
+etc/pam.d/nx
+etc/pam.d/nxlimits
+var/lib/dpkg/info/nomachine.*
+var/NX
+var/NX/*
+usr/share/icons/hicolor/*/apps/NoMachine-*.png
+usr/share/mime/packages/NoMachine-mime.xml
+usr/share/polkit-1/actions/org.freedesktop.pkexec.nomachine.policy
+usr/share/polkit-1/rules.d/55-org.nomachine.rules
+etc/apparmor.d/zoom
+usr/share/mime/application/x-zoom.xml
+var/lib/dpkg/info/zoom.*
+
+# Host network history and per-box secrets
+var/lib/NetworkManager/seen-bssids
+var/lib/NetworkManager/*.lease
+var/lib/NetworkManager/timestamps
+home/*/.config/pulse/cookie
+etc/highascg/exfat-sync.json.bak.*
+
+# NDI: no system-path copy (NDI docs: "Please do not install your NDI DLLs into the system path"). Caspar loads
+# home/casparcg/highascg/lib/libndi.so.6 (bin/casparcg RUNPATH $ORIGIN/../lib + run.sh LD_LIBRARY_PATH; checked in
+# /proc/<caspar>/maps 16.11) — no process maps the /usr/lib copy.
+usr/lib/x86_64-linux-gnu/libndi.so
+usr/lib/x86_64-linux-gnu/libndi.so.*
+
+# CEF 142.0.17 duplicate (622 MB): Caspar loads lib/libcef.so; nothing maps /usr/lib/cef (WO-848, checked 16.11)
+usr/lib/cef
+usr/lib/cef/*
+
+# Ubuntu 24.04 (noble) compat libs in ~/highascg/lib (lib/NOBLE-COMPAT-MANIFEST.txt): only the rollback binaries
+# bin/casparcg.{prev,253c16c,pre-26build,pre-wo742-*,v1-shm} link them, and those are excluded (bin/casparcg.*);
+# bin/casparcg (26.04 native) links none (ldd, 16.11). Version-pinned so the 26.04 libs in lib/ are untouched.
+home/casparcg/highascg/lib/NOBLE-COMPAT-MANIFEST.txt
+home/casparcg/highascg/lib/libSvtAv1Enc.so.1*
+home/casparcg/highascg/lib/libavcodec.so.60*
+home/casparcg/highascg/lib/libavdevice.so.60*
+home/casparcg/highascg/lib/libavfilter.so.9*
+home/casparcg/highascg/lib/libavformat.so.60*
+home/casparcg/highascg/lib/libavutil.so.58*
+home/casparcg/highascg/lib/libbluray.so.2*
+home/casparcg/highascg/lib/libboost_chrono.so.1.83.0
+home/casparcg/highascg/lib/libicu*.so.74*
+home/casparcg/highascg/lib/libjxl.so.0.7*
+home/casparcg/highascg/lib/libjxl_threads.so.0.7*
+home/casparcg/highascg/lib/libplacebo.so.338
+home/casparcg/highascg/lib/libpocketsphinx.so.3*
+home/casparcg/highascg/lib/libpostproc.so.57*
+home/casparcg/highascg/lib/librav1e.so.0*
+home/casparcg/highascg/lib/librubberband.so.2*
+home/casparcg/highascg/lib/libsfml-*.so.2.6*
+home/casparcg/highascg/lib/libsphinxad.so.3*
+home/casparcg/highascg/lib/libsphinxbase.so.3*
+home/casparcg/highascg/lib/libssh-gcrypt.so.4*
+home/casparcg/highascg/lib/libswresample.so.4*
+home/casparcg/highascg/lib/libswscale.so.7*
+home/casparcg/highascg/lib/libtheora.so.0*
+home/casparcg/highascg/lib/libtheoradec.so.1*
+home/casparcg/highascg/lib/libtheoraenc.so.1*
+home/casparcg/highascg/lib/libudfread.so.0*
+home/casparcg/highascg/lib/libvpx.so.9*
+home/casparcg/highascg/lib/libx264.so.164
+home/casparcg/highascg/lib/libx265.so.199
+home/casparcg/highascg/lib/libxml2.so.2*
