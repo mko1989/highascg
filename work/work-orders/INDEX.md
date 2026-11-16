@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1010 live WOs (34 open, 155 in progress, 821 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1011 live WOs (34 open, 156 in progress, 821 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -430,7 +430,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1078 IN PROGRESS [lighting] visualiser: the sACN-driven part of the rig stays dark → 1078_WO_visualiser_sacn_part_of_rig_dark.md
 - 1097 DONE [lighting+tracking-vr,godot-client] Desk feed: the fronts' final pan / tilt / dimmer to the LD's desk on a spare un… → 1097_WO_desk_feed_fronts_to_lighting_desk.md
 
-## godot-client — Godot client (174)
+## godot-client — Godot client (175)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -606,6 +606,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1093 DONE [godot-client+audio,devices-config] Settings menu review: one place per setting, 17 panes → 7 → 1093_WO_settings_menu_review_and_compaction.md
 - 1099 DONE [godot-client+tracking-vr,lighting] House lights: a 0–100 % slider that dims the room so only the rig lights it (pr… → 1099_WO_previs_house_lights_slider.md
 - 1100 DONE [godot-client+tracking-vr] Previs: deselect with Esc or a click on empty space (one selection in the 3D vi… → 1100_WO_previs_deselect_esc_and_empty_click.md
+- 1104 IN PROGRESS [godot-client+mapping,web-client] Previs: "Drape" (kotara) as a stage object type — procedural pleats, skirt unde… → 1104_WO_previs_stage_drape_object.md
 
 ## web-client — Web client (90)
 

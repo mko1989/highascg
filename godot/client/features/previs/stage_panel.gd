@@ -5,6 +5,7 @@ extends VBoxContainer
 
 const S := preload("res://features/previs/stage_objects.gd")
 const StageBuilder := preload("res://features/previs/stage_builder.gd")
+const DrapeUi := preload("res://features/previs/drape_ui.gd")  # WO-1104
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const ROLES := ["opgui", "pgm1", "prv1", "pgm2", "prv2", "pgm3", "prv3", "pgm4", "prv4"]
 
@@ -20,6 +21,8 @@ const FIELDS := {
 	"projection": [["Screen W m", "screen_m", 0, "f", 0.1, 100, 0.05], ["Screen H m", "screen_m", 1, "f", 0.1, 100, 0.05], ["Rear", "rear", -1, "b"],
 		["Throw ratio", "throw", -1, "f", 0.1, 20, 0.05], ["Lens shift V", "lens_shift_v", -1, "f", -2, 2, 0.05],
 		["Res W", "resolution", 0, "i", 1, 16384, 1], ["Res H", "resolution", 1, "i", 1, 16384, 1], ["Brightness", "brightness", -1, "f", 0, 4, 0.05]],
+	"drape": [["Width m", "size_m", 0, "f", 0.1, 100, 0.05], ["Height m", "size_m", 1, "f", 0.1, 100, 0.05],
+		["Fullness %", "fullness", -1, "f", 0, 200, 5], ["Pleat spacing m", "pleat_m", -1, "f", 0.08, 2, 0.01]],
 }
 signal stage_loaded(count: int)
 signal stage_changed            # any edit/reload (the tracking page re-reads builder.objects)
@@ -35,6 +38,8 @@ var _info: Label
 var _selected := ""
 var _last_json := ""
 var _dests: Array = []
+## WO-1104: stage-frame point → the visible floor's height under it (NAN = nothing); previs_tab sets mvr_scene.floor_below.
+var floor_probe: Callable
 
 
 func bind(b: StageBuilder) -> void:
@@ -79,6 +84,10 @@ func _fill_add_menu() -> void:
 	p.add_item("LED wall", 0)
 	p.add_item("TV", 1)
 	p.add_item("Projection", 2)
+	p.add_item("Drape", 3)
+	var sel := builder.index_of(_selected)
+	if sel >= 0 and S.is_screen(builder.objects[sel]):
+		p.add_item("Skirt under %s" % builder.objects[sel].name, 4)
 	p.add_separator("Templates")
 	var names: Array = S.TEMPLATES.keys()
 	for i in names.size():
@@ -92,8 +101,8 @@ func _fill_add_menu() -> void:
 				p.add_item("%s  %d×%d → %s" % [d.get("label", "Screen"), int(d.get("width", 0)), int(d.get("height", 0)), ["LED wall", "TV", "Projection"][k]], 100 + i * 3 + k)
 
 
-## Menu ids: 0 LED wall, 1 TV, 2 projection, 100 + dest*3 + type (from destination), 200+ templates
-## (ids 0-2 also used by the --probe-stage-add dev flag).
+## Menu ids: 0 LED wall, 1 TV, 2 projection, 3 drape, 4 skirt under the selected screen, 100 + dest*3 + type (from
+## destination), 200+ templates (ids 0-4 also used by the --probe-stage-add dev flag).
 func _load_dests() -> void:
 	var sd: Variant = Settings.get_setting("screenDestinations", {})
 	_dests = (sd as Dictionary).get("destinations", []) if sd is Dictionary else []
@@ -108,6 +117,11 @@ func _on_add(id: int) -> void:
 		var role := _default_role()
 		_add_many(S.template(S.TEMPLATES.keys()[id - 200], builder.objects, role, _role_raster(role)), true)
 		return
+	if id == 3 or id == 4:
+		var d := _new_drape() if id == 3 else _skirt()
+		if not d.is_empty():
+			_add_many([d], false)
+		return
 	var o: Dictionary
 	if id >= 100:
 		o = S.from_destination(_dests[(id - 100) / 3], S.TYPES[(id - 100) % 3], builder.objects)
@@ -118,6 +132,40 @@ func _on_add(id: int) -> void:
 		o["source"] = {"role": role, "rect": {"x": 0, "y": 0, "w": r.x, "h": r.y}}
 	o["position"] = [_free_x(), 0.0, 0.0]
 	_add_many([o], false)
+
+
+## WO-1104: a 6 × 4 m drape on the floor under the orbit point, facing the camera (no stage view: right of the stage).
+func _new_drape() -> Dictionary:
+	var d := S.new_object("drape", builder.objects)
+	var st := builder.get_parent()
+	if st != null and st.has_method("orbit_target"):
+		var t: Vector3 = st.orbit_target()
+		d["position"] = [snappedf(t.x, 0.01), snappedf(_floor_at([t]), 0.001), snappedf(t.z, 0.01)]
+		d["rotation"] = [0.0, wrapf(snappedf(float(st.orbit_yaw_deg()), 5.0), -180.0, 180.0), 0.0]
+	else:
+		d["position"] = [_free_x(), 0.0, 0.0]
+	return S.normalize(d)
+
+
+## WO-1104: a black skirt from the visible floor up to the selected screen's bottom edge ({} = no screen / no room).
+func _skirt() -> Dictionary:
+	var i := builder.index_of(_selected)
+	if i < 0 or not S.is_screen(builder.objects[i]):
+		return {}
+	var o: Dictionary = builder.objects[i]
+	var d := S.skirt_under(o, _floor_at(S.skirt_probe_points(o)), builder.objects)
+	if d.is_empty():
+		_info.text = "%s stands on the floor: no room for a skirt under it." % o.name
+	return d
+
+
+## The visible floor under stage-frame points: the median of the scene's hits, else the tracking grid's deck, else 0.
+func _floor_at(points: Array) -> float:
+	var hits := []
+	if floor_probe.is_valid():
+		for p in points:
+			hits.append(floor_probe.call(p))
+	return S.floor_of(hits, DrapeUi.grid_floor(Store.project, points[0]))
 
 
 ## Upsert several new objects, persist once, select the last. `shift` moves the group right of the stage.
@@ -254,11 +302,19 @@ func _build_inspector() -> void:
 		c.queue_free()
 	var i := builder.index_of(_selected)
 	if i < 0:
-		_info.text = "%d object(s). Add ▾ creates LED walls, TVs, projection." % builder.objects.size()
+		_info.text = "%d object(s). Add ▾ creates LED walls, TVs, projection, drapes." % builder.objects.size()
 		return
 	var o: Dictionary = builder.objects[i]
 	for f in COMMON + FIELDS.get(str(o.type), []):
 		_field(o, f)
+	if not o.has("source"):  # WO-1104: a drape — its colour instead of a picture source
+		_label("Colour")
+		_inspector.add_child(DrapeUi.color_row(o, func(hex: String, done: bool) -> void:
+			_edit(func(x: Dictionary) -> void: x.color = hex)
+			if done:
+				_build_inspector.call_deferred()))
+		_update_info(o)
+		return
 	if str(o.type) == "projection":  # WO-1010 (owner 09.11): the beams switch sits with the projection, not on the toolbar
 		_label("Beams")
 		_inspector.add_child(preload("res://features/previs/projector_beams.gd").checkbox())
@@ -320,6 +376,9 @@ func _edit(mutate: Callable) -> void:
 
 
 func _update_info(o: Dictionary) -> void:
+	if str(o.type) == "drape":
+		_info.text = DrapeUi.info(o)
+		return
 	var s := S.size_m(o)
 	var px := S.pixels(o)
 	var t := "%.2f × %.2f m · %d×%d px" % [s.x, s.y, px.x, px.y]
@@ -364,6 +423,8 @@ func _refresh_list() -> void:
 
 
 func _item_text(o: Dictionary) -> String:
+	if not o.has("source"):
+		return DrapeUi.item_text(o)
 	var px := S.pixels(o)
 	return "%s  ·  %s  %d×%d  → %s" % [o.name, {"led_wall": "LED", "tv": "TV", "projection": "PROJ"}.get(str(o.type), "?"), px.x, px.y, o.source.role]
 

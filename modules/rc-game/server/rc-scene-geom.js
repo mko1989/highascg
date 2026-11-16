@@ -110,13 +110,28 @@ function visibleParts(scene, cfg) {
 	return out
 }
 
-/** Stage objects (LED walls, TVs, projection screens) as boxes: [{ name, xf (unit box → world), color }]. */
+/**
+ * A stage object's frame → world (Godot rotation_degrees, rotation order YXZ: basis = Ry · Rx · Rz; origin = the
+ * object's bottom-centre `position`).
+ */
+function objectXf(o) {
+	const pos = Array.isArray(o.position) ? o.position.map(num) : [0, 0, 0]
+	const rot = (Array.isArray(o.rotation) ? o.rotation.map(num) : [0, 0, 0]).map((d) => (d * Math.PI) / 180)
+	const R = compose(rotY(rot[1]), compose(rotX(rot[0]), rotZ(rot[2])))
+	R[9] = pos[0]
+	R[10] = pos[1]
+	R[11] = pos[2]
+	return R
+}
+
+/**
+ * Stage objects (LED walls, TVs, projection screens) as boxes: [{ name, xf (unit box → world), color }].
+ * WO-1104: drapes are not boxes (rc-scene-drape.js draws their pleats) — they used to fall through to a 1 × 1 m box.
+ */
 function stageObjectBoxes(objects) {
 	const out = []
 	for (const o of Array.isArray(objects) ? objects : []) {
-		if (!o || typeof o !== 'object' || o.visible === false) continue
-		const pos = Array.isArray(o.position) ? o.position.map(num) : [0, 0, 0]
-		const rot = (Array.isArray(o.rotation) ? o.rotation.map(num) : [0, 0, 0]).map((d) => (d * Math.PI) / 180)
+		if (!o || typeof o !== 'object' || o.visible === false || o.type === 'drape') continue
 		let w = 1, h = 1, depth = Math.max(0.05, num(o.depth_m) || 0.06)
 		if (o.type === 'led_wall' && Array.isArray(o.panels) && Array.isArray(o.panel_mm)) {
 			w = (num(o.panel_mm[0]) * num(o.panels[0])) / 1000
@@ -133,12 +148,8 @@ function stageObjectBoxes(objects) {
 			depth = 0.03
 		}
 		if (!(w > 0.01 && h > 0.01) || w > 200 || h > 100) continue
-		// Godot rotation_degrees, rotation order YXZ: basis = Ry · Rx · Rz. Object origin = bottom-centre of the picture,
-		// the picture faces +Z, the cabinet is behind it.
-		const R = compose(rotY(rot[1]), compose(rotX(rot[0]), rotZ(rot[2])))
-		R[9] = pos[0]
-		R[10] = pos[1]
-		R[11] = pos[2]
+		// object origin = bottom-centre of the picture, the picture faces +Z, the cabinet is behind it
+		const R = objectXf(o)
 		const body = compose(R, [w, 0, 0, 0, h, 0, 0, 0, depth, 0, h / 2, -depth / 2])
 		const face = compose(R, [w, 0, 0, 0, h, 0, 0, 0, 0.01, 0, h / 2, 0.006])
 		out.push({ name: String(o.name || o.id || o.type), xf: body, color: [0.02, 0.02, 0.025, 1] })
@@ -402,6 +413,7 @@ module.exports = {
 	boxUnder,
 	visibleParts,
 	stageObjectBoxes,
+	objectXf,
 	stageFloor,
 	hallFloor,
 	slabGrid,

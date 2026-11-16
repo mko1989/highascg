@@ -30,10 +30,11 @@ const T = require('./rc-scene-tex')
 const { sceneGlb } = require('./rc-scene-glb')
 const R = require('./rc-scene-rich')
 const F = require('./rc-scene-fixtures')
+const { drapeParts } = require('./rc-scene-drape')
 const { RC_SCALE, sceneScale } = require('./rc-scale')
 const { generateTracksAsync, GENERATOR_VERSION } = require('./rc-tracks')
 
-const BAKE_VERSION = 9 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights; 4: §3 scale + occ; 5: venue .glb; 6: occ band from FLAT_DECOR; 7: hall level by union area, roomy tours; 8: stage field cleared to FLAT_DECOR; 9: MVR mesh materials, patched heads from their rigs)
+const BAKE_VERSION = 10 // bump when the bake's output changes for the same input (2: v2 hall floor, 3D tracks; 3: heights; 4: §3 scale + occ; 5: venue .glb; 6: occ band from FLAT_DECOR; 7: hall level by union area, roomy tours; 8: stage field cleared to FLAT_DECOR; 9: MVR mesh materials, patched heads from their rigs; 10: WO-1104 stage drapes)
 const FLAT_DECOR = 0.3 // u (× scale = 3 cm live): what lies this low on a floor is floor, not an occupancy obstacle
 const REV_MEMO_MS = 2000
 const KEEP_CACHED = 6
@@ -124,6 +125,9 @@ async function bakeScene(inp, rev, deps = {}) {
 	for (const [k, t] of rig?.templates || []) templates.set(k, t)
 	if (rig) parts.push(...rig.parts)
 	for (const b of G.stageObjectBoxes(inp.stageObjects)) parts.push({ key: BOX, xf: b.xf, color: b.color, fixture: false, uuid: b.name })
+	const drapes = drapeParts(inp.stageObjects) // WO-1104: their own pleats, obstacles like any wall
+	for (const [k, t] of drapes.templates) templates.set(k, t)
+	parts.push(...drapes.parts)
 	const boxes = []
 	for (const p of parts) {
 		const t = templates.get(p.key)

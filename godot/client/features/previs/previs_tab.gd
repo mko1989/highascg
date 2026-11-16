@@ -174,6 +174,7 @@ func _ready() -> void:
 	stage_panel.stage_changed.connect(func() -> void: track_page.set_objects(builder.objects.duplicate(true)))
 	stage_panel.selection_changed.connect(func(id: String) -> void: builder.set_selected(id))
 	stage_panel.bind(builder)
+	stage_panel.floor_probe = mvr.floor_below  # WO-1104: a drape's skirt finds the visible floor
 	mvr_section.scene_loaded.connect(func(info: Dictionary) -> void:
 		if info.has("parts") and builder.objects.is_empty():
 			stage.frame_box(mvr.bounds()))

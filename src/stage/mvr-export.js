@@ -8,12 +8,15 @@
  * Geometry is written in the object's own frame (glTF: Y-up metres, origin bottom-centre, picture facing +Z — the
  * Godot stage frame) and placed by the inverse of the importer's transform, so an export re-imports where it was.
  * UUIDs derive from the object ids: a re-export updates the same objects in the receiving tool. Pure.
+ * WO-1104: a drape (no picture) is a `SceneObject` on its own layer "Drapes" with its generated pleats
+ * (drape-geometry.js) in a double-sided material named 'drape' — it re-imports as scenery, never as a screen.
  */
 
 const crypto = require('crypto')
 const { mul, MVR_FROM_GLTF, GODOT_FROM_MVR } = require('./mvr-math')
 const { writeGlb } = require('./glb-write')
 const { buildZipStore } = require('../support/zip-store')
+const Drape = require('./drape-geometry')
 
 const DARK = [0.03, 0.03, 0.035, 1]
 const SCREEN = [0.08, 0.1, 0.14, 1]
@@ -144,9 +147,17 @@ function buildStageMvr(objects, opts = {}) {
 	const files = {}
 	const roles = new Map()
 	const screens = []
+	const drapes = []
 	let skipped = 0
 	for (const o of list) {
 		const id = String(o.id || '').replace(/[^\w.-]/g, '_')
+		if (id && o.type === 'drape') {
+			const m = Drape.mesh(o, Drape.SAMPLES[2])
+			files[`${id}.glb`] = writeGlb([{ name: id, primitives: [{ positions: m.positions, normals: m.normals, uvs: m.uvs, indices: m.indices,
+				color: Drape.linearColor(o.color), material: 'drape' }] }])
+			drapes.push({ o, id, file: `${id}.glb` })
+			continue
+		}
 		if (!id || !['led_wall', 'tv', 'projection'].includes(o.type)) {
 			skipped++
 			continue
@@ -186,13 +197,21 @@ function buildStageMvr(objects, opts = {}) {
 		].join('\n')),
 		'        </ChildList>',
 		'      </Layer>',
+		...(drapes.length ? [`      <Layer name="Drapes" uuid="${uuidOf(`layer:drapes:${opts.name || 'stage'}`)}">`, '        <ChildList>',
+			...drapes.map(({ o, id, file }) => [
+				`          <SceneObject name="${esc(o.name || id)}" uuid="${uuidOf(`drape:${id}`)}">`,
+				`            <Matrix>${mvrMatrixText(o)}</Matrix>`,
+				`            <Geometries><Geometry3D fileName="${esc(file)}"/></Geometries>`,
+				'          </SceneObject>',
+			].join('\n')),
+			'        </ChildList>', '      </Layer>'] : []),
 		'    </Layers>',
 		'  </Scene>',
 		'</GeneralSceneDescription>',
 		'',
 	].join('\n')
 	files['GeneralSceneDescription.xml'] = xml
-	return { buffer: buildZipStore(files), report: { screens: screens.length, skipped, roles: [...roles.keys()] } }
+	return { buffer: buildZipStore(files), report: { screens: screens.length, drapes: drapes.length, skipped, roles: [...roles.keys()] } }
 }
 
 module.exports = { buildStageMvr, godotMatrix, sizeM, uuidOf }

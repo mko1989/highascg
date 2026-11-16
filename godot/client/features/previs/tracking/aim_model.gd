@@ -4,7 +4,7 @@ extends RefCounted
 ## axis-aligned rectangle of tracking_model.gd (centre x_offset / y_offset, floor z_offset).
 ##
 ## "Audience side" comes from data, first hit wins:
-##   1. the stage objects (LED walls, TVs, projection screens) — each faces its audience (+Z local, stage_objects.gd);
+##   1. the stage screens (LED walls, TVs, projection screens; not drapes, WO-1104) — each faces its audience (+Z local);
 ##      their facings summed, weighted by picture width. The most direct statement of where people look from.
 ##   2. the room (MVR scene box) — a stage stands against a wall; the audience is on the side with the most floor.
 ##   3. the grid — an audience faces a long side: a stage deeper than wide that sits off to the X side of the venue
@@ -37,6 +37,8 @@ static func audience(grid: Dictionary, objects: Array, room := AABB()) -> Dictio
 		if not (raw is Dictionary) or (raw as Dictionary).get("visible", true) == false:
 			continue
 		var o := S.normalize(raw)
+		if not S.is_screen(o):
+			continue  # WO-1104: a drape hangs anywhere (a masking leg stands sideways) — only pictures say where people look
 		var r: Array = o.get("rotation", [0.0, 0.0, 0.0])
 		var f := Basis.from_euler(Vector3(deg_to_rad(r[0]), deg_to_rad(r[1]), deg_to_rad(r[2]))) * Vector3(0, 0, 1)
 		var d := Vector2(f.x, -f.z)

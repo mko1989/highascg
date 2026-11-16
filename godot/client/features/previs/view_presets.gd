@@ -4,7 +4,7 @@ extends RefCounted
 ##
 ## The audience side is the WO-1091 model (tracking/aim_model.gd `audience`: the stage objects' facing weighted by
 ## width → the room side with the most floor → the grid's shape) — one model for the tracking cameras and the views.
-## What is framed: the visible stage objects (LED walls, TVs, projection screens) and the tracking grid with a standing
+## What is framed: the visible stage objects (LED walls, TVs, projection screens, drapes) and the tracking grid with a standing
 ## person's height on it — the stage as people see it. Orbit convention = previs_stage.gd `_update_camera`: the
 ## camera sits at target + (sin yaw · cos pitch, sin pitch, cos yaw · cos pitch) · dist, yaw 0 = from +Z.
 ##   Front — from the audience, level (a slight look down), the stage + screens across the frame with a margin;

@@ -3,8 +3,16 @@ extends RefCounted
 ## LED walls from panel numbers, TVs, projection screens. Pure: normalise + derived geometry only,
 ## no nodes (stage_builder.gd turns them into meshes). Units: metres, degrees, pixels.
 ## Object origin = bottom-centre of the picture surface; the picture faces +Z (towards the audience).
+## WO-1104: "drape" (kotara) — a pleated cloth, no picture: size_m [width, height], color "#rrggbb", fullness % (0 = flat
+## molton), pleat_m (fold to fold); folds from drape_geometry.gd. Origin bottom-centre, facing +Z like the others.
 
-const TYPES := ["led_wall", "tv", "projection"]
+const D := preload("res://features/previs/drape_geometry.gd")
+const TYPES := ["led_wall", "tv", "projection", "drape"]
+const SCREENS := ["led_wall", "tv", "projection"]  ## types with a picture (a source, a crop, "where the audience is")
+const DRAPE_COLORS := [["Black", "#151515"], ["Dark grey", "#3a3a3a"], ["White", "#e8e8e4"], ["Navy", "#1b2442"], ["Burgundy", "#5a1622"]]
+const SKIRT_GAP := 0.02  ## m between a screen's face and the back of its skirt's folds
+const SKIRT_OVERHANG := 0.05  ## m the skirt reaches past each side of the screen
+const SKIRT_FOLDS := [50.0, 0.2]  ## a skirt's fullness % and pleat spacing: tighter, shallower folds (≈ 0.1 m deep) than a backdrop
 
 ## Generic panels by pitch — every one an exact division of 500 mm (P = 500 / px).
 const PANEL_PRESETS := [
@@ -19,6 +27,7 @@ const DEFAULTS := {
 	"led_wall": {"name": "LED wall", "panel_px": [192, 192], "panel_mm": [500, 500], "panels": [10, 6], "curve_deg": 0.0, "depth_m": 0.08},
 	"tv": {"name": "TV", "diagonal_in": 65.0, "aspect": [16, 9], "resolution": [3840, 2160], "portrait": false, "bezel_mm": 10.0, "depth_m": 0.06},
 	"projection": {"name": "Projection", "screen_m": [4.0, 2.25], "rear": false, "throw": 1.5, "lens_shift_v": 0.0, "resolution": [1920, 1080], "brightness": 0.8},
+	"drape": {"name": "Drape", "size_m": [6.0, 4.0], "color": "#151515", "fullness": 60.0, "pleat_m": 0.25},
 }
 
 
@@ -74,8 +83,21 @@ static func normalize(src: Dictionary) -> Dictionary:
 			o["lens_shift_v"] = clampf(float(o.lens_shift_v), -2.0, 2.0)
 			o["resolution"] = _ivec2(o.resolution, 1, 16384)
 			o["brightness"] = clampf(float(o.brightness), 0.0, 4.0)
-	o["source"] = _source(o.get("source"), pixels(o))
+		"drape":
+			o["size_m"] = _fvec2(o.size_m, 0.1, 100.0)
+			o["color"] = str(o.color) if str(o.color).begins_with("#") and Color.html_is_valid(str(o.color)) else DEFAULTS.drape.color
+			o["fullness"] = clampf(float(o.fullness), 0.0, 200.0)
+			o["pleat_m"] = clampf(float(o.pleat_m), 0.08, 2.0)
+	if is_screen(o):
+		o["source"] = _source(o.get("source"), pixels(o))
+	else:
+		o.erase("source")  # a drape shows no picture: no surface held, no crop
 	return o
+
+
+## A screen = an object with a picture (LED wall, TV, projection); a drape is not one.
+static func is_screen(o: Dictionary) -> bool:
+	return SCREENS.has(str(o.get("type", "led_wall")))
 
 
 ## Picture size in pixels (what the object can show natively).
@@ -88,6 +110,8 @@ static func pixels(o: Dictionary) -> Vector2i:
 			return Vector2i(r.y, r.x) if o.get("portrait", false) else r
 		"projection":
 			return Vector2i(int(o.resolution[0]), int(o.resolution[1]))
+		"drape":
+			return Vector2i.ZERO
 	return Vector2i(1920, 1080)
 
 
@@ -104,6 +128,8 @@ static func size_m(o: Dictionary) -> Vector2:
 			return Vector2(s.y, s.x) if o.get("portrait", false) else s
 		"projection":
 			return Vector2(float(o.screen_m[0]), float(o.screen_m[1]))
+		"drape":
+			return Vector2(float(o.size_m[0]), float(o.size_m[1]))
 	return Vector2.ONE
 
 
@@ -231,6 +257,7 @@ const TEMPLATES := {
 	"three_walls": "Centre LED + 2 angled side walls (one canvas, carved L|C|R)",
 	"imag_lr": "Two IMAG projection screens L/R",
 	"tv_row": "Row of 4 × 55\" TVs",
+	"wall_skirt": "LED wall 5 × 3 m + black skirt to the floor",
 }
 
 
@@ -281,6 +308,16 @@ static func template(name: String, existing: Array = [], role := "pgm1", raster 
 			out.append(first)
 			all.append(first)
 			out.append_array(array_copies(first, 3, 0.7, all))
+		"wall_skirt":
+			var w := new_object("led_wall", all)
+			w["name"] = "LED wall"
+			w["panels"] = [10, 6]
+			w["position"] = [0.0, 1.0, 0.0]
+			w["source"] = {"role": role, "rect": full.duplicate()}
+			w = normalize(w)
+			out.append(w)
+			all.append(w)
+			out.append(skirt_under(w, 0.0, all))
 	return out
 
 
@@ -303,3 +340,70 @@ static func array_copies(o: Dictionary, count: int, gap_m: float, existing: Arra
 		out.append(c)
 		all.append(c)
 	return out
+
+
+## WO-1104 — a screen's face line in its own frame: (left x, right x, front z) — an LED wall's chord at its most forward
+## column edge, a TV with its bezel.
+static func face_span(o: Dictionary) -> Vector3:
+	var w := size_m(o).x
+	match str(o.get("type")):
+		"led_wall":
+			var e := column_edges(o)
+			var front := -INF
+			for p in e:
+				front = maxf(front, p.y)
+			return Vector3(e[0].x, e[e.size() - 1].x, front)
+		"tv":
+			var b := float(o.bezel_mm) / 1000.0
+			return Vector3(-w / 2.0 - b, w / 2.0 + b, 0.0)
+	return Vector3(-w / 2.0, w / 2.0, 0.0)
+
+
+## The height of a screen's bottom edge (a TV's bezel included).
+static func bottom_y(o: Dictionary) -> float:
+	return float(o.position[1]) - (float(o.bezel_mm) / 1000.0 if str(o.get("type")) == "tv" else 0.0)
+
+
+## WO-1104 — a black skirt from `floor_y` up to the screen's bottom edge: its width + SKIRT_OVERHANG each side, the back
+## of its folds SKIRT_GAP in front of the face, turned with the screen (yaw; a tilt is ignored). {} = no room under it.
+static func skirt_under(screen: Dictionary, floor_y: float, existing: Array = []) -> Dictionary:
+	var s := normalize(screen)
+	var top := bottom_y(s)
+	if not is_screen(s) or top - floor_y < 0.05:
+		return {}
+	var span := face_span(s)
+	var d := new_object("drape", existing)
+	d["name"] = "%s skirt" % s.name
+	d["size_m"] = [snappedf(span.y - span.x + 2.0 * SKIRT_OVERHANG, 0.001), snappedf(top - floor_y, 0.001)]
+	d["color"] = DRAPE_COLORS[0][1]
+	d["fullness"] = SKIRT_FOLDS[0]
+	d["pleat_m"] = SKIRT_FOLDS[1]
+	d = normalize(d)
+	var yaw := float(s.rotation[1])
+	var local := Vector3((span.x + span.y) / 2.0, 0.0, span.z + SKIRT_GAP - D.depth_range(d).x)
+	var p := Vector3(s.position[0], 0.0, s.position[2]) + local.rotated(Vector3.UP, deg_to_rad(yaw))
+	d["position"] = [snappedf(p.x, 0.001), snappedf(floor_y, 0.001), snappedf(p.z, 0.001)]
+	d["rotation"] = [0.0, yaw, 0.0]
+	return normalize(d)
+
+
+## Where to look for the floor under a screen's skirt (stage frame): five points along the skirt's line just under the
+## screen's bottom edge — a ray straight down from each finds the visible floor (mvr_scene.gd floor_below).
+static func skirt_probe_points(screen: Dictionary) -> Array:
+	var s := normalize(screen)
+	var span := face_span(s)
+	var yaw := deg_to_rad(float(s.rotation[1]))
+	var out := []
+	for f in [0.1, 0.3, 0.5, 0.7, 0.9]:
+		var p := Vector3(s.position[0], 0.0, s.position[2]) + Vector3(lerpf(span.x, span.y, f), 0.0, span.z + SKIRT_GAP + 0.06).rotated(Vector3.UP, yaw)
+		out.append(Vector3(p.x, bottom_y(s) - 0.02, p.z))
+	return out
+
+
+## The floor from probe hits (NAN = nothing below): their median, else `fallback`.
+static func floor_of(hits: Array, fallback: float) -> float:
+	var ys := hits.filter(func(v: Variant) -> bool: return (v is float or v is int) and not is_nan(float(v)))
+	if ys.is_empty():
+		return fallback
+	ys.sort()
+	return float(ys[ys.size() / 2])

@@ -6,6 +6,9 @@ extends Node3D
 const S := preload("res://features/previs/stage_objects.gd")
 const LED_SHADER := preload("res://features/previs/led_screen.gdshader")
 const Beams := preload("res://features/previs/projector_beams.gd")
+const D := preload("res://features/previs/drape_geometry.gd")  # WO-1104
+const DRAPE_SHADER := preload("res://features/previs/drape.gdshader")
+const Quality := preload("res://features/previs/previs_quality.gd")
 
 var objects: Array = []          # normalised object dicts, in draw order
 var _nodes := {}                 # id -> Node3D
@@ -25,6 +28,7 @@ func _init(tex_provider: Callable = Callable()) -> void:
 	_tex_provider = tex_provider
 	show_beams = Beams.shared().on
 	Beams.shared().changed.connect(set_beams)
+	Quality.shared().changed.connect(func(_l: int) -> void: _rebuild_drapes())  # WO-1104: pleat sampling per level
 
 
 func set_objects(list: Array) -> void:
@@ -87,7 +91,8 @@ func node_for(id: String) -> Node3D:
 ## the cabinet backs (their wall is turned 180°).
 func front_yaw() -> float:
 	var facing := Vector2.ZERO
-	for o in objects:
+	var screens := objects.filter(func(o: Dictionary) -> bool: return S.is_screen(o))  # WO-1104: a drape shows no picture
+	for o in (screens if not screens.is_empty() else objects):
 		if o.visible:
 			var ry := deg_to_rad(float(o.rotation[1]))
 			facing += Vector2(sin(ry), cos(ry))
@@ -111,17 +116,22 @@ func set_selected(id: String) -> void:
 
 
 ## Nearest object under a screen point of `cam` (ray against each object's mesh boxes); "" = none.
+## WO-1104: each box is tested in its mesh's own frame — a turned object's world AABB is much bigger than the object, so a
+## skirt under a wall (or any turned object) took clicks meant for the wall / the MVR behind it.
 func pick(cam: Camera3D, at: Vector2) -> String:
-	var from := cam.project_ray_origin(at)
-	var dir := cam.project_ray_normal(at)
+	return pick_ray(cam.project_ray_origin(at), cam.project_ray_normal(at))
+
+
+func pick_ray(from: Vector3, dir: Vector3) -> String:
 	var best := ""
 	var best_d := INF
 	for id in _nodes:
 		for mi in (_nodes[id] as Node).find_children("*", "MeshInstance3D", true, false):
-			var box: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
-			var hit: Variant = box.grow(0.02).intersects_ray(from, dir)
-			if hit != null and from.distance_to(hit) < best_d:
-				best_d = from.distance_to(hit)
+			var xf: Transform3D = (mi as MeshInstance3D).global_transform
+			var inv := xf.affine_inverse()
+			var hit: Variant = (mi as MeshInstance3D).get_aabb().grow(0.02).intersects_ray(inv * from, inv.basis * dir)
+			if hit != null and from.distance_to(xf * (hit as Vector3)) < best_d:
+				best_d = from.distance_to(xf * (hit as Vector3))
 				best = str(id)
 	return best
 
@@ -162,6 +172,8 @@ func _process(delta: float) -> void:
 		return
 	_check = 0.0
 	for o in objects:
+		if not o.has("source"):
+			continue  # WO-1104: a drape
 		var role: String = o.source.role
 		var r := _raster(role)
 		if r != _rasters.get(role, Vector2i.ZERO):
@@ -178,6 +190,9 @@ func _build(o: Dictionary) -> void:
 	add_child(root)
 	_nodes[o.id] = root
 	_beams.erase(o.id)
+	if str(o.type) == "drape":
+		root.add_child(_drape(o))
+		return
 	var mat := ShaderMaterial.new()
 	mat.shader = LED_SHADER
 	_mats[o.id] = mat
@@ -223,7 +238,7 @@ func set_beams(on: bool) -> void:
 
 func _apply_source_all(role: String) -> void:
 	for o in objects:
-		if o.source.role == role:
+		if o.has("source") and o.source.role == role:
 			_apply_source(o)
 
 
@@ -261,7 +276,8 @@ func sync_holds() -> void:
 	var want := {}
 	if live:
 		for o in objects:
-			want[str(o.source.role)] = true
+			if o.has("source"):
+				want[str(o.source.role)] = true
 	for role in _held.keys():
 		if not want.has(role):
 			vs.release(role, self)
@@ -299,6 +315,20 @@ static func _strip(edges: PackedVector2Array, h: float, back: float) -> ArrayMes
 			st.set_uv(v[1])
 			st.add_vertex(v[0])
 	return st.commit()
+
+
+## WO-1104 — a drape: its pleats (drape_geometry.gd, sampled for the previs quality) in matte cloth of its colour.
+static func _drape(o: Dictionary) -> MeshInstance3D:
+	var m := ShaderMaterial.new()
+	m.shader = DRAPE_SHADER
+	m.set_shader_parameter("albedo", Color.html(str(o.color)))
+	return _mesh(D.mesh(o, D.SAMPLES[clampi(mini(Quality.shared().level, Quality.max_level()), 0, D.SAMPLES.size() - 1)]), m)
+
+
+func _rebuild_drapes() -> void:
+	for o in objects:
+		if str(o.type) == "drape" and _nodes.has(o.id):
+			upsert(o)
 
 
 static func _quad(size: Vector2, back: float) -> ArrayMesh:

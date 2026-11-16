@@ -293,6 +293,22 @@ func pick(cam: Camera3D, at: Vector2) -> String:
 	return best
 
 
+## WO-1104 — the visible floor straight under `p` (stage frame, where WO-614 objects live): the height of the nearest
+## visible MVR / venue triangle below it, NAN when nothing is there (a drape's skirt finds the floor it stands on).
+func floor_below(p: Vector3) -> float:
+	if not is_inside_tree():
+		return NAN
+	var inv := _stage_inv()
+	var to_world := inv.affine_inverse()
+	var from := to_world * p
+	var dir := (to_world.basis * Vector3.DOWN).normalized()
+	var best := INF
+	for n in _objects():
+		for mi in (n as Node).find_children("*", "MeshInstance3D", true, false):
+			best = minf(best, W.ray_distance(mi as MeshInstance3D, from, dir, _tris))
+	return (inv * (from + dir * best)).y if best < INF else NAN
+
+
 ## Visible objects as mvr_screen_model.cluster items: {uuid, key (model), box (world AABB)}.
 func cluster_items() -> Array:
 	var out := []

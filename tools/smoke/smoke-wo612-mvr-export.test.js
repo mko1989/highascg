@@ -35,7 +35,7 @@ async function members(buf) {
 
 test('export: archive layout, sources, crops, mapping definitions', async () => {
 	const { buffer, report } = buildStageMvr(OBJECTS, { name: 'Show', rasterFor: (role) => (role === 'pgm1' ? { w: 3840, h: 2160 } : null) })
-	assert.deepStrictEqual(report, { screens: 3, skipped: 1, roles: ['pgm1', 'opgui'] })
+	assert.deepStrictEqual(report, { screens: 3, drapes: 0, skipped: 1, roles: ['pgm1', 'opgui'] })
 	const files = await members(buffer)
 	assert.deepStrictEqual(Object.keys(files).sort(), ['GeneralSceneDescription.xml', 'led_wall_1.glb', 'projection_1.glb', 'tv_1.glb'])
 	const xml = files['GeneralSceneDescription.xml'].toString()

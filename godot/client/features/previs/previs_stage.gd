@@ -305,6 +305,15 @@ func camera() -> Camera3D:
 	return walk.camera() if walk != null else _cam  # WO-741
 
 
+## WO-1104: where a new drape goes — the orbit point, and the yaw (degrees) that turns an object's +Z towards the camera.
+func orbit_target() -> Vector3:
+	return _target
+
+
+func orbit_yaw_deg() -> float:
+	return rad_to_deg(_yaw)
+
+
 ## Aim the orbit camera at a world box (stage builder objects, WO-614). `yaw` (radians, NAN = keep) sets the side
 ## it looks from: 0 = from +Z.
 func frame_box(box: AABB, yaw := NAN) -> void:
