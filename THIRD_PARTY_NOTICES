@@ -31,14 +31,36 @@ HighAsCG's previs tracking (WO-616) contains code ported from OpenFollow at comm
 Each ported file carries this attribution and lists its changes. The OpenFollow name and logo are not
 covered by the licence; HighAsCG calls the feature "Tracking" and credits OpenFollow here and in the files.
 
-Person detection (WO-616 T9) — runtime components NOT shipped in this repository; installed per machine
-outside the tree by tools/tracking-detect/setup-venv.sh and export-models.sh:
+Person detection (WO-616 T9, WO-665, WO-667, WO-675, WO-1094) — runtime components NOT shipped in this repository
+or on the HighAsCG install image. Each machine downloads them when the operator clicks Install (Previs → Tracking →
+Detect; tools/tracking-detect/install.sh, setup-venv.sh, export-models.sh, fetch-face-models.sh) into
+~/.local/share/highascg (tracking-venv/, wheels/, models/). The image build refuses any of them
+(tools/eggs/live-usb/verify-iso-detection-runtime.sh). "Export to folder" writes them for the operator's own machines.
 
-  Ultralytics YOLO26 weights (yolo26n / yolo26s, exported to ONNX) — https://github.com/ultralytics/ultralytics
-  Copyright Ultralytics. License: AGPL-3.0.
+  Models (models/):
+  Ultralytics YOLO26 weights — yolo26n, yolo26s (person boxes), yolo26n-pose (body pose), yolo26n-seg (cut-outs);
+  downloaded as .pt from https://github.com/ultralytics/assets and exported to ONNX on the machine.
+  https://github.com/ultralytics/ultralytics — Copyright Ultralytics. License: AGPL-3.0
+  (https://www.gnu.org/licenses/agpl-3.0.html).
+  OpenCV Zoo face models (presenter recognition, opt-in) — https://github.com/opencv/opencv_zoo:
+    YuNet face_detection_yunet_2023mar.onnx — Copyright (c) 2020 Shiqi Yu. License: MIT.
+    SFace face_recognition_sface_2021dec.onnx — License: Apache-2.0 (trained on research face datasets).
+    youtureid person_reid_youtu_2021nov.onnx — License: Apache-2.0 (trained on Market-1501, DukeMTMC-reID and
+    MSMT17, which are distributed for research use only).
+
+  Python packages of the detection venv (tracking-venv/, wheels/ from https://pypi.org):
   ONNX Runtime — https://github.com/microsoft/onnxruntime — Copyright Microsoft Corporation. License: MIT.
-  OpenCV (opencv-python-headless) — https://opencv.org — License: Apache-2.0.
+  OpenCV (opencv-python-headless) — https://opencv.org — License: Apache-2.0 (the wheel bundles FFmpeg, LGPL-2.1).
   NumPy — https://numpy.org — Copyright NumPy Developers. License: BSD-3-Clause.
+  protobuf (BSD-3-Clause), flatbuffers (Apache-2.0), packaging (Apache-2.0 / BSD-2-Clause) — ONNX Runtime's
+  dependencies.
+  pip — https://pip.pypa.io — License: MIT (get-pip.py from https://bootstrap.pypa.io when the system Python has
+  no ensurepip).
+
+  Export-time only (a temporary venv in install-work/, deleted after the export):
+  Ultralytics 8.4.182 (AGPL-3.0), PyTorch + torchvision CPU builds from https://download.pytorch.org/whl/cpu
+  (BSD-3-Clause), ONNX (Apache-2.0), onnxslim (MIT), ONNX Runtime (MIT), opencv-python (Apache-2.0), and their
+  PyPI dependencies (polars, matplotlib, pillow, scipy, pyyaml, psutil, requests …, permissive licences).
 
 ================================================================================
 cables.gl — https://github.com/cables-gl/cables
@@ -282,3 +304,29 @@ License: MIT (http://www.opensource.org/licenses/mit-license.php; the notice is 
 
 Used by the RC game module's host panel to draw the join address as a QR code (WO-1074). "QR Code" is a registered
 trademark of DENSO WAVE INCORPORATED.
+
+================================================================================
+UI icons (WO-1096 inventory) — every third-party icon in client/assets and godot/client/assets
+
+  Lucide "headphones" glyph — https://lucide.dev — one of the Lucide icons derived from Feather
+  (https://github.com/feathericons/feather):
+    client/components/header-bar-audio.js (inline path), godot/client/assets/ui/icons/headphones.svg
+    Copyright (c) 2013-present Cole Bemis (Feather, MIT License) and Copyright (c) 2026 Lucide Icons and
+    Contributors (ISC License) — https://github.com/lucide-icons/lucide/blob/main/LICENSE
+    Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby
+    granted, provided that the above copyright notice and this permission notice appear in all copies. (ISC)
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+    documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+    to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above
+    copyright notice and this permission notice shall be included in all copies or substantial portions of the
+    Software. (MIT)
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+  bnc_female_axis.svg (client/assets, godot/client/assets/devices) — openclipart.org, public domain (the file's
+  RDF metadata: creativecommons.org/licenses/publicdomain/). No attribution required.
+
+  Every other icon in client/assets and godot/client/assets is HighAsCG's own drawing (AGPL-3.0-or-later). WO-1096
+  redrew the port icons (hdmi/display-port/ethernet), the save/arrow/alignment icons and Godot's save/load, whose
+  origin (uxwing-style exports, IcoMoon, embedded rasters) could not be placed under a redistributable licence, and
+  deleted three unused unlicensed files (two "Uploaded to: SVG Repo" cables, camera-icon.svg).
