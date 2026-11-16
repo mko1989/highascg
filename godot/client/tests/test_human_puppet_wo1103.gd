@@ -221,3 +221,36 @@ func test_height_scales_the_body() -> void:
 	t.ok(absf(h.transform.basis.get_scale().y * float(Body.template("woman").height) - 1.55) < 0.005, "1.55 m tall")
 	t.eq(h.shown().height, 1.55, "shown height")
 	h.free()
+
+
+func test_blink() -> void:
+	for b in ["woman", "man"]:
+		var h := Human.new(b)
+		(t.root as Node).add_child(h)
+		h.set_process(false)
+		h.set_target(Vector3.ZERO, 1.7, {}, null, 0.0)
+		var sk: Skeleton3D = h._sk
+		var top := sk.find_bone("Bip01 LEyeBlinkTop")
+		var bot := sk.find_bone("Bip01 LEyeBlinkBottom")
+		var gap := func() -> float: return h._bone_global(top).origin.y - h._bone_global(bot).origin.y
+		h.step(1.0 / 60.0)
+		var open_gap: float = gap.call()
+		var shut := 0
+		var least := open_gap
+		for i in 60 * 14:
+			h.step(1.0 / 60.0)
+			var g: float = gap.call()
+			least = minf(least, g)
+			if g < open_gap * 0.4:
+				shut += 1
+		t.ok(least < open_gap * 0.4, "%s: the lids close (gap %.4f → %.4f m)" % [b, open_gap, least])
+		t.ok(shut > 0 and shut < 60 * 14 / 10, "%s: briefly (%d of %d frames)" % [b, shut, 60 * 14])
+		var eye := h._bone_global(sk.find_bone("Bip01 LEye")).origin
+		h.blink.hold = 0.0
+		h.step(1.0 / 60.0)
+		var up: Vector3 = h._bone_global(top).origin
+		h.blink.hold = 1.0
+		h.step(1.0 / 60.0)
+		var lid: Vector3 = h._bone_global(top).origin
+		t.ok(lid.y < up.y - 0.008 and lid.z > eye.z, "%s: shut, the top lid %.3f m lower and still in front of the eye" % [b, up.y - lid.y])
+		h.free()

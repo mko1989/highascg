@@ -4,7 +4,7 @@ extends Node
 ##   shots: {"name": "s", "quality": ["Low", "Ultra"], "house": [1, 0.35], "views": ["front", "three_quarter", "face"]}
 ##     every visible people-layer figure, per quality × house level × view → `<name>_<Quality>_<house %>_<n>_<body>_<view>.png`;
 ##     with "bodies": [...] (woman / man / an absolute "<dir>/<name>" of a baked body) and "centre": [x, y, z] (PSN)
-##     those are put up as local stand-ins in a row instead (facing the Front camera, standing);
+##     those are put up as local stand-ins in a row instead (facing the Front camera, standing; "blink": 0…1 holds the lids);
 ##   stride: {"name": "w", "stride": 8, "bodies": [...], "centre": [...], "speed": 1.2, "views": ["side", "front"]}
 ##     each body walks a straight line through `centre`; `stride` shots evenly over one walk cycle per view →
 ##     `<name>_<body>_<view>_<k>.png` and `<name>_<body>_feet.json` (the toes' floor points every frame for 4 s);
@@ -86,6 +86,8 @@ func _row(bodies: Array, st: Node) -> void:
 		cards.avatars.add_child(node)
 		var w := {"node": node, "mode": "stand", "at": _centre + Vector3((i - (bodies.size() - 1) / 2.0) * 1.2, 0.0, 0.0), "h": _h(str(bodies[i]))}
 		node.set_heading(face - PI / 2.0)  # PSN heading h faces Godot yaw h + PI / 2 (person_human.set_heading)
+		if cfg.has("blink"):  # 0 open … 1 shut, held
+			node.blink.hold = float(cfg.blink)
 		_walkers.append(w)
 		_feed(w)
 

@@ -2,7 +2,7 @@ extends Node3D
 ## WO-1103 — a test puppet as a realistic human (Tracking → Markers → Test people → Look: Woman / Man / Mixed): a
 ## Microsoft Rocketbox avatar (human_body.gd) at the puppet's floor point, scaled to its height, moved by motion-capture
 ## clips (human_motion.gd: idle, walks blended by speed with the cycle rate locked to the ground speed — no sliding
-## feet —, standing turns). The same interface as the pebble avatar (person_avatar.gd), so the people layer
+## feet —, standing turns) and blinking (human_blink.gd). The same interface as the pebble avatar (person_avatar.gd), so the people layer
 ## (person_avatars.gd) drives either: set_target per snapshot, step per frame, set_tag, shown(). Puppets only — a
 ## camera person never gets a body from here, and nothing about the body comes from a camera: the body is the
 ## operator's Look choice.
@@ -12,6 +12,7 @@ extends Node3D
 
 const Body := preload("res://features/previs/tracking/human_body.gd")
 const Motion := preload("res://features/previs/tracking/human_motion.gd")
+const Blink := preload("res://features/previs/tracking/human_blink.gd")
 const AV := preload("res://features/previs/tracking/person_avatar_model.gd")
 
 const POS_RATE := 8.0  # 1/s — as person_avatar.gd: the floor point follows the tracked point
@@ -24,6 +25,7 @@ const VEL_WINDOW := 0.6
 var body := ""
 var tag: Label3D
 var motion := Motion.new()
+var blink := Blink.new()  # lids (bodies that have lid bones)
 var _root: Node3D
 var _sk: Skeleton3D
 var _model_h := 1.7
@@ -60,6 +62,8 @@ func _init(body_ := "woman") -> void:
 	if not motion.setup(_root, inst.moves):
 		_root.free()
 		_root = null
+		return
+	blink.setup(_sk)
 
 
 ## The people layer: does a card with this body get a human node? (woman / man / own:<slug>, and only if it loads)
@@ -118,6 +122,7 @@ func step(dt: float) -> void:
 	var speed := Vector2(_rv.x, _rv.z).length() / s
 	var err := angle_difference(_yaw, float(_target.yaw))
 	_yaw += motion.update(dt, speed, err)
+	blink.update(dt)
 	if not motion.turning() and motion.move > 0.05:  # walking: turn into the path
 		_yaw = lerp_angle(_yaw, float(_target.yaw), AV.blend(dt, YAW_RATE * motion.move))
 	transform = Transform3D(Basis(Vector3.UP, _yaw).scaled(Vector3.ONE * s), _pos)
