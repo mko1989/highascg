@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1004 live WOs (36 open, 155 in progress, 813 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1004 live WOs (34 open, 155 in progress, 815 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -410,8 +410,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 699 DONE [lighting+godot-client] previs Inspector: the lighting controls grouped by job → 699_WO_previs_lighting_inspector_groups.md
 - 700 DONE [lighting+tracking-vr] calibrate heads from Lighting, on real stage marks → 700_WO_calibrate_heads_on_stage_marks.md
 - 703 DONE [lighting] Preset stage marks from the tracking grid → 703_WO_preset_stage_marks.md
-- 764 OPEN [lighting+tracking-vr] Calibrate heads: solve each head's real pose from its marks (for the desk, neve… → 764_WO_calibrate_heads_solved_rig_pose_for_export.md
-- 765 OPEN [lighting] MVR export of the calibrated rig to the desk (grandMA3 / MagicQ) → 765_WO_mvr_export_calibrated_rig_to_desk.md
+- 764 DONE [lighting+tracking-vr] Calibrate heads: solve each head's real pose from its marks (for the desk, neve… → 764_WO_calibrate_heads_solved_rig_pose_for_export.md
+- 765 DONE [lighting] MVR export of the calibrated rig to the desk (grandMA3 / MagicQ) → 765_WO_mvr_export_calibrated_rig_to_desk.md
 - 767 IN PROGRESS [lighting+godot-client] Imported MVR: MAC Aura PXL heads drawn ~1000× too big (GDTF glb in mm), pick bo… → 767_WO_gdtf_glb_mm_units_heads_huge.md
 - 784 DONE [lighting] Previs: MAC Aura PXL never lights (virtual dimmers read as 0) and its body draw… → 784_WO_previs_virtual_dimmers_and_materialless_glb.md
 - 785 IN PROGRESS [lighting] Better GDTF Share recognition of MVR heads → 785_WO_gdtf_share_recognition.md

@@ -204,3 +204,13 @@ write). No "desk pose" Inspector line per head (WO-764's own item).
   they should); the error model the comparison assumed; floor heads (X-Dot / Sharpy at 0.15 m) aimed at floor marks
   are near grazing — the solve is fine noise-free but the real accuracy there is unknown; the Godot fold's layout on
   screen (not opened in the owner's GUI).
+
+## Note from WO-764 / WO-765 (16.11)
+
+- Anchors are now solved with `calibrate-pose.js solveHeadPose` (pitch / roll when the marks prove them, verdict +
+  note) and take 4 marks each (`MARKS_PER_ANCHOR`). A row inherits a rake only when 2+ of its anchors were solved
+  6-DOF and agree within 2° (`rig-infer.js ROW_TILT_AGREE_DEG`).
+- Hilton Wawer harness (WO-764 table): inferred heads are close (≤ 7 cm / 0.17°) on a rigid truss, but where each
+  clamp is off on its own (±0.1 m / ±2°) they aim no better than the patch — measure the heads that matter.
+- The calibrated rig goes to the desk with **Export calibrated rig…** (WO-765); inferred heads are marked in the
+  file's comment and the CSV.
