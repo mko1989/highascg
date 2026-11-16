@@ -376,7 +376,7 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		const fold = GD('features/previs/fixtures/calibrate_fold.gd')
 		assert.match(fold, /_calib\.lighting = true/)
 		assert.match(fold, /_calib\.add_point_button\(_on_mark\)/)
-		assert.match(fold, /_calib\.add_floor_point\(\[m\.x, m\.y, m\.z\]\)/)
+		assert.match(fold, /_calib\.add_floor_point\(\[m\.x, m\.y, m\.z\], null, str\(m\.name\)\)/ /* WO-764: + the mark name */)
 		assert.match(fold, /sel\.floor_picked\.connect\(_add_mark\)/)
 		assert.match(fold, /s\.patch\[i\] = F\.apply_solve\(s\.patch\[i\], solve\)/)
 		// owner 23.10: just below the Programmer that aims the head

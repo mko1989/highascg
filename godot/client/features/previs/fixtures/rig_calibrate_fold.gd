@@ -125,7 +125,8 @@ func _fill_result() -> void:
 	_apply.disabled = not (r is Dictionary)
 	_measure.disabled = not (r is Dictionary)
 	if not r is Dictionary:
-		_summary.text = "%d heads to measure, %d marks each; the rest is inferred." % [anchors.size(), 3]
+		_summary.text = "%d heads to measure, %d marks each; the rest is inferred." % [anchors.size(),
+			(anchors[0].get("marks", []) as Array).size() if not anchors.is_empty() else 4]
 		return
 	_summary.text = "%d of %d anchors measured · %d heads inferred%s · rig turned %.2f°" % [solved, anchors.size(),
 		int(r.inferred), (" · worst ±%.2f m" % float(r.worst_m)) if r.get("worst_m") != null else "", float(r.fit.turn_deg)]

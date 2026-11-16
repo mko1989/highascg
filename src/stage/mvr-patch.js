@@ -91,6 +91,40 @@ function poseFromMatrix(m) {
 	return pose
 }
 
+/**
+ * WO-765 — the exact inverse of poseFromMatrix: patch pose { x, y, z, hang, yaw, pitch, roll } (MVR frame, metres) →
+ * MVR world matrix (column-major 4×4, metres). `like` (optional, a matrix the fixture had) keeps that frame's column
+ * scales and its handedness (a mirrored file frame stays mirrored), so only position and rotation change.
+ */
+function matrixFromPose(pose, like = null) {
+	const rad = Math.PI / 180
+	const [cy, sy] = [Math.cos(-(Number(pose.yaw) || 0) * rad), Math.sin(-(Number(pose.yaw) || 0) * rad)]
+	const [cx, sx] = [Math.cos((Number(pose.pitch) || 0) * rad), Math.sin((Number(pose.pitch) || 0) * rad)]
+	const roll = (Number(pose.roll) || 0) + (pose.hang === 'floor' ? 180 : 0)
+	const [cz, sz] = [Math.cos(roll * rad), Math.sin(roll * rad)]
+	const mm = (A, B) => [0, 1, 2].map((r) => [0, 1, 2].map((c) => A[r][0] * B[0][c] + A[r][1] * B[1][c] + A[r][2] * B[2][c]))
+	const Q = mm(mm([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]], [[1, 0, 0], [0, cx, -sx], [0, sx, cx]]), [[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
+	const C = [0, 1, 2].map((r) => [0, 1, 2].map((c) => GODOT_FROM_MVR[c * 4 + r]))
+	const Ct = [0, 1, 2].map((r) => [0, 1, 2].map((c) => C[c][r]))
+	const R = mm(mm(Ct, Q), C) // Q = C · R · C⁻¹ (toGodotRows) inverted
+	let scale = [1, 1, 1]
+	let mirrored = false
+	if (Array.isArray(like) && like.length === 16) {
+		scale = [0, 1, 2].map((c) => Math.hypot(like[c * 4], like[c * 4 + 1], like[c * 4 + 2]) || 1)
+		mirrored = rotationRows(like).mirrored
+	}
+	const out = new Array(16).fill(0)
+	for (let c = 0; c < 3; c++) {
+		const k = scale[c] * (mirrored && c === 2 ? -1 : 1)
+		for (let r = 0; r < 3; r++) out[c * 4 + r] = R[r][c] * k
+	}
+	out[12] = Number(pose.x) || 0
+	out[13] = Number(pose.y) || 0
+	out[14] = Number(pose.z) || 0
+	out[15] = 1
+	return out
+}
+
 /** The mode of a stored type that an MVR GDTFMode names (exact, then trimmed / case-insensitive), or ''. An empty GDTFMode
  * is not guessed: the type's first mode is usually its biggest and would overlap the next fixture (Basic Festival #327). */
 function matchMode(modeNames, wanted) {
@@ -184,4 +218,4 @@ function buildMvrPatch(objects, { protocol = 'artnet', typeFor }) {
 	return { fixtures, skipped, notes }
 }
 
-module.exports = { buildMvrPatch, poseFromMatrix, splitAddress, firstAddress, matchMode, eulerYXZ }
+module.exports = { buildMvrPatch, poseFromMatrix, matrixFromPose, splitAddress, firstAddress, matchMode, eulerYXZ }

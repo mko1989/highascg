@@ -182,7 +182,7 @@ func test_rig_result_writes_calibrated_pose_only() -> void:
 		{"id": "zz", "source": "inferred", "pose": {"x": 1, "y": 1, "z": 1}}]
 	var out := F.apply_rig([fx, b], heads)
 	t.eq(out[0].calibrated_pose, {"x": 0.12, "y": -0.05, "z": 5.9, "yaw": 1.5, "pitch": 0.0, "roll": 0.0, "hang": "truss",
-		"source": "measured", "residual_m": 0.031, "rms_deg": 0.2})
+		"source": "measured", "residual_m": 0.031, "rms_deg": 0.2, "method": "rig"})
 	t.eq(out[0].pose, fx.pose, "the patch pose stays (R6)")
 	t.eq(out[0].offset, fx.offset, "the trim stays")
 	t.eq(out[1].has("calibrated_pose"), false, "a head the result doesn't list keeps none")
@@ -191,3 +191,41 @@ func test_rig_result_writes_calibrated_pose_only() -> void:
 	var inferred := F.normalize_calibrated_pose({"x": 1, "y": 2, "z": 3, "source": "?", "residual_m": null})
 	t.eq([inferred.source, inferred.has("residual_m")], ["inferred", false], "unknown residual left out")
 	t.eq(F.normalize_calibrated_pose({"x": 1, "y": "2", "z": 3}), {}, "not a pose")
+
+
+## WO-764: a Lighting session's pins carry their mark (at, name) and the pose they solve goes into calibrated_pose
+## (the desk's, WO-765) — never the patch pose (R6); Clear-style empty map with a failed fit drops a "marks" pose only.
+func test_pose_fit_writes_desk_pose_only() -> void:
+	var fx := F.normalize_fixture({"id": "a", "pose": {"x": 0, "y": 0, "z": 6}}, 0)
+	var pins := [{"pan": 10, "tilt": 100, "dpan": 2, "dtilt": -1, "at": [1, 2, 0], "name": " DSL "},
+		{"pan": 20, "tilt": 90, "dpan": 0, "dtilt": 0, "at": [1, "x", 0], "name": "junk"}]
+	var fit := {"ok": true, "pose": {"x": 0.3, "y": -0.2, "z": 6.05, "yaw": 4.0, "pitch": 2.5, "roll": -1.0, "hang": "truss"},
+		"rms_deg": 0.21, "max_deg": 0.4, "verdict": "good", "note": "good: fit 0.21°, worst 3 cm (DSL) · pitch / roll solved",
+		"dof": 6, "errors_deg": [0.1, 0.2, 0.3, 0.4]}
+	var out := F.apply_solve(fx, {"ok": true, "map": pins, "pose_fit": fit})
+	t.eq(out.offset_map[0].at, [1.0, 2.0, 0.0], "the mark rides with its pin")
+	t.eq(out.offset_map[0].name, "DSL")
+	t.eq(out.offset_map[1].has("at"), false, "a broken mark is dropped, the pin stays")
+	t.eq(out.offset_map[1].has("name"), false, "no name without its mark")
+	t.eq(out.pose, fx.pose, "the patch pose stays (R6)")
+	var cp: Dictionary = out.calibrated_pose
+	t.eq([cp.x, cp.y, cp.z, cp.yaw, cp.pitch, cp.roll, cp.hang], [0.3, -0.2, 6.05, 4.0, 2.5, -1.0, "truss"])
+	t.eq([cp.source, cp.method, cp.verdict, cp.dof, cp.marks, cp.rms_deg, cp.max_deg], ["measured", "marks", "good", 6, 4, 0.21, 0.4])
+	t.eq(F.normalize({"patch": [out]}).patch[0].calibrated_pose, cp, "normalize keeps the fit report")
+	var undone := F.apply_solve(out, {"ok": true, "map": pins.slice(0, 1), "pose_fit": {"ok": false, "need": 2}})
+	t.eq(undone.has("calibrated_pose"), false, "marks undone below 3 → its desk pose goes")
+	var rig: Dictionary = F.apply_rig([fx], [{"id": "a", "source": "inferred", "residual_m": 0.1, "pose": {"x": 1, "y": 1, "z": 6}}])[0]
+	t.eq(F.apply_solve(rig, {"ok": true, "map": [], "pose_fit": {"ok": false, "need": 3}}).calibrated_pose, rig.calibrated_pose,
+		"a rig calibration's pose stays")
+	t.ok(F.calib_summary({"points": [{}, {}, {}], "solve": {"ok": true, "map": pins, "rms_deg": 0.1, "pose_fit": fit}}).ends_with(
+		"\nDesk pose: " + fit.note), "the summary says where it hangs")
+	var Desk := preload("res://features/previs/fixtures/desk_pose_model.gd")
+	var line := Desk.desk_line(out)
+	t.ok(line.begins_with("Desk pose (measured · 4 marks): 0.36 m from the patch, turned "), line)
+	t.ok(line.ends_with(fit.note), line)
+	t.eq(Desk.desk_line(fx), "", "no desk pose → no line")
+	t.ok(absf(Desk.turned_deg({"yaw": 0}, {"yaw": 30}) - 30.0) < 1e-3, "turned = the angle between")
+	t.ok(absf(Desk.turned_deg({"hang": "floor"}, {"hang": "truss"}) - 180.0) < 1e-3, "floor = turned over")
+	var X := preload("res://features/previs/rig_export.gd")
+	t.eq([X.query_for("a.mvr"), X.query_for("a.CSV"), X.query_for("a.magicq.csv")], ["", "?format=csv", "?format=csv&desk=magicq"])
+	t.eq(X.counts_line({"counts": {"calibrated": 2, "inferred": 5, "unchanged": 1, "added": 0}}), "2 measured, 5 inferred, 1 unchanged")

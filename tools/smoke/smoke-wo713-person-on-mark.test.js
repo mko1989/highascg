@@ -145,8 +145,8 @@ describe('WO-713 R1 — a person on the mark pins the head at their height', () 
 	it('the Lighting fold: Person on the mark sends aim; floor marks unchanged (source pins)', () => {
 		const fold = GD('features/previs/fixtures/calibrate_fold.gd')
 		assert.match(fold, /_person\.text = "Person on the mark"/)
-		assert.match(fold, /_calib\.add_floor_point\(\[m\.x, m\.y, m\.z\], "aim"\)/)
-		assert.match(fold, /_calib\.add_floor_point\(\[m\.x, m\.y, m\.z\]\)/)
+		assert.match(fold, /_calib\.add_floor_point\(\[m\.x, m\.y, m\.z\], "aim", str\(m\.name\)\)/)
+		assert.match(fold, /_calib\.add_floor_point\(\[m\.x, m\.y, m\.z\], null, str\(m\.name\)\)/)
 		assert.match(fold, /"Beam is on the person at %s"/)
 		assert.match(fold, /PM\.near_line\(/)
 		assert.match(

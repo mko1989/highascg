@@ -66,10 +66,10 @@ func _ready() -> void:
 	_pick.item_selected.connect(_on_pick)
 	add_child(_pick)
 	var row := HBoxContainer.new()
-	for spec in [["Import…", _import], ["Export…", _export], ["Remove", _ask_remove]]:
+	for spec in [["Import…", _import], ["Export…", _export], ["Export calibrated rig…", func() -> void: preload("res://features/previs/rig_export.gd").run(self, _status)], ["Remove", _ask_remove]]:  # WO-765
 		var b := Button.new()
 		b.text = spec[0]
-		if spec[0] == "Export…": b.tooltip_text = "Save this project's stage (LED walls, TVs, projection) as an .mvr for Capture, consoles, Perastage"
+		if spec[0].begins_with("Export"): b.tooltip_text = "Save this project's stage (LED walls, TVs, projection) as an .mvr for Capture, consoles, Perastage" if spec[0] == "Export…" else "This scene with every calibrated head where its marks put it — an .mvr (or .csv table) for the desk"
 		b.pressed.connect(spec[1])
 		row.add_child(b)
 		_remove_btn = b  # the loop ends on Remove

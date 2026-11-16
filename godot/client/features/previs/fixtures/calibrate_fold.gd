@@ -17,6 +17,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const T := preload("res://features/previs/tracking/tracking_model.gd")
 const PM := preload("res://features/previs/tracking/person_mark_model.gd")
 const RigFold := preload("res://features/previs/fixtures/rig_calibrate_fold.gd")  # WO-804
+const Desk := preload("res://features/previs/fixtures/desk_pose_model.gd")  # WO-764
 
 var sel: RefCounted = Sel.shared()
 var _list: ItemList
@@ -31,6 +32,7 @@ var _on_mark: Button
 var _picked := 0  # selected mark id
 var _trim_row: HBoxContainer
 var _trim: Array = []  # SpinBox pan, tilt — the selected head's beam offset (R7 manual trim)
+var _desk: Label  # WO-764: the selected head's calibrated pose (for the desk) against its patch pose
 var _key := ""
 var _person: CheckBox  # WO-713 R1
 var _near: Label  # is a detected person on the picked mark
@@ -91,8 +93,16 @@ func _ready() -> void:
 		_xyz.append(sb)
 	add_child(_edit)
 	add_child(RigFold.new())  # WO-804: the whole rig — a few anchor heads on the marks above, the rest inferred
+	var export := Button.new()  # WO-765: the calibrated rig to the desk (MVR / position table)
+	export.text = "Export calibrated rig…"
+	export.tooltip_text = "Every calibrated head where its marks put it — an .mvr the desk imports (or a .csv position table)"
+	export.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	add_child(export)
+	var export_status := _muted("")
+	export.pressed.connect(func() -> void: preload("res://features/previs/rig_export.gd").run(self, export_status))
 	_head = _muted("")
 	_build_trim()
+	_desk = _muted("")
 	_calib.lighting = true
 	_calib.apply_requested.connect(_apply_solve)
 	add_child(_calib)
@@ -177,9 +187,9 @@ func _pin_mark() -> void:
 	if m.is_empty():
 		return
 	if _person.button_pressed:
-		_calib.add_floor_point([m.x, m.y, m.z], "aim")  # WO-713 R1: the head's own aim_z above the mark
+		_calib.add_floor_point([m.x, m.y, m.z], "aim", str(m.name))  # WO-713 R1: the head's own aim_z above the mark
 	else:
-		_calib.add_floor_point([m.x, m.y, m.z])
+		_calib.add_floor_point([m.x, m.y, m.z], null, str(m.name))  # WO-764: the name is in the fit report
 
 
 func _on_ws(type: String, data: Variant) -> void:
@@ -276,7 +286,7 @@ func _build_trim() -> void:
 		_trim.append(sb)
 	var clear := Button.new()
 	clear.text = "Clear"
-	clear.tooltip_text = "Drop this head's beam offset and every mark pinned on it"
+	clear.tooltip_text = "Drop this head's beam offset, every mark pinned on it and its desk pose"
 	clear.pressed.connect(_clear_calibration)
 	_trim_row.add_child(clear)
 	add_child(_trim_row)
@@ -293,6 +303,8 @@ func _patch_index() -> int:
 func _fill_trim() -> void:
 	var i := _patch_index()
 	_trim_row.visible = i >= 0
+	_desk.text = Desk.desk_line(_slice().patch[i]) if i >= 0 else ""
+	_desk.visible = _desk.text != ""
 	if i < 0:
 		return
 	var off: Dictionary = _slice().patch[i].get("offset", {})
@@ -320,6 +332,7 @@ func _clear_calibration() -> void:
 		_calib.end()  # an open session would put its starting pins back with the next point
 	var s := _slice()
 	s.patch[i] = F.apply_solve(s.patch[i], {"ok": true, "offset": {"pan": 0, "tilt": 0}, "map": []})
+	s.patch[i].erase("calibrated_pose")  # WO-764: the desk pose goes with the marks it came from
 	_persist(s)
 
 

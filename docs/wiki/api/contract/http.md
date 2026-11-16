@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-617 routes.
+619 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -457,6 +457,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | DELETE | `/api/stage/mvr/*` | registry | `src/api/routes-stage-mvr.js` |
 | GET | `/api/stage/mvr/*` | registry | `src/api/routes-stage-mvr.js` |
 | POST | `/api/stage/mvr/*` | registry | `src/api/routes-stage-mvr.js` |
+| GET | `/api/stage/rig-export` | registry | `src/api/routes-rig-export.js` |
 | GET | `/api/state` | registry | `src/api/router.js` |
 | GET | `/api/state/*` | registry | `src/api/router.js` |
 | POST | `/api/stop` | handler | `src/api/routes-amcp.js` |
@@ -572,6 +573,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | * | `/api/tracking/follow/calibrate` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/follow/calibrate/rig` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/follow/calibrate/spot` | handler | `src/tracking/register.js` |
+| * | `/api/tracking/follow/feed.csv` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/markers` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/puppet/people` | handler | `src/tracking/puppet-people.js` |
 | GET | `/api/tracking/runtime` | registry | `src/api/routes-tracking-runtime.js` |
@@ -684,6 +686,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-project-hardware.js` | WO-608 — project hardware reconcile on the node (web lib/project-import-flow.js + project-hardware-apply.js). |
 | `src/api/routes-replication-get.js` | WO-1029: this server's device-key fingerprint (public, as GET /api/cluster/identity); '' when it has none. |
 | `src/api/routes-replication-post.js` | optional |
+| `src/api/routes-rig-export.js` | WO-765 — the calibrated rig for the desk (Lighting → Calibrate and the previs MVR section, "Export calibrated rig"). |
 | `src/api/routes-scene.js` |  |
 | `src/api/routes-screen-timers.js` | routes-screen-timers.js — Panel-owned screen timer control API (WO-210). |
 | `src/api/routes-server-duties.js` | WO-723 — this server's duties, resolved from its config and the linked servers (src/cluster/server-duties.js), and the "which server sends / receives" choice (s |

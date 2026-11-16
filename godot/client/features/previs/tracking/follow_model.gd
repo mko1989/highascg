@@ -39,8 +39,14 @@ static func normalize_offset_map(raw: Variant) -> Array:
 			var v: Variant = p.get(k)
 			ok = ok and (v is int or v is float) and is_finite(float(v))
 		if ok:
-			out.append({"pan": clampf(float(p.pan), -720, 720), "tilt": clampf(float(p.tilt), -360, 360),
-				"dpan": clampf(float(p.dpan), -180, 180), "dtilt": clampf(float(p.dtilt), -180, 180)})
+			var pin := {"pan": clampf(float(p.pan), -720, 720), "tilt": clampf(float(p.tilt), -360, 360),
+				"dpan": clampf(float(p.dpan), -180, 180), "dtilt": clampf(float(p.dtilt), -180, 180)}
+			var at: Variant = p.get("at")  # WO-764: the mark the pin was taken on (the pose solve's input) + its name
+			if at is Array and (at as Array).size() == 3 and (at as Array).all(func(v: Variant) -> bool: return (v is int or v is float) and is_finite(float(v))):
+				pin["at"] = (at as Array).map(func(v: Variant) -> float: return clampf(float(v), -500, 500))
+				if p.get("name") is String and str(p.name).strip_edges() != "":
+					pin["name"] = str(p.name).strip_edges().left(64)
+			out.append(pin)
 	return out.slice(maxi(0, out.size() - 64))
 
 
@@ -102,10 +108,22 @@ static func normalize_calibrated_pose(raw: Variant) -> Dictionary:
 		"yaw": _num(d.get("yaw"), 0, -360, 360), "pitch": _num(d.get("pitch"), 0, -180, 180),
 		"roll": _num(d.get("roll"), 0, -180, 180), "hang": "floor" if d.get("hang") == "floor" else "truss",
 		"source": "measured" if d.get("source") == "measured" else "inferred"}
-	for k in ["residual_m", "rms_deg"]:
+	for k in ["residual_m", "rms_deg", "max_deg"]:
 		var v: Variant = d.get(k)
 		if (v is int or v is float) and is_finite(float(v)):
 			out[k] = maxf(0.0, float(v))
+	# WO-764: the fit report — verdict good | weak | bad + its line, 4 / 6 solved parameters, marks used, and where it
+	# came from (marks = this head's own pins, rig = the WO-804 rig calibration)
+	if d.get("verdict") in ["good", "weak", "bad"]:
+		out["verdict"] = d.verdict
+	if d.get("note") is String and str(d.note) != "":
+		out["note"] = str(d.note).left(240)
+	if d.get("dof") in [4, 6, 4.0, 6.0]:
+		out["dof"] = int(d.dof)
+	if (d.get("marks") is int or d.get("marks") is float) and float(d.marks) >= 1:
+		out["marks"] = int(d.marks)
+	if d.get("method") in ["marks", "rig"]:
+		out["method"] = d.method
 	return out
 
 
@@ -122,7 +140,8 @@ static func apply_rig(patch: Array, heads: Array) -> Array:
 		var h: Variant = by.get(str(f.get("id", "")))
 		if h is Dictionary:
 			var cp := normalize_calibrated_pose((h.pose as Dictionary).merged({"source": h.get("source"),
-				"residual_m": h.get("residual_m"), "rms_deg": h.get("rms_deg")}))
+				"residual_m": h.get("residual_m"), "rms_deg": h.get("rms_deg"), "verdict": h.get("verdict"),
+				"note": h.get("note"), "dof": h.get("dof"), "marks": h.get("marks"), "method": "rig"}))
 			if not cp.is_empty():
 				f["calibrated_pose"] = cp
 		out.append(f)
@@ -333,6 +352,15 @@ static func apply_solve(fx: Dictionary, solve: Dictionary) -> Dictionary:
 			out.erase("offset_map")
 		else:
 			out.offset_map = pins
+		var pf: Variant = solve.get("pose_fit")  # WO-764: the pose its pinned marks give (3+), for the desk only
+		if pf is Dictionary and pf.get("ok") == true and pf.get("pose") is Dictionary:
+			var cp := normalize_calibrated_pose((pf.pose as Dictionary).merged({"source": "measured", "rms_deg": pf.get("rms_deg"),
+				"max_deg": pf.get("max_deg"), "verdict": pf.get("verdict"), "note": pf.get("note"), "dof": pf.get("dof"),
+				"marks": (pf.get("errors_deg", []) as Array).size(), "method": "marks"}))
+			if not cp.is_empty():
+				out.calibrated_pose = cp
+		elif pf is Dictionary and out.get("calibrated_pose") is Dictionary and out.calibrated_pose.get("method") == "marks":
+			out.erase("calibrated_pose")  # its marks were undone below 3; a rig calibration's pose stays
 		if not solve.get("offset") is Dictionary:
 			return out
 	if solve.get("offset") is Dictionary:  # WO-700 R3: a Lighting session corrects where the beam points, not the head
@@ -361,6 +389,11 @@ static func calib_summary(sess: Dictionary) -> String:
 		var line := "%d mark%s pinned%s — the digital beam is on each." % [n, "" if n == 1 else "s", " (%d on a person)" % held if held > 0 else ""]
 		if float(s.get("rms_deg", 0.0)) > 1.0:
 			line += "\nOne offset would miss them by %.1f° on average: the head is probably not where it is patched." % float(s.rms_deg)
+		var pf: Variant = s.get("pose_fit")  # WO-764: where the head really hangs, for the desk
+		if pf is Dictionary and pf.get("ok") == true:
+			line += "\nDesk pose: %s" % str(pf.get("note", ""))
+		elif pf is Dictionary:
+			line += "\nDesk pose: %d more mark%s to solve where it hangs." % [int(pf.get("need", 1)), "" if int(pf.get("need", 1)) == 1 else "s"]
 		return line
 	if s.get("offset") is Dictionary:  # WO-700 R3
 		var line := "%d point%s · beam offset pan %+.1f°  tilt %+.1f° (fit %.2f°)" % [n, "" if n == 1 else "s",

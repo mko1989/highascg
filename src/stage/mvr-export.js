@@ -195,4 +195,4 @@ function buildStageMvr(objects, opts = {}) {
 	return { buffer: buildZipStore(files), report: { screens: screens.length, skipped, roles: [...roles.keys()] } }
 }
 
-module.exports = { buildStageMvr, godotMatrix, sizeM }
+module.exports = { buildStageMvr, godotMatrix, sizeM, uuidOf }
