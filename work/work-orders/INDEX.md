@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1007 live WOs (34 open, 155 in progress, 818 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1009 live WOs (34 open, 157 in progress, 818 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -607,7 +607,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1099 DONE [godot-client+tracking-vr,lighting] House lights: a 0–100 % slider that dims the room so only the rig lights it (pr… → 1099_WO_previs_house_lights_slider.md
 - 1100 DONE [godot-client+tracking-vr] Previs: deselect with Esc or a click on empty space (one selection in the 3D vi… → 1100_WO_previs_deselect_esc_and_empty_click.md
 
-## web-client — Web client (88)
+## web-client — Web client (90)
 
 - 05 DONE [web-client+video-io] Live Video Preview (go2rtc) + Settings Modal + Audio Monitoring → 05_WO_LIVE_PREVIEW_SETTINGS.md
 - 14 DONE [web-client+devices-config] Offline Preparation Mode → 14_WO_OFFLINE_PREPARATION_MODE.md
@@ -697,6 +697,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1083 DONE [web-client] Stage Skirmish: bots see no farther than a player (no more cross-map shots); fl… → 1083_WO_skirmish_bots_fair_sight_and_spotlight_mode.md
 - 1089 DONE [web-client+engine] Stage Salad: slingshot vegetables at the presenter's avatar (third opt-in brows… → 1089_WO_stage_salad_vegetable_slingshot.md
 - 1090 DONE [web-client+engine] Game scenes keep the MVR meshes' own pictures; patched heads are their real GDT… → 1090_WO_game_scene_mvr_materials_and_real_heads.md
+- 1101 IN PROGRESS [web-client+engine] Game World step 1: one shared room — the three browser games see each other → 1101_WO_game_world_shared_room.md
+- 1102 IN PROGRESS [web-client+engine] Game World step 2: the games affect each other (server-refereed, capped, never… → 1102_WO_game_world_cross_game_effects.md
 
 ## companion — Companion integration (23)
 
