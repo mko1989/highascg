@@ -156,4 +156,4 @@ function skpMaterials(entries) {
 	return out
 }
 
-module.exports = { parseMtl, pbrOf, norm, mapPath, textureIndex, findTexture, skpMaterials, toLinear, IMAGE_EXT }
+module.exports = { parseMtl, pbrOf, norm, mapPath, textureIndex, findTexture, skpMaterials, toLinear }

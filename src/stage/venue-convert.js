@@ -28,7 +28,7 @@ const { parseMtl, pbrOf, textureIndex, findTexture, toLinear } = require('./obj-
 const { classify } = require('./venue-build')
 const { weldBucket, fitBudget } = require('./venue-optimize')
 const { writeGlb } = require('./glb-write')
-const tex = require('../../modules/rc-game/server/rc-scene-tex')
+const tex = require('./scene-tex')
 
 const EXT = 'HIGHASCG_venue'
 const DEFAULTS = { budget: 250000, textureBudget: 6 * 1024 * 1024, maxEdge: 1024 }
