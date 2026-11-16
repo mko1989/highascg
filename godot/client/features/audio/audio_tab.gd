@@ -74,7 +74,7 @@ func _ready() -> void:
 	_add.added.connect(_on_visible)
 	var plus := Button.new()
 	plus.text = "+ Live audio input"
-	plus.tooltip_text = "Add a live audio (ALSA / USB) input. Its device and routing: Settings → Live audio; remove it from its strip."
+	plus.tooltip_text = "Add a live audio (ALSA / USB) input. Program routes: its Ch buttons; capture device and route defaults: click the strip (Devices inspector); remove it from its strip."
 	plus.pressed.connect(func() -> void: _add.open("live_audio"))
 	foot.add_child(plus)
 	ctl.changed.connect(_refresh)

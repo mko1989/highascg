@@ -1,24 +1,10 @@
 extends RefCounted
-## WO-608 — Settings → Live audio status + ALSA mixer rules (web settings-live-audio-panel.js, lib/alsa-mixer-api.js).
+## WO-608 — ALSA mixer rules (web lib/alsa-mixer-api.js). The panel is docked in the Audio tab (WO-799); the Settings →
+## Live audio pane and its status model (live_audio_model.gd) were removed in WO-1093 — the Devices live-audio inspector
+## shows the same status.
 
-const L := preload("res://features/settings/live_audio_model.gd")
 const A := preload("res://features/settings/alsa_mixer_model.gd")
 var t
-
-
-func test_status_lines() -> void:
-	t.eq(L.status_lines({"liveAudioCount": 0, "configured": {"count": 0}})[0][1], "")
-	t.eq(L.status_lines({"liveAudioCount": 2, "liveAudioInputChannels": []})[0][1], "warn")
-	var live := {"liveAudioCount": 1.0, "liveAudioInputChannels": [5.0], "configured": {"count": 1.0},
-		"status": {"enabled": true, "started": [{"slot": 1.0}], "failed": []}}
-	var lines := L.status_lines(live)
-	t.eq(lines[0], ["Live audio inputs: 1 dedicated channel(s)", ""])
-	t.eq(lines[1][0].begins_with("Slot 1 → ch 5"), true, lines[1][0])
-	t.eq(lines[2], ["Started: slot 1", "ok"])
-	t.eq(L.status_lines({"liveAudioCount": 1.0, "liveAudioInputChannels": [5.0], "status": {"enabled": false,
-		"reason": "amcp_disconnected", "failed": [{"message": "no device"}]}}).slice(2), [["amcp_disconnected", "warn"],
-		["Failed: no device", "warn"]])
-	t.eq(L.preview_devices([{"name": "PCH"}, {"id": "hw:1"}, {}]), [["", "Default sink"], ["PCH", "PCH"], ["hw:1", "hw:1"]])
 
 
 func test_alsa_normalize_and_view() -> void:

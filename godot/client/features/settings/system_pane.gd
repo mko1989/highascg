@@ -1,16 +1,13 @@
 extends VBoxContainer
-## WO-608 — Settings → System (web settings-modal-mount-hardware.js): operator display line, open browser / file
-## manager on :0, system time (WO-193: live clock, NTP toggle, manual set behind a confirm), hardware summary
-## (GET /api/system/hardware) — time above the long hardware list here, the web has it below. POSTs go through
-## the nuclear gate.
+## WO-608 — Settings → System → System time (web settings-modal-mount-hardware.js, WO-193): live clock, NTP toggle,
+## manual set behind a confirm; POSTs go through the nuclear gate. WO-1093: the hardware summary is hardware_pane.gd,
+## the operator display line moved to This screen, and the kiosk-era "Open browser" / "Open file manager" buttons left
+## the Godot client (POST /api/system/gui-launch stays for the web UI).
 
 const NuclearGate := preload("res://app/nuclear_gate.gd")
 const K := preload("res://features/settings/pane_kit.gd")
 const M := preload("res://features/settings/system_model.gd")
 
-var _operator: Label
-var _launch_status: Label
-var _hw: VBoxContainer
 var _clock: Label
 var _ntp: CheckBox
 var _date: LineEdit
@@ -24,13 +21,6 @@ var _base_ticks := 0
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 8)
-	K.heading(self, "Operator display")
-	_operator = K.note(self, "Loading operator display…")
-	var r := K.row(self)
-	K.button(r, "Open browser", func() -> void: _launch("firefox"))
-	K.button(r, "Open file manager", func() -> void: _launch("file-manager"))
-	K.button(r, "Refresh hardware", refresh)
-	_launch_status = K.note(self, "")
 	K.heading(self, "System time")
 	_clock = Label.new()
 	_clock.text = "Current time: loading…"
@@ -46,9 +36,6 @@ func _ready() -> void:
 	_time.placeholder_text = "14:30:00"
 	_set = K.button(tr, "Set time", _on_set)
 	_result = K.note(self, "")
-	_hw = VBoxContainer.new()
-	_hw.add_theme_constant_override("separation", 6)
-	add_child(_hw)
 	var t := Timer.new()
 	t.wait_time = 0.5
 	t.timeout.connect(_tick)
@@ -56,25 +43,7 @@ func _ready() -> void:
 	t.start()
 	visibility_changed.connect(func() -> void:
 		if is_visible_in_tree():
-			refresh())
-
-
-## Hardware last: GET /api/system/hardware takes ~4 s on the box (lsblk / nvidia-smi / ALSA probes).
-func refresh() -> void:
-	var od: Dictionary = await Api.get_json("/api/system/operator-display")
-	_operator.text = M.operator_line(od.data if od.ok else null)
-	await _refresh_time()
-	if _hw.get_child_count() == 0:
-		K.note(_hw, "Loading hardware…")
-	var hw: Dictionary = await Api.get_json("/api/system/hardware")
-	for c in _hw.get_children():
-		c.queue_free()
-	if hw.ok and hw.data is Dictionary:
-		for sec in M.hardware_sections(hw.data):
-			K.heading(_hw, sec[0]).add_theme_font_size_override("font_size", 15)
-			K.fill_grid(K.grid(_hw), sec[1])
-	else:
-		K.note(_hw, "Hardware summary unavailable: %s" % str(hw.error))
+			_refresh_time())
 
 
 func _refresh_time() -> void:
@@ -136,13 +105,6 @@ func _on_set() -> void:
 			_result.text = ("Time set: %s" % str(d.get("now", date)) if res.ok and d.get("ok") == true
 				else "Error: %s" % str(d.get("error", res.error)))
 			await _refresh_time())
-
-
-func _launch(action: String) -> void:
-	_launch_status.text = "Launching…"
-	var res: Dictionary = await NuclearGate.post(self, "/api/system/gui-launch", {"action": action})
-	var d: Dictionary = res.data if res.data is Dictionary else {}
-	_launch_status.text = M.launch_note(d) if res.ok else str(d.get("error", res.error))
 
 
 func _field(parent: Node, label: String, width: int) -> LineEdit:

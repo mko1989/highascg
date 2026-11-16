@@ -27,7 +27,8 @@ test('routes: registered by routes-gdtf-share, every endpoint the Godot pane cal
 	for (const p of pane.match(/\/api\/fixtures\/library\/[a-z]+/g)) {
 		assert.ok(server.includes(`'${p}'`), `${p} is served`)
 	}
-	assert.match(read('godot/client/features/settings/settings_tab.gd'), /_pane\("GDTF library"\)\.add_child\(LibraryPane\.new\(\)\)/)
+	// WO-1093: the pane is a fold of Settings → System
+	assert.match(read('godot/client/features/settings/settings_tab.gd'), /K\.fold_pane\(sys, "GDTF library", LibraryPane\.new\(\)\)/)
 })
 
 test('the library lives under ~/.highascg/cache, which the ISO exclude lists drop', () => {

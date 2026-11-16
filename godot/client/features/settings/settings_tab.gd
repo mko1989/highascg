@@ -3,6 +3,10 @@ extends VBoxContainer
 ## Godot client replaces the kiosk): sub-tabs over settings_form.gd panes, autosaved through the Settings mirror (600 ms,
 ## no Save button, web parity) with the save result in the status line. Slice 1: Defaults, Companion, Media / USB;
 ## About (WO-616 attribution, GET /api/about).
+## WO-1093 (owner 16.11 "it got too big"): 17 panes → 7, each setting in one place. Live audio is gone (its controls
+## are the Devices live-audio inspector + the Audio tab), Network lives on the Devices server page only, Updates /
+## Tailscale / DeckLink / GDTF library / Controllers / hardware are System folds, Variables + compose preview are
+## Companion folds, Lockscreen + UI scale + simulated server are This screen, Diagnostics is About.
 
 const Form := preload("res://features/settings/settings_form.gd")
 const Panes := preload("res://features/settings/settings_panes.gd")
@@ -13,11 +17,11 @@ const FilePick := preload("res://features/devices/file_pick.gd")
 const UpdatesPane := preload("res://features/settings/updates_pane.gd")
 const NuclearPane := preload("res://features/settings/nuclear_pane.gd")
 const TailscalePane := preload("res://features/settings/tailscale_pane.gd")
-const SystemPane := preload("res://features/settings/system_pane.gd")
+const SystemPane := preload("res://features/settings/system_pane.gd")  # System time
+const HardwarePane := preload("res://features/settings/hardware_pane.gd")  # WO-1093
+const K := preload("res://features/settings/pane_kit.gd")
 const DecklinkPane := preload("res://features/settings/decklink_pane.gd")
 const VariablesPane := preload("res://features/settings/variables_pane.gd")
-const LiveAudioPane := preload("res://features/settings/live_audio_pane.gd")
-const NetworkPane := preload("res://features/settings/network_pane.gd")
 const LibraryPane := preload("res://features/settings/library_pane.gd")  # WO-825
 const LockscreenPane := preload("res://features/settings/lockscreen_pane.gd")
 const LtcPane := preload("res://features/settings/ltc_pane.gd")  # WO-974
@@ -48,17 +52,31 @@ func _ready() -> void:
 	Panes.defaults(_pane("Defaults"), func() -> float:
 		var cm: Variant = Store.get_value("channelMap", {})
 		return SendTo.project_fps({}, cm if cm is Dictionary else {}))
+	Panes.media(_pane("Media / USB"))
+	var screen := _pane("This screen")
+	Panes.this_screen(screen)
+	K.fold_pane(screen, "Lockscreen", LockscreenPane.new())  # WO-838
 	_comp_status = Label.new()
 	_comp_check = Button.new()
 	_comp_check.text = "Check"
 	_comp_check.pressed.connect(_check_companion)
-	Panes.companion(_pane("Companion"), _comp_status, _comp_check)
-	Panes.media(_pane("Media / USB"))
-	_pane("Updates").add_child(UpdatesPane.new())
-	_pane("System").add_child(SystemPane.new())
-	_pane("Network").add_child(NetworkPane.new())  # WO-692
-	_pane("GDTF library").add_child(LibraryPane.new())  # WO-825
-	_pane("DeckLink").add_child(DecklinkPane.new())
+	var comp := _pane("Companion")
+	Panes.companion(comp, _comp_status, _comp_check)
+	K.fold(comp, "Variables").add_child(VariablesPane.new())
+	var sys := _pane("System")
+	sys.add_child(UpdatesPane.new())
+	Panes.startup(sys)
+	K.fold_pane(sys, "System time", SystemPane.new())
+	K.fold_pane(sys, "Tailscale", TailscalePane.new())
+	K.fold_pane(sys, "Game controllers", ControllersPane.new())  # WO-1066 Bluetooth gamepads
+	K.fold_pane(sys, "Blackmagic DeckLink", DecklinkPane.new())
+	K.fold_pane(sys, "GDTF library", LibraryPane.new())  # WO-825
+	K.fold_pane(sys, "Hardware", HardwarePane.new())
+	LtcPane.build(_pane("Timecode"))  # WO-974 LTC in / out
+	var nuclear := _pane("Nuclear")
+	Panes.nuclear(nuclear)
+	nuclear.add_child(NuclearPane.new())
+	var about := _pane("About")
 	_bundle = Button.new()
 	_bundle.text = "Save support bundle…"
 	_bundle.pressed.connect(_save_bundle)
@@ -66,17 +84,9 @@ func _ready() -> void:
 	logs.text = "Open server logs"
 	logs.pressed.connect(logs_requested.emit)
 	_bundle_status = Label.new()
-	Panes.diagnostics(_pane("Diagnostics"), _bundle, logs, _bundle_status)
-	_pane("Tailscale").add_child(TailscalePane.new())
-	_pane("Live audio").add_child(LiveAudioPane.new())
-	LtcPane.build(_pane("Timecode"))  # WO-974 LTC in / out
-	_pane("Controllers").add_child(ControllersPane.new())  # WO-1066 Bluetooth gamepads
-	_pane("Variables").add_child(VariablesPane.new())
-	_pane("Lockscreen").add_child(LockscreenPane.new())  # WO-838
-	var nuclear := _pane("Nuclear")
-	Panes.nuclear(nuclear)
-	nuclear.add_child(NuclearPane.new())
-	_about = _pane("About")
+	Panes.diagnostics(about, _bundle, logs, _bundle_status)
+	_about = Form.new()  # Panes.about() replaces its children when GET /api/about answers
+	about.add_child(_about)
 	Panes.about(_about, {})
 	_tabs.tab_changed.connect(func(i: int) -> void:
 		if _tabs.get_tab_title(i) == "Companion":

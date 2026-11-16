@@ -16,7 +16,7 @@ func build(role: String, dest: Dictionary, ch: Variant, entry: Dictionary) -> Di
 			var slot: Variant = HS.live_audio_slot(dest)
 			if slot == null:
 				return {}
-			return {"bottom": [_live_audio(int(slot), ch, entry.get("layer")), _remove_input(int(slot), "live_audio")]}
+			return {"bottom": [_live_audio(int(slot), ch, entry.get("layer")), pgm_routes(), _remove_input(int(slot), "live_audio")]}
 		"v4l2_input":
 			var slot: Variant = HS.v4l2_slot(dest)
 			if slot == null:
@@ -131,6 +131,60 @@ func _boot(show_status: Callable, fill: Callable) -> void:
 	var d: Dictionary = await DevicesTarget.api.get_json("/api/audio/devices")
 	if d.ok:
 		fill.call(H.R.d(d.data).get("devices"))
+
+
+## WO-1093 — "▸ Program routes (all live audio inputs)": the three defaults every live audio input shares, moved here from
+## the removed Settings → Live audio pane. Folded (rarely touched); each change is one POST /api/settings
+## {casparServer: {key}} (IS.pgm_route_body), then the settings re-read; a refused save puts the control back.
+func pgm_routes() -> Control:
+	var ui := IS.read_live_audio(H.R.d(H.R.d(DevicesTarget.settings.settings).get("casparServer")))
+	var box := _section()
+	var body := _section()
+	body.visible = false
+	var tog := Button.new()
+	tog.flat = true
+	tog.toggle_mode = true
+	tog.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	tog.text = "▸ Program routes (all live audio inputs)"
+	tog.add_theme_font_size_override("font_size", 11)
+	tog.toggled.connect(func(on: bool) -> void:
+		body.visible = on
+		tog.text = ("▾ " if on else "▸ ") + "Program routes (all live audio inputs)")
+	box.add_child(tog)
+	box.add_child(body)
+	var always := _check("Put the program routes back after a restart", ui.pgmAlwaysOn,
+		"At boot and when CasparCG reconnects, every live audio input goes back onto the program channels chosen with its Ch buttons in the Audio tab")
+	var layers := []
+	for n in range(1, IS.PGM_LAYER_MAX + 1):
+		layers.append([n, "Layer %d" % n])
+	var layer := _select(layers, clampi(int(ui.pgmLayer), 1, IS.PGM_LAYER_MAX), "Input 1 plays on this program layer, input N on layer + N − 1 (audio tracks 1–9)")
+	var audio_only := _check("Audio only (no picture on program)", ui.pgmAudioOnly, "The route layer on program is kept at opacity 0")
+	body.add_child(always)
+	body.add_child(_field("Program layer of input 1", layer))
+	body.add_child(audio_only)
+	body.add_child(_note("Saved at once and used by the next routing (a restart, CasparCG reconnect or an input's Start); routes on air now are not touched."))
+	var save := func(key: String, value: Variant, revert: Callable) -> void:
+		var r: Dictionary = await DevicesTarget.api.post_json("/api/settings", IS.pgm_route_body(key, value))
+		var err := _reply_error(r)
+		if err != "":
+			status.emit("Not saved: " + err, false)
+			revert.call()
+			return
+		status.emit("Saved — used by the next routing.", true)
+		await DevicesTarget.settings.load_from_server()
+	always.toggled.connect(func(on: bool) -> void:
+		save.call("live_audio_pgm_always_on", on, func() -> void: always.set_pressed_no_signal(not on)))
+	audio_only.toggled.connect(func(on: bool) -> void:
+		save.call("live_audio_pgm_audio_only", on, func() -> void: audio_only.set_pressed_no_signal(not on)))
+	var cur := {"layer": clampi(int(ui.pgmLayer), 1, IS.PGM_LAYER_MAX)}
+	layer.item_selected.connect(func(i: int) -> void:
+		var n := int(layer.get_item_metadata(i))
+		var prev: int = cur.layer
+		cur.layer = n
+		save.call("live_audio_pgm_layer", n, func() -> void:
+			cur.layer = prev
+			layer.select(prev - 1)))
+	return box
 
 
 ## Remove live audio / USB video slot N: settings re-read, plan, post, settings re-read, dirty when the count shrank.

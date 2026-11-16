@@ -72,6 +72,20 @@ static func _or(v: Variant, def: String) -> String:  # String(v || def)
 	return _str(v) if H.truthy(v) else def
 
 
+## WO-1093 — the program-route defaults shared by every live audio input (were Settings → Live audio, whose Save never
+## persisted the layer / audio-only keys: POST /api/audio/live-inputs/config copies only a nested casparServer). Saved
+## through POST /api/settings (casparServer is in the server's hand-listed newConfig) and NOT applied: a re-apply re-PLAYs
+## every input, which glitches what is on air. The value is clamped like the server reads it (layer 1–9 audio tracks).
+const PGM_ROUTE_KEYS := ["live_audio_pgm_always_on", "live_audio_pgm_layer", "live_audio_pgm_audio_only"]
+const PGM_LAYER_MAX := 9  # live-audio-input.js PGM_AUDIO_TRACK_LAYER_MAX
+
+
+static func pgm_route_body(key: String, value: Variant) -> Dictionary:
+	assert(key in PGM_ROUTE_KEYS, "not a program-route key: " + key)
+	var v: Variant = clampi(int(value), 1, PGM_LAYER_MAX) if key == "live_audio_pgm_layer" else value == true
+	return {"casparServer": {key: v}}
+
+
 ## buildLiveAudioConfigBody
 static func live_audio_body(ui: Dictionary) -> Dictionary:
 	var body := {

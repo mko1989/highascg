@@ -2,7 +2,7 @@ extends VBoxContainer
 ## WO-692 — Network: one card per NIC (GET /api/system/network `nics`, also ports that are down — a port without a
 ## cable keeps its settings and takes them when plugged in), DHCP / static + Apply (POST /api/system/network/apply;
 ## only the primary port's settings are the box's config.network), and Wi-Fi: on / off, scan, join with a password,
-## disconnect (/api/system/network/wifi*). Lives in Settings → Network and on the Devices server page.
+## disconnect (/api/system/network/wifi*). Lives on the Devices server page (WO-1093: no longer a Settings pane too).
 
 const Kit := preload("res://features/settings/pane_kit.gd")
 const M := preload("res://features/settings/network_model.gd")

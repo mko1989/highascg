@@ -31,6 +31,48 @@ static func button(parent: Node, text: String, cb: Callable) -> Button:
 	return b
 
 
+## WO-1093 — a folded section: a flat "▸ title" toggle (accent, heading size) over a body that is hidden until opened.
+## Panes inside the body fetch on their own `visibility_changed`, so a closed fold costs no request. Returns the body.
+static func fold(parent: Node, title: String, open := false) -> VBoxContainer:
+	var b := Button.new()
+	b.flat = true
+	b.toggle_mode = true
+	b.button_pressed = open
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	b.add_theme_font_size_override("font_size", 18)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(state, ThemeBuilder.ACCENT)
+	b.text = fold_label(title, open)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 8)
+	body.visible = open
+	b.toggled.connect(func(on: bool) -> void:
+		body.visible = on
+		b.text = fold_label(title, on))
+	parent.add_child(b)
+	parent.add_child(body)
+	return body
+
+
+static func fold_label(title: String, open: bool) -> String:
+	return ("▾ " if open else "▸ ") + title
+
+
+## A self-contained pane (its own first heading) in a fold titled `title`: the pane's heading of the same text is hidden
+## so the title is not shown twice. Returns the pane.
+static func fold_pane(parent: Node, title: String, pane: Control, open := false) -> Control:
+	var hide_heading := func() -> void:
+		var first := pane.get_child(0) if pane.get_child_count() > 0 else null
+		if first is Label and (first as Label).text == title:
+			(first as Label).visible = false
+	if not pane.is_node_ready():
+		pane.ready.connect(hide_heading, CONNECT_ONE_SHOT)  # most panes build their children in _ready
+	fold(parent, title, open).add_child(pane)
+	hide_heading.call()  # already built (in the tree, or made before)
+	return pane
+
+
 static func row(parent: Node) -> HBoxContainer:
 	var r := HBoxContainer.new()
 	r.add_theme_constant_override("separation", 10)

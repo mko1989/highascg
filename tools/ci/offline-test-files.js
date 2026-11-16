@@ -338,6 +338,7 @@ module.exports = [
 	'tools/smoke/smoke-wo333-audio-capture-fft.test.js',
 	'tools/smoke/smoke-wo270-settings-devices-only.test.js',
 	'tools/smoke/smoke-wo619-settings-editor-defaults-persist.test.js',
+	'tools/smoke/smoke-wo1093-settings-save-paths.test.js',
 	'tools/smoke/smoke-wo616-tracking-camera-model.test.js',
 	'tools/smoke/smoke-wo616-tracking-marker-hub.test.js',
 	'tools/smoke/smoke-wo616-follow-artnet.test.js',

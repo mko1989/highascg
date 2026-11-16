@@ -1,6 +1,8 @@
 extends RefCounted
 ## WO-608 slice 1 — the Defaults, Companion and Media / USB panes (web settings-modal-templates.js, hydrate /
 ## buildSettingsPayload in settings-modal-logic.js, editor-defaults.js). Built on settings_form.gd rows.
+## WO-1093: Defaults holds the editor defaults only; the screen-local rows are This screen, start-up is System, the
+## compose preview (web client + Companion previews) is a Companion fold; "Invert touchpad scroll" (web only) is gone.
 
 const Placement := preload("res://app/window_placement.gd")
 const ScreenPicker := preload("res://app/operator_screen_picker.gd")
@@ -9,6 +11,8 @@ const AboutModel := preload("res://features/settings/about_model.gd")
 const NuclearModel := preload("res://app/nuclear_model.gd")
 const T := preload("res://features/live/transitions.gd")
 const ConnectionMenu := preload("res://app/connection_menu.gd")
+const K := preload("res://features/settings/pane_kit.gd")
+const SystemModel := preload("res://features/settings/system_model.gd")
 
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"],
 	["vertical", "Fill height"], ["stretch", "Stretch"]]
@@ -41,32 +45,11 @@ static func defaults(f: Form, fps: Callable) -> void:
 		tweens.append([t, t])
 	f.option("Tween", "editorDefaults.transition.tween", tweens, "linear")
 	f.note("Also used for the timeline Take bar default. Existing looks and clips are not changed.")
-	f.heading("Compose preview")
-	var mode := f.option("Preview source", "composePreview.mode", [["canvas", "Canvas thumbnails"],
-		["ffmpeg_jpeg", "Caspar JPEG — ffmpeg writes file"], ["stream", "Live stream (hardware encoded)"]], "canvas")
-	f.note("What the browser remote client and Companion previews use; this client shows its own previews.")
-	var g := f.group()
-	f.target = g
-	f.note("JPEG mode embeds a low-cost ffmpeg consumer in Caspar config. Apply Caspar config after changing FPS or resolution.")
-	f.number("Update rate (fps)", "composePreview.fps", 1, 30, 25)
-	f.option("Resolution (relative to channel)", "composePreview.resolutionScale",
-		[["half", "Half width × height (default)"], ["75", "75%"], ["full", "Full channel size"]], "half")
-	f.number("JPEG quality (lower = better)", "composePreview.jpegQuality", 2, 20, 10)
-	f.check("Companion preview variables (Stream Deck button images)", "composePreview.companionThumbEnabled", false)
-	f.target = f
-	var sync := func() -> void: g.visible = str(Settings.get_setting("composePreview.mode", "")) == "ffmpeg_jpeg"
-	mode.item_selected.connect(func(_i: int) -> void: sync.call())
-	f.on_hydrate(sync)
-	f.note("Screen labels and the streaming channel are configured in the Devices tab.")
-	f.heading("Input — mouse and touchpad")
-	f.check("Invert touchpad scroll", "ui.invertTouchpadScroll", false)
-	f.note("Reverses two-finger touchpad scrolling in the browser client's zoom / pan controls.")
-	f.heading("Start-up")  # WO-645
-	f.option("When the box starts", "startup.mode", [["ask", "Ask on every screen — Start operator here / Run headless"],
-		["gui", "Start CasparCG and the operator GUI"], ["headless", "Start CasparCG headless (web UI only)"]], "ask")
-	f.note("Ask: the desktop comes up with a small window on every screen and CasparCG waits for the choice. The other "
-		+ "two start everything by themselves. Takes effect at the next boot. Right-click the desktop → Operator GUI "
-		+ "opens this client later.")
+
+
+## WO-1093 — This screen: what is kept in this client's ui.cfg (UI scale, the simulated server) and which screen is the
+## operator's (the picker + GET /api/system/operator-display, which used to sit in Settings → System).
+static func this_screen(f: Form) -> void:
 	f.heading("This screen")  # WO-599 T4: kept in this screen's ui.cfg, not shared with other clients
 	f.local_option("UI scale", Placement.SCALES, Placement.saved_scale(), Placement.apply_scale)
 	f.note("Auto draws 1× at 1080p and 2× at 4K. Kept on this screen only.")
@@ -78,13 +61,32 @@ static func defaults(f: Form, fps: Callable) -> void:
 	f._row("Operator screen", choose)
 	var said := f.note("Shows a button on every screen; the one you press becomes the operator screen (same as "
 		+ "cabling the operator GUI in the Devices tab). Esc cancels.")
+	var now := f.note("")
+	var load_now := func() -> void:
+		var od: Dictionary = await Api.get_json("/api/system/operator-display")
+		now.text = SystemModel.operator_line(od.data if od.ok else null)
 	choose.pressed.connect(func() -> void:
 		choose.disabled = true
 		picker.open())
 	picker.finished.connect(func(r: Dictionary) -> void:
 		choose.disabled = false
-		said.text = ("Operator screen: %s." % r.name) if r.ok else ("Nothing changed — %s." % r.get("error", "")))
+		said.text = ("Operator screen: %s." % r.name) if r.ok else ("Nothing changed — %s." % r.get("error", ""))
+		load_now.call())
+	f.visibility_changed.connect(func() -> void:
+		if f.is_visible_in_tree():
+			load_now.call())
+	f.heading("Simulated server")
 	demo_switch(f)
+
+
+## WO-645 start-up (moved from Defaults to System, WO-1093): box-global, read at boot.
+static func startup(f: Form) -> void:
+	f.heading("Start-up")
+	f.option("When the box starts", "startup.mode", [["ask", "Ask on every screen — Start operator here / Run headless"],
+		["gui", "Start CasparCG and the operator GUI"], ["headless", "Start CasparCG headless (web UI only)"]], "ask")
+	f.note("Ask: the desktop comes up with a small window on every screen and CasparCG waits for the choice. The other "
+		+ "two start everything by themselves. Takes effect at the next boot. Right-click the desktop → Operator GUI "
+		+ "opens this client later.")
 
 
 ## WO-815 — "Simulated server" (ui.cfg [demo] enabled): the client answers itself, without a node or CasparCG (show
@@ -134,6 +136,7 @@ static func companion(f: Form, status: Label, check: Button) -> void:
 	f.add_child(row)
 	f.text("Companion host", "companion.host", "127.0.0.1")
 	f.number("Companion port (HTTP press)", "companion.port", 1, 65535, 8000)
+	f.target = K.fold(f, "Button previews (Satellite)")
 	f.check("Satellite preview (button images)", "companion.satelliteEnabled", true)
 	f.text("Satellite host", "companion.satelliteHost", "same as Companion host")
 	f.number("Satellite port", "companion.satellitePort", 1, 65535, 16622)
@@ -141,6 +144,30 @@ static func companion(f: Form, status: Label, check: Button) -> void:
 	f.number("Page picker grid size", "companion.pickerGridSize", 1, 16, 8)
 	f.note("Timeline companion_press flags use HTTP for triggers. Button previews use Companion Satellite ADD-SUB — in "
 		+ "Companion enable both the Satellite server (port 16622) and the Button Subscriptions API.")
+	f.target = K.fold(f, "Previews for the web client and Companion")
+	compose_preview(f)
+	f.target = f
+
+
+## The compose preview (WO-1093: moved from Defaults): what the browser remote client and the Companion thumbnails show —
+## this client draws its own previews. Rows go to `f.target`.
+static func compose_preview(f: Form) -> void:
+	var host := f.target
+	var mode := f.option("Preview source", "composePreview.mode", [["canvas", "Canvas thumbnails"],
+		["ffmpeg_jpeg", "Caspar JPEG — ffmpeg writes file"], ["stream", "Live stream (hardware encoded)"]], "canvas")
+	f.note("What the browser remote client and Companion previews use; this client shows its own previews.")
+	var g := f.group()
+	f.target = g
+	f.note("JPEG mode embeds a low-cost ffmpeg consumer in Caspar config. Apply Caspar config after changing FPS or resolution.")
+	f.number("Update rate (fps)", "composePreview.fps", 1, 30, 25)
+	f.option("Resolution (relative to channel)", "composePreview.resolutionScale",
+		[["half", "Half width × height (default)"], ["75", "75%"], ["full", "Full channel size"]], "half")
+	f.number("JPEG quality (lower = better)", "composePreview.jpegQuality", 2, 20, 10)
+	f.check("Companion preview variables (Stream Deck button images)", "composePreview.companionThumbEnabled", false)
+	f.target = host
+	var sync := func() -> void: g.visible = str(Settings.get_setting("composePreview.mode", "")) == "ffmpeg_jpeg"
+	mode.item_selected.connect(func(_i: int) -> void: sync.call())
+	f.on_hydrate(sync)
 
 
 static func media(f: Form) -> void:
