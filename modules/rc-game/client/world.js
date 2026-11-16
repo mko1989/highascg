@@ -100,6 +100,7 @@ export function createWorld(canvas, { phone = false, quality = 'high' } = {}) {
 					world.model = gltf.scene
 					freeze(world.model)
 					statics.add(world.model)
+					sharpTextures(world.model, renderer)
 					cheapMaterials(world.model, world.quality === 'low')
 					applyCut(world.model)
 					return { ok: true }
@@ -137,6 +138,21 @@ function freeze(root) {
 }
 
 /** Lambert instead of PBR on "low" (much cheaper per pixel on phones); keeps colour / texture / vertex colours / opacity. */
+/** WO-1090: the room's tiled pictures (Hilton's wood panelling, carpet) seen at a grazing angle shimmer with plain
+ * mipmapping — anisotropic filtering keeps them as the previs shows them. */
+function sharpTextures(root, renderer) {
+	const max = Math.min(8, renderer.capabilities?.getMaxAnisotropy?.() || 1)
+	if (max <= 1) return
+	root.traverse((o) => {
+		for (const t of o.isMesh && o.material ? [o.material.map, o.material.emissiveMap] : []) {
+			if (t && t.anisotropy !== max) {
+				t.anisotropy = max
+				t.needsUpdate = true
+			}
+		}
+	})
+}
+
 function cheapMaterials(root, low) {
 	root.traverse((o) => {
 		if (!o.isMesh) return
