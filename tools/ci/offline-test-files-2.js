@@ -104,5 +104,6 @@ module.exports = [
 	'tools/smoke/smoke-wo1096-lower-thirds-no-gsap.test.js', // WO-1096 D: GSAP removed; lt-tween.js eases/timeline maths, legacy studio-export upgrade
 	'tools/smoke/smoke-wo1097-desk-feed.test.js', // WO-1097 desk feed: final fronts' pan/tilt/dimmer to the LD's desk (mirror byte-for-byte, hold, refusals, CSV)
 	'tools/smoke/smoke-wo1103-puppet-humans.test.js', // WO-1103 human test puppets: body / walk / own:<slug> API, MIT asset manifest + notices + recipe, never-distributed excludes, Godot wiring
+	'tools/smoke/smoke-wo1103-dna-convert.test.js', // WO-1103 MetaHuman DNA → GLB converter against a synthetic stand-in dna module (own data)
 	'tools/smoke/smoke-wo1104-drape.test.js', // WO-1104 drape stage object: geometry twin numbers, save path, MVR export + re-import, games' bake + obstacle
 ]

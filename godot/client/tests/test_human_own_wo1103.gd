@@ -205,3 +205,33 @@ func test_fbx_textures_by_name_survive_the_look_pass() -> void:
 	t.ok(hair.albedo_texture != null and hair.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 		and hair.alpha_antialiasing_mode == BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE, "hair: textured, alpha-cut cards with A2C")
 	root.free()
+
+
+## A MetaHuman DNA folder: listed, picking it starts the conversion (or says the DNA library is missing), a dead job
+## reads as failed, and once <name>.converted.glb is there the body loads without a restart.
+func test_dna_folder_converts_then_loads() -> void:
+	const Dna := preload("res://features/previs/tracking/human_own_dna.gd")
+	var dir := OS.get_user_data_dir().path_join("wo1103_dna")
+	var folder := dir.path_join("ada")
+	DirAccess.make_dir_recursive_absolute(folder.path_join("Head"))
+	FileAccess.open(folder.path_join("Head/head.dna"), FileAccess.WRITE).store_string("not a real DNA")
+	t.eq(Dna.files(folder), [folder.path_join("Head/head.dna")], "DNA found in sub-folders")
+	var ls := Own.list(dir)
+	t.eq(ls.size(), 1, "the DNA folder is listed")
+	t.eq(str(ls[0].file), "", "with no model yet")
+	t.ok(FileAccess.file_exists(Dna.converter()), "the converter is in the tree: %s" % Dna.converter())
+	if not DirAccess.dir_exists_absolute(Dna.lib()):
+		var tpl := Own.template("ada", func(n: String) -> Dictionary: return Body.template(n), dir)
+		t.ok(tpl.is_empty() and str(Own.report("ada").get("error", "")).contains("openriglogic_build.sh"), "no DNA library: says how to get it — %s" % Own.report("ada"))
+	FileAccess.open(folder.path_join("convert.json"), FileAccess.WRITE).store_string(JSON.stringify({"state": "running", "progress": 0.4, "step": "mesh head", "pid": 999999999}))
+	t.eq(str(Dna.job(folder).state), "failed", "a job whose process is gone reads as failed")
+	t.ok(Dna.status(folder).contains("failed"), Dna.status(folder))
+	FileAccess.open(folder.path_join("convert.json"), FileAccess.WRITE).store_string(JSON.stringify({"state": "running", "progress": 0.4, "step": "mesh head", "pid": OS.get_process_id()}))
+	t.eq(Dna.status(folder), "converting the MetaHuman DNA: 40 % (mesh head)", "progress for the Look row")
+	Own._reports["ada"] = {"slug": "ada", "dna_folder": folder}
+	t.ok(not Own.stale("ada"), "not converted yet")
+	_synthetic(folder.path_join("ada.converted.glb"))
+	Own._looked.erase("ada")
+	t.ok(Own.stale("ada"), "converted: load it again")
+	var tpl2 := Own.template("ada", func(n: String) -> Dictionary: return Body.template(n), dir)
+	t.ok(not tpl2.is_empty() and Own.report("ada").get("ok", false), "the converted GLB loads as the own puppet")

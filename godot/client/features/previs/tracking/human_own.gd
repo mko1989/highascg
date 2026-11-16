@@ -16,6 +16,7 @@ extends RefCounted
 const Map := preload("res://features/previs/tracking/human_rig_map.gd")
 const Retarget := preload("res://features/previs/tracking/human_retarget.gd")
 const Tex := preload("res://features/previs/tracking/human_own_tex.gd")
+const Dna := preload("res://features/previs/tracking/human_own_dna.gd")
 const EXT := ["glb", "gltf", "fbx"]
 const MAX_TEX := 2048
 const WARN_TRIS := 150000
@@ -25,6 +26,7 @@ const HIDE_RE := "eyeedge|eye_edge|eyeshell|eye_shell|occlusion|cartilage|tearli
 const SKIN_RE := "skin|head|face|body|torso|arm|leg"
 
 static var _reports := {}
+static var _looked := {}  # slug → msec of the last stale() look
 
 
 ## The folder: always under $HOME (not $XDG_DATA_HOME: run-xr.sh moves that) — the ISO / sync excludes name exactly this folder.
@@ -49,8 +51,8 @@ static func list(root := "") -> Array:
 		return out
 	for sub in da.get_directories():
 		var f := _model_in(d.path_join(sub))
-		if f != "":
-			out.append({"slug": slug_of(sub), "name": _meta(d.path_join(sub)).get("name", sub), "file": f})
+		if f != "" or not Dna.files(d.path_join(sub)).is_empty():  # a MetaHuman DNA folder: converted when picked
+			out.append({"slug": slug_of(sub), "name": _meta(d.path_join(sub)).get("name", sub), "file": f, "folder": d.path_join(sub)})
 	for f in da.get_files():
 		if f.get_extension().to_lower() in EXT:
 			out.append({"slug": slug_of(f.get_basename()), "name": f.get_basename(), "file": d.path_join(f)})
@@ -79,7 +81,23 @@ static func _meta(folder: String) -> Dictionary:
 
 
 static func report(slug: String) -> Dictionary:
-	return _reports.get(slug, {})
+	var r: Dictionary = _reports.get(slug, {})
+	if r.has("dna_folder"):  # a conversion in progress: its live state
+		var s := Dna.status(str(r.dna_folder))
+		if s != "":
+			r.error = s
+		elif _model_in(str(r.dna_folder)) != "":
+			r.error = "converted — loading"
+	return r
+
+
+## A DNA conversion has finished since `slug` last failed to load (human_body.gd then loads it again).
+static func stale(slug: String) -> bool:
+	var r: Dictionary = _reports.get(slug, {})
+	if not r.has("dna_folder") or Time.get_ticks_msec() - int(_looked.get(slug, -10000)) < 1000:  # asked every frame
+		return false
+	_looked[slug] = Time.get_ticks_msec()
+	return _model_in(str(r.dna_folder)) != ""
 
 
 ## Load `slug` (from `root`, default dir()) and retarget `moves_of.call(name)` → {root, height, moves, toes, own,
@@ -94,6 +112,11 @@ static func template(slug: String, moves_of: Callable, root := "") -> Dictionary
 			entry = e
 	if entry.is_empty():
 		rep.error = "no model for %s in %s" % [slug, root if root != "" else dir()]
+		return _fail(rep)
+	if str(entry.file) == "":  # MetaHuman DNA, not converted yet
+		rep.dna_folder = entry.folder
+		var why := Dna.start(str(entry.folder))
+		rep.error = why if why != "" else "converting the MetaHuman DNA (started)"
 		return _fail(rep)
 	rep.file = entry.file
 	var fbx := str(entry.file).get_extension().to_lower() == "fbx"
@@ -134,10 +157,9 @@ static func template(slug: String, moves_of: Callable, root := "") -> Dictionary
 			n.get_parent().remove_child(n)
 			n.free()
 	var own := _place(scene, sk, m.bones)
-	if fbx:
-		var found := Tex.fill(own.root, str(entry.file).get_base_dir())
-		if found > 0:
-			rep.warnings.append("FBX: %d texture(s) matched by file name (a GLB carries its own — preferred)" % found)
+	var found := Tex.fill(own.root, str(entry.file).get_base_dir())  # FBX / DNA-converted: textures by file name
+	if found > 0:
+		rep.warnings.append("%d texture(s) matched by file name" % found)
 	var meta := _meta(str(entry.file).get_base_dir())
 	var moves_name := str(meta.get("moves", "woman" if float(own.height) < 1.75 else "man"))
 	var src: Dictionary = moves_of.call(moves_name)

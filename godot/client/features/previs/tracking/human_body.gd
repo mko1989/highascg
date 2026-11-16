@@ -49,7 +49,7 @@ static func _path(body: String) -> String:
 ## The body as loaded: {root (Node3D: the skeleton "Skeleton3D" under it), height (m, soles to the top of the head),
 ## moves (AnimationLibrary)}.
 static func template(body: String) -> Dictionary:
-	if _templates.has(body):
+	if _templates.has(body) and not (body.begins_with("own:") and (_templates[body] as Dictionary).is_empty() and Own.stale(body.substr(4))):
 		return _templates[body]
 	if body.begins_with("own:"):
 		_templates[body] = {}  # a failed import is not retried every frame
