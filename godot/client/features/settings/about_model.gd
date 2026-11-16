@@ -13,8 +13,10 @@ static func rows(a: Dictionary, error := "") -> Array:
 		["note", "License: %s. %s" % [a.get("license", ""), a.get("warranty", "")]],
 		["note", "Source code: %s" % a.get("source", "")],
 		["note", "Full licence texts and third-party notices: %s." % a.get("notices", "")],
-		["heading", "Credits"],
 	]
+	if str(a.get("detection", "")) != "":  # WO-1094: this machine's person-detection runtime, next to the notices
+		out.append(["note", str(a.detection)])
+	out.append(["heading", "Credits"])
 	for c in a.get("credits", []):
 		if c is Dictionary:
 			out.append(["note", "%s — %s\n%s · %s · %s" % [c.get("name", ""), c.get("what", ""),

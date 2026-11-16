@@ -7,10 +7,14 @@ extends VBoxContainer
 ## detected person.
 ## T9c: the camera's ROI masks below the fields (mask_section.gd; drawn by clicking in the camera view).
 ## T10d: the verification walk below the masks (walk_section.gd).
+## WO-1094: the runtime block on top (runtime_section.gd) — is detection installed on THIS machine, Install / Repair /
+## … as a background job; the master offers the install instead of starting into an error when it is not.
 
 const D := preload("res://features/previs/tracking/detect_model.gd")
 const MaskSection := preload("res://features/previs/tracking/mask_section.gd")
 const WalkSection := preload("res://features/previs/tracking/walk_section.gd")
+const RuntimeSection := preload("res://features/previs/tracking/runtime_section.gd")
+const RuntimeModel := preload("res://features/previs/tracking/runtime_model.gd")
 
 signal edit(detection: Dictionary)  # new detection slice → persist
 
@@ -33,15 +37,21 @@ var _confirm_on: ConfirmationDialog
 var _pick_note := ""  # WO-624 E2: the last person pick's outcome, under the live status
 var masks := MaskSection.new()  # created here so tracking_page can connect it before _ready
 var walk := WalkSection.new()  # T10d verification walk (tracking_page connects accepted / view_changed)
+var runtime := RuntimeSection.new()  # WO-1094
 
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 6)
+	runtime.changed.connect(func(_st: Dictionary) -> void: _load_models())
+	add_child(runtime)
+	add_child(HSeparator.new())
 	_master = CheckButton.new()
 	_master.text = "Person detection"
 	_master.toggled.connect(func(on: bool) -> void:
 		_master.set_pressed_no_signal(data.enabled)
-		if on:
+		if on and not runtime.st.is_empty() and not RuntimeModel.usable(runtime.st):
+			runtime.offer_install()  # WO-1094: not installed here — offer the install, not an error string
+		elif on:
 			_confirm_on.popup_centered()
 		else:
 			_set_key("enabled", false))
@@ -118,7 +128,7 @@ func refresh() -> void:
 	masks.visible = not cam_id.is_empty()
 	masks.set_masks(D.masks_of(data, cam_id))
 	_model.clear()
-	var models := _models.duplicate()
+	var models := _models.filter(func(m: String) -> bool: return not D.is_aux_model(m))
 	if not models.has(data.model):
 		models.append(data.model)
 	for m in models:

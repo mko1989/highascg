@@ -75,6 +75,7 @@ func _ready() -> void:
 	row.add_child(_button("Add", _add_cam))
 	row.add_child(_button("Delete", func() -> void: _confirm.popup_centered()))
 	add_child(row)
+	mode = str(Config.args.get("tracking-mode", mode))  # dev: --tracking-mode=detect (with --tab=Previs) — box checks, no pointer
 	var modes := HBoxContainer.new()
 	var group := ButtonGroup.new()
 	for m in ["calibrate", "markers", "follow", "zones", "detect", "presenters"]:

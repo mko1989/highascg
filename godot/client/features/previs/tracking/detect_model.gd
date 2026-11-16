@@ -156,3 +156,9 @@ static func person_at(snap: Dictionary, cam_id: String, raster: Vector2, px: Vec
 				best_d = r.get_center().distance_squared_to(px)
 				best = "w:%d" % int(p.world) if p.get("world") != null else "%s:%d" % [cam_id, int(p.get("tid", 0))]
 	return best
+
+
+## WO-1094: a models-dir file that is not a person detector — the face / re-ID models (presenters) and the pose models
+## (the Body pose list) — kept out of the detection Model list.
+static func is_aux_model(m: String) -> bool:
+	return m.begins_with("face_") or m.begins_with("person_reid") or m.contains("-pose")
