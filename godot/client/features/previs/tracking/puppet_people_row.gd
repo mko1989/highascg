@@ -12,6 +12,7 @@ extends VBoxContainer
 const PM := preload("res://features/previs/tracking/puppet_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Own := preload("res://features/previs/tracking/human_own.gd")
+const HelpDialog := preload("res://app/help_dialog.gd")
 const PATH := "/api/tracking/puppet/people"
 const LOOKS := ["Cartoon", "Woman", "Man", "Mixed"]  # WO-1103 → body cartoon / woman / man / mixed
 
@@ -61,6 +62,7 @@ func _ready() -> void:
 	_walk.tooltip_text = "Off: the test people stop where they are and stand (they still turn to look round)"
 	_walk.toggled.connect(func(v: bool) -> void: _post({"walk": v}))
 	row2.add_child(_walk)
+	row2.add_child(HelpDialog.button("own-test-puppet"))  # your own character / MetaHuman
 	add_child(row2)
 	_own_note = Label.new()
 	_own_note.autowrap_mode = TextServer.AUTOWRAP_WORD
