@@ -185,6 +185,7 @@ function startKeepingUp(ctx, opts = {}) {
 			follow: ctx.fixtureService?.engine?.takeTiming?.() || null,
 			tracking: det && det.enabled && det.running ? { intervalMs: det.intervalMs,
 				cameras: Object.entries(det.sidecar || {}).map(([id, c]) => ({ id, state: c?.state, fps: Number(c?.fps), ms: Number(c?.ms) })) } : null,
+			ltc: ctx._ltcService?.health?.() || null, // WO-1092
 			ws: wsSample(), host: offline ? null : hostSample(), reported: [...reported.values()].map((v) => v.result),
 		}
 	}

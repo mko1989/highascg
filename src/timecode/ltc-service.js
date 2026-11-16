@@ -10,7 +10,8 @@ const { probeLibltc, setLibPath, APT_HINT } = require('./ltc-helper')
 const { createLtcInput } = require('./ltc-input')
 const { createLtcOutput } = require('./ltc-output')
 const { decideChase, chaseOps } = require('./ltc-lock')
-const { fpsMode, tcToFrames, parseTc } = require('./timecode-math')
+const { fpsMode, tcToFrames, parseTc, ltcModeForRate } = require('./timecode-math')
+const { currentTarget } = require('./ltc-share-io')
 
 const CHASE_TICK_MS = 40
 const STATUS_BROADCAST_MS = 200
@@ -24,6 +25,19 @@ function ltcOutPlayhead(eng) {
 	if (!id || eng.get(id)?.ltcOut !== true) return null
 	const pb = eng.getPlayback(id)
 	return pb ? { playing: !!pb.playing, position: pb.position ?? 0 } : null
+}
+
+/**
+ * WO-1092 — the LTC rate LTC out sends: forced (`output.fps`), or the on-air LTC timeline's rate (50 → 25, 59.94 → 29.97
+ * DF, 60 → 30), else the shared LTC rate (`ltc.fps`).
+ */
+function ltcOutMode(cfg, eng) {
+	const forced = cfg.output?.fps
+	if (forced && forced !== 'timeline') return fpsMode(forced).key
+	const id = eng?._airTimelineId
+	const tl = id ? eng.get(id) : null
+	if (tl && tl.ltcOut === true && Number(tl.fps) > 0) return ltcModeForRate(tl.fps)
+	return fpsMode(cfg.fps).key
 }
 
 /**
@@ -173,6 +187,21 @@ function createLtcService({ appCtx, log = () => {} }) {
 		}
 	}
 
+	function startOutput() {
+		const fps = ltcOutMode(cfg, engine())
+		const target = cfg.output.sink === 'alsa' ? () => currentTarget(cfg.output, appCtx.config || {}) : undefined
+		output = createLtcOutput({ cfg: cfg.output, fps, log, getPlayhead: airPlayhead, target })
+		output.start()
+		log('info', `[LTC out] ${cfg.output.source} → ${output.status().where} @ ${fps}`)
+	}
+
+	/** WO-1092: keeping-up input (src/health): null while LTC out is off. */
+	function health() {
+		if (!cfg.output.enabled) return null
+		if (!output) return { state: lib && !lib.ok ? 'error' : 'off', error: lib && !lib.ok ? `libltc missing — ${APT_HINT}` : outputProblem(cfg) || null }
+		return output.status()
+	}
+
 	function start() {
 		cfg = normalizeLtcConfig(appCtx.config?.ltc)
 		setLibPath(cfg.libPath)
@@ -194,11 +223,15 @@ function createLtcService({ appCtx, log = () => {} }) {
 			if (cfg.input.chase.enabled) timers.push(setInterval(chaseTick, CHASE_TICK_MS))
 		}
 		if (cfg.output.enabled && !outputProblem(cfg)) {
-			output = createLtcOutput({ cfg: cfg.output, fps, log, getPlayhead: airPlayhead })
-			output.start()
-			onPlayback = () => output?.sync()
+			startOutput()
+			onPlayback = () => {
+				// follow the on-air timeline's rate: a different LTC rate needs a new encoder
+				if (output && cfg.output.fps === 'timeline' && ltcOutMode(cfg, engine()) !== output.mode.key) {
+					output.stop()
+					startOutput()
+				} else output?.sync()
+			}
 			engine()?.on?.('playback', onPlayback)
-			log('info', `[LTC out] ${cfg.output.source} → ${output.status().where} @ ${fps}`)
 		}
 		timers.push(
 			setInterval(() => {
@@ -229,7 +262,7 @@ function createLtcService({ appCtx, log = () => {} }) {
 		start()
 	}
 
-	return { start, stop, restart, status, onShutdown: stop }
+	return { start, stop, restart, status, health, onShutdown: stop }
 }
 
-module.exports = { createLtcService, ltcOutPlayhead }
+module.exports = { createLtcService, ltcOutPlayhead, ltcOutMode }

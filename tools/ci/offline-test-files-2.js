@@ -88,6 +88,7 @@ module.exports = [
 	'tools/smoke/smoke-wo974-ltc-roundtrip.test.js', // skips without libltc11
 	'tools/smoke/smoke-wo1058-ltc-alsa-pacing.test.js', // skips without libltc11
 	'tools/smoke/smoke-wo1060-ltc-per-timeline.test.js',
+	'tools/smoke/smoke-wo1092-ltc-out.test.js', // WO-1092 LTC out settings, channel share, keeping-up (libltc parts skip)
 	'tools/smoke/smoke-wo974-timeline-still-seek.test.js', // Caspar never answers CALL SEEK on an image
 	'tools/smoke/smoke-wo975-nvidia-sync-auto.test.js',
 	'tools/smoke/smoke-wo1084-next-show-setup.test.js', // WO-1084 screens not plugged in are not started

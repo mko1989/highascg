@@ -9,9 +9,11 @@
  */
 
 const FPS_MODES = Object.freeze({
+	'23.976': Object.freeze({ key: '23.976', fps: 24000 / 1001, nominal: 24, df: false }), // WO-1092
 	24: Object.freeze({ key: '24', fps: 24, nominal: 24, df: false }),
 	25: Object.freeze({ key: '25', fps: 25, nominal: 25, df: false }),
 	'29.97df': Object.freeze({ key: '29.97df', fps: 30000 / 1001, nominal: 30, df: true }),
+	'29.97ndf': Object.freeze({ key: '29.97ndf', fps: 30000 / 1001, nominal: 30, df: false }), // WO-1092: labels never skip
 	30: Object.freeze({ key: '30', fps: 30, nominal: 30, df: false }),
 })
 
@@ -21,17 +23,38 @@ const DF_FRAMES_PER_MIN = 30 * 60 - DF_DROP // 1798
 const DF_FRAMES_PER_10MIN = 10 * 30 * 60 - 9 * DF_DROP // 17982
 
 /**
- * @param {unknown} v 24 | 25 | 29.97 | '29.97df' | 30 (numbers or strings); anything else → 25
+ * @param {unknown} v 23.976 | 24 | 25 | 29.97 (= drop-frame) | '29.97df' | '29.97ndf' | 30 (numbers or strings); anything
+ *   else → 25
  * @returns {{ key: string, fps: number, nominal: number, df: boolean }}
  */
 function fpsMode(v) {
 	const s = String(v ?? '')
 		.trim()
 		.toLowerCase()
-	if (s === '24' || s === '23.976' || s === '23.98') return FPS_MODES[24]
+	if (s === '23.976' || s === '23.98') return FPS_MODES['23.976']
+	if (s === '29.97ndf') return FPS_MODES['29.97ndf']
+	if (s === '24') return FPS_MODES[24]
 	if (s === '29.97' || s === '29.97df' || s === '30df') return FPS_MODES['29.97df']
 	if (s === '30') return FPS_MODES[30]
 	return FPS_MODES[25]
+}
+
+/**
+ * WO-1092 — the LTC rate for a timeline / channel rate. LTC carries at most 30 frames: 50 → 25, 59.94 → 29.97, 60 → 30
+ * (the frame pairs of a 50/60 p timeline share one LTC frame; no field bit is set). 29.97 is drop-frame unless `ndf`.
+ * @param {unknown} fps e.g. 25, 50, 29.97, 59.94, 23.976
+ * @returns {string} an FPS_MODES key
+ */
+function ltcModeForRate(fps, ndf = false) {
+	let f = Number(fps)
+	if (!Number.isFinite(f) || f <= 0) return '25'
+	while (f > 30.5) f /= 2
+	const near = (x) => Math.abs(f - x) < 0.01
+	if (near(24000 / 1001)) return '23.976'
+	if (near(24)) return '24'
+	if (near(30000 / 1001)) return ndf ? '29.97ndf' : '29.97df'
+	if (near(30)) return '30'
+	return '25'
 }
 
 /** Frames in 24 h at the mode's real rate (labels per day for NDF). */
@@ -138,7 +161,9 @@ function frameDelta(a, b, mode) {
 }
 
 module.exports = {
+	FPS_MODES,
 	fpsMode,
+	ltcModeForRate,
 	framesPerDay,
 	framesToTc,
 	tcToFrames,

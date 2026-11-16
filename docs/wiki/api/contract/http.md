@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-607 routes.
+608 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -243,6 +243,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/lower-thirds/update` | handler | `src/api/routes-lower-thirds.js` |
 | GET | `/api/ltc` | registry | `src/timecode/routes-ltc.js` |
 | POST | `/api/ltc/config` | registry | `src/timecode/routes-ltc.js` |
+| GET | `/api/ltc/devices` | registry | `src/timecode/routes-ltc.js` |
 | GET | `/api/media` | registry | `src/api/router.js` |
 | GET | `/api/media-docs` | registry | `src/api/routes-project-files.js` |
 | DELETE | `/api/media-docs/file` | registry | `src/api/routes-project-files.js` |

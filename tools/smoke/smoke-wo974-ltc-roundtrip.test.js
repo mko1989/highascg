@@ -57,7 +57,7 @@ describe('WO-974: generator → FIFO → reader follows the playhead', { skip },
 		const cfg = normalizeLtcConfig({
 			fps: 25,
 			input: { enabled: true, source: 'fifo', path: fifo },
-			output: { enabled: true, source: 'timeline', sink: 'fifo', path: fifo, offset: '01:00:00:00', leadMs: 0 },
+			output: { enabled: true, source: 'timeline', sink: 'fifo', path: fifo, offset: '01:00:00:00', latencyMs: 0 },
 		})
 		let p0 = 5000
 		let t0 = Date.now()

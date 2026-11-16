@@ -14,6 +14,7 @@
  *   server loop        p99 ≥ 100 ms or a stall ≥ 500 ms → 1;  mean ≥ 50 ms → 2
  *   DMX follow         a tick gap ≥ 4 ticks or a tick longer than its 23 ms budget → 1;  mean tick ≥ budget → 2
  *   tracking camera    detection fps < 0.8 T while each step takes ≥ 0.8 interval → 1;  < 0.5 T → 2
+ *   LTC out            device missing / busy / error, under-runs or repeated drift re-aligns → 1 (keeping-up-ltc.js)
  *   client WS backlog  ≥ 1 MiB queued → 1;  ≥ 6 MiB → 2 (the server drops a client at 8 MiB)
  *   box                CPU ≥ 90 % → 1, ≥ 98 % → 2;  RAM ≥ 90 / 96 %;  VRAM ≥ 90 / 97 %;  GPU ≥ 95 % → 1;
  *                      GPU or CPU thermal throttling → 1
@@ -22,6 +23,7 @@
  */
 
 const { OK, BEHIND, FAILING } = require('./keeping-up-model')
+const { ltcChecks } = require('./keeping-up-ltc')
 
 const MiB = 1024 * 1024
 const r1 = (n) => Math.round(n * 10) / 10
@@ -205,7 +207,7 @@ function reportedChecks(s) {
 
 function evaluate(s) {
 	if (s.offline) return []
-	return [...casparChecks(s), ...outputChecks(s), ...sourceChecks(s), ...serverChecks(s), ...boxChecks(s), ...reportedChecks(s)]
+	return [...casparChecks(s), ...outputChecks(s), ...sourceChecks(s), ...serverChecks(s), ...ltcChecks(s), ...boxChecks(s), ...reportedChecks(s)]
 }
 
 module.exports = { evaluate }

@@ -5,10 +5,13 @@
  *   GET  /api/ltc         status: libltc probe, normalized config, reader (tc, lock state), generator, chase
  *   POST /api/ltc/config  { ltc: {...} } or the ltc object itself — deep-merged over the stored section, persisted
  *                         (general.json) and the service restarted. Answers the new status.
+ *   GET  /api/ltc/devices WO-1092: LTC out device picker — the program output (shared, own channels) + every playback
+ *                         device with its name, channel count, busy flag and the outputs using it
  */
 
 const { JSON_HEADERS, jsonBody, parseBodyStrict } = require('../api/response')
 const { normalizeLtcConfig } = require('./ltc-config')
+const { listLtcDevices } = require('./ltc-share-io')
 
 function merge(base, patch) {
 	if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return base
@@ -44,6 +47,7 @@ function handleConfigPost(body, ctx) {
 /** @param {import('../api/route-registry').RouteRegistry} routes */
 function register(routes) {
 	routes.get('/api/ltc', ({ ctx }) => ok(getStatus(ctx)), { requireCaspar: false })
+	routes.get('/api/ltc/devices', ({ ctx }) => ok(listLtcDevices({ ...(ctx.config || {}), ltc: normalizeLtcConfig(ctx.config?.ltc) })), { requireCaspar: false })
 	routes.post('/api/ltc/config', ({ body, ctx }) => handleConfigPost(body, ctx), { requireCaspar: false })
 }
 

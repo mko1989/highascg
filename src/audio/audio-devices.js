@@ -207,18 +207,22 @@ const ASOUNDRC_END = '# <<< HighAsCG default device <<<'
  * verbatim (the box's hand-authored `pcm.sc60mon` 48 kHz plug, WO-406, lived in this file and was destroyed by a
  * whole-file overwrite). A missing block is appended; an existing one is replaced in place.
  * @param {string} existing
- * @param {string} content  the `defaults.*` lines
+ * @param {string} content  the `defaults.*` lines ('' with `drop`: remove the block)
+ * @param {{ begin?: string, end?: string, drop?: boolean }} [markers] another owner's block (WO-1092: the LTC channel share)
  * @returns {string}
  */
-function mergeAsoundrcBlock(existing, content) {
-	const block = `${ASOUNDRC_BEGIN}\n${content.endsWith('\n') ? content : content + '\n'}${ASOUNDRC_END}\n`
+function mergeAsoundrcBlock(existing, content, markers = {}) {
+	const BEGIN = markers.begin || ASOUNDRC_BEGIN
+	const END = markers.end || ASOUNDRC_END
+	const block = markers.drop ? '' : `${BEGIN}\n${content.endsWith('\n') ? content : content + '\n'}${END}\n`
 	const text = String(existing || '')
-	const b = text.indexOf(ASOUNDRC_BEGIN)
-	const e = b === -1 ? -1 : text.indexOf(ASOUNDRC_END, b)
+	const b = text.indexOf(BEGIN)
+	const e = b === -1 ? -1 : text.indexOf(END, b)
 	if (b !== -1 && e !== -1) {
-		const after = text.slice(e + ASOUNDRC_END.length).replace(/^\r?\n/, '')
+		const after = text.slice(e + END.length).replace(/^\r?\n/, '')
 		return text.slice(0, b) + block + after
 	}
+	if (markers.drop) return text
 	const sep = text === '' || text.endsWith('\n\n') ? '' : text.endsWith('\n') ? '\n' : '\n\n'
 	return text + sep + block
 }

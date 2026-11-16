@@ -5,7 +5,7 @@
  * audio device until the operator enables a direction and picks its device.
  */
 
-const { fpsMode, parseTc } = require('./timecode-math')
+const { fpsMode, parseTc, FPS_MODES } = require('./timecode-math')
 
 const LTC_DEFAULTS = Object.freeze({
 	fps: '25',
@@ -35,17 +35,22 @@ const LTC_DEFAULTS = Object.freeze({
 			prerollMs: 800,
 		}),
 	}),
+	/** WO-1092: see the settings table in work/work-orders/1092_WO_ltc_out_settings_and_channel_pair.md. */
 	output: Object.freeze({
 		enabled: false,
-		source: 'timeline', // 'timeline' | 'clock'
+		source: 'timeline', // 'timeline' | 'clock' (time of day) | 'test' (free-running from `offset`)
 		sink: 'alsa', // 'alsa' | 'fifo'
-		device: '',
-		channels: 2,
-		channel: 1,
+		device: '', // ALSA PCM (plughw:CARD=<id>,DEV=<n>) or 'program' = the program audio output (shared, own channels)
+		channels: 2, // channels on the device (filled from the device probe; the fallback when a busy card cannot be asked)
+		channel: 1, // LTC on this channel …
+		pair: false, // … and on the next one (the same signal on both)
 		path: '',
-		volumeDb: -18,
-		offset: '00:00:00:00', // LTC at timeline 0
-		leadMs: 60,
+		volumeDb: -18, // peak dBFS; −18 dBFS ≈ 0 dBu at EBU R68 alignment
+		offset: '00:00:00:00', // LTC at timeline 0 (source timeline) / where the test clock starts (source test)
+		fps: 'timeline', // 'timeline' = the on-air timeline's rate (50 → 25, 59.94 → 29.97 DF) or a forced LTC rate key
+		latencyMs: 0, // delay LTC by this much (negative = earlier) to meet picture at the receiver
+		whenPaused: 'silence', // 'silence' (a chasing reader parks) | 'hold' (repeat the paused frame)
+		userBits: '', // '' or 8 hex digits, user-bit group 1 first
 	}),
 })
 
@@ -69,6 +74,13 @@ function tcText(v, d) {
 
 function oneOf(v, list, d) {
 	return list.includes(v) ? v : d
+}
+
+const OUT_FPS = ['timeline', ...Object.keys(FPS_MODES)]
+
+function hex8(v, d) {
+	const t = typeof v === 'string' ? v.trim().toUpperCase() : ''
+	return t === '' || /^[0-9A-F]{8}$/.test(t) ? t : d
 }
 
 /**
@@ -108,18 +120,29 @@ function normalizeLtcConfig(raw, prev) {
 				prerollMs: int(c.prerollMs, 0, 2000, D.input.chase.prerollMs),
 			},
 		},
-		output: {
-			enabled: o.enabled === true,
-			source: oneOf(o.source, ['timeline', 'clock'], D.output.source),
-			sink: oneOf(o.sink, ['alsa', 'fifo'], D.output.sink),
-			device: str(o.device),
-			channels: outChannels,
-			channel: int(o.channel, 1, outChannels, 1),
-			path: str(o.path),
-			volumeDb: num(o.volumeDb, -60, 0, D.output.volumeDb),
-			offset: tcText(o.offset, prev?.output?.offset || D.output.offset),
-			leadMs: int(o.leadMs, 0, 1000, D.output.leadMs),
-		},
+		output: outputSection(o, outChannels, prev),
+	}
+}
+
+function outputSection(o, outChannels, prev) {
+	const D = LTC_DEFAULTS.output
+	const pair = o.pair === true && outChannels >= 2
+	const channel = int(o.channel, 1, pair ? outChannels - 1 : outChannels, 1)
+	return {
+		enabled: o.enabled === true,
+		source: oneOf(o.source, ['timeline', 'clock', 'test'], D.source),
+		sink: oneOf(o.sink, ['alsa', 'fifo'], D.sink),
+		device: str(o.device),
+		channels: outChannels,
+		channel,
+		pair,
+		path: str(o.path),
+		volumeDb: num(o.volumeDb, -60, 0, D.volumeDb),
+		offset: tcText(o.offset, prev?.output?.offset || D.offset),
+		fps: oneOf(String(o.fps ?? ''), OUT_FPS, D.fps),
+		latencyMs: int(o.latencyMs, -500, 1000, D.latencyMs),
+		whenPaused: oneOf(o.whenPaused, ['silence', 'hold'], D.whenPaused),
+		userBits: hex8(o.userBits, prev?.output?.userBits ?? D.userBits),
 	}
 }
 

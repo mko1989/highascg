@@ -126,7 +126,7 @@ describe('WO-974: LTC out judges an encoder report at its own time', () => {
 	const { targetFramesAt } = require('../../src/timecode/ltc-output')
 	const { fpsMode } = require('../../src/timecode/timecode-math')
 	const m30 = fpsMode('30')
-	const cfg = { source: 'timeline', leadMs: 60 }
+	const cfg = { source: 'timeline', latencyMs: -60 } // WO-1092: latencyMs (− = LTC earlier) replaced the old leadMs
 	it('a report read 90 ms late (event-loop stall) is not a 2-frame error (box 06.11: one repeated frame)', () => {
 		const pb = { playing: true, position: 70000 }
 		const now = 1e12
@@ -177,7 +177,8 @@ describe('WO-974: settings POST persists ltc', () => {
 		assert.equal(saved[0].ltc.fps, '30')
 		assert.equal(saved[0].ltc.output.enabled, true)
 		assert.equal(saved[0].ltc.output.device, 'plughw:3,0')
-		assert.equal(saved[0].ltc.output.leadMs, 60, 'untouched fields keep defaults')
+		assert.equal(saved[0].ltc.output.volumeDb, -18, 'untouched fields keep defaults')
+		assert.equal(saved[0].ltc.output.fps, 'timeline', 'untouched fields keep defaults (WO-1092)')
 		await handlePost('/api/settings', JSON.stringify({ usbIngest: { enabled: true } }), ctx)
 		assert.equal(saved[1].ltc.output.device, 'plughw:3,0', 'an unrelated save keeps it')
 	})

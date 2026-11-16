@@ -4,6 +4,8 @@ const { channelCountFromLayout, normalizeProgramLayout, maxProgramLayout } = req
 const { destinationsFromConfig, destinationAudioLayoutsByMain } = require('./screen-destinations')
 const { resolveMonitorBus } = require('./monitor-bus')
 const { portAudioOutputId, normalizeHostApi } = require('./portaudio-output')
+const { programDeviceName } = require('../timecode/ltc-share')
+const { readCards } = require('../timecode/ltc-share-io')
 
 /**
  * Device View destination `audioLayout` → `screen_N_audio_layout` for Caspar PGM bus width.
@@ -77,7 +79,8 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 			const chCount = channelCountFromLayout(layout)
 
 			const consumer = {
-				deviceName: out.deviceName,
+				// WO-1092: while LTC out shares this card (own channels), Caspar plays through the managed dshare PCM
+				deviceName: programDeviceName(appConfig, out, readCards()),
 				hostApi: normalizeHostApi(out.hostApi),
 				outputChannels: chCount,
 				audioLayout: layout,

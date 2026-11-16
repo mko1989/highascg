@@ -49,7 +49,9 @@ function probeLibltc(opts = {}) {
 
 /** @param {{ fps: number }} mode */
 function fpsArg(mode) {
-	return String(mode.df ? 29.97 : mode.fps)
+	if (Math.abs(mode.fps - 30000 / 1001) < 1e-3) return '29.97'
+	if (Math.abs(mode.fps - 24000 / 1001) < 1e-3) return '23.976'
+	return String(mode.fps)
 }
 
 /**
@@ -64,17 +66,25 @@ function spawnDecoder(mode, opts = {}) {
 
 /**
  * @param {{ fps: number, df: boolean }} mode
- * @param {{ channels?: number, channel?: number, volume?: number, start?: string, stopped?: boolean, report?: number, realtime?: boolean, sinkCmd?: string[] }} [opts]
- *   sinkCmd: argv the helper starts itself on a real 4 KiB pipe (aplay) — see WO-1058 in ltc_helper.py open_sink()
+ * @param {{ channels?: number, channel?: number|number[], volume?: number, start?: string, stopped?: boolean, report?: number,
+ *   realtime?: boolean, alsa?: string, latencyMs?: number, sinkCmd?: string[], sinkLatencyMs?: number, userBits?: string }} [opts]
+ *   alsa: play to that ALSA PCM in-process (WO-1092); sinkCmd: a player the helper starts on a real 4 KiB pipe (tests);
+ *   neither: PCM on stdout. channel: one 1-based channel or a list (the same LTC on each).
  */
 function spawnEncoder(mode, opts = {}) {
 	const args = ['-I', HELPER, 'encode', '--rate', String(LTC_SAMPLE_RATE), '--fps', fpsArg(mode)]
-	args.push('--channels', String(opts.channels || 1), '--channel', String(opts.channel || 1))
+	const ch = Array.isArray(opts.channel) ? opts.channel.join(',') : String(opts.channel || 1)
+	args.push('--channels', String(opts.channels || 1), '--channel', ch)
 	args.push('--volume', String(Number.isFinite(opts.volume) ? opts.volume : -18))
 	args.push('--start', opts.start || '00:00:00:00', '--report', String(opts.report ?? 5))
+	if (Math.abs(mode.fps - 30000 / 1001) < 1e-3) args.push('--df', mode.df ? '1' : '0')
+	if (opts.userBits) args.push('--userbits', opts.userBits)
 	if (opts.stopped) args.push('--stopped')
 	if (opts.realtime) args.push('--realtime')
-	if (Array.isArray(opts.sinkCmd) && opts.sinkCmd.length) args.push('--sink-cmd', JSON.stringify(opts.sinkCmd))
+	if (opts.alsa) args.push('--alsa', opts.alsa, '--latency-ms', String(opts.latencyMs ?? 60))
+	else if (Array.isArray(opts.sinkCmd) && opts.sinkCmd.length) {
+		args.push('--sink-cmd', JSON.stringify(opts.sinkCmd), '--sink-latency-ms', String(opts.sinkLatencyMs ?? 0))
+	}
 	return spawn(python(), args, { stdio: ['pipe', 'pipe', 'pipe'], env: childEnv() })
 }
 
