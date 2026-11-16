@@ -1,0 +1,46 @@
+{
+	"about": "WO-1096 — shaders taken OUT of the shipped library (repo, ISO, releases). Not shipped: no template here, no data/shaders config on the ISO. The box's own copies were moved to ~/.highascg/backup/wo1096-shaders/ (not in the ISO). src/shaderfx/shader-licence.js RETIRED_SHADER_IDS hides a leftover data/shaders/<id>.json on other boxes until it carries a valid attribution header (title — by author / source URL / License: line) — that header is the opt-in.",
+	"optIn": [
+		{
+			"id": "sh-blue-thunder",
+			"name": "Blue Thunder",
+			"reason": "origin unknown: no author, URL or licence in the code, and no match in the Shadertoy public-API dumps (Vipitis/shadertoys-dataset to 2021-12, GabeRundlett/shadertoy-api-shaders) or ShaderAmp",
+			"getIt": "owner's box copy ~/.highascg/backup/wo1096-shaders/sh-blue-thunder.json; if the owner wrote it (or generated it), add an own-work header (License: AGPL-3.0-or-later) and copy it back to data/shaders/"
+		},
+		{
+			"id": "sh-closer-to-god",
+			"name": "Closer to God",
+			"reason": "origin unknown (code starts \"Compiled Custom Parameters for Shadertoy\"; no author/URL/licence; no match in the dumps)",
+			"getIt": "~/.highascg/backup/wo1096-shaders/sh-closer-to-god.json — same opt-in as above"
+		},
+		{
+			"id": "sh-dot-globe",
+			"name": "Dot Globe",
+			"reason": "origin unknown (\"Audio-Reactive Dot Matrix Sphere\"; no author/URL/licence; no match in the dumps)",
+			"getIt": "~/.highascg/backup/wo1096-shaders/sh-dot-globe.json — same opt-in as above"
+		},
+		{
+			"id": "sh-shader-equalizor",
+			"name": "Shader Equalizor",
+			"reason": "origin unknown (\"Circular Audio Equalizer - Shadertoy\"; no author/URL/licence; no match in the dumps)",
+			"getIt": "~/.highascg/backup/wo1096-shaders/sh-shader-equalizor.json — same opt-in as above"
+		}
+	],
+	"removed": [
+		{
+			"id": "sh-mario",
+			"name": "mario",
+			"reason": "\"Super Mario Bros.\" by HLorenzi (https://www.shadertoy.com/view/Msj3zD) draws Nintendo's Mario characters and level art; the code licence (Shadertoy default CC BY-NC-SA 3.0) cannot license Nintendo's IP"
+		},
+		{
+			"id": "sh-balatro",
+			"name": "balatro",
+			"reason": "\"Original by localthunk (https://www.playbalatro.com)\": the background shader of the commercial game Balatro, published with no licence (all rights reserved)"
+		},
+		{
+			"id": "sh-audio-visualiser-v0-1-sadeghi",
+			"name": "Audio Visualiser v0.1 Sadeghi",
+			"reason": "the code says \"All rights reserved - Sadeghi-Alavi\""
+		}
+	]
+}

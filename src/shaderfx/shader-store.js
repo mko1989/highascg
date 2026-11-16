@@ -22,6 +22,7 @@ const { REPO_ROOT } = require('../repo-paths')
 const { atomicWriteFile } = require('../utils/atomic-file-write')
 const { buildShaderTemplateHtml } = require('./shader-template-export')
 const { normalizeFragcoordParts, fragcoordUsesAudio } = require('./fragcoord-config')
+const { isRetiredShader } = require('./shader-licence')
 
 const SHADERS_DATA_DIR = path.join(REPO_ROOT, 'data', 'shaders')
 const SHADERS_TEMPLATE_DIR = path.join(REPO_ROOT, 'template', 'shaders')
@@ -286,6 +287,7 @@ async function reconcileShaderStore() {
 		try {
 			const raw = JSON.parse(await fsp.readFile(dataPath(id), 'utf8'))
 			if (raw?.dialect === 'fragcoord') continue // WO-999: Caspar's player cannot run it — no template by design
+			if (isRetiredShader(id, raw)) continue // WO-1096: taken out of the shipped library — never re-export it
 			await atomicWriteFile(templatePath(id), buildShaderTemplateHtml(normalizeShaderConfig(raw)))
 			exported.push(id)
 		} catch {
@@ -303,6 +305,7 @@ async function reconcileShaderStore() {
 			if (!m) continue
 			// The exporter escapes `</` as `<\/` so shader source can never close the script tag.
 			const cfg = JSON.parse(m[1].replace(/<\\\//g, '</'))
+			if (isRetiredShader(id, cfg)) continue // WO-1096: a stale retired template must not seed a config
 			await atomicWriteFile(dataPath(id), JSON.stringify(normalizeShaderConfig(cfg), null, '\t') + '\n')
 			recovered.push(id)
 		} catch {
@@ -331,6 +334,7 @@ async function listShaders() {
 	for (const f of names.filter((n) => n.endsWith('.json')).sort()) {
 		try {
 			const raw = JSON.parse(await fsp.readFile(path.join(SHADERS_DATA_DIR, f), 'utf8'))
+			if (isRetiredShader(f.slice(0, -5), raw)) continue // WO-1096: no licence to ship it — hidden until attributed
 			const st = await fsp.stat(path.join(SHADERS_DATA_DIR, f))
 			out.push({
 				id: raw.id,

@@ -48,6 +48,13 @@ collect_stack_licenses() {
 	_lic_row cef "Chromium Embedded Framework + Chromium" "$cefv" "BSD-3-Clause AND see Chromium credits" browser third-party/cef-LICENSE.txt \
 		"Chromium third-party licences: third-party/chromium-142.0.7444-LICENSES.html." "https://github.com/chromiumembedded/cef"
 
+	# --- ShaderToyLite.js (template/shaders, BSD-3-Clause; vendor/ itself is not on the ISO) — WO-1096 B ---
+	if [[ -f "${REPO_ROOT}/vendor/shadertoy/LICENSE" ]]; then
+		cp -f "${REPO_ROOT}/vendor/shadertoy/LICENSE" "${TP}/shadertoylite-LICENSE.txt"
+		_lic_row shadertoylite ShaderToyLite.js 11bbc09a BSD-3-Clause ui-runtime third-party/shadertoylite-LICENSE.txt \
+			"Patched copy: template/shaders/ShaderToyLite.js. Shaders: template/shaders/LICENSES/manifest.json (NOT AGPL)." "https://github.com/chipweinberger/ShaderToyLite.js"
+	fi
+
 	# --- Godot (operator client export + editor) ---
 	local gv="4.7.2"
 	f="$(unzip -Z1 "${home}/.local/opt/godot/dl/godot.zip" 2>/dev/null | head -1 || true)"

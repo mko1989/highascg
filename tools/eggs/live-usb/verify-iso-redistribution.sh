@@ -27,6 +27,7 @@ REDIST_NEEDLES=(
 	'^(opt/magicq|home/casparcg/show|home/casparcg/highascg/godot/export/(windows|web-demo)|home/casparcg/\.highascg/(backup|retro/games))(/|$)|dev-box tools and data (WO-870 30.10: MagicQ, shows, Godot exports for other OSes, switch backups, game ROMs)'
 	'^home/[^/]+/highascg/template/mario(/|$)|Nintendo-derived template (WO-1096 A)'
 	'^home/[^/]+/highascg/node_modules/wetransfert(/|$)|unlicensed npm package wetransfert (WO-1096 C)'
+	'^home/[^/]+/highascg/template/shaders/sh-(mario|balatro|audio-visualiser-v0-1-sadeghi|blue-thunder|closer-to-god|dot-globe|shader-equalizor)\.html$|retired shaders: Nintendo IP / no licence / all rights reserved / unknown origin (WO-1096 B)'
 )
 
 # WO-1096 F — what MUST ship: licence texts + the source offer. <if-ERE (empty = always)>|<required ERE>|<what>

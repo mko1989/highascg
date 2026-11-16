@@ -19,6 +19,8 @@
  *   - `fetchShadertoyShader()` is the thin network edge that needs the owner's key.
  */
 
+const { buildShaderHeader, licenceIdFromText, FORBIDDEN_RE, SHADERTOY_DEFAULT_LICENCE } = require('./shader-licence')
+
 const SHADERTOY_ID_RE = /^[A-Za-z0-9]{6,}$/
 
 /**
@@ -129,7 +131,12 @@ function shadertoyConfigFromApiJson(json) {
 		if (p && p.channels.includes('audio')) usesAudio = true
 	}
 
-	const name = String(info?.name || 'shadertoy import').trim().slice(0, 80)
+	const name = String(info?.name || 'shadertoy import')
+		.trim()
+		.slice(0, 80)
+	const header = shadertoyAttributionHeader(info, renderpass)
+	if (typeof header === 'string') passes.image = { ...passes.image, source: header + passes.image.source }
+	else skipped.push(`attribution header (${header ? header.refused : 'no author/id in the response'})`)
 	return {
 		name,
 		common,
@@ -140,6 +147,43 @@ function shadertoyConfigFromApiJson(json) {
 		skipped,
 		source: { site: 'shadertoy', id: String(info?.id || ''), username: String(info?.username || '') },
 	}
+}
+
+/**
+ * WO-1096 — the attribution header every imported shader starts with (shader-licence.js format): title, author, the
+ * Shadertoy URL and the licence — the one stated near the top of the code, else Shadertoy's default (CC BY-NC-SA 3.0,
+ * https://www.shadertoy.com/terms). `{ refused }` for "All rights reserved" or a licence line it cannot read, null when the
+ * response carries no author or id — nothing is invented; the import reports it in `skipped[]`.
+ * @param {any} info
+ * @param {any[]} renderpass
+ */
+function shadertoyAttributionHeader(info, renderpass) {
+	const id = String(info?.id || '').trim()
+	const author = String(info?.username || '').trim()
+	if (!SHADERTOY_ID_RE.test(id) || !author) return null
+	const top = renderpass
+		.map((p) =>
+			String(p?.code || '')
+				.split('\n')
+				.slice(0, 15)
+				.join('\n')
+		)
+		.join('\n')
+	const licLines = top.split('\n').filter((l) => /licen[cs]e|creative ?commons|\bCC0\b|all rights reserved/i.test(l))
+	if (licLines.some((l) => FORBIDDEN_RE.test(l)))
+		return { refused: 'the code says "All rights reserved" — it may not be redistributed' }
+	const stated = licLines.map(licenceIdFromText).find(Boolean)
+	if (!stated && licLines.length) return { refused: `unrecognised licence line "${licLines[0].trim().slice(0, 80)}"` }
+	return buildShaderHeader({
+		title: String(info?.name || id).trim(),
+		author,
+		url: `https://www.shadertoy.com/view/${id}`,
+		licence: stated || SHADERTOY_DEFAULT_LICENCE,
+		basis: stated
+			? 'stated in the original code'
+			: 'Shadertoy default licence: the original has no licence line; https://www.shadertoy.com/terms',
+		notes: ['Imported for HighAsCG from Shadertoy (WO-380); changes are under the same licence'],
+	})
 }
 
 /**
@@ -155,7 +199,7 @@ async function fetchShadertoyShader(id, apiKey, opts = {}) {
 	if (!key) {
 		throw new Error(
 			'No Shadertoy API key configured. www.shadertoy.com is behind Cloudflare and refuses ' +
-				'server-side requests without one — get a free key at shadertoy.com/howto#q2 and save it in Settings.',
+				'server-side requests without one — get a free key at shadertoy.com/howto#q2 and save it in Settings.'
 		)
 	}
 	const doFetch = opts.fetchImpl || fetch

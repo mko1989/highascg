@@ -370,3 +370,16 @@ texts in tools/release/licenses/), and SOURCES.md there is the written source of
   Ubuntu 26.04 packages — each under the licence in /usr/share/doc/<package>/copyright; versions and source packages
     in the licence tree's ubuntu-packages.tsv.
   Not on the ISO (excluded, installed per box): Blackmagic Desktop Video, ChamSys MagicQ.
+
+================================================================================
+Shader library — template/shaders/sh-*.html (and data/shaders/*.json)
+License: each shader under its own licence — NOT under HighAsCG's AGPL. Mostly Creative Commons
+Attribution-NonCommercial-ShareAlike 3.0/4.0 (Shadertoy's default licence for shaders without a licence
+line, https://www.shadertoy.com/terms), plus CC0, MIT, CC BY 3.0/4.0 and CC BY-NC 4.0.
+Every shader names its author, source URL and licence in a header at the top of its code; the per-file
+map is template/shaders/LICENSES/manifest.json, explained in template/shaders/LICENSES/README.md.
+Exception: sh-fft-test (HighAsCG's own, AGPL-3.0-or-later). The shader player (template/shaders/player*.js)
+is HighAsCG code (AGPL); ShaderToyLite.js is BSD-3-Clause (vendor/shadertoy/LICENSE).
+Removed in WO-1096 (not ours to ship): sh-mario (Nintendo IP), sh-balatro (commercial game, no licence),
+sh-audio-visualiser-v0-1-sadeghi ("All rights reserved") and four shaders of unknown origin (opt-in list:
+template/shaders/LICENSES/opt-in.json).

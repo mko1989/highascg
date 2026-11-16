@@ -23,7 +23,7 @@ test.after(cleanupStoreRoot)
 const cfgOf = (image, common = '') => ({ common, passes: { image: { source: image } } })
 
 /** data/shaders is git-ignored runtime data; reconcileShaderStore recovers it from the tracked template/shaders/*.html
- * (what the server does on every listShaders), so a fresh CI clone tests the same 190-shader library as the box. */
+ * (what the server does on every listShaders), so a fresh CI clone tests the same shader library as the box (183 templates after WO-1096). */
 async function library() {
 	const dir = SHADERS_DATA_DIR
 	await reconcileShaderStore()
