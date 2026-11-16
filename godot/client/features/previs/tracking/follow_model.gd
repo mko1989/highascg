@@ -154,16 +154,15 @@ static func normalize(slice: Variant) -> Dictionary:
 ## left, y upstage, z up), within 500 m (the server's calibrate `at` limit); ids unique, junk dropped.
 ## WO-703 (owner 23.10: "prebuilt marks similar to what the camera calibration has. but just 6 8 points around the
 ## stage and dead center"): the tracking grid's 4 corners, 4 edge middles and dead centre (PSN, the floor points the
-## camera calibration uses — tracking_model.gd grid_corners; stage left = +X, downstage = −Y), clockwise from DSR.
+## camera calibration uses — tracking_model.gd grid_corners), clockwise from DSR. WO-1091: named for the stage's real
+## audience side `aud` (aim_model.gd: the stage objects' facing; default −Y = PSN downstage, stage left = +X).
 ## Appended to `marks` under their names; a name already there is left as it is (it may have been measured).
-static func preset_marks(grid: Dictionary, marks: Array) -> Array:
-	var hw: float = float(grid.width) / 2.0
-	var x0: float = float(grid.x_offset)
-	var ym: float = float(grid.y_offset)
-	var y0: float = ym - float(grid.depth) / 2.0
-	var y1: float = ym + float(grid.depth) / 2.0
-	var spots := [["DSR", x0 - hw, y0], ["DSC", x0, y0], ["DSL", x0 + hw, y0], ["SL", x0 + hw, ym], ["USL", x0 + hw, y1],
-		["USC", x0, y1], ["USR", x0 - hw, y1], ["SR", x0 - hw, ym], ["Centre", x0, ym]]
+static func preset_marks(grid: Dictionary, marks: Array, aud := Vector2(0, -1)) -> Array:
+	var spots := []
+	for sp in [["DSR", 1, -1], ["DSC", 1, 0], ["DSL", 1, 1], ["SL", 0, 1], ["USL", -1, 1], ["USC", -1, 0], ["USR", -1, -1],
+			["SR", 0, -1], ["Centre", 0, 0]]:
+		var at: Vector2 = preload("res://features/previs/tracking/aim_model.gd").stage_spot(grid, aud, sp[1], sp[2])
+		spots.append([sp[0], at.x, at.y])
 	var out := normalize_marks(marks)
 	var names := {}
 	var id := 0

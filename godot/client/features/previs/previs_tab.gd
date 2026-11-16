@@ -158,6 +158,7 @@ func _ready() -> void:
 	track_view.clicked.connect(track_page.click)
 	track_view.picked.connect(track_page.pick)
 	track_view.source_size.connect(track_page.adopt_size)
+	track_view.aimed.connect(track_page.aim_pose)  # WO-1091 rough aim
 	_side = _build_panel()
 	models.bind(_models, _status, stage)
 	_side.visible = false
@@ -205,6 +206,7 @@ func _on_tracking_changed() -> void:
 		track_page.follow.set_calib_camera(str(track_page.entry().get("id", "")))
 	track_view.zones_mode = track_page.mode == "zones"
 	track_view.detect_mode = track_page.mode == "detect"
+	track_view.aim_on = track_page.pose != null and track_page.pose.aim_on()  # WO-1091
 	handover3d.show_thresholds(markers.handover, track_page.mode == "follow", Store.project)
 	_push_zones()
 	_push_masks()
@@ -368,7 +370,10 @@ func _apply_mode() -> void:
 	if InspectorPanel.current != null:
 		if iscam and shown:
 			InspectorPanel.current.present(track_page)
+			track_page.room = mvr.room().get("box", AABB())  # WO-1091: Aim at stage stays inside the room
 			track_page.set_objects(builder.objects.duplicate(true))
+			if track_page.pose != null and not track_page.pose.show_3d.is_connected(_show_in_3d):
+				track_page.pose.show_3d.connect(_show_in_3d)
 		else:
 			InspectorPanel.current.release(track_page)
 		if is3d and shown:
@@ -401,10 +406,22 @@ func _build_toolbar() -> Control:
 		_save_ui())
 	bar.add_child(_coverage_cb)
 	bar.add_child(cards.picker)
-	var fit := UI.button("Fit", func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))
+	var fit := UI.button("Fit", func() -> void:
+		track_view.fit()  # WO-1091: the Camera view too (Fit used to frame only the hidden 3D stage)
+		stage.frame_box(_fit_box(), builder.front_yaw()))
 	for c in [fit, preload("res://features/previs/previs_quality.gd").picker(), preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button()]:
 		bar.add_child(c)  # WO-892 quality (WO-1010: with Haze in it; projector beams → the projection's Stage inspector), WO-770 VR
 	return bar
+
+
+## WO-1091 "Show in 3D": the tracking cameras from outside — frustums, footprints, coverage — framed from the shown
+## camera's side.
+func _show_in_3d() -> void:
+	_coverage_cb.button_pressed = true
+	set_mode("3d")
+	var ce := track_page.entry()
+	var off := Vector3.ZERO if ce.is_empty() else TrackingModel.C.godot_transform(ce.cam).origin - coverage.box.get_center()
+	stage.frame_box(coverage.box, atan2(off.x, off.z) + 0.6 if off.length() > 0.01 else NAN)
 
 
 func _set_source(role: String) -> void:

@@ -360,12 +360,15 @@ describe('WO-700 calibrate heads from Lighting', () => {
 
 	it('WO-703 preset marks: grid corners, edge middles, dead centre (source pins)', () => {
 		const model = GD('features/previs/tracking/follow_model.gd')
-		assert.match(model, /\["DSR", x0 - hw, y0\], \["DSC", x0, y0\], \["DSL", x0 \+ hw, y0\]/)
-		assert.match(model, /\["Centre", x0, ym\]/)
+		// WO-1091: [name, downstage, stage-left] factors placed by aim_model.stage_spot for the stage's audience side
+		assert.match(model, /\["DSR", 1, -1\], \["DSC", 1, 0\], \["DSL", 1, 1\]/)
+		assert.match(model, /\["Centre", 0, 0\]/)
+		assert.match(model, /static func preset_marks\(grid: Dictionary, marks: Array, aud := Vector2\(0, -1\)\)/, 'default audience −Y')
+		assert.match(GD('features/previs/tracking/aim_model.gd'), /static func stage_spot\(/)
 		assert.match(model, /if names\.has\(sp\[0\]\):\n\t\t\tcontinue/, 'a measured preset name is kept')
 		const fold = GD('features/previs/fixtures/calibrate_fold.gd')
 		assert.match(fold, /preset\.pressed\.connect\(_add_presets\)/)
-		assert.match(fold, /s\.marks = F\.preset_marks\(grid, s\.marks\)/)
+		assert.match(fold, /s\.marks = F\.preset_marks\(grid, s\.marks, preload\("res:\/\/features\/previs\/tracking\/aim_model\.gd"\)\.project_audience\(Store\.project\)\)/)
 		assert.match(fold, /T\.normalize\(\(pv as Dictionary\)\.get\("tracking"\)/, 'the camera calibration grid')
 	})
 

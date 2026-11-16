@@ -14,12 +14,17 @@ extends Control
 ## its shader) between the picture and the 2D lines — the picture and ghost are children drawn behind this node.
 ## T9b: detected persons of this camera are boxed (the one a marker is pinned to in that marker's colour, thicker);
 ## an assisted marker's ring is the operator's anchor, a thin line joins it to the body at the AI-corrected output.
+## WO-1091: zoom goes below 1× (the ghost then renders around the frame, which is outlined); while the camera may be
+## aimed by hand (`aim_on`: Calibrate mode, not solved or unlocked) drag = look around, shift+drag = move, shift+wheel =
+## dolly, ctrl+wheel = lens (`aimed`); a click without a drag is still a calibration click.
 ## T9c: Detect mode draws the camera's ROI masks (filled while they filter, outline only while off); while one is
 ## being drawn a click is a picture corner (`clicked`) instead of a marker grab.
 
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const D := preload("res://features/previs/tracking/detect_model.gd")
+const L := preload("res://features/previs/tracking/view_layers.gd")  # WO-1091 split
+const A := preload("res://features/previs/tracking/aim_model.gd")  # WO-1091
 
 signal clicked(px: Vector2)          # raster pixels of the camera picture
 signal picked(id: String)
@@ -27,6 +32,7 @@ signal source_size(size: Vector2i)   # the surface's real size (differs from the
 signal grab(px: Vector2)             # Markers mode, raster px
 signal drag(px: Vector2)
 signal let_go
+signal aimed(cam: Dictionary, done: bool)  # WO-1091 rough aim: a new pose (done = the drag / wheel step ended)
 
 var markers_mode := false
 var marks: Array = []  # marker_driver.marks()
@@ -58,6 +64,15 @@ var _drag := false
 var _told := Vector2i.ZERO
 var ghost: SubViewport  # camera_overlay.gd (previs_tab), or null
 var ghost_on := false
+var ghost_opacity := 0.6
+var aim_on := false  # WO-1091 (previs_tab: pose_section.aim_on())
+var _aim := {}  # the pose being dragged
+var _press := Vector2.INF  # left press while aiming (a release without a drag is a click)
+var _pic := false  # a live camera picture is drawn
+var _wide := 1.0
+var _black := false  # the picture is all black (no signal on the input) — checked every 2 s
+var _black_t := 0.0
+var _floor := 0.0  # the grid's floor z (rough aim: distances to the stage floor)
 var _back: Control
 var _ghost: TextureRect
 
@@ -88,6 +103,7 @@ func set_state(t: Dictionary, ce: Dictionary, objects: Array, active_id: String)
 	active = active_id
 	_lines = O.lines(t, ce, objects) if not ce.is_empty() else {}
 	_pts = O.points(t, ce, objects) if not ce.is_empty() else []
+	_floor = float((t.get("grid", {}) as Dictionary).get("z_offset", 0.0))
 	rms = float(ce.get("rms", -1.0))
 	_hold()
 	_sync_ghost()
@@ -97,8 +113,9 @@ func set_state(t: Dictionary, ce: Dictionary, objects: Array, active_id: String)
 ## T12: show / hide the 3D ghost (rendered only while shown).
 func set_ghost(on: bool, opacity: float) -> void:
 	ghost_on = on
+	ghost_opacity = opacity
 	if ghost != null:
-		ghost.set_opacity(opacity)
+		ghost.set_opacity(opacity if _pic else 1.0)  # WO-1091: no picture → the ghost is the picture
 	_sync_ghost()
 
 
@@ -170,7 +187,12 @@ func _exit_tree() -> void:
 	VideoSurfaces.release_all(self)
 
 
-func _process(_d: float) -> void:
+func _process(d: float) -> void:
+	_black_t -= d
+	if _black_t <= 0.0 and ghost_on:  # WO-1091: a black input is no picture — the ghost then draws at full strength
+		_black_t = 2.0
+		var tex: Texture2D = VideoSurfaces.texture(_role) if _role != "" else null
+		_black = tex != null and tex.get_width() > 1 and A.is_black(tex.get_image())
 	queue_redraw()  # the surface texture updates in place, but its size can arrive after the lease
 	_back.queue_redraw()
 
@@ -207,9 +229,19 @@ func _draw_back() -> void:
 	if entry.is_empty():
 		return
 	var img := Rect2(_origin(), _raster() * _scale())
-	_ghost.position = img.position
-	_ghost.size = img.size
 	var tex: Texture2D = VideoSurfaces.texture(_role) if _role != "" else null
+	var pic := tex != null and tex.get_width() > 1 and not _black
+	if pic != _pic:
+		_pic = pic
+		if ghost != null:
+			ghost.set_opacity(ghost_opacity if pic else 1.0)
+	if ghost != null and _ghost.visible:  # WO-1091: zoomed out, the ghost fills the view around the frame
+		ghost.set_wide(A.wide(size, img))
+		_wide = ghost.wide_used
+	else:
+		_wide = 1.0
+	_ghost.position = img.get_center() - img.size * _wide / 2.0
+	_ghost.size = img.size * _wide
 	if tex != null and tex.get_width() > 1:
 		_back.draw_texture_rect(tex, img, false)
 		var real := Vector2i(tex.get_width(), tex.get_height())
@@ -218,7 +250,6 @@ func _draw_back() -> void:
 			source_size.emit.call_deferred(real)
 	else:
 		_back.draw_rect(img, ThemeBuilder.BG_ELEVATED)
-		_back.draw_string(get_theme_default_font(), img.position + Vector2(16, 28), "no picture from %s" % entry.role, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ThemeBuilder.TEXT_MUTED)
 
 
 func _draw() -> void:
@@ -227,6 +258,7 @@ func _draw() -> void:
 	if entry.is_empty():
 		draw_string(font, Vector2(16, 32), "No tracking camera — Add one in the Inspector.", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ThemeBuilder.TEXT_MUTED)
 		return
+	_draw_frame(font)
 	var gcol := Color(ThemeBuilder.ACCENT_GREEN, 0.6)
 	for pl in _lines.get("grid", []):
 		draw_polyline(_xf(pl), gcol, 1.5, true)
@@ -252,16 +284,18 @@ func _draw() -> void:
 		if at != null and not (markers_mode or zones_mode):
 			draw_arc(to_view(at), 13.0, 0.0, TAU, 28, ThemeBuilder.ACCENT_HOVER, 2.5, true)
 	if markers_mode or zones_mode:
-		_draw_zones(font)
+		L.zones(self, font)
 	if markers_mode:
-		_draw_beams(font)
+		L.beams(self, font)
 	if detect_mode:
-		_draw_masks()
-		_draw_walk(font)
-	_draw_boxes(font)
-	_draw_marks(font)
+		L.masks(self)
+		L.walk(self, font)
+	L.boxes(self, font)
+	L.marks(self, font)
 	var head := "Active: %s — click where it is in the picture" % act.label if not act.is_empty() else "Pick a point in the Inspector list"
 	var tail := " · ctrl+click: pick point · wheel: zoom · right-drag: pan · F: fit"
+	if aim_on:
+		tail = " · drag: look around · shift+drag: move · shift+wheel: dolly · ctrl+wheel: lens · wheel: zoom · right-drag: pan · F: fit"
 	if markers_mode:
 		head = "Markers — click the floor: the selected marker goes there · drag a circle · stick / arrows move it"
 		if marks.any(func(m: Dictionary) -> bool: return int(m.id) == selected_marker and m.get("driven", false)):
@@ -281,159 +315,27 @@ func _draw() -> void:
 	draw_string(font, Vector2(10, size.y - 8), head + rs + tail, HORIZONTAL_ALIGNMENT_LEFT, size.x - 20, 13, ThemeBuilder.TEXT)
 
 
-func _draw_marks(font: Font) -> void:
-	for m in marks:
-		if m.centre == null:
-			continue
-		var col: Color = m.color
-		if m.stale:
-			col.a = 0.35
-		var sel: bool = m.id == selected_marker and m.own
-		if (m.ring as PackedVector2Array).size() >= 2:
-			draw_polyline(_xf(m.ring), col, 3.0 if sel else 2.0, true)
-		var c := to_view(m.centre)
-		var foot := to_view(m.foot) if m.get("foot") != null else c
-		var top := to_view(m.top) if m.top != null else foot
-		if m.get("assisted", false) and foot.distance_to(c) > 1.0:
-			draw_line(c, foot, Color(col, col.a * 0.6), 1.5, true)
-			draw_arc(foot, 5.0, 0.0, TAU, 14, col, 2.0, true)
-		draw_line(foot, top, col, 2.0, true)
-		draw_circle(top, 5.0 if sel else 4.0, col)
-		var label := "%s%s%s" % [m.name, " · stale" if m.stale else "", _pin_tag(m)]
-		draw_string(font, top + Vector2(8, -4), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14 if sel else 13, col)
-		if sel:
-			draw_arc(c, 4.0, 0.0, TAU, 12, ThemeBuilder.TEXT, 2.0, true)
-
-
-func _pin_tag(m: Dictionary) -> String:
-	if m.get("assisted", false):
-		return " · assist"
-	if m.get("driven", false):
-		return " · AI" if float(m.get("status", 1.0)) > 0.0 else " · AI lost"
-	return ""
-
-
-func _draw_boxes(font: Font) -> void:
-	if entry.is_empty() or detections.get("enabled") != true or not (markers_mode or zones_mode):
-		return
-	var r := _raster()
-	var cols := {}
-	for m in marks:
-		cols[int(m.id)] = m.color
-	for cam in detections.get("cameras", []):
-		if not (cam is Dictionary) or str(cam.get("id", "")) != str(entry.get("id", "")) or cam.get("stale") == true:
-			continue
-		for p in cam.get("persons", []):
-			var b: Array = p.get("box", [])
-			if b.size() < 4:
-				continue
-			var pinned: bool = p.has("marker")
-			var col: Color = cols.get(int(p.get("marker", 0)), ThemeBuilder.ACCENT) if pinned else Color(ThemeBuilder.ACCENT, 0.7)
-			if float(p.get("age_s", 0.0)) > 0.0:
-				col.a *= 0.45  # coasting: the tracker predicts it, no box matched this step
-			var a := to_view(Vector2(float(b[0]) * r.x, float(b[1]) * r.y))
-			var z := to_view(Vector2(float(b[2]) * r.x, float(b[3]) * r.y))
-			draw_rect(Rect2(a, z - a), col, false, 3.0 if pinned else 1.5)
-			if detect_mode and masks_on:
-				draw_circle(Vector2((a.x + z.x) / 2.0, z.y), 4.0, col)  # the feet point the masks test
-			var wtag := "P%d · " % int(p.world) if p.has("world") else ""
-			draw_string(font, a + Vector2(3, -4), "%s#%d %.0f%%" % [wtag, int(p.get("tid", 0)), float(p.get("score", 0.0)) * 100.0],
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col)
-	_draw_unseen(font, cols)
-
-
-## T10b: world persons this camera has no box for (seen by another camera, or predicted) — a hollow ring at their
-## floor point, tagged with who sees them: the occlusion handover made visible.
-func _draw_unseen(font: Font, cols: Dictionary) -> void:
-	var world: Variant = detections.get("world")
-	if not (world is Dictionary) or world.get("fused") != true or not (entry.get("cam") is Dictionary):
-		return
-	var me := str(entry.get("id", ""))
-	for w in world.get("persons", []):
-		if not (w is Dictionary) or (w.get("cameras", []) as Array).has(me) and float(w.get("age_s", 0.0)) <= 0.0:
-			continue
-		var at: Variant = O.shown(entry, [[float(w.x), float(w.y), float(world.get("plane_z", 0.0))]])[0]
-		if at == null:
-			continue
-		var col: Color = cols.get(int(w.get("marker", 0)), ThemeBuilder.ACCENT) if w.has("marker") else Color(ThemeBuilder.ACCENT, 0.7)
-		var v := to_view(Vector2(at[0], at[1]))
-		draw_arc(v, 14.0, 0.0, TAU, 28, col, 2.0, true)
-		var who := "predicted" if float(w.get("age_s", 0.0)) > 0.0 else "/".join(w.get("cameras", []))
-		draw_string(font, v + Vector2(16, 4), "P%d · %s" % [int(w.id), who], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col)
-
-
-func _draw_masks() -> void:
-	var r := _raster()
-	for m in mask_shapes:
-		var poly := PackedVector2Array()
-		for v in m.vertices:
-			poly.append(to_view(Vector2(float(v[0]) * r.x, float(v[1]) * r.y)))
-		var live: bool = masks_on and m.enabled
-		var col := Color(ThemeBuilder.ACCENT_GREEN, 1.0 if live else 0.45)
-		if live and poly.size() >= 3 and not Geometry2D.triangulate_polygon(poly).is_empty():
-			draw_colored_polygon(poly, Color(col, 0.12))
-		if poly.size() >= 2:
-			var loop := poly.duplicate()
-			if poly.size() >= 3:
-				loop.append(poly[0])
-			draw_polyline(loop, col, 3.0 if m.selected else 1.5, true)
-		if m.selected and mask_drawing:
-			for p in poly:
-				draw_circle(p, 4.0, col)
-
-
-func _draw_zones(font: Font) -> void:
-	for z in zone_shapes:
-		var col := Color(z.color)
-		var loop: Array = z.loop
-		if loop.size() < 2:
-			continue
-		var px := O.shown(entry, loop)
-		if z.occupied and not px.has(null) and px.size() >= 4:
-			var poly := PackedVector2Array()
-			for i in px.size() - 1:
-				poly.append(to_view(Vector2(px[i][0], px[i][1])))
-			if not Geometry2D.triangulate_polygon(poly).is_empty():
-				draw_colored_polygon(poly, Color(col, 0.3))
-		for i in loop.size() - 1:
-			for pl in O.edge(entry, loop[i], loop[i + 1]):
-				draw_polyline(_xf(pl), col, 3.0 if z.selected else 1.5, true)
-		if z.selected and zone_drawing:
-			for p in px:
-				if p != null:
-					draw_circle(to_view(Vector2(p[0], p[1])), 4.0, col)
-		var at: Variant = px[0]
-		if at != null:
-			draw_string(font, to_view(Vector2(at[0], at[1])) + Vector2(6, -6), z.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
+## WO-1091: the camera's frame outlined, the overlay around it veiled; "no picture" over the ghost.
+func _draw_frame(font: Font) -> void:
+	var img := Rect2(_origin(), _raster() * _scale())
+	var c := img.intersection(Rect2(Vector2.ZERO, size))
+	if _wide > 1.0 and c.has_area():
+		var veil := Color(ThemeBuilder.BG_DARK, 0.45)
+		for r in [Rect2(0, 0, size.x, c.position.y), Rect2(0, c.end.y, size.x, size.y - c.end.y),
+				Rect2(0, c.position.y, c.position.x, c.size.y), Rect2(c.end.x, c.position.y, size.x - c.end.x, c.size.y)]:
+			if (r as Rect2).has_area():
+				draw_rect(r, veil)
+	draw_rect(img, Color(ThemeBuilder.TEXT, 0.55), false, 1.5)
+	if not _pic:
+		var msg: String = ("no signal on %s (black) — the 3D stage shown in its place" if _black else "no picture from %s — the 3D stage shown in its place") % entry.role
+		var at := c.position + Vector2(8, 8)
+		draw_rect(Rect2(at, font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 14) + Vector2(12, 8)), Color(ThemeBuilder.BG_DARK, 0.8))
+		draw_string(font, at + Vector2(6, 18), msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ThemeBuilder.TEXT)
 
 
 func set_walk_line(l: Dictionary) -> void:
 	walk_line = l
 	queue_redraw()
-
-
-func _draw_walk(font: Font) -> void:
-	if walk_line.is_empty() or not entry.get("cam") is Dictionary:
-		return
-	var a := [walk_line.a[0], walk_line.a[1], walk_line.z]
-	var col := Color(ThemeBuilder.ACCENT_HOVER, 0.9)
-	for pl in O.edge(entry, a, [walk_line.b[0], walk_line.b[1], walk_line.z]):
-		draw_polyline(_xf(pl), col, 3.0, true)
-	var s: Variant = O.shown(entry, [a])[0]
-	if s != null:
-		draw_string(font, to_view(Vector2(s[0], s[1])) + Vector2(8, -8), "Walk: " + str(walk_line.name), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
-
-
-func _draw_beams(font: Font) -> void:
-	for b in beams:
-		var col := Color(ThemeBuilder.WARN, 0.95 if b.live else 0.4)
-		for pl in O.edge(entry, b.from, b.to):
-			draw_polyline(_xf(pl), col, 2.5 if b.live else 1.5, true)
-		var head: Variant = O.shown(entry, [b.from])[0]
-		if head != null:
-			var at := to_view(Vector2(head[0], head[1]))
-			draw_rect(Rect2(at - Vector2(5, 5), Vector2(10, 10)), col)
-			draw_string(font, at + Vector2(8, 14), b.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
 
 
 func _xf(pl: PackedVector2Array) -> PackedVector2Array:
@@ -460,25 +362,37 @@ func _gui_input(event: InputEvent) -> void:
 				_held = false
 				let_go.emit()
 			accept_event()
+		elif mb.button_index == MOUSE_BUTTON_LEFT and aim_on:  # WO-1091: a drag aims, a click is still a click
+			grab_focus()
+			if mb.pressed:
+				_press = mb.position
+				_aim = {}
+			elif not _aim.is_empty():
+				aimed.emit(_aim, true)
+				_aim = {}
+			elif _press != Vector2.INF:
+				_click(mb)
+			if not mb.pressed:
+				_press = Vector2.INF
+			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
 			grab_focus()
-			var px := to_raster(mb.position)
-			if mb.is_command_or_control_pressed():
-				var i := O.nearest(_pts, px, 16.0 / _scale())
-				if i >= 0:
-					picked.emit(str(_pts[i].id))
-			elif Rect2(Vector2.ZERO, _raster()).has_point(px):
-				clicked.emit(px)
+			_click(mb)
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_RIGHT:
 			_drag = mb.pressed
 			accept_event()
 		elif mb.pressed and mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-			var f := 1.2 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.2
-			var z := clampf(_zoom * f, 1.0, 40.0)
+			var st := 1.0 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else -1.0
+			if aim_on and (mb.shift_pressed or mb.is_command_or_control_pressed()):  # WO-1091: lens / dolly
+				var cam: Dictionary = entry.cam
+				aimed.emit(A.zoom_fov(cam, st) if mb.is_command_or_control_pressed() else A.dolly(cam, st, A.focus_distance(cam, _floor)), true)
+				accept_event()
+				return
+			var z := A.clamp_zoom(_zoom * pow(1.2, st))  # WO-1091: below 1× too — the frame inside a wider overlay
 			var o2 := mb.position - (mb.position - _origin()) * (z / _zoom)
 			_zoom = z
-			_pan = Vector2.ZERO if z == 1.0 else o2 - (size - _raster() * _scale()) / 2.0
+			_pan = Vector2.ZERO if z <= 1.0 else o2 - (size - _raster() * _scale()) / 2.0
 			queue_redraw()
 			accept_event()
 	var k := event as InputEventKey
@@ -492,3 +406,22 @@ func _gui_input(event: InputEvent) -> void:
 		_pan += mm.relative
 		queue_redraw()
 		accept_event()
+	if mm != null and aim_on and _press != Vector2.INF and (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		if _aim.is_empty() and mm.position.distance_to(_press) < 4.0:
+			return  # not a drag yet
+		var cam: Dictionary = _aim if not _aim.is_empty() else entry.cam
+		var fw := _raster().x * _scale()
+		_aim = A.move(cam, mm.relative, fw, A.focus_distance(cam, _floor)) if mm.shift_pressed else A.look(cam, mm.relative, fw)
+		aimed.emit(_aim, false)
+		accept_event()
+
+
+## A calibration click: ctrl = make the nearest point active, else put the active point here.
+func _click(mb: InputEventMouseButton) -> void:
+	var px := to_raster(mb.position)
+	if mb.is_command_or_control_pressed():
+		var i := O.nearest(_pts, px, 16.0 / _scale())
+		if i >= 0:
+			picked.emit(str(_pts[i].id))
+	elif Rect2(Vector2.ZERO, _raster()).has_point(px):
+		clicked.emit(px)

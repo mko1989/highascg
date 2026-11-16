@@ -220,7 +220,7 @@ func _add_presets() -> void:
 	var pv: Variant = Store.project.get("previs")
 	var grid: Dictionary = T.normalize((pv as Dictionary).get("tracking") if pv is Dictionary else null).grid
 	var s := _slice()
-	s.marks = F.preset_marks(grid, s.marks)
+	s.marks = F.preset_marks(grid, s.marks, preload("res://features/previs/tracking/aim_model.gd").project_audience(Store.project))  # WO-1091
 	_persist(s)
 
 

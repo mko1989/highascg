@@ -7,6 +7,7 @@ extends RefCounted
 
 const C := preload("res://features/previs/tracking/camera_model.gd")
 const S := preload("res://features/previs/stage_objects.gd")
+const A := preload("res://features/previs/tracking/aim_model.gd")  # WO-1091
 
 const GRID_DEFAULT := {"width": 10.0, "depth": 6.0, "spacing": 1.0, "x_offset": 0.0, "y_offset": 3.0, "z_offset": 0.0}
 const RASTER_DEFAULT := [1920, 1080]
@@ -95,20 +96,21 @@ static func normalize_camera(src: Dictionary) -> Dictionary:
 	return o
 
 
-static func new_camera(existing: Array, role := "in1") -> Dictionary:
+## `cam`: the start pose — the page passes aim_model.stage_pose (WO-1091: in front of THIS stage, framing its grid);
+## without one, OpenFollow's stage_default camera (FOH of a stage at the origin facing −Y).
+static func new_camera(existing: Array, role := "in1", cam := {}) -> Dictionary:
 	var ids := {}
 	for c in existing:
 		ids[str((c as Dictionary).get("id", ""))] = true
 	var n := existing.size() + 1
 	while ids.has("cam_%d" % n):
 		n += 1
-	# A front-of-house start (OpenFollow's stage_default camera) so the overlay is roughly right before calibration.
 	return normalize_camera({"id": "cam_%d" % n, "name": "Camera %d" % n, "role": role,
-		"cam": C.camera(0.0, -11.0, 6.0, -22.0, 0.0, 0.0, 60.0)})
+		"cam": cam if not cam.is_empty() else C.camera(0.0, -11.0, 6.0, -22.0, 0.0, 0.0, 60.0)})
 
 
-## The grid rectangle's corners (PSN), downstage first, clockwise seen from above:
-## DSR (-x, -y), DSL (+x, -y), USL (+x, +y), USR (-x, +y). Stage left = +X.
+## The grid rectangle's corners (PSN), clockwise seen from above: (-x, -y), (+x, -y), (+x, +y), (-x, +y) — DSR, DSL,
+## USL, USR for a stage facing −Y (ids keep these names; labels name them for the real audience, WO-1091).
 static func grid_corners(g: Dictionary) -> Array:
 	var hw: float = g.width / 2.0
 	var y0: float = g.y_offset - g.depth / 2.0
@@ -136,8 +138,10 @@ static func candidate_points(t: Dictionary, objects: Array) -> Array:
 	var g: Dictionary = t.get("grid", GRID_DEFAULT)
 	var names := ["DSR", "DSL", "USL", "USR"]
 	var corners := grid_corners(g)
+	var aud: Vector2 = A.audience(g, objects).dir  # WO-1091: a turned stage's DSR is another corner
 	for i in 4:
-		out.append({"id": "grid:%s" % names[i], "label": "Grid corner %s" % names[i], "world": corners[i]})
+		var off := Vector2(corners[i][0] - g.x_offset, corners[i][1] - g.y_offset)
+		out.append({"id": "grid:%s" % names[i], "label": "Grid corner %s" % A.stage_name(off, aud), "world": corners[i]})
 	var nx := maxi(1, roundi(g.width / g.spacing))
 	var k := 0
 	for p in grid_crossings(g):

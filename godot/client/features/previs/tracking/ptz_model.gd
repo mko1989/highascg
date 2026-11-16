@@ -116,14 +116,14 @@ static func normalize_list(src: Variant) -> Array:
 
 
 ## A fresh entry: lowest free "ptzN" id, disabled and not auto (nothing is sent until the operator ticks Enabled).
-static func new_camera(existing: Array) -> Dictionary:
+static func new_camera(existing: Array, pose := {}) -> Dictionary:
 	var used := {}
 	for c in existing:
 		used[str(c.id)] = true
 	var n := 1
 	while used.has("ptz%d" % n):
 		n += 1
-	return normalize_camera({"id": "ptz%d" % n, "name": "PTZ %d" % n}, n - 1)
+	return normalize_camera({"id": "ptz%d" % n, "name": "PTZ %d" % n, "pose": pose}, n - 1)
 
 
 ## One line for the server's per-camera status (GET /api/tracking/auto `ptz`: {id, name, enabled, state, pan?, tilt?, error?}).

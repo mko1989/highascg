@@ -175,7 +175,7 @@ func _set_protocol(p: String) -> void:
 
 
 func _add() -> void:
-	cams.append(P.new_camera(cams))
+	cams.append(P.new_camera(cams, preload("res://features/previs/tracking/aim_model.gd").ptz_pose(Store.project)))  # WO-1091
 	sel = cams.size() - 1
 	_commit()
 

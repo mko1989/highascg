@@ -24,14 +24,9 @@ const PersonMarkRow := preload("res://features/previs/tracking/person_mark_row.g
 const MI := preload("res://features/previs/tracking/marker_input.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const HelpDialog := preload("res://app/help_dialog.gd")  # WO-740
+const PoseSection := preload("res://features/previs/tracking/pose_section.gd")  # WO-1091
+const Aim := preload("res://features/previs/tracking/aim_model.gd")  # WO-1091
 
-## [label, key, min, max, step]
-const POSE := [["X m (stage left +)", "pos_x", -200, 200, 0.01], ["Y m (upstage +)", "pos_y", -200, 200, 0.01],
-	["Z m (height)", "pos_z", -20, 100, 0.01], ["Pitch °", "pitch", -89, 89, 0.1], ["Yaw °", "yaw", -180, 180, 0.1],
-	["Roll °", "roll", -180, 180, 0.1], ["FOV h °", "fov", 10, 170, 0.1], ["Lens k1", "lens_k1", -1, 1, 0.001],
-	["Lens k2", "lens_k2", -1, 1, 0.001]]
-const GRID := [["Width m", "width", 0.5, 200, 0.1], ["Depth m", "depth", 0.5, 200, 0.1], ["Spacing m", "spacing", 0.1, 50, 0.1],
-	["Centre X m", "x_offset", -100, 100, 0.1], ["Centre Y m", "y_offset", -100, 100, 0.1], ["Floor Z m", "z_offset", -10, 50, 0.01]]
 
 signal changed  # data / camera / active point changed → the view redraws
 signal ghost_changed(on: bool, opacity: float)  # T12 overlay toggle / opacity
@@ -51,14 +46,16 @@ var driver: Node  # marker_driver.gd (previs_tab)
 var cam_idx := 0
 var active := ""
 var objects: Array = []
+var room := AABB()  # WO-1091: the MVR scene's box (Godot frame; previs_tab), AABB() = unknown
+var unlocked := false  # WO-1091: the operator unlocked the shown solved camera's pose (this session, this camera)
+var pose: PoseSection
 var _last_json := ""
 var _cams: OptionButton
 var _name: LineEdit
 var _role: OptionButton
 var _rw: SpinBox
 var _rh: SpinBox
-var _pose := {}
-var _grid := {}
+var _grid: GridContainer  # grid_section.gd
 var _list: ItemList
 var _ids: Array = []
 var _fit_lens: CheckBox
@@ -153,12 +150,9 @@ func _ready() -> void:
 	_rh = _spin(16, 16384, 1)
 	_rh.value_changed.connect(func(v: float) -> void: _edit(func(c: Dictionary) -> void: c.raster[1] = int(v)))
 	_pair(g, "Raster H px", _rh)
-	for f in POSE:
-		var sb := _spin(f[2], f[3], f[4])
-		var key: String = f[1]
-		sb.value_changed.connect(func(v: float) -> void: _edit(func(c: Dictionary) -> void: c.cam[key] = v))
-		_pose[key] = sb
-		_pair(g, f[0], sb)
+	pose = PoseSection.new(self)  # WO-1091: first — a new camera's next step is its pose
+	_body.add_child(_heading("Pose"))
+	_body.add_child(pose)
 	_body.add_child(g)
 	_body.add_child(HelpDialog.beside(_heading("Calibration points"), "calibrate-cameras"))
 	_list = ItemList.new()
@@ -182,14 +176,8 @@ func _ready() -> void:
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	_body.add_child(_status)
 	_body.add_child(_heading("Floor grid"))
-	var gg := _grid_box()
-	for f in GRID:
-		var sb := _spin(f[2], f[3], f[4])
-		var key: String = f[1]
-		sb.value_changed.connect(func(v: float) -> void: _edit_grid(key, v))
-		_grid[key] = sb
-		_pair(gg, f[0], sb)
-	_body.add_child(gg)
+	_grid = preload("res://features/previs/tracking/grid_section.gd").new(self)
+	_body.add_child(_grid)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _maybe_reload())
 	VideoSurfaces.sources_changed.connect(_sync)  # WO-694: the Source list fills once the server announced it
 	_maybe_reload()
@@ -277,6 +265,7 @@ func solve() -> void:
 	if not r.ok:
 		_status.text = "Not solved: %s" % r.error
 		return
+	unlocked = false  # WO-1091: solved = locked again
 	_edit(func(c: Dictionary) -> void:
 		c.cam = r.cam
 		c.rms = r.rms)
@@ -319,9 +308,10 @@ func _add_cam() -> void:
 		if d is Dictionary and (d as Dictionary).get("channel") != null:
 			role = r
 			break
-	data.cameras.append(T.new_camera(data.cameras, role))
+	data.cameras.append(T.new_camera(data.cameras, role, Aim.stage_pose(data.grid, objects, room).cam))  # WO-1091
 	cam_idx = data.cameras.size() - 1
 	active = ""
+	unlocked = false
 	_persist()
 
 
@@ -331,15 +321,31 @@ func _delete_cam() -> void:
 	data.cameras.remove_at(cam_idx)
 	cam_idx = clampi(cam_idx, 0, maxi(0, data.cameras.size() - 1))
 	active = ""
+	unlocked = false
 	_persist()
 
 
 func _select_cam(i: int) -> void:
 	cam_idx = i
 	active = ""
+	unlocked = false
 	_status.text = ""
 	_sync()
 	changed.emit()
+
+
+## WO-1091: a hand pose (pose_section, the Camera view's rough aim) — refused for a locked solved camera; `done` false
+## while a drag is under way (the view follows, nothing is saved until the release).
+func aim_pose(cam: Dictionary, done: bool) -> void:
+	var e := Aim.with_pose(entry(), cam, unlocked)
+	if e.is_empty():
+		return
+	data.cameras[cam_idx] = T.normalize_camera(e)
+	if done:
+		_persist()
+	else:
+		pose.refresh()
+		changed.emit()
 
 
 func _edit(mutate: Callable) -> void:
@@ -359,12 +365,6 @@ func _stamp_verified(r: Dictionary, line_name: String) -> void:
 		var own: Variant = (cams.get(c.id) as Dictionary).get("rms_cm") if cams.get(c.id) is Dictionary else null
 		c["verified"] = {"at": Time.get_datetime_string_from_system(true), "line": line_name, "samples": r.samples,
 			"world_rms_cm": r.world.rms_cm, "rms_cm": own, "covered": r.covered}
-	_persist()
-
-
-func _edit_grid(key: String, v: float) -> void:
-	data.grid[key] = v
-	data.grid = T.normalize_grid(data.grid)
 	_persist()
 
 
@@ -415,8 +415,7 @@ func _sync() -> void:
 	detect.set_detection(data.get("detection"), str(ce.get("id", "")))
 	detect.walk.set_grid(data.grid)
 	markers.set_defs(data.markers)
-	for k in _grid:
-		(_grid[k] as SpinBox).set_value_no_signal(float(data.grid[k]))
+	_grid.refresh()
 	if ce.is_empty():
 		return
 	_cams.select(cam_idx)
@@ -430,8 +429,7 @@ func _sync() -> void:
 	_role.select(opts.map(func(o: Array) -> String: return o[0]).find(ce.role))
 	_rw.set_value_no_signal(ce.raster[0])
 	_rh.set_value_no_signal(ce.raster[1])
-	for k in _pose:
-		(_pose[k] as SpinBox).set_value_no_signal(float(ce.cam[k]))
+	pose.refresh()
 	_sync_points()
 
 
