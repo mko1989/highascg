@@ -1,0 +1,56 @@
+{
+	"_about": "WO-1094: what each person-detection feature needs. Read by install.sh (which models to export / fetch) and by src/tracking/runtime-status.js (the ready / missing / broken verdicts). Models live in $HIGHASCG_TRACKING_MODELS (default ~/.local/share/highascg/models); none of them is ever committed or shipped (THIRD_PARTY_NOTICES).",
+	"core": {
+		"imports": ["numpy", "cv2", "onnxruntime"],
+		"requirements": "requirements.txt"
+	},
+	"features": {
+		"person": {
+			"label": "Person boxes",
+			"uses": "pins, Auto follow, zones, presenters",
+			"models": ["yolo26n.onnx"],
+			"optional": ["yolo26s.onnx"],
+			"source": "ultralytics",
+			"license": "AGPL-3.0",
+			"default": true
+		},
+		"pose": {
+			"label": "Body pose",
+			"uses": "posed dummies, avatar regions",
+			"models": ["yolo26n-pose.onnx"],
+			"source": "ultralytics",
+			"license": "AGPL-3.0",
+			"default": true
+		},
+		"seg": {
+			"label": "Cut-outs",
+			"uses": "person cut-out cards",
+			"models": ["yolo26n-seg.onnx"],
+			"source": "ultralytics",
+			"license": "AGPL-3.0",
+			"default": true
+		},
+		"face": {
+			"label": "Faces",
+			"uses": "presenter recognition",
+			"models": ["face_detection_yunet_2023mar.onnx", "face_recognition_sface_2021dec.onnx", "person_reid_youtu_2021nov.onnx"],
+			"source": "opencv-zoo",
+			"license": "MIT / Apache-2.0 (trained on research-only datasets)",
+			"default": false
+		},
+		"traits": {
+			"label": "Looks",
+			"uses": "avatar colours (from boxes and pose)",
+			"models": [],
+			"source": "",
+			"license": "",
+			"default": false
+		}
+	},
+	"links": {
+		"ultralytics": "https://github.com/ultralytics/ultralytics",
+		"agpl": "https://www.gnu.org/licenses/agpl-3.0.html",
+		"opencv_zoo": "https://github.com/opencv/opencv_zoo"
+	},
+	"space_mb": { "core": 700, "export": 3000, "face": 300 }
+}

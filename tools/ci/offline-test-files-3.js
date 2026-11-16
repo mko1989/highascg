@@ -416,4 +416,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1090-rc-mvr-materials.test.js', // WO-1090 game scene: MVR meshes keep their pictures; patched heads are their rigs
 	'tools/smoke/smoke-wo1090-rc-rig-heads.test.js',
 	'tools/smoke/smoke-wo1093-settings-save-paths.test.js', // WO-1093: compacted Settings / Devices inspector saves reach the hand-listed newConfig
+	'tools/smoke/smoke-wo1094-detection-runtime.test.js', // WO-1094: detection runtime status / install job / never distributed (ISO, sticks, sync)
 ]

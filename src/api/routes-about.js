@@ -43,7 +43,7 @@ const CREDITS = [
 	},
 	{
 		name: 'Ultralytics YOLO26',
-		what: 'Person detection weights (installed per machine)',
+		what: 'Person detection, pose and cut-out weights (downloaded and exported per machine on the operator\'s Install, never shipped)',
 		license: 'AGPL-3.0',
 		copyright: 'Copyright Ultralytics',
 		url: 'https://github.com/ultralytics/ultralytics',
@@ -54,6 +54,13 @@ const CREDITS = [
 		license: 'MIT',
 		copyright: 'Copyright Microsoft Corporation',
 		url: 'https://github.com/microsoft/onnxruntime',
+	},
+	{
+		name: 'OpenCV Zoo (YuNet, SFace, youtureid)',
+		what: 'Presenter recognition models (downloaded per machine on request, never shipped; SFace and youtureid were trained on research-only datasets)',
+		license: 'MIT (YuNet), Apache-2.0 (SFace, youtureid)',
+		copyright: 'Copyright (c) 2020 Shiqi Yu (YuNet); OpenCV Zoo contributors',
+		url: 'https://github.com/opencv/opencv_zoo',
 	},
 	{
 		name: 'Rewir',
@@ -95,6 +102,7 @@ function aboutInfo(root = ROOT) {
 		source: SOURCE,
 		notices: 'THIRD_PARTY_NOTICES and licenses/INDEX.md in the source tree',
 		credits: CREDITS,
+		detection: require('./routes-tracking-runtime').aboutLine(), // WO-1094: this machine's runtime, next to the notices
 	}
 }
 

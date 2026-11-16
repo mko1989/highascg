@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-608 routes.
+617 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -574,6 +574,15 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | * | `/api/tracking/follow/calibrate/spot` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/markers` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/puppet/people` | handler | `src/tracking/puppet-people.js` |
+| GET | `/api/tracking/runtime` | registry | `src/api/routes-tracking-runtime.js` |
+| POST | `/api/tracking/runtime/cancel` | registry | `src/api/routes-tracking-runtime.js` |
+| POST | `/api/tracking/runtime/export` | registry | `src/api/routes-tracking-runtime.js` |
+| GET | `/api/tracking/runtime/folders` | registry | `src/api/routes-tracking-runtime.js` |
+| POST | `/api/tracking/runtime/import` | registry | `src/api/routes-tracking-runtime.js` |
+| POST | `/api/tracking/runtime/install` | registry | `src/api/routes-tracking-runtime.js` |
+| POST | `/api/tracking/runtime/remove` | registry | `src/api/routes-tracking-runtime.js` |
+| POST | `/api/tracking/runtime/repair` | registry | `src/api/routes-tracking-runtime.js` |
+| POST | `/api/tracking/runtime/resume` | registry | `src/api/routes-tracking-runtime.js` |
 | * | `/api/tracking/stats` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/verify` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/zones` | handler | `src/tracking/register.js` |
@@ -689,6 +698,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-system-setup.js` | Server setup info: IPs, Tailscale, Syncthing URLs (read-only; for remote admin). |
 | `src/api/routes-system-update.js` |  |
 | `src/api/routes-timeline.js` | GET/POST/PUT/DELETE /api/timelines, /api/timelines/:id, /api/timelines/:id/:action |
+| `src/api/routes-tracking-runtime.js` | WO-1094 — the person-detection runtime (src/tracking/runtime-*.js; the work is tools/tracking-detect/install.sh): GET  /api/tracking/runtime[?net=1]          →  |
 | `src/api/routes-usb-ingest.js` | USB media ingest REST API (WO-29). |
 | `src/api/routes-v4l2-input.js` |  |
 | `src/api/routes-virtual-camera.js` |  |

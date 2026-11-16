@@ -202,7 +202,7 @@ routes.get('/api/system/update', ({ path, ctx, query }) => routesSystemUpdate.ha
 routes.post('/api/system/update/apply', ({ path, body, ctx }) => routesSystemUpdate.handlePost(path, body, ctx), { requireCaspar: false })
 
 routes.get('/api/modules', () => routesModules.handle('GET', '/api/modules'), { requireCaspar: false }); routesModules.registerPostRoutes(routes) // WO-1076 enable / disable / install / uninstall
-routes.get('/api/about', () => routesAbout.handleGet(), { requireCaspar: false })
+routes.get('/api/about', () => routesAbout.handleGet(), { requireCaspar: false }); require('./routes-tracking-runtime').register(routes) // WO-1094 person-detection runtime: status, install / repair / remove / export / import
 
 // Scene live
 routes.get('/api/scene/layer-options', ({ query, ctx }) => require('./routes-scene-layer-tools').handleLayerOptions(query, ctx), { requireCaspar: false }) // WO-601

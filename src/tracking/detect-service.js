@@ -20,10 +20,10 @@
 
 const childProcess = require('child_process')
 const fs = require('fs')
-const os = require('os')
 const path = require('path')
 const { normalizeDetection, detectCameras, personsFrom, maskSizeFrom } = require('./detect-model')
 const { onProjectChanged } = require('../engine/project-events')
+const { runtimePaths } = require('./runtime-paths') // WO-1094: HIGHASCG_TRACKING_PREFIX / _PYTHON / _MODELS, one layout
 
 const LEASE_ID = 'tracking-detect'
 const LEASE_MS = 5000
@@ -32,7 +32,6 @@ const BACKOFF_MIN_MS = 1000
 const BACKOFF_MAX_MS = 30000
 const SCRIPT = path.join(__dirname, '..', '..', 'tools', 'tracking-detect', 'sidecar.py')
 const SIM = path.join(__dirname, 'detect-sim.js') // WO-979: detection.simulate → the imitated camera
-const DATA = path.join(os.homedir(), '.local', 'share', 'highascg')
 
 function createDetectService(ctx, deps = {}) {
 	const log = typeof ctx?.log === 'function' ? ctx.log.bind(ctx) : () => {}
@@ -47,8 +46,8 @@ function createDetectService(ctx, deps = {}) {
 		}
 	})
 	const duties = deps.duties || require('../cluster/server-duties')
-	const python = deps.python || process.env.HIGHASCG_TRACKING_PYTHON || path.join(DATA, 'tracking-venv', 'bin', 'python')
-	const modelsDir = deps.modelsDir || process.env.HIGHASCG_TRACKING_MODELS || path.join(DATA, 'models')
+	const python = deps.python || runtimePaths().python
+	const modelsDir = deps.modelsDir || runtimePaths().models
 	const lease = deps.lease || ((roles) => require('../system/video-surfaces').getVideoSurfaceManager(ctx).lease(LEASE_ID, roles))
 
 	let det = normalizeDetection(null)
@@ -59,6 +58,7 @@ function createDetectService(ctx, deps = {}) {
 	let ready = false
 	let providers = []
 	let error = ''
+	let missing = '' // WO-1094: 'python' | 'model' — the runtime is not installed: the client offers Install, not just the text
 	let backoff = BACKOFF_MIN_MS
 	let restartTimer = null
 	let leaseTimer = null
@@ -168,8 +168,10 @@ function createDetectService(ctx, deps = {}) {
 	function start() {
 		if (child || restartTimer || !wanted()) return
 		const sim = det.simulate
-		if (!sim && !exists(python)) return void (error = `no Python at ${python} — run tools/tracking-detect/setup-venv.sh`)
-		if (!sim && !exists(modelPath())) return void (error = `no model ${det.model} in ${modelsDir} — run tools/tracking-detect/export-models.sh`)
+		missing = !sim && !exists(python) ? 'python' : !sim && !exists(modelPath()) ? 'model' : ''
+		const where = 'install it in Previs → Tracking → Detect'
+		if (missing === 'python') return void (error = `person detection is not installed on this machine (no Python at ${python}) — ${where} (or tools/tracking-detect/setup-venv.sh)`)
+		if (missing === 'model') return void (error = `no model ${det.model} in ${modelsDir} — ${where} (or tools/tracking-detect/export-models.sh)`)
 		buf = ''
 		ready = false
 		let proc
@@ -282,6 +284,7 @@ function createDetectService(ctx, deps = {}) {
 			simulated: det.simulate,
 			running: !!child && ready,
 			error: !det.enabled ? '' : error,
+			...(det.enabled && missing && !child ? { runtime_missing: missing } : {}),
 			cameras: cams.map((c) => {
 				const l = latest.get(c.id)
 				const fresh = !!l && t - l.at <= STALE_MS
