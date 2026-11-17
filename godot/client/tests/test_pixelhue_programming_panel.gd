@@ -48,6 +48,9 @@ class FakeApi:
 		return {"ok": false, "bytes": PackedByteArray()}
 
 
+var _panel: ProgPanel = null  # the panel of the running test (for _wait)
+
+
 func _setup() -> Array:
 	var api := FakeApi.new()
 	var p := ProgPanel.new()
@@ -55,6 +58,7 @@ func _setup() -> Array:
 	var notes: Array = []
 	p.status.connect(func(text: String) -> void: notes.append(text))
 	t.root.add_child(p)
+	_panel = p
 	await t.process_frame
 	await p.refresh()
 	return [p, api, notes]
@@ -64,8 +68,15 @@ func _geometry_posts(api: FakeApi) -> Array:
 	return api.posts.filter(func(x: Array) -> bool: return str(x[0]).ends_with("geometry"))
 
 
+## WO-1106: a fixed 0.12 s was not enough on a slow CI runner (the queue spaces its sends with a timer): after the
+## pause, wait — up to 3 s — until the panel's geometry queue has nothing pending or in flight.
 func _wait(s := 0.12) -> void:
 	await t.create_timer(s).timeout
+	var until := Time.get_ticks_msec() + 3000
+	while is_instance_valid(_panel) and _panel._queue != null and (_panel._queue.sync.dirty or _panel._queue.sync.saving) \
+			and _panel._queue.sync.failure == "" and Time.get_ticks_msec() < until:
+		await t.process_frame
+	await t.process_frame
 
 
 func test_refresh_draws_bands() -> void:
