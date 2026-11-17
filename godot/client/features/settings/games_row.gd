@@ -30,6 +30,7 @@ var _affect: OptionButton
 var _affect_row: HBoxContainer
 var _defaults: VBoxContainer
 var _levels: Array = []
+var _dlevel_items: Array = []  # the box-default level picker's [[value, label]] ("" = the game's own)
 var _quiet := false  # show_state(): a bound or value set by the state never posts back
 
 
@@ -131,16 +132,26 @@ func _build_defaults() -> void:
 		var key := str(spec[0])
 		sb.value_changed.connect(func(v: float) -> void: _patch_default(key, int(v)))
 		h.add_child(sb)
+	# WO-1106 A27: each picker starts with "Game's own" (patches null: the key goes), so "on" can be picked explicitly too
 	var lv := OptionButton.new()
 	lv.name = "d_botLevel"
-	lv.item_selected.connect(func(i: int) -> void: _patch_default("botLevel", lv.get_item_text(i)))
+	lv.item_selected.connect(func(i: int) -> void:
+		if i < _dlevel_items.size():
+			_patch_default("botLevel", str(_dlevel_items[i][0])))
 	h.add_child(lv)
 	var af := OptionButton.new()
 	af.name = "d_affect"
-	for a in M.AFFECT:
+	var affect_items := M.affect_items()
+	for a in affect_items:
 		af.add_item(str(a[1]))
-	af.item_selected.connect(func(i: int) -> void: _patch_default("affect", str(M.AFFECT[i][0])))
+	af.item_selected.connect(func(i: int) -> void:
+		if i < affect_items.size():
+			_patch_default("affect", str(affect_items[i][0])))
 	h.add_child(af)
+	var own := Kit.button(h, M.OWN, func() -> void:
+		if not _quiet:
+			Settings.patch(M.reset_patch(id)))
+	own.tooltip_text = "Every default of this game back to the game's own values"
 
 
 func _post(body: Dictionary) -> void:
@@ -151,7 +162,7 @@ func _post(body: Dictionary) -> void:
 func _patch_default(key: String, v: Variant) -> void:
 	if _quiet:
 		return
-	Settings.patch({"games": {"defaults": {id: {key: v}}}})
+	Settings.patch(M.default_patch(id, key, v))  # "" = the game's own (WO-1106 A27)
 
 
 func _open(kind: String) -> void:
@@ -250,10 +261,11 @@ func _show_defaults(row: Dictionary, d: Dictionary) -> void:
 		bots.set_value_no_signal(float(d.get("bots", 0)))
 	if not main.get_line_edit().has_focus():
 		main.set_value_no_signal(float(d.get("main", m.get("value", 0) if m is Dictionary and m.get("value") != null else 0)))
-	if lv.item_count == 0 and b is Dictionary:
-		for x in b.get("levels", []):
-			lv.add_item(str(x))
-	for i in lv.item_count:
-		if lv.get_item_text(i) == str(d.get("botLevel", "normal")):
-			lv.select(i)
-	af.select(maxi(0, M.AFFECT.map(func(a: Array) -> String: return str(a[0])).find(str(d.get("affect", "on")))))
+	var li := M.level_items(b.get("levels", []) if b is Dictionary else [])
+	if li != _dlevel_items:
+		_dlevel_items = li
+		lv.clear()
+		for it in li:
+			lv.add_item(str(it[1]))
+	lv.select(M.item_index(_dlevel_items, d.get("botLevel")))
+	af.select(M.item_index(M.affect_items(), d.get("affect")))

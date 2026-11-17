@@ -77,6 +77,8 @@ static func open(host: Node, row: Dictionary) -> AcceptDialog:
 		send.disabled = true
 		said.text = "Staging on preview…"
 		var r: Dictionary = await send_to_preview(row, maxi(0, screens.selected))
+		if not is_instance_valid(said) or not is_instance_valid(send):  # WO-1106 A29: the dialog was closed meanwhile
+			return
 		said.text = str(r.text)
 		said.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if r.ok else ThemeBuilder.ERROR)
 		send.disabled = false)

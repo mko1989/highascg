@@ -7,6 +7,8 @@ const PHASES := {"off": "module off", "closed": "session closed", "lobby": "lobb
 	"race": "racing", "match": "match on", "round": "round on", "results": "results", "paused": "paused"}
 const AFFECT := [["on", "Others can affect it"], ["soft", "Soft (no knock-backs)"], ["off", "Nobody affects it"]]
 const QR_QUIET := 4
+const OWN := "Game's own"  # WO-1106 A27: a box default not set → the game's own value
+const KIND_TAG := {"vpn": " (VPN)", "local": " (local only — phones cannot reach it)"}  # WO-1106 A7
 
 
 ## The status line of one game row: "lobby · 2 players · 3 bots" / "module off".
@@ -82,8 +84,63 @@ static func address_items(st: Variant) -> Array:
 	if j is Dictionary and j.get("addresses") is Array:
 		for a in j.addresses:
 			if a is Dictionary and str(a.get("kind", "")) != "loopback":
-				out.append([str(a.ip), "%s — %s%s" % [str(a.ip), str(a.get("iface", "")), " (VPN)" if a.get("kind") == "vpn" else ""]])
+				out.append([str(a.ip), "%s — %s%s" % [str(a.ip), str(a.get("iface", "")), str(KIND_TAG.get(str(a.get("kind", "")), ""))]])
 	return out
+
+
+## WO-1106 A28 — ids of rows built earlier that the state no longer has (an uninstalled game module): the pane frees them.
+static func gone_ids(have: Array, st: Dictionary) -> Array:
+	var keep := {}
+	if st.get("world") is Dictionary:
+		keep[str((st.world as Dictionary).get("id", "world"))] = true
+	if st.get("games") is Array:
+		for g in st.games:
+			if g is Dictionary:
+				keep[str((g as Dictionary).get("id", ""))] = true
+	var out: Array = []
+	for id in have:
+		if not keep.has(str(id)):
+			out.append(str(id))
+	return out
+
+
+## WO-1106 A27 — the items of a box-default picker: [[value, label]], "" first = the game's own (the key is removed).
+static func level_items(levels: Variant) -> Array:
+	var out: Array = [["", OWN]]
+	if levels is Array:
+		for lv in levels:
+			out.append([str(lv), str(lv)])
+	return out
+
+
+static func affect_items() -> Array:
+	var out: Array = [["", OWN]]
+	for a in AFFECT:
+		out.append([str(a[0]), str(a[1])])
+	return out
+
+
+## The item that shows a stored default: missing or null → 0 (the game's own); an unknown value too.
+static func item_index(items: Array, v: Variant) -> int:
+	if v == null:
+		return 0
+	for i in items.size():
+		if str(items[i][0]) == str(v):
+			return i
+	return 0
+
+
+## The Settings patch of one box default of one game; "" or null = back to the game's own (the server drops the key).
+static func default_patch(id: String, key: String, v: Variant) -> Dictionary:
+	var val: Variant = v
+	if v == null or (v is String and str(v) == ""):
+		val = null
+	return {"games": {"defaults": {id: {key: val}}}}
+
+
+## Every box default of one game back to the game's own (the server drops the game's entry).
+static func reset_patch(id: String) -> Dictionary:
+	return {"games": {"defaults": {id: null}}}
 
 
 ## The QR payload of the server (n, hex rows) → {n, dark: PackedByteArray (row-major, 1 = dark)}; n 0 when invalid.

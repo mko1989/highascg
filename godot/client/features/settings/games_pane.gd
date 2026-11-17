@@ -11,6 +11,7 @@ const Kit := preload("res://features/settings/pane_kit.gd")
 const Row := preload("res://features/settings/games_row.gd")
 const Q := preload("res://features/settings/games_qr.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const HOUSE_DEBOUNCE_S := 0.25
 
 var state: Dictionary = {}
 var _summary: Label
@@ -20,6 +21,8 @@ var _lights: CheckBox
 var _wall: CheckBox
 var _house: HSlider
 var _house_val: Label
+var _house_post: Timer  # WO-1106 A10: wheel / arrow keys / drag all post, once the value rests
+var _house_want := 1.0
 var _join: Label
 var _join_qr: Button
 var _warn: Label
@@ -59,10 +62,16 @@ func _ready() -> void:
 	_house.step = 5
 	_house.custom_minimum_size.x = 180
 	_house.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_house.drag_ended.connect(func(changed: bool) -> void:
-		if changed:
-			_post(M.body_global("house", _house.value / 100.0)))
-	_house.value_changed.connect(func(v: float) -> void: _house_val.text = "%d %%" % int(v))
+	_house_post = Timer.new()
+	_house_post.one_shot = true
+	_house_post.wait_time = HOUSE_DEBOUNCE_S
+	_house_post.timeout.connect(func() -> void: _post(M.body_global("house", _house_want)))
+	add_child(_house_post)
+	_house.value_changed.connect(func(v: float) -> void:
+		_house_val.text = "%d %%" % int(v)
+		if not _quiet:
+			_house_want = v / 100.0  # kept: a broadcast landing before the timer must not post the old value back
+			_house_post.start())
 	g.add_child(_house)
 	_house_val = Label.new()
 	g.add_child(_house_val)
@@ -87,6 +96,8 @@ func _ready() -> void:
 		if not _quiet and i < _addr_items.size():
 			Settings.patch({"games": {"joinAddress": str(_addr_items[i][0])}}))
 	ar.add_child(_addr)
+	# WO-1106 A31 (partial): the pick reaches only this pane's join code; the games' host pages build their own list
+	Kit.note(box, "This choice sets the join code and QR shown here. The games' own host pages list every address of this box.")
 	_auto = CheckBox.new()
 	_auto.text = "Open the game sessions when the server starts (lobby only, never a round)"
 	_auto.toggled.connect(func(on: bool) -> void:
@@ -191,6 +202,9 @@ func show_state(st: Dictionary) -> void:
 			_rows.add_child(r)
 			_by_id[gid] = r
 		(_by_id[gid] as Row).show_state(row, defaults.get(gid, {}) if defaults.get(gid) is Dictionary else {})
+	for gid in M.gone_ids(_by_id.keys(), st):  # WO-1106 A28: an uninstalled game's row goes (frozen, its buttons 404)
+		(_by_id[gid] as Node).queue_free()
+		_by_id.erase(gid)
 	var items := M.address_items(st)
 	if items != _addr_items:  # rebuilt only when the box's addresses changed (an open list stays open)
 		_addr_items = items
