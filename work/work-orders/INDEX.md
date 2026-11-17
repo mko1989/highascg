@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1014 live WOs (34 open, 156 in progress, 824 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1017 live WOs (34 open, 156 in progress, 827 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -430,7 +430,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1078 IN PROGRESS [lighting] visualiser: the sACN-driven part of the rig stays dark → 1078_WO_visualiser_sacn_part_of_rig_dark.md
 - 1097 DONE [lighting+tracking-vr,godot-client] Desk feed: the fronts' final pan / tilt / dimmer to the LD's desk on a spare un… → 1097_WO_desk_feed_fronts_to_lighting_desk.md
 
-## godot-client — Godot client (176)
+## godot-client — Godot client (179)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -608,6 +608,9 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1100 DONE [godot-client+tracking-vr] Previs: deselect with Esc or a click on empty space (one selection in the 3D vi… → 1100_WO_previs_deselect_esc_and_empty_click.md
 - 1104 DONE [godot-client+mapping,web-client] Previs: "Drape" (kotara) as a stage object type — procedural pleats, skirt unde… → 1104_WO_previs_stage_drape_object.md
 - 1105 DONE [godot-client+web-client,devices-config] Settings ▸ Games: host the browser games and the Game World from the operator c… → 1105_WO_settings_games_hosting_and_join_qr.md
+- 1108 DONE [godot-client+tracking-vr,video-io] The Previs view as a Live source (shm ring previs), so it can be recorded or st… → 1108_WO_previs_view_as_live_source.md
+- 1109 DONE [godot-client+tracking-vr] Previs: a camera slider (A → B camera moves, played smooth and repeatable) for… → 1109_WO_previs_camera_slider.md
+- 1110 DONE [godot-client+lighting] Previs at 15 fps with a 252-head rig: multi-cell fixtures drawn as batches (42… → 1110_WO_previs_cell_fixtures_batched.md
 
 ## web-client — Web client (90)
 

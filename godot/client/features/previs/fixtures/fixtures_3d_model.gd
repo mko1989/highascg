@@ -148,5 +148,10 @@ static func from_glb(bytes: PackedByteArray) -> Node3D:
 
 ## WO-797 — a viewport draws the rig unless it is a SubViewport set to UPDATE_DISABLED (a window always draws). Every
 ## view turns its SubViewport off while hidden, so this is when the rig watches tracking:fixtures (fixtures_watch.gd).
+## WO-1108: a hidden view whose stage the Previs output renders (meta FEEDS on its SubViewport) still draws the rig.
 static func renders(vp: Viewport) -> bool:
-	return vp != null and (not (vp is SubViewport) or (vp as SubViewport).render_target_update_mode != SubViewport.UPDATE_DISABLED)
+	return vp != null and (not (vp is SubViewport) or (vp as SubViewport).render_target_update_mode != SubViewport.UPDATE_DISABLED
+		or vp.get_meta(FEEDS, false) == true)
+
+
+const FEEDS := "previs_output"  ## WO-1108 (output/previs_output.gd sets it; previs_tab.gd _apply_mode reads it)

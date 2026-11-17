@@ -15,6 +15,7 @@ const Tint := preload("res://features/previs/model_tint.gd")
 const Haze := preload("res://features/previs/haze.gd")
 const Quality := preload("res://features/previs/previs_quality.gd")  # WO-892
 const Cone := preload("res://features/previs/fixtures/beam_cone.gd")
+const Batch := preload("res://features/previs/fixtures/cell_batch.gd")  # WO-1110: a cell rig in a few draw calls
 const House := preload("res://features/previs/house_lights.gd")  # WO-1099: the rig is show light — never dimmed
 
 var _colors := {}  # WO-641: typeId → "#rrggbb" (project.previs.fixture_colors)
@@ -158,6 +159,8 @@ func _build(f: Dictionary, rig: Dictionary) -> void:
 		root.add_child(ph)
 	parts.root = root
 	parts.box = _body_box(root)
+	if cells:
+		Batch.run(root, parts)
 	parts.mark = _mark(parts.box)
 	root.add_child(parts.mark)
 	parts.cmark = _mark(parts.box, Con.COLOR, 0.04)  # WO-857: a console-selected head
@@ -336,7 +339,7 @@ func _beam(node: Node3D, beam: Dictionary, body: Node3D) -> Dictionary:
 	lens.material_override = lmat
 	lens.set_meta("no_tint", true)
 	node.add_child(lens)
-	var out := {"lens": lmat, "body": body if beam.get("beamType") == "Glow" else null}
+	var out := {"lens": lmat, "lens_mi": lens, "body": body if beam.get("beamType") == "Glow" else null}
 	if beam.get("beamType") == "Glow" or beam.get("driven", true) == false:
 		return out
 	var cone := MeshInstance3D.new()
@@ -411,13 +414,10 @@ func _light(p: Dictionary, b: Dictionary) -> void:
 	var t := F.shown_tint(b, beams_on)
 	var lit := t.a > F.LIT
 	p.i = t.a  # WO-1099: beam_cone.gd pick ranks the beams by it
-	(p.lens as StandardMaterial3D).emission = Color(t.r, t.g, t.b)
-	(p.lens as StandardMaterial3D).emission_energy_multiplier = t.a * 4.0
-	if p.get("body") is GeometryInstance3D:
-		var mi := p.body as GeometryInstance3D
-		if mi.material_override is StandardMaterial3D:
-			(mi.material_override as StandardMaterial3D).emission_enabled = true
-			(mi.material_override as StandardMaterial3D).emission = Color(t.r, t.g, t.b) * t.a
+	if p.has("cell"):
+		Batch.light(p.cell, t)
+	else:
+		Batch.plain(p, t)
 	if p.has("cone"):
 		(p.cone as MeshInstance3D).visible = lit
 		(p.cmat as ShaderMaterial).set_shader_parameter("tint", t)

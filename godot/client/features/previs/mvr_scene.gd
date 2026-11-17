@@ -386,6 +386,7 @@ func mark(frames: Array) -> void:
 		mi.mesh = box
 		mi.top_level = true
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.set_meta("previs_helper", true)  # WO-1108: never in the Previs output (output/clean_layer.gd)
 		add_child(mi)
 		var local := Transform3D(f.basis, f.origin) * Transform3D(Basis.IDENTITY, Vector3(0, (f.size as Vector2).y / 2.0, 0.03))
 		mi.global_transform = (p.global_transform if p != null else Transform3D.IDENTITY) * local

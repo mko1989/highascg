@@ -10,6 +10,7 @@ const FLOOR_LAYER := 1 << 19  # WO-616 T12: the camera overlay culls the floor p
 const Quality := preload("res://features/previs/previs_quality.gd")  # WO-892
 const PadCamera := preload("res://features/previs/pad_camera.gd")  # WO-1067
 const House := preload("res://features/previs/house_lights.gd")  # WO-1099
+const CamPose := preload("res://features/previs/camera/camera_slider_model.gd")  # WO-1109
 const MIN_DIST := 2.0  # the wheel's closest orbit distance (WO-1025: then it dollies on)
 const PRESETS := {"Front": Vector3(0.0, 0.12, 12.0), "Top": Vector3(0.0, 1.45, 14.0), "ISO": Vector3(-0.75, 0.45, 13.0)}
 
@@ -309,6 +310,29 @@ func _update_camera() -> void:
 
 func camera() -> Camera3D:
 	return walk.camera() if walk != null else _cam  # WO-741
+
+
+## WO-1109 camera slider: the orbit camera as a pose {pos, look, fov} (stage frame, camera_slider_model.gd) …
+func view_pose() -> Dictionary:
+	return CamPose.pose(_cam.position if _cam != null else Vector3.ZERO, _target, _cam.fov if _cam != null else CamPose.DEFAULT_FOV)
+
+
+## … and back, as orbit state (orbit / pan / dolly go on from there); a running fly-to ends.
+func set_view_pose(pos: Vector3, look: Vector3, fov: float) -> void:
+	if _fly_tween != null:
+		_fly_tween.kill()
+	var o := CamPose.orbit_of(CamPose.pose(pos, look, fov))
+	_target = o.target
+	_dist = o.dist
+	_yaw = o.yaw
+	_pitch = o.pitch
+	if _cam != null:
+		_cam.fov = o.fov
+	_update_camera()
+
+
+func flying() -> bool:  # a preset's fly-to is under way (the slider's playback gives way to it)
+	return _fly_tween != null and _fly_tween.is_valid() and _fly_tween.is_running()
 
 
 ## WO-1104: where a new drape goes — the orbit point, and the yaw (degrees) that turns an object's +Z towards the camera.

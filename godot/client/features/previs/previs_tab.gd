@@ -5,8 +5,8 @@ extends HSplitContainer
 ## i dont need 2d, that was a misunderstanding") — 3D is the stage view. WO-616: a 2nd mode, Camera — a tracking camera's picture with the stage drawn through its solved camera; its
 ## settings and calibration live on an Inspector page (WO-608 R2). T5b: its Markers mode drives the operator's markers (marker_driver → server hub). T12: the 3D stage through the solved camera
 ## as an optional ghost overlay (camera_overlay.gd). T10c: 3D mode's "Tracking cameras" toggle shows each tracking
-## camera's frustum + footprint and the grid's coverage (coverage_3d.gd), with a one-line verdict under the view.
-## WO-640: 3D mode's stage / MVR / fixtures / models column is an Inspector page too (`_side`). WO-710: Auto tracking overlay.
+## camera's frustum + footprint and the grid's coverage (coverage_3d.gd), with a one-line verdict under the view. WO-640: 3D
+## mode's column is an Inspector page too (`_side`). WO-710: Auto tracking overlay. WO-1109/1108: camera slider, output.
 
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -358,12 +358,13 @@ func _apply_mode() -> void:
 	if _sv == null:
 		return
 	var shown := is_visible_in_tree()
+	var out: bool = _sv.get_meta("previs_output", false) == true  # WO-1108: the Previs output renders this stage, shown or not
 	var is3d := mode == "3d"
 	_svc.visible = is3d
 	_sv.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if is3d and shown else SubViewport.UPDATE_DISABLED
-	builder.set_live((is3d or (mode == "camera" and track_view.ghost_on)) and shown)  # T12: the ghost shows live walls
-	mvr.set_live(is3d and shown)  # WO-612 T5: MVR VideoScreens bound to HighAsCG surfaces
-	if is3d and shown and not stage.screens.is_empty():  # GLB screens only — no model, no hold
+	builder.set_live((is3d or (mode == "camera" and track_view.ghost_on)) and shown or out)  # T12: the ghost shows live walls
+	mvr.set_live(is3d and shown or out)  # WO-612 T5: MVR VideoScreens bound to HighAsCG surfaces
+	if (is3d and shown or out) and not stage.screens.is_empty():  # GLB screens only — no model, no hold
 		VideoSurfaces.acquire(_glb_role, self)
 	else:
 		VideoSurfaces.release(_glb_role, self)
@@ -473,6 +474,7 @@ func _build_panel() -> Control:
 		b.pressed.connect(func() -> void: stage.fly_to_preset(p, _view_pose(p)))
 		cams.add_child(b)
 	v.add_child(Fold.new("View", [UI.caption("Camera"), cams, UI.caption("Live picture on the screens"), _source]))
+	for f in preload("res://features/previs/camera/previs_cinema.gd").attach(self): v.add_child(f)  # WO-1109 slider, WO-1108 output
 	stage_panel = StagePanel.new()
 	v.add_child(Fold.new("Stage", [stage_panel]))
 	_models = ItemList.new()
