@@ -65,7 +65,7 @@ test('B2: a file then a folder of the same name is a rejected file, not a crash'
 		assert.match(r.rejected[0].error, /already in the upload/)
 		// the other way round, and across two uploads of one session (the earlier file is on disk by then)
 		const r2 = await upload([['d/a.png', 'png'], ['d', 'x'], ['d.obj', 'o']], r.session)
-		assert.deepEqual(r2.saved, ['d/a.png', 'd.obj'])
+		assert.deepEqual([...r2.saved].sort(), ['d.obj', 'd/a.png'])
 		const r3 = await upload([['x.obj/z.png', 'png'], ['d/a.png/q.png', 'png']], r.session)
 		await new Promise((res) => setImmediate(res))
 		assert.equal(crashed, null, String(crashed))
