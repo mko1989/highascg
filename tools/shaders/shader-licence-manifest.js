@@ -14,6 +14,10 @@
  *   - `boxLibrary`: data/shaders configs with no template (WO-999 FragCoord shaders) — box state, untracked, so a
  *     fresh clone keeps the committed rows instead of dropping them.
  * To fix an attribution: edit the header in the shader editor and save (writes both halves), then --write.
+ *
+ * WO-1106 B67: only shippable shaders are recorded. A NonCommercial licence is a problem (it does not ship: owner
+ * 17.11.26), and NC / retired configs a box holds locally are not part of the library, so `boxLibrary` skips them.
+ * The withdrawn NC shaders are recorded in LICENSES/withdrawn-nc.json instead.
  */
 
 const fs = require('fs')
@@ -24,6 +28,9 @@ const {
 	SHADERTOY_TERMS_URL,
 	SHADERTOY_DEFAULT_LICENCE,
 	shaderAttribution,
+	isShippableShader,
+	isNonCommercialLicence,
+	WITHDRAWN_NC_SHADERS,
 } = require('../../src/shaderfx/shader-licence')
 
 const DEFAULT_ROOT = path.join(__dirname, '..', '..')
@@ -65,6 +72,8 @@ function problemsOf(e) {
 	if (!e.author || !e.source) out.push('no attribution header (title — by author / source URL / License: line)')
 	if (e.licenceLine && FORBIDDEN_RE.test(e.licenceLine)) out.push(`forbidden licence "${e.licenceLine}"`)
 	else if (!e.licence || !LICENCES[e.licence]) out.push(`unknown licence "${e.licenceLine || ''}"`)
+	else if (isNonCommercialLicence(e.licence)) out.push(`non-commercial licence ${e.licence}: not shippable (WO-1106 B67)`)
+	if (WITHDRAWN_NC_SHADERS.has(e.id)) out.push('withdrawn (LICENSES/withdrawn-nc.json): not shippable (WO-1106 B67)')
 	return out.map((p) => `${e.file}: ${p}`)
 }
 
@@ -105,6 +114,7 @@ function buildManifest(opts = {}) {
 			} catch {
 				/* reported below */
 			}
+			if (cfg && !isShippableShader(f.slice(0, -5), cfg)) continue // WO-1106 B67: held on this box only
 			boxLibrary.push(entryOf(`data/shaders/${f}`, cfg))
 		}
 	} else {

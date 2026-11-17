@@ -22,7 +22,13 @@ const { REPO_ROOT } = require('../repo-paths')
 const { atomicWriteFile } = require('../utils/atomic-file-write')
 const { buildShaderTemplateHtml } = require('./shader-template-export')
 const { normalizeFragcoordParts, fragcoordUsesAudio } = require('./fragcoord-config')
-const { isRetiredShader } = require('./shader-licence')
+const {
+	isRetiredShader,
+	isShippableShader,
+	nonCommercialLicenceOf,
+	REMOVED_SHADER_IDS,
+	NON_COMMERCIAL_NOTE,
+} = require('./shader-licence')
 
 const SHADERS_DATA_DIR = path.join(REPO_ROOT, 'data', 'shaders')
 const SHADERS_TEMPLATE_DIR = path.join(REPO_ROOT, 'template', 'shaders')
@@ -264,11 +270,12 @@ function templatePath(id) {
  *   - missing JSON → recover it from the config the exporter EMBEDS in the HTML
  *                    (`window.__SHADERFX_CONFIG__`), then normalise and write it.
  *
- * @returns {Promise<{ exported: string[], recovered: string[] }>}
+ * @returns {Promise<{ exported: string[], recovered: string[], unexported: string[] }>}
  */
 async function reconcileShaderStore() {
 	const exported = []
 	const recovered = []
+	const unexported = []
 	const listDir = async (dir, suffix) => {
 		try {
 			return (await fsp.readdir(dir)).filter((n) => n.endsWith(suffix))
@@ -287,7 +294,8 @@ async function reconcileShaderStore() {
 		try {
 			const raw = JSON.parse(await fsp.readFile(dataPath(id), 'utf8'))
 			if (raw?.dialect === 'fragcoord') continue // WO-999: Caspar's player cannot run it — no template by design
-			if (isRetiredShader(id, raw)) continue // WO-1096: taken out of the shipped library — never re-export it
+			// WO-1096 retired / WO-1106 B67 NonCommercial: held on this box only — never re-export it into the shipped folder
+			if (!isShippableShader(id, raw)) continue
 			await atomicWriteFile(templatePath(id), buildShaderTemplateHtml(normalizeShaderConfig(raw)))
 			exported.push(id)
 		} catch {
@@ -305,7 +313,8 @@ async function reconcileShaderStore() {
 			if (!m) continue
 			// The exporter escapes `</` as `<\/` so shader source can never close the script tag.
 			const cfg = JSON.parse(m[1].replace(/<\\\//g, '</'))
-			if (isRetiredShader(id, cfg)) continue // WO-1096: a stale retired template must not seed a config
+			// WO-1096 / WO-1106 B67: a stale retired or NonCommercial template must not seed a config
+			if (!isShippableShader(id, cfg)) continue
 			await atomicWriteFile(dataPath(id), JSON.stringify(normalizeShaderConfig(cfg), null, '\t') + '\n')
 			recovered.push(id)
 		} catch {
@@ -313,7 +322,21 @@ async function reconcileShaderStore() {
 		}
 	}
 
-	return { exported, recovered }
+	// WO-1106 B67: a template exported before NC shaders stopped shipping (an earlier local import) is a derived copy of
+	// a config this box still holds — drop it so it neither shows in git nor rides along into an ISO.
+	for (const id of dataIds) {
+		if (!isValidShaderId(id) || !tplSet.has(id)) continue
+		try {
+			const raw = JSON.parse(await fsp.readFile(dataPath(id), 'utf8'))
+			if (isShippableShader(id, raw)) continue
+			await fsp.unlink(templatePath(id))
+			unexported.push(id)
+		} catch {
+			/* unreadable config — leave both halves alone */
+		}
+	}
+
+	return { exported, recovered, unexported }
 }
 
 /** @returns {Promise<Array<{ id: string, name: string, audio: boolean, alpha: boolean, casparPath: string, updatedAt: string|null }>>} */
@@ -336,6 +359,7 @@ async function listShaders() {
 			const raw = JSON.parse(await fsp.readFile(path.join(SHADERS_DATA_DIR, f), 'utf8'))
 			if (isRetiredShader(f.slice(0, -5), raw)) continue // WO-1096: no licence to ship it — hidden until attributed
 			const st = await fsp.stat(path.join(SHADERS_DATA_DIR, f))
+			const nc = nonCommercialLicenceOf(f.slice(0, -5), raw)
 			out.push({
 				id: raw.id,
 				name: raw.name,
@@ -346,6 +370,8 @@ async function listShaders() {
 					: {}),
 				casparPath: `shaders/${raw.id}`,
 				updatedAt: st.mtime ? st.mtime.toISOString() : null,
+				// WO-1106 B67: held on this box only (Visuals), no Caspar template — the list says why
+				...(nc ? { casparPath: null, local: true, nonCommercial: true, licence: nc, licenceNote: NON_COMMERCIAL_NOTE } : {}),
 			})
 		} catch {
 			/* skip unreadable entries — surfaced by the missing row, not a 500 */
@@ -368,17 +394,43 @@ async function getShader(id) {
 }
 
 /**
- * Normalize, persist and export. Returns the saved config + Caspar path.
+ * Normalize, persist and export. Returns the saved config + Caspar path (null = no Caspar template).
+ *
+ * WO-1106 B67: a NonCommercial config is saved on this box only (data/shaders) and never exported to template/shaders.
+ * A NEW one needs `allowNonCommercial: true` — the operator's own choice for non-paid work on this machine; editing a
+ * config this box already holds (or a Shader Live child of one) does not. Ids removed for IP reasons never save.
  * @param {any} input
  */
 async function saveShader(input) {
 	const config = normalizeShaderConfig(input)
+	if (REMOVED_SHADER_IDS.has(config.id)) {
+		throw new Error(`"${config.id}" was removed from HighAsCG: it is not ours to distribute or use`)
+	}
+	const nc = nonCommercialLicenceOf(config.id, config)
+	if (nc && input.allowNonCommercial !== true && !(await heldLocally(config.id)) && !(await heldLocally(config.parentId))) {
+		throw new Error(
+			`"${config.name}" is ${nc}: non-commercial use only, not part of HighAsCG. Save it with allowNonCommercial to keep it on this machine for non-paid work`
+		)
+	}
 	if (!fs.existsSync(SHADERS_DATA_DIR)) await fsp.mkdir(SHADERS_DATA_DIR, { recursive: true })
 	if (!fs.existsSync(SHADERS_TEMPLATE_DIR)) await fsp.mkdir(SHADERS_TEMPLATE_DIR, { recursive: true })
 	await atomicWriteFile(dataPath(config.id), JSON.stringify(config, null, '\t') + '\n')
 	if (config.dialect === 'fragcoord') return { config, casparPath: null } // WO-999: Visuals only, no Caspar template
+	if (!isShippableShader(config.id, config)) {
+		await fsp.unlink(templatePath(config.id)).catch(() => {}) // never leave a stale export in the shipped folder
+		return { config, casparPath: null, ...(nc ? { nonCommercial: true, licence: nc } : {}) }
+	}
 	await atomicWriteFile(templatePath(config.id), buildShaderTemplateHtml(config))
 	return { config, casparPath: `shaders/${config.id}` }
+}
+
+/** WO-1106 B67: does this box already hold a config with that id? @param {any} id */
+async function heldLocally(id) {
+	if (!isValidShaderId(id)) return false
+	return fsp
+		.access(dataPath(id))
+		.then(() => true)
+		.catch(() => false)
 }
 
 /**

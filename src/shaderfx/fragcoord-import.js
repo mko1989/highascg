@@ -255,7 +255,13 @@ async function importFragcoordShader(input, opts = {}) {
 		const glsl = await convertGolf(code, f)
 		set(key === 'common' ? stripEmptyMain(glsl) : glsl)
 	}
-	return { ...fragcoordConfigFromParsed(p, slug, { golf }), licenseKind: lic.kind, shareAlike: lic.shareAlike }
+	return {
+		...fragcoordConfigFromParsed(p, slug, { golf }),
+		licenseKind: lic.kind,
+		shareAlike: lic.shareAlike,
+		// WO-1106 B67: the operator's NC choice rides to store.saveShader (an NC config needs it to be kept on the box)
+		...(lic.kind === 'nc' ? { allowNonCommercial: true } : {}),
+	}
 }
 
 module.exports = {

@@ -474,4 +474,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-misc-zoom.test.js', // WO-1106 D3: rebind runs in the per-source chain, apply() waits for the tick in flight
 	'tools/smoke/smoke-wo1106-misc-pixelhue.test.js', // WO-1106 C41: a dead Studio session is dropped, reconnected once and the call retried
 	'tools/smoke/smoke-wo1106-misc-ci-decklink.test.js', // WO-1106 D4 / D5: dpkg --force-confmiss for desktopvideo, dev-dependency licences in the verify job
+	'tools/smoke/smoke-wo1106-shaders-nc-tracked.test.js', // WO-1106 B67: no tracked template belongs to a NonCommercial-licensed shader; the withdrawn record
+	'tools/smoke/smoke-wo1106-shaders-nc-store.test.js', // WO-1106 B67: the store never exports / seeds / ships an NC shader; locally held ones keep working, marked
+	'tools/smoke/smoke-wo1106-shaders-nc-verifier.test.js', // WO-1106 B67: the ISO verifier fails an image that carries an NC shader
 ]

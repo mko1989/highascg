@@ -24,6 +24,20 @@ Drag the shader from the **Templates** tab onto PGM/PRV like any other template 
 - **Save & export** with the same shader re-exports in place (same id/path). The config is baked into the exported template at save time — re-save after any change.
 - **Delete** removes both the config (`data/shaders/<id>.json`) and the exported template (`template/shaders/<id>.html`).
 
+## Shader licences: what ships, what stays on your box
+
+The library that comes with HighAsCG holds only shaders whose licence allows commercial use (CC0, MIT, CC BY, and
+HighAsCG's own `sh-fft-test`): 14 shaders, listed in `template/shaders/LICENSES/README.md`. The 169 shaders under
+**NonCommercial** licences (CC BY-NC-SA, CC BY-NC, and Shadertoy's default licence for code with no licence line) were
+withdrawn on 17.11.26, because HighAsCG is used at paid shows.
+
+- A box that already had them keeps its own copy. They still run in the **Visuals**, saved looks keep using them, and
+  the shader list marks each one **non-commercial licence — not part of HighAsCG**. They get no Caspar template and
+  never go into the repository or an ISO.
+- Bringing in a NonCommercial shader yourself (for non-paid work) is your choice on that machine: save or import it
+  with `allowNonCommercial: true`. Without it the save is refused with the licence named.
+- A Caspar look layer that still points at `shaders/<id>` of a withdrawn shader finds no template on that box.
+
 ## What a shader can use
 
 Standard Shadertoy entry point `mainImage(out vec4 fragColor, in vec2 fragCoord)` and uniforms:

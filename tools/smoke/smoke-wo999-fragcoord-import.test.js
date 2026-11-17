@@ -137,6 +137,10 @@ describe('WO-999 import (fake fetch, no network)', () => {
 		const cfg = await imp.importFragcoordShader('abc12345', { fetchImpl: fakeFetch(md), allowNonCommercial: true })
 		assert.equal(cfg.licenseKind, 'nc')
 		assert.equal(cfg.shareAlike, true)
+		// WO-1106 B67: the operator's choice rides to store.saveShader, which refuses a new NC config without it
+		assert.equal(cfg.allowNonCommercial, true)
+		const mit = await imp.importFragcoordShader('abc12345', { fetchImpl: fakeFetch(page()) })
+		assert.equal(mit.allowNonCommercial, undefined, 'only an NC import carries the flag')
 	})
 
 	it('golf passes go through convert_shader; the original is kept', async () => {

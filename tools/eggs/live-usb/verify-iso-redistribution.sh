@@ -32,6 +32,54 @@ REDIST_NEEDLES=(
 	'^home/[^/]+/(highascg/modules|\.highascg/modules)(/|$)|^home/[^/]+/\.highascg/modules\.json$|optional modules (WO-1076: opt-in packages, never in a base ISO; WO-1106 B70)'
 )
 
+# WO-1106 B67 — NonCommercial shaders do not ship (owner 17.11.26: "Don't ship them"). Two checks: the withdrawn ids
+# by path (needle built from template/shaders/LICENSES/withdrawn-nc.json, so the list lives in one place), and every
+# shader template on the image judged by the store's own rule (tools/shaders/check-shipped-templates.js: the
+# attribution header, not a dual-licensed helper snippet further down) — catches an NC template under any id, e.g. a
+# local import exported before the store stopped exporting NC shaders. Their configs (data/shaders) go with data/.
+SHADER_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+SHADER_NC_RECORD="${SHADER_REPO}/template/shaders/LICENSES/withdrawn-nc.json"
+SHADER_TPL_RE='^home/[^/]+/highascg/template/shaders/sh-[^/]+\.html$'
+
+shader_nc_needle() {
+	local ids
+	ids="$(grep -o '"id": *"sh-[a-z0-9-]*"' "$SHADER_NC_RECORD" 2>/dev/null | sed -E 's/.*"(sh-[a-z0-9-]+)"$/\1/' | paste -sd "|" - || true)"
+	[[ -n "$ids" ]] || return 1
+	printf '^home/[^/]+/highascg/template/shaders/(%s)\\.html$' "$ids"
+}
+
+shader_nc_check() {
+	local listing="$1" re hit tmp n
+	if re="$(shader_nc_needle)"; then
+		hit="$(grep -E -m 3 "$re" "$listing" | tr '\n' ' ' || true)"
+		if [[ -n "$hit" ]]; then
+			bad "not ours to ship (WO-1106 B67): withdrawn NonCommercial shader templates: ${hit}— delete them from template/shaders"
+		else
+			ok "absent (WO-1106 B67): withdrawn NonCommercial shader templates"
+		fi
+	else
+		bad "WO-1106 B67: cannot read the withdrawn shader record ${SHADER_NC_RECORD}"
+	fi
+	tmp="$(mktemp -d)"
+	grep -E "$SHADER_TPL_RE" "$listing" >"${tmp}/list" || true
+	n="$(wc -l <"${tmp}/list")"
+	if [[ "$n" -eq 0 ]]; then
+		ok "WO-1106 B67: no shader templates on the image"
+	elif ! command -v node >/dev/null 2>&1; then
+		bad "WO-1106 B67: node is needed to read the licences of the ${n} shader templates"
+	elif ! "${UNSQ[@]}" -q -n -d "${tmp}/x" -extract-file "${tmp}/list" "$SQ" >/dev/null 2>&1 || [[ ! -d "${tmp}/x" ]]; then
+		bad "WO-1106 B67: cannot extract the ${n} shader templates to read their licences"
+	else
+		hit="$(node "${SHADER_REPO}/tools/shaders/check-shipped-templates.js" "${tmp}/x" 2>&1 | head -n 3 | tr '\t\n' ': ' || true)"
+		if [[ -n "$hit" ]]; then
+			bad "not ours to ship (WO-1106 B67): shader templates that must not ship: ${hit}— delete it from template/shaders (the config stays in data/shaders)"
+		else
+			ok "WO-1106 B67: none of the ${n} shader templates is NonCommercial or retired"
+		fi
+	fi
+	rm -rf "$tmp"
+}
+
 # WO-1096 F — what MUST ship: licence texts + the source offer. <if-ERE (empty = always)>|<required ERE>|<what>
 LIC_T='^usr/share/doc/highascg/licenses'
 REDIST_REQUIRED=(
@@ -108,6 +156,7 @@ redistribution_check() {
 			ok "absent (WO-1096): ${what}"
 		fi
 	done
+	shader_nc_check "$listing"
 	licence_tree_check "$listing"
 	rm -f "$listing"
 }

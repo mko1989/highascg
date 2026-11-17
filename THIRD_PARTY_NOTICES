@@ -436,9 +436,8 @@ texts in tools/release/licenses/), and SOURCES.md there is the written source of
 
 ================================================================================
 Shader library — template/shaders/sh-*.html (and data/shaders/*.json)
-License: each shader under its own licence — NOT under HighAsCG's AGPL. Mostly Creative Commons
-Attribution-NonCommercial-ShareAlike 3.0/4.0 (Shadertoy's default licence for shaders without a licence
-line, https://www.shadertoy.com/terms), plus CC0, MIT, CC BY 3.0/4.0 and CC BY-NC 4.0.
+License: each shader under its own licence — NOT under HighAsCG's AGPL. Only licences that allow commercial
+use and redistribution ship: CC0 1.0, MIT, CC BY 3.0 and CC BY 4.0 (14 shaders, see the manifest).
 Every shader names its author, source URL and licence in a header at the top of its code; the per-file
 map is template/shaders/LICENSES/manifest.json, explained in template/shaders/LICENSES/README.md.
 Exception: sh-fft-test (HighAsCG's own, AGPL-3.0-or-later). The shader player (template/shaders/player*.js)
@@ -446,3 +445,6 @@ is HighAsCG code (AGPL); ShaderToyLite.js is BSD-3-Clause (vendor/shadertoy/LICE
 Removed in WO-1096 (not ours to ship): sh-mario (Nintendo IP), sh-balatro (commercial game, no licence),
 sh-audio-visualiser-v0-1-sadeghi ("All rights reserved") and four shaders of unknown origin (opt-in list:
 template/shaders/LICENSES/opt-in.json).
+Withdrawn in WO-1106 B67 (17.11.26): the 169 shaders under NonCommercial licences (CC BY-NC-SA 3.0/4.0,
+incl. Shadertoy's default licence, and CC BY-NC 4.0) — HighAsCG is used at paid shows. They are not in the
+repository or the ISO; template/shaders/LICENSES/withdrawn-nc.json records their authors and sources.

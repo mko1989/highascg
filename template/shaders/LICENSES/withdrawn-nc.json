@@ -1,0 +1,1365 @@
+{
+	"about": "WO-1106 B67 — shaders WITHDRAWN from the shipped library (repo, ISO, releases) because their licence is NonCommercial (CC BY-NC-SA 3.0 / 4.0, CC BY-NC 4.0). HighAsCG is used at paid shows; owner decision 17.11.26: \"Don't ship them\". Their template/shaders/<id>.html files were deleted from the repo; this record keeps who made each one and where it came from. Not hand-picked: every manifest row whose licence id contains -NC was withdrawn.",
+	"rule": "A shader ships only when its licence allows commercial use and redistribution. src/shaderfx/shader-licence.js treats a config as non-commercial when its attribution names an -NC licence, its id (or its Shader Live parent) is listed here, or a FragCoord import recorded licenseKind nc. Such a config is held on that box only (data/shaders, never in the ISO): the store never exports it to template/shaders, never seeds it from a stale template, and lists it marked nonCommercial / local. A new one needs the operator's explicit allowNonCommercial (their own choice and responsibility, per machine).",
+	"getIt": "An operator who wants one of these for non-paid work imports it on that machine from its source link (FragCoord / Shadertoy import with allowNonCommercial). Boxes that already had them keep their local data/shaders copy.",
+	"withdrawnAt": "2026-11-17",
+	"counts": {
+		"CC-BY-NC-SA-4.0": 12,
+		"CC-BY-NC-SA-3.0": 156,
+		"CC-BY-NC-4.0": 1
+	},
+	"withdrawn": [
+		{
+			"id": "sh-3d-meters-c2",
+			"name": "mirrors c2",
+			"title": "3D Audio Visualizer",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/dtl3Dr",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-3d-meters-c3",
+			"name": "mirrors c3",
+			"title": "3D Audio Visualizer",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/dtl3Dr",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-3d-meters-c4",
+			"name": "mirrors c4",
+			"title": "3D Audio Visualizer",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/dtl3Dr",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-3d-meters-c5",
+			"name": "mirrors c5",
+			"title": "3D Audio Visualizer",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/dtl3Dr",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-3d-meters-c6",
+			"name": "mirrors c6",
+			"title": "3D Audio Visualizer",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/dtl3Dr",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-3d-meters-c7",
+			"name": "mirrors c7",
+			"title": "3D Audio Visualizer",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/dtl3Dr",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-3d-meters",
+			"name": "mirrors",
+			"title": "3D Audio Visualizer",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/dtl3Dr",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-audio-reactive-galaxy",
+			"name": "Audio Reactive Galaxy",
+			"title": "Audio Reactive Galaxy",
+			"author": "JelyMe314",
+			"source": "https://www.shadertoy.com/view/NdG3zw",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-audio",
+			"name": "console",
+			"title": "20221105_inercia intended one",
+			"author": "0b5vr",
+			"source": "https://www.shadertoy.com/view/cs2GWD",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-21-august-2017",
+			"name": "21 August 2017",
+			"title": "21 August 2017",
+			"author": "rigel",
+			"source": "https://www.shadertoy.com/view/ls2fzK",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-2d-simplex-clouds",
+			"name": "2D Simplex Clouds",
+			"title": "2D Simplex Clouds",
+			"author": "voax",
+			"source": "https://www.shadertoy.com/view/XtfSW4",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-auroras",
+			"name": "Auroras",
+			"title": "Auroras",
+			"author": "nimitz",
+			"source": "https://www.shadertoy.com/view/XtGGRt",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-cloudy-sunset",
+			"name": "cloudy sunset",
+			"title": "cloudy sunset",
+			"author": "miloszmaki",
+			"source": "https://www.shadertoy.com/view/XlsXDB",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-electric-sinusoid",
+			"name": "Electric Sinusoid",
+			"title": "Electric Sinusoid",
+			"author": "ddoodm",
+			"source": "https://www.shadertoy.com/view/XdXXzr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-fbm-multiple-octave-noise",
+			"name": "fbm multiple octave noise",
+			"title": "fbm multiple octave noise",
+			"author": "hellochar",
+			"source": "https://www.shadertoy.com/view/ltdBzr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-fly-by-night",
+			"name": "Fly by Night",
+			"title": "Fly by Night",
+			"author": "mhnewman",
+			"source": "https://www.shadertoy.com/view/XlXGD7",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-foamy-water",
+			"name": "Foamy water",
+			"title": "Foamy water",
+			"author": "k_mouse",
+			"source": "https://www.shadertoy.com/view/llcXW7",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-k-moon",
+			"name": "K-moon",
+			"title": "K-moon",
+			"author": "Kali",
+			"source": "https://www.shadertoy.com/view/4tXGzj",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-light-circles",
+			"name": "Light Circles",
+			"title": "Light Circles",
+			"author": "Deefunct",
+			"source": "https://www.shadertoy.com/view/MlyGzW",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-night-sky-01",
+			"name": "Night Sky 01",
+			"title": "Night Sky 01",
+			"author": "xaot88",
+			"source": "https://www.shadertoy.com/view/XsSXz3",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-paint-archipelago",
+			"name": "Paint Archipelago",
+			"title": "Paint Archipelago",
+			"author": "samlo",
+			"source": "https://www.shadertoy.com/view/3lf3z2",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-perlin-water-noise",
+			"name": "Perlin Water Noise",
+			"title": "Perlin Water Noise",
+			"author": "jackdavenport",
+			"source": "https://www.shadertoy.com/view/Mt2SzR",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-redsmoke",
+			"name": "RedSmoke",
+			"title": "RedSmoke",
+			"author": "Makio64",
+			"source": "https://www.shadertoy.com/view/llsSzB",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-simple-2d-clouds",
+			"name": "simple 2D clouds",
+			"title": "simple 2D clouds",
+			"author": "zxxuan1001",
+			"source": "https://www.shadertoy.com/view/tlB3zK",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-simple-parallax-snow",
+			"name": "Simple parallax snow",
+			"title": "Simple parallax snow",
+			"author": "fenwick67",
+			"source": "https://www.shadertoy.com/view/MdXcW8",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-slowstars-2-197-chars",
+			"name": "Slowstars 2  ( 197 chars )",
+			"title": "Slowstars 2  ( 197 chars )",
+			"author": "FabriceNeyret2",
+			"source": "https://www.shadertoy.com/view/XsVSWG",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-star-field-4-433-chars",
+			"name": "star field 4 (433 chars)",
+			"title": "star field 4 (433 chars)",
+			"author": "FabriceNeyret2",
+			"source": "https://www.shadertoy.com/view/ltBXDd",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-starfield-dots-ii",
+			"name": "Starfield DOTs II",
+			"title": "Starfield DOTs II",
+			"author": "patu",
+			"source": "https://www.shadertoy.com/view/XtjcW3",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-starfield02",
+			"name": "StarField02",
+			"title": "StarField02",
+			"author": "xaot88",
+			"source": "https://www.shadertoy.com/view/MdSXRd",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-sunlight-through-water",
+			"name": "Sunlight through Water",
+			"title": "Sunlight through Water",
+			"author": "bbcollinsworth",
+			"source": "https://www.shadertoy.com/view/ld2yWy",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-sunset-cloud",
+			"name": "Sunset Cloud",
+			"title": "Sunset Cloud",
+			"author": "kuvkar",
+			"source": "https://www.shadertoy.com/view/llj3RD",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-synth-waves",
+			"name": "Synth waves",
+			"title": "Synth waves",
+			"author": "avin",
+			"source": "https://www.shadertoy.com/view/Wts3DB",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-traveling-through-mist",
+			"name": "Traveling Through Mist",
+			"title": "Traveling Through Mist",
+			"author": "Emil",
+			"source": "https://www.shadertoy.com/view/MtcyWr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-wavy-background-effect",
+			"name": "Wavy Background Effect",
+			"title": "Wavy Background Effect",
+			"author": "gigaherz",
+			"source": "https://www.shadertoy.com/view/ltGSWD",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-worley-algorithm-cell-noise",
+			"name": "Worley Algorithm (Cell Noise )",
+			"title": "Worley Algorithm (Cell Noise )",
+			"author": "Yeis",
+			"source": "https://www.shadertoy.com/view/Xl33Wn",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bg-worley-noise-waters",
+			"name": "Worley Noise Waters",
+			"title": "Worley Noise Waters",
+			"author": "Kyle273",
+			"source": "https://www.shadertoy.com/view/llS3RK",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-bubles",
+			"name": "bubles",
+			"title": "Balls on a rope",
+			"author": "xjorma (David Gallardo)",
+			"source": "https://www.shadertoy.com/view/WdVyRd",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-chillwave-planet",
+			"name": "chillwave planet",
+			"title": "chillwave planet",
+			"author": "z0rg",
+			"source": "https://www.shadertoy.com/view/ftV3zK",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-console",
+			"name": "audio",
+			"title": "20221105_inercia intended one",
+			"author": "0b5vr",
+			"source": "https://www.shadertoy.com/view/cs2GWD",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-fork-abstract-music",
+			"name": "Fork Abstract Music",
+			"title": "Abstract Music",
+			"author": "MatHack",
+			"source": "https://www.shadertoy.com/view/4stSRs",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-fork-shimmy-woodsgao-951",
+			"name": "Fork Shimmy WoodsGao 951",
+			"title": "Shimmy",
+			"author": "Kali",
+			"source": "https://www.shadertoy.com/view/fd2GD1",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-fork-soundeclip-nobody-012",
+			"name": "Fork SoundEclip nobody 012",
+			"title": "Fork SoundEclip nobody 012",
+			"author": "nobody",
+			"source": "https://www.shadertoy.com/view/mtjSWm",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-fork-soundeclip-swaglordla-430",
+			"name": "Fork SoundEclip SwagLordLa 430",
+			"title": "Fork SoundEclip SwagLordLa 430",
+			"author": "SwagLordLancalot",
+			"source": "https://www.shadertoy.com/view/McSBRy",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-hexagons",
+			"name": "hexagons",
+			"title": "Hexagone",
+			"author": "Martijn Steinrucken aka BigWings",
+			"source": "https://www.shadertoy.com/view/wsl3WB",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-jj2",
+			"name": "jj2",
+			"title": "jj2",
+			"author": "jjdee",
+			"source": "https://www.shadertoy.com/view/lXfXR2",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-ksbhdgdgb",
+			"name": "ring",
+			"title": "1D Radial Lightmap Test",
+			"author": "Flyguy",
+			"source": "https://www.shadertoy.com/view/XsK3RR",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-ksjb",
+			"name": "tunnel-ball",
+			"title": "Cave Diving",
+			"author": "Elsio",
+			"source": "https://www.shadertoy.com/view/XcVyWD",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-matrix",
+			"name": "matrix",
+			"title": "Matrix Lavalamp",
+			"author": "xjorma (David Gallardo)",
+			"source": "https://www.shadertoy.com/view/3dX3zj",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-mb-fork-polar",
+			"name": "Mb Fork Polar",
+			"title": "Polar react",
+			"author": "firebreathz",
+			"source": "https://www.shadertoy.com/view/stj3Rw",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-mirrors",
+			"name": "mirrors",
+			"title": "3D Audio Visualizer",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/dtl3Dr",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-raymarched-mandelbaum-reactive",
+			"name": "Raymarched mandelbaum reactive",
+			"title": "Raymarched 3D Kandinsky (Ultra-Smooth Ambient A/V Build)",
+			"author": "desisn (Copyright (c) 2026 desisn.com)",
+			"source": "https://desisn.com",
+			"licence": "CC-BY-NC-4.0"
+		},
+		{
+			"id": "sh-revision-qualification-2018-cupe",
+			"name": "Revision Qualification 2018-Cupe",
+			"title": "Revision Qualification 2018-Cupe",
+			"author": "nightfox",
+			"source": "https://www.shadertoy.com/view/MsGczc",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-ryb-color-wheel",
+			"name": "RYB Color wheel",
+			"title": "RYB Color wheel",
+			"author": "pthextract",
+			"source": "https://www.shadertoy.com/view/4sjfzm",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-3d-audio-visualizer-2",
+			"name": "3D Audio Visualizer #2",
+			"title": "3D Audio Visualizer #2",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/Dtj3zW",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-sa-3d-audio-visualizer",
+			"name": "3D Audio Visualizer",
+			"title": "3D Audio Visualizer",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/dtl3Dr",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-sa-abstract-music",
+			"name": "Abstract Music",
+			"title": "Abstract Music",
+			"author": "MatHack",
+			"source": "https://www.shadertoy.com/view/4stSRs",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-acid-blossom-visualizer-sound",
+			"name": "Acid blossom visualizer (Sound!)",
+			"title": "Acid blossom visualizer (Sound!)",
+			"author": "Forthro",
+			"source": "https://www.shadertoy.com/view/mlcfW2",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-another-synthwave-sunset-thing",
+			"name": "another synthwave sunset thing",
+			"title": "another synthwave sunset thing",
+			"author": "stduhpf",
+			"source": "https://www.shadertoy.com/view/tsScRK",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-audio-band-eq-demo",
+			"name": "Audio Band EQ Demo",
+			"title": "Audio Band EQ Demo",
+			"author": "byt3_m3chanic",
+			"source": "https://www.shadertoy.com/view/WfByz1",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-audio-flight-v2-strobes",
+			"name": "Audio Flight v2 (strobes)",
+			"title": "Audio Flight v2 (strobes)",
+			"author": "byt3_m3chanic",
+			"source": "https://www.shadertoy.com/view/7tfyRl",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-audio-reactive-fractal",
+			"name": "Audio Reactive Fractal",
+			"title": "Audio Reactive Fractal",
+			"author": "FaustianBargainForTop",
+			"source": "https://www.shadertoy.com/view/dtSBR1",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-audio-reactive-scene-1st-attempt",
+			"name": "Audio-reactive scene 1st attempt",
+			"title": "Audio-reactive scene 1st attempt",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/cslSRr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-audio-visualizer-5-wipeout",
+			"name": "Audio Visualizer #5 - Wipeout",
+			"title": "Audio Visualizer #5 - Wipeout",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/ddXfzf",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-audio-visualizer",
+			"name": "Audio-Visualizer",
+			"title": "Audio-Visualizer",
+			"author": "CoolerZ",
+			"source": "https://www.shadertoy.com/view/wd3XzS",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-audiovisual",
+			"name": "AudioVisual",
+			"title": "AudioVisual",
+			"author": "Passion",
+			"source": "https://www.shadertoy.com/view/MsBSzw",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-audiovisualizer-bars-3-sidhu",
+			"name": "AudioVisualizer bars 3 (sidhu)",
+			"title": "AudioVisualizer bars 3 (sidhu)",
+			"author": "ramansinghdhiman",
+			"source": "https://www.shadertoy.com/view/lcBSWR",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-auroras",
+			"name": "Auroras",
+			"title": "Auroras",
+			"author": "nimitz",
+			"source": "https://www.shadertoy.com/view/XtGGRt",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-basic-audio-visualizer",
+			"name": "Basic Audio Visualizer",
+			"title": "Basic Audio Visualizer",
+			"author": "chronos",
+			"source": "https://www.shadertoy.com/view/lsdGR8",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-blueprint-of-the-architekt",
+			"name": "Blueprint of the Architekt",
+			"title": "Blueprint of the Architekt",
+			"author": "s23b",
+			"source": "https://www.shadertoy.com/view/4tySDW",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-bubbles-music-visualizer",
+			"name": "Bubbles music visualizer",
+			"title": "Bubbles music visualizer",
+			"author": "liyouvane",
+			"source": "https://www.shadertoy.com/view/llXBWB",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-burning-heart",
+			"name": "Burning Heart",
+			"title": "Burning Heart",
+			"author": "dnnkeeper",
+			"source": "https://www.shadertoy.com/view/llXGRX",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-call-of-the-siren",
+			"name": "Call of the Siren",
+			"title": "Call of the Siren",
+			"author": "Quasimondo",
+			"source": "https://www.shadertoy.com/view/7sSSDd",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-cheshire-cat-and-cute-little-shader-combined-https-w",
+			"name": "Cheshire Cat and cute little shader combined. https://www.shadertoy.com/view/wsf3RN",
+			"title": "Cheshire Cat and cute little shader combined. https://www.shadertoy.com/view/wsf3RN",
+			"author": "teassy000 and julianlumia",
+			"source": "https://www.shadertoy.com/view/MdtSWr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-christmas-tree",
+			"name": "Christmas tree ::)",
+			"title": "Christmas tree ::)",
+			"author": "vanshika",
+			"source": "https://www.shadertoy.com/view/MfGBWm",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-cloned-rainbow-spectrum",
+			"name": "cloned: rainbow spectrum",
+			"title": "cloned: rainbow spectrum",
+			"author": "hornet",
+			"source": "https://www.shadertoy.com/view/ldX3D8",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-cosmic-scene",
+			"name": "Cosmic scene",
+			"title": "Cosmic scene",
+			"author": "Thominator",
+			"source": "https://www.shadertoy.com/view/Xl3fWr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-cross-sdf-fractal",
+			"name": "Cross SDF fractal",
+			"title": "Cross SDF fractal",
+			"author": "bradjamesgrant",
+			"source": "https://www.shadertoy.com/view/tssfz7",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-danaga-s-wingman",
+			"name": "danaga's wingman",
+			"title": "danaga's wingman",
+			"author": "s23b",
+			"source": "https://www.shadertoy.com/view/MdtXDf",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-dancing-color-rings",
+			"name": "Dancing Color Rings",
+			"title": "Dancing Color Rings",
+			"author": "QuantumSuper",
+			"source": "https://www.shadertoy.com/view/md3GDl",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-domain-warped-fbm-noise",
+			"name": "Domain warped FBM noise",
+			"title": "Domain warped FBM noise",
+			"author": "liamegan",
+			"source": "https://www.shadertoy.com/view/wttXz8",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-ethereal-pulsar-music-visualizer",
+			"name": "Ethereal Pulsar Music Visualizer",
+			"title": "Ethereal Pulsar Music Visualizer",
+			"author": "Forthro",
+			"source": "https://www.shadertoy.com/view/dtyfzD",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-evacuation",
+			"name": "Evacuation",
+			"title": "Evacuation",
+			"author": "Xor",
+			"source": "https://www.shadertoy.com/view/4l2GW1",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-everybody-dance",
+			"name": "Everybody Dance",
+			"title": "Everybody Dance",
+			"author": "s23b",
+			"source": "https://www.shadertoy.com/view/XsySDW",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-exclamation-heart-nr-2-3",
+			"name": "Exclamation Heart Nr.2 <3!",
+			"title": "Exclamation Heart Nr.2 <3!",
+			"author": "ArthurTent",
+			"source": "https://www.shadertoy.com/view/43dGDn",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-sa-exit-the-matrix",
+			"name": "Exit the Matrix",
+			"title": "Exit the Matrix",
+			"author": "Kali",
+			"source": "https://www.shadertoy.com/view/NlsXDH",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-eye-of-haji-sauron",
+			"name": "Eye of Haji Sauron",
+			"title": "Eye of Haji Sauron",
+			"author": "arminkz",
+			"source": "https://www.shadertoy.com/view/X3jcWR",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-fft-domain-coloring",
+			"name": "FFT Domain Coloring",
+			"title": "FFT Domain Coloring",
+			"author": "pixelbeast",
+			"source": "https://www.shadertoy.com/view/Mt2GWt",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-fft-experiment",
+			"name": "fft experiment",
+			"title": "fft experiment",
+			"author": "nshelton",
+			"source": "https://www.shadertoy.com/view/4tK3zG",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-flower-speaker",
+			"name": "Flower Speaker",
+			"title": "Flower Speaker",
+			"author": "coposuke",
+			"source": "https://www.shadertoy.com/view/ttXczX",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-fluidic-space",
+			"name": "Fluidic Space",
+			"title": "Fluidic Space",
+			"author": "EnigmaCurry",
+			"source": "https://www.shadertoy.com/view/tdS3DD",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-fork-dancing-glow-lights",
+			"name": "Fork: Dancing Glow Lights",
+			"title": "Fork: Dancing Glow Lights",
+			"author": "QuantumSuper",
+			"source": "https://www.shadertoy.com/view/DtsBWH",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-fork-dive-into-music",
+			"name": "Fork: Dive Into Music",
+			"title": "Fork: Dive Into Music",
+			"author": "QuantumSuper",
+			"source": "https://www.shadertoy.com/view/cst3zl",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-fork-ltt-logo-radiantmusicvis",
+			"name": "Fork LTT Logo + RadiantMusicVis",
+			"title": "Fork LTT Logo + RadiantMusicVis",
+			"author": "ArthurTent",
+			"source": "https://www.shadertoy.com/view/4XKGRw",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-fork-neural-stanford-c-base",
+			"name": "Fork: Neural Stanford c-base",
+			"title": "Fork: Neural Stanford c-base",
+			"author": "ArthurTent",
+			"source": "https://www.shadertoy.com/view/4fyfzK",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-fork-nixie-tube-clock",
+			"name": "Fork Nixie Tube Clock",
+			"title": "Fork Nixie Tube Clock",
+			"author": "picoplanetdev",
+			"source": "https://www.shadertoy.com/view/Dds3WB",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-foxie",
+			"name": "Foxie",
+			"title": "Foxie",
+			"author": "z0rg",
+			"source": "https://www.shadertoy.com/view/NdlGzs",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-fractal-77-music-visualizer",
+			"name": "Fractal 77 Music Visualizer",
+			"title": "Fractal 77 Music Visualizer",
+			"author": "orblivius",
+			"source": "https://www.shadertoy.com/view/XXBGzw",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-frequency-balls",
+			"name": "frequency balls",
+			"title": "frequency balls",
+			"author": "nshelton",
+			"source": "https://www.shadertoy.com/view/4scGW2",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-frequency-visualization",
+			"name": "Frequency Visualization",
+			"title": "Frequency Visualization",
+			"author": "rakeshcjadav",
+			"source": "https://www.shadertoy.com/view/MdVSWG",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-galaxy-of-universes",
+			"name": "Galaxy of Universes",
+			"title": "Galaxy of Universes",
+			"author": "Dave_Hoskins",
+			"source": "https://www.shadertoy.com/view/MdXSzS",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-gauges",
+			"name": "Gauges",
+			"title": "Gauges",
+			"author": "QuantumSuper",
+			"source": "https://www.shadertoy.com/view/DsjcRD",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-genizm-id-visualizer",
+			"name": "Genizm - Id (Visualizer)",
+			"title": "Genizm - Id (Visualizer)",
+			"author": "gurudevbk",
+			"source": "https://www.shadertoy.com/view/7ldyzN",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-glowest",
+			"name": "Glowest",
+			"title": "Glowest",
+			"author": "TornaxO7",
+			"source": "https://www.shadertoy.com/view/w3tcWr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-glxy-epilogue",
+			"name": "glxy epilogue",
+			"title": "glxy epilogue",
+			"author": "vadevaman",
+			"source": "https://www.shadertoy.com/view/MtdfRM",
+			"licence": "CC-BY-NC-SA-4.0"
+		},
+		{
+			"id": "sh-sa-habitable-planet",
+			"name": "Habitable Planet",
+			"title": "Habitable Planet",
+			"author": "Kali",
+			"source": "https://www.shadertoy.com/view/WdScRW",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-i-don-t-know-how-i-made-this",
+			"name": "i don't know how i made this",
+			"title": "i don't know how i made this",
+			"author": "xbvuno",
+			"source": "https://www.shadertoy.com/view/43KBRK",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-inercia-royaliptic",
+			"name": "Inercia Royaliptic",
+			"title": "Inercia Royaliptic",
+			"author": "leon",
+			"source": "https://www.shadertoy.com/view/md2GDD",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-livecoding-airport-animefes-2023",
+			"name": "LiveCoding@AirPort AnimeFes 2023",
+			"title": "LiveCoding@AirPort AnimeFes 2023",
+			"author": "gam0022",
+			"source": "https://www.shadertoy.com/view/dldyz2",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-log-spherical-kifs-zoomer",
+			"name": "Log Spherical KIFS 'Zoomer'",
+			"title": "Log Spherical KIFS 'Zoomer'",
+			"author": "derSchamane",
+			"source": "https://www.shadertoy.com/view/ctcGRf",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-low-frequency-flow",
+			"name": "♫ Low Frequency Flow",
+			"title": "♫ Low Frequency Flow",
+			"author": "patu",
+			"source": "https://www.shadertoy.com/view/MtKSRc",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-magfest-station-event",
+			"name": "♫ [MAGFest] Station event",
+			"title": "♫ [MAGFest] Station event",
+			"author": "patu",
+			"source": "https://www.shadertoy.com/view/4llfDs",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-mandelkoch-music-visualiser-ver",
+			"name": "MandelKoch- Music Visualiser ver",
+			"title": "MandelKoch- Music Visualiser ver",
+			"author": "Pelegefen",
+			"source": "https://www.shadertoy.com/view/sslXzX",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-merry-christmas-388-chars",
+			"name": "Merry Christmas! [388 chars]",
+			"title": "Merry Christmas! [388 chars]",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/4fs3WS",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-modified-bear",
+			"name": "Modified Bear",
+			"title": "Modified Bear",
+			"author": "s23b",
+			"source": "https://www.shadertoy.com/view/XtGGW3",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-music-mandlebrot",
+			"name": "Music + Mandlebrot",
+			"title": "Music + Mandlebrot",
+			"author": "sujay",
+			"source": "https://www.shadertoy.com/view/4dKBDh",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-musical-heart",
+			"name": "Musical Heart",
+			"title": "Musical Heart",
+			"author": "Passion",
+			"source": "https://www.shadertoy.com/view/XdsyW4",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-mystic-flower-interactive",
+			"name": "Mystic Flower interactive",
+			"title": "Mystic Flower interactive",
+			"author": "timmaffett",
+			"source": "https://www.shadertoy.com/view/mdjGDc",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-nanokontrol2",
+			"name": "nanoKontrol2",
+			"title": "nanoKontrol2",
+			"author": "byt3_m3chanic",
+			"source": "https://www.shadertoy.com/view/NlsfDM",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-neon-bridge",
+			"name": "Neon Bridge",
+			"title": "Neon Bridge",
+			"author": "kishimisu",
+			"source": "https://www.shadertoy.com/view/msjXzR",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-neon-octagonal-audio-visualizer",
+			"name": "Neon Octagonal Audio Visualizer",
+			"title": "Neon Octagonal Audio Visualizer",
+			"author": "Emiel",
+			"source": "https://www.shadertoy.com/view/Wd23Rw",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-new-colorful-galaxy",
+			"name": "new colorful galaxy",
+			"title": "new colorful galaxy",
+			"author": "nayk",
+			"source": "https://www.shadertoy.com/view/l3fczr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-otherworldy",
+			"name": "Otherworldy",
+			"title": "Otherworldy",
+			"author": "lherm",
+			"source": "https://www.shadertoy.com/view/MlySWd",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-pop-shift",
+			"name": "Pop Shift",
+			"title": "Pop Shift",
+			"author": "QuantumSuper",
+			"source": "https://www.shadertoy.com/view/cdcBWs",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-quicky-058",
+			"name": "大龙猫 - Quicky#058",
+			"title": "大龙猫 - Quicky#058",
+			"author": "totetmatt",
+			"source": "https://www.shadertoy.com/view/fdcGRj",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-radar-music-visualizer",
+			"name": "Radar Music Visualizer",
+			"title": "Radar Music Visualizer",
+			"author": "laserdog",
+			"source": "https://www.shadertoy.com/view/Ml2cDK",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-rainbow-soundviz",
+			"name": "🎶 Rainbow soundviz 🎶",
+			"title": "🎶 Rainbow soundviz 🎶",
+			"author": "avin",
+			"source": "https://www.shadertoy.com/view/ttfGzH",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-recogniser",
+			"name": "Recogniser",
+			"title": "Recogniser",
+			"author": "fizzer",
+			"source": "https://www.shadertoy.com/view/MdX3Dn",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-resonance-club-3d-audio",
+			"name": "Resonance Club 3D (Audio)",
+			"title": "Resonance Club 3D (Audio)",
+			"author": "dathor",
+			"source": "https://www.shadertoy.com/view/sXV3zR",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-ribbons",
+			"name": "Ribbons",
+			"title": "Ribbons",
+			"author": "XT95",
+			"source": "https://www.shadertoy.com/view/lds3zr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-ripplelppir",
+			"name": "ripplelppir",
+			"title": "ripplelppir",
+			"author": "bombblob",
+			"source": "https://www.shadertoy.com/view/w3sGR7",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-sailing-beyond-hyper-tunnel",
+			"name": "♫ Sailing Beyond - Hyper Tunnel",
+			"title": "♫ Sailing Beyond - Hyper Tunnel",
+			"author": "patu",
+			"source": "https://www.shadertoy.com/view/4t2cR1",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-sesh-maybe",
+			"name": "SESH maybe?",
+			"title": "SESH maybe?",
+			"author": "MeDope",
+			"source": "https://www.shadertoy.com/view/ftSGWy",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-sh18-babytoy",
+			"name": "[SH18] BabyToy",
+			"title": "[SH18] BabyToy",
+			"author": "Martijn Steinrucken aka BigWings",
+			"source": "https://www.shadertoy.com/view/lldyWn",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-shatter-flake",
+			"name": "Shatter Flake",
+			"title": "Shatter Flake",
+			"author": "QuantumSuper",
+			"source": "https://www.shadertoy.com/view/ctBSWt",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-shit-just-got-real",
+			"name": "Shit just got real",
+			"title": "Shit just got real",
+			"author": "db0x90",
+			"source": "https://www.shadertoy.com/view/Xdjczt",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-soap-bubble-music-visualizer-1",
+			"name": "Soap Bubble Music Visualizer #1",
+			"title": "Soap Bubble Music Visualizer #1",
+			"author": "Ruzzyr",
+			"source": "https://www.shadertoy.com/view/XtVSDt",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-solum-object",
+			"name": "Solum Object",
+			"title": "Solum Object",
+			"author": "QuantumSuper",
+			"source": "https://www.shadertoy.com/view/mtKGRW",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-sonic-pulse",
+			"name": "Sonic Pulse",
+			"title": "Sonic Pulse",
+			"author": "WillKirkby",
+			"source": "https://www.shadertoy.com/view/4dcyD2",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-sound-blob",
+			"name": "Sound Blob",
+			"title": "Sound Blob",
+			"author": "seb0fh",
+			"source": "https://www.shadertoy.com/view/Ms3SWr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-sound-everyone-s-favorite-song",
+			"name": "(sound) Everyone's Favorite Song",
+			"title": "(sound) Everyone's Favorite Song",
+			"author": "Tilmann",
+			"source": "https://www.shadertoy.com/view/fldcWf",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-sound-reactive-circle",
+			"name": "Sound Reactive Circle",
+			"title": "Sound Reactive Circle",
+			"author": "Friend",
+			"source": "https://www.shadertoy.com/view/NlsfDM",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-spaceship-console",
+			"name": "Spaceship Console",
+			"title": "Spaceship Console",
+			"author": "QuantumSuper",
+			"source": "https://www.shadertoy.com/view/DlVXDc",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-speaker-visualizer",
+			"name": "Speaker visualizer",
+			"title": "Speaker visualizer",
+			"author": "jaszunio15",
+			"source": "https://www.shadertoy.com/view/wsdXDN",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-supernoise",
+			"name": "♫ SuperNoise",
+			"title": "♫ SuperNoise",
+			"author": "patu",
+			"source": "https://www.shadertoy.com/view/XtlfWX",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-synesthetic-rings",
+			"name": "Synesthetic Rings",
+			"title": "Synesthetic Rings",
+			"author": "isaacchurchill",
+			"source": "https://www.shadertoy.com/view/Wt2cWR",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-techno-core",
+			"name": "Techno Core",
+			"title": "Techno Core",
+			"author": "Kali",
+			"source": "https://www.shadertoy.com/view/wtdXzS",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-testmoney",
+			"name": "TestMoney",
+			"title": "TestMoney",
+			"author": "uratowel12",
+			"source": "https://www.shadertoy.com/view/ds23zd",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-the-dark-side-of-the-moon",
+			"name": "The Dark Side of the Moon",
+			"title": "The Dark Side of the Moon",
+			"author": "nyri0",
+			"source": "https://www.shadertoy.com/view/sdSyz3",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-the-popular-shader-2",
+			"name": "The Popular Shader",
+			"title": "The Popular Shader",
+			"author": "fizzer",
+			"source": "https://www.shadertoy.com/view/XdB3Dw",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-the-popular-shader",
+			"name": "The Popular Shader",
+			"title": "The Popular Shader",
+			"author": "fizzer",
+			"source": "https://www.shadertoy.com/view/XdB3Dw",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-the-raven-that-refused-to-sing",
+			"name": "The Raven That Refused To Sing",
+			"title": "The Raven That Refused To Sing",
+			"author": "s23b",
+			"source": "https://www.shadertoy.com/view/4dSyDm",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-the-voiceless",
+			"name": "The Voiceless",
+			"title": "The Voiceless",
+			"author": "python273",
+			"source": "https://www.shadertoy.com/view/ls3cWM",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-toydivision",
+			"name": "ToyDivision",
+			"title": "ToyDivision",
+			"author": "seani",
+			"source": "https://www.shadertoy.com/view/MlG3zm",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-turbulent-flame-vs-glasshawk",
+			"name": "Turbulent Flame vs Glasshawk",
+			"title": "Turbulent Flame vs Glasshawk",
+			"author": "Cotterzz",
+			"source": "https://www.shadertoy.com/view/tfjXWK",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-twisted-thingy",
+			"name": "twisted thingy",
+			"title": "twisted thingy",
+			"author": "wj",
+			"source": "https://www.shadertoy.com/view/3dXSDB",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-tycho-awake-album-cover",
+			"name": "Tycho | Awake - Album Cover",
+			"title": "Tycho | Awake - Album Cover",
+			"author": "vochsel",
+			"source": "https://www.shadertoy.com/view/MsGGzR",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-vinyl-visualizer",
+			"name": "Vinyl Visualizer",
+			"title": "Vinyl Visualizer",
+			"author": "s23b",
+			"source": "https://www.shadertoy.com/view/XlcXDX",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-vortex",
+			"name": "大龙猫 - Vortex",
+			"title": "大龙猫 - Vortex",
+			"author": "totetmatt",
+			"source": "https://www.shadertoy.com/view/3tdfD2",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-vt220-at-night",
+			"name": "vt220 at night",
+			"title": "vt220 at night",
+			"author": "sprash3",
+			"source": "https://www.shadertoy.com/view/lt2SDK",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-warp-speed",
+			"name": "Warp speed",
+			"title": "Warp speed",
+			"author": "Dave_Hoskins",
+			"source": "https://www.shadertoy.com/view/Msl3WH",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-sa-waveform-music-445",
+			"name": "Waveform Music [445]",
+			"title": "Waveform Music [445]",
+			"author": "Xor",
+			"source": "https://www.shadertoy.com/view/wfcGR2",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-solines",
+			"name": "Solines",
+			"title": "Solines",
+			"author": "Pol Jeremias (poljere)",
+			"source": "https://www.shadertoy.com/view/MtBGRt",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-soundshader-lines",
+			"name": "Soundshader lines",
+			"title": "Soundshader lines",
+			"author": "Airground",
+			"source": "https://www.shadertoy.com/view/WdfSDr",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-soundshader",
+			"name": "Soundshader",
+			"title": "Soundshader",
+			"author": "Airground",
+			"source": "https://www.shadertoy.com/view/tslSz7",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-synthwave-sunset-mic-visualizer",
+			"name": "Synthwave Sunset Mic Visualizer",
+			"title": "Synthwave Sunset Mic Visualizer",
+			"author": "TheWindowStreamz",
+			"source": "https://www.shadertoy.com/view/XctBW7",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-test",
+			"name": "squeres",
+			"title": "Squares Background v2",
+			"author": "vamoss",
+			"source": "https://www.shadertoy.com/view/MdVXzw",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-vision-on-line",
+			"name": "vision on line",
+			"title": "vision on line",
+			"author": "dj_afroedi",
+			"source": "https://www.shadertoy.com/view/csVyRR",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-waveform-microphone",
+			"name": "Waveform Microphone",
+			"title": "Waveform",
+			"author": "XorDev",
+			"source": "https://www.shadertoy.com/view/wfcGR2",
+			"licence": "CC-BY-NC-SA-3.0"
+		},
+		{
+			"id": "sh-wavy",
+			"name": "wavy",
+			"title": "Wavy Background Effect",
+			"author": "gigaherz",
+			"source": "https://www.shadertoy.com/view/ltGSWD",
+			"licence": "CC-BY-NC-SA-3.0"
+		}
+	]
+}

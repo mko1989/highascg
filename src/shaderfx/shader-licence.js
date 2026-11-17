@@ -1,5 +1,8 @@
 'use strict'
 
+const fs = require('fs')
+const path = require('path')
+
 /**
  * WO-1096 — licence/attribution of the shader library (third-party works, NOT under HighAsCG's AGPL).
  *
@@ -142,6 +145,57 @@ function isRetiredShader(id, cfg) {
 	return !(a && a.licence)
 }
 
+/**
+ * WO-1106 B67 — NonCommercial shaders do not ship (owner 17.11.26: "Don't ship them"): HighAsCG runs paid shows, and an
+ * NC licence (CC BY-NC-SA 3.0 / 4.0, CC BY-NC 4.0) does not allow that use. The rule is the licence, not a list: every
+ * library shader whose licence id contains -NC was withdrawn (169, 17.11.26), and template/shaders/LICENSES/
+ * withdrawn-nc.json keeps who made each one and where it came from. A config that is NC stays on the box that holds it
+ * (data/shaders: untracked, never in the ISO); the store never exports it to template/shaders.
+ */
+const WITHDRAWN_NC_FILE = path.join(__dirname, '..', '..', 'template', 'shaders', 'LICENSES', 'withdrawn-nc.json')
+/** What the shader list says next to a locally held NC shader (operator-facing). */
+const NON_COMMERCIAL_NOTE = 'non-commercial licence — not part of HighAsCG'
+
+/** @returns {Map<string, { id: string, licence: string }>} */
+function loadWithdrawnNc() {
+	try {
+		const doc = JSON.parse(fs.readFileSync(WITHDRAWN_NC_FILE, 'utf8'))
+		return new Map((doc.withdrawn || []).map((e) => [e.id, e]))
+	} catch {
+		return new Map() // a missing record still leaves the licence rule below
+	}
+}
+const WITHDRAWN_NC_SHADERS = loadWithdrawnNc()
+
+/** @param {string|null|undefined} licence SPDX-style id */
+function isNonCommercialLicence(licence) {
+	return /-NC(-|$)/.test(String(licence || ''))
+}
+
+/**
+ * The NonCommercial licence a config is under, or null: a withdrawn id (or a Shader Live child of one), an attribution
+ * naming an -NC licence, or a FragCoord import that recorded licenseKind "nc".
+ * @param {string} id @param {any} cfg
+ * @returns {string|null}
+ */
+function nonCommercialLicenceOf(id, cfg) {
+	const w = WITHDRAWN_NC_SHADERS.get(id) || WITHDRAWN_NC_SHADERS.get(String(cfg?.parentId || ''))
+	if (w) return w.licence
+	const a = shaderAttribution(cfg)
+	if (a && isNonCommercialLicence(a.licence)) return a.licence
+	if (cfg?.dialect === 'fragcoord' && cfg.source?.licenseKind === 'nc') return String(cfg.source.license || 'NonCommercial')
+	return null
+}
+
+/**
+ * May this config have a template in template/shaders (the tracked, shipped folder)? Not when it is retired (WO-1096)
+ * or NonCommercial (WO-1106 B67).
+ * @param {string} id @param {any} cfg
+ */
+function isShippableShader(id, cfg) {
+	return !isRetiredShader(id, cfg) && !nonCommercialLicenceOf(id, cfg)
+}
+
 module.exports = {
 	SHADERTOY_TERMS_URL,
 	SHADERTOY_DEFAULT_LICENCE,
@@ -155,4 +209,10 @@ module.exports = {
 	OPT_IN_SHADER_IDS,
 	REMOVED_SHADER_IDS,
 	isRetiredShader,
+	WITHDRAWN_NC_FILE,
+	WITHDRAWN_NC_SHADERS,
+	NON_COMMERCIAL_NOTE,
+	isNonCommercialLicence,
+	nonCommercialLicenceOf,
+	isShippableShader,
 }

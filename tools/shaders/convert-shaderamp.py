@@ -6,6 +6,8 @@ shader-store configs. Output: out/<id>.json per shader + out/_report.json (conve
   python3 tools/shaders/convert-shaderamp.py /tmp/sa/dist/shaders /tmp/sa-out <existing,ids>
   node tools/shaders/validate-shader-configs.js /tmp/sa-out /tmp/sa-results.json
   then POST each passing config to /api/shaders (the store writes JSON + Caspar template).
+WO-1106 B67: most ShaderAmp shaders are NonCommercial (CC BY-NC-SA). Those do not ship: the POST needs
+allowNonCommercial: true, keeps the config on that box only and writes no template.
 Existing ids (comma list) are never reused. Imported ids are prefixed sh-sa- so the batch can be
 found or removed as a unit.
 

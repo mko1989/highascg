@@ -54,7 +54,7 @@ test('WO-379 the two halves of the shader store are reconciled, never deleted', 
 		const first = await store.reconcileShaderStore()
 		assert.ok(Array.isArray(first.exported) && Array.isArray(first.recovered))
 		const second = await store.reconcileShaderStore()
-		assert.deepEqual(second, { exported: [], recovered: [] }, 'a healed store reconciles to a no-op')
+		assert.deepEqual(second, { exported: [], recovered: [], unexported: [] }, 'a healed store reconciles to a no-op')
 	})
 
 	await t.test('an unparseable orphan template is left alone rather than faked', () => {

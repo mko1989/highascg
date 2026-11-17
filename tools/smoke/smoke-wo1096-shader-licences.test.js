@@ -19,7 +19,8 @@ const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, MANIFEST_REL), 'utf8
 const htmlFiles = fs.readdirSync(TPL).filter((f) => f.endsWith('.html'))
 
 test('every template/shaders/*.html has exactly one manifest row, and every row has its file', () => {
-	assert.ok(htmlFiles.length > 100, 'library present')
+	// WO-1106 B67: 169 NonCommercial shaders were withdrawn; the 14 commercial-use ones (+ any added later) still ship
+	assert.ok(htmlFiles.length >= 14, 'library present')
 	const rows = new Map(manifest.templates.map((e) => [e.file, e]))
 	assert.equal(rows.size, manifest.templates.length, 'no duplicate rows')
 	for (const f of htmlFiles) assert.ok(rows.has(`template/shaders/${f}`), `${f} has no manifest entry`)
@@ -31,6 +32,8 @@ test('every manifest licence is known and redistributable; author and source are
 		assert.ok(e.licence && lic.LICENCES[e.licence], `${e.file}: unknown licence "${e.licence}"`)
 		assert.doesNotMatch(String(e.licenceLine), lic.FORBIDDEN_RE, `${e.file}: forbidden licence line`)
 		assert.ok(e.author && e.source, `${e.file}: attribution (author + source) missing`)
+		assert.equal(lic.isNonCommercialLicence(e.licence), false, `${e.file}: ${e.licence} does not ship (WO-1106 B67)`)
+		assert.equal(e.nonCommercial, false, `${e.file}: nonCommercial row`)
 	}
 	assert.equal(manifest.counts.UNKNOWN, undefined, 'no UNKNOWN licence bucket')
 })
@@ -83,7 +86,7 @@ test('the shader store neither re-exports nor lists a retired config without a h
 		}
 		fs.writeFileSync(path.join(store.SHADERS_DATA_DIR, 'sh-mario.json'), JSON.stringify(cfg))
 		const list = await store.listShaders()
-		assert.ok(list.length > 100, 'library still lists')
+		assert.ok(list.length >= 14, 'library still lists (WO-1106 B67: the shipped, commercial-use set)')
 		assert.ok(!list.some((s) => s.id === 'sh-mario'), 'retired shader hidden')
 		assert.ok(!fs.existsSync(path.join(store.SHADERS_TEMPLATE_DIR, 'sh-mario.html')), 'retired shader not re-exported')
 	} finally {
@@ -119,5 +122,8 @@ test('the store and the README name the licence split (third-party, not AGPL)', 
 	assert.match(readme, /NOT covered by HighAsCG's AGPL-3\.0-or-later/)
 	assert.match(readme, /ShaderToyLite\.js`: vendored renderer, \*\*BSD-3-Clause\*\*/)
 	const store = fs.readFileSync(path.join(ROOT, 'src/shaderfx/shader-store.js'), 'utf8')
-	assert.equal((store.match(/isRetiredShader\(/g) || []).length, 3, 'reconcile (both directions) + listShaders')
+	// WO-1106 B67: reconcile (export, seed, drop a stale export) + save ask isShippableShader (retired OR NonCommercial);
+	// the list still hides retired ids and marks NC ones
+	assert.equal((store.match(/isShippableShader\(/g) || []).length, 4, 'reconcile (three passes) + saveShader')
+	assert.equal((store.match(/isRetiredShader\(/g) || []).length, 1, 'listShaders')
 })
