@@ -63,6 +63,19 @@ func acquire(role: String, owner: Object) -> Texture2D:
 
 ## WO-1106 B28: is `role`'s picture black? Sampled on the CPU from the bytes already uploaded (ShmTexture.is_black: no
 ## GPU readback, no frame copy); false before the first frame. A demo's SubViewport has no CPU bytes: read back (demo only).
+## WO-1120: the picture size behind `role` (its channel's, when the ring is a scaled-down copy — feed_roles.gd raster).
+func raster(role: String) -> Vector2i:
+	var t := texture(role)
+	if t == null:
+		return Vector2i.ZERO
+	var size := Vector2i(t.get_width(), t.get_height())
+	var d: Variant = descriptors.get(role)
+	if relayed(role) or not d is Dictionary or (d as Dictionary).get("channel") == null:
+		return size
+	var all: Variant = Store.get_value("channelMap", {}).get("channelResolutionsByChannel", {})
+	return FeedRoles.raster(size, (all as Dictionary).get(str(int(d.channel))) if all is Dictionary else null)
+
+
 func is_black(role: String) -> bool:
 	var tex: Variant = _ensure(role).tex
 	if tex is ShmTexture:

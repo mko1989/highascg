@@ -50,3 +50,12 @@ func test_wo1119_big_rings_are_read_every_nth_frame() -> void:
 	t.eq(FR.read_every(11520 * 1536), 2, "the 30 m LED canvas: every 2nd frame")
 	t.eq(FR.read_every(7680 * 4320), 4, "8K: every 4th")
 	t.eq(FR.read_every(20000 * 10000), 4, "never rarer than every 4th")
+
+
+func test_wo1120_raster_of_a_scaled_ring_is_the_channel_size() -> void:
+	t.eq(FR.raster(Vector2i(5760, 768), {"w": 11520, "h": 1536}), Vector2i(11520, 1536), "half-size ring")
+	t.eq(FR.raster(Vector2i(11520, 1536), {"w": 11520, "h": 1536}), Vector2i(11520, 1536), "full-size ring")
+	t.eq(FR.raster(Vector2i(1920, 1080), {"w": 11520.0, "h": 1536.0}), Vector2i(1920, 1080), "not a whole factor on both axes: the ring")
+	t.eq(FR.raster(Vector2i(1920, 1080), null), Vector2i(1920, 1080), "no channel known")
+	t.eq(FR.raster(Vector2i.ZERO, {"w": 1920, "h": 1080}), Vector2i.ZERO, "no picture yet")
+

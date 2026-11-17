@@ -60,6 +60,17 @@ function resolveRoleChannel(role, map) {
 	return ch
 }
 
+/**
+ * WO-1120: a channel far above UHD is published at half size (Caspar shm consumer `SCALE 2`, build 2b608f13a+): the
+ * 11520×1536 LED canvas is 70 MB a frame, and every reader copied and uploaded all of it. 1 for everything else. An
+ * older Caspar ignores the parameter and publishes full size — readers take the factor from the ring they open.
+ */
+const SCALE_ABOVE_PX = 3840 * 2160 * 1.25
+function scaleFor(channel, map) {
+	const r = map?.channelResolutionsByChannel?.[String(channel)]
+	return r && Number(r.w) * Number(r.h) > SCALE_ABOVE_PX ? 2 : 1
+}
+
 function segmentFor(role) {
 	// WO-719: a sandbox instance shares /dev/shm with the live Caspar — announce a path inside its own root instead
 	if (require('../bootstrap/sandbox').isSandbox()) return { shm: `/highascg-${role}`, path: require('path').join(process.cwd(), 'shm', `highascg-${role}`) }
@@ -117,11 +128,12 @@ function createVideoSurfaceManager(deps) {
 			if (was && settleMs > 0) await new Promise((res) => setTimeout(res, settleMs))
 		}
 		try {
-			const res = await amcp.basic.add(channel, 'SHM', `NAME ${role}`, index)
+			const scale = scaleFor(channel, deps.getChannelMap())
+			const res = await amcp.basic.add(channel, 'SHM', `NAME ${role}${scale > 1 ? ` SCALE ${scale}` : ''}`, index)
 			if (res && res.ok === false) throw new Error(res.error || 'ADD refused')
 			active.set(role, { channel, index })
 			known.add(role)
-			log('info', `[video-surfaces] ADD ${channel}-${index} SHM NAME ${role}`)
+			log('info', `[video-surfaces] ADD ${channel}-${index} SHM NAME ${role}${scale > 1 ? ` SCALE ${scale}` : ''}`)
 			return true
 		} catch (e) {
 			log('warn', `[video-surfaces] ADD ${channel}-${index} SHM ${role} failed: ${e?.message || e}`)
@@ -191,6 +203,7 @@ function createVideoSurfaceManager(deps) {
 				role,
 				kind: 'runtime',
 				channel: resolveRoleChannel(role, map),
+				scale: scaleFor(resolveRoleChannel(role, map), map),
 				index: roleIndex(role),
 				active: active.has(role),
 				leases: leases.get(role)?.size || 0,
@@ -238,6 +251,7 @@ function getVideoSurfaceManager(ctx) {
 }
 
 module.exports = {
+	scaleFor,
 	createVideoSurfaceManager,
 	getVideoSurfaceManager,
 	resolveRoleChannel,

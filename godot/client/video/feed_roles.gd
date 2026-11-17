@@ -68,3 +68,15 @@ static func tile_roles(cells: Array, remote: Array, descriptors: Dictionary, vis
 static func read_every(px: int) -> int:
 	return clampi(roundi(float(px) / (3840.0 * 2160.0)), 1, 4)
 
+
+## WO-1120 — the picture size a ring stands for: the channel's own size when the ring is that picture scaled down by a
+## whole factor on both axes (Caspar shm consumer SCALE 2 for a canvas far above UHD), else the ring's size. Rects on a
+## screen are in channel pixels, so UVs must divide by this, not by the texture.
+static func raster(tex: Vector2i, channel: Variant) -> Vector2i:
+	if tex.x <= 0 or tex.y <= 0 or not channel is Dictionary:
+		return tex
+	var w := int((channel as Dictionary).get("w", 0))
+	var h := int((channel as Dictionary).get("h", 0))
+	var n := w / tex.x
+	return Vector2i(w, h) if n >= 2 and h / tex.y == n and w - tex.x * n < n and h - tex.y * n < n else tex
+

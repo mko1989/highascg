@@ -290,6 +290,9 @@ func sync_holds() -> void:
 
 func _raster(role: String) -> Vector2i:
 	var t := _texture(role)
+	var vs := get_node_or_null("/root/VideoSurfaces")
+	if t != null and not _tex_provider.is_valid() and vs != null:
+		return vs.raster(role)  # WO-1120: the channel's size when the ring is a scaled-down copy
 	return Vector2i(t.get_width(), t.get_height()) if t != null else Vector2i.ZERO
 
 
