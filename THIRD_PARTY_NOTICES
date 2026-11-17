@@ -405,6 +405,9 @@ texts in tools/release/licenses/), and SOURCES.md there is the written source of
     Television AB.
   penguins-eggs 26.10.30 (patched: scripts/eggs/patches) — https://github.com/pieroproietti/penguins-eggs — MIT OR
     GPL-2.0, (c) 2017-2025 Piero Proietti.
+  LocalSend 1.18.2 (upstream .deb, /opt/localsend_app; unmodified) — https://github.com/localsend/localsend —
+    Apache-2.0, (c) Tien Do Nam and the LocalSend contributors (licence tree: Apache-2.0.txt; its Flutter / Dart
+    component notices ship in /opt/localsend_app/data/flutter_assets/NOTICES.Z).
   NVIDIA Linux driver — NVIDIA Driver License Agreement (licence tree: nvidia-driver.NOTICE); unmodified binaries.
   NDI runtime (lib/libndi.so.6) — NDI SDK License Agreement (licence tree: ndi-sdk-license-agreement.pdf).
     NDI® is a registered trademark of Vizrt NDI AB. https://ndi.video/

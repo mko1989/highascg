@@ -182,6 +182,13 @@ collect_stack_licenses() {
 			"Patched: scripts/eggs/patches in the HighAsCG repo." "https://github.com/pieroproietti/penguins-eggs"
 	fi
 
+	# --- LocalSend (WO-1124: the upstream .deb in /opt/localsend_app; it carries no /usr/share/doc copyright) ---
+	if dpkg-query -W localsend &>/dev/null; then
+		cp -f /usr/share/common-licenses/Apache-2.0 "${TP}/Apache-2.0.txt"
+		_lic_row localsend LocalSend "$(dpkg-query -W -f='${Version}' localsend)" Apache-2.0 desktop third-party/Apache-2.0.txt \
+			"Unmodified upstream package; its Flutter/Dart notices ship in /opt/localsend_app/data/flutter_assets/NOTICES.Z." "https://github.com/localsend/localsend"
+	fi
+
 	# --- WayVR AppImage (GPL-3.0) ---
 	f="$(ls -1 "${home}"/.local/opt/wayvr/WayVR-v*-x86_64.AppImage 2>/dev/null | tail -1 || true)"
 	if [[ -n "$f" ]]; then
