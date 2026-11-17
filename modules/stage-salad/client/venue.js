@@ -118,7 +118,7 @@ function lightColliders(lights) {
 function wallColliders(screens) {
 	const out = []
 	for (const s of Array.isArray(screens) ? screens : []) {
-		if (!Array.isArray(s?.p) || !Array.isArray(s?.size)) continue
+		if (!Array.isArray(s?.p) || s.p.length !== 3 || !s.p.every((v) => Number.isFinite(Number(v))) || !Array.isArray(s?.size)) continue // WO-1106 B63: a finite 3-entry p
 		const w = num(s.size[0]), h = num(s.size[1])
 		if (!(w > 0.05 && h > 0.05)) continue
 		const ax = axesYXZ(s.rot).map((v) => v.map(r4))
@@ -175,4 +175,16 @@ export function pouch(slot) {
 export function standInSpot(venue) {
 	const f = venue.front
 	return [f.c[0] - f.f[0] * 0.6, venue.stage.y, f.c[2] - f.f[1] * 0.6]
+}
+
+/**
+ * WO-1106 A36: the floor height under (x, z) — the stage top inside the stage rect, else the hall floor (0 without a
+ * venue). The Game World visitors put a car's shadow / landing on it, so a car over the stage is not shadowed 0.4 m below.
+ */
+export function floorYAt(venue, x, z) {
+	const hall = Number.isFinite(venue?.hall?.y) ? venue.hall.y : 0
+	const st = venue?.stage
+	const r = st?.rect
+	if (Array.isArray(r) && Number.isFinite(st.y) && x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3]) return Math.max(hall, st.y)
+	return hall
 }

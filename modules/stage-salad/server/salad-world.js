@@ -60,12 +60,13 @@ function bonusPts(kind) {
 }
 
 /**
- * @param {{ room: () => object|null, send: (conn, msg) => void, lights?: object|null, now?: () => number }} deps
+ * @param {{ room: () => object|null, send: (conn, msg) => boolean|void, lights?: object|null, now?: () => number }} deps
  */
 function createSaladWorld(deps) {
 	const now = deps.now || Date.now
 	const room = () => deps.room() || null
 	const caps = new WeakMap()
+	const resync = new WeakSet() // WO-1106 A32: sockets left out of one viewers() call — the hub forgets the view, then serves it afresh
 
 	const adapter = {
 		id: ID,
@@ -97,13 +98,14 @@ function createSaladWorld(deps) {
 			const r = room()
 			const w = r?.world()
 			if (!w) return []
-			return w.conns.map((c) => {
+			return w.conns.filter((c) => !resync.delete(c.conn)).map((c) => {
 				const p = c.spectator ? null : w.players.get(c.pid)
 				const slot = p?.slot != null && w.venue ? w.venue.slots[p.slot] : null
 				return { key: c.conn, kind: c.spectator ? 'spectator' : 'player', p: slot ? slot.p.slice() : null, cap: caps.get(c.conn) ?? 12 }
 			})
 		},
-		send: (key, msg) => deps.send(key, msg),
+		/** WO-1106 A5: false = the game socket skipped it (backpressure / closed); true = handed to the socket. */
+		send: (key, msg) => deps.send(key, msg) !== false,
 		toAll: (msg) => room()?.ctx.toAll(msg),
 		board() {
 			const r = room()
@@ -180,7 +182,12 @@ function createSaladWorld(deps) {
 	return {
 		adapter,
 		hooks: () => (hubOf() ? hooks : null),
+		/** `wq` { n } = the visitor cap; { re: true } = the page's pre-load queue overflowed: re-send its whole view (A32). */
 		quality(conn, m) {
+			if (m?.re === true) {
+				resync.add(conn)
+				if (!CAPS.includes(m.n)) return
+			}
 			const n = CAPS.includes(m?.n) ? m.n : 12
 			caps.set(conn, n)
 			try {

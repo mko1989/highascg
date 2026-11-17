@@ -27,7 +27,8 @@ export function createAudio() {
 		return true
 	}
 
-	const live = () => !muted && ctx
+	// WO-1106 B62: no nodes while the context is suspended (they would queue up and play all at once on resume)
+	const live = () => !muted && ctx && (ctx.state ?? 'running') === 'running'
 
 	function tone(type, f0, f1, ms, vol, at = 0, mid = null) {
 		const t = ctx.currentTime + at

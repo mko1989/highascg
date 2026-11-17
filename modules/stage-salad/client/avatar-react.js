@@ -114,11 +114,17 @@ export function createReactions(THREE, model) {
 		}
 	}
 
+	function dropHat() {
+		hat.removeFromParent()
+		hat.userData.mat.dispose() // WO-1106 B61 (the leaves share the module's ballGeo)
+		hat = null
+	}
+
 	function addHat(sNow) {
 		hatUntil = sNow + HAT_MS
 		if (hat) return
 		hat = new THREE.Group()
-		const mat = new THREE.MeshLambertMaterial({ color: 0x7cc44e, emissive: 0x1c3010, side: THREE.DoubleSide, transparent: true })
+		const mat = (hat.userData.mat = new THREE.MeshLambertMaterial({ color: 0x7cc44e, emissive: 0x1c3010, side: THREE.DoubleSide, transparent: true }))
 		for (let k = 0; k < 6; k++) {
 			const leaf = new THREE.Mesh(ballGeo, mat)
 			const a = (k / 6) * Math.PI * 2
@@ -171,10 +177,8 @@ export function createReactions(THREE, model) {
 			})
 			if (hat) {
 				const left = hatUntil - sNow
-				if (left <= 0) {
-					hat.removeFromParent()
-					hat = null
-				} else hat.scale.setScalar(Math.min(1, left / 600, (HAT_MS - left) / 150 + 0.2))
+				if (left <= 0) dropHat()
+				else hat.scale.setScalar(Math.min(1, left / 600, (HAT_MS - left) / 150 + 0.2))
 			}
 			umbOpen += ((umbrellaUp ? 1 : 0) - umbOpen) * Math.min(1, dt * 8)
 			umbrella.visible = umbOpen > 0.02
@@ -184,9 +188,17 @@ export function createReactions(THREE, model) {
 		get decals() {
 			return decals.length
 		},
+		/** WO-1106 B61: everything this avatar's reactions own (the shared ball / star geometries stay). */
 		dispose() {
 			for (const d of decals) dropDecal(d)
 			decals.length = 0
+			if (hat) dropHat()
+			for (const m of stars.splice(0)) (m.removeFromParent(), m.material.dispose())
+			umbrella.removeFromParent()
+			umbrella.traverse((o) => {
+				o.geometry?.dispose()
+				o.material?.dispose()
+			})
 		},
 	}
 }

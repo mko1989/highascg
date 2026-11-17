@@ -301,11 +301,12 @@ function backIn(G) {
 	return left > 0 ? `Back to the lobby in ${left} s.` : 'Back to the lobby in a moment.'
 }
 
-function toggleMute(G, el, keep = false) {
-	if (!keep) {
-		G.audio.setMuted(!G.audio.muted)
-		storeSet('muted', G.audio.muted ? '1' : '0')
-	} else G.audio.setMuted(storeGet('muted', '0') === '1')
+/**
+ * WO-1106 B62: the page always loads muted (WO: sound off until the player unmutes) — an AudioContext made at load
+ * starts suspended on Chrome / iOS and stays silent; it is created / resumed only inside the unmute tap or key.
+ */
+function toggleMute(G, el, init = false) {
+	G.audio.setMuted(init ? true : !G.audio.muted)
 	if (el) {
 		el.textContent = G.audio.muted ? 'SND' : 'SND ON'
 		el.classList.toggle('on', !G.audio.muted)

@@ -57,7 +57,7 @@ export function launches(veg, origin, yaw, pitch, power, seed = 0) {
 }
 
 export function createFlight(veg, launch) {
-	return { veg, i: launch.i || 0, p: launch.p.slice(), v: launch.v.slice(), t: 0, bounces: 0, end: null, lastTag: null }
+	return { veg, i: launch.i || 0, p: launch.p.slice(), v: launch.v.slice(), t: 0, bounces: 0, end: null, lastTag: null, lastW: null }
 }
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
@@ -75,7 +75,7 @@ export function closestOnSegment(a, b, c) {
 function sphereContact(c, r, q, R) {
 	const d = sub(c, q)
 	const L = Math.hypot(d[0], d[1], d[2])
-	if (L >= r + R) return null
+	if (!(L < r + R)) return null // WO-1106 B63: NaN (a broken collider / position) is no contact
 	return L > 1e-9 ? { n: d.map((x) => x / L), depth: r + R - L } : { n: [0, 1, 0], depth: r + R }
 }
 
@@ -94,8 +94,13 @@ function boxLocal(l, r, h) {
 	return { n, depth: depth + r }
 }
 
-/** One collider vs a sphere → { n, depth } | null. */
+/** One collider vs a sphere → { n, depth } | null (WO-1106 B63: null unless depth and normal are finite). */
 export function contact(col, c, r) {
+	const k = contactOf(col, c, r)
+	return k && Number.isFinite(k.depth) && k.n.every(Number.isFinite) ? k : null
+}
+
+function contactOf(col, c, r) {
 	switch (col.k) {
 		case 'plane': {
 			const dist = dot(col.n, c) - col.d
@@ -135,6 +140,11 @@ export function stepFlight(f, venue, opts = {}) {
 	if (f.end) return f
 	const veg = f.veg
 	const speed0 = Math.hypot(f.v[0], f.v[1], f.v[2])
+	if (!Number.isFinite(speed0) || !f.p.every(Number.isFinite) || !Number.isFinite(f.t)) {
+		// WO-1106 B63: a NaN / infinite launch would never advance f.t (simulate() looping forever) — it ends here
+		f.end = { k: 'out', p: f.p.map((x) => (Number.isFinite(x) ? x : 0)), t: Number.isFinite(f.t) ? f.t : 0, bounced: false }
+		return f
+	}
 	const n = Math.max(1, Math.ceil((speed0 * DT) / SUB_LEN))
 	const h = DT / n
 	const cols = opts.extra && opts.extra.length ? venue.colliders.concat(opts.extra) : venue.colliders
@@ -173,6 +183,7 @@ export function stepFlight(f, venue, opts = {}) {
 		if (touched) {
 			const fresh = touched.col.tag !== f.lastTag || f.lastContactT == null || f.t - f.lastContactT > 0.05
 			f.lastTag = touched.col.tag
+			f.lastW = touched.col.w ?? null // WO-1106 A2: the world hub's collider id — hub.contact finds its target by it
 			f.lastContactT = f.t
 			if (fresh) f.bounces++
 			const surf = [f.p[0] - touched.n[0] * veg.r, f.p[1] - touched.n[1] * veg.r, f.p[2] - touched.n[2] * veg.r]

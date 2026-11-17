@@ -131,7 +131,11 @@ export function createProjectileView(THREE, scene) {
 		/** Bits flying off a splat / hit at p (n of them, the vegetable's colour), at server time sNow. */
 		burst(p, color, sNow, n = 8, speed = 2.2, size = 0.02) {
 			for (let k = 0; k < n; k++) {
-				if (bits.length >= MAX_BITS) bits.shift().m.removeFromParent()
+				if (bits.length >= MAX_BITS) {
+					const old = bits.shift().m
+					old.removeFromParent()
+					old.material.dispose() // WO-1106 B61: each bit owns its material
+				}
 				const m = new THREE.Mesh(bitGeo, new THREE.MeshBasicMaterial({ color, transparent: true }))
 				m.scale.setScalar(size * (0.6 + Math.random() * 0.8))
 				m.position.set(p[0], p[1], p[2])

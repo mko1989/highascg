@@ -8,7 +8,7 @@
  * anything on a screen, and this panel offers no way to.
  */
 import { createHouseSlider } from './kit/house-slider.js'
-import { h, setText, show, apiGet, apiHost, safeColor } from './dom.js'
+import { h, setText, show, apiGet, apiHost, safeColor, createBusyGate } from './dom.js'
 import { qrMatrix, drawQr } from './kit/join-code.js'
 import { TEAMS } from './hud-board.js'
 
@@ -108,16 +108,14 @@ export function startHost(root) {
 		)
 	)
 
-	let busy = false
+	const gate = createBusyGate() // WO-1106 B64: the presenter-safe tap is never dropped behind another request
 	const say = (text, bad = false) => {
 		setText(msg, text || '')
 		msg.classList.toggle('bad', !!bad)
 	}
-	async function act(body, okText) {
-		if (busy) return
-		busy = true
-		const r = await apiHost(body)
-		busy = false
+	async function act(body, okText, urgent = false) {
+		const r = await gate.run(() => apiHost(body), urgent)
+		if (!r) return
 		if (r.ok) say(okText || '')
 		else if (r.status === 401 || r.status === 403)
 			say('Not allowed: log in to the HighAsCG web UI in this browser first (or open this page with ?token=…).', true)
@@ -138,7 +136,7 @@ export function startHost(root) {
 	}
 	safeBtn.addEventListener('click', () => {
 		const on = !state?.safe
-		act({ action: 'safe', on }, on ? 'Paused: no shots until you resume.' : 'Resumed: guests can throw again.')
+		act({ action: 'safe', on }, on ? 'Paused: no shots until you resume.' : 'Resumed: guests can throw again.', true)
 	})
 	enableBtn.addEventListener('click', () => act({ action: 'enable' }, 'Game enabled.'))
 	disableBtn.addEventListener('click', () => act({ action: 'disable' }, 'Game disabled.'))
@@ -207,7 +205,7 @@ export function startHost(root) {
 		setText(safeBtn, safe ? 'PAUSED — tap to resume' : 'Pause — presenter safe')
 		safeBtn.classList.toggle('on', safe)
 		safeBtn.disabled = !on
-		setText(safeNote, safe ? 'No shots can leave any slingshot. Flights in the air finish; nothing new starts.' : 'One tap stops every shot at once (the presenter needs a break, someone walks on stage…).')
+		setText(safeNote, safe ? 'No shots can leave any slingshot. Vegetables in the air stop where they are; nothing new starts.' : 'One tap stops every shot at once (the presenter needs a break, someone walks on stage…).')
 		show(enableBtn, !on)
 		show(disableBtn, on)
 		startBtn.disabled = !on || state.phase !== 'lobby' || !n

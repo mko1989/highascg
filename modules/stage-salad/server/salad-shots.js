@@ -132,7 +132,7 @@ function createShots(X, presenters) {
 		if (f.xwT != null && f.t - f.xwT < WORLD_GAP) return
 		f.xwT = f.t
 		try {
-			xw.contact({ g: 'salad', pid: rec.p.id, veg: rec.veg.id, p: f.p.slice(), v: f.v.slice(), tag: f.lastTag, end: !!f.end })
+			xw.contact({ g: 'salad', pid: rec.p.id, veg: rec.veg.id, p: f.p.slice(), v: f.v.slice(), tag: f.lastTag, w: f.lastW, end: !!f.end }) // WO-1106 A2: w = the car / soldier hit
 		} catch {}
 		if (!f.end) X.toAll({ t: 'xb', id: rec.p.id, n: rec.n, i: f.i, p: f.p.map(r3), v: f.v.map(r3), at: rec.ts + Math.round(f.t * 1000) })
 	}
@@ -166,8 +166,18 @@ function createShots(X, presenters) {
 		active: () => live.length,
 		/** WO-1101 Game World: the open flights (vegetables in the air) — [{ rec, f }], newest last. */
 		flights: () => live.flatMap((rec) => rec.flights.filter((f) => !f.end).map((f) => ({ rec, f }))),
-		/** Phase change / stop: open flights end where they are (no score). */
-		clear() {
+		/**
+		 * Phase change / stop: open flights end where they are (no score). `notify` (WO-1106 B60 / B64: the buzzer, the
+		 * presenter-safe) also tells every client with an `end` k 'out' per open flight, so nothing keeps flying on screen.
+		 */
+		clear(notify = false) {
+			if (notify) {
+				for (const rec of live) {
+					for (const f of rec.flights) {
+						if (!f.end) X.toAll({ t: 'end', id: rec.p.id, n: rec.n, i: f.i, k: 'out', p: f.p.map(r3), at: rec.ts + Math.round(f.t * 1000) })
+					}
+				}
+			}
 			live.length = 0
 		},
 		LIMITS,

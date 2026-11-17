@@ -2,7 +2,7 @@
 
 /**
  * WO-1089 — Stage Salad: the room (pure; clock, timers and senders injected, no I/O). Players join over the game
- * socket (max 20 incl. bots — a joining guest takes a bot's place; max 20 spectators) and get a slingshot slot of the
+ * socket (max 20 incl. bots — a joining guest takes a bot's place, else a dropped player's; max 20 spectators) and get a slingshot slot of the
  * venue (contract §3: lowest free index; in team mode on their team's side). Phases (§8): lobby (practice: flights and
  * reactions, nothing scored) → host start → countdown 3 s → round (`secs`) → results 12 s → lobby; `stop` → lobby.
  * The referee is salad-shots.js, the avatars salad-presenters.js, the bots salad-bots.js.
@@ -176,7 +176,7 @@ function createSaladRoom(deps) {
 	function housekeeping() {
 		const t = now()
 		for (const c of [...conns.values()]) {
-			if (c.joined && !c.spectator && t - c.last > SILENT_MS) {
+			if (c.joined && t - c.last > SILENT_MS) { // WO-1106 B36: spectators too (a half-open phone held a seat for good)
 				drop(c)
 				close(c.conn, 4408, 'silent')
 			} else if (!c.joined && t - c.opened > UNJOINED_MS) {
@@ -211,6 +211,7 @@ function createSaladRoom(deps) {
 			joining = 1 // a bot makes room: bots.sync counts the guest already
 			bots.sync()
 			joining = 0
+			if (players.size >= maxPlayers) dropGhost()
 		}
 		const p = addPlayer({ name: null, color: null, bot: false, conn: c.conn })
 		if (!p) return send(c.conn, { t: 'full' })
@@ -225,12 +226,23 @@ function createSaladRoom(deps) {
 		broadcastState()
 	}
 
+	/**
+	 * WO-1106 B34: a full room whose seats are partly held by players whose socket dropped mid-round ("ghosts") — the
+	 * joining guest takes the seat of the one gone longest, as a guest takes a bot's. (A rejoin cannot claim its old
+	 * entry back yet: no resume token.)
+	 */
+	function dropGhost() {
+		let g = null
+		for (const p of players.values()) if (!p.bot && !p.connected && (!g || p.goneAt < g.goneAt)) g = p
+		if (g) removePlayer(g)
+	}
+
 	function drop(c) {
 		conns.delete(c.conn)
 		const p = c.pid != null && !c.spectator ? players.get(c.pid) : null
 		if (p) {
 			if (phase === 'lobby') players.delete(p.id)
-			else Object.assign(p, { connected: false, conn: null, aim: null, pull: 0 })
+			else Object.assign(p, { connected: false, conn: null, aim: null, pull: 0, goneAt: now() })
 			bots.sync()
 		}
 		if (c.joined) broadcastState()
@@ -261,6 +273,7 @@ function createSaladRoom(deps) {
 		if (phase !== 'round' && phase !== 'countdown') return
 		clearPhaseTimer()
 		shots.tick(now())
+		shots.clear(true) // WO-1106 B60: nothing in the air scores after `results` (each open flight gets its `end`)
 		phase = 'results'
 		presenters.setRound(false)
 		endsAt = now() + RULES.resultsMs
@@ -344,7 +357,7 @@ function createSaladRoom(deps) {
 				if (typeof a.on !== 'boolean') return { ok: false, status: 400, error: '`on` must be true or false' }
 				safe = a.on
 				presenters.setSafe(safe)
-				if (safe) shots.clear()
+				if (safe) shots.clear(true) // WO-1106 B64: the flights stop where they are and the clients hear it
 				break
 			case 'kick': {
 				const id = Number(a.id)

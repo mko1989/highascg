@@ -35,6 +35,23 @@ function stretch(mesh, a, b, tmp) {
 
 let Y_AXIS = null
 
+/**
+ * WO-1106 B61: every geometry / material this slingshot built. Not the vegetables (veg-models.js meshes share the
+ * cached kind's geometry and materials, `veg:` names) and not the tag sprite (makeTag's own dispose; three's sprite
+ * geometry is shared by every sprite).
+ */
+function disposeOwned(root) {
+	const own = new Set()
+	const walk = (o) => {
+		if (o.isSprite || (typeof o.name === 'string' && o.name.startsWith('veg:'))) return
+		if (o.geometry) own.add(o.geometry)
+		for (const m of [].concat(o.material || [])) own.add(m)
+		for (const c of o.children) walk(c)
+	}
+	walk(root)
+	for (const x of own) x.dispose()
+}
+
 export function createSlingshot(THREE, { color = '#ffffff', name = '', slotYaw = 0 } = {}) {
 	if (!Y_AXIS) Y_AXIS = new THREE.Vector3(0, 1, 0)
 	const tmp = new THREE.Vector3()
@@ -203,7 +220,7 @@ export function createSlingshot(THREE, { color = '#ffffff', name = '', slotYaw =
 		dispose() {
 			root.removeFromParent()
 			tag?.dispose()
-			grip.dispose() // the rest is a few small shared buffers: left to the GC with the group
+			disposeOwned(root) // WO-1106 B61: slings are rebuilt on every roster change — free their GPU buffers
 		},
 	}
 }

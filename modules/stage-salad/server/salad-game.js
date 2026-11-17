@@ -21,11 +21,23 @@ const { createSaladWorld } = require('./salad-world')
 const MAX_SOCKETS = RULES.maxPlayers + RULES.maxSpectators
 const MSG_RATE = 30 // messages / s per socket (aim ≤ 10 + fire ≤ 3 + pings), burst the same
 const MAX_BUFFERED = 256 * 1024
+const MAX_PER_ADDRESS = 4 // WO-1106 B36: sockets from one device (20 silent sockets from one phone held every seat)
 const LEASE_ID = 'stage-salad'
 const POLL_MS = 100
 const VENUE_EVERY = 50 // polls between live venue checks (5 s)
 
 /** The tracking module's detections snapshot, in-process (no HTTP); null when tracking is not loaded / running. */
+/**
+ * WO-1106 B36: the remote address a per-device cap can trust, or null. Loopback = a proxy on the box in front of the
+ * game (every guest would share it): not capped.
+ */
+function addressOf(req) {
+	const a = req?.socket?.remoteAddress
+	if (typeof a !== 'string' || !a) return null
+	const ip = a.startsWith('::ffff:') ? a.slice(7) : a
+	return ip === '::1' || ip.startsWith('127.') ? null : ip
+}
+
 async function readTrackingLive() {
 	const m = kit().core('src/module-registry').get('tracking')
 	if (!m || typeof m.handleApi !== 'function') return null
@@ -59,6 +71,7 @@ function createSaladGame(deps = {}) {
 	let polls = 0
 	let reading = false
 	const sockets = new Set()
+	const perAddr = new Map() // remote address → open game sockets (WO-1106 B36)
 	const text = new WeakMap()
 
 	const json = (m) => {
@@ -69,12 +82,14 @@ function createSaladGame(deps = {}) {
 	const cgnat = (ip) => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip)
 	const joinUrls = () => [...lanIps()].sort((a, b) => cgnat(a) - cgnat(b)).map((ip) => `http://${ip}:${port()}/game/salad/`)
 
+	/** → true when handed to the socket, false when skipped (closed / over MAX_BUFFERED) — WO-1106 A5: the world hub commits on true only. */
 	function sendTo(ws, m) {
-		if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > MAX_BUFFERED) return
+		if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > MAX_BUFFERED) return false
 		try {
 			ws.send(json(m))
+			return true
 		} catch {
-			/* socket going away */
+			return false /* socket going away */
 		}
 	}
 
@@ -212,13 +227,24 @@ function createSaladGame(deps = {}) {
 		return room.state()
 	}
 
-	function attach(ws) {
+	/** `req` = the upgrade request (salad-ws.js): its remote address caps the sockets per device. */
+	function attach(ws, req = null) {
 		ws.on('error', () => {})
 		if (!room) {
 			sendTo(ws, { t: 'off' })
 			return ws.close(4403, 'game disabled')
 		}
 		if (sockets.size >= MAX_SOCKETS) return ws.close(1013, 'full')
+		const addr = addressOf(req)
+		if (addr && (perAddr.get(addr) || 0) >= MAX_PER_ADDRESS) return ws.close(1013, 'too many connections from this device')
+		if (addr) {
+			perAddr.set(addr, (perAddr.get(addr) || 0) + 1)
+			ws.once('close', () => {
+				const n = (perAddr.get(addr) || 1) - 1
+				if (n > 0) perAddr.set(addr, n)
+				else perAddr.delete(addr)
+			})
+		}
 		sockets.add(ws)
 		room.connect(ws)
 		lights?.attach(ws)
@@ -274,6 +300,7 @@ function createSaladGame(deps = {}) {
 		baker,
 		live: () => ({ lights, video }),
 		MAX_SOCKETS,
+		MAX_PER_ADDRESS,
 	}
 }
 
@@ -302,4 +329,4 @@ function shutdownSaladGame() {
 	_game = null
 }
 
-module.exports = { createSaladGame, getSaladGame, useSaladGame, shutdownSaladGame, MAX_SOCKETS, LEASE_ID }
+module.exports = { createSaladGame, getSaladGame, useSaladGame, shutdownSaladGame, MAX_SOCKETS, MAX_PER_ADDRESS, LEASE_ID }

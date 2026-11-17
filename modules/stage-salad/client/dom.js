@@ -137,3 +137,23 @@ export const COLORS = [
 export function safeColor(c, fallback = '#cccccc') {
 	return /^#[0-9a-f]{6}$/i.test(String(c)) ? String(c) : fallback
 }
+
+/**
+ * WO-1106 B64: one request at a time for ordinary taps; an `urgent` one (the presenter-safe pause) always goes, even
+ * while another POST is in flight. gate.run(fn, urgent) → fn's promise, or null when the tap was skipped.
+ */
+export function createBusyGate() {
+	let pending = 0
+	return {
+		busy: () => pending > 0,
+		async run(fn, urgent = false) {
+			if (pending && !urgent) return null
+			pending++
+			try {
+				return await fn()
+			} finally {
+				pending--
+			}
+		},
+	}
+}

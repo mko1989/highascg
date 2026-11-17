@@ -10,7 +10,8 @@
  *              the avatars it DRAWS (opts.hitTest): a contact holds the vegetable there for up to HOLD_MS (the server's
  *              `end` usually lands inside that window) — no vegetable visibly flying through the presenter while the
  *              verdict travels; no word in time → it flies on. A local land / out without a word finishes quietly
- *              after LINGER_MS (a round change clears the server's flights without `end`s).
+ *              after LINGER_MS (a round start / stop clears the server's flights without `end`s; the buzzer and the
+ *              presenter-safe send an `end` k out for each, WO-1106 B60 / B64).
  * Budgets (contract §11): ≤ MAX_LIVE projectiles, ≤ MAX_MARKS ground / wall splats fading over MARK_MS.
  * update() returns the finished projectiles as events for the effects (splats, avatar reactions, banners, sounds).
  */
