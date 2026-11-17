@@ -125,7 +125,7 @@ function cycle(R, hooks = {}) {
 	R.advance(WORLD_MS * 20)
 	R.room.host('stop')
 	R.advance(3000)
-	return [a, b, sp].map((c) => JSON.stringify(R.of(c))).join('\n')
+	return [a, b, sp].map((c) => JSON.stringify(R.of(c)).replace(/"resume":"[^"]+"/g, '"resume":"<token>"')).join('\n') // WO-1106 B34: tokens are random
 }
 
 test('alone = unchanged: no hub → the same messages over a full race cycle, no world message, no `paused` key', () => {

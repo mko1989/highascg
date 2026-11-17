@@ -139,7 +139,9 @@ export function decode(text) {
 	if (!obj(m) || typeof m.t !== 'string') return null
 	switch (m.t) {
 		case 'welcome':
-			return id(m.id) && obj(m.state) ? { t: 'welcome', id: m.id, you: obj(m.you) ? m.you : {}, state: m.state } : null
+			if (!id(m.id) || !obj(m.state)) return null
+			return { t: 'welcome', id: m.id, you: obj(m.you) ? m.you : {}, state: m.state, // WO-1106 B34: the resume token
+				...(typeof m.resume === 'string' ? { resume: m.resume } : {}), ...(m.resumed === true ? { resumed: true } : {}) }
 		case 'full':
 		case 'off':
 			return { t: m.t }

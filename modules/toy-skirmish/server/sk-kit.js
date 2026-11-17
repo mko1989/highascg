@@ -13,6 +13,7 @@
  *   occFromJSON, distanceTransform, occEncodeRle   rc-scene-occ.js — the occupancy grid
  *   heightsFromJSON             rc-scene-height.js — the scene's height field (what stands how high; WO-1083 flat decor)
  *   MAX_MESSAGE_BYTES, cleanName, cleanColor, PALETTE   rc-sanitize.js — the 2 KB cap and the name / colour rules
+ *   resume                      rc-resume.js — the resume token after a reconnect (WO-1106 B34)
  *   core                        the sibling's host.core(id): `src/…` core files and core npm packages (`ws`)
  * Nothing under modules/rc-game/ is edited. Sibling missing → `Stage Skirmish needs the "rc-game" module installed`.
  */
@@ -64,6 +65,7 @@ function kit() {
 	const occ = require(file('rc-scene-occ.js'))
 	const heights = require(file('rc-scene-height.js'))
 	const san = require(file('rc-sanitize.js'))
+	const resume = require(file('rc-resume.js'))
 	loaded = {
 		dir,
 		clientDir: path.join(dir, 'client'),
@@ -83,6 +85,7 @@ function kit() {
 		cleanName: san.cleanName,
 		cleanColor: san.cleanColor,
 		PALETTE: san.PALETTE,
+		resume, // WO-1106 B34: the one resume-token design of the three games (rc-resume.js)
 	}
 	return loaded
 }

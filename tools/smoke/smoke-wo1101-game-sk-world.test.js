@@ -153,7 +153,7 @@ function cycle(S, hooks = {}) {
 	S.clock.advance(60000)
 	S.clock.advance(R.RULES.resultsMs + WORLD_MS)
 	assert.equal(S.room.snapshot().phase, 'lobby')
-	return [a, b, sp].map((c) => JSON.stringify(c.out)).join('\n')
+	return [a, b, sp].map((c) => JSON.stringify(c.out).replace(/"resume":"[^"]+"/g, '"resume":"<token>"')).join('\n') // WO-1106 B34: tokens are random
 }
 
 test('alone = unchanged: no hub → the same messages over a full match cycle, no world message, no `paused` key', (t) => {

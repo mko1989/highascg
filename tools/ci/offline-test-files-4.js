@@ -46,4 +46,9 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-shaders-nc-tracked.test.js', // WO-1106 B67: no tracked template belongs to a NonCommercial-licensed shader; the withdrawn record
 	'tools/smoke/smoke-wo1106-shaders-nc-store.test.js', // WO-1106 B67: the store never exports / seeds / ships an NC shader; locally held ones keep working, marked
 	'tools/smoke/smoke-wo1106-shaders-nc-verifier.test.js', // WO-1106 B67: the ISO verifier fails an image that carries an NC shader
+	'tools/smoke/smoke-wo1106-games2-lan.test.js', // WO-1106 D3: the games' join URLs rank link-local / bridge addresses last (same order as games-join)
+	'tools/smoke/smoke-wo1106-games2-rc.test.js', // WO-1106 B34 / A35: RC resume token, bots take the hub's slick patches
+	'tools/smoke/smoke-wo1106-games2-skirmish.test.js', // WO-1106 B34 / B56: Skirmish resume token, scene rev reaches players without a host page
+	'tools/smoke/smoke-wo1106-games2-salad.test.js', // WO-1106 B34 / B60: Salad resume token, start / stop end practice flights
+	'tools/smoke/smoke-wo1106-games2-client.test.js', // WO-1106 B34: the three net layers keep and send the token; 4410 = playing on another page
 ]

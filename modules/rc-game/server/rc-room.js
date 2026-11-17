@@ -13,9 +13,10 @@
 const S = require('./rc-sanitize')
 const { sceneScale } = require('./rc-scale')
 const { createRoomItems } = require('./rc-room-items')
+const { issue: issueToken, revoke: revokeToken, resumeJoin } = require('./rc-resume') // WO-1106 B34
 
 const COUNTDOWN_MS = 5000
-const GRACE_MS = 20000
+const GRACE_MS = 20000 // the finish grace; WO-1106 B34: also how long a dropped racer may resume into its race
 const SILENT_MS = 10000
 const UNJOINED_MS = 15000
 const WORLD_MS = Math.round(1000 / 15)
@@ -155,10 +156,34 @@ function createRcRoom(deps) {
 		if (!timer.world) timer.world = T.setInterval(worldTick, WORLD_MS)
 	}
 
+	/**
+	 * WO-1106 B34: a racer who dropped keeps its seat and grid slot (it can resume); a joiner to a full room takes the
+	 * longest-gone such seat (an unfinished racer's first): that racer's resume token is void, its line stays.
+	 */
+	const seated = () => [...players.values()].filter((p) => !p.seatless)
 	function freeSlot() {
-		const used = new Set(connected().map((p) => p.slot))
+		if (seated().length >= maxPlayers) {
+			const gone = seated().filter((p) => !p.connected).sort((a, b) => !!a.race?.finished - !!b.race?.finished || a.goneAt - b.goneAt)[0]
+			if (!gone) return null
+			gone.seatless = true
+			revokeToken(gone)
+		}
+		const used = new Set(seated().map((p) => p.slot))
 		for (let s = 0; s < maxPlayers; s++) if (!used.has(s)) return s
 		return null
+	}
+
+	/** WO-1106 B34: the same player back on this socket (rc-resume.js); a racer gone longer than the grace races next time. */
+	function resumed(c, r) {
+		const p = r.p
+		p.car = null
+		const live = phase === 'countdown' || phase === 'race'
+		if (live && p.racing && !p.race?.finished && r.goneMs > GRACE_MS) {
+			p.racing = false
+			p.race = null
+		}
+		send(c.conn, { t: 'welcome', id: p.id, state: state(), you: you(c), resume: issueToken(p), resumed: true })
+		broadcastState()
 	}
 
 	function join(c, m) {
@@ -171,22 +196,27 @@ function createRcRoom(deps) {
 			send(c.conn, { t: 'welcome', id: c.pid, state: state(), you: you(c) })
 			return broadcastState()
 		}
+		const r = resumeJoin({ players, conns, close, now }, c, m) // WO-1106 B34: before `full` — the seat is the player's
+		if (r?.p) return resumed(c, r)
 		const slot = freeSlot()
-		if (slot == null || connected().length >= maxPlayers) return send(c.conn, { t: 'full' })
+		if (slot == null) return send(c.conn, { t: 'full' }), r?.bad ? 'bad' : undefined
 		const id = nextId++
 		const p = { id, name: S.cleanName(m.name, `Player ${id}`), color: S.cleanColor(m.color, slot), ready: false, connected: true, slot,
 			racing: false, car: null, race: null, conn: c.conn, bot: !!c.conn?.botSink } // WO-1082: a server bot (rc-room-bots.js); a socket cannot claim it
 		players.set(id, p)
 		c.pid = id
 		c.joined = true
-		send(c.conn, { t: 'welcome', id, state: state(), you: you(c) })
+		const token = issueToken(p)
+		send(c.conn, { t: 'welcome', id, state: state(), you: you(c), ...(token ? { resume: token } : {}) })
 		broadcastState()
+		return r?.bad ? 'bad' : undefined // the service counts a wrong token on the socket's bad-message counter
 	}
 
 	function you(c) {
 		const p = players.get(c.pid)
 		if (c.spectator || !p) return { id: c.pid, name: c.name, color: null, slot: null, spectator: true }
-		return { id: p.id, name: p.name, color: p.color, slot: p.slot, spectator: false }
+		const race = p.racing && p.race ? { race: { lap: p.race.lap, cp: p.race.cp } } : {} // WO-1106 B34: a resumed racer's count
+		return { id: p.id, name: p.name, color: p.color, slot: p.slot, spectator: false, ...race }
 	}
 
 	/** A player's socket is gone: lobby → removed; in a race a racer stays listed (disconnected) until the lobby. */
@@ -200,6 +230,7 @@ function createRcRoom(deps) {
 				p.connected = false
 				p.car = null
 				p.conn = null
+				p.goneAt = now() // WO-1106 B34: the resume grace and the longest-gone seat
 			}
 			checkAllFinished() // WO-1106 B39: also in the countdown
 		}
@@ -367,7 +398,7 @@ function createRcRoom(deps) {
 				const c = [...conns.values()].find((x) => x.pid === id)
 				const p = players.get(id)
 				if (!c && !p) return { ok: false, status: 404, error: 'no such player' }
-				if (p) players.delete(id), items.forget(id)
+				if (p) revokeToken(p), players.delete(id), items.forget(id) // WO-1106 B34: a kicked player's token is void
 				if (c) {
 					conns.delete(c.conn)
 					close(c.conn, 4409, 'kicked')

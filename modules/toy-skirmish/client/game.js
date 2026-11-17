@@ -134,6 +134,7 @@ export async function startGame({ spectator = false } = {}) {
 		G.lobby = createLobby($('#lobby'), {
 			onJoin: (name, color) => join(G, name, color),
 			onRejoin: () => {
+				G.net?.forget() // WO-1106 B34: a new name is a new player
 				G.net?.close()
 				sessSet('joined', null)
 				G.lobby.showJoin()
@@ -155,6 +156,7 @@ export async function startGame({ spectator = false } = {}) {
 		onMessage: (m) => onMessage(G, m),
 		onStatus: (s) => onStatus(G, s),
 		onBinary: (d) => G.fx?.onBinary(d),
+		resume: { get: () => sessGet('resume'), set: (v) => sessSet('resume', v) }, // WO-1106 B34: a reload of this tab resumes
 	})
 	if (spectator) G.net.connect('Spectator', '#ffffff', true)
 	else {
@@ -366,8 +368,19 @@ function onStatus(G, s) {
 				},
 			},
 		])
+	} else if (s === 'replaced') {
+		/* WO-1106 B34: this player went on on another page of this device (the same resume token) */
+		G.screens.show('Playing on another page', 'The game goes on in another tab or window on this device. Play here to take your soldier back.', [
+			{
+				label: 'Play here',
+				onClick: () => {
+					G.screens.hide()
+					if (G.joinInfo) join(G, G.joinInfo.name, G.joinInfo.color)
+				},
+			},
+		])
 	} else if (s === 'closed') G.hud.setStatus('Reconnecting…')
 	else if (s === 'joined') G.hud.setStatus('')
 	if (s === 'joined') document.body.classList.add('joined')
-	else if (s === 'full' || s === 'kicked' || s === 'off' || s === 'idle') document.body.classList.remove('joined')
+	else if (s === 'full' || s === 'kicked' || s === 'replaced' || s === 'off' || s === 'idle') document.body.classList.remove('joined')
 }

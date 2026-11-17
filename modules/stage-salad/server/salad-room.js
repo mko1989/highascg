@@ -10,12 +10,14 @@
  * something moved) while anyone is connected or bots exist; one phase timer.
  */
 
-const { kit } = require('./salad-kit')
+const { kit, shared } = require('./salad-kit')
 const S = require('./salad-sanitize')
 const { createShots } = require('./salad-shots')
 const { createBots, MAX_BOTS } = require('./salad-bots')
 const { createPresenters } = require('./salad-presenters')
 
+/** WO-1106 B34: a resumed player's reload (the longest vegetable's, ms). */
+const RELOAD_MAX_MS = Math.round(Math.max(...Object.values(shared().veggies.VEGGIES).map((v) => v.reload)) * 1000)
 const RULES = Object.freeze({ maxPlayers: 20, maxSpectators: 20, countdownMs: 3000, resultsMs: 12000, secs: { min: 30, max: 600, def: 90 } })
 const SILENT_MS = 10000
 const UNJOINED_MS = 15000
@@ -206,7 +208,10 @@ function createSaladRoom(deps) {
 			ensureTick()
 			return broadcastState()
 		}
-		if (humans().length >= maxPlayers) return send(c.conn, { t: 'full' })
+		const r = K.resume.resumeJoin({ players, conns, close, now }, c, m) // WO-1106 B34: before `full` — the seat is its own
+		if (r?.p) return resumed(c, r.p)
+		const bad = r?.bad ? 'bad' : undefined // the service counts a wrong token on the socket's bad-message counter
+		if (humans().length >= maxPlayers) return send(c.conn, { t: 'full' }), bad
 		if (players.size >= maxPlayers) {
 			joining = 1 // a bot makes room: bots.sync counts the guest already
 			bots.sync()
@@ -214,22 +219,35 @@ function createSaladRoom(deps) {
 			if (players.size >= maxPlayers) dropGhost()
 		}
 		const p = addPlayer({ name: null, color: null, bot: false, conn: c.conn })
-		if (!p) return send(c.conn, { t: 'full' })
+		if (!p) return send(c.conn, { t: 'full' }), bad
 		p.name = K.cleanName(m.name, `Player ${p.id}`)
 		p.color = K.cleanColor(m.color, p.id - 1)
 		c.pid = p.id
 		c.joined = true
 		bots.sync()
-		send(c.conn, { t: 'welcome', id: p.id, you: you(c), state: state() })
+		send(c.conn, { t: 'welcome', id: p.id, you: you(c), state: state(), resume: K.resume.issue(p) })
 		send(c.conn, { t: 'me', ready: p.readyAt, streak: p.streak, score: p.score })
 		lastW = '' // the newcomer needs the avatars even when nothing moves
+		broadcastState()
+		return bad
+	}
+
+	/**
+	 * WO-1106 B34: the same player back (id, name, colour, team, slot, score). Its aim starts over, the shot counter too
+	 * (the page's may have restarted), and the reload starts again: never shorter than the longest vegetable's.
+	 */
+	function resumed(c, p) {
+		Object.assign(p, { aim: null, pull: 0, lastN: -1, fireTimes: [], readyAt: Math.max(p.readyAt, now() + RELOAD_MAX_MS) })
+		bots.sync() // a bot gives the seat back when the room is full
+		send(c.conn, { t: 'welcome', id: p.id, you: you(c), state: state(), resume: kit().resume.issue(p), resumed: true })
+		send(c.conn, { t: 'me', ready: p.readyAt, streak: p.streak, score: p.score })
+		lastW = ''
 		broadcastState()
 	}
 
 	/**
 	 * WO-1106 B34: a full room whose seats are partly held by players whose socket dropped mid-round ("ghosts") — the
-	 * joining guest takes the seat of the one gone longest, as a guest takes a bot's. (A rejoin cannot claim its old
-	 * entry back yet: no resume token.)
+	 * joining guest takes the seat of the one gone longest, as a guest takes a bot's (its resume token goes with it).
 	 */
 	function dropGhost() {
 		let g = null
@@ -301,7 +319,7 @@ function createSaladRoom(deps) {
 		if (!venue) return { ok: false, status: 409, error: 'no venue yet' }
 		if (!players.size) return { ok: false, status: 409, error: 'no players' }
 		toLobby()
-		shots.clear()
+		shots.clear(true) // WO-1106 (B60 follow-up): a practice flight still in the air ends on every client (`end` k out)
 		for (const p of players.values()) Object.assign(p, { score: 0, hits: 0, shots: 0, streak: 0, best: 0, readyAt: 0 })
 		phase = 'countdown'
 		startAt = now() + RULES.countdownMs
@@ -325,7 +343,7 @@ function createSaladRoom(deps) {
 				if (!idle) return busy
 				return start()
 			case 'stop':
-				shots.clear()
+				shots.clear(true) // WO-1106 (B60 follow-up): the clients hear each flight's `end`, none hangs in the air
 				toLobby()
 				break
 			case 'round':
@@ -365,7 +383,7 @@ function createSaladRoom(deps) {
 				const p = players.get(id)
 				if (!c && !p) return { ok: false, status: 404, error: 'no such player' }
 				if (p?.bot) bots.kick(p)
-				else if (p) removePlayer(p)
+				else if (p) kit().resume.revoke(p), removePlayer(p) // WO-1106 B34: a kicked player's token is void
 				if (c) conns.delete(c.conn), close(c.conn, 4409, 'kicked')
 				bots.sync()
 				break

@@ -73,17 +73,21 @@ export function onMessage(G, m) {
 	if (G.wj?.onMessage(m)) return // WO-1101 Game World: wst / wv / xb / xbonus
 	const sNow = G.net ? G.net.serverNow() : 0
 	switch (m.t) {
-		case 'welcome':
+		case 'welcome': {
+			const again = m.resumed === true && G.meId === m.id // WO-1106 B34: this page's own player back (a reconnect)
 			G.meId = m.id
 			G.you = m.you || {}
 			G.book.meId = m.id
-			G.book.clear()
+			if (!again) G.book.clear() // a resume keeps the flights in the air (their `end` reaches this socket too)
 			if (m.you?.color) G.joinInfo = { ...(G.joinInfo || {}), color: m.you.color, name: m.you.name ?? G.joinInfo?.name }
-			G.state = null
-			G.phase = null
+			if (!again) {
+				G.state = null
+				G.phase = null
+			}
 			applyState(G, m.state)
 			if (!G.spectator && G.joinInfo) sessSet('joined', JSON.stringify(G.joinInfo))
 			break
+		}
 		case 'state':
 			applyState(G, m.state)
 			break

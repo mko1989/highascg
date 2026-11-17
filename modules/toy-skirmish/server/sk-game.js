@@ -24,6 +24,7 @@ const MSG_RATE = 60 // messages / s per socket (20 states + automatic fire + its
 const MAX_BUFFERED = 256 * 1024
 const MAX_PER_ADDRESS = 0 // WO-1106 B36: default per-address cap, 0 = off (phones behind NAT'd guest Wi-Fi share one address); deps.maxPerAddress turns it on
 const LEASE_ID = 'toy-skirmish'
+const REV_CHECK_MS = 5000 // WO-1106 B56: how often the housekeeping tick looks for a new scene rev (the baker memoises 2 s)
 
 /**
  * @param {{ port?: () => number, lanIps?: () => string[], log?: Function, now?: () => number, timers?: object, rng?: Function,
@@ -53,9 +54,8 @@ function createSkGame(deps = {}) {
 		if (!s) text.set(m, (s = JSON.stringify(m)))
 		return s
 	}
-	// venue network first: 100.64/10 (VPN / carrier NAT) addresses are no use to a guest's phone, so they go last
-	const cgnat = (ip) => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip)
-	const joinUrls = () => [...lanIps()].sort((a, b) => cgnat(a) - cgnat(b)).map((ip) => `http://${ip}:${port()}/game/sk/`)
+	// venue network first, then VPN (100.64/10 …), then local-only (169.254 / docker0 …): lan-ipv4.js ranks them (WO-1106 D3)
+	const joinUrls = () => [...lanIps()].map((ip) => `http://${ip}:${port()}/game/sk/`)
 
 	/** → true when handed to the socket, false when skipped (closed, > 256 KB queued) or it threw (WO-1106 A5). */
 	function sendTo(ws, m) {
@@ -94,6 +94,22 @@ function createSkGame(deps = {}) {
 		if (room && r !== lastRev) refreshScene().catch((e) => log('warn', `[toy-skirmish] scene failed: ${e.message}`))
 		return r
 	}
+	/**
+	 * WO-1106 B56: a previs edit reaches the players with nobody calling state() (no host page open): the room's 1 Hz
+	 * housekeeping (only while sockets are open) checks the rev every REV_CHECK_MS — a new one rebakes and, in the lobby,
+	 * broadcasts the state with the new `sceneRev` (the pages refetch); a running match keeps its arena until the lobby.
+	 */
+	let revCheckAt = -Infinity
+	function houseRev() {
+		const t = now()
+		if (t - revCheckAt < REV_CHECK_MS) return
+		revCheckAt = t
+		try {
+			rev()
+		} catch (e) {
+			log('warn', `[toy-skirmish] scene rev check failed: ${e.message}`)
+		}
+	}
 
 	function enable() {
 		if (room) return
@@ -101,6 +117,7 @@ function createSkGame(deps = {}) {
 		const w = world
 		room = createSkRoom({ now, timers: deps.timers, rng: deps.rng, send: sendTo, decorate, maxPlayers: RULES.maxPlayers, maxSpectators: RULES.maxSpectators,
 			tap: (m) => w.onShot(m),
+			house: houseRev,
 			close: (ws, code, reason) => {
 				try {
 					ws.close(code, reason)
@@ -196,7 +213,7 @@ function createSkGame(deps = {}) {
 				return
 			}
 			if (m.t === 'wq') return world?.quality(ws, m) // WO-1101: the visitor cap of the client's quality tier
-			if (room) room.handle(ws, m)
+			if (room && room.handle(ws, m) === 'bad' && ++bad > 20) ws.close(1008, 'invalid') // WO-1106 B34: a wrong resume token
 		})
 		let counted = !!from
 		ws.on('close', () => {
@@ -262,4 +279,4 @@ function shutdownSkGame() {
 	_game = null
 }
 
-module.exports = { createSkGame, getSkGame, useSkGame, shutdownSkGame, MAX_SOCKETS, MAX_PER_ADDRESS, LEASE_ID }
+module.exports = { createSkGame, getSkGame, useSkGame, shutdownSkGame, MAX_SOCKETS, MAX_PER_ADDRESS, LEASE_ID, REV_CHECK_MS }

@@ -257,6 +257,11 @@ makes it a lottery and would let Skirmish grief Salad's scoring).
   `soldier`) or `{ end: false }` (it bounced). A bounce changes the flight: Salad sends its clients
   `{ t: 'xb', id, n, i, p: [x,y,z], v: [vx,vy,vz], at }` (server ms) and they re-anchor that projectile there.
 - `hub.landed({ g, pid, veg, p, tag })` → R2 patch / R5 scatter.
+- `hub.patches(gameId)` → the live R2 slick patches `[{ x, y, z, r, until }]` (`until` in server ms) — the same patches
+  the pages get as `splat` visitors, for a game's server-side players (WO-1106 A35). `[]` while safe, while the world
+  tick does not run, for a game that is not attached, or while that game's affect is not `on` (a slide is a loss of
+  control). RC: `rc-world.js patches()` → `rc-room-bots.js` hands them to every bot step as `world.patches` (once per
+  tick; none → the step gets the very same world object as before).
 - `hub.shot({ g, pid, o: [x,y,z], yaw, range, los(a, b) })` → R4 (Skirmish, at an accepted hitscan `fire`).
 - R3 / R7 / R8 / R9 run in the hub's world tick (they need only positions).
 
@@ -312,3 +317,31 @@ Visitor visuals come in `wv.fx` (`[w, kind, ms, c]`: `splat`, `sparks`, `stun`, 
 - Viewer keys may be the games' socket objects (the hub serialises them); `wst.scale` is the toy scale of a game that
   brings a car / soldier model (never Salad's life-size 1); Salad's client draws visitors at `wst.scale`.
 - The spectator camera frames the stage edge from ≤ 14 m, 1 m under the ceiling, inside the hall (not the whole room).
+
+## 9. Resume after a reconnect — one design for the three games (WO-1106 B34)
+
+The three game rooms (RC, Stage Skirmish, Stage Salad) share `modules/rc-game/server/rc-resume.js` (Skirmish and
+Salad through their kits). The world wire is unchanged: a resumed player is the same entity id, so visitors and
+effects simply carry on.
+
+- `welcome` for a player carries `"resume": "<id>.<22 base64url chars>"` — 128 random bits per player entry, the same
+  for the entry's life. It goes only to that player's own socket: never in a `state`, a broadcast or a world entity.
+  Spectators and server bots get none.
+- The page keeps it in memory and in sessionStorage (`resume`): a reload of the same tab resumes, a new tab is a new
+  player. It sends it back as `"resume"` in its next player `join` (never a spectator join).
+- A valid token for an entry whose socket is gone — or still open but silent (half-open) — gives that SAME player back
+  (id, name, colour, team, slot, score / laps / kills), before any `full` check. The old socket is forgotten and closed
+  with **4410** `resumed elsewhere`; its late close drops nothing. The welcome then also has `"resumed": true`.
+  RC: `you.race = { lap, cp }` (the server's count); still racing when gone ≤ 20 s (the finish grace), else out of
+  this race. Skirmish: respawns through the normal spawn, score kept. Salad: slot and score kept, its aim / shot
+  counter start over, the reload restarts (never shorter than the longest vegetable's).
+- No entry for it any more (lobby drop, lobby reset, kicked, a ghost whose seat a joiner took) → a normal join. A
+  malformed token or a wrong secret for a live entry → a normal join counted on the socket's bad-message counter
+  (> 20 → 1008). Constant-time compare; the id only picks the entry.
+- Seats: a player who dropped mid-game keeps its seat (RC: its grid slot too); a joiner to a full room takes the
+  longest-gone one's (RC: an unfinished racer's first) — that token is void, the line and score stay until the lobby.
+  Lobby drops still leave at once (nothing to keep); in the lobby only the half-open take-over resumes.
+- Pages: 4409 kicked forgets the token; 4410 → status `replaced`, no auto-reconnect, a "Playing on another page" card
+  with "Play here" (rejoins with the token and takes the seat back). The lobby's change-name rejoin forgets the token
+  (a new name is a new player). A resumed `welcome` does not rebuild the page as a new player (RC keeps its car model
+  and takes the server's lap / checkpoint; Salad keeps its state, phase and flights); the A4 visitors reset stays.

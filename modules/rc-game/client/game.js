@@ -69,7 +69,7 @@ export async function startGame({ spectator = false } = {}) {
 		fx: null, // §2.6 stage-fx.js
 		launch: null,
 	}
-	G.ctl = { setTrack: (id) => setTrack(G, id), toGrid: () => toGrid(G), gameOff: () => gameOff(G) }
+	G.ctl = { setTrack: (id) => setTrack(G, id), toGrid: () => toGrid(G), gameOff: () => gameOff(G), respawn: () => respawn(G) }
 	installDevHook(G) // WO-1082: 127.0.0.1 + ?dev=1 only (headless checks on the box)
 
 	/* ---------- wait for the game to be enabled ---------- */
@@ -134,6 +134,7 @@ export async function startGame({ spectator = false } = {}) {
 			onJoin: (name, color) => join(G, name, color),
 			onReady: (r) => G.net?.setReady(r),
 			onRejoin: () => {
+				G.net?.forget() // WO-1106 B34: a new name is a new player
 				G.net?.close()
 				sessSet('joined', null)
 				G.lobby.showJoin(G.T)
@@ -156,6 +157,7 @@ export async function startGame({ spectator = false } = {}) {
 		onMessage: (m) => onMessage(G, m),
 		onStatus: (s) => onStatus(G, s),
 		onBinary: (d) => G.fx?.onBinary(d),
+		resume: { get: () => sessGet('resume'), set: (v) => sessSet('resume', v) }, // WO-1106 B34: a reload of this tab resumes
 	})
 	if (spectator) G.net.connect('Spectator', '#ffffff', true)
 	else {
@@ -353,6 +355,17 @@ export function onStatus(G, s) {
 				onClick: () => {
 					G.screens.hide()
 					G.lobby?.showJoin(G.T)
+				},
+			},
+		])
+	} else if (s === 'replaced') {
+		/* WO-1106 B34: this player went on on another page of this device (the same resume token) */
+		G.screens.show('Playing on another page', 'The race goes on in another tab or window on this device. Play here to take the car back.', [
+			{
+				label: 'Play here',
+				onClick: () => {
+					G.screens.hide()
+					if (G.joinInfo) join(G, G.joinInfo.name, G.joinInfo.color)
 				},
 			},
 		])

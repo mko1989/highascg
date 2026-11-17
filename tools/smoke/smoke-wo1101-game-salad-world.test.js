@@ -100,7 +100,7 @@ function script(R, hooks = {}) {
 	hooks.round?.()
 	R.clk.advance(30000 + 12000)
 	assert.equal(R.room.snapshot().phase, 'lobby')
-	return { a, b, sp, text: R.all.map((m) => JSON.stringify(m)).join('\n') }
+	return { a, b, sp, text: R.all.map((m) => JSON.stringify(m).replace(/"resume":"[^"]+"/g, '"resume":"<token>"')).join('\n') } // WO-1106 B34: tokens are random
 }
 
 test('alone = unchanged: no hub (or a hub with no other room) → byte-identical messages, the state keys, no world message', (t) => {

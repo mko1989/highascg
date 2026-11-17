@@ -11,6 +11,7 @@
  *   createRcVideo, rcVideoDeps  rc-video.js — the LED wall pictures
  *   serveRcStatic               rc-static.js — the static-file logic
  *   MAX_MESSAGE_BYTES, cleanName, cleanColor   rc-sanitize.js
+ *   resume                     rc-resume.js — the resume token after a reconnect (WO-1106 B34)
  *   core                        the sibling's host.core(id): core files / core npm packages (`ws`)
  * and `shared()`: this module's own pure ES modules in client/ (veggies, flight, venue, avatar-body, aim), loaded with
  * require() of an ES module — the server referee runs the very code the browser runs.
@@ -61,6 +62,7 @@ function kit() {
 	const video = require(file('rc-video.js'))
 	const stat = require(file('rc-static.js'))
 	const san = require(file('rc-sanitize.js'))
+	const resume = require(file('rc-resume.js'))
 	loaded = {
 		dir,
 		clientDir: path.join(dir, 'client'),
@@ -75,6 +77,7 @@ function kit() {
 		MAX_MESSAGE_BYTES: san.MAX_MESSAGE_BYTES,
 		cleanName: san.cleanName,
 		cleanColor: san.cleanColor,
+		resume, // WO-1106 B34: the one resume-token design of the three games (rc-resume.js)
 	}
 	return loaded
 }

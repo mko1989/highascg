@@ -15,6 +15,9 @@
  *   hub.contact({ g, pid, veg, p, v, tag, w }) → { end }   R1 / R6 (end: a splat vegetable ends on it)
  *   hub.landed({ g, pid, veg, p, tag })        → true      R2 slick patch / R5 pea scatter
  *   hub.shot({ g, pid, o, yaw, range, los })   → { hit }   R4 (o = muzzle, range in metres, los(a, b) → true when clear)
+ *   hub.patches(gameId)            → the live R2 slick patches [{ x, y, z, r, until }] (until in server ms) for that
+ *                                    game's server-side players (RC bots, WO-1106 A35); [] while safe, while the world
+ *                                    does not run, or while the game's affect is not 'on' (a slide is a loss of control)
  *   hub.wantsFrame(gameId)         → true while the world tick runs and that game is attached (cheap)
  *   hub.isSafe()                   → presenter safe on?
  *   hub.affect(gameId)             → 'on' | 'soft' | 'off'
@@ -373,6 +376,15 @@ function createHub(opts = {}) {
 		}
 		return out
 	}
+	/**
+	 * WO-1106 A35: the live slick patches (§6 R2) for a game's own server-side players — the very list the pages get as
+	 * `splat` visitors (flag 1), in the shape visitors.patches() hands the clients: { x, y, z, r, until (server ms) }.
+	 */
+	function patches(gameId) {
+		if (safe || !timer || !rooms.has(gameId) || (affect[gameId] || 'on') !== 'on') return []
+		const list = call(() => ref.patches())
+		return Array.isArray(list) ? list.map((x) => ({ x: x.p[0], y: x.p[1], z: x.p[2], r: x.r, until: x.until })) : []
+	}
 	const nameOf = (g, pid) => {
 		for (const e of snap.ents) if (e.g === g && e.id === pid && (e.k === 'sling' || e.k === 'car' || e.k === 'soldier')) return e.n
 		return ''
@@ -425,6 +437,7 @@ function createHub(opts = {}) {
 		contact,
 		landed,
 		shot,
+		patches,
 		wantsFrame: (g) => !!timer && rooms.has(g),
 		isSafe: () => safe,
 		affect: (g) => affect[g] || 'on',

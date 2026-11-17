@@ -80,8 +80,8 @@ function createSaladGame(deps = {}) {
 		if (!s) text.set(m, (s = JSON.stringify(m)))
 		return s
 	}
-	const cgnat = (ip) => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip)
-	const joinUrls = () => [...lanIps()].sort((a, b) => cgnat(a) - cgnat(b)).map((ip) => `http://${ip}:${port()}/game/salad/`)
+	// venue network first, then VPN (100.64/10 …), then local-only (169.254 / docker0 …): lan-ipv4.js ranks them (WO-1106 D3)
+	const joinUrls = () => [...lanIps()].map((ip) => `http://${ip}:${port()}/game/salad/`)
 
 	/** → true when handed to the socket, false when skipped (closed / over MAX_BUFFERED) — WO-1106 A5: the world hub commits on true only. */
 	function sendTo(ws, m) {
@@ -269,7 +269,7 @@ function createSaladGame(deps = {}) {
 			}
 			if (m.t === 'wq') return world?.quality(ws, m) // WO-1101: the visitor cap of the client's quality tier
 			if (!room) return
-			room.handle(ws, m)
+			if (room.handle(ws, m) === 'bad' && ++bad > 20) return ws.close(1008, 'invalid') // WO-1106 B34: a wrong resume token
 			if (m.t === 'join') startPoll()
 		})
 		ws.on('close', () => {

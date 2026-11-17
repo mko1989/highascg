@@ -7,7 +7,9 @@
  * `use` / `hit` messages, same referee. One 30 Hz timer (two 60 Hz physics steps per bot) runs only while bots exist.
  * The scene's tracks become physics worlds lazily (one per track a bot is on; the occupancy grids decoded once).
  *
- *   createRoomBots({ connect(conn), handle(conn, msg), disconnect(conn), now?, timers?, rng?, log?, load? })
+ *   createRoomBots({ connect(conn), handle(conn, msg), disconnect(conn), now?, timers?, rng?, log?, load?, patches? })
+ *     patches() → the Game World's live R2 slick patches [{ x, y, z, r, until }] (rc-world.js; WO-1106 A35): handed to
+ *     every bot's step as `world.patches`, so a splat slows a bot as it slows a player's car; none → the step is as before
  *     setScene(scene)      the baked scene JSON (floors, obstacles, occ, tracks, scale)
  *     setCount(n, level?)  → { ok, count }: bots join / leave until n (0 … MAX_BOTS); level easy | normal | hard
  *     preload()            → Promise: load the brain + physics modules (enable() calls it; setCount waits for it)
@@ -57,13 +59,26 @@ function createRoomBots(deps) {
 		return w
 	}
 
+	/** WO-1106 A35: the slick patches once per tick ([] when none or the call fails — a world never stops the bots). */
+	function livePatches() {
+		if (typeof deps.patches !== 'function') return null
+		try {
+			const list = deps.patches()
+			return Array.isArray(list) && list.length ? list : null
+		} catch {
+			return null
+		}
+	}
+
 	function tick() {
 		const t = now()
+		const pl = livePatches()
 		for (const b of bots) {
 			if (!bots.includes(b)) continue // removed while an earlier bot's messages were handled
 			let msgs
 			try {
-				msgs = b.brain.step(worldOf(b.brain.trackId), t, STEPS)
+				const w = worldOf(b.brain.trackId)
+				msgs = b.brain.step(w && pl ? { T: w.T, env: w.env, patches: pl } : w, t, STEPS)
 			} catch (e) {
 				log('warn', `[rc-game] bot ${b.name} stopped: ${e.message}`)
 				remove(b)

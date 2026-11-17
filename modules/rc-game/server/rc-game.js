@@ -122,7 +122,8 @@ function createRcGame(deps = {}) {
 			} })
 		const r = room
 		bots = createRoomBots({ now, timers: deps.timers, log, load: deps.loadBots,
-			connect: (c) => r.connect(c), handle: (c, m) => r.handle(c, m), disconnect: (c) => r.disconnect(c) })
+			connect: (c) => r.connect(c), handle: (c, m) => r.handle(c, m), disconnect: (c) => r.disconnect(c),
+			patches: () => world?.patches() || [] }) // WO-1106 A35: R2 slick patches reach the bots as they reach the players
 		bots.preload()
 		world = createRcWorld({ room: () => room, send: sendTo, lights, now })
 		setRcGameEnabled(true)
@@ -228,7 +229,7 @@ function createRcGame(deps = {}) {
 				return
 			}
 			if (m.t === 'wq') return world?.quality(ws, m) // WO-1101: the visitor cap of the client's quality tier
-			if (room) room.handle(ws, m)
+			if (room && room.handle(ws, m) === 'bad' && ++bad > 20) ws.close(1008, 'invalid') // WO-1106 B34: a wrong resume token
 		})
 		ws.on('close', () => {
 			sockets.delete(ws)

@@ -130,18 +130,21 @@ export function onMessage(G, m) {
 	const sNow = G.net ? G.net.serverNow() : 0
 	if (onItemMessage(G, m, sNow)) return
 	switch (m.t) {
-		case 'welcome':
+		case 'welcome': {
 			if (G.meId != null && G.meId !== m.id) G.race.remove(G.meId) // rejoined under a new id
+			const same = G.meId === m.id && G.me?.color === m.you?.color // WO-1106 B34: a resume of this page's own car
 			G.meId = m.id
 			G.me = m.you || { id: m.id }
-			if (G.myModel && G.me.color) {
+			if (G.myModel && G.me.color && !same) {
 				G.world.scene.remove(G.myModel.group)
 				G.myModel.dispose()
 				G.myModel = createCarModel({ color: safeColor(G.me.color), scale: G.s ?? 1 })
 				G.world.scene.add(G.myModel.group)
 			}
 			applyState(G, m.state)
+			if (m.resumed) resumeLaps(G, m.you?.race)
 			break
+		}
 		case 'state':
 			applyState(G, m.state)
 			break
@@ -179,6 +182,21 @@ export function onMessage(G, m) {
 			showResults(G)
 			break
 	}
+}
+
+/**
+ * WO-1106 B34: back in its race after a reconnect / reload — the server's lap count wins: a page that counted
+ * differently (a fresh page counts from 0; checkpoints passed while offline were never refereed) takes the server's
+ * lap and checkpoint and goes back to that checkpoint, so its next gates are the ones the server waits for.
+ */
+export function resumeLaps(G, r) {
+	if (!r || !G.car || G.spectator || !Number.isInteger(r.lap) || !Number.isInteger(r.cp)) return
+	const c = G.race._get(G.meId)
+	c.serverLap = Math.max(c.serverLap, r.lap)
+	if (c.lap.lap === r.lap && c.lap.cp === r.cp) return
+	c.lap.lap = r.lap
+	c.lap.cp = r.cp
+	G.ctl.respawn?.()
 }
 
 export function showResults(G) {

@@ -17,6 +17,8 @@ export const OFF_CODE = 4403
 /** Minimum spacing of item events (the server allows ≤ 10 box / ≤ 5 use per second). */
 export const EVENT_GAP_MS = { box: 110, use: 210 }
 export const KICK_CODE = 4409
+/** WO-1106 B34: this seat went on on another page (the same resume token): no auto-rejoin — the page offers "Play here". */
+export const REPLACED_CODE = 4410
 
 /** ws(s)://host/api/game/rc/ws for a page location. */
 export function wsUrlFor(loc) {
@@ -28,12 +30,15 @@ export class RcNet {
 	/**
 	 * @param {{ url: string, WebSocket: any, now: () => number, setTimeout: Function, clearTimeout: Function,
 	 *   setInterval: Function, clearInterval: Function, onMessage?: (m: object) => void, onStatus?: (s: string) => void,
-	 *   onBinary?: (data: ArrayBuffer | Blob) => void }} env
+	 *   onBinary?: (data: ArrayBuffer | Blob) => void, resume?: { get: () => string|null, set: (v: string|null) => void } }} env
+	 *   resume: where the resume token lives (WO-1106 B34; the page: sessionStorage — a reload of this tab resumes, a new
+	 *   tab is a new player)
 	 */
 	constructor(env) {
 		this.env = env
+		this.token = readToken(env) // WO-1106 B34: the welcome's resume token, sent back in the next join
 		this.clock = new ClockSync()
-		this.status = 'idle' // idle | connecting | open | joined | full | off | kicked | closed
+		this.status = 'idle' // idle | connecting | open | joined | full | off | kicked | replaced | closed
 		this.closeCode = null
 		this.ws = null
 		this.attempt = 0
@@ -83,7 +88,7 @@ export class RcNet {
 		ws.onopen = () => {
 			this._set('open')
 			this.clock.reset() // WO-1106 B43: pre-sleep samples would keep server time off by the sleep length
-			this._sendRaw(this.join)
+			this._sendRaw(this.token && !this.join.spectator ? { ...this.join, resume: this.token } : this.join)
 			this.pings = 0
 			this._sendPing()
 			this._ping = this.env.setInterval(() => this._sendPing(), 500)
@@ -97,9 +102,10 @@ export class RcNet {
 			this.closeCode = ev ? ev.code : null
 			const final = this._stopped || this.status === 'full' || this.status === 'off'
 			if (ev && ev.code === OFF_CODE) this._set('off')
-			else if (!final && ev && ev.code === KICK_CODE) this._set('kicked') // removed by the host: no auto-rejoin
+			else if (!final && ev && ev.code === KICK_CODE) this._set('kicked'), this.forget() // removed by the host: no auto-rejoin
+			else if (!final && ev && ev.code === REPLACED_CODE) this._set('replaced') // WO-1106 B34: resumed on another page
 			/* anything else (network drop, 4408 silent after a phone slept, 1013 busy …) → reconnect with backoff */
-			if (this._stopped || this.status === 'full' || this.status === 'off' || this.status === 'kicked') return
+			if (this._stopped || this.status === 'full' || this.status === 'off' || this.status === 'kicked' || this.status === 'replaced') return
 			this._scheduleRetry()
 		}
 	}
@@ -133,6 +139,7 @@ export class RcNet {
 			return
 		}
 		if (m.t === 'welcome') {
+			if (typeof m.resume === 'string') this._keep(m.resume)
 			this.attempt = 0
 			this._set('joined')
 		} else if (m.t === 'full' || m.t === 'off') {
@@ -189,6 +196,26 @@ export class RcNet {
 		return this.clock.now(this.env.now())
 	}
 
+	/** WO-1106 B34: keep the welcome's resume token (memory + the page's store). */
+	_keep(token) {
+		this.token = token
+		try {
+			this.env.resume?.set(token)
+		} catch {
+			/* storage blocked: memory only */
+		}
+	}
+
+	/** WO-1106 B34: the next join is a new player (kicked; the page's "change name" rejoin). */
+	forget() {
+		this.token = null
+		try {
+			this.env.resume?.set(null)
+		} catch {
+			/* ignore */
+		}
+	}
+
 	close() {
 		this._stopped = true
 		this._clearTimers()
@@ -202,5 +229,15 @@ export class RcNet {
 		}
 		this.ws = null
 		this._set('idle')
+	}
+}
+
+/** WO-1106 B34: the stored resume token, or null (blocked storage, junk). */
+function readToken(env) {
+	try {
+		const v = env.resume?.get()
+		return typeof v === 'string' && /^[1-9]\d{0,8}\.[A-Za-z0-9_-]{22}$/.test(v) ? v : null
+	} catch {
+		return null
 	}
 }

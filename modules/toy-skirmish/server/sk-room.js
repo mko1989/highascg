@@ -24,15 +24,16 @@ const { createSpot, SPOT } = require('./sk-spot')
 const G = require('./sk-grid')
 const { acceptMove } = require('./sk-move')
 const { floorOcc, sceneScaleOf } = require('./sk-arena-check')
+const { createSeats, MAX_GHOSTS } = require('./sk-room-seats') // WO-1106 B34: ghosts keep their seat; ≤ 10 listed
 
 const SILENT_MS = 10000
 const UNJOINED_MS = 15000
-const MAX_GHOSTS = 10 // WO-1106 B34: disconnected players kept listed (with their score) until the lobby
 const WORLD_MS = 50
 
 /**
  * @param {{ now?: () => number, timers?: object, send: (conn, msg) => void, close?: (conn, code, reason) => void,
- *   decorate?: (state) => object, maxPlayers?: number, maxSpectators?: number, rng?: () => number }} deps
+ *   decorate?: (state) => object, maxPlayers?: number, maxSpectators?: number, rng?: () => number, house?: () => void }} deps
+ *   house: called on each 1 Hz housekeeping tick (while sockets are open)
  */
 function createSkRoom(deps) {
 	const now = deps.now || Date.now
@@ -82,6 +83,8 @@ function createSkRoom(deps) {
 		room: () => ({ maxPlayers, humans: humans().length }),
 	})
 
+	const seats = createSeats({ players, maxPlayers, removePlayer: (p) => removePlayer(p), revoke: (p) => kit().resume.revoke(p) })
+	const trimGhosts = seats.trimGhosts
 	const spot = createSpot(X, { changed: () => broadcastState() })
 	/** The Spotlight tick runs while the mode is `spot` (any phase: the pool is there in the lobby, scores in a match). */
 	function syncSpotTimer() {
@@ -170,6 +173,7 @@ function createSkRoom(deps) {
 			T.clearInterval(timer.house)
 			timer.house = null
 		}
+		if (deps.house) deps.house() // WO-1106 B56: the service's scene-rev check (sk-game.js, throttled there)
 	}
 
 	const you = (c) => {
@@ -189,7 +193,9 @@ function createSkRoom(deps) {
 			send(c.conn, { t: 'welcome', id: c.pid, you: you(c), state: state() })
 			return broadcastState()
 		}
-		if (humans().length >= maxPlayers) return send(c.conn, { t: 'full' })
+		const r = K.resume.resumeJoin({ players, conns, close, now }, c, m) // WO-1106 B34: before `full` — the seat is its own
+		if (r?.p) return resumed(c, r.p)
+		if (!seats.free()) return send(c.conn, { t: 'full' }), r?.bad ? 'bad' : undefined
 		const p = addPlayer({ name: null, color: null, bot: false, conn: c.conn })
 		p.name = K.cleanName(m.name, `Player ${p.id}`)
 		p.color = K.cleanColor(m.color, p.id - 1)
@@ -197,7 +203,18 @@ function createSkRoom(deps) {
 		c.joined = true
 		bots.sync() // a guest takes a bot's place when the room is full
 		trimGhosts()
-		send(c.conn, { t: 'welcome', id: p.id, you: you(c), state: state() })
+		send(c.conn, { t: 'welcome', id: p.id, you: you(c), state: state(), resume: K.resume.issue(p) })
+		combat.spawn(p, phase === 'countdown' ? { until: startAt + RULES.protectMs } : {})
+		broadcastState()
+		return r?.bad ? 'bad' : undefined // the service counts a wrong token on the socket's bad-message counter
+	}
+
+	/** WO-1106 B34: the same player back (id, name, colour, team, score); it respawns through the normal path. */
+	function resumed(c, p) {
+		combat.clearRespawn(p)
+		p.sent = ''
+		bots.sync() // a bot gives the seat back when the room is full
+		send(c.conn, { t: 'welcome', id: p.id, you: you(c), state: state(), resume: kit().resume.issue(p), resumed: true })
 		combat.spawn(p, phase === 'countdown' ? { until: startAt + RULES.protectMs } : {})
 		broadcastState()
 	}
@@ -215,15 +232,6 @@ function createSkRoom(deps) {
 			X.dirty()
 		}
 		if (c.joined) broadcastState()
-	}
-
-	/**
-	 * WO-1106 B34: at most MAX_GHOSTS disconnected entries — so `players` stays ≤ maxPlayers (humans + bots) + 10 however
-	 * many sockets join and drop mid-match; the oldest goes first (its score with it), a join is never refused for it.
-	 */
-	function trimGhosts() {
-		const ghosts = [...players.values()].filter((p) => !p.bot && !p.connected).sort((a, b) => a.goneAt - b.goneAt || a.id - b.id)
-		for (const p of ghosts.slice(0, Math.max(0, ghosts.length - MAX_GHOSTS))) removePlayer(p)
 	}
 
 	function move(c, m) {
@@ -394,7 +402,7 @@ function createSkRoom(deps) {
 				const p = players.get(id)
 				if (!c && !p) return { ok: false, status: 404, error: 'no such player' }
 				if (p?.bot) bots.kick(p)
-				else if (p) removePlayer(p)
+				else if (p) kit().resume.revoke(p), removePlayer(p) // WO-1106 B34: a kicked player's token is void
 				if (c) {
 					conns.delete(c.conn)
 					close(c.conn, 4409, 'kicked')

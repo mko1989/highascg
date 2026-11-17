@@ -16,6 +16,8 @@ export const BACKOFF_MS = [500, 1000, 2000, 4000, 8000]
 export const WS_PATH = '/api/game/sk/ws'
 export const OFF_CODE = 4403
 export const KICK_CODE = 4409
+/** WO-1106 B34: this seat went on on another page (the same resume token): no auto-rejoin — the page offers "Play here". */
+export const REPLACED_CODE = 4410
 export const PICK_GAP_MS = 400
 
 /** ws(s)://host/api/game/sk/ws for a page location (also under /instance/<id>/ when the page is). */
@@ -29,12 +31,15 @@ export class SkNet {
 	/**
 	 * @param {{ url: string, WebSocket: any, now: () => number, setTimeout: Function, clearTimeout: Function,
 	 *   setInterval: Function, clearInterval: Function, onMessage?: (m: object) => void, onStatus?: (s: string) => void,
-	 *   onBinary?: (data: ArrayBuffer | Blob) => void }} env
+	 *   onBinary?: (data: ArrayBuffer | Blob) => void, resume?: { get: () => string|null, set: (v: string|null) => void } }} env
+	 *   resume: where the resume token lives (WO-1106 B34; the page: sessionStorage — a reload of this tab resumes, a new
+	 *   tab is a new player)
 	 */
 	constructor(env) {
 		this.env = env
+		this.token = readToken(env) // WO-1106 B34: the welcome's resume token, sent back in the next join
 		this.clock = new ClockSync()
-		this.status = 'idle' // idle | connecting | open | joined | full | off | kicked | closed
+		this.status = 'idle' // idle | connecting | open | joined | full | off | kicked | replaced | closed
 		this.closeCode = null
 		this.ws = null
 		this.attempt = 0
@@ -77,7 +82,7 @@ export class SkNet {
 		this.ws = ws
 		ws.onopen = () => {
 			this._set('open')
-			this._sendRaw(this.join)
+			this._sendRaw(this.token && !this.join.spectator ? { ...this.join, resume: this.token } : this.join)
 			this.pings = 0
 			this._sendPing()
 			this._ping = this.env.setInterval(() => this._sendPing(), 500)
@@ -90,8 +95,9 @@ export class SkNet {
 			this.closeCode = ev ? ev.code : null
 			const final = this._stopped || this.status === 'full' || this.status === 'off'
 			if (ev && ev.code === OFF_CODE) this._set('off')
-			else if (!final && ev && ev.code === KICK_CODE) this._set('kicked')
-			if (this._stopped || this.status === 'full' || this.status === 'off' || this.status === 'kicked') return
+			else if (!final && ev && ev.code === KICK_CODE) this._set('kicked'), this.forget()
+			else if (!final && ev && ev.code === REPLACED_CODE) this._set('replaced') // WO-1106 B34: resumed on another page
+			if (this._stopped || this.status === 'full' || this.status === 'off' || this.status === 'kicked' || this.status === 'replaced') return
 			this._scheduleRetry()
 		}
 	}
@@ -135,6 +141,7 @@ export class SkNet {
 			return
 		}
 		if (m.t === 'welcome') {
+			if (typeof m.resume === 'string') this._keep(m.resume)
 			this.attempt = 0
 			this._set('joined')
 		} else if (m.t === 'full' || m.t === 'off') {
@@ -190,10 +197,40 @@ export class SkNet {
 		return this.clock.now(this.env.now())
 	}
 
+	/** WO-1106 B34: keep the welcome's resume token (memory + the page's store). */
+	_keep(token) {
+		this.token = token
+		try {
+			this.env.resume?.set(token)
+		} catch {
+			/* storage blocked: memory only */
+		}
+	}
+
+	/** WO-1106 B34: the next join is a new player (kicked; the page's "change name" rejoin). */
+	forget() {
+		this.token = null
+		try {
+			this.env.resume?.set(null)
+		} catch {
+			/* ignore */
+		}
+	}
+
 	close() {
 		this._stopped = true
 		this._clearTimers()
 		this._drop()
 		this._set('idle')
+	}
+}
+
+/** WO-1106 B34: the stored resume token, or null (blocked storage, junk). */
+function readToken(env) {
+	try {
+		const v = env.resume?.get()
+		return typeof v === 'string' && /^[1-9]\d{0,8}\.[A-Za-z0-9_-]{22}$/.test(v) ? v : null
+	} catch {
+		return null
 	}
 }

@@ -7,7 +7,8 @@
  * (`reg.hub` null) nothing here runs: no timer, no message, no state field.
  *   register(getGame) / unregister()   register.js: the descriptor (host / state functions, page paths, the car model)
  *   createRcWorld({ room, send, lights, now })   rc-game.js while a session is enabled: the room adapter (§0.2) —
- *     cars as world entities, the joined sockets as viewers, effects → `xfx`, the causer's bonus → a mini-boost.
+ *     cars as world entities, the joined sockets as viewers, effects → `xfx`, the causer's bonus → a mini-boost;
+ *     patches() → the live R2 slick patches for the server's bots (WO-1106 A35).
  */
 
 const { RC_SCALE } = require('./rc-scale')
@@ -161,6 +162,18 @@ function createRcWorld(deps) {
 			try {
 				hubOf()?.quality?.(ID, conn, n)
 			} catch {}
+		},
+		/**
+		 * WO-1106 A35: the live R2 slick patches for the server's bots [{ x, y, z, r, until }] (hub.patches; [] without
+		 * the world module, while safe, or while this game's affect is not 'on') — the players' pages get the same splats.
+		 */
+		patches() {
+			try {
+				const list = hubOf()?.patches?.(ID)
+				return Array.isArray(list) ? list : []
+			} catch {
+				return []
+			}
 		},
 		attach() {
 			try {
