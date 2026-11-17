@@ -46,7 +46,10 @@ func _build() -> void:
 	out_section = OutSection.new()
 	out_section.edited.connect(_apply)
 	section.changed.connect(_apply)
-	output.feeding_changed.connect(func() -> void: tab.call("_apply_mode"))
+	output.feeding_changed.connect(func() -> void:
+		tab.call("_apply_mode")
+		_mirror_sync())
+	_build_mirror()
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _apply())
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
 		if path == "*" or path == "channelMap":
@@ -54,6 +57,39 @@ func _build() -> void:
 	if Config.args.has("probe-previs-output"):  # dev: --probe-previs-output=<dir> (the lead's box check)
 		(func() -> void: preload("res://features/previs/output/previs_output_probe.gd").run(self, str(Config.args["probe-previs-output"]))).call_deferred()
 	_apply.call_deferred()
+
+
+## WO-1117 (owner 17.11: "we need to render the scene only once when wanted to be recorded. it cant keep up") — while
+## the output runs, the tab's own viewport does not render (previs_tab.gd _apply_mode): the tab shows the output's
+## picture instead, so the stage is drawn once. The camera input still goes to the view underneath ("My view" follows
+## it); the picture is the clean 16:9 output, letterboxed.
+var _mirror: ColorRect
+
+
+func _build_mirror() -> void:
+	var svc: Control = tab.get("_svc")
+	if svc == null or svc.get_parent() == null:
+		return
+	_mirror = ColorRect.new()
+	_mirror.color = Color.BLACK
+	_mirror.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mirror.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var pic := TextureRect.new()
+	pic.texture = output.vp.get_texture()
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pic.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_mirror.add_child(pic)
+	svc.get_parent().add_child(_mirror)
+	svc.get_parent().move_child(_mirror, svc.get_index() + 1)
+	svc.visibility_changed.connect(_mirror_sync)
+	_mirror_sync()
+
+
+func _mirror_sync() -> void:
+	if _mirror != null:
+		_mirror.visible = output.running() and (tab.get("_svc") as Control).visible
 
 
 ## "" when this client can write the ring (on the box, with libhshm_sink), else why not — the Visuals wording.

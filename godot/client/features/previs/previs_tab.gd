@@ -361,7 +361,7 @@ func _apply_mode() -> void:
 	var out: bool = _sv.get_meta("previs_output", false) == true  # WO-1108: the Previs output renders this stage, shown or not
 	var is3d := mode == "3d"
 	_svc.visible = is3d
-	_sv.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if is3d and shown else SubViewport.UPDATE_DISABLED
+	_sv.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if is3d and shown and not out else SubViewport.UPDATE_DISABLED  # WO-1117: the output's render is shown instead
 	builder.set_live((is3d or (mode == "camera" and track_view.ghost_on)) and shown or out)  # T12: the ghost shows live walls
 	mvr.set_live(is3d and shown or out)  # WO-612 T5: MVR VideoScreens bound to HighAsCG surfaces
 	if (is3d and shown or out) and not stage.screens.is_empty():  # GLB screens only — no model, no hold
