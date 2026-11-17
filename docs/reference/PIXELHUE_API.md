@@ -2,7 +2,7 @@
 
 This document combines:
 
-1. **Authoritative path list** — **PixelFlow OpenAPI Manual V2.0.1** (NovaStar), PDF at [`vendor/PixelFlow-OpenAPI Manual-V2.0.1.pdf`](vendor/PixelFlow-OpenAPI%20Manual-V2.0.1.pdf) — supported devices: **P10, P20, Q8, P80** (per release notes; Companion also uses a **PF** model profile on virtual devices).
+1. **Authoritative path list** — **PixelFlow OpenAPI Manual V2.0.1** (NovaStar), published by NovaStar / PixelHue (their document, not kept in this repo: get it from the vendor) — supported devices: **P10, P20, Q8, P80** (per release notes; Companion also uses a **PF** model profile on virtual devices).
 2. **Request bodies and working usage** — **PixelHue** Companion module in this repo: `companion-module-pixelhue-switcher-main 2/` (`src/services/ApiClient.ts`, `src/config/devices/*.ts`).
 
 > **Caveats**  
@@ -210,7 +210,7 @@ HighAsCG can start with **HTTP polling**; WS is for low-latency mirroring and Co
 
 | File | Content |
 |------|--------|
-| [`vendor/PixelFlow-OpenAPI Manual-V2.0.1.pdf`](vendor/PixelFlow-OpenAPI%20Manual-V2.0.1.pdf) | Official paths, methods, and field tables. |
+| PixelFlow OpenAPI Manual V2.0.1 (from the vendor; not in this repo) | Official paths, methods, and field tables. |
 | `src/services/ApiClient.ts` | HTTP methods and bodies. |
 | `src/services/HttpClient.ts` | HTTP vs HTTPS base selection. |
 | `src/services/WebSocketClient.ts` | WSS URL, TLV parsing. |
