@@ -171,7 +171,8 @@ describe('WO-712 R3 exchange: receiver', () => {
 		s.T.ex.offer('tracking.auto', SNAP)
 		await flush()
 		assert.equal(s.M.ws.length, 1, 'a heartbeat with the same data is not re-broadcast')
-		assert.deepEqual(s.M.logs, [], 'information: no "[cluster] remote …" line')
+		// WO-1106 C27: the once-per-server "still uses the old signed call" note is not a per-call line (these fakes speak v1)
+		assert.deepEqual(s.M.logs.filter((l) => !/still uses the old signed call/.test(l)), [], 'information: no "[cluster] remote …" line')
 		assert.deepEqual(s.M.ex.latest('tracking.auto'), { ...SNAP, source: { id: 'T', name: 'srv-T' } })
 	})
 

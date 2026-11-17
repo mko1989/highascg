@@ -23,6 +23,8 @@
  *       master (or no master among the owners) → runs here and sends the same call to the other owners in parallel
  *       (`via` added to the answer); a follower whose master also owns it → the press goes to the master (`fanout`, 1 s:
  *       it drives every owner, this one included) — no answer → run here, answer `diverged: true` (owner answer 3).
+ *       WO-1106 C19: such a press carries a `pressId` (press-once.js): it lands once on this screen, whichever of the
+ *       local fallback and the master's forwarded copy comes first.
  *   relayAll(ctx, action, args) → per remote screen results, for the "all screens" presses (FTB all, test card master).
  *   relayOwners(ctx, action, args) → one call per owner of remote screens (`all: true`), for timeline "every screen".
  *
@@ -34,6 +36,7 @@
 
 const { AsyncLocalStorage } = require('node:async_hooks')
 const { JSON_HEADERS, jsonBody } = require('../api/response')
+const once = require('./press-once')
 const CAP = 'dest-actions'
 const RELAY_MS = 4000
 const BACKUP_MS = 1000
@@ -167,17 +170,41 @@ async function backupPlan(ctx, q, action, args = {}) {
 	if (remote && !remote.fanout) return null
 	const t = nh().screenTarget(ctx, q)
 	if (!t.here || t.idx == null) return null
-	const others = await ownersFor(ctx, t.destId)
+	let others = await ownersFor(ctx, t.destId)
 	if (!others.length) return null
 	const m = masterView(ctx)
 	const masterOwner = !remote && !m.is_master && m.master_id ? others.find((o) => o.id === m.master_id) : null
-	if (masterOwner) {
-		const [r] = await sendDest(ctx, { destId: t.destId, owners: [masterOwner] }, action, { ...args, fanout: true }, { timeoutMs: BACKUP_MS })
-		if (r && !r.skipped && r.status > 0) return { reply: await relayReply(ctx, t, [r]) }
-		log(ctx, 'warn', `screen ${t.idx + 1}: ${masterOwner.name} did not take ${action} (${r?.error || 'no answer'}) — run here, the backup diverged`)
-		return { diverged: true }
+	if (masterOwner) return handToMaster(ctx, t, masterOwner, action, args)
+	// WO-1106 C19: the master forwards the press it was handed with the origin's pressId (the origin runs it once), and
+	// not back to the origin when that one already reported taking it itself (press-once.js `dest.ran`)
+	const pressId = once.validId(remote?.pressId)
+	if (pressId && once.ranAtOrigin(ctx, pressId, remote.from)) {
+		others = others.filter((o) => o.id !== remote.from)
+		log(ctx, 'info', `screen ${t.idx + 1}: ${action} ${pressId} already ran on ${remote.from}: not forwarded back to it`)
+		if (!others.length) return null
 	}
-	return { forward: sendDest(ctx, { destId: t.destId, owners: others }, action, args), wait: !remote }
+	return { forward: sendDest(ctx, { destId: t.destId, owners: others }, action, pressId ? { ...args, pressId } : args), wait: !remote }
+}
+
+/**
+ * A follower's press on a backup screen the master owns too: the master takes it (and drives every owner, this one
+ * included); no answer in BACKUP_MS → taken here (`diverged`). WO-1106 C19: the press carries a pressId; the master's
+ * forwarded copy and this local fallback run it once between them (press-once.js), and the master hears that it ran here.
+ */
+async function handToMaster(ctx, t, masterOwner, action, args) {
+	const pressId = once.newPressId()
+	const [r] = await sendDest(ctx, { destId: t.destId, owners: [masterOwner] }, action, { ...args, fanout: true, pressId }, { timeoutMs: BACKUP_MS })
+	if (r && !r.skipped && r.status > 0) return { reply: await relayReply(ctx, t, [r]) }
+	const prior = once.claimHere(ctx, pressId)
+	if (prior) {
+		const a = (await Promise.resolve(prior.answer).catch(() => null)) || { status: 200, body: { ok: true } }
+		log(ctx, 'info', `screen ${t.idx + 1}: ${masterOwner.name} answered ${action} late, its copy already ran here — not taken twice`)
+		return { reply: reply(Number(a.status) || 200, a.body && typeof a.body === 'object' ? a.body : { ok: true }) }
+	}
+	log(ctx, 'warn', `screen ${t.idx + 1}: ${masterOwner.name} did not take ${action} (${r?.error || 'no answer'}) — run here, the backup diverged`)
+	const api = callApi(ctx)
+	if (api) once.tellRan((a, x, o) => api.call(masterOwner.id, a, x, o), pressId)
+	return { diverged: true }
 }
 
 function mergeBody(res, extra) {

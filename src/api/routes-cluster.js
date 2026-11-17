@@ -33,6 +33,9 @@
  *   GET    /api/cluster/apply-plan · POST /api/cluster/apply { servers?, force?, wait? } · GET /api/cluster/apply/status
  *                                              → WO-1029: Apply (restart Caspar) on every linked server that needs it
  *                                                (cluster-apply.js); progress WS `cluster:apply`
+ * WO-1106 C29: the routes that change the linked servers (POST peers · invites accept/decline · auto-accept · DELETE
+ * peers/:id · send-media · master/set · show · apply) answer only API auth, the box itself, or a request signed by a
+ * linked server (cluster-route-gate.js; a link-back may only add a new server; `?link_back=0` signed by that server).
  * GET /api/cluster also carries `master` (the view) and `invites` (WO-739: [{ id, fp, host, port, name, version,
  * first_at, asked_at }]). Changes broadcast WS `cluster:peers` (the GET body).
  * WO-1029 2a: and `destinations: [{ id, label, main, owners: [server ids], here, kind: 'own'|'backup'|'remote'|'local'|'nowhere',
@@ -62,6 +65,9 @@ const duties = require('../cluster/server-duties')
 const { isSandbox } = require('../bootstrap/sandbox')
 const { createSendersSync } = require('../cluster/server-senders')
 const { ownView, ownershipDeps } = require('../cluster/ownership-ctx')
+const { sandboxCaspar, refusedPeerCaspar, destPressed, applyOf } = require('../cluster/cluster-routes-ctx')
+const { createClusterGate } = require('../cluster/cluster-route-gate')
+const { isSigned } = require('../cluster/cluster-signed-request')
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: jsonBody(obj) })
 
@@ -171,21 +177,6 @@ function airJournalOf(ctx) {
 /** WO-1029: the virtual box bed (tools/e2e/virtual-boxes.js) lets a sandbox master forward to its peers' fake Caspars. */
 const sandboxFanout = () => process.env.HIGHASCG_SANDBOX_FANOUT === '1'
 
-/**
- * WO-1029: a sandbox opens a socket only to a loopback throwaway Caspar, never to :5250 (WO-990: the live Caspar's AMCP
- * acceptor dies on connect + reset) and never onto the LAN (WO-719). Outside a sandbox every address is allowed.
- */
-function sandboxCaspar(host, port) {
-	if (!isSandbox()) return true
-	return Number(port) !== 5250 && /^(127\.\d{1,3}\.\d{1,3}\.\d{1,3}|localhost|::1)$/.test(String(host || ''))
-}
-
-/** A connection that never connects: the fan-out shows that server as not connected and sends nothing. */
-function refusedPeerCaspar(ctx, host, port) {
-	ctx.log?.('warn', `[cluster] sandbox: refusing to forward to ${host}:${port} (only a loopback throwaway Caspar, never :5250)`)
-	return { isConnected: false, stop() {}, enqueueSend() {}, enqueueBatchLines() {} }
-}
-
 /** P4a: while this server is master, its takes go to every linked server where the destination is cabled. */
 function fanoutOf(ctx) {
 	if (ctx._clusterFanout) return ctx._clusterFanout
@@ -212,6 +203,7 @@ function fanoutOf(ctx) {
 		// WO-933: what that Caspar already shows, so a server that kept playing is not cut back to frame 0
 		queryInfo: (host, port, channels) => (sandboxCaspar(host, port) ? require('../cluster/cluster-peer-info').queryChannels(host, port, channels) : Promise.resolve(null)),
 		journal: airJournalOf(ctx),
+		suppressed: () => require('../cluster/press-once').suppressedTarget(ctx), // WO-1106 C19: a press its origin took itself
 		log: ctx.log,
 		onChange: () => broadcast(ctx),
 	})
@@ -280,20 +272,12 @@ function callOf(ctx) {
 		post: postJson,
 		masterId: () => (masterOf(ctx).view().is_master ? '' : masterOf(ctx).view().master_id),
 		acceptsRemote: () => require('../cluster/server-duties').has('accept_remote'),
-		info: { ...exchangeOf(ctx).info, ...showOf(ctx).info, ...require('../cluster/cluster-device-view').clusterInfo(ctx), ...reportOf(ctx).info, ...require('../cluster/dest-actions').destActionsOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
+		info: { ...exchangeOf(ctx).info, ...showOf(ctx).info, ...require('../cluster/cluster-device-view').clusterInfo(ctx), ...reportOf(ctx).info, ...require('../cluster/dest-actions').destActionsOf(ctx).info, ...require('../cluster/press-once').info(ctx), 'cluster.senders': (args) => sendersReceived(ctx, args) },
 		actions: { ...createCallActions(ctx, { callMaster: (a, args, o) => callOf(ctx).callMaster(a, args, o), call: (id, a, args, o) => callOf(ctx).call(id, a, args, o),
 			owners: (ids) => ownershipOf(ctx).owners(ids), isFollower: () => isClusterFollower(ctx) }), ...showOf(ctx).actions },
 		log: ctx.log,
 	})
 	return ctx._clusterCall
-}
-
-/** WO-1029 2a: an owner pressed on its own screen locally → the master stops catching that screen up there. */
-function destPressed(ctx, args, peer) {
-	const destId = String(args?.destId || '')
-	if (!destId || !Number.isFinite(Number(args?.seq))) return { status: 400, body: { error: 'destId and seq required' } }
-	if (!ctx._clusterFanout) return { status: 409, body: { error: 'not forwarding (not the master)' } }
-	return ctx._clusterFanout.ownerPressed(peer?.id, destId, Number(args.seq))
 }
 
 /** WO-746: one show on the linked servers that switched sharing on (shared-show.js); persistProject calls `written`. */
@@ -365,6 +349,18 @@ function mediaDeps(ctx) {
 	}
 }
 
+/** WO-1106 C29: who may change the linked servers (cluster-route-gate.js: API auth, the box itself, a signed request). */
+function gateOf(ctx) {
+	if (!ctx._clusterGate) ctx._clusterGate = createClusterGate({ peers: () => clusterOf(ctx).list(), selfKey: identity.getDevicePublicKeyPem, verify: identity.verifyMessage })
+	return ctx._clusterGate
+}
+
+/** WO-1106 C29: a route that changes membership, mastership, the shared show or pushes media / restarts Caspar. */
+const gated = (fn) => async (a) => {
+	const g = gateOf(a.ctx).check(a.req, a.ctx, a.body)
+	return g.ok ? fn(a) : reply(g.status, g.body)
+}
+
 function register(routes) {
 	const opt = { requireCaspar: false }
 	routes.get('/api/cluster', async ({ ctx }) => {
@@ -373,33 +369,41 @@ function register(routes) {
 		return reply(200, full(ctx))
 	}, opt)
 	routes.post('/api/cluster/scan', async ({ ctx }) => reply(200, { found: await clusterOf(ctx).scan() }), opt)
-	routes.post('/api/cluster/peers', async ({ body, ctx }) => {
-		const r = await clusterOf(ctx).add(parseBody(body))
+	routes.post('/api/cluster/peers', async ({ body, ctx, req }) => {
+		const b = parseBody(body)
+		const g = gateOf(ctx).check(req, ctx, body)
+		// WO-1106 C29: not allowed here = only a server linking back (`link_back: false`), and only a new one (cluster-peers.js)
+		if (!g.ok && (b?.link_back !== false || isSigned(req))) return reply(g.status, g.body)
+		const r = await clusterOf(ctx).add(b, { untrusted: !g.ok })
 		return reply(r.status, r.body)
 	}, opt)
-	routes.post('/api/cluster/invites/:id/accept', async ({ ctx, params }) => {
+	routes.post('/api/cluster/invites/:id/accept', gated(async ({ ctx, params }) => {
 		const r = await clusterOf(ctx).accept(params.id)
 		return reply(r.status, r.body)
-	}, opt)
-	routes.post('/api/cluster/invites/:id/decline', async ({ ctx, params }) => {
+	}), opt)
+	routes.post('/api/cluster/invites/:id/decline', gated(async ({ ctx, params }) => {
 		const r = await clusterOf(ctx).decline(params.id)
 		return reply(r.status, r.body)
-	}, opt)
-	routes.post('/api/cluster/auto-accept', ({ ctx, body }) => {
+	}), opt)
+	routes.post('/api/cluster/auto-accept', gated(({ ctx, body }) => {
 		const on = parseBody(body)?.on
 		if (typeof on !== 'boolean') return reply(400, { error: 'on must be true or false' })
 		return reply(200, clusterOf(ctx).setAutoAccept(on))
-	}, opt)
-	routes.delete('/api/cluster/peers/:id', async ({ ctx, params, query }) => {
-		// WO-732: unlinks there too; `?link_back=0` = that server is the one unlinking
+	}), opt)
+	routes.delete('/api/cluster/peers/:id', async ({ ctx, params, query, req, body }) => {
+		// WO-732: unlinks there too; `?link_back=0` = that server is the one unlinking (WO-1106 C29: signed by it)
+		const there = String(query?.link_back ?? '') === '0'
+		if (there && !clusterOf(ctx).saved(params.id)) return reply(404, { error: 'no such server' })
+		const g = gateOf(ctx).check(req, ctx, body, there ? { onlyPeer: params.id } : {})
+		if (!g.ok) return reply(g.status, g.body)
 		const r = await clusterOf(ctx).unlink(params.id, { linkBack: String(query?.link_back ?? '') !== '0' })
 		if (r.ok && clusterOf(ctx).size() === 0) masterOf(ctx).forget() // also done by `removed`: kept for a master not built yet
 		return reply(r.ok ? 200 : 404, r.ok ? r : { error: 'no such server' })
 	}, opt)
-	routes.post('/api/cluster/peers/:id/send-media', async ({ ctx, params }) => {
+	routes.post('/api/cluster/peers/:id/send-media', gated(async ({ ctx, params }) => {
 		const r = await sendMedia(params.id, mediaDeps(ctx))
 		return reply(r.status, r.body)
-	}, opt)
+	}), opt)
 	routes.get('/api/cluster/identity', ({ ctx }) => {
 		const me = clusterOf(ctx).snapshot().self
 		const key = identity.getDevicePublicKeyPem()
@@ -414,10 +418,10 @@ function register(routes) {
 		const r = masterOf(ctx).accept(parseBody(body))
 		return reply(r.status, r.body)
 	}, opt)
-	routes.post('/api/cluster/master/set', async ({ ctx, body }) => {
+	routes.post('/api/cluster/master/set', gated(async ({ ctx, body }) => {
 		const r = await masterOf(ctx).set(parseBody(body))
 		return reply(r.status, r.body)
-	}, opt)
+	}), opt)
 	routes.post('/api/cluster/call', async ({ ctx, body }) => {
 		const r = await callOf(ctx).handle(parseBody(body))
 		return reply(r.status, r.body)
@@ -432,18 +436,19 @@ function register(routes) {
 		return reply(r.status || 502, r.json && typeof r.json === 'object' ? r.json : { error: r.error || 'no answer' })
 	}, opt)
 	routes.get('/api/cluster/exchange', ({ ctx }) => reply(200, exchangeOf(ctx).view()), opt)
-	routes.post('/api/cluster/show', ({ ctx, body }) => {
+	routes.post('/api/cluster/show', gated(({ ctx, body }) => {
 		const on = parseBody(body)?.on
 		if (typeof on !== 'boolean') return reply(400, { error: 'on must be true or false' })
 		const v = showOf(ctx).setOn(on)
 		broadcast(ctx)
 		return reply(200, v)
-	}, opt)
+	}), opt)
 	routes.get('/api/cluster/peers/:id/device-view', async ({ ctx, params }) => {
 		const r = await clusterOf(ctx).deviceView(params.id)
 		return reply(r.status, r.body)
 	}, opt)
-	const relay = ({ method, ctx, params, query, body }) => relayOf(ctx)({ method, id: params.id, tail: params['*'], query, body })
+	// WO-1106 C29: an operator allowed here edits a linked server's cluster settings with this server's signature
+	const relay = ({ method, ctx, params, query, body, req }) => relayOf(ctx)({ method, id: params.id, tail: params['*'], query, body, signed: gateOf(ctx).operator(req, ctx) })
 	routes.get('/api/cluster/peers/:id/relay/*', relay, opt) // WO-802
 	routes.post('/api/cluster/peers/:id/relay/*', relay, opt)
 	routes.delete('/api/cluster/peers/:id/relay/*', relay, opt)
@@ -453,39 +458,15 @@ function register(routes) {
 		const self = servers.find((x) => x.self)
 		return reply(200, { generatedAt: Date.now(), self_id: self?.id || '', master_id: servers.find((x) => x.master)?.id || '', running: a.status().running, servers })
 	}, opt)
-	routes.post('/api/cluster/apply', async ({ ctx, body }) => {
+	routes.post('/api/cluster/apply', gated(async ({ ctx, body }) => {
 		const r = await applyOf(ctx).apply(parseBody(body) || {})
 		return reply(r.status, r.body)
-	}, opt)
+	}), opt)
 	routes.get('/api/cluster/apply/status', ({ ctx }) => reply(200, applyOf(ctx).status()), opt)
 }
 
-/** WO-1029: one Apply for every linked server that needs it, only those (cluster-apply.js); each runs on its own server. */
-function applyOf(ctx) {
-	if (ctx._clusterApply) return ctx._clusterApply
-	const selfId = () => clusterOf(ctx).snapshot().self?.id || 'self'
-	ctx._clusterApply = require('../cluster/cluster-apply').createClusterApply({
-		selfId,
-		selfName: () => clusterOf(ctx).snapshot().self?.hostname || '',
-		peers: () => clusterOf(ctx).snapshot().peers,
-		peerCaps: (id) => clusterOf(ctx).peerCaps(id), // WO-1029 C0
-		masterId: () => (masterOf(ctx).view().is_master ? selfId() : masterOf(ctx).view().master_id || ''),
-		localDirty: () => require('../config/caspar-config-dirty').casparConfigDirty(ctx),
-		localApply: (b) => require('./routes-caspar-config').handlePost('/api/caspar-config/apply', JSON.stringify(b), ctx),
-		relay: (method, id, p, b) => relayOf(ctx)({ method, id, tail: p.replace(/^\/+/, ''), query: {}, body: b == null ? undefined : JSON.stringify(b) }),
-		screens: () => {
-			const by = {}
-			for (const d of safeDestinations(ctx)) for (const o of d.owners || []) (by[o] = by[o] || []).push(d.label || d.id)
-			return by
-		},
-		broadcast: (data) => typeof ctx._wsBroadcast === 'function' && ctx._wsBroadcast('cluster:apply', data),
-		log: ctx.log,
-	})
-	return ctx._clusterApply
-}
-
 function relayOf(ctx) {
-	if (!ctx._clusterRelay) ctx._clusterRelay = createRelay({ cluster: clusterOf(ctx), log: ctx.log, onAnswered: (id, m, p, st) => require('../cluster/cluster-device-view').relayWrote(ctx, id, m, p, st) }) // WO-1029 S4
+	if (!ctx._clusterRelay) ctx._clusterRelay = createRelay({ cluster: clusterOf(ctx), log: ctx.log, selfKey: identity.getDevicePublicKeyPem, sign: identity.signMessage, onAnswered: (id, m, p, st) => require('../cluster/cluster-device-view').relayWrote(ctx, id, m, p, st) }) // WO-1029 S4
 	return ctx._clusterRelay
 }
 
@@ -496,4 +477,4 @@ function startIfLinked(ctx) {
 	if (Array.isArray(peers) && peers.length) clusterOf(ctx)
 }
 
-module.exports = { register, clusterOf, masterOf, fanoutOf, ownershipOf, followsMaster, isClusterFollower, callOf, exchangeOf, showOf, sendersSyncOf, sendersReceived, startIfLinked }
+module.exports = { register, gateOf, relayOf, safeDestinations, clusterOf, masterOf, fanoutOf, ownershipOf, followsMaster, isClusterFollower, callOf, exchangeOf, showOf, sendersSyncOf, sendersReceived, startIfLinked }

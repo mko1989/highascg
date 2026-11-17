@@ -152,8 +152,10 @@ describe('WO-670 P2 cluster peers', () => {
 		assert.equal(get.status, 200)
 		assert.equal(JSON.parse(get.body).self.id, 'boxA')
 		assert.equal(JSON.parse(get.body).master.epoch, 0, 'P3a: the master view rides along')
-		assert.equal((await routes.dispatch('POST', '/api/cluster/peers', JSON.stringify({ address: '10.0.0.99' }), ctx)).status, 404)
-		assert.equal((await routes.dispatch('DELETE', '/api/cluster/peers/boxZ', '', ctx)).status, 404)
+		// WO-1106 C29: changing the linked servers needs API auth or the box itself — a request from the box here
+		const box = { socket: { remoteAddress: '127.0.0.1', localPort: 4200 }, headers: { host: '127.0.0.1:4200' } }
+		assert.equal((await routes.dispatch('POST', '/api/cluster/peers', JSON.stringify({ address: '10.0.0.99' }), ctx, box)).status, 404)
+		assert.equal((await routes.dispatch('DELETE', '/api/cluster/peers/boxZ', '', ctx, box)).status, 404)
 		assert.equal((await routes.dispatch('GET', '/api/cluster/peers/boxZ/device-view', '', ctx)).status, 404)
 		const router = fs.readFileSync(path.join(ROOT, 'src/api/router.js'), 'utf8')
 		assert.match(router, /require\('\.\/routes-cluster'\)\.register\(routes\)/)

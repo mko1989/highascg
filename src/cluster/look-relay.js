@@ -12,6 +12,8 @@
  * Answers `{ status, body: object }` (the caller wraps it) or `{ local: true, diverged?: true }` or null.
  */
 
+const once = require('./press-once')
+
 const BACKUP_MS = 1000
 const REMOTE_MS = 4000
 
@@ -22,17 +24,26 @@ const answered = (r) => !!r && Number(r.status) > 0
  * @param {object} args  relayArgs(...) of the take (`relayed: true`)
  * @param {{ channel, screen, drivenBy, code?, owners? }} held  the screen's verdict (null → null)
  * @param {{ isFollower: () => boolean, callMaster: Function, call: Function, owners: (ids: string[]) => Array<{ id, name,
- *   online }>, diverge: (ch: number) => void, log?: Function }} deps
+ *   online }>, diverge: (ch: number) => void, log?: Function, ctx?: object }} deps  ctx: the press-once ledger's server
  */
 async function relayLook(args, held, deps) {
 	if (!held) return null
 	const log = (lvl, msg) => deps.log?.(lvl, `[cluster] ${msg}`)
 	const json = (r) => (r?.json && typeof r.json === 'object' ? r.json : { ok: false, error: r?.error || 'no answer' })
 	if (held.code !== 'REMOTE_SCREEN') {
-		const r = await deps.callMaster('look.take', args, { quiet: true, timeoutMs: BACKUP_MS })
+		// WO-1106 C19: the press carries a pressId — the master's forwarded copy and the local fallback run it once here
+		const pressId = once.newPressId()
+		const r = await deps.callMaster('look.take', { ...args, pressId }, { quiet: true, timeoutMs: BACKUP_MS })
 		if (answered(r)) return { status: r.status, body: { ...json(r), viaMaster: true } }
+		const prior = deps.ctx ? once.claimHere(deps.ctx, pressId) : null
+		if (prior) {
+			const a = (await Promise.resolve(prior.answer).catch(() => null)) || { status: 200, body: { ok: true } }
+			log('info', `screen ${held.screen}: ${held.drivenBy} answered the take late, its copy already ran here — not taken twice`)
+			return { status: Number(a.status) || 200, body: { ...(a.body && typeof a.body === 'object' ? a.body : { ok: true }), viaMaster: true } }
+		}
 		deps.diverge(held.channel)
 		log('warn', `screen ${held.screen}: ${held.drivenBy} did not answer the take in ${BACKUP_MS} ms (${r?.error || 'no answer'}) — taken here, the backup diverged`)
+		once.tellRan(deps.callMaster, pressId)
 		return { local: true, diverged: true }
 	}
 	if (deps.isFollower()) {
@@ -62,6 +73,7 @@ function relayDeps(ctx, cluster) {
 		owners: (ids) => (cluster.ownershipOf ? cluster.ownershipOf(ctx).owners(ids) : []),
 		diverge: (ch) => ctx?._clusterReport?.diverge?.(ch),
 		log: ctx?.log,
+		ctx, // WO-1106 C19: press-once.js ledger
 	}
 }
 

@@ -25,8 +25,23 @@ const { createReplayGuard, createStamper, sharedFloorStore } = require('./call-r
 const MAX_SKEW_MS = 60000
 const KEY_RE = /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256) [A-Za-z0-9+/=]{40,800}( [^\s]{0,100})?$/
 
-/** Short id of a device public key (what a request names its receiver by). */
-const fingerprint = (pem) => (pem ? crypto.createHash('sha256').update(String(pem).trim()).digest('hex').slice(0, 16) : '')
+/**
+ * Short id of a device public key (what a request names its receiver by). WO-1106 C25: a linked server's key is hashed
+ * once, not on every snapshot / call / AMCP verdict (bounded by count).
+ */
+const FP_CACHE_MAX = 256
+const fpCache = new Map()
+function fingerprint(pem) {
+	if (!pem) return ''
+	const k = String(pem)
+	let fp = fpCache.get(k)
+	if (fp === undefined) {
+		fp = crypto.createHash('sha256').update(k.trim()).digest('hex').slice(0, 16)
+		if (fpCache.size >= FP_CACHE_MAX) fpCache.delete(fpCache.keys().next().value)
+		fpCache.set(k, fp)
+	}
+	return fp
+}
 
 /** The signed text: field order fixed, nothing else signed. */
 const canonical = (b) => JSON.stringify([String(b.from_key || ''), String(b.to || ''), String(b.ssh_public_key || ''), Number(b.ts) || 0])
@@ -54,6 +69,9 @@ function acceptSshKey(body, remoteAddress, deps) {
 	const peer = deps.cluster.byDeviceKey(String(b.from_key || ''))
 	if (!peer) return { status: 403, body: { error: 'not linked here: link this server on the receiving server too' } }
 	if (String(b.to || '') !== fingerprint(deps.selfKey)) return { status: 400, body: { error: 'request is for another server' } }
+	// WO-1106 C27: v1 (a ±60 s clock window) only from a server never seen on v2; a v2 sender resends as v2 on `caps`
+	if (!v2 && deps.cluster.spokeV2?.(fingerprint(peer.device_key)))
+		return { status: 400, body: { error: `old signed request refused: ${peer.name} has used the clock-free one before (after a rollback to an older build, unlink and link it again)`, code: 'CALL_V1_REFUSED', caps: [CAP] } }
 	if (!v2 && !(Math.abs(now() - Number(b.ts)) <= MAX_SKEW_MS))
 		return { status: 400, body: { error: 'stale request (check both clocks)', caps: [CAP] } } // a newer sender resends as v2
 	const key = String(b.ssh_public_key || '').trim()
@@ -65,7 +83,8 @@ function acceptSshKey(body, remoteAddress, deps) {
 		const no = guard.check(fp, b.ts, b.nonce)
 		if (no) return { status: 409, body: no } // after the signature: only that server learns its floor
 		guard.take(fp, b.ts, b.nonce)
-	}
+		deps.cluster.markV2?.(fp) // WO-1106 C27
+	} else deps.log?.('info', `[cluster] ${peer.name} still uses the old signed ssh-key request (v1, ±60 s clock window): update it`)
 	const from = String(remoteAddress || '').replace(/^::ffff:/, '')
 	const r = deps.install(key, { fromHost: from })
 	if (!r?.ok) return { status: 500, body: { error: r?.error || 'could not install the key' } }

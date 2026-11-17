@@ -54,7 +54,9 @@ function ctxFor(box, extra = {}) {
 const owners = (map) => ({ ownersOf: (id) => (map[id] || []).map((n) => ({ id: n, name: n, online: true, caps: [] })) })
 const peer = (name, caps, online = true) => ({ snapshot: () => ({ peers: [{ id: name, name, online, caps }] }) })
 const ALL = ['dest-actions', 'channels-cabled']
-const call = async (ctx, body) => JSON.parse((await routes.handlePost(JSON.stringify(body), ctx)).body)
+// WO-1106 C29: the real switch is a cluster change — these calls come from the box itself
+const BOX = { socket: { remoteAddress: '127.0.0.1', localPort: 4200 }, headers: { host: '127.0.0.1:4200' } }
+const call = async (ctx, body) => JSON.parse((await routes.handlePost(JSON.stringify(body), ctx, BOX)).body)
 
 function withLocalUse(ctx, ...ids) {
 	let g = dg.ensureConnectorsFromSuggested(ctx.config.deviceGraph, ['local_use'], dg.suggestConnectorsAndDevicesFromLive({}, ctx.config))
@@ -124,7 +126,7 @@ describe('WO-1029 channels-where-cabled: refusals', () => {
 
 	it('a destination cabled nowhere: 409 without force, applied with force', async () => {
 		const ctx = base()
-		const r = quiet(() => routes.handlePost(JSON.stringify({ enable: true, dryRun: false }), ctx))
+		const r = quiet(() => routes.handlePost(JSON.stringify({ enable: true, dryRun: false }), ctx, BOX))
 		const res = await r
 		assert.equal(res.status, 409)
 		assert.equal(channelsWhereCabledEnabled(ctx.configManager.saved()), false)
@@ -217,3 +219,13 @@ describe('WO-1029 channels-where-cabled: the switch', () => {
 		assert.match(src, /routes\.post\('\/api\/cluster\/channels-where-cabled'/)
 	})
 })
+
+it('WO-1106 C29: the real switch from a LAN device with API auth off is refused; the dry run still answers', async () => {
+	const lan = { socket: { remoteAddress: '192.168.0.77', localPort: 4200 }, headers: { host: '192.168.0.15:4200' } }
+	const ctx = { config: { security: { enforceAuth: false } }, log() {} }
+	const r = await routes.handlePost(JSON.stringify({ enable: true, dryRun: false }), ctx, lan)
+	assert.equal(r.status, 403)
+	assert.equal(JSON.parse(r.body).code, 'NOT_ALLOWED')
+	assert.equal((await routes.handlePost(JSON.stringify({ enable: true, dryRun: false }), ctx)).status, 403, 'no request = refused')
+})
+

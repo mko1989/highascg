@@ -222,7 +222,22 @@ function createCluster(opts) {
 		else if (hello?.fresh(p)) p.live = { ...p.live, online: true, via: 'hello', error: '' } // WO-1029: one-way reachable
 		else p.live = { ...p.live, online: false, error: r.error || (r.status ? `HTTP ${r.status}` : 'no answer') }
 		if (p.live.online !== true) p.live.caps = [] // WO-1029 C0: an offline server's caps are unknown (it may come back on another build)
+		else if (p.live.caps?.includes('call-signed')) latchV2(p) // WO-1106 C27
 	}
+
+	/**
+	 * WO-1106 C27: a linked server seen on the clock-free signed call (it advertises 'call-signed', or a v2 call / ssh-key
+	 * from it was taken) is latched, persisted with its record (`signed_v2`): its v1 requests (a ±60 s clock window) are
+	 * refused from then on (cluster-call.js, cluster-media.js). Unlink and link it again to clear (a rollback to a build
+	 * without v2). A server never seen on v2 (an older build) keeps v1.
+	 */
+	function latchV2(p) {
+		if (!p || p.saved.signed_v2 === true) return
+		p.saved = { ...p.saved, signed_v2: true }
+		save()
+		log('info', `${p.saved.name} speaks the clock-free signed call: its old signed calls (v1) are refused from now on`)
+	}
+	const byFp = (fp) => (fp ? [...peers.values()].find((p) => p.saved.device_key && fingerprint(p.saved.device_key) === fp) : null)
 
 	/** WO-732: ask that server to link this one back → { ok, status, error, unlinked, pending } (recorded in p.back). */
 	async function linkBack(p) {
@@ -296,7 +311,13 @@ function createCluster(opts) {
 		timer = null
 	}
 
-	async function add(raw) {
+	/**
+	 * @param {object} raw  { address, name?, link_back? }
+	 * @param {{ untrusted?: boolean }} [o]  WO-1106 C29: a server's link-back that came unsigned while API auth is off
+	 *   (routes-cluster.js): it may add a NEW server (an invite, or linked at once when this server auto-accepts), never
+	 *   change a linked one — a moved server is re-addressed by its signed hello (cluster-hello.js)
+	 */
+	async function add(raw, o = {}) {
 		const addr = parseAddress(raw?.address ?? (raw?.host ? `${raw.host}:${raw.port || 4200}` : ''))
 		if (!addr) return { status: 400, body: { error: 'address must be host or host:port' } }
 		if (peers.size >= MAX_PEERS) return { status: 400, body: { error: `at most ${MAX_PEERS} servers` } }
@@ -319,6 +340,10 @@ function createCluster(opts) {
 		// WO-1029: a link-back proves nothing an operator saw: it never replaces a saved key (nor the host under it)
 		if (fromServer && prev?.saved.device_key && prev.saved.device_key.trim() !== deviceKey)
 			return { status: 409, body: { error: `${prev.saved.name} is linked here with another device identity: link it from ${self?.hostname || 'this server'} to replace it` } }
+		if (o.untrusted && prev) {
+			prev.back = { ok: true, error: '', at: now() } // it did link back (display only; the record stays as it is)
+			return { status: 200, body: { peer: view(prev), unchanged: true } }
+		}
 		if (fromServer && !prev && invites && !invites.autoAccept()) {
 			const name = String(r.json.hostname || id).slice(0, 64)
 			if (invites.record({ id, fp: deviceKey ? fingerprint(deviceKey) : '', host: addr.host, port: addr.port, name, version: versionOf(r.json), device_key: deviceKey }))
@@ -371,12 +396,23 @@ function createCluster(opts) {
 		const me = idFromPing(self, '')
 		tombstone(p.saved.device_key, 2 * HEAL_MS) // and a repair racing the DELETE is refused, not taken
 		remove(id)
-		const r = me ? await request('DELETE', p.saved.host, p.saved.port, `/api/cluster/peers/${encodeURIComponent(me)}?link_back=0`) : { ok: false, status: 0, error: 'this server has no id' }
+		const r = me ? await leaveThere(p.saved, me) : { ok: false, status: 0, error: 'this server has no id' }
 		const ok = r.ok || r.status === 404 // 404: it did not list this server
 		if (!ok) tombstone(p.saved.device_key, TOMBSTONE_MS)
 		const error = ok ? '' : r.json?.error || r.error || `HTTP ${r.status}`
 		if (!ok) log('warn', `${p.saved.name}: unlink there failed (${error}); it will drop this server when it is back`)
 		return { ok: true, link_back: { ok, error } }
+	}
+
+	/**
+	 * WO-732: "drop this server there too" (`?link_back=0`). WO-1106 C29: signed with this server's key (that server takes
+	 * an unlink of a server only from that server itself while its API auth is off); unsigned without a key to sign with.
+	 */
+	function leaveThere(to, me) {
+		const path = `/api/cluster/peers/${encodeURIComponent(me)}?link_back=0`
+		const send = (headers) => request('DELETE', to.host, to.port, path, undefined, undefined, headers || undefined)
+		if (!opts.sign || !opts.selfKey || !to.device_key) return send(null)
+		return require('./cluster-signed-request').sendSigned(send, { method: 'DELETE', path, body: '', toKey: to.device_key, selfKey: opts.selfKey, sign: opts.sign })
 	}
 
 	/** WO-739: this operator accepts an invite = links that server (which then lists this one: it asked). */
@@ -395,7 +431,7 @@ function createCluster(opts) {
 		changed()
 		await refreshSelf()
 		const me = idFromPing(self, '')
-		const r = me ? await request('DELETE', inv.host, inv.port, `/api/cluster/peers/${encodeURIComponent(me)}?link_back=0`) : { ok: false, status: 0 }
+		const r = me ? await leaveThere(inv, me) : { ok: false, status: 0 }
 		log('info', `${inv.name}: invite declined${r.ok || r.status === 404 ? '' : ' (it drops this server at its next repair)'}`)
 		return { status: 200, body: { ok: true, told: r.ok || r.status === 404 } }
 	}
@@ -441,7 +477,7 @@ function createCluster(opts) {
 		changed()
 	}
 
-	return { snapshot, poll, add, accept, decline, setAutoAccept, remove, unlink, deviceView, dropView: (id) => void (peers.has(id) && (peers.get(id).view = null)), scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
+	return { spokeV2: (fp) => byFp(fp)?.saved.signed_v2 === true, markV2: (fp) => latchV2(byFp(fp)), snapshot, poll, add, accept, decline, setAutoAccept, remove, unlink, deviceView, dropView: (id) => void (peers.has(id) && (peers.get(id).view = null)), scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
 		...caps.createCapsApi(peers), saved, list, byDeviceKey, mediaSend, setMediaSend, afterPoll: (fn) => pollHooks.push(fn),
 		hello: (body) => (hello ? hello.handle(body) : { status: 404, body: { error: 'not found' } }) } // WO-1029
 }

@@ -36,11 +36,19 @@
  * e.g. this node was frozen and reads the queued request when it thaws) is answered 409 DEST_EXPIRED and not run: the
  * operator was already told "unreachable", the press must not land seconds later. Its age is estimated without comparing
  * clocks: (local arrival − sender ts) minus the smallest such value seen from that sender in the last BASE_MS (the clock
- * offset plus the fastest delivery). The very first call from a sender has no baseline and always runs.
+ * offset plus the fastest delivery). The very first call from a sender has no baseline and always runs. A sender whose
+ * clock stepped (its stamps stop rising in step with arrival) is rebased within a few presses (WO-1106 C21, lateBy).
  */
+
+const once = require('./press-once')
 
 const STALE_WINDOW_MS = 2000
 const BASE_MS = 10 * 60 * 1000
+/** WO-1106 C21: lateness after a sender's clock step (lateBy). */
+const SPREAD_MS = 250 // presses read closer together than this came in one burst (a thaw), never a clock step
+const IN_STEP_MS = 500 // two presses' stamps rose with their arrival within this
+const IN_STEP_SPAN_MS = 2000 // … over at least this long, before a sender of unknown lateness gets a baseline again
+const REBASE_AFTER = 3
 const TIMELINE_OPS = new Set(['play', 'take', 'pause', 'stop', 'seek', 'loop'])
 
 /** A route reply → { status, body: object }. */
@@ -101,22 +109,57 @@ function createDestActions(ctx, deps = {}) {
 	}
 
 	const holder = new Map() // destId → { from, name, seq, action, at (wall clock) }
-	const base = new Map() // sender → { d: smallest (arrival − ts), at }
+	const base = new Map() // sender → { d: smallest (arrival − ts), at, ts, t (the last press), over, unsure }
 	const wall = deps.wall || (() => performance.timeOrigin + performance.now())
 
-	/** ms this call arrived after its sender gave up, or 0 (see the header: no clock comparison). */
+	/**
+	 * ms this call arrived after its sender gave up, or 0 (see the header: no clock comparison).
+	 * WO-1106 C21: the baseline used to only go down — after the sender's clock stepped back (or its stamp stuck at
+	 * last + 1 until its clock caught up again, an older build) every press from it was refused DEST_EXPIRED for up to
+	 * BASE_MS. Now the sender's stamp must rise in step with arrival:
+	 *   - two presses in a row over the ttl, SPREAD_MS apart and in step with each other (same lateness) → the clock
+	 *     moved, not the delivery: rebase on this press and run it;
+	 *   - REBASE_AFTER presses in a row over the ttl, SPREAD_MS apart (the stamp is not rising with time at all) → the
+	 *     lateness of this sender is unknown: its presses run (as a first press does) until its stamp rises in step again
+	 *     over IN_STEP_SPAN_MS, which starts a new baseline.
+	 * Presses read together after a freeze (arrival < SPREAD_MS apart) never count: a frozen node still drops them.
+	 */
 	function lateBy(from, ts, ttlMs) {
 		if (!Number.isSafeInteger(ts) || !(Number(ttlMs) > 0)) return 0
+		const ttl = Number(ttlMs)
 		const t = wall()
 		const d = t - ts
 		const b = base.get(from)
 		if (!b || t - b.at > BASE_MS) {
-			base.set(from, { d, at: t })
+			base.set(from, { d, at: t, ts, t, over: 0, unsure: false })
+			return 0
+		}
+		const dt = t - b.t
+		const inStep = Math.abs(dt - (ts - b.ts)) <= IN_STEP_MS
+		b.ts = ts
+		b.t = t
+		if (b.unsure) {
+			if (inStep && dt >= IN_STEP_SPAN_MS) Object.assign(b, { d, at: t, over: 0, unsure: false })
 			return 0
 		}
 		if (d < b.d) b.d = d
 		const age = d - b.d
-		return age >= Number(ttlMs) ? Math.round(age) : 0
+		if (age < ttl) {
+			b.over = 0
+			return 0
+		}
+		if (dt < SPREAD_MS) return Math.round(age) // read together with the one before (a thaw): late, not counted
+		const steady = b.over > 0 && inStep
+		b.over++
+		if (steady) {
+			Object.assign(b, { d, at: t, over: 0 }) // the same lateness twice, a press apart: the sender's clock moved
+			return 0
+		}
+		if (b.over >= REBASE_AFTER) {
+			Object.assign(b, { over: 0, unsure: true })
+			return 0
+		}
+		return Math.round(age)
 	}
 
 	const press = (name, run) => async (args, peer, meta = {}) => {
@@ -131,17 +174,22 @@ function createDestActions(ctx, deps = {}) {
 		const seq = meta?.seq ?? null
 		const old = stale(destId, from, seq)
 		if (old) return { status: 200, body: { ok: true, stale: true, destId, last: old } }
-		record(destId, from, seq)
-		holder.set(destId, { from, name: peer?.name || from, seq, action: name, at: Date.now() })
-		// plan 07 C8: the last press on an owned screen travels in dest.air as its `holder` (both GUIs show who drives it)
-		try {
-			require('./dest-air').noteHolder(ctx, destId, { server: from, seq })
-		} catch {
-			/* advisory */
-		}
-		const { runAsRemote } = require('./dest-route')
-		const fanout = a.fanout === true && isMaster()
-		return asObj(await runAsRemote({ from, fanout }, () => run(r.idx, a)))
+		// WO-1106 C19: a press with a pressId runs once here — the master's forwarded copy of a press this server already
+		// took itself (its master answered too late) is answered `duplicate` and not run (press-once.js)
+		const pressId = once.validId(a.pressId)
+		return once.runOnce(ctx, pressId, async () => {
+			record(destId, from, seq)
+			holder.set(destId, { from, name: peer?.name || from, seq, action: name, at: Date.now() })
+			// plan 07 C8: the last press on an owned screen travels in dest.air as its `holder` (both GUIs show who drives it)
+			try {
+				require('./dest-air').noteHolder(ctx, destId, { server: from, seq })
+			} catch {
+				/* advisory */
+			}
+			const { runAsRemote } = require('./dest-route')
+			const fanout = a.fanout === true && isMaster()
+			return asObj(await runAsRemote({ from, fanout, ...(pressId ? { pressId } : {}) }, () => run(r.idx, a)))
+		}, { destId })
 	}
 
 	const take = (idx, a) => {

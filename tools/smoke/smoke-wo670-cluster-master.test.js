@@ -192,7 +192,8 @@ describe('WO-670 P3a cluster master', () => {
 		const get = await routes.dispatch('GET', '/api/cluster/master', '', ctx)
 		assert.equal(JSON.parse(get.body).claim.epoch, 1)
 		assert.equal((await routes.dispatch('POST', '/api/cluster/master', '{}', ctx)).status, 400)
-		const set = await routes.dispatch('POST', '/api/cluster/master/set', JSON.stringify({ master: 'B' }), ctx)
+		const box = { socket: { remoteAddress: '127.0.0.1', localPort: 4200 }, headers: { host: '127.0.0.1:4200' } } // WO-1106 C29
+		const set = await routes.dispatch('POST', '/api/cluster/master/set', JSON.stringify({ master: 'B' }), ctx, box)
 		assert.equal(JSON.parse(set.body).master_id, 'B')
 		const { startIfLinked } = require('../../src/api/routes-cluster')
 		const idle = { persistence: { get: () => [] } }

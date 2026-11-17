@@ -25,9 +25,14 @@ function handleGet(ctx) {
 	}
 }
 
-async function handlePost(body, ctx) {
+async function handlePost(body, ctx, req) {
 	const b = parseBody(body) || {}
 	if (typeof b.enable !== 'boolean') return reply(400, { error: '"enable" (true | false) required' })
+	if (b.dryRun === false) {
+		// WO-1106 C29: the real switch rewrites this server's channels — password, the box itself, or a linked server's signature (the dry run only reads)
+		const g = require('./routes-cluster').gateOf(ctx).check(req, ctx, body)
+		if (!g.ok) return reply(g.status, g.body)
+	}
 	try {
 		if (b.dryRun !== false) {
 			return reply(200, { ok: true, dryRun: true, on: channelsWhereCabledEnabled(ctx.config), plan: publicPlan(planChannelsCabled(ctx, { enable: b.enable })) })

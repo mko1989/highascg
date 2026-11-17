@@ -144,6 +144,14 @@ function createClusterFanout(deps) {
 	let lastSig = ''
 	let lastDestCalls = false
 	const log = (lvl, msg) => deps.log?.(lvl, `[cluster] ${msg}`)
+	/** WO-1106 C19: the linked server whose Caspar must not get the lines sent now ('' = none; press-once.js). */
+	const suppressed = () => {
+		try {
+			return String(deps.suppressed?.() || '')
+		} catch {
+			return ''
+		}
+	}
 
 	function drop(id) {
 		const t = targets.get(id)
@@ -334,8 +342,10 @@ function createClusterFanout(deps) {
 		if (!lines.length) return
 		const pressed = active ? ownScreensOf(lines) : new Map()
 		for (const id of pressed.keys()) if (holders.pressSelf(id)) log('info', `holds ${id} again (its operator pressed on it)`)
+		const skip = active ? suppressed() : '' // WO-1106 C19: the press's origin took it itself (press-once.js)
 		for (const t of active ? targets.values() : []) {
 			if (!t.plan?.map.size || !t.conn?.isConnected) continue
+			if (skip && t.id === skip) continue
 			catchUp(t) // the journal without these lines, so they land on the rebuilt state
 			const out = []
 			for (const l of lines) {

@@ -22,7 +22,10 @@
  *     per sender, OP_TTL_MS on this server's monotonic clock). seq: per-destination press order for dest.* (C5).
  *   The action handler gets (args, peer, meta = { v, opId, seq, ts }).
  * Old builds: a sender uses v2 only when the peer advertises CAP (deps.peerCaps) or answered a v1 call "stale" with
- * `caps: [CAP]` (learned, then resent once as v2); otherwise v1 exactly as before. A v1 call here keeps the v1 rules.
+ * `caps: [CAP]` (learned, then resent once as v2); otherwise v1 exactly as before. A v1 call here keeps the v1 rules —
+ * WO-1106 C27: only from a server never seen on v2 (deps.cluster.spokeV2 / markV2, persisted with the peer record);
+ * one latched on v2 gets 400 "stale call …" CALL_V1_REFUSED (a v2 sender resends as v2). Each server still on v1 is
+ * logged once per start ("still uses the old signed call"): v1 is deleted once no linked server logs that.
  */
 
 const crypto = require('crypto')
@@ -97,10 +100,11 @@ function createClusterCall(deps) {
 	const fail = (status, error) => ({ status, body: { error } })
 	const mono = deps.mono || (() => performance.now())
 	const guard = createReplayGuard({ store: deps.floorStore || sharedFloorStore(deps.log), ns: 'call' })
-	const stamp = createStamper(now)
+	const stamp = createStamper(now, mono) // WO-1106 C21: a wall-clock step back keeps the stamps' pace
 	const learned = new Map() // receiver fp → { v, at } (from its answers)
 	const ops = new Map() // sender fp → Map<opId, { key, at, answer: Promise }>
 	const seqs = new Map() // destId → last seq sent
+	const v1Warned = new Set() // WO-1106 C27: servers logged as still on v1 / refused v1
 
 	function forget(t) {
 		for (const [n, at] of seen) {
@@ -202,6 +206,7 @@ function createClusterCall(deps) {
 			if (no) return { status: 409, body: no }
 			guard.take(from, b.ts, b.nonce)
 		} else {
+			if (deps.cluster.spokeV2?.(from)) return v1Refused(peer)
 			const t = now()
 			if (!(Math.abs(t - Number(b.ts)) <= MAX_SKEW_MS))
 				return { status: 400, body: { error: 'stale call (check both clocks)', caps: [CAP] } } // a newer sender resends as v2
@@ -209,7 +214,9 @@ function createClusterCall(deps) {
 			if (seen.has(b.nonce)) return fail(409, 'replayed call')
 			if (!deps.verify(peer.device_key, callText(b), b.sig)) return fail(403, 'bad signature')
 			seen.set(b.nonce, t) // only signed calls take a slot: an outsider cannot flush the window
+			stillV1(peer)
 		}
+		if (v2) deps.cluster.markV2?.(from) // WO-1106 C27: v1 from this server is refused from now on
 		const meta = v2 ? { v: 2, opId: b.opId, seq: b.seq ?? null, ts: b.ts } : { v: 1 }
 		const info = deps.info && Object.prototype.hasOwnProperty.call(deps.info, b.action) ? deps.info[b.action] : null
 		if (info) return run(info, b, peer, meta)
@@ -224,6 +231,23 @@ function createClusterCall(deps) {
 			log('info', `remote ${b.action} from ${peer.name}`)
 			return run(fn, b, peer, meta)
 		})
+	}
+
+	/**
+	 * WO-1106 C27: a v1 call from a server latched on v2 (cluster-peers.js `signed_v2`). The text starts "stale call":
+	 * every v2 sender resends as v2 on it (call() above); a server rolled back to a build without v2 is told how to relink.
+	 */
+	function v1Refused(peer) {
+		if (!v1Warned.has(`refused:${peer.id}`)) log('warn', `${peer.name}: old signed call (v1) refused — it has used the clock-free call before (rolled back? unlink and link it again)`)
+		v1Warned.add(`refused:${peer.id}`)
+		return { status: 400, body: { error: `stale call (the old signed call is refused: ${peer.name} has used the clock-free call before; after a rollback to an older build, unlink and link it again)`, code: 'CALL_V1_REFUSED', caps: [CAP] } }
+	}
+
+	/** WO-1106 C27: which linked servers still use v1 (once per server and process) — v1 goes once nobody logs this. */
+	function stillV1(peer) {
+		if (v1Warned.has(peer.id)) return
+		v1Warned.add(peer.id)
+		log('info', `${peer.name} still uses the old signed call (v1, ±60 s clock window): update it — v1 is removed once no linked server logs this`)
 	}
 
 	/** opId → the first answer (also while it still runs); the same opId for another action / args is refused. */

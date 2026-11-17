@@ -16,6 +16,11 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { mediaServiceOf } = require('../cluster/cluster-media-service')
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: jsonBody(obj) })
+/** WO-1106 C29: pushing media to linked servers is a cluster change — password, the box itself, or a linked server's signature. */
+function denied(ctx, req, body) {
+	const g = require('./routes-cluster').gateOf(ctx).check(req, ctx, body)
+	return g.ok ? null : reply(g.status, g.body)
+}
 
 function register(routes) {
 	const opt = { requireCaspar: false }
@@ -24,14 +29,18 @@ function register(routes) {
 		return reply(200, await mediaServiceOf(ctx).needs({ refresh }))
 	}, opt)
 	routes.get('/api/cluster/media-library', async ({ ctx, query }) => reply(200, await mediaServiceOf(ctx).library({ offset: query?.offset, limit: query?.limit })), opt)
-	routes.post('/api/cluster/media-spread', async ({ ctx, body }) => {
+	routes.post('/api/cluster/media-spread', async ({ ctx, body, req }) => {
+		const no = denied(ctx, req, body)
+		if (no) return no
 		const b = parseBody(body) || {}
 		if ((b.files != null && !Array.isArray(b.files)) || (b.to != null && !Array.isArray(b.to))) return reply(400, { error: 'files and to must be lists' })
 		const r = await mediaServiceOf(ctx).spread(b)
 		return reply(r.status, r.body)
 	}, opt)
 	routes.get('/api/cluster/media-spread/status', ({ ctx }) => reply(200, mediaServiceOf(ctx).status()), opt)
-	routes.post('/api/cluster/media-spread/cancel', ({ ctx }) => {
+	routes.post('/api/cluster/media-spread/cancel', ({ ctx, body, req }) => {
+		const no = denied(ctx, req, body)
+		if (no) return no
 		const r = mediaServiceOf(ctx).cancel()
 		return reply(r.status, r.body)
 	}, opt)

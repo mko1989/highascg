@@ -19,13 +19,47 @@ function ownView(ctx) {
 }
 
 /**
+ * WO-1106 C25: what the view is built from, compared by identity — every config write replaces a slice object
+ * (device-view CRUD, settings, shared destinations, `Object.assign(ctx.config, cm.get())`), the switcher bus map and
+ * Caspar's INFO CONFIG are replaced when they change. A list of references: no hashing, no copy.
+ */
+function revisionOf(ctx) {
+	const c = ctx?.config || null
+	const out = [c, ctx?.switcherOutputBusByChannel, ctx?.gatheredInfo?.infoConfig]
+	if (c) for (const k of Object.keys(c)) out.push(k, c[k])
+	return out
+}
+
+const sameRevision = (a, b) => a.length === b.length && a.every((x, i) => x === b[i])
+
+/**
+ * WO-1106 C25: ownView cached per config revision — the AMCP gate asks on every line a follower sends (destination-
+ * ownership.js `verdict` / `cwc`), and the view (device graph + channel map) used to be rebuilt each time. Rebuilt when a
+ * slice changed (revisionOf), when invalidateOwnView runs (a local Devices write: cluster-device-view.js localChanged;
+ * every cluster poll: destination-ownership.js refresh — catches a slice edited in place), never more.
+ */
+function cachedOwnView(ctx) {
+	const rev = revisionOf(ctx)
+	const c = ctx._clusterOwnView
+	if (c && sameRevision(c.rev, rev)) return c.view
+	const view = ownView(ctx)
+	ctx._clusterOwnView = { rev, view }
+	return view
+}
+
+const invalidateOwnView = (ctx) => {
+	if (ctx) ctx._clusterOwnView = null
+}
+
+/**
  * @param {object} ctx
  * @param {{ cluster: () => object, master: () => object, report: () => object, call: () => object }} get
  */
 function ownershipDeps(ctx, get) {
 	return {
 		selfId: () => get.cluster().snapshot().self?.id || '',
-		ownView: () => ownView(ctx),
+		ownView: () => cachedOwnView(ctx), // WO-1106 C25: per config revision
+		invalidateOwnView: () => invalidateOwnView(ctx),
 		peers: () => get.cluster().snapshot().peers || [],
 		peerView: async (id) => {
 			const r = await get.cluster().deviceView?.(id)
@@ -41,4 +75,4 @@ function ownershipDeps(ctx, get) {
 	}
 }
 
-module.exports = { ownView, ownershipDeps }
+module.exports = { ownView, invalidateOwnView, ownershipDeps }

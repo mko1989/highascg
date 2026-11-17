@@ -85,6 +85,7 @@ function createOwnership(deps) {
 	/** After every cluster poll: the linked servers' cables (their device views, cached by cluster-peers.js). */
 	async function refresh() {
 		await owners0.refresh()
+		deps.invalidateOwnView?.() // WO-1106 C25: the poll tick re-reads this server's view once (a slice edited in place)
 		own = null
 	}
 

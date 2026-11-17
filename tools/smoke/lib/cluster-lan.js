@@ -8,11 +8,16 @@
  * `move(name, host)` re-addresses a server; `block(from, to)` / `unblock(from, to)` cut one direction only.
  * WO-1029 C0: `caps` = the capability list that server advertises (default: this build's; null = a build before caps).
  * `noHello` = a server before WO-1029 (no hello route, no ping fingerprint). Hellos are counted in `hellos`, not `calls`.
+ * WO-1106 C29: a current server (not `old`) routes node-to-node requests as routes-cluster.js does with API auth off: a
+ * link-back (`link_back: false`, unsigned) may only add a NEW server (`untrusted`), any other unsigned POST /peers is
+ * refused, and an unlink there (`?link_back=0`) is taken only when signed by that server (cluster-signed-request.js).
+ * `refusedUnsigned` counts what was refused.
  */
 
 const { createCluster, linkedFingerprints } = require('../../../src/cluster/cluster-peers')
 const { createInvites } = require('../../../src/cluster/cluster-invites')
 const { fingerprint } = require('../../../src/cluster/cluster-media')
+const { createRequestVerifier, isSigned } = require('../../../src/cluster/cluster-signed-request')
 const crypto = require('crypto')
 
 /** WO-1029: a fake signature only the holder of `key` makes (keys are names here, never exchanged in a hello). */
@@ -59,7 +64,7 @@ function lan() {
 				if (url === '/api/cluster/identity') return ok({ device_key: peer.key })
 				return ok({ error: 'not found' }, 404)
 			},
-			request: async (method, h, p, url, body) => {
+			request: async (method, h, p, url, body, _timeout, headers) => {
 				const peer = reach(h, p)
 				if (!peer) return refused
 				if (method === 'POST' && url === '/api/cluster/hello') {
@@ -72,7 +77,8 @@ function lan() {
 				if (peer.auth) return ok({ error: 'Unauthorized' }, 401)
 				if (method === 'POST' && url === '/api/cluster/peers') {
 					const b = peer.old ? { address: body.address } : body // an older server ignores link_back
-					const r = await peer.c.add(b)
+					if (!peer.old && b.link_back !== false) return (peer.refusedUnsigned++, ok({ error: 'not allowed', code: 'NOT_ALLOWED' }, 403))
+					const r = await peer.c.add(b, peer.old ? {} : { untrusted: true }) // WO-1106 C29
 					return ok(r.body, r.status)
 				}
 				const inv = /^\/api\/cluster\/invites\/([^/]+)\/(accept|decline)$/.exec(url)
@@ -82,6 +88,15 @@ function lan() {
 				}
 				const del = /^\/api\/cluster\/peers\/([^?]+)(\?link_back=0)?$/.exec(url)
 				if (method === 'DELETE' && del) {
+					if (!peer.old && del[2]) {
+						// WO-1106 C29: only that server's own signature unlinks it here
+						const id = decodeURIComponent(del[1])
+						const saved = peer.c.saved(id)
+						if (!saved) return ok({ error: 'no such server' }, 404)
+						const req = { method, url, headers: headers || {} }
+						const v = isSigned(req) ? peer.verifyRequest(req, '', (fp) => (saved.device_key && fingerprint(saved.device_key) === fp ? saved.device_key : null)) : { ok: false, status: 403, body: { code: 'NOT_ALLOWED' } }
+						if (!v.ok) return (peer.refusedUnsigned++, ok(v.body, v.status))
+					}
 					const r = await peer.c.unlink(decodeURIComponent(del[1]), { linkBack: !del[2] })
 					return r.ok ? ok(r) : ok({ error: 'no such server' }, 404)
 				}
@@ -90,6 +105,9 @@ function lan() {
 			localAddress: async (h, p) => (reach(h, p) ? n.host : ''),
 			onRemove: o.onRemove, // WO-802
 		})
+		n.refusedUnsigned = 0
+		const floors = new Map()
+		n.verifyRequest = createRequestVerifier({ selfKey: () => n.key, verify: fakeVerify, floorStore: { get: (k) => floors.get(k) || 0, set: (k, v) => floors.set(k, v) } })
 		nodes.set(`${host}:4200`, n)
 		return n
 	}

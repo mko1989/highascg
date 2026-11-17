@@ -160,7 +160,7 @@ describe('WO-1029 POST /api/cluster/apply', () => {
 		assert.match(src, /routes\.get\('\/api\/cluster\/apply-plan'/)
 		assert.match(src, /routes\.post\('\/api\/cluster\/apply'/)
 		assert.match(src, /routes\.get\('\/api\/cluster\/apply\/status'/)
-		assert.match(src, /_wsBroadcast\('cluster:apply', data\)/)
+		assert.match(fs.readFileSync(path.join(__dirname, '../../src/cluster/cluster-routes-ctx.js'), 'utf8'), /_wsBroadcast\('cluster:apply', data\)/) // WO-1106: applyOf moved (line limit)
 		const { relayPath } = require('../../src/cluster/cluster-relay')
 		assert.deepEqual(relayPath('api/caspar-config/dirty'), { path: '/api/caspar-config/dirty' })
 	})

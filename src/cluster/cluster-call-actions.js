@@ -56,6 +56,7 @@ function createCallActions(ctx, deps) {
 		owners: deps.owners || (() => []),
 		diverge: deps.diverge || ((ch) => ctx?._clusterReport?.diverge?.(ch)),
 		log: ctx?.log,
+		ctx, // WO-1106 C19: press-once.js ledger
 	})
 	const auto = (op) => async (args) => {
 		const { handleAuto } = require('../tracking/auto-routes')
@@ -89,7 +90,8 @@ function createCallActions(ctx, deps) {
 			const { runAsRemote } = require('./dest-route')
 			const fanout = ctx?._clusterMaster?.view?.()?.is_master === true
 			const take = () => takeLook({ ...opts, target, ...(args.relayed || routed ? { relayed: true } : {}) })
-			const out = asObj(await runAsRemote({ from: String(peer?.id || ''), fanout }, take))
+			const pressId = require('./press-once').validId(args.pressId) // WO-1106 C19: the master forwards it with the press
+			const out = asObj(await runAsRemote({ from: String(peer?.id || ''), fanout, ...(pressId ? { pressId } : {}) }, take))
 			return routed && out.status < 400 ? { ...out, body: { ...out.body, diverged: true } } : out
 		},
 		'tracking.auto.pin': auto('pin'),

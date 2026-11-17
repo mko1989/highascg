@@ -92,6 +92,9 @@ function signed(s, n, to, over = {}) {
 	}
 }
 
+/** WO-1106 C27: a v1 sender is logged once ("still uses the old signed call"); these fakes speak v1. */
+const noV1Note = (logs) => logs.filter((l) => !/still uses the old signed call/.test(l))
+
 describe('WO-712 R2 cluster call: wire + receiver checks', () => {
 	it('a signed call is taken, runs the action once and logs "[cluster] remote <action> from <peer name>"', async () => {
 		const s = servers(['A', 'B'])
@@ -99,7 +102,7 @@ describe('WO-712 R2 cluster call: wire + receiver checks', () => {
 		assert.equal(r.status, 200)
 		assert.deepEqual(r.json, { ok: true, on: 'B' })
 		assert.deepEqual(s.ran, [['B', 'ping', { b: 2, a: 1 }, 'A']])
-		assert.deepEqual(s.nodes.B.logs, ['info [cluster] remote ping from srv-A'])
+		assert.deepEqual(noV1Note(s.nodes.B.logs), ['info [cluster] remote ping from srv-A']) // WO-1106 C27: + the once-per-server v1 note
 		assert.equal(s.nodes.A.call.me, s.fp('A'))
 	})
 
@@ -264,6 +267,8 @@ describe('WO-712 R2 allow-list: each action runs the local handler', () => {
 		assert.deepEqual(await a['look.take']({ sceneId: 's1' }), { status: 200, body: { ok: true, by: 'master' } })
 		await a['look.take']({ sceneId: 's2', target: 'preview' })
 		await a['look.take']({ sceneId: 's3', relayed: true })
+		assert.match(seen[0][2].pressId, /^[0-9a-f]{16,}$/, 'WO-1106 C19: the hand-off names its press') // the follower drops the master's copy of it
+		delete seen[0][2].pressId
 		assert.deepEqual(seen, [
 			['master', 'look.take', { sceneId: 's1', target: 'program', relayed: true }],
 			['take', { sceneId: 's2', target: 'preview' }],
@@ -328,7 +333,7 @@ describe('WO-712 R2 allow-list: each action runs the local handler', () => {
 		const r = await s.nodes.A.call.call('B', 'look.take', { sceneId: 'scene_7' })
 		assert.equal(r.status, 200)
 		assert.deepEqual(seen, [['take', { sceneId: 'scene_7', target: 'program' }]])
-		assert.deepEqual(s.nodes.B.logs, ['info [cluster] remote look.take from srv-A'])
+		assert.deepEqual(noV1Note(s.nodes.B.logs), ['info [cluster] remote look.take from srv-A'])
 	})
 })
 
@@ -369,7 +374,7 @@ describe('WO-712 R2 zone look: on a follower goes to the master', () => {
 			detail: 'look scene_8 → preview',
 		})
 		assert.deepEqual(local, [{ sceneId: 'scene_8', target: 'preview' }])
-		assert.deepEqual(s.nodes.M.logs, ['info [cluster] remote look.take from srv-F'])
+		assert.deepEqual(noV1Note(s.nodes.M.logs), ['info [cluster] remote look.take from srv-F'])
 	})
 
 	it('the master refusing (accept_remote off) shows in the zone detail', async () => {

@@ -200,6 +200,7 @@ let notifyTimer = null
  * saves several slices).
  */
 function localChanged(ctx) {
+	require('./ownership-ctx').invalidateOwnView(ctx) // WO-1106 C25: the AMCP gate's cached view of this server
 	if (!ctx?._cluster || notifyTimer) return
 	notifyTimer = setTimeout(() => {
 		notifyTimer = null

@@ -32,7 +32,7 @@ describe('WO-725 sandbox guards for cluster runs', () => {
 		assert.match(s, /isMaster: \(\) => \(!isSandbox\(\) \|\| sandboxFanout\(\)\) && masterOf\(ctx\)\.view\(\)\.is_master === true/)
 		assert.match(s, /const sandboxFanout = \(\) => process\.env\.HIGHASCG_SANDBOX_FANOUT === '1'/)
 		assert.match(s, /if \(!sandboxCaspar\(host, port\)\) return refusedPeerCaspar\(ctx, host, port\)/)
-		assert.match(s, /return Number\(port\) !== 5250 && \/\^\(127/)
+		assert.match(read('src/cluster/cluster-routes-ctx.js'), /return Number\(port\) !== 5250 && \/\^\(127/) // WO-1106: moved for the line limit
 	})
 })
 

@@ -43,7 +43,7 @@ function fetchBody(reqOpts, data, { cap = capFor(reqOpts.path), deadline = deadl
 				if (size > cap) return fail('answer too large')
 				chunks.push(c)
 			})
-			res.on('end', () => settle({ status: res.statusCode, body: Buffer.concat(chunks) }))
+			res.on('end', () => settle({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }))
 			res.on('error', (e) => settle({ status: 0, error: e.message }))
 			res.on('aborted', () => settle({ status: 0, error: 'aborted' }))
 		})
@@ -74,10 +74,10 @@ async function getJson(host, port, path, timeout = TIMEOUT_MS, { auth = true } =
 /** POST JSON → { ok, status, json } (never throws). */
 const postJson = (host, port, path, body, timeout = 5000) => requestJson('POST', host, port, path, body, timeout)
 
-/** method + JSON body → { ok, status, json } (never throws). */
-async function requestJson(method, host, port, path, body, timeout = 5000) {
+/** method + JSON body → { ok, status, json } (never throws). `extraHeaders`: WO-1106 C29 signed-request headers. */
+async function requestJson(method, host, port, path, body, timeout = 5000, extraHeaders = null) {
 	const data = Buffer.from(body === undefined ? '' : JSON.stringify(body))
-	const headers = { 'Content-Type': 'application/json', 'Content-Length': data.length, Accept: 'application/json', ...outboundAuthHeaders() }
+	const headers = { 'Content-Type': 'application/json', 'Content-Length': data.length, Accept: 'application/json', ...outboundAuthHeaders(), ...(extraHeaders || {}) }
 	const r = await fetchBody({ host, port, path, method, timeout, headers }, data)
 	if (!r.status) return { ok: false, status: 0, json: null, error: r.error }
 	return { ok: r.status >= 200 && r.status < 300, status: r.status, json: parsed(r.body) }

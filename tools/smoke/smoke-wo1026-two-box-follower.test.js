@@ -56,6 +56,8 @@ describe('WO-1026 follower: a program take-look goes to the master', () => {
 		const r = await handleTakeLook(JSON.stringify({ sceneId: 's1', forceCut: true, mainIdx: 3, transitionOverride: { type: 'MIX', duration: 12 }, takeGroup: { id: 'g', size: 2 } }), {}, deps)
 		assert.equal(r.status, 200)
 		assert.deepEqual(JSON.parse(r.body), { ok: true, by: 'master', viaMaster: true })
+		assert.match(seen[0][1].pressId, /^[0-9a-f]{16,}$/, 'WO-1106 C19: the hand-off names its press')
+		delete seen[0][1].pressId
 		assert.deepEqual(seen, [['look.take', { sceneId: 's1', target: 'program', relayed: true, mainIdx: 3, forceCut: true, transitionOverride: { type: 'MIX', duration: 12 } }]])
 	})
 
@@ -81,7 +83,9 @@ describe('WO-1026 follower: a program take-look goes to the master', () => {
 		const r = await handleTakeLook({ sceneId: 's1' }, {}, deps)
 		assert.equal(r.status, 200)
 		assert.deepEqual(JSON.parse(r.body), { ok: true, diverged: true })
-		assert.deepEqual(seen.map((x) => x[0]), ['look.take', 'local'], 'asked the master first, then took it here')
+		// WO-1106 C19: + a `dest.ran` notice (ran here: the master's late copy must not land here again)
+		assert.deepEqual(seen.map((x) => x[0]).filter((a) => a !== 'dest.ran'), ['look.take', 'local'], 'asked the master first, then took it here')
+		assert.ok(seen.some((x) => x[0] === 'dest.ran'))
 		assert.equal((await handleTakeLook({}, {}, deps)).status, 400)
 	})
 

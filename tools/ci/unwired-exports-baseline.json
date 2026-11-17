@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 608,
+	"count": 605,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -142,7 +142,6 @@
 		"client/lib/mixer-fill.js: isFullCanvasFill",
 		"client/lib/mixer-fill.js: isFullScaleWithNonZeroOrigin",
 		"client/lib/mixer-fill.js: isMixerFillReasonable",
-		"client/lib/ndi-attribution.js: NDI_TRADEMARK_NOTICE",
 		"client/lib/optional-modules-registry.js: getOptionalModuleDef",
 		"client/lib/optional-modules.js: getOptionalModuleState",
 		"client/lib/pip-overlay-amcp.js: pipOverlayClearAmcpLinesForContentRange",
@@ -167,6 +166,7 @@
 		"client/lib/previs-uv-mapper.js: __selfTest",
 		"client/lib/previs-uv-mapper.js: computeContentBounds",
 		"client/lib/previs-uv-mapper.js: ledPanelSizeMeters",
+		"client/lib/previs-uv-mapper.js: rotate2D",
 		"client/lib/previs-video-texture.js: createPlaceholderTexture",
 		"client/lib/previs-video-texture.js: findWebrtcVideoElement",
 		"client/lib/previs-video-texture.js: fitInsideMaxLongEdge",
@@ -322,6 +322,7 @@
 		"src/caspar/amcp-teardown-targeting.js: parseTeardownTarget",
 		"src/caspar/amcp-utils.js: stripAmcpLineBreaks",
 		"src/cluster/cluster-exchange.js: TOPICS",
+		"src/cluster/cluster-fanout-report.js: ACTION",
 		"src/cluster/cluster-invites.js: AUTO_KEY",
 		"src/cluster/cluster-master.js: wellFormed",
 		"src/cluster/shared-show-ctx.js: casparLayoutDiffers",
@@ -380,7 +381,6 @@
 		"src/config/screen-consumer-port-resolve.js: resolveGpuOutConnectorFromSource",
 		"src/engine/cg-routing.js: TEMPLATE_CG_OVERLAY_LAYER_MAX",
 		"src/engine/cg-routing.js: isSceneTemplateCgName",
-		"src/engine/global-border-live.js: TEMPLATE_DIR",
 		"src/engine/global-border-live.js: liveFilePath",
 		"src/engine/global-border.js: readGlobalBorderSlot",
 		"src/engine/multiview-apply.js: deployMultiviewTemplates",
@@ -415,10 +415,10 @@
 		"src/engine/timeline-playback-runtime.js: _holdEnd",
 		"src/engine/timeline-take.js: collectTimelinePhysicalLayers",
 		"src/fixtures/beam-offset.js: PIN_DEG",
+		"src/fixtures/console-selection.js: EVENT",
 		"src/fixtures/gdtf-library-build.js: THUMB_PX",
 		"src/fixtures/gdtf-library-build.js: extractParts",
 		"src/fixtures/gdtf-library.js: indexFile",
-		"src/fixtures/gdtf-patch.js: valueFor",
 		"src/fixtures/gdtf-share-full.js: ensureFull",
 		"src/fixtures/gdtf-share-job.js: withRetry",
 		"src/fixtures/gdtf-share-match.js: SURE_COVERAGE",
@@ -434,7 +434,6 @@
 		"src/fixtures/rig-anchors.js: spreadOrder",
 		"src/fixtures/rig-infer.js: RIG_SPREAD_M",
 		"src/fixtures/rig-infer.js: ROW_SPREAD_M",
-		"src/fixtures/rig-infer.js: predict",
 		"src/fixtures/rig-infer.js: rigFit",
 		"src/lighting-console/console-store.js: consolesFile",
 		"src/media/caspar-cls-id.js: normalizeCasparMediaPath",
@@ -510,7 +509,6 @@
 		"src/stage/glb-units.js: FIXTURE_MAX_M",
 		"src/stage/glb-units.js: MM_RATIO",
 		"src/stage/mvr-3ds.js: parse3ds",
-		"src/stage/mvr-patch.js: eulerYXZ",
 		"src/stage/mvr-store.js: unitBox",
 		"src/state/live-deck-state.js: PERSIST_BANKS_KEY",
 		"src/state/live-deck-state.js: PERSIST_DECK_KEY",
@@ -608,7 +606,6 @@
 		"src/virtual-output/v4l2-bridge-consumer.js: removeV4l2BridgeConsumer",
 		"src/virtual-output/v4l2-kernel-modules.js: VCAM_MODULES_WRAPPER",
 		"src/virtual-output/v4l2-kernel-modules.js: v4l2DevicePresent",
-		"src/vr/magicq-mvr.js: SHOW_DIR",
-		"src/vr/magicq-mvr.js: gdtfName"
+		"src/vr/magicq-mvr.js: SHOW_DIR"
 	]
 }

@@ -153,13 +153,28 @@ function createReplayGuard({ store, ns }) {
 	return { check, take }
 }
 
-/** Sender: strictly rising ts per receiver from the own clock; `adopt(last)` after a refusal counts on above it. */
-function createStamper(now = Date.now) {
-	const per = new Map() // receiver fp → { offset, last }
-	const of = (fp) => per.get(fp) || (per.set(fp, { offset: 0, last: 0 }), per.get(fp))
+/** WO-1106 C21: a step back of the own clock larger than this moves the offset (smaller ones only hold the stamp). */
+const STEP_BACK_MS = 250
+
+/**
+ * Sender: strictly rising ts per receiver from the own clock; `adopt(last)` after a refusal counts on above it.
+ * WO-1106 C21: when the own clock steps back, the stamp goes on from the last one plus the time that really passed
+ * since (`mono`, this process' monotonic clock: a wall-clock step does not move it) — instead of sticking at last + 1
+ * until the clock caught up again. The receiver's lateness estimate (dest-actions.js lateBy) reads the stamps as the
+ * sender's elapsed time.
+ * @param {() => number} [now]  wall clock
+ * @param {() => number} [mono]  monotonic ms
+ */
+function createStamper(now = Date.now, mono = () => performance.now()) {
+	const per = new Map() // receiver fp → { offset, last, mono }
+	const of = (fp) => per.get(fp) || (per.set(fp, { offset: 0, last: 0, mono: 0 }), per.get(fp))
 	function next(fp) {
 		const p = of(fp)
+		const m = mono()
+		const raw = now() + p.offset
+		if (p.last && raw < p.last - STEP_BACK_MS) p.offset += p.last + Math.max(0, m - p.mono) - raw
 		p.last = Math.max(now() + p.offset, p.last + 1)
+		p.mono = m
 		return p.last
 	}
 	function adopt(fp, last) {

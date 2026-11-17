@@ -51,4 +51,10 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-games2-skirmish.test.js', // WO-1106 B34 / B56: Skirmish resume token, scene rev reaches players without a host page
 	'tools/smoke/smoke-wo1106-games2-salad.test.js', // WO-1106 B34 / B60: Salad resume token, start / stop end practice flights
 	'tools/smoke/smoke-wo1106-games2-client.test.js', // WO-1106 B34: the three net layers keep and send the token; 4410 = playing on another page
+	'tools/smoke/smoke-wo1106-cluster2-relay.test.js', // WO-1106 D3: the relay has an overall deadline
+	'tools/smoke/smoke-wo1106-cluster2-ownview.test.js', // WO-1106 C25: ownView cached per config revision (1000 verdicts, one build)
+	'tools/smoke/smoke-wo1106-cluster2-lateness.test.js', // WO-1106 C21: the lateness baseline recovers after the sender's clock steps back
+	'tools/smoke/smoke-wo1106-cluster2-press-once.test.js', // WO-1106 C19: a press runs once on the follower (local fallback or the master's copy, never both)
+	'tools/smoke/smoke-wo1106-cluster2-v1-latch.test.js', // WO-1106 C27: v1 signed calls are refused from a peer seen on v2
+	'tools/smoke/smoke-wo1106-cluster2-route-gate.test.js', // WO-1106 C29: cluster changes need the password, the box itself or a linked server's signature
 ]

@@ -328,7 +328,9 @@ describe('WO-1029 Wave B hot backup (a screen cabled here AND elsewhere)', () =>
 			r = await require('../../src/api/routes-ftb').handlePost('/api/ftb', JSON.stringify({ screenIdx: 3, durationFrames: 0 }), ctx)
 			assert.equal(r.status, 200, r.body)
 			assert.equal(json(r).diverged, true)
-			assert.equal(sent.length, 1, 'asked the master once')
+			// WO-1106 C19: + one `dest.ran` notice (this box ran it: the master's late copy must not land here again)
+			assert.deepEqual(sent.map((s) => s.action), ['dest.ftb', 'dest.ran'], 'asked the master once')
+			assert.equal(sent[1].args.pressId, sent[0].args.pressId)
 			assert.ok(amcp.length > 0, 'run here')
 			const takes = []
 			const t = await require('../../src/api/routes-scene-take-look').handleTakeLook({ sceneId: 'L3' }, ctx, lookDeps(takes))
