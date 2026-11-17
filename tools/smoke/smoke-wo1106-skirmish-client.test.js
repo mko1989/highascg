@@ -12,6 +12,8 @@
  *   B56  a new scene rev in the lobby fetches the scene again (not in a match, not twice)
  *   B58  another weapon fires 250 ms after the last shot at the earliest (the server's raise gap)
  *   B59  the own spread seed goes out with `fire`
+ *   soft affect (§7b)  a slick patch slows the soldier only while the `wst` says affect 'on' and no Presenter safe;
+ *        a new socket clears the clock samples (as RC B43): pre-sleep samples never skew server time
  */
 
 const { describe, it, before } = require('node:test')
@@ -83,6 +85,18 @@ describe('WO-1106 Skirmish client: the Game World join (A4 / A32 / A11)', () => 
 		await W.release()
 		assert.deepEqual(W.wj.wish({ mx: 1, mz: 0 }, 1000), { mx: 1, mz: 0 }, 'expired (900 < 1000)')
 		assert.deepEqual(W.wj.wish({ mx: 1, mz: 0 }, 800), { mx: 0.75, mz: 0 }, 'live: × 0.75')
+	})
+
+	it('soft affect: a slick patch slows the soldier only while the wst says affect on and no Presenter safe', async () => {
+		const W = worldJoin({ patches: [{ x: 0, y: 0, z: 0, r: 1, until: 2000 }] })
+		W.wj.onMessage(WST)
+		await W.release()
+		const wish = () => W.wj.wish({ mx: 1, mz: 0 }, 1000)
+		assert.deepEqual(wish(), { mx: 0.75, mz: 0 }, 'no affect in the wst = on (decodeWst)')
+		for (const [w, mx, why] of [[{ affect: 'soft' }, 1, 'soft: visuals only'], [{ affect: 'off' }, 1, 'off'], [{ affect: 'on', safe: true }, 1, 'Presenter safe'], [{ affect: 'on' }, 0.75, 'on again']]) {
+			W.wj.onMessage({ ...WST, ...w })
+			assert.deepEqual(wish(), { mx, mz: 0 }, why)
+		}
 	})
 
 	it('A32: a queue overflow drops the queue, asks once for a fresh view and waits for the next wst', async () => {
@@ -199,5 +213,43 @@ describe('WO-1106 Skirmish client: state (B35 / B54 / B56)', () => {
 		} finally {
 			globalThis.fetch = prev
 		}
+	})
+})
+
+describe('WO-1106 §7b Skirmish client: the clock forgets pre-sleep samples on a new socket (as RC B43)', () => {
+	it('after a reconnect the first new pong sets the offset (an old low-RTT sample does not win)', async () => {
+		const N = await load('net.js')
+		let now = 0
+		const sockets = []
+		class FakeWS {
+			constructor() {
+				this.sent = []
+				sockets.push(this)
+			}
+			send(x) {
+				this.sent.push(JSON.parse(x))
+			}
+			close() {}
+			open() {
+				this.readyState = 1
+				this.onopen()
+			}
+		}
+		const nop = () => 0
+		const net = new N.SkNet({ url: 'ws://box/api/game/sk/ws', WebSocket: FakeWS, now: () => now, setTimeout: nop, clearTimeout: nop, setInterval: nop, clearInterval: nop, onMessage() {}, onStatus() {} })
+		const pong = (ws, rtt, offset) => {
+			const c = ws.sent.find((m) => m.t === 'ping').c
+			now += rtt
+			ws.onmessage({ data: JSON.stringify({ t: 'pong', c, s: c + rtt / 2 + offset }) })
+		}
+		net.connect('Ola', '#ff5533')
+		sockets[0].open()
+		pong(sockets[0], 0, 100000) // RTT 0: the best sample there can be
+		sockets[0].onclose({ code: 1006 }) // the phone slept: the server's clock ran on, the page's did not
+		net._open()
+		sockets[1].open()
+		assert.equal(net.clock.synced, false, 'samples cleared on open')
+		pong(sockets[1], 40, 160000)
+		assert.ok(Math.abs(net.clock.offset - 160000) < 1, `offset ${net.clock.offset} follows the new socket`)
 	})
 })

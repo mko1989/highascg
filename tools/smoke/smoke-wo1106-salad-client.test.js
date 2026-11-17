@@ -5,13 +5,24 @@
  *   A36: world-join.js gives the visitors renderer a per-floor height (stage top over the stage, hall elsewhere).
  *   A4:  a `welcome` (a new socket) resets the visitors (wst off), re-sends `wq`, and drops what was queued.
  *   A32: a pre-load queue overflow drops the queue, asks for a fresh view (`wq` re) and waits for the next `wst`.
+ *   §7b: a new socket clears the clock samples (as RC B43): pre-sleep samples never skew server time.
  */
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const path = require('path')
 const { pathToFileURL } = require('url')
+const { registerHooks } = require('node:module')
 const F = require('./lib/salad-fixtures')
+
+/* net.js imports the RC kit as ./kit/ (served by salad-static.js from modules/rc-game/client) */
+const KIT = pathToFileURL(path.join(F.SALAD, '..', 'rc-game', 'client') + path.sep).href
+registerHooks({
+	resolve(spec, ctx, next) {
+		if (spec.startsWith('./kit/') && ctx.parentURL && ctx.parentURL.includes('/stage-salad/client/')) return next(KIT + spec.slice(6), ctx)
+		return next(spec, ctx)
+	},
+})
 
 const load = (f) => import(pathToFileURL(path.join(F.SALAD, 'client', f)).href)
 const WST = { t: 'wst', v: 1, on: true, client: '/game/world/visitors.js', models: {}, scale: 0.1, safe: false, games: [] }
@@ -241,4 +252,40 @@ test('B61: burst bits pushed out by the cap free their material', async () => {
 	view.burst([0, 1, 0], '#ff0000', 0, 10)
 	assert.equal(view.group.children.length, 72, 'the cap holds')
 	assert.equal(first.filter((m) => m.disposed).length, 10, 'the 10 pushed out are freed')
+})
+
+test('§7b: after a reconnect the first new pong sets the clock offset (an old low-RTT sample does not win)', async () => {
+	const N = await load('net.js')
+	let now = 0
+	const sockets = []
+	class FakeWS {
+		constructor() {
+			this.sent = []
+			sockets.push(this)
+		}
+		send(x) {
+			this.sent.push(JSON.parse(x))
+		}
+		close() {}
+		open() {
+			this.readyState = 1
+			this.onopen()
+		}
+	}
+	const nop = () => 0
+	const net = new N.SaladNet({ url: 'ws://box/api/game/salad/ws', WebSocket: FakeWS, now: () => now, setTimeout: nop, clearTimeout: nop, setInterval: nop, clearInterval: nop, onMessage() {}, onStatus() {} })
+	const pong = (ws, rtt, offset) => {
+		const c = ws.sent.find((m) => m.t === 'ping').c
+		now += rtt
+		ws.onmessage({ data: JSON.stringify({ t: 'pong', c, s: c + rtt / 2 + offset }) })
+	}
+	net.connect('Ola', '#ff5533')
+	sockets[0].open()
+	pong(sockets[0], 0, 100000) // RTT 0: the best sample there can be
+	sockets[0].onclose({ code: 1006 }) // the phone slept: the server's clock ran on, the page's did not
+	net._open()
+	sockets[1].open()
+	assert.equal(net.synced, false, 'samples cleared on open')
+	pong(sockets[1], 40, 160000)
+	assert.ok(Math.abs(net.clock.offset - 160000) < 1, `offset ${net.clock.offset} follows the new socket`)
 })

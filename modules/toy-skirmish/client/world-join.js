@@ -4,7 +4,9 @@
  * game alone never gets one, so nothing here loads, draws or sends.
  *   const wj = createWorldJoin(G, { send, importer? })
  *   wj.onMessage(m)       wst / wv / xfx / xbonus → true when it was one (session.js stops there); peeks at `state`
- *   wj.wish(input, sNow)  the move wish after the world: held while stunned, × 0.75 on a slick splat (R2)
+ *   wj.wish(input, sNow)  the move wish after the world: held while stunned, × 0.75 on a slick splat (R2) — only while
+ *                         the last `wst` says this game takes effects (affect 'on', no Presenter safe: WO-1106 "soft
+ *                         affect", as world-hub.js patches() gates the server's bots)
  *   wj.held(sNow)         true while stunned (no fire)   wj.jitter(now) → an aim offset (rad) while pea-scattered (R5)
  *   wj.knock(st, dt, grid, s)  each movement step: the stun's knock-back (1.2 u over 0.3 s, through the grid clamp)
  *   wj.frame(sNow, dt)    every rendered frame: the visitors (flying vegetables above the cut-away: a shadow / marker)
@@ -37,12 +39,16 @@ const MAX_QUEUE = 64
 const WST_OFF = Object.freeze({ t: 'wst', v: 1, on: false })
 const SCATTER_RAD = (6 * Math.PI) / 180
 const SCATTER_MS = 1500
+/* WO-1106 "soft affect": a slick patch slows this soldier only when the world says others may affect this game ('on'; a
+   missing value is 'on', as world-wire.js decodeWst) and Presenter safe is off — world-hub.js patches() for the bots */
+const slickOn = (m) => m?.on === true && m.safe !== true && m.affect !== 'soft' && m.affect !== 'off'
 
 export function createWorldJoin(G, { send, importer = (u) => import(u) }) {
 	let vis = null
 	let loading = null
 	let on = false
 	let paused = false
+	let slick = false // the last `wst` lets slick patches slow the soldier (slickOn)
 	let stale = false // WO-1106 A4 / A32: `wv` waits for a fresh `wst` (a new view: every `add` again)
 	const queue = [] // world messages that arrive while the renderer loads (replayed in order)
 	let stunUntil = 0
@@ -121,6 +127,7 @@ export function createWorldJoin(G, { send, importer = (u) => import(u) }) {
 					return false
 				case 'wst':
 					on = m.on === true && okClient(m.client)
+					slick = on && slickOn(m)
 					if (on) start(m)
 					else {
 						queue.length = 0
@@ -157,7 +164,7 @@ export function createWorldJoin(G, { send, importer = (u) => import(u) }) {
 		},
 		wish(input, sNow) {
 			if (sNow < stunUntil) return { mx: 0, mz: 0 }
-			if (!vis || !G.my) return input
+			if (!vis || !G.my || !slick) return input
 			const r = G.my
 			for (const s of vis.patches()) {
 				if (!(s.until > sNow)) continue // WO-1106 A4: a patch past its `until` (its `gone` may never come) slows nothing

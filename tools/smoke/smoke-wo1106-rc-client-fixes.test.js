@@ -4,7 +4,7 @@
  * WO-1106 — review fix list, RC client slice (modules/rc-game/client): B35 (disconnected racers), B42 (item press on
  * high-refresh screens), B46 (mid-race rejoin), B43 (clock samples across a reconnect), B44 / A35 (bot hits + slick
  * patches), B45 (host refresh), B47 / B48 (spectator full card, bfcache), B49 (head binding), B50 (tunnel floor
- * normal), A4 / A32 (Game World join on reconnect, pre-load queue).
+ * normal), A4 / A32 (Game World join on reconnect, pre-load queue), §7b soft affect (no slick patch unless affect 'on').
  */
 
 const { describe, it, before, after } = require('node:test')
@@ -291,6 +291,19 @@ describe('WO-1106 A4 / A32 world-join: reconnect reset, pre-load queue overflow'
 		assert.equal(h.G.car.wslick, 1)
 		h.wj.frame(1000, 0.016)
 		assert.equal(h.G.car.wslick, 0, '`until` not after the server time')
+	})
+
+	it('§7b soft affect: a slick patch makes the car slick only while the wst says affect on and no Presenter safe', async () => {
+		const h = harness()
+		h.wj.onMessage(WST())
+		await h.finish()
+		h.wj.frame(999, 0.016)
+		assert.equal(h.G.car.wslick, 1, 'no affect in the wst = on (decodeWst)')
+		for (const [w, slick, why] of [[{ affect: 'soft' }, 0, 'soft: visuals only'], [{ affect: 'off' }, 0, 'off'], [{ affect: 'on', safe: true }, 0, 'Presenter safe'], [{ affect: 'on' }, 1, 'on again']]) {
+			h.wj.onMessage({ ...WST(), ...w })
+			h.wj.frame(999, 0.016)
+			assert.equal(h.G.car.wslick, slick, why)
+		}
 	})
 
 	it('A32: no overflow → replayed in order; overflow → dropped, `wq re` once, wv ignored until the next wst', async () => {

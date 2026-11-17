@@ -9,7 +9,9 @@
  *                           pre-load queue is dropped and `{ t: 'wq', n, re: true }` asks for the view afresh (A32)
  *   wj.beforeStep(P)        once per frame before the physics steps: the queued effects on the own car
  *   wj.step(car, h)         after every stepCar(): the effect timers
- *   wj.frame(sNow, dt)      every rendered frame: the visitors, the slick patch under the own car
+ *   wj.frame(sNow, dt)      every rendered frame: the visitors, the slick patch under the own car — only while the last
+ *                           `wst` says this game takes effects (affect 'on', no Presenter safe: WO-1106 "soft affect",
+ *                           as world-hub.js patches() gates the server's bots)
  *   wj.setQuality(q)  wj.paused
  */
 import * as THREE from 'three'
@@ -28,6 +30,9 @@ const QUEUE_MAX = 64
    `wq re` sent before the renderer has loaded (WO-1106 A32) */
 const capOf = (q) => (q === 'low' ? 6 : 20)
 const WST_OFF = { t: 'wst', v: 1, on: false }
+/* WO-1106 "soft affect": a slick patch slows this car only when the world says others may affect this game ('on'; a
+   missing value is 'on', as world-wire.js decodeWst) and Presenter safe is off — world-hub.js patches() for the bots */
+const slickOn = (m) => m?.on === true && m.safe !== true && m.affect !== 'soft' && m.affect !== 'off'
 const BONUS_TEXT = {
 	hop: 'Splat!',
 	bounce: 'Bounce!',
@@ -42,6 +47,7 @@ export function createWorldJoin(G, { send, load = (u) => import(u) }) {
 	let loading = null
 	let on = false
 	let paused = false
+	let slick = false // the last `wst` lets slick patches slow the car (slickOn)
 	const queue = [] // world messages that arrive while the renderer loads (replayed in order)
 	let stale = false // WO-1106 A32 / A4: the queued view is broken — `wv` is dropped until the next `wst` starts afresh
 	const fx = []
@@ -108,6 +114,7 @@ export function createWorldJoin(G, { send, load = (u) => import(u) }) {
 					return false
 				case 'wst':
 					on = m.on === true && okClient(m.client)
+					slick = on && slickOn(m)
 					if (on) start(m)
 					else {
 						queue.length = 0
@@ -158,7 +165,7 @@ export function createWorldJoin(G, { send, load = (u) => import(u) }) {
 			}
 			try {
 				vis.update(sNow, dt, G.world.camera)
-				if (G.car) G.car.wslick = slickUnder(G.car, vis.patches(), sNow) // WO-1106 A4: expired patches never count
+				if (G.car) G.car.wslick = slick ? slickUnder(G.car, vis.patches(), sNow) : 0 // WO-1106 A4: expired patches never count
 			} catch {
 				/* the visitors never break the game loop */
 			}

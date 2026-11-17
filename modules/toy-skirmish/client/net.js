@@ -82,6 +82,7 @@ export class SkNet {
 		this.ws = ws
 		ws.onopen = () => {
 			this._set('open')
+			this.clock.reset() // WO-1106 "soft affect" row (as RC B43): pre-sleep samples would keep server time off by the sleep length
 			this._sendRaw(this.token && !this.join.spectator ? { ...this.join, resume: this.token } : this.join)
 			this.pings = 0
 			this._sendPing()
