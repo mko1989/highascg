@@ -445,4 +445,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-salad-world.test.js', // WO-1106 A2 / A5 / A32: contact carries the collider id (real hub), send says if it went, wq re
 	'tools/smoke/smoke-wo1106-salad-client.test.js', // WO-1106 A4 / A32 / A36 / B61–B64: welcome reset, queue overflow, floors, disposal, muted start, non-finite flights, host gate
 	'tools/smoke/smoke-wo1106-salad-room.test.js', // WO-1106 B34 / B36 / B60 / B64: ghost seats, silent spectators, per-address cap, buzzer clears flights
+	'tools/smoke/smoke-wo1106-rc-client-fixes.test.js', // WO-1106 A4 / A32 / A35 / B35 / B42–B50: ghosts hidden, item press kept, clock reset, bot hit, host refresh, racing flag, spectator full card
 ]

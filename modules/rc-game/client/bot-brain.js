@@ -7,8 +7,10 @@
  *
  *   createBot({ skill?, rng? }) → bot
  *     bot.onMessage(m, sNow)            a server message (welcome / state / countdown / w / items / results)
- *     bot.step(world, sNow, steps)      `steps` physics steps of 1/60 s on world = { T, env } (the bot's track) → the
- *                                       messages to send (state ≤ 15 Hz while it drives, 1 Hz parked; claims; uses)
+ *     bot.step(world, sNow, steps)      `steps` physics steps of 1/60 s on world = { T, env, patches? } (the bot's track;
+ *                                       patches: the Game World slick splats [{ x, y, z, r, until }] in server ms, absent
+ *                                       = none — WO-1106 A35) → the messages to send (state ≤ 15 Hz while it drives, 1 Hz
+ *                                       parked; claims; uses; the `hit`s queued by onMessage since the last step)
  *     bot.trackId / bot.id / bot.G      what the host needs (the world to hand in; diagnostics for the smokes)
  *   botInput(T, car, hint, skill, line) the steering rule alone: aim LOOK ahead on the centre line (+ the bot's lane),
  *                                       full gas on straights, slower into tight corners (× skill), no drift.
@@ -20,7 +22,7 @@ import { ItemState } from './items.js'
 import { fxFlags } from './drive-rules.js'
 import { stateMsg } from './protocol.js'
 import { onItemMessage, ownCarItems, launchTick } from './item-play.js'
-import { applyWorldFx, stepWorldFx } from './world-fx.js'
+import { applyWorldFx, stepWorldFx, slickUnder } from './world-fx.js'
 
 export const SEND_MS = 66 // ≈ 15 Hz while driving (the room drops a player's states over 20 a second)
 export const PARK_MS = 1000 // parked (lobby / results / waiting): one state a second keeps the bot from going silent
@@ -169,6 +171,7 @@ export function createBot(o = {}) {
 					useAt = null
 				}
 			}
+			G.car.wslick = slickUnder(G.car, world.patches, t) // WO-1106 A35: R2 slick splats slow bots like players (none → 0)
 			stepCar(G.car, b.input, world.env, others, dt)
 			stepWorldFx(G.car, dt) // WO-1102: a Game World wobble / hop in progress
 			G.car.ev.length = 0
@@ -223,8 +226,10 @@ export function createBot(o = {}) {
 			}
 		},
 		step(world, sNow, steps = 2) {
-			out.length = 0
-			if (G.meId == null || !world?.T) return []
+			/* WO-1106 B44: `out` is emptied after it is handed over, not here — a `hit` queued by onMessage('fx') between
+			   two steps (item-play.js pulse) goes out with the next step */
+			const flush = () => out.splice(0)
+			if (G.meId == null || !world?.T) return flush()
 			const key = `${trackId}|${G.phase === 'lobby' ? '' : G.startAt}`
 			if (placedFor !== key || G.T !== world.T) {
 				placedFor = key
@@ -236,7 +241,7 @@ export function createBot(o = {}) {
 			if (G.car) for (const x of wfx.splice(0)) applyWorldFx(G.car, x, world.env?.P || PHYS)
 			if (driving) drive(world, sNow, steps)
 			sendState(sNow, driving && G.phase === 'race' ? SEND_MS : PARK_MS)
-			return out.slice()
+			return flush()
 		},
 	}
 }

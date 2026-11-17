@@ -113,9 +113,9 @@ export function launchTick(G, throttle, sNow, frozen) {
 	return res
 }
 
-/** Catch-up by race position (never for the leader; only while racing). */
+/** Catch-up by race position (never for the leader; only while racing — WO-1106 B46: not for a mid-race rejoin). */
 export function updateCatchup(G, pos, total) {
-	if (G.car) G.car.catchup = G.phase === 'race' ? catchupFor(pos, total) : 0
+	if (G.car) G.car.catchup = G.phase === 'race' && G.myRacing !== false ? catchupFor(pos, total) : 0
 }
 
 /** Drain the own car's physics events into sounds / pop words. */

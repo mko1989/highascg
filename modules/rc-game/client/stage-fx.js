@@ -11,6 +11,7 @@
  *                               the game's world.setHouse) and returns false for them
  *   fx.onBinary(data)           every binary socket message (ArrayBuffer or Blob) → true when it was a wall picture
  *   fx.update(dt)               every rendered frame (seconds since the last)
+ *   fx.sceneLoaded()            the scene GLB is in the world: the heads bind to its nodes (WO-1106 B49)
  *   fx.setQuality('low'|'high') low = pools and lens glows only (no cones)
  *   fx.setEnabled(on)           hide everything and stop asking for pictures (e.g. the player's own toggle / tab hidden)
  *   fx.dispose()
@@ -193,6 +194,10 @@ export function createStageFx(o) {
 		onMessage,
 		onBinary,
 		update,
+		/** WO-1106 B49: the scene GLB is in (game.js after world.loadScene): the moving heads bind to its nodes now. */
+		sceneLoaded() {
+			if (!disposed) follow.rescan()
+		},
 		setQuality(q) {
 			beams.setQuality(q === 'low' ? 'low' : 'high')
 		},

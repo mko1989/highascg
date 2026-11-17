@@ -65,6 +65,15 @@ function syncRemotes(G, players) {
 				spinAdd: 0,
 			})
 		}
+		/* WO-1106 B35: a racer whose socket is gone stays listed until the lobby (rc-room.js drop): its frozen car is
+		   not drawn, collided with or followed (loop.js remoteCars); back online it starts from fresh snapshots */
+		const rr = G.remotes.get(p.id)
+		const off = p.connected === false
+		if (rr.off && !off) {
+			rr.buf = new SnapshotBuffer({ snapDist: SNAP_DIST * (G.s ?? 1) })
+			rr.seen = false
+		}
+		rr.off = off
 	}
 }
 
@@ -92,6 +101,8 @@ function applyState(G, state) {
 	}
 	const meP = (state.players || []).find((p) => p.id === G.meId)
 	if (meP && G.me) G.me = { ...G.me, name: meP.name, color: meP.color }
+	/* WO-1106 B46: a mid-race (re)join is listed with racing:false: no laps, position or catch-up until the next race */
+	G.myRacing = meP?.racing !== false
 	ensureMyCar(G)
 	if (G.phase === 'lobby') {
 		if (prevPhase !== 'lobby') {

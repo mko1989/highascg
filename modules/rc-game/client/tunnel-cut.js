@@ -25,17 +25,18 @@ export function setCut(list) {
 	U.rcCutN.value = L.length
 }
 
-const VERT_HEAD = 'varying vec3 vRcWorld;\nvarying float vRcUp;\n'
+/* WO-1106 B50: the baked scene GLB has no normals (the `normal` attribute reads 0 → NaN), so the floor test uses the
+   face's own normal from the screen-space derivatives of the world position (WebGL2 core; abs: either winding) */
+const VERT_HEAD = 'varying vec3 vRcWorld;\n'
 const VERT_BODY = `
 	vRcWorld = (modelMatrix * vec4(position, 1.0)).xyz;
-	vRcUp = normalize(mat3(modelMatrix) * normal).y;
 `
 const FRAG_HEAD = `varying vec3 vRcWorld;
-varying float vRcUp;
 uniform int rcCutN;
 uniform vec4 rcCutA[${CUT_MAX}];
 uniform vec4 rcCutB[${CUT_MAX}];
 bool rcInCut(vec3 p) {
+	float rcUp = abs(normalize(cross(dFdx(p), dFdy(p))).y);
 	for (int i = 0; i < ${CUT_MAX}; i++) {
 		if (i >= rcCutN) break;
 		vec2 a = rcCutA[i].xy, b = rcCutA[i].zw;
@@ -49,7 +50,7 @@ bool rcInCut(vec3 p) {
 		float h = p.y - rcCutB[i].x;
 		float top = rcCutB[i].z + (rcCutB[i].w - rcCutB[i].z) * sqrt(max(0.0, 1.0 - (d / wo) * (d / wo)));
 		if (h > top) continue;
-		if (vRcUp > 0.7 && h < 0.004) continue; // the floor itself
+		if (rcUp > 0.7 && h < 0.004) continue; // the floor itself
 		return true;
 	}
 	return false;

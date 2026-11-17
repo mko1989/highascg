@@ -4,7 +4,9 @@
  * caller passes its own step. A game alone never receives an `xfx`, so nothing here ever runs then.
  *   applyWorldFx(car, m, P)    an `xfx` message for this car → true when it changed the car (soft: false, visual only)
  *   stepWorldFx(car, dt, P)    after every stepCar(): the wobble's steering jitter, the timers running down
- *   slickUnder(car, patches)   R2: 1 when the car's centre is inside a slick splat (visitors.patches(): { x, y, z, r }), else 0
+ *   slickUnder(car, patches, sNow?)  R2: 1 when the car's centre is inside a slick splat (visitors.patches():
+ *                              { x, y, z, r, until }), else 0; with sNow (server ms) a patch whose `until` is not after
+ *                              it is over (WO-1106 A4: a stale patch never slows that spot for good)
  */
 const HOP_MUL = 1.6 // × the drift hop's upward speed (P.HOP_V, toy scale already)
 const HOP_KEEP = 0.6 // R1: speed × 0.6, steering kept
@@ -58,10 +60,12 @@ export function stepWorldFx(car, dt) {
 	if (w.t <= 0) car.wfx = null
 }
 
-export function slickUnder(car, patches) {
+export function slickUnder(car, patches, sNow) {
 	if (!car || !Array.isArray(patches)) return 0
+	const live = Number.isFinite(sNow)
 	for (const s of patches) {
 		if (!s || !Number.isFinite(s.x) || !Number.isFinite(s.z)) continue
+		if (live && Number.isFinite(s.until) && !(s.until > sNow)) continue
 		const dx = car.x - s.x
 		const dz = car.z - s.z
 		if (dx * dx + dz * dz <= s.r * s.r && Math.abs(car.y - (s.y || 0)) < 0.2) return 1

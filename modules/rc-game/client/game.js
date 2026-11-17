@@ -1,4 +1,4 @@
-/* global window, document, WebSocket, performance, setTimeout */
+/* global window, document, WebSocket, performance, setTimeout, clearTimeout */
 /**
  * Player + spectator session of the RC game (WO-1074): waits until the game is enabled, loads the scene (GLB in the
  * background with a loading bar), joins over the WebSocket and follows the server's phases
@@ -32,6 +32,7 @@ import { startLoop } from './loop.js'
 import { createStageFx } from './stage-fx.js'
 
 const STATE_POLL_MS = 4000
+const SPECTATE_RETRY_MS = 5000
 
 export async function startGame({ spectator = false } = {}) {
 	const phone = isPhone()
@@ -84,7 +85,11 @@ export async function startGame({ spectator = false } = {}) {
 		onHouse: (level) => G.world.setHouse(level) }) // WO-1099 house lights (players and spectators alike)
 	G.wj = createWorldJoin(G, { send: (m) => G.net?._sendRaw(m) ?? false }) // WO-1101 Game World (idle without the world module)
 	document.addEventListener('visibilitychange', () => G.fx?.setEnabled(!document.hidden)) // hidden tab: no pictures
-	window.addEventListener('pagehide', () => G.fx?.dispose())
+	/* WO-1106 B48: a page kept in the back-forward cache comes back as it was — only a real unload disposes the stage fx
+	   (hidden, the visibilitychange above already stops the wall pictures) */
+	window.addEventListener('pagehide', (e) => {
+		if (!e.persisted) G.fx?.dispose()
+	})
 	window.addEventListener('resize', () => G.world.resize())
 	window.addEventListener('orientationchange', () => setTimeout(() => G.world.resize(), 250))
 
@@ -213,6 +218,7 @@ async function loadScene(G) {
 		})
 		.then((res) => {
 			G.screens.loading(null)
+			G.fx?.sceneLoaded?.() // WO-1106 B49
 			if (!res.ok) G.hud.toast('Stage model unavailable — plain arena')
 		})
 	return true
@@ -308,9 +314,25 @@ function gameOff(G) {
 	return false
 }
 
-function onStatus(G, s) {
+/** WO-1106 B47: the spectator page refused (too many watchers): not the drivers' card — it tries again by itself. */
+function spectatorFull(G) {
+	const retry = () => {
+		clearTimeout(G.spectateRetry)
+		G.spectateRetry = null
+		G.screens.hide()
+		G.net?.connect('Spectator', '#ffffff', true)
+	}
+	G.screens.show('Too many viewers', 'The race view is full right now. This page tries again every few seconds.', [
+		{ label: 'Try again', onClick: retry },
+	])
+	clearTimeout(G.spectateRetry)
+	G.spectateRetry = setTimeout(retry, SPECTATE_RETRY_MS)
+}
+
+export function onStatus(G, s) {
 	G.hud.setConn(s, G.net?.clock.rtt)
 	if (s === 'off') gameOff(G)
+	else if (s === 'full' && G.spectator) spectatorFull(G)
 	else if (s === 'full') {
 		sessSet('joined', null)
 		G.screens.show('The race is full', 'Ten drivers are already in. You can watch, or try again later.', [

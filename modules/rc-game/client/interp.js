@@ -149,6 +149,14 @@ export class ClockSync {
 		return this.samples.length > 0
 	}
 
+	/**
+	 * WO-1106 B43: a new socket (after a phone slept) — forget the old samples, whose offsets were taken before the
+	 * sleep and would win the lowest-RTT pick for a while; the offset stays as the best guess until the first pong.
+	 */
+	reset() {
+		this.samples = []
+	}
+
 	get rtt() {
 		return this.samples.length ? this.samples[this.samples.length - 1].rtt : null
 	}

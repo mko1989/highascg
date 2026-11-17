@@ -8,9 +8,13 @@
  *   const hf = createHeadFollow(THREE, scene)
  *   hf.load(heads)      the scene JSON's `heads` (or nothing): forget the old binding
  *   hf.turn(id, d)      the beam of head `id` now points along d (unit, world)
- *   hf.tick(nowMs)      every frame: (re)binds the GLB nodes at most once a second while some are missing
+ *   hf.tick(nowMs)      every frame: (re)binds the GLB nodes at most once a second while some are missing — at most
+ *                       BIND_TRIES times after a load / rescan (WO-1106 B49: a head the GLB lacks never binds)
+ *   hf.rescan()         the scene GLB (re)loaded: bind again now (world.loadScene → stage-fx sceneLoaded)
  *   solveHead(h, d, prevTilt) → { pan, tilt } (radians; pure — the smoke checks it)
  */
+
+const BIND_TRIES = 5
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
@@ -63,6 +67,7 @@ export function solveHead(h, d, prevTilt = 0) {
 export function createHeadFollow(THREE, scene) {
 	let heads = new Map() // id → { h, pan: Object3D | null, tilt: Object3D | null, tiltA, d }
 	let lastBind = -Infinity
+	let tries = 0 // WO-1106 B49: whole-scene traversals since the last load / rescan
 	const mp = new THREE.Matrix4(), mt = new THREE.Matrix4(), mr = new THREE.Matrix4(), v = new THREE.Vector3(), ax = new THREE.Vector3()
 
 	/** Rotation by ang about the axis { o, a } through its origin → into m. */
@@ -108,6 +113,11 @@ export function createHeadFollow(THREE, scene) {
 				if (h && typeof h.id === 'string' && Array.isArray(h.d) && (h.pan || h.tilt)) heads.set(h.id, { h, pan: null, tilt: null, tiltA: 0, d: null })
 			}
 			lastBind = -Infinity
+			tries = 0
+		},
+		rescan() {
+			lastBind = -Infinity
+			tries = 0
 		},
 		turn(id, d) {
 			const e = heads.get(id)
@@ -116,13 +126,14 @@ export function createHeadFollow(THREE, scene) {
 			apply(e)
 		},
 		tick(now) {
-			if (!heads.size || now - lastBind < 1000) return
+			if (!heads.size || tries >= BIND_TRIES || now - lastBind < 1000) return
 			let stale = false
 			for (const e of heads.values()) {
 				if ((!e.pan && !e.tilt) || (e.pan && !attached(e.pan)) || (e.tilt && !attached(e.tilt))) stale = true
 			}
 			if (!stale) return
 			lastBind = now
+			tries++
 			bind()
 		},
 		stats: () => ({ heads: heads.size, bound: [...heads.values()].filter((e) => e.pan || e.tilt).length }),

@@ -27,6 +27,7 @@ export function startLoop(G) {
 	let fov = FOV
 	let lastCdSec = null
 	const prev = { x: 0, y: 0, z: 0, yaw: 0 }
+	let useHeld = false // WO-1106 B42: an item press waits for a physics step (90 / 120 Hz frames often run none)
 
 	function frame(now) {
 		window.requestAnimationFrame(frame)
@@ -48,19 +49,22 @@ export function startLoop(G) {
 			const frozen = (G.phase === 'countdown' && (G.startAt == null || sNow < G.startAt)) || !!G.wj?.paused // WO-1101 world pause
 			G.wj?.beforeStep(G.env?.P)
 			launchTick(G, input.throttle, sNow, frozen)
-			let useLeft = input.use
+			useHeld = useHeld || input.use
 			const alpha = G.stepper.advance(dt, (h) => {
 				prev.x = G.car.x
 				prev.y = G.car.y
 				prev.z = G.car.z
 				prev.yaw = G.car.yaw
-				if (frozen) return
+				if (frozen) {
+					useHeld = false // as before: a press during the countdown does nothing
+					return
+				}
 				stepCar(G.car, input, G.env, others, h)
 				G.wj?.step(G.car, h)
-				ownCarItems(G, { ...input, use: useLeft }, sNow)
-				useLeft = false
+				ownCarItems(G, { ...input, use: useHeld }, sNow)
+				useHeld = false
 				const ev = G.race.move(G.meId, G.car.x, G.car.z, sNow, false, G.car.y)
-				if (ev?.type === 'lap' && G.phase === 'race') G.audio.beep(988, 160)
+				if (ev?.type === 'lap' && G.phase === 'race' && G.myRacing !== false) G.audio.beep(988, 160)
 			})
 			drainEvents(G)
 			const car = G.car
@@ -160,9 +164,15 @@ export function startLoop(G) {
 }
 
 /** Remote cars: interpolated poses, their effects, lap tracking, director cues. Returns the poses for collisions. */
-function remoteCars(G, sNow, now, dt, t) {
+export function remoteCars(G, sNow, now, dt, t) {
 	const others = []
 	for (const r of G.remotes.values()) {
+		if (r.off) {
+			/* WO-1106 B35: disconnected (session.js syncRemotes): hidden, no collisions, the director and the minimap skip it */
+			r.model.group.visible = false
+			r.pose = null
+			continue
+		}
 		const pose = r.buf.render(sNow, now)
 		if (!pose) continue
 		const fx = pose.fx | 0
@@ -201,7 +211,7 @@ function phaseLabel(G) {
 function updateHud(G, sNow, v) {
 	const laps = G.state?.laps || 3
 	const rc = G.meId != null ? G.race.cars.get(G.meId) : null
-	const racing = !G.spectator && !!rc && (G.phase === 'race' || G.phase === 'countdown')
+	const racing = !G.spectator && !!rc && (G.phase === 'race' || G.phase === 'countdown') && G.myRacing !== false // WO-1106 B46
 	const done = rc ? G.race.lapsOf(G.meId) : 0
 	const started = G.startAt != null && sNow >= G.startAt
 	const lapStart = rc?.lap.lapStart

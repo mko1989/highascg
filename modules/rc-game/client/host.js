@@ -11,6 +11,32 @@ import { previewTrack } from './trackdraw.js'
 import { sceneScale } from './scale.js'
 import { qrMatrix, drawQr } from './join-code.js'
 
+/**
+ * WO-1106 B45: one run of `fn` at a time. A call while one runs returns that run; with `again` (after a host action)
+ * one more run follows it so the buttons show the answer to the action, never an older one.
+ */
+export function singleFlight(fn) {
+	let running = null
+	let again = false
+	return function run(opts) {
+		if (running) {
+			if (opts?.again) again = true
+			return running
+		}
+		running = (async () => {
+			try {
+				do {
+					again = false
+					await fn()
+				} while (again)
+			} finally {
+				running = null
+			}
+		})()
+		return running
+	}
+}
+
 /** The join address for a phone: a QR code to scan, and the address in large type for typing it in. */
 export function renderJoinCode(url, el) {
 	el.textContent = ''
@@ -105,7 +131,7 @@ export function startHost(root) {
 		else if (r.status === 401 || r.status === 403)
 			say('Not allowed: log in to the HighAsCG web UI in this browser first (or open this page with ?token=…).', true)
 		else say(`Failed (${r.status || 'no connection'})${r.data?.error ? ': ' + r.data.error : ''}`, true)
-		await refresh()
+		await refresh({ again: true })
 	}
 
 	enableBtn.addEventListener('click', () => act({ action: 'enable' }, 'Game enabled.'))
@@ -190,7 +216,8 @@ export function startHost(root) {
 	let lastJoinKey = null
 	let lastTracksKey = ''
 	let lastPlayersKey = ''
-	async function refresh() {
+	const refresh = singleFlight(refreshOnce) // WO-1106 B45: a 2 s tick never starts a second /scene fetch during a bake
+	async function refreshOnce() {
 		const r = await apiGet('/state')
 		if (!r.ok || !r.data) {
 			setText(stateEl, r.status ? `State unavailable (${r.status})` : 'No connection to the box')
@@ -230,7 +257,8 @@ export function startHost(root) {
 				joinBox.append(slot)
 			}
 		}
-		if (on && (state.sceneRev !== sceneRev || !tracks.length)) {
+		/* WO-1106 B45: only a new rev refetches the multi-MB scene (a failed fetch leaves sceneRev, so it retries) */
+		if (on && state.sceneRev !== sceneRev) {
 			const s = await apiGet('/scene')
 			if (s.ok && s.data) {
 				sceneRev = s.data.rev ?? state.sceneRev
@@ -255,7 +283,7 @@ export function startHost(root) {
 	}
 
 	refresh()
-	setInterval(refresh, 2000)
+	setInterval(() => refresh(), 2000)
 }
 
 /** The track's suggested lap count (1…20) or null. */
