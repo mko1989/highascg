@@ -9,8 +9,9 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const THIN := 0.12  ## m — a piece this thin between its top and bottom faces is not a floor (floor_from_hits)
 
 
-## Swatches for the presets and a picker; `set_color(hex, done)` gets "#rrggbb" — done = a swatch click (the row may be
-## rebuilt), false while the picker is open (it must survive).
+## Swatches for the presets and a picker; `set_color(hex, done)` gets "#rrggbb" — done = a swatch click or the picker
+## closed on a new colour: commit it (the row may be rebuilt); false = the picker dragging, a live preview only (it must
+## survive). WO-1106 A43: every drag tick used to rebuild the pleats, re-scan the stage and save the project.
 static func color_row(o: Dictionary, set_color: Callable) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
@@ -35,6 +36,10 @@ static func color_row(o: Dictionary, set_color: Callable) -> HBoxContainer:
 	pick.custom_minimum_size = Vector2(36, 22)
 	pick.tooltip_text = "Any colour"
 	pick.color_changed.connect(func(col: Color) -> void: set_color.call("#" + col.to_html(false), false))
+	var was := pick.color
+	pick.popup_closed.connect(func() -> void:
+		if pick.color != was:
+			set_color.call("#" + pick.color.to_html(false), true))
 	row.add_child(pick)
 	return row
 

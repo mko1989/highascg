@@ -48,6 +48,8 @@ static var _led: Shader
 static var _led_base := ""
 static var _applied_globals := {}
 static var _meters: Array = []  # WeakRef → Viewport whose GPU time the picker shows
+static var _pickers: Array = []  # WeakRef → a picker() menu the Haze level keeps in step (WO-1106 A20)
+static var _haze_hooked := false
 
 var level := DEFAULT  # what the operator picked (the effective level may be lower: max_level)
 
@@ -236,19 +238,19 @@ static func picker() -> Control:
 	pm.set_item_tooltip(haze_at, "Haze in the 3D views: the beams show as shafts of light, as with a hazer in the venue.")
 	var House := preload("res://features/previs/house_lights.gd")  # WO-1099: its slider sits beside this menu
 	var sync := func() -> void:
-		if not is_instance_valid(o):  # Haze.shared() outlives a freed picker
-			return
-		var lv := mini(shared().level, max_level())
-		for i in NAMES.size():
-			pm.set_item_checked(i, i == lv)
-		pm.set_item_text(haze_at, "Haze: " + str(Haze.LEVELS[Haze.nearest(Haze.shared().level)][0]))
-		o.text = "Quality: " + NAMES[lv]
+		if is_instance_valid(o):
+			_sync_picker(o)
 	pm.id_pressed.connect(func(i: int) -> void:
 		if i < NAMES.size():
 			shared().set_level(i)
 		sync.call())
 	pm.about_to_popup.connect(sync)
-	Haze.shared().changed.connect(func(_h: float) -> void: sync.call())
+	# WO-1106 A20: one static-method hook for every picker (the WO-1103 exit-134 shape), never a lambda per picker
+	# left on the static Haze singleton — that leaked one connection per call and is the heap-corruption pattern at exit
+	_pickers.append(weakref(o))
+	if not _haze_hooked:
+		_haze_hooked = true
+		Haze.shared().changed.connect(_on_haze)
 	sync.call()
 	box.add_child(o)
 	box.add_child(House.control())
@@ -265,3 +267,24 @@ static func picker() -> Control:
 		lab.text = ("GPU %.1f ms" % ms if ms > 0.0 else "") + (" · " if ms > 0.0 and hint != "" else "") + hint)
 	box.add_child(t)
 	return box
+
+
+static func _on_haze(_h: float) -> void:
+	var live: Array = []
+	for w: WeakRef in _pickers:
+		var o := w.get_ref() as MenuButton
+		if o != null:  # Haze.shared() outlives a freed picker
+			live.append(w)
+			_sync_picker(o)
+	_pickers = live
+
+
+## The menu's checks, its Haze item (the last one) and its label at the current levels.
+static func _sync_picker(o: MenuButton) -> void:
+	var Haze := preload("res://features/previs/haze.gd")
+	var pm := o.get_popup()
+	var lv := mini(shared().level, max_level())
+	for i in NAMES.size():
+		pm.set_item_checked(i, i == lv)
+	pm.set_item_text(pm.item_count - 1, "Haze: " + str(Haze.LEVELS[Haze.nearest(Haze.shared().level)][0]))
+	o.text = "Quality: " + NAMES[lv]

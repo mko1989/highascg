@@ -24,9 +24,11 @@ const MAX_TRIS := 1000000
 const CARDS_RE := "hair|lash|brow|fuzz|card|beard|groom|opacity|alpha"
 const HIDE_RE := "eyeedge|eye_edge|eyeshell|eye_shell|occlusion|cartilage|tearline|tear_line|eyelashes_?shadow"
 const SKIN_RE := "skin|head|face|body|torso|arm|leg"
+const MOVES := ["woman", "man"]  ## whose shipped moves an own puppet may borrow: human_body.gd BODIES (WO-1106 A41)
 
 static var _reports := {}
 static var _looked := {}  # slug → msec of the last stale() look
+static var _sigs := {}  # slug → {path, sig}: its files when template() last read them (WO-1106 A13)
 
 
 ## The folder: always under $HOME (not $XDG_DATA_HOME: run-xr.sh moves that) — the ISO / sync excludes name exactly this folder.
@@ -39,7 +41,9 @@ static func slug_of(name: String) -> String:
 	var s := ""
 	for ch in name.to_lower():
 		s += ch if (ch >= "a" and ch <= "z") or (ch >= "0" and ch <= "9") or ch in ["-", "_", "."] else "-"
-	return s.lstrip("-._").left(48)
+	s = s.lstrip("-._").left(48)
+	# WO-1106 A44: a name with no ASCII letter or digit (e.g. kanji only) gave "own:", which the server refuses — a stable hash
+	return s if s != "" else "puppet-%08x" % name.hash()
 
 
 ## The own puppets on this machine: [{slug, name, file}] — one per sub-folder holding a model, or per loose model file.
@@ -61,16 +65,23 @@ static func list(root := "") -> Array:
 
 
 static func _model_in(folder: String) -> String:
+	var found := _models_in(folder)
+	return str(found[0]) if not found.is_empty() else ""
+
+
+## Every model file directly in `folder`, glb first.
+static func _models_in(folder: String) -> Array:
+	var out := []
 	var da := DirAccess.open(folder)
 	if da == null:
-		return ""
+		return out
 	var files := Array(da.get_files())
 	files.sort()
 	for ext in EXT:  # glb first
 		for f: String in files:
 			if f.get_extension().to_lower() == ext:
-				return folder.path_join(f)
-	return ""
+				out.append(folder.path_join(f))
+	return out
 
 
 static func _meta(folder: String) -> Dictionary:
@@ -91,13 +102,32 @@ static func report(slug: String) -> Dictionary:
 	return r
 
 
-## A DNA conversion has finished since `slug` last failed to load (human_body.gd then loads it again).
+## `slug`'s files changed since template() last read them (human_body.gd then loads it again): a DNA conversion
+## finished, the operator deleted the converted GLB or convert.json (the help's "to try again"), replaced the model or
+## edited puppet.json. WO-1106 A13: it used to see only a finished conversion of a failed DNA folder.
 static func stale(slug: String) -> bool:
-	var r: Dictionary = _reports.get(slug, {})
-	if not r.has("dna_folder") or Time.get_ticks_msec() - int(_looked.get(slug, -10000)) < 1000:  # asked every frame
+	if not _sigs.has(slug) or Time.get_ticks_msec() - int(_looked.get(slug, -10000)) < 1000:  # asked every frame
 		return false
 	_looked[slug] = Time.get_ticks_msec()
-	return _model_in(str(r.dna_folder)) != ""
+	return _sig(str(_sigs[slug].path)) != str(_sigs[slug].sig)
+
+
+## A folder's (or a loose model's) look: its file names, the model files' and puppet.json's modification times; ""
+## when it is gone. Cheap (one listing), so stale() can ask it once a second.
+static func _sig(path: String) -> String:
+	if path == "":
+		return ""
+	if FileAccess.file_exists(path):
+		return "%s@%d" % [path, FileAccess.get_modified_time(path)]
+	var da := DirAccess.open(path)
+	if da == null:
+		return ""
+	var parts := []
+	for f in da.get_files():
+		var timed: bool = f.get_extension().to_lower() in EXT or f == "puppet.json"
+		parts.append("%s@%d" % [f, FileAccess.get_modified_time(path.path_join(f))] if timed else f)
+	parts.sort()
+	return "|".join(PackedStringArray(parts))
 
 
 ## Load `slug` (from `root`, default dir()) and retarget `moves_of.call(name)` → {root, height, moves, toes, own,
@@ -110,6 +140,8 @@ static func template(slug: String, moves_of: Callable, root := "") -> Dictionary
 	for e: Dictionary in list(root):
 		if e.slug == slug:
 			entry = e
+	var src_path: String = str(entry.get("folder", entry.get("file", ""))) if not entry.is_empty() else (root if root != "" else dir())
+	_sigs[slug] = {"path": src_path, "sig": _sig(src_path)}
 	if entry.is_empty():
 		rep.error = "no model for %s in %s" % [slug, root if root != "" else dir()]
 		return _fail(rep)
@@ -119,6 +151,12 @@ static func template(slug: String, moves_of: Callable, root := "") -> Dictionary
 		rep.error = why if why != "" else "converting the MetaHuman DNA (started)"
 		return _fail(rep)
 	rep.file = entry.file
+	var models: Array = _models_in(str(entry.folder)) if entry.has("folder") else []
+	if models.size() > 1:
+		# WO-1106 A12: only one file loads (a body FBX + a head FBX gave a headless puppet reported "ok")
+		rep.error = "%d model files in the folder (%s) — only one can load: put the body and the head in one file" % [models.size(),
+			", ".join(PackedStringArray(models.map(func(f: String) -> String: return f.get_file())))]
+		return _fail(rep)
 	var fbx := str(entry.file).get_extension().to_lower() == "fbx"
 	var doc: GLTFDocument = FBXDocument.new() if fbx else GLTFDocument.new()
 	var st: GLTFState = FBXState.new() if fbx else GLTFState.new()
@@ -152,16 +190,18 @@ static func template(slug: String, moves_of: Callable, root := "") -> Dictionary
 		rep.error = "not a humanoid skeleton the puppet's motion can drive — missing: %s" % ", ".join(m.missing)
 		scene.free()
 		return _fail(rep)
-	for n in scene.find_children("*", "", true, false):  # the importer's helpers: not ours to play
-		if is_instance_valid(n) and (n is AnimationPlayer or n is BoneAttachment3D):
-			n.get_parent().remove_child(n)
-			n.free()
+	_strip_helpers(scene)
 	var own := _place(scene, sk, m.bones)
 	var found := Tex.fill(own.root, str(entry.file).get_base_dir())  # FBX / DNA-converted: textures by file name
 	if found > 0:
 		rep.warnings.append("%d texture(s) matched by file name" % found)
 	var meta := _meta(str(entry.file).get_base_dir())
-	var moves_name := str(meta.get("moves", "woman" if float(own.height) < 1.75 else "man"))
+	var moves_name := "woman" if float(own.height) < 1.75 else "man"
+	if meta.has("moves"):
+		if str(meta.moves) in MOVES:
+			moves_name = str(meta.moves)
+		else:  # WO-1106 A41: "own:x" / a path loaded another body as the moves (a null skeleton → script errors)
+			rep.warnings.append("puppet.json moves \"%s\" is not woman or man — using %s" % [str(meta.moves), moves_name])
 	var src: Dictionary = moves_of.call(moves_name)
 	if src.is_empty():
 		rep.error = "the shipped moves (%s) are missing" % moves_name
@@ -184,6 +224,17 @@ static func template(slug: String, moves_of: Callable, root := "") -> Dictionary
 	for side in ["Left", "Right"]:
 		toes.append(sk.get_bone_name(int(m.bones.get(side + "Toes", m.bones[side + "Foot"]))))
 	return {"root": own.root, "height": own.height, "moves": res.lib, "toes": toes, "own": true, "skeleton_path": (own.root as Node).get_path_to(sk)}
+
+
+## The importer's helpers are not ours to play: its AnimationPlayers, and bone attachments that carry no mesh.
+## WO-1106 A40: an attachment holding a mesh (rigid eyes, glasses, a hat) stays — it follows its bone.
+static func _strip_helpers(scene: Node) -> void:
+	for n in scene.find_children("*", "", true, false):
+		if not is_instance_valid(n):
+			continue
+		if n is AnimationPlayer or (n is BoneAttachment3D and n.find_children("*", "MeshInstance3D", true, false).is_empty()):
+			n.get_parent().remove_child(n)
+			n.free()
 
 
 static func _fail(rep: Dictionary) -> Dictionary:

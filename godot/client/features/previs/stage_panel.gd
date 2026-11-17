@@ -310,10 +310,13 @@ func _build_inspector() -> void:
 		_field(o, f)
 	if not o.has("source"):  # WO-1104: a drape — its colour instead of a picture source
 		_label("Colour")
+		var id := str(o.id)
 		_inspector.add_child(DrapeUi.color_row(o, func(hex: String, done: bool) -> void:
+			if not done:  # WO-1106 A43: a picker drag only tints; the pleats, the stage scan and the save wait for the release
+				builder.tint(id, hex)
+				return
 			_edit(func(x: Dictionary) -> void: x.color = hex)
-			if done:
-				_build_inspector.call_deferred()))
+			_build_inspector.call_deferred()))
 		_update_info(o)
 		return
 	if str(o.type) == "projection":  # WO-1010 (owner 09.11): the beams switch sits with the projection, not on the toolbar

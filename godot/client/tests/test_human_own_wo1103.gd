@@ -117,6 +117,7 @@ func _synthetic(path: String) -> void:
 
 func test_own_synthetic_humanoid_is_placed_and_walks() -> void:
 	var dir := OS.get_user_data_dir().path_join("wo1103_own")
+	_rm_tree(dir)  # WO-1106 A45: never left behind in the operator's user dir
 	_synthetic(dir.path_join("synth/synth.glb"))
 	var ls := Own.list(dir)
 	t.eq(ls.map(func(e: Dictionary) -> String: return e.slug), ["synth"], "the folder lists it")
@@ -124,6 +125,7 @@ func test_own_synthetic_humanoid_is_placed_and_walks() -> void:
 	var rep := Own.report("synth")
 	t.ok(rep.get("ok", false), "imported: %s" % rep)
 	if tpl.is_empty():
+		_rm_tree(dir)
 		return
 	t.ok(absf(float(tpl.height) - 1.76) < 0.02, "height from the skinned rest pose %.2f m (toe patch 0.01 → head top patch 1.77)" % tpl.height)
 	t.ok((rep.mapped as Array).has("LeftUpperArm") and (rep.mapped as Array).has("UpperChest"), "arms and the spine mapped")
@@ -169,12 +171,17 @@ func test_own_synthetic_humanoid_is_placed_and_walks() -> void:
 	t.ok(drift < 0.08, "a planted toe drifts %.3f m at most (other proportions than the clips' actor)" % drift)
 	h.free()
 	Body._templates.erase("own:synth")
+	(tpl.root as Node).free()
+	Own._reports.erase("synth")
+	Own._sigs.erase("synth")
+	_rm_tree(dir)
 
 
 ## FBX: a material without a colour map gets the folder's image by name, and the look pass keeps it (hair cards cut).
 func test_fbx_textures_by_name_survive_the_look_pass() -> void:
 	const Tex := preload("res://features/previs/tracking/human_own_tex.gd")
 	var dir := OS.get_user_data_dir().path_join("wo1103_tex")
+	_rm_tree(dir)  # WO-1106 A45
 	DirAccess.make_dir_recursive_absolute(dir.path_join("Textures"))
 	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0.8, 0.5, 0.4))
@@ -205,6 +212,7 @@ func test_fbx_textures_by_name_survive_the_look_pass() -> void:
 	t.ok(hair.albedo_texture != null and hair.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 		and hair.alpha_antialiasing_mode == BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE, "hair: textured, alpha-cut cards with A2C")
 	root.free()
+	_rm_tree(dir)
 
 
 ## A MetaHuman DNA folder: listed, picking it starts the conversion (or says the DNA library is missing), a dead job
@@ -230,6 +238,8 @@ func test_dna_folder_converts_then_loads() -> void:
 	FileAccess.open(folder.path_join("convert.json"), FileAccess.WRITE).store_string(JSON.stringify({"state": "running", "progress": 0.4, "step": "mesh head", "pid": OS.get_process_id()}))
 	t.eq(Dna.status(folder), "converting the MetaHuman DNA: 40 % (mesh head)", "progress for the Look row")
 	Own._reports["ada"] = {"slug": "ada", "dna_folder": folder}
+	Own._sigs["ada"] = {"path": folder, "sig": Own._sig(folder)}  # WO-1106 A13: stale() = its files changed since read
+	Own._looked.erase("ada")
 	t.ok(not Own.stale("ada"), "not converted yet")
 	_synthetic(folder.path_join("ada.converted.glb"))
 	Own._looked.erase("ada")
@@ -239,6 +249,7 @@ func test_dna_folder_converts_then_loads() -> void:
 	if not tpl2.is_empty():
 		(tpl2.root as Node).free()
 	Own._reports.erase("ada")
+	Own._sigs.erase("ada")
 	_rm_tree(dir)
 
 

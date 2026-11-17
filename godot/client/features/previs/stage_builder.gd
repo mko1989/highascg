@@ -325,6 +325,18 @@ static func _drape(o: Dictionary) -> MeshInstance3D:
 	return _mesh(D.mesh(o, D.SAMPLES[clampi(mini(Quality.shared().level, Quality.max_level()), 0, D.SAMPLES.size() - 1)]), m)
 
 
+## WO-1106 A43: a drape's colour while the picker drags — its material only: no new pleat mesh, no stage re-scan, no
+## save (stage_panel.gd commits once the picker closes).
+func tint(id: String, hex: String) -> void:
+	var v: Variant = _nodes.get(id)
+	if not is_instance_valid(v):
+		return
+	for c in (v as Node).get_children():
+		var mi := c as MeshInstance3D
+		if mi != null and mi.material_override is ShaderMaterial:
+			(mi.material_override as ShaderMaterial).set_shader_parameter("albedo", Color.html(hex))
+
+
 func _rebuild_drapes() -> void:
 	for o in objects:
 		if str(o.type) == "drape" and _nodes.has(o.id):

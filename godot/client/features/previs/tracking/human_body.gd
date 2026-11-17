@@ -49,9 +49,14 @@ static func _path(body: String) -> String:
 ## The body as loaded: {root (Node3D: the skeleton "Skeleton3D" under it), height (m, soles to the top of the head),
 ## moves (AnimationLibrary)}.
 static func template(body: String) -> Dictionary:
-	if _templates.has(body) and not (body.begins_with("own:") and (_templates[body] as Dictionary).is_empty() and Own.stale(body.substr(4))):
+	# WO-1106 A13: an own body loads again once its files change (a failed one and a loaded one alike), so the help's
+	# "delete the converted GLB / convert.json to try again" works without a client restart
+	if _templates.has(body) and not (body.begins_with("own:") and Own.stale(body.substr(4))):
 		return _templates[body]
 	if body.begins_with("own:"):
+		var old: Dictionary = _templates.get(body, {})
+		if old.has("root") and is_instance_valid(old.root):
+			(old.root as Node).free()  # an orphan template: the puppets wear their own duplicates
 		_templates[body] = {}  # a failed import is not retried every frame
 		_templates[body] = Own.template(body.substr(4), func(n: String) -> Dictionary: return template(n))
 		return _templates[body]

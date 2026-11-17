@@ -266,7 +266,7 @@ func dolly(m: float) -> void:
 
 ## WO-1067: the first game controller flies the orbit camera while the stage is on screen (pad_camera.gd has the layout).
 func _process(dt: float) -> void:
-	if not pad_camera or walk != null or _cam == null or not is_visible_in_tree():
+	if not pad_camera or walk != null or _cam == null or not is_visible_in_tree() or not pad_window_focused(get_window()):
 		return
 	var pads := Input.get_connected_joypads()
 	if pads.is_empty():
@@ -291,6 +291,12 @@ func _process(dt: float) -> void:
 	ahead = ahead.normalized() if ahead.length() > 0.001 else Vector3.ZERO
 	_target += ahead * float(m.forward) + Vector3(b.x.x, 0.0, b.x.z).normalized() * float(m.strafe) + Vector3.UP * float(m.lift)
 	_update_camera()
+
+
+## WO-1106 B25: the pad flies the camera only while this client's window has the focus — a pad played in the retro
+## game's window also flew the previs camera.
+static func pad_window_focused(w: Window) -> bool:
+	return w != null and w.has_focus()
 
 
 func _update_camera() -> void:

@@ -85,7 +85,7 @@ static func normalize(src: Dictionary) -> Dictionary:
 			o["brightness"] = clampf(float(o.brightness), 0.0, 4.0)
 		"drape":
 			o["size_m"] = _fvec2(o.size_m, 0.1, 100.0)
-			o["color"] = str(o.color) if str(o.color).begins_with("#") and Color.html_is_valid(str(o.color)) else DEFAULTS.drape.color
+			o["color"] = drape_color(o.color)
 			o["fullness"] = clampf(float(o.fullness), 0.0, 200.0)
 			o["pleat_m"] = clampf(float(o.pleat_m), 0.08, 2.0)
 	if is_screen(o):
@@ -93,6 +93,16 @@ static func normalize(src: Dictionary) -> Dictionary:
 	else:
 		o.erase("source")  # a drape shows no picture: no surface held, no crop
 	return o
+
+
+## A drape's colour in its one canonical form "#rrggbb" (WO-1106 A42: "#fff" / "#rrggbbaa" from the API or a hand
+## edit were kept as given, and src/stage/drape-geometry.js read them as black in the MVR export and the games).
+## Alpha is dropped: a drape is opaque. Not a "#" colour → the default black.
+static func drape_color(v: Variant) -> String:
+	var s := str(v)
+	if not s.begins_with("#") or not Color.html_is_valid(s):
+		return str(DEFAULTS.drape.color)
+	return s if s.length() == 7 else "#" + Color.html(s).to_html(false)
 
 
 ## A screen = an object with a picture (LED wall, TV, projection); a drape is not one.

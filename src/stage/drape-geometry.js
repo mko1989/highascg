@@ -21,10 +21,21 @@ const DEFAULTS = { size_m: [6, 4], color: '#151515', fullness: 60, pleat_m: 0.25
 const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
+/**
+ * WO-1106 A42: the drape colour in its one canonical form "#rrggbb", as stage_objects.gd drape_color(): "#rgb", "#rgba"
+ * and "#rrggbbaa" (API / hand edits; Godot accepts them) read as that colour, not black. Alpha dropped: opaque.
+ */
+function colorOf(c) {
+	const m = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(String(c || ''))
+	if (!m) return DEFAULTS.color
+	const h = m[1]
+	return '#' + (h.length <= 4 ? h.slice(0, 3).replace(/./g, (d) => d + d) : h.slice(0, 6))
+}
+
 /** stage_objects.gd normalize for the drape fields (what the twins read). */
 function drapeOf(o) {
 	const s = Array.isArray(o?.size_m) ? o.size_m : DEFAULTS.size_m
-	const color = /^#[0-9a-f]{6}$/i.test(String(o?.color || '')) ? String(o.color) : DEFAULTS.color
+	const color = colorOf(o?.color)
 	return { id: String(o?.id ?? ''), size_m: [clamp(num(Number(s[0]), 6), 0.1, 100), clamp(num(Number(s[1]), 4), 0.1, 100)], color,
 		fullness: clamp(num(Number(o?.fullness), DEFAULTS.fullness), 0, 200), pleat_m: clamp(num(Number(o?.pleat_m), DEFAULTS.pleat_m), 0.08, 2) }
 }
@@ -147,4 +158,4 @@ function linearColor(hex) {
 	return [lin(((v >> 16) & 255) / 255), lin(((v >> 8) & 255) / 255), lin((v & 255) / 255), 1]
 }
 
-module.exports = { SAMPLES, seedOf, hash01, amplitude, nodes, profile, mesh, linearColor }
+module.exports = { SAMPLES, seedOf, hash01, amplitude, nodes, profile, mesh, linearColor, colorOf }

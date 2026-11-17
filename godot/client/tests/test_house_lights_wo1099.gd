@@ -219,3 +219,74 @@ func test_control_is_a_slider_with_a_toggle() -> void:
 	t.ok(b.text.begins_with("House"), "the label")
 	t.eq(sl.focus_mode, Control.FOCUS_NONE, "arrows stay with the 3D view")
 	c.free()
+
+
+## WO-1106 A9: the label's last lit level is read back at launch (it was saved, never loaded: after a restart the
+## toggle went to 100 %). shared() is built by from_cfg(), so the test reads a scratch file the same way.
+func test_last_level_survives_a_restart() -> void:
+	var path := "user://test_house_lights_last.cfg"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var h: RefCounted = House.new()
+	h.set_level(0.35, true, path)
+	h.set_level(0.0, true, path)
+	var again: RefCounted = House.from_cfg(path)
+	t.eq([again.level, again.last], [0.0, 0.35], "off, and the last lit level read back")
+	again.toggle(path)
+	t.eq(again.level, 0.35, "after a restart the label returns to 35 %, not 100 %")
+	var cfg := ConfigFile.new()
+	cfg.set_value("previs", "house_last", 0.0)
+	cfg.save(path)
+	t.eq(House.from_cfg(path).last, 1.0, "a stored 0 is no lit level: full")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	t.eq(House.from_cfg(path).last, 1.0, "nothing stored: full")
+	var src := FileAccess.get_file_as_string("res://features/previs/house_lights.gd")
+	t.ok(src.contains("_shared = from_cfg(UiCfg.PATH)"), "the shared level is built the same way")
+
+
+## WO-1106 A20: control() hooks the shared singleton once, through a static method (the WO-1103 exit-134 shape) — not
+## one lambda per control left on the static singleton; a freed control is dropped, a live one follows.
+func test_control_hooks_once_without_a_lambda() -> void:
+	var hs: RefCounted = House.shared()
+	var c1 := House.control()
+	var n: int = hs.changed.get_connections().size()
+	var c2 := House.control()
+	var c3 := House.control()
+	t.eq(hs.changed.get_connections().size(), n, "more controls: no more connections")
+	var ok_hook := false
+	for c in hs.changed.get_connections():
+		var cb: Callable = c.callable
+		ok_hook = ok_hook or (cb.get_method() == &"_on_level" and not cb.is_custom())
+	t.ok(ok_hook, "hooked by the static _on_level, not a lambda")
+	var was: float = hs.level
+	c2.free()
+	hs.level = 0.0
+	hs.changed.emit(0.0)
+	t.eq([(c1.get_node("Level") as HSlider).value, (c3.get_node("Toggle") as Button).text], [0.0, "House off"], "live controls follow")
+	hs.level = was
+	hs.changed.emit(was)
+	t.eq((c3.get_node("Level") as HSlider).value, roundf(was * 100.0), "back as it was")
+	c1.free()
+	c3.free()
+	hs.changed.emit(was)  # every control freed: nothing to sync, no error
+	var src := FileAccess.get_file_as_string("res://features/previs/house_lights.gd")
+	t.ok(not src.contains("shared().changed.connect(sync)"), "no per-control lambda on the singleton")
+
+
+## WO-1106 A20, the older instance: the Quality picker hooks Haze.shared() once through a static method.
+func test_quality_picker_hooks_haze_once_without_a_lambda() -> void:
+	var Haze := preload("res://features/previs/haze.gd")
+	var hz: RefCounted = Haze.shared()
+	var p1 := Quality.picker()
+	var n: int = hz.changed.get_connections().size()
+	var p2 := Quality.picker()
+	t.eq(hz.changed.get_connections().size(), n, "another picker: no more connections")
+	var ok_hook := false
+	for c in hz.changed.get_connections():
+		var cb: Callable = c.callable
+		ok_hook = ok_hook or (cb.get_method() == &"_on_haze" and not cb.is_custom())
+	t.ok(ok_hook, "hooked by the static _on_haze, not a lambda")
+	var o := p2.get_child(0) as MenuButton
+	p1.free()
+	hz.changed.emit(hz.level)  # the freed picker is skipped
+	t.ok(o.get_popup().get_item_text(o.get_popup().item_count - 1).begins_with("Haze: "), "a live picker still shows the haze")
+	p2.free()

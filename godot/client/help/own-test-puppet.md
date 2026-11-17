@@ -11,9 +11,14 @@ the shipped bodies. It is never a tracked person's look.
 
 1. Make a folder per character in `~/.local/share/highascg/puppets/` on this machine, e.g.
    `~/.local/share/highascg/puppets/ada/`.
-2. Put the model in it: `.glb` (best), `.gltf` or `.fbx`, with its textures beside it or in a sub-folder.
+2. Put the model in it: `.glb` (best), `.gltf` or `.fbx`, with its textures beside it or in a sub-folder. Use
+   **one model file** per character: the body and the head together in one file. A folder with more than one model
+   file is not loaded.
 3. In **Test people → Look**, pick **Own: ada**. The line under the row says what was loaded: triangles, how many
    bones were mapped, the height, and any warning.
+
+When you change the files in the folder (replace the model, edit `puppet.json`, delete a converted file), the
+puppet loads again within a second or so. No restart is needed.
 
 Optional `puppet.json` in the folder: `{"name": "Ada", "moves": "woman"}` (`moves`: whose walk it borrows, `woman`
 or `man`; by default the shorter characters take the woman's).
@@ -40,7 +45,9 @@ To use the same character on a second box of yours, copy the folder there yourse
 **Possible:**
 
 - **A — export from Unreal.** In Unreal, export the MetaHuman's body and head skeletal meshes as FBX (or glTF),
-  with their textures. Put them in one folder as above. The Unreal bone names are mapped.
+  with their textures. Unreal exports them as two files, but the puppet loads **one file**: join them first, for
+  example in Blender (import both, parent the head mesh to the body's skeleton, export one `.glb`). Put that file and
+  the textures in one folder as above. The Unreal bone names are mapped.
 - **B — the DNA files** (MetaHuman Creator's **Export → DCC Export**, or Fab's **OpenRigLogic Sample Content**).
   On Fab, download the **Additional files** (the DNA files and textures), not the Unreal Engine format; `.uasset`
   files cannot be read outside Unreal. Then:
@@ -84,6 +91,7 @@ Fab listing "OpenRigLogic Sample Content".
 The line under **Look** says why:
 
 - **missing: …**: not a humanoid skeleton, or bone names that could not be matched.
+- **model files in the folder**: there is more than one model file. Put the body and the head in one file.
 - **no skeleton**: the model is not rigged.
 - **over the … limit**: export a lower detail level.
 - **needs Epic's DNA library**: run the build script above.

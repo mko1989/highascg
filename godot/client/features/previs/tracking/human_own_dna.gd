@@ -7,6 +7,8 @@ extends RefCounted
 
 const LIB := ".local/share/highascg/openriglogic/lib"
 
+static var _children := {}  # pid → true: converters this client started (WO-1106 A38)
+
 
 ## The DNA files in `folder` (and its sub-folders).
 static func files(folder: String, into: Array = []) -> Array:
@@ -36,8 +38,23 @@ static func job(folder: String) -> Dictionary:
 	return d
 
 
+## WO-1106 A38: our own converter is asked through OS.is_process_running, which reaps it — a crashed child stayed a
+## zombie whose /proc entry read "converting" for the whole session and refused a restart. A converter another client
+## process started (before a restart) is not our child: /proc says whether it still runs.
 static func _alive(pid: int) -> bool:
-	return pid > 0 and DirAccess.dir_exists_absolute("/proc/%d" % pid)
+	if pid <= 0:
+		return false
+	if _children.has(pid):
+		return OS.is_process_running(pid)
+	return DirAccess.dir_exists_absolute("/proc/%d" % pid)
+
+
+## Start `cmd` in the background as a child this client tracks (and reaps): its pid, or -1.
+static func _spawn(cmd: String, args: PackedStringArray) -> int:
+	var pid := OS.create_process(cmd, args)
+	if pid > 0:
+		_children[pid] = true
+	return pid
 
 
 static func converter() -> String:
@@ -56,7 +73,7 @@ static func start(folder: String) -> String:
 		return "the converter is missing (%s)" % converter()
 	if not DirAccess.dir_exists_absolute(lib()):
 		return "MetaHuman DNA needs Epic's DNA library on this machine — run tools/people/openriglogic_build.sh once (see the help page)"
-	var pid := OS.create_process("python3", ["-I", converter(), folder, "--lib", lib()])
+	var pid := _spawn("python3", PackedStringArray(["-I", converter(), folder, "--lib", lib()]))
 	return "" if pid > 0 else "cannot start python3"
 
 

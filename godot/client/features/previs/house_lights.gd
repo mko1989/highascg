@@ -23,6 +23,8 @@ const SHOW_LIGHT := "show_light"  ## node or material meta: show light — never
 const ORIG := "house_emission"  ## material meta: its emission energy at full house light
 
 static var _shared: RefCounted
+static var _controls: Array = []  # WeakRef → a control() box the shared level keeps in step (WO-1106 A20)
+static var _hooked := false
 
 var level := 1.0  ## the slider, 0..1 (perceived brightness)
 var last := 1.0  ## the level the label toggle goes back to (ui.cfg [previs] house_last)
@@ -32,12 +34,21 @@ var lit := {}  # rig (fixtures_3d.gd) instance id → its lit beams now, for hin
 
 static func shared() -> RefCounted:
 	if _shared == null:
-		_shared = new()
-		var cfg := ConfigFile.new()
-		cfg.load(UiCfg.PATH)
-		_shared.level = clampf(float(cfg.get_value("previs", "house_lights", 1.0)), 0.0, 1.0)
-		_shared.avatar_floor = clampf(float(cfg.get_value("previs", "avatar_floor", AVATAR_FLOOR)), 0.0, 1.0)
+		_shared = from_cfg(UiCfg.PATH)
 	return _shared
+
+
+## A level as stored in `path` (ui.cfg): the slider, the label's last lit level (WO-1106 A9: it was saved, never read
+## back, so after a restart the label went to 100 %) and the avatar floor.
+static func from_cfg(path: String) -> RefCounted:
+	var h: RefCounted = new()
+	var cfg := ConfigFile.new()
+	cfg.load(path)
+	h.level = clampf(float(cfg.get_value("previs", "house_lights", 1.0)), 0.0, 1.0)
+	var l := clampf(float(cfg.get_value("previs", "house_last", 1.0)), 0.0, 1.0)
+	h.last = l if l > 0.0 else 1.0
+	h.avatar_floor = clampf(float(cfg.get_value("previs", "avatar_floor", AVATAR_FLOOR)), 0.0, 1.0)
+	return h
 
 
 ## `save` false while a slider drags (the control saves once it rests).
@@ -171,15 +182,34 @@ static func control() -> HBoxContainer:
 	rest.wait_time = 0.4
 	rest.timeout.connect(func() -> void: shared().set_level(shared().level))
 	box.add_child(rest)
-	var sync := func(h: float) -> void:
-		if not is_instance_valid(sl):  # shared() outlives a freed control
-			return
-		sl.set_value_no_signal(roundf(h * 100.0))
-		b.text = "House %d %%" % roundi(h * 100.0) if h > 0.0 else "House off"
 	sl.value_changed.connect(func(v: float) -> void:
 		shared().set_level(v / 100.0, false)
 		rest.start())
 	b.pressed.connect(func() -> void: shared().toggle())
-	shared().changed.connect(sync)
-	sync.call(shared().level)
+	# WO-1106 A20: one static-method hook for every control (the WO-1103 exit-134 shape), never a lambda per control
+	# left on the static singleton — that leaked one connection per call and is the heap-corruption pattern at exit
+	_controls.append(weakref(box))
+	if not _hooked:
+		_hooked = true
+		shared().changed.connect(_on_level)
+	_sync_control(box, shared().level)
 	return box
+
+
+static func _on_level(h: float) -> void:
+	var live: Array = []
+	for w: WeakRef in _controls:
+		var box := w.get_ref() as HBoxContainer
+		if box != null:  # shared() outlives a freed control
+			live.append(w)
+			_sync_control(box, h)
+	_controls = live
+
+
+static func _sync_control(box: HBoxContainer, h: float) -> void:
+	var sl := box.get_node_or_null("Level") as HSlider
+	var b := box.get_node_or_null("Toggle") as Button
+	if sl == null or b == null:
+		return
+	sl.set_value_no_signal(roundf(h * 100.0))
+	b.text = "House %d %%" % roundi(h * 100.0) if h > 0.0 else "House off"
