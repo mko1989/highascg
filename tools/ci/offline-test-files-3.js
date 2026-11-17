@@ -460,4 +460,9 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-iso-release-licences.test.js', // WO-1106 B65 / B66 / B69 / B70 / B72 / B73: collector home under sudo, host licence check, source state, dev-dep notices, module excludes, PortAudio, empty listing
 	'tools/smoke/smoke-wo1106-games-hosting-fixes.test.js', // WO-1106 A6 / A7 / A19 / A23 / A26 / A30 + B1: sticky pause, local-only addresses, module list cache, level check, web save leaves games, module switch gate
 	'tools/smoke/smoke-wo1106-stage-ltc.test.js', // WO-1106 B5 / B6 / B18–B23: zip budget, asoundrc label, one MagicQ rotation, finite OBJ numbers, cancel kills ffmpeg, libltc argtypes, degenerate matrix, runtime job restore
+	'tools/smoke/smoke-wo1106-zoom-engine-window-fit.test.js', // WO-1106 C7: three empty looks clear the crop box (g++ harness, skipped without g++)
+	'tools/smoke/smoke-wo1106-zoom-engine-audio.test.js', // WO-1106 C8 / C14: one tick at a time, daemon restart backoff + give-up, child error listeners
+	'tools/smoke/smoke-wo1106-zoom-engine-session.test.js', // WO-1106 C9 / C12: one chain per source, a quit leaves no grabber, async grabber build
+	'tools/smoke/smoke-wo1106-zoom-engine-ui.test.js', // WO-1106 C13: shared AT-SPI dump, one join / camera loop
+	'tools/smoke/smoke-wo1106-zoom-engine-pixelhue.test.js', // WO-1106 C11 / C16: one Studio connect per host + failure cache, a layer removed mid-drive
 ]

@@ -9,12 +9,15 @@
  * under the operator GUI or bring it back. The child's JSON status lines are kept as `status`.
  *
  * The binary is built on first use from tools/window-grab/build.sh (g++ + X dev headers; ~2 s) so a fresh clone or an
- * ISO install needs no separate step; `ensureBinary` reports why when it cannot be built.
+ * ISO install needs no separate step; `ensureBinary` reports why when it cannot be built. WO-1106 C12: the build runs
+ * as an async child (it ran synchronously on the POST /api/zoom/source path and froze the whole server for it), and
+ * callers that arrive during a build share it.
  */
 
 const fs = require('fs')
 const path = require('path')
-const { spawn, execFileSync } = require('child_process')
+const { spawn, execFile } = require('child_process')
+const { promisify } = require('util')
 const { REPO_ROOT } = require('../repo-paths')
 const { displaySessionEnv } = require('../utils/x-display-session-runtime-env')
 
@@ -22,24 +25,32 @@ const GRAB_DIR = path.join(REPO_ROOT, 'tools', 'window-grab')
 const GRAB_BIN = path.join(GRAB_DIR, 'build', 'window_grab')
 
 let buildError = ''
+let building = null // the build in flight, shared by concurrent callers (WO-1106 C12)
 const GRAB_SOURCES = ['window_grab.cpp', 'window_fit.h', 'build.sh']
+const execFileP = promisify(execFile)
 
-/** @returns {{ ok: boolean, bin: string, error?: string }} */
-function ensureBinary(deps = {}) {
+/** @returns {Promise<{ ok: boolean, bin: string, error?: string }>} */
+async function ensureBinary(deps = {}) {
 	const exists = deps.exists || fs.existsSync
-	const build = deps.build || (() => execFileSync(path.join(GRAB_DIR, 'build.sh'), { timeout: 120000, stdio: 'pipe' }))
+	const build = deps.build || (() => execFileP(path.join(GRAB_DIR, 'build.sh'), [], { timeout: 120000, killSignal: 'SIGKILL', maxBuffer: 4 << 20 }))
 	// a binary older than its source is rebuilt: an update that adds a grabber option must not leave the old one running
 	const mtime = deps.mtime || ((f) => { try { return fs.statSync(f).mtimeMs } catch { return 0 } })
 	const stale = exists(GRAB_BIN) && GRAB_SOURCES.some((f) => mtime(path.join(GRAB_DIR, f)) > mtime(GRAB_BIN))
 	if (exists(GRAB_BIN) && !stale) return { ok: true, bin: GRAB_BIN }
 	if (stale) buildError = ''
 	if (buildError) return { ok: false, bin: GRAB_BIN, error: buildError }
-	try {
-		build()
-	} catch (e) {
-		buildError = `window grabber build failed: ${String(e.stderr || e.message || e).trim().split('\n').slice(-3).join(' ')}`
-		return { ok: false, bin: GRAB_BIN, error: buildError }
+	if (!building) {
+		building = (async () => {
+			try {
+				await build()
+				return ''
+			} catch (e) {
+				return (buildError = `window grabber build failed: ${String(e.stderr || e.message || e).trim().split('\n').slice(-3).join(' ')}`)
+			}
+		})().finally(() => (building = null))
 	}
+	const err = await building
+	if (err) return { ok: false, bin: GRAB_BIN, error: err }
 	return exists(GRAB_BIN) ? { ok: true, bin: GRAB_BIN } : { ok: false, bin: GRAB_BIN, error: 'window grabber not built' }
 }
 

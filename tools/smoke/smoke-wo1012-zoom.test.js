@@ -296,7 +296,7 @@ test('fit (on by default): the grab gets the Zoom chrome colours, so the ring ho
 	assert.strictEqual(st.sources.presenter.box, null)
 })
 
-test('grabber: the fit option reaches the command line; a binary older than its source is rebuilt', () => {
+test('grabber: the fit option reaches the command line; a binary older than its source is rebuilt', async () => {
 	const { createGrab, ensureBinary } = require('../../src/zoom/zoom-grab')
 	const { EventEmitter } = require('node:events')
 	let argv = null
@@ -314,8 +314,8 @@ test('grabber: the fit option reaches the command line; a binary older than its 
 	createGrab({ ring: 'zoom-share', size: '1920x1080', fps: 30, window: '0x1', spawn })
 	assert.ok(!argv.includes('--fit'))
 	let built = 0
-	const fresh = ensureBinary({ exists: () => true, mtime: (f) => (f.endsWith('window_grab') ? 200 : 100), build: () => built++ })
+	const fresh = await ensureBinary({ exists: () => true, mtime: (f) => (f.endsWith('window_grab') ? 200 : 100), build: () => built++ })
 	assert.ok(fresh.ok && built === 0)
-	ensureBinary({ exists: () => true, mtime: (f) => (f.endsWith('window_fit.h') ? 300 : 200), build: () => built++ })
+	await ensureBinary({ exists: () => true, mtime: (f) => (f.endsWith('window_fit.h') ? 300 : 200), build: () => built++ })
 	assert.strictEqual(built, 1, 'window_fit.h is newer than the binary')
 })

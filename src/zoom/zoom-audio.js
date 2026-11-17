@@ -37,6 +37,10 @@ const OUT_UDP_PORT = 52232
 const IN_URL = `udp://127.0.0.1:${IN_UDP_PORT}`
 const CONSUMER_INDEX = 9277
 const LINK_MS = 2000
+// WO-1106 C8: a daemon that cannot start is retried with backoff (2 s doubling to 60 s), and given up after 8 failures
+const RESTART_BACKOFF_MS = 2000
+const RESTART_BACKOFF_CAP_MS = 60000
+const RESTART_MAX_FAILURES = 8
 const addCmd = (ch) =>
 	`ADD ${ch}-${CONSUMER_INDEX} STREAM udp://127.0.0.1:${OUT_UDP_PORT}?pkt_size=1316 -vn -codec:a pcm_s16le -ar 48000 -filter:a pan=stereo|c0=c0|c1=c1 -format s16le`
 const removeCmd = (ch) => `REMOVE ${ch}-${CONSUMER_INDEX}`
@@ -73,6 +77,8 @@ function createZoomAudio(deps = {}) {
 	const getConfig = deps.getConfig || (() => ({}))
 	const feedsOf = deps.feeds || defaultFeeds
 	const log = deps.log || (() => {})
+	const now = deps.now || Date.now
+	const sleep = deps.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)))
 	const hasBin = deps.hasBin || ((b) => ['/usr/bin', '/usr/local/bin'].some((d) => fsx.existsSync(path.join(d, b))))
 	const env = { ...process.env, XDG_RUNTIME_DIR: base, PIPEWIRE_RUNTIME_DIR: dir, PIPEWIRE_REMOTE: 'highascg-pw', PULSE_RUNTIME_PATH: dir }
 
@@ -89,6 +95,10 @@ function createZoomAudio(deps = {}) {
 	let daemonChild = null
 	const bridges = { tap: null, feeder: null, sock: null }
 	let restored = false
+	let ticking = null // the 2 s tick in flight (WO-1106 C8: a slow tick is never overlapped by the next one)
+	let starting = null // the daemon start in flight: the tick and an enable share it
+	const restart = { failures: 0, nextAt: 0, gaveUp: false }
+	const resetRestart = () => Object.assign(restart, { failures: 0, nextAt: 0, gaveUp: false })
 
 	const save = () => {
 		try {
@@ -114,7 +124,12 @@ function createZoomAudio(deps = {}) {
 	}
 	const hasNode = (g, name) => !!g?.nodes.some((n) => n.info?.props?.['node.name'] === name)
 
-	async function startDaemon() {
+	function startDaemon() {
+		if (!starting) starting = startDaemonOnce().finally(() => (starting = null))
+		return starting
+	}
+
+	async function startDaemonOnce() {
 		if (await dump()) return true
 		fsx.mkdirSync(dir, { recursive: true, mode: 0o700 })
 		const conf = path.join(dir, 'pipewire.conf')
@@ -129,7 +144,7 @@ function createZoomAudio(deps = {}) {
 		daemonChild.on?.('error', (e) => (lastError = `pipewire: ${e.message}`))
 		for (let i = 0; i < 20; i++) {
 			if (await dump()) return true
-			await new Promise((r) => setTimeout(r, 150))
+			await sleep(150)
 		}
 		lastError = lastError || 'private PipeWire daemon did not come up'
 		return false
@@ -159,14 +174,19 @@ function createZoomAudio(deps = {}) {
 		const drop = () => {
 			if (bridges.tap?.rec === rec) bridges.tap = null
 		}
-		rec.on('exit', () => {
+		const recGone = () => {
 			drop()
 			try { ff.kill('SIGTERM') } catch { /* gone */ }
-		})
-		ff.on('exit', () => {
+		}
+		const ffGone = () => {
 			drop()
 			try { rec.kill('SIGTERM') } catch { /* gone */ }
-		})
+		}
+		rec.on('exit', recGone)
+		ff.on('exit', ffGone)
+		// WO-1106 C14: a missing binary is an 'error' (no 'exit'): unhandled it threw out of node
+		rec.on('error', (e) => ((lastError = `pw-cat: ${e.message}`), recGone()))
+		ff.on('error', (e) => ((lastError = `ffmpeg: ${e.message}`), ffGone()))
 		bridges.tap = { rec, ff }
 	}
 
@@ -181,6 +201,10 @@ function createZoomAudio(deps = {}) {
 		sock.bind(OUT_UDP_PORT, '127.0.0.1')
 		play.stdin.on?.('error', () => {})
 		play.on('exit', () => {
+			if (bridges.feeder?.play === play) stopFeeder()
+		})
+		play.on('error', (e) => {
+			lastError = `pw-cat: ${e.message}` // WO-1106 C14
 			if (bridges.feeder?.play === play) stopFeeder()
 		})
 		bridges.feeder = { play }
@@ -204,18 +228,41 @@ function createZoomAudio(deps = {}) {
 		let g = await dump()
 		if (!g) {
 			// the daemon is gone (killed, crashed): bring it back, it was never restarted before (10.11, live)
-			if (!persisted.enabled || !(await startDaemon())) return
+			if (!persisted.enabled || restart.gaveUp || now() < restart.nextAt) return
+			if (!(await startDaemon())) return restartFailed()
+			resetRestart()
 			log('warn', '[zoom-audio] private PipeWire daemon was gone, started again')
 			spawnTap()
 			g = await dump()
 			if (!g) return
-		}
+		} else if (restart.failures) resetRestart()
 		const cfgs = portConfigs(g)
 		for (const c of cfgs) await pw('pw-cli', ['s', String(c.id), 'PortConfig', portConfigPod(c)]).catch((e) => log('warn', `[zoom-audio] PortConfig ${c.id}: ${e.message}`))
 		if (cfgs.length) g = (await dump()) || g
 		for (const [o, i] of wantedLinks(g)) {
 			await pw('pw-link', [String(o), String(i)]).catch((e) => log('warn', `[zoom-audio] pw-link ${o} ${i}: ${e.message}`))
 		}
+	}
+
+	/** WO-1106 C8: one more failed restart — wait twice as long (to 60 s); after 8 in a row stop with one warn line. */
+	function restartFailed() {
+		restart.failures++
+		if (restart.failures >= RESTART_MAX_FAILURES) {
+			restart.gaveUp = true
+			lastError = `The private PipeWire daemon did not start after ${restart.failures} tries. Turn Zoom audio off and on to try again.`
+			log('warn', `[zoom-audio] private PipeWire daemon did not start after ${restart.failures} tries; restart attempts stopped`)
+			return
+		}
+		restart.nextAt = now() + Math.min(RESTART_BACKOFF_MS * 2 ** (restart.failures - 1), RESTART_BACKOFF_CAP_MS)
+	}
+
+	/** The interval's entry: a tick still running (a slow daemon start, pw-link) makes the next one a no-op. */
+	function runTick() {
+		if (ticking) return ticking
+		ticking = tick()
+			.catch(() => {})
+			.finally(() => (ticking = null))
+		return ticking
 	}
 
 	/**
@@ -301,6 +348,7 @@ function createZoomAudio(deps = {}) {
 			feeds,
 			note: available ? note : 'PipeWire tools are not installed (pipewire-bin: pipewire, pw-cat, pw-dump, pw-link)',
 			error: lastError,
+			restart: { failures: restart.failures, gaveUp: restart.gaveUp }, // WO-1106 C8
 			env: zoomEnv(),
 		}
 	}
@@ -319,6 +367,7 @@ function createZoomAudio(deps = {}) {
 			persisted.feed = f
 		}
 		if (typeof body.enabled === 'boolean') persisted.enabled = body.enabled
+		if (body.enabled === true) resetRestart() // WO-1106 C8: an explicit enable retries a daemon the tick gave up on
 		if (persisted.enabled) {
 			if (!(await startDaemon())) {
 				persisted.enabled = false
@@ -327,7 +376,7 @@ function createZoomAudio(deps = {}) {
 			}
 			spawnTap()
 			if (!linkTimer) {
-				linkTimer = timers.setInterval(() => tick().catch(() => {}), LINK_MS)
+				linkTimer = timers.setInterval(runTick, LINK_MS)
 				linkTimer.unref?.()
 			}
 			await linkTick()

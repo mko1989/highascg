@@ -22,6 +22,7 @@ const { pathToFileURL } = require('node:url')
 
 const SERVER = path.join(__dirname, 'vendor', 'pixelhue-studio', 'server.js')
 const TIMEOUT_MS = 90000 // Studio's own device calls may take up to 80 s (layer create on a busy switcher)
+const CONNECT_FAIL_CACHE_MS = 3000 // WO-1106 C11: a switcher that just refused is not asked again for this long
 
 function createStudioBridge(deps = {}) {
 	const startApp = deps.startApp || (async () => {
@@ -36,6 +37,9 @@ function createStudioBridge(deps = {}) {
 	let session = ''
 	let host = ''
 	let state = null // Studio's answer to the last connect: { session, device: { model, serial, … }, capabilities }
+	const now = deps.now || Date.now
+	let connecting = null // { host, promise } — the connect in flight
+	let failed = null // { host, at, error } — the last refused connect
 
 	function ensureApp() {
 		if (app) return Promise.resolve(app)
@@ -71,16 +75,40 @@ function createStudioBridge(deps = {}) {
 		}
 	}
 
-	/** Connect Studio to `wantHost` (again when it changed or `force`). → Studio's state, or throws with its reason. */
+	/**
+	 * Connect Studio to `wantHost` (again when it changed or `force`). → Studio's state, or throws with its reason.
+	 * WO-1106 C11: every connect invalidates Studio's previous session, so the pane's burst of requests each logging in
+	 * meant 409s and more logins. Callers for the same host share the connect in flight (a forced one too: it is a
+	 * fresh connect), and a refused connect is answered from a 3 s cache unless forced.
+	 */
 	async function connect(wantHost, force = false) {
 		if (!force && session && host === wantHost) return state
-		const r = await raw('POST', '/api/connect', { host: wantHost })
+		if (connecting && connecting.host === wantHost) return connecting.promise
+		if (!force && failed && failed.host === wantHost && now() - failed.at < CONNECT_FAIL_CACHE_MS) throw failed.error
+		const promise = connectOnce(wantHost).finally(() => {
+			if (connecting && connecting.promise === promise) connecting = null
+		})
+		connecting = { host: wantHost, promise }
+		return promise
+	}
+
+	async function connectOnce(wantHost) {
+		let r
+		try {
+			r = await raw('POST', '/api/connect', { host: wantHost })
+		} catch (e) {
+			failed = { host: wantHost, at: now(), error: e }
+			throw e
+		}
 		const j = json(r)
 		if (r.status !== 200 || !j?.session) {
 			session = ''
 			state = null
-			throw Object.assign(new Error(j?.error || `PixelHue Studio could not connect to ${wantHost}`), { status: r.status === 200 ? 502 : r.status })
+			const error = Object.assign(new Error(j?.error || `PixelHue Studio could not connect to ${wantHost}`), { status: r.status === 200 ? 502 : r.status })
+			failed = { host: wantHost, at: now(), error }
+			throw error
 		}
+		failed = null
 		session = j.session
 		host = wantHost
 		state = j
@@ -131,6 +159,7 @@ function createStudioBridge(deps = {}) {
 			app = null
 			session = ''
 			state = null
+			failed = null
 		},
 	}
 }

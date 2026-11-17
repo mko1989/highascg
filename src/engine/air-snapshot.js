@@ -179,12 +179,19 @@ function waitRestored(id, ms) {
 	if (finished.has(id)) return Promise.resolve(finished.get(id))
 	return new Promise((resolve) => {
 		const list = waiters.get(id) || []
-		const t = setTimeout(() => resolve(null), ms)
-		if (t.unref) t.unref()
-		list.push((r) => {
+		const done = (r) => {
 			clearTimeout(t)
 			resolve(r)
-		})
+		}
+		// WO-1106 C15: a timed-out wait takes its callback out (it stayed in `waiters` for good, one per un-restored Apply)
+		const t = setTimeout(() => {
+			const left = (waiters.get(id) || []).filter((fn) => fn !== done)
+			if (left.length) waiters.set(id, left)
+			else waiters.delete(id)
+			resolve(null)
+		}, ms)
+		if (t.unref) t.unref()
+		list.push(done)
 		waiters.set(id, list)
 	})
 }
@@ -207,4 +214,5 @@ module.exports = {
 	armedSnapshot,
 	waitRestored,
 	reportRestored,
+	pendingWaiters: () => [...waiters.values()].reduce((n, l) => n + l.length, 0), // WO-1106 C15 (smoke)
 }

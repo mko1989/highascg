@@ -328,3 +328,34 @@ describe('WO-1029 air snapshot — program look banks (A 10–99 / B 110–199)'
 		assert.deepEqual(copiesOf(rig.caspar.state, 2, 'STALE_PREV'), [])
 	})
 })
+
+describe('WO-1106 C10 / C15 — one restore per snapshot; a timed-out wait leaves nothing behind', () => {
+	it('C10: a Caspar reconnect during a restore joins it (looks taken once); a new snapshot afterwards still restores', async () => {
+		const live = memLive({ 1: look('L1', 'Look one'), 3: htmlLook('L2', 'Look two') })
+		const snap = await snapshotNow(fakeCaspar(onAir()), live)
+		const rig = restoreRig(snap, { live })
+		const o = { reconnect: true, setup: { restagePersistedPreviewLooks: async () => {} }, deps: rig.deps }
+		const [a, b] = await Promise.all([restoreOnConnect(rig.ctx, o), restoreOnConnect(rig.ctx, o)])
+		assert.deepEqual(rig.takes.map((t) => t[0]), [2, 4], 'each look taken once, not twice')
+		assert.equal(a, b, 'the reconnect got the same restore report')
+		assert.equal(rig.persistence.get(Air.KEY), undefined)
+		// a later Apply takes a new snapshot: it is restored as usual
+		const next = { ...snap, id: `${snap.id}_next` }
+		Air.storeSnapshot(next, rig.persistence)
+		const r = await restoreOnConnect(rig.ctx, o)
+		assert.ok(r && r !== a, 'the new snapshot was restored')
+		assert.equal(rig.tl.played.length, 2, 'its timeline was resumed (once for each snapshot)')
+		assert.equal(rig.persistence.get(Air.KEY), undefined)
+	})
+
+	it('C15: a timed-out waitRestored takes its callback out of the waiters', async () => {
+		const before = Air.pendingWaiters()
+		assert.equal(await Air.waitRestored('wo1106-c15-never', 5), null)
+		assert.equal(Air.pendingWaiters(), before, 'nothing left behind')
+		const p = Air.waitRestored('wo1106-c15-late', 1000)
+		assert.equal(Air.pendingWaiters(), before + 1)
+		Air.reportRestored('wo1106-c15-late', { ok: 1 })
+		assert.deepEqual(await p, { ok: 1 })
+		assert.equal(Air.pendingWaiters(), before)
+	})
+})

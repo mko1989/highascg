@@ -83,6 +83,18 @@ function createZoomSession(deps = {}) {
 	let rebindTimer = null
 	let lastError = ''
 
+	/**
+	 * WO-1106 C9: one promise chain per source. assign (and its ensureGrab) and quit for the same source run one after
+	 * the other: two overlapping assigns each started a window_grab (one orphaned, both writing the same ring), and a
+	 * quit during an assign's await was undone when the assign went on to start its grabber.
+	 */
+	const chains = {}
+	function serial(s, fn) {
+		const run = (chains[s] || Promise.resolve()).then(fn)
+		chains[s] = run.catch(() => {})
+		return run
+	}
+
 	// The bindings outlive a node restart (Zoom runs in its own scope and keeps its windows): the title, never the
 	// window id, is kept, and restore() re-finds the window. Only the box instance has a state file.
 	const stateFile = deps.stateFile || null
@@ -173,7 +185,7 @@ function createZoomSession(deps = {}) {
 		const old = e.grab
 		stopGrab(s)
 		if (old && old.exited) await Promise.race([old.exited, new Promise((r) => setTimeout(r, 2000))])
-		const bin = ensureBinary()
+		const bin = await ensureBinary() // WO-1106 C12: async, a build never blocks the event loop
 		if (!bin.ok) {
 			lastError = bin.error || 'window grabber unavailable'
 			return false
@@ -269,13 +281,18 @@ function createZoomSession(deps = {}) {
 
 	/** Stop every grab and quit the Zoom client (leaves any meeting). */
 	async function quit() {
-		for (const s of SOURCES) {
-			// kept as a saved binding: the next Zoom start re-binds by title
-			if (src[s].window) pending[s] = { title: src[s].title, role: src[s].role, hidden: src[s].hidden, fit: src[s].fit, size: src[s].size, fps: src[s].fps }
-			stopGrab(s)
-			src[s].window = null
-			src[s].hidden = false
-		}
+		// after any assign in flight for that source (WO-1106 C9), so no grabber starts after the quit
+		await Promise.all(
+			SOURCES.map((s) =>
+				serial(s, () => {
+					// kept as a saved binding: the next Zoom start re-binds by title
+					if (src[s].window) pending[s] = { title: src[s].title, role: src[s].role, hidden: src[s].hidden, fit: src[s].fit, size: src[s].size, fps: src[s].fps }
+					stopGrab(s)
+					src[s].window = null
+					src[s].hidden = false
+				})
+			)
+		)
 		syncTimer()
 		const pids = await zoomPids()
 		for (const p of pids) {
@@ -296,6 +313,10 @@ function createZoomSession(deps = {}) {
 	 */
 	async function assign(s, o = {}) {
 		if (!SOURCES.includes(s)) throw new Error(`unknown Zoom source "${s}" (presenter, share, gallery)`)
+		return serial(s, () => assignNow(s, o))
+	}
+
+	async function assignNow(s, o) {
 		const e = src[s]
 		if (o.size != null) e.size = cleanSize(o.size)
 		if (o.fps != null) e.fps = Math.max(5, Math.min(60, parseInt(String(o.fps), 10) || DEFAULT_FPS))

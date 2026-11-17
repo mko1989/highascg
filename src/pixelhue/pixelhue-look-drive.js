@@ -132,6 +132,7 @@ async function driveLook(scene, reader, deps = {}) {
 	if (moved.length) await reader.put('/unico/v1/layers/window', moved.map((c) => ({ layerId: c.layerId, window: globalWindow(c) })))
 	const ok = (all, c) => {
 		const l = all.find((x) => x.layerId === c.layerId)
+		if (!l) return false // WO-1106 C16: the layer was removed during the drive (reading .window threw: "not driven")
 		return (!c.window || sameWindow(l.window || l, c.window)) && (!c.source || sameSource(l, c.source))
 	}
 	let lost = changes

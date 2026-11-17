@@ -9,7 +9,9 @@
  * window wide: icons, labels and the title-bar tab are shorter than that, a share or a video is not.
  *
  * The box found must repeat three detections in a row before it replaces the current one, so a dark scene that
- * happens to match a chrome colour for a moment does not make the picture jump.
+ * happens to match a chrome colour for a moment does not make the picture jump. Likewise the picture is dropped (the
+ * whole window shown again) only after three looks in a row find none (WO-1106 C7: a share that stopped kept its
+ * stale crop until the window was re-mapped, because an empty look never counted towards the three).
  */
 #pragma once
 
@@ -37,12 +39,14 @@ struct Fit
     std::vector<uint32_t> chrome; // 0xRRGGBB
     Rect                  cur, cand;
     int                   cand_hits = 0;
+    int                   misses    = 0; // consecutive looks that found no picture (WO-1106 C7)
     unsigned              frames    = 0;
 
     void reset()
     {
         cur = cand = Rect{};
         cand_hits  = 0;
+        misses     = 0;
         frames     = 0;
     }
 
@@ -142,17 +146,24 @@ struct Fit
     {
         if (frames++ % 8 == 0) {
             Rect r = detect(data, stride, w, h);
-            if (r.valid() && r.near(cand))
-                ++cand_hits;
-            else {
-                cand      = r;
-                cand_hits = 1;
+            if (!r.valid()) {
+                // the picture going away must hold for three looks; one empty look (a dark frame) keeps the box
+                cand      = Rect{};
+                cand_hits = 0;
+                if (++misses >= 3)
+                    cur = Rect{};
+            } else {
+                misses = 0;
+                if (r.near(cand))
+                    ++cand_hits;
+                else {
+                    cand      = r;
+                    cand_hits = 1;
+                }
+                // the first box is taken at once; a change must hold for three looks
+                if (!cur.valid() || cand_hits >= 3)
+                    cur = cand;
             }
-            // the first box is taken at once; a change (or the picture going away) must hold for three looks
-            if ((!cur.valid() && r.valid()) || cand_hits >= 3)
-                cur = cand;
-            else if (!r.valid() && !cand.valid() && cand_hits >= 3)
-                cur = Rect{};
         }
         if (cur.valid() && (cur.x + cur.w > w || cur.y + cur.h > h))
             cur = Rect{}; // the window shrank under the box

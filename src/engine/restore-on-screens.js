@@ -303,6 +303,8 @@ async function restoreLedTestCard(ctx, { deps: injected } = {}) {
  * reconnect (air-snapshot.js `armedSnapshot`): live looks follow their destination first, then the looks, the preview
  * re-stage, every other layer from Caspar's INFO at `position + elapsed`, the timeline, the card last (layer 999 on
  * top), then the stream; the report goes to the waiting apply route and the log.
+ * WO-1106 C10: a Caspar reconnect while a snapshot's restore still runs joins that restore (the snapshot is only
+ * discarded at its end, so the second connect found it armed and took every look a second time).
  * @param {object} ctx
  * @param {{ reconnect: boolean, answeredAt?: number, routingDone?: Promise<unknown>, setup?: object, deps?: object }} o
  * @returns {Promise<object|null>} the snapshot's restore report, null without a snapshot
@@ -326,6 +328,24 @@ async function restoreOnConnect(ctx, { reconnect, answeredAt, routingDone, setup
 	} catch (e) {
 		log(ctx, 'warn', `[air-snapshot] armed check: ${e?.message || e}`)
 	}
+	const run = () => restoreSteps(ctx, { reconnect, routingDone, injected, Air, AirRestore, Setup, persistence, now, t0, snap })
+	if (!snap) return run()
+	const running = restoringSnapshots.get(snap.id)
+	if (running) {
+		log(ctx, 'info', `[air-snapshot] ${snap.id} is already being restored (Caspar reconnected mid-restore): joined, not restored twice`)
+		return running
+	}
+	const p = run()
+	restoringSnapshots.set(snap.id, p)
+	p.finally(() => restoringSnapshots.delete(snap.id)).catch(() => {})
+	return p
+}
+
+/** WO-1106 C10: snapshot id → its restore in flight. */
+const restoringSnapshots = new Map()
+
+/** The steps of {@link restoreOnConnect} for one connect (`snap` null = WO-1013 without an air snapshot). */
+async function restoreSteps(ctx, { reconnect, routingDone, injected, Air, AirRestore, Setup, persistence, now, t0, snap }) {
 	const report = { looks: [], clips: [], layers: [], card: null, timeline: null, consumers: null, skipped: [], ms: 0 }
 	const step = async (name, fn) => {
 		try {

@@ -133,10 +133,15 @@ function createZoomUi(deps = {}) {
 		}
 	}
 	// One read serves every caller within 700 ms (the GUI polls each second, the join watcher too); any press drops it.
+	// WO-1106 C13: callers that arrive while a read runs share it (each client's poll started its own python dump);
+	// a read started before a press is neither shared nor cached after it (`gen`).
 	let cached = { at: 0, value: null }
+	let gen = 0
+	let reading = null // { gen, promise } — the full dump in flight
 	const dump = async (frame) => (await a11y(frame ? ['dump', '--frame', frame] : ['dump'])).frames || []
 	const press = (frame, name, extra = []) => {
 		cached = { at: 0, value: null }
+		gen++
 		return a11y(['press', '--frame', frame, '--name', name, ...extra])
 	}
 	const need = (r, what) => {
@@ -146,9 +151,25 @@ function createZoomUi(deps = {}) {
 
 	/** The last settings run: null (never), { running: true }, { error }, or applySettings' result. */
 	let settingsRun = null
+	const readShared = () => {
+		if (reading && reading.gen === gen) return reading.promise
+		const g = gen
+		const at = Date.now()
+		const promise = dump()
+			.then((frames) => {
+				const value = readState(frames)
+				if (g === gen) cached = { at, value }
+				return value
+			})
+			.finally(() => {
+				if (reading && reading.promise === promise) reading = null
+			})
+		reading = { gen: g, promise }
+		return promise
+	}
 	const state = async () => {
-		if (!cached.value || Date.now() - cached.at > 700) cached = { at: Date.now(), value: readState(await dump()) }
-		return { ok: true, ...cached.value, settings: settingsRun }
+		const value = cached.value && Date.now() - cached.at <= 700 ? cached.value : await readShared()
+		return { ok: true, ...value, settings: settingsRun }
 	}
 
 	/** Press a two-state toolbar button until Zoom shows the wanted state. */
@@ -181,14 +202,29 @@ function createZoomUi(deps = {}) {
 		return state()
 	}
 
+	// WO-1106 C13: one join watcher and one camera loop at a time (each launch stacked another 15-minute loop)
+	let joining = null
+	let cameraLoop = null
+	function startCameraLoop() {
+		if (cameraLoop) return
+		cameraLoop = cameraOnceInside()
+			.catch((e) => log('warn', `[zoom-ui] camera after joining: ${e.message}`))
+			.finally(() => (cameraLoop = null))
+	}
+
 	/** After a launch with a meeting link: wait for the preview (or the meeting itself) and go in. */
-	async function autoJoin(timeoutMs = 45000) {
+	function autoJoin(timeoutMs = 45000) {
+		if (!joining) joining = autoJoinOnce(timeoutMs).finally(() => (joining = null))
+		return joining
+	}
+
+	async function autoJoinOnce(timeoutMs) {
 		const until = Date.now() + timeoutMs
 		while (Date.now() < until) {
 			let s = await state()
 			if (s.preview) s = await join()
 			if (s.inMeeting || s.waiting) {
-				cameraOnceInside().catch((e) => log('warn', `[zoom-ui] camera after joining: ${e.message}`))
+				startCameraLoop()
 				return s
 			}
 			await sleep(1500)
