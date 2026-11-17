@@ -86,7 +86,7 @@ test('B2: a file then a folder of the same name is a rejected file, not a crash'
 test('B4: file count and bytes per session are capped; over-cap files are removed and do not count', async () => {
 	job.LIMITS.files = 2
 	const r = await upload([['a.obj', '1'], ['b.png', '2'], ['c.png', '3']])
-	assert.deepEqual(r.saved, ['a.obj', 'b.png'])
+	assert.deepEqual([...r.saved].sort(), ['a.obj', 'b.png']) // order = which write finished first
 	assert.match(r.rejected[0].error, /too many files in one venue upload \(2 at most\)/)
 	job.LIMITS.files = 100
 	job.LIMITS.sessionBytes = 1000
