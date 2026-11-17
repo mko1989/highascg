@@ -29,14 +29,35 @@ function createAirJournal() {
 		return c.layers.get(l)
 	}
 
+	/** WO-1106 C28: a layer whose last entry went (STOP / CLEAR / MIXER CLEAR, or a query that only touched it) is
+	 *  dropped, and a channel with nothing left — so layers used once are not carried (and walked) for the whole show. */
+	function prune(ch, layer) {
+		const c = channels.get(ch)
+		if (!c) return
+		const empty = (L) => !L.play.length && !L.mixer.size && !L.cg.length
+		for (const [l, L] of c.layers) if ((layer == null || l === layer) && empty(L)) c.layers.delete(l)
+		if (!c.mixer.size && !c.layers.size) channels.delete(ch)
+	}
+
 	function record(raw) {
+		const at = apply(raw)
+		if (at) prune(at.ch, at.layer)
+	}
+
+	/** One line into the journal → the { ch, layer } it touched (undefined when it is no channel line). */
+	function apply(raw) {
 		const line = String(raw || '').trim().replace(/\s+DEFER\s*$/i, '')
 		const m = line.match(LINE)
 		if (!m) return
 		const verb = m[1].toUpperCase()
 		const ch = Number(m[2])
 		const layer = m[3] == null ? null : Number(m[3])
-		const rest = String(m[4] || '').trim()
+		const at = { ch, layer }
+		apply1(verb, ch, layer, line, String(m[4] || '').trim())
+		return at
+	}
+
+	function apply1(verb, ch, layer, line, rest) {
 		const first = (rest.split(/\s+/)[0] || '').toUpperCase()
 		if (verb === 'MIXER') {
 			if (first === 'COMMIT' || !first) return
@@ -88,7 +109,10 @@ function createAirJournal() {
 	/** Forget everything (the Caspar these lines went to is gone). */
 	const reset = () => channels.clear()
 
-	return { record, replay, reset }
+	/** How many channel-layers are kept (WO-1106 C28: the smokes check that cleared ones go). */
+	const layerCount = () => [...channels.values()].reduce((n, c) => n + c.layers.size, 0)
+
+	return { record, replay, reset, layerCount, channelCount: () => channels.size }
 }
 
 /**

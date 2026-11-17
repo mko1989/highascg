@@ -11,8 +11,10 @@
  * refuses unknown senders, a hello for another server and a ts not above the highest taken from that sender (replay).
  * Never a wall-clock window: show LANs have no NTP and a dead RTC puts boxes years apart (lead, WO-1029). A sender
  * whose clock went back is answered 409 with that highest ts and resends once above it (still signed by its key).
- * After a restart here the first valid hello sets the floor (a captured hello replayed then only repeats an address
- * the server itself signed).
+ * WO-1106 C23: the floor survives a restart here — kept in the call-floor store (call-replay-guard.js, namespace
+ * 'hello'), written PERSIST_AHEAD_MS above the ts taken and only when a ts crosses it (≤ one write per sender per
+ * minute). After a restart that value is the floor: an old captured hello cannot re-address the server to its old IP;
+ * the live sender gets one 409 with `last` and resends above it (send() below).
  * Then it marks that server seen now (online even if its own poll cannot reach it: the incident was one-way reachable)
  * and, when the address differs, re-addresses it. A Tailscale 100.64/10 or non-IPv4 address never replaces a LAN one
  * (the fan-out drives Caspar :5250 at that host), and a saved host NAME is kept (the operator chose it).
@@ -22,6 +24,7 @@
 
 const { fingerprint } = require('./cluster-media')
 const { normalize: normalizeCaps } = require('./cluster-caps')
+const { sharedFloorStore, PERSIST_AHEAD_MS } = require('./call-replay-guard')
 
 const FRESH_MS = 12000 // a hello this recent keeps the peer online when our poll to it fails (2 polls + slack)
 const UNSUPPORTED_MS = 60000
@@ -52,11 +55,24 @@ function refuseHost(host, next) {
 /**
  * @param {{ peers: Map<string, object>, selfKey: string, sign: Function, verify: Function, request: Function,
  *   localAddress: Function, selfPort: () => number, selfHost?: () => string, selfId: () => string, parseAddress: Function,
- *   now: () => number, save: Function, changed: Function, log: Function }} deps
+ *   now: () => number, save: Function, changed: Function, log: Function, floorStore?: { get: Function, set: Function } }} deps
+ *   floorStore: call-replay-guard.js store (default: the shared one; a temp file under `node --test`)
  */
 function createHello(deps) {
 	const me = fingerprint(deps.selfKey)
 	const lastTs = new Map() // sender fp → the ts of the last hello taken (replay)
+	const floors = deps.floorStore || sharedFloorStore(deps.log)
+	const saved = new Map() // WO-1106 C23: sender fp → the floor last written to the store
+	const floorKey = (fp) => `hello:${fp}`
+	/** The highest ts taken from fp; after a restart, the stored floor. */
+	function lastOf(fp) {
+		if (!lastTs.has(fp)) {
+			const f = Number(floors.get(floorKey(fp))) || 0
+			lastTs.set(fp, f)
+			saved.set(fp, f)
+		}
+		return lastTs.get(fp)
+	}
 	let lastSent = 0
 	const fail = (status, error) => ({ status, body: { error } })
 
@@ -97,8 +113,13 @@ function createHello(deps) {
 		const t = deps.now()
 		if (!deps.verify(p.saved.device_key, helloText(b), b.sig)) return fail(403, 'bad signature')
 		// after the signature: only that server learns the floor (it may restart with a clock that went back)
-		if (Number(b.ts) <= (lastTs.get(fp) || 0)) return { status: 409, body: { error: 'replayed hello', last: lastTs.get(fp) } }
+		const last = lastOf(fp)
+		if (Number(b.ts) <= last) return { status: 409, body: { error: 'replayed hello', last } }
 		lastTs.set(fp, Number(b.ts))
+		if (Number(b.ts) > saved.get(fp)) {
+			saved.set(fp, Number(b.ts) + PERSIST_AHEAD_MS)
+			floors.set(floorKey(fp), saved.get(fp))
+		}
 		p.heardAt = t
 		const caps = normalizeCaps(b.caps) // WO-1029 C0: [] from an older build
 		p.live = { ...p.live, online: true, last_seen: t, error: '', via: p.live.via === 'poll' && p.live.online === true ? 'poll' : 'hello', caps }

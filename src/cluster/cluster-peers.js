@@ -27,10 +27,9 @@
  * link-back cannot replace a saved key; a re-add with a saved key under a new id replaces that entry.
  */
 
-const http = require('http')
 const net = require('net')
 const os = require('os')
-const { outboundAuthHeaders } = require('../server/auth')
+const { getJson, postJson, requestJson } = require('./cluster-http')
 const { createHello, advertised } = require('./cluster-hello')
 const caps = require('./cluster-caps')
 
@@ -46,56 +45,6 @@ const TOMBSTONE_MS = 30 * 24 * 3600 * 1000
 
 /** WO-958: the version a server shows = its build stamp; appVersion (package.json, frozen) only for older peers. */
 const versionOf = (ping) => String(ping?.buildStamp || ping?.appVersion || '')
-
-/** GET http://host:port/path → { ok, status, json } (never throws). WO-811: carries this node's shared password
- * (auth.outboundAuthHeaders, none today) — except `{ auth: false }`, the subnet scan, which must not hand it to every host. */
-function getJson(host, port, path, timeout = TIMEOUT_MS, { auth = true } = {}) {
-	return new Promise((resolve) => {
-		const headers = { Accept: 'application/json', ...(auth ? outboundAuthHeaders() : {}) }
-		const req = http.get({ host, port, path, timeout, headers }, (res) => {
-			const chunks = []
-			res.on('data', (c) => chunks.push(c))
-			res.on('end', () => {
-				let json
-				try {
-					json = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-				} catch {
-					json = null
-				}
-				resolve({ ok: res.statusCode >= 200 && res.statusCode < 300 && json !== null, status: res.statusCode, json })
-			})
-		})
-		req.on('timeout', () => req.destroy(new Error('timeout')))
-		req.on('error', (e) => resolve({ ok: false, status: 0, json: null, error: e.message }))
-	})
-}
-
-/** POST JSON → { ok, status, json } (never throws). */
-const postJson = (host, port, path, body, timeout = 5000) => requestJson('POST', host, port, path, body, timeout)
-
-/** method + JSON body → { ok, status, json } (never throws). */
-function requestJson(method, host, port, path, body, timeout = 5000) {
-	return new Promise((resolve) => {
-		const data = Buffer.from(body === undefined ? '' : JSON.stringify(body))
-		const req = http.request({ host, port, path, method, timeout,
-			headers: { 'Content-Type': 'application/json', 'Content-Length': data.length, Accept: 'application/json', ...outboundAuthHeaders() } }, (res) => {
-			const chunks = []
-			res.on('data', (c) => chunks.push(c))
-			res.on('end', () => {
-				let json
-				try {
-					json = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-				} catch {
-					json = null
-				}
-				resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, json })
-			})
-		})
-		req.on('timeout', () => req.destroy(new Error('timeout')))
-		req.on('error', (e) => resolve({ ok: false, status: 0, json: null, error: e.message }))
-		req.end(data)
-	})
-}
 
 /** WO-732: this box's own address on the route to host:port ('' when unreachable) — what the peer links back to. */
 function localAddressTo(host, port, timeout = TIMEOUT_MS) {
@@ -153,7 +102,7 @@ function subnetHosts(nets = os.networkInterfaces()) {
  * @param {{ persistence: { get: Function, set: Function }, selfPing: () => Promise<object|null>, fetchJson?: Function,
  *   now?: () => number, onChange?: (snap: object) => void, hosts?: () => string[], selfKey?: string,
  *   selfPort?: () => number, request?: Function, localAddress?: Function, log?: Function,
- *   onRemove?: (saved: object) => void }} opts
+ *   onRemove?: (saved: object) => void, floorStore?: { get: Function, set: Function } }} opts
  */
 function createCluster(opts) {
 	const fetchJson = opts.fetchJson || getJson
@@ -312,11 +261,19 @@ function createCluster(opts) {
 	// WO-1029 P1a: signed hellos (only with a device key to sign with: routes-cluster.js, the LAN smokes)
 	const hello = opts.sign && opts.verify && selfFp
 		? createHello({ peers, selfKey: opts.selfKey, sign: opts.sign, verify: opts.verify, request, localAddress, selfPort: opts.selfPort, selfHost: opts.selfHost,
-			selfId: () => idFromPing(self, ''), selfCaps: () => (self ? caps.normalize(self.caps) : caps.supported()), parseAddress, now, save, changed, log })
+			selfId: () => idFromPing(self, ''), selfCaps: () => (self ? caps.normalize(self.caps) : caps.supported()), parseAddress, now, save, changed, log,
+			floorStore: opts.floorStore }) // WO-1106 C23: the hello floor's store (default: the shared call-floor store)
 		: null
 
 	const pollHooks = []
-	async function poll() {
+	/** WO-1106 C22: one poll at a time — the timer and every GET /api/cluster share the in-flight one (the afterPoll
+	 *  hooks — master claims, failover, fan-out — have no busy guard of their own). */
+	let polling = null
+	function poll() {
+		if (!polling) polling = pollOnce().finally(() => (polling = null))
+		return polling
+	}
+	async function pollOnce() {
 		await refreshSelf()
 		await Promise.all([...peers.values()].map(pollOne))
 		if (hello) await Promise.all([...peers.values()].map((p) => hello.send(p).catch(() => {})))

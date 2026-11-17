@@ -236,3 +236,63 @@ describe('WO-1029 P1b mastership', () => {
 		assert.equal(k.nodes.B.claim().epoch, 2)
 	})
 })
+
+describe('WO-1106 C18 a replayed claim keeps no dead master alive', () => {
+	/** Every claim A pushes to B is recorded (the copy a LAN listener could re-POST). */
+	function tap(k) {
+		const sent = []
+		const accept = k.nodes.B.accept
+		k.nodes.B.accept = (body) => (sent.push(body), accept(body))
+		sent.replay = (body) => accept({ ...body }) // the listener's copy: not recorded as A's push
+		return sent
+	}
+
+	it('(a) re-POSTing the master\'s last claim every second does not delay failover', async () => {
+		const k = cluster(['A', 'B'])
+		const sent = tap(k)
+		await k.nodes.A.set({ master: 'self' })
+		await k.round()
+		await k.round() // A re-pushes its heartbeat (fresh ts)
+		const copy = sent[sent.length - 1]
+		assert.ok(copy && copy.by === k.keys.A.pub, 'a heartbeat signed by A was captured')
+		k.up.delete('A')
+		const gone = k.clock.t
+		while (k.clock.t + 1000 - gone < FAILOVER_MS) {
+			assert.equal(sent.replay(copy).status, 200, 'the replay is still a valid, same claim')
+			await k.round(['B'], 1000)
+			assert.equal(k.nodes.B.claim().master, k.fp('A'), `not yet at +${k.clock.t - gone} ms`)
+		}
+		sent.replay(copy)
+		await k.round(['B'], 2000)
+		assert.equal(k.nodes.B.claim().master, k.fp('B'), 'failover on time despite the replays')
+		assert.equal(k.nodes.B.claim().epoch, 2)
+	})
+
+	it('(b) a live master B cannot poll keeps sending fresh claims → never failed over (replays mixed in)', async () => {
+		const k = cluster(['A', 'B'])
+		const sent = tap(k)
+		await k.nodes.A.set({ master: 'self' })
+		await k.round()
+		k.cut.add('B>A') // only A's pushes tell B that A is alive
+		const old = sent[sent.length - 1]
+		for (let i = 0; i < 4 * (FAILOVER_MS / POLL); i++) {
+			sent.replay(old)
+			await k.round(i % 2 ? ['A', 'B'] : ['B', 'A'])
+			assert.equal(k.nodes.B.claim().master, k.fp('A'), `round ${i}: B keeps A`)
+			assert.equal(k.nodes.A.view().is_master, true)
+		}
+		assert.equal(k.nodes.B.claim().epoch, 1)
+		assert.ok(sent.length > 10)
+		for (let i = 1; i < sent.length; i++) assert.ok(sent[i].ts > sent[i - 1].ts, 'the master re-signs every heartbeat with a rising ts')
+	})
+
+	it('B\'s own poll of a reachable master stays a liveness source (no pushes at all)', async () => {
+		const k = cluster(['A', 'B'])
+		await k.nodes.A.set({ master: 'self' })
+		await k.round()
+		await k.round()
+		// A stays up and reachable but never ticks (no pushes): B's own pulls are the liveness source
+		for (let i = 0; i < 4 * (FAILOVER_MS / POLL); i++) await k.round(['B'])
+		assert.equal(k.nodes.B.claim().master, k.fp('A'), 'reachable master, no pushes → no failover')
+	})
+})

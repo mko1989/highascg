@@ -49,6 +49,8 @@ function lan() {
 			selfPing: async () => n.ping(),
 			selfPort: () => 4200,
 			now: clock.now,
+			// WO-1106 C23: each box keeps its own hello floor (its own call-floor file), here in its own store
+			floorStore: o.floorStore || { get: (k) => m.get(`floor:${k}`) || 0, set: (k, v) => m.set(`floor:${k}`, v) },
 			hosts: () => [],
 			fetchJson: async (h, p, url) => {
 				const peer = reach(h, p)

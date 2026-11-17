@@ -465,4 +465,8 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-zoom-engine-session.test.js', // WO-1106 C9 / C12: one chain per source, a quit leaves no grabber, async grabber build
 	'tools/smoke/smoke-wo1106-zoom-engine-ui.test.js', // WO-1106 C13: shared AT-SPI dump, one join / camera loop
 	'tools/smoke/smoke-wo1106-zoom-engine-pixelhue.test.js', // WO-1106 C11 / C16: one Studio connect per host + failure cache, a layer removed mid-drive
+	'tools/smoke/smoke-wo1106-cluster-http.test.js', // WO-1106 C17 / C22: peer answers capped + deadline, one poll in flight
+	'tools/smoke/smoke-wo1106-cluster-media-link.test.js', // WO-1106 C20 / C26: sleep drops its abort listener, an aborted waiter hands the slot on
+	'tools/smoke/smoke-wo1106-cluster-floors.test.js', // WO-1106 C23 / C24: hello floor persisted, per-namespace floors, linked fingerprints never evicted
+	'tools/smoke/smoke-wo1106-cluster-air-journal.test.js', // WO-1106 C28: cleared layers leave the journal
 ]

@@ -68,7 +68,10 @@ function createPushJobs(deps) {
 	async function run(spec, { signal, onProgress } = {}) {
 		while (busy) {
 			await new Promise((r) => waiters.push(r))
-			if (signal?.aborted) return { state: 'failed', error: 'cancelled' }
+			if (signal?.aborted) {
+				if (!busy) waiters.shift()?.() // WO-1106 C26: the slot it was woken for goes to the next waiter
+				return { state: 'failed', error: 'cancelled' }
+			}
 		}
 		const j = make(spec)
 		const abort = () => j.ctl.abort()
@@ -103,10 +106,12 @@ function createPushJobs(deps) {
 	return { run, start, status, cancel, busy: () => !!busy }
 }
 
+/** WO-1106 C20: the abort listener goes when the timer fires (one per 500 ms poll piled up over a long copy). */
 const sleep = (ms, signal) =>
 	new Promise((resolve) => {
-		const t = setTimeout(resolve, ms)
-		signal?.addEventListener?.('abort', () => (clearTimeout(t), resolve()), { once: true })
+		const onAbort = () => (clearTimeout(t), resolve())
+		const t = setTimeout(() => (signal?.removeEventListener?.('abort', onAbort), resolve()), ms)
+		signal?.addEventListener?.('abort', onAbort, { once: true })
 	})
 
 const isOld = (r) => r?.status === 404 || /unknown action/i.test(String(r?.json?.error || ''))
@@ -158,4 +163,4 @@ async function remoteCopy(t, o, deps) {
 	}
 }
 
-module.exports = { createPushJobs, remoteCopy, POLL_MS }
+module.exports = { createPushJobs, remoteCopy, sleep, POLL_MS }

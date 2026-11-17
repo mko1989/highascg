@@ -27,7 +27,8 @@
  * WO-1029 P1b (incident: B could not reach A, A could reach B; B failed over and A stepped down):
  * - "Heard from": a valid claim pushed here and signed by a server, or any answer to a pull, counts as that server
  *   seen now. The master re-pushes its claim (same epoch, re-signed by itself) to the online servers on every tick, so a
- *   follower that cannot poll the master still hears from it. Failover waits FAILOVER_MS from the latest of: the peer
+ *   follower that cannot poll the master still hears from it (WO-1106 C18: only a claim with a ts above every earlier
+ *   one from that signer counts, so a replayed copy keeps nobody alive). Failover waits FAILOVER_MS from the latest of: the peer
  *   list's last_seen, heard-from, boot, and the adoption of the claim held (an operator's claim is never overruled by a
  *   follower whose last_seen of the new master is old).
  * - The epoch floor is stored (`clusterMasterFloor`, a separate key so an older build still reads `clusterMaster`).
@@ -87,6 +88,7 @@ function createMaster(deps) {
 	let floor = Math.max(claim?.epoch || 0, Number.isInteger(store.get(FLOOR_KEY)) ? store.get(FLOOR_KEY) : 0)
 	const log = (lvl, msg) => deps.log?.(lvl, `[cluster] ${msg}`)
 	const heard = new Map() // WO-1029: fingerprint → when a valid claim signed by it, or a pull answer, came
+	const heardTs = new Map() // WO-1106 C18: signer fingerprint → the highest claim ts it signed that reached us
 	let adoptedAt = startedAt // WO-1029: the failover timer of a claim starts no earlier than its adoption
 	let settled = false // WO-1029: a stored claim is not acted on before the first pull round (see header)
 
@@ -145,13 +147,22 @@ function createMaster(deps) {
 	function accept(body) {
 		const err = valid(body)
 		if (err) return { status: REFUSED_400.has(err) ? 400 : 403, body: { error: err } }
-		heard.set(fingerprint(signerKey(body)), now()) // WO-1029: the signer is alive and reaches us
+		// WO-1029: the signer is alive and reaches us. WO-1106 C18: only a claim NEWER than any this signer sent here (its
+		// ts strictly rising — the master re-signs its heartbeat with a fresh ts) counts: a replayed copy of the master's
+		// claim must not keep a dead master "alive" and block failover. Our own pull answers still count (tick).
+		const signer = fingerprint(signerKey(body))
+		const fresh = Number(body.ts) > (heardTs.has(signer) ? heardTs.get(signer) : -Infinity)
+		if (fresh) {
+			heardTs.set(signer, Number(body.ts))
+			heard.set(signer, now())
+		}
 		raiseFloor(body.epoch)
 		if (!masterLinked(body)) return { status: 409, body: { error: 'its master is not linked here' } }
 		if (!beats(body, claim)) {
 			const same = claim && claim.epoch === body.epoch && claim.master === body.master
 			return { status: same ? 200 : 409, body: same ? { ok: true } : { error: 'older than the claim held here', claim: view() } }
 		}
+		heard.set(signer, now()) // WO-1106 C18: an adopted claim beats the held one, so it is no replay of it either
 		adopt(body, 'pushed')
 		return { status: 200, body: { ok: true } }
 	}

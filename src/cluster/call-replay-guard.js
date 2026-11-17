@@ -3,7 +3,7 @@
 /**
  * WO-1029 plan 07 C4 — replay protection for signed node-to-node messages WITHOUT comparing the sender's timestamp with
  * the receiver's clock (show LANs have no NTP; a dead RTC puts boxes years apart). Used by cluster-call.js (call v2)
- * and cluster-media.js (ssh-key v2).
+ * and cluster-media.js (ssh-key v2); cluster-hello.js keeps its hello floor in the same store (WO-1106 C23).
  *
  * Receiver, per sender fingerprint (and namespace: 'call', 'ssh'):
  *   refuse ts ≤ floor                         (restart floor / evicted nonces: everything at or below was or may be taken)
@@ -27,7 +27,10 @@ const WINDOW_MS = 10000
 const NONCE_KEEP_MS = 20000
 const MAX_NONCES = 1024 // per sender; evicting one raises the floor to its ts (never a gap a replay could use)
 const PERSIST_AHEAD_MS = 60000
-const MAX_SENDERS = 64 // entries in the store (oldest written dropped)
+/** WO-1106 C24: entries kept PER NAMESPACE ('call', 'ssh', 'media-call', 'feed-feed', 'hello': the key up to its last
+ *  ':'), so one namespace never pushes out another's floors; only a fingerprint no longer linked here is dropped
+ *  (oldest written first). cluster-peers.js MAX_PEERS is 16, so a namespace holds every linked sender with room. */
+const MAX_PER_NS = 64
 
 /** config/cluster-call-floor.json (machine-local: config/*.json is git- and Syncthing-ignored); a temp file under
  * `node --test` so a smoke never touches the box's floor; HIGHASCG_CLUSTER_CALL_FLOOR_PATH overrides both. */
@@ -43,12 +46,21 @@ function defaultFloorFile() {
 	return path.join(require('../repo-paths').REPO_ROOT, 'config', 'cluster-call-floor.json')
 }
 
+const nsOf = (key) => key.slice(0, Math.max(0, key.lastIndexOf(':')))
+const fpOf = (key) => key.slice(key.lastIndexOf(':') + 1)
+
+/** WO-1106 C24: the fingerprints linked here (the node's peer list) — never evicted from the floor store. */
+function linkedHere() {
+	return require('./cluster-peers').linkedFingerprints(require('../utils/persistence'))
+}
+
 /**
  * The persisted floors: { get(key) → number, set(key, value) }. A missing / corrupt file reads as empty (the floor
- * then starts at the first valid message, as the hello does); a write error is logged once and does not refuse calls.
- * @param {{ file?: string, log?: Function }} [opts]
+ * then starts at the first valid message); a write error is logged once and does not refuse calls.
+ * @param {{ file?: string, log?: Function, linked?: () => Iterable<string> }} [opts]  linked: fingerprints kept
+ *   whatever their age (WO-1106 C24)
  */
-function createFloorStore({ file = defaultFloorFile(), log } = {}) {
+function createFloorStore({ file = defaultFloorFile(), log, linked = () => [] } = {}) {
 	let floors = null
 	let warned = false
 	function load() {
@@ -66,7 +78,7 @@ function createFloorStore({ file = defaultFloorFile(), log } = {}) {
 		const f = load()
 		f.delete(key) // re-insert: Map order = write order, the oldest written is dropped first
 		f.set(key, value)
-		while (f.size > MAX_SENDERS) f.delete(f.keys().next().value)
+		evict(f, nsOf(key))
 		try {
 			fs.mkdirSync(path.dirname(file), { recursive: true })
 			fs.writeFileSync(`${file}.tmp`, JSON.stringify({ v: 1, floors: Object.fromEntries(f) }) + '\n')
@@ -76,12 +88,30 @@ function createFloorStore({ file = defaultFloorFile(), log } = {}) {
 			warned = true
 		}
 	}
+	/** WO-1106 C24: over MAX_PER_NS in that namespace → drop its oldest-written UNLINKED senders (a linked one stays). */
+	function evict(f, ns) {
+		const keys = [...f.keys()].filter((k) => nsOf(k) === ns)
+		if (keys.length <= MAX_PER_NS) return
+		let keep
+		try {
+			keep = new Set(linked() || [])
+		} catch {
+			keep = new Set()
+		}
+		let over = keys.length - MAX_PER_NS
+		for (const k of keys) {
+			if (over <= 0) break
+			if (keep.has(fpOf(k))) continue
+			f.delete(k)
+			over--
+		}
+	}
 	return { get: (key) => load().get(key) || 0, set, file }
 }
 
 let _shared = null
 /** One store per process for the default file (cluster-call and the ssh-key exchange share it, by namespace). */
-const sharedFloorStore = (log) => _shared || (_shared = createFloorStore({ log }))
+const sharedFloorStore = (log) => _shared || (_shared = createFloorStore({ log, linked: linkedHere }))
 
 /**
  * @param {{ store: { get: Function, set: Function }, ns: string }} opts
@@ -147,4 +177,6 @@ module.exports = {
 	createStamper,
 	defaultFloorFile,
 	WINDOW_MS,
+	PERSIST_AHEAD_MS,
+	MAX_PER_NS,
 }
