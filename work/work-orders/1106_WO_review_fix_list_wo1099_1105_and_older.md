@@ -1,7 +1,7 @@
 # WO-1106 — Review fix list: bugs, leaks and gaps found in WO-1099 … WO-1105 (and older work orders)
 
 **Area:** testing-ci, web-client, godot-client, engine
-**Status: IN PROGRESS (17.11.26 — 120 rows listed; fixing started with agents; part C review of 10–12.11 running)**
+**Status: IN PROGRESS (17.11.26 — 165 rows; about 140 fixed and committed with tests, about 10 partial, 15 open, offline suite 7311 / 0, Godot 29698 / 0; open rows in §7; nothing checked on the glass, node not restarted)**
 
 Owner, 17.11.26: "do a review of latest changes looking for bugs and leaks and other undesired gaps." → "add all of
 those to a fixing list. expand the review to older wos"
@@ -276,7 +276,91 @@ Four read-only reviewers on `f1b11bb5..da2c7b9e` (about 57k lines), code read at
 | C44 | `godot/client/app/handover_watch.gd:68-115`, `core/platform.gd:8-11` | Probes create an HTTPRequest each, overlap every 2 s, and a slow answer can overwrite a newer one. "On-box" = loopback origin only: an on-box client started with the box's LAN IP counts as remote and would follow to a linked server (owner rule: it never follows). | read + plausible | One in-flight probe per origin with a sequence check; treat any local address as on-box. |
 | C45 | `media_ops.gd:158`, `programming_effects.gd:92`, `outputs_panel.gd:124`, `devices/pixelhue_panel.gd:113`, `media_needs_flow.gd` | Small ones: the remote-file drop guard can never fire; opacity slider sends only on drag end; the 95 s capacity write can be queued twice; a refused "Looks drive the switcher" stays ticked; confirm may use stale needs. | read | As in each line. |
 
-## 5. Not verified
+## 5. What was done (17.11.26)
 
-- Nothing in this list was reproduced on the glass; `run` rows were reproduced offline on the real modules.
-- A10, A20, A29, A38–A40 depend on Godot behaviour that was read, not run.
+Fix agents (Opus, one Sonnet follow-up) each owned a set of folders; the lead checked every slice against its smokes,
+wired the new tests into `tools/ci/offline-test-files-3.js` and committed. Each fixed row has a test that fails on the
+old code unless noted. Commits, in order:
+
+| Commit | Slice | Rows |
+|--------|-------|------|
+| `f21e0a6f` | Game World client | A1, A4 (kit), A8 (client), A14, A21, A33, A34, A37 |
+| `5415a1b7` | Game World server | A5 (hub), A8 (server), A15, A16, A17, A18, A25 |
+| `d4568d68` | Stage Salad | A2, A4, A5, A32, A36, B34 (partial), B36, B60, B61, B62, B63, B64 |
+| `b4732053` | RC client | A4, A32, A35 (client half), B35, B42–B50 |
+| `3b4f90b3` | Stage Skirmish | A3, A4, A5, A11, A24, A32, B34 (cap), B35, B36, B54–B59 |
+| `bb9f68eb` | core Node | B1, B2, B3, B4, B7–B14, B68 |
+| `9285f7d1` | RC server | A5, A23, A32, B36, B37–B41, B51 (partial), B52, B53 |
+| `4277dee7` | ISO / licences | B65, B66, B69, B70, B72, B73, B74 (text) |
+| `3185fe79` | Settings ▸ Games server | A6, A7, A19, A23, A26, A30, B1 for the module switch |
+| `1c10236c` | games follow-up | per-address socket cap made an option, off by default; B51 without the resolve hook |
+| `9665505b` | ignore lines, converter | A22, A46 |
+| `3393220d` | stage / fixtures / LTC | B5, B6, B15, B17–B23 |
+| `4e4a124f` | Zoom / window grab / engine | C7–C16 |
+| `453b4c35` | linked servers | C17, C18, C20, C22, C23, C24, C26, C28 |
+| `a6785411` | Settings ▸ Games pane | A10, A27, A28, A29, A31 (note only) |
+| `0e27ac84` | previs / puppets | A9, A12 (refusal), A13, A20, A38, A40–A45, B25 |
+| `6eeee1e0` | Godot client | B16, B24, B26, B27, B30, B31, B33, C1–C6, B28 / B29 (partial) |
+| `9084126e` | PixelHue tab / Devices / config / handover | C30–C39, C42, C43, C44 (probes), C45 (opacity, capacity) |
+
+Lead decisions that differ from a row's recommended fix, and why:
+- **B1** — "from the box" uses the existing `checkBoxLocalRequest` (stricter than a bare loopback test). A remote Godot
+  client cannot install / enable / disable / uninstall modules while API auth is off.
+- **B36** — the per-address socket cap is an option, off by default: a NAT'd guest Wi-Fi puts every phone on one
+  address. The silent-spectator timeout is on. No ws-level ping was added (the pages ping every 2 s already).
+- **B51** — a process-wide `module.registerHooks` resolve hook was written and removed again: only the entry files are
+  re-imported; restart node after upgrading the RC module.
+- **B4** — the staging folder is wiped on the first session after a start, not at module load (an agent's bare
+  `require` of the file emptied the live staging folder once, 17.11).
+- **B18** — both MagicQ exports print the WO-765 rotation and the shorter of two equal spellings (a floor head with
+  yaw −180: `0,180,180` → `180,0,0`). Same physical rotation; not re-imported into MagicQ.
+- **B62** — Salad always loads muted (the remembered "sound on" is dropped). **B64** — the host note was corrected.
+- **B55** — Skirmish's move window is 0.25 s: a phone that stalls for a second is pulled back further than before.
+- **B65** — the ISO build now checks the licence texts on the host right after the collector and stops there.
+- **A12** — a puppet folder with more than one model file is refused; the help says one file per character.
+
+Found while fixing: `godot/client/app/config_pane.gd` set a `CodeEdit`-only property on a `TextEdit` (commit
+765919a6) — the logs window's casparcg.config pane threw in `_init`. Fixed with C36.
+
+## 6. Verified
+
+- Offline suite `npm run test:ci`: **7318 tests, 7311 pass, 0 fail, 7 skipped** (17.11, before the Godot commits); with
+  everything in: 7328 tests, 7320 pass, **1 fail** (the load-sensitive keeping-up smoke, row D6; 8 of 8 alone), 4 skipped.
+  `check-require-integrity` fails only on `projects/*sync-conflict*` files, as before. Lint 0 errors; format check, 500-line check, unwired-exports
+  and `check-wos` pass.
+- Godot `run-client.sh --test`: **29698 passed, 0 failed**; `--check`: boot OK (no script errors). First run with the
+  four unrun GDScript slices was 29676 / 7 failed: all in new tests (scripts naming autoloads compiled before the
+  runner has them; a Range emits `value_changed` only inside the tree) plus the `config_pane` bug above.
+- All 321 linked-server smokes pass with C17–C28 in.
+- The real Hilton hall (WO-1098) imports to the same 8,912,748-byte GLB under the new worker heap limit (peak 415 MB).
+
+## 7. Still open
+
+| # | State | What is left |
+|---|-------|--------------|
+| B67 | owner decision | 169 of 183 shipped shaders are NonCommercial: mark + warn before PGM, or move to an opt-in download. |
+| B71 | owner decision | Two PixelHue manuals tracked in the public repo; stick-guide screenshots. |
+| B32 | owner decision | Clip pads vs look pads: binding only free pads leaves the library fill 28 of 40 pads per bank (WO-1070 test pins today's behaviour). |
+| C19, C21, C27, C29 | not started | Follower double take, lateness baseline after a clock step, v1 signed calls, auth on the cluster routes — need a design call or the two-box harness. C25 (ownView cache) is performance only. |
+| C40, C41 | not started | Per-keystroke layer geometry (Studio does the same); reconnect after a switcher restart (needs the switcher). |
+| B34 | partial | No resume token: a reconnecting phone is a new player with 0 points (Salad: can take a ghost's seat; Skirmish: ≤ 10 ghosts kept). |
+| A35 | partial | Bots take slick patches on the client side; the RC server has no list of live patches to hand them. |
+| A39 | skipped | Own-puppet import still on the main thread. |
+| B28, B29 | partial | The 2 s GPU readback still runs while the tracking view is visible; the MIDI library still re-requests every thumbnail. |
+| B50 | unrendered | Tunnel floor by derivative normal: shader text only, not compiled on a GPU. |
+| C18 | edge | Master clock stepping back + a follower that can only hear pushes → a failover against a live master. |
+| C44 | half | An on-box client started with the box's LAN address counts as remote (today nothing passes `--server` on the box). |
+| C45 | leftovers | Remote-file drop guard, "Looks drive the switcher" tick, stale needs on confirm. |
+| new D1 | not started | Seven more previs SpinBoxes apply per keystroke (`zones_section`, `follow_section`, `detect_section`, `tracking_page`, `ptz_section`, `stage_panel`, `dmx_monitor_window`): check which write to the server (RULES.md input rule). |
+| new D2 | not started | `test_demo_engine` clip-player branch never ran headless (now gated on a non-headless display): the demo clip player has no test. |
+| new D3 | not started | `cluster-relay.js rawRequest` has no overall deadline; `zoom-session.js rebind()` uses a grab after an await unchecked; `src/utils/lan-ipv4.js` still ranks docker0 / 169.254.x first for the games' own join URLs. |
+| new D4 | owner | Per-box DeckLink install will not recreate the excluded dracut conffile (`--force-confmiss`) — B74 follow-up. |
+| new D6 | flaky | `smoke-wo1088-keeping-up-service` "nothing moved → no broadcast" failed once in three full offline runs on the box (2 broadcasts instead of 1) and passes 8 of 8 alone: `sampleOnce()` reads the real machine's state, which moves under the load of the parallel suite. |
+| new D5 | CI | The verify job checks production npm licences only; dev dependencies are checked at release time. |
+
+## 8. Not verified
+
+- Nothing was checked on the glass, on phones, on a switcher, a lighting desk or the second box: every proof is an offline smoke, the Godot unit suite or the headless boot check.
+- The node service was not restarted: no server-side fix is live on the box yet. The web client was rebuilt (`npm run build:client`) but no browser was reloaded.
+- The `window_grab` binary was not rebuilt (C7); it rebuilds at the next Zoom source assign.
+- The ISO changes were not run under sudo and no ISO was built.
