@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1013 live WOs (34 open, 156 in progress, 823 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1014 live WOs (34 open, 156 in progress, 824 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -960,7 +960,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 922 DONE [media] Media import keeps Polish file names on every path (URL downloads saved the %-e… → 922_WO_media_import_utf8_names.md
 - 951 DONE [media+godot-client] Import a .gtzip lower third (NewTek LiveGraphics-style) as a CG Studio template → 951_WO_gtzip_lower_third_import.md
 
-## tracking-vr — Tracking, previs, VR (43)
+## tracking-vr — Tracking, previs, VR (44)
 
 - 17 DONE [tracking-vr+web-client] 3D Previs — Live Video on Imported 3D Stage Models → 17_WO_3D_PREVIS.md
 - 30 IN PROGRESS [tracking-vr+process] Previs & Tracking Module — Packaging and Integration → 30_WO_PREVIS_TRACKING_MODULE.md
@@ -1005,6 +1005,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1094 DONE [tracking-vr+godot-client,os-iso] Person detection runtime: status, install / repair / remove and offline provisi… → 1094_WO_detection_runtime_install_from_gui.md
 - 1098 DONE [tracking-vr+godot-client,media] OBJ venue importer (SketchUp export → venue .glb) and the real Hilton ballroom → 1098_WO_obj_venue_importer_and_real_hilton_hall.md
 - 1103 DONE [tracking-vr+godot-client] Realistic woman / man test puppets (Rocketbox MIT bodies + motion capture; brin… → 1103_WO_realistic_human_test_puppets.md
+- 1107 DONE [tracking-vr+lighting,godot-client] "gutmanny 26": the Capture MVR + .glb into the project (room textures from PGRP… → 1107_WO_gutmanny26_capture_scene_into_project.md
 
 ## testing-ci — Tests and CI (29)
 
