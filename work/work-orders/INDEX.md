@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1012 live WOs (34 open, 155 in progress, 823 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1013 live WOs (35 open, 155 in progress, 823 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -1006,7 +1006,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1098 DONE [tracking-vr+godot-client,media] OBJ venue importer (SketchUp export → venue .glb) and the real Hilton ballroom → 1098_WO_obj_venue_importer_and_real_hilton_hall.md
 - 1103 DONE [tracking-vr+godot-client] Realistic woman / man test puppets (Rocketbox MIT bodies + motion capture; brin… → 1103_WO_realistic_human_test_puppets.md
 
-## testing-ci — Tests and CI (28)
+## testing-ci — Tests and CI (29)
 
 - 77 IN PROGRESS [testing-ci+os-iso] Operator USB stick — post-boot QA test suite (read-only) → 77_WO_STICK_BOOT_QA_TEST_SUITE.md
 - 99 DONE [testing-ci] CI, lint, and format pipeline → 99_WO_CI_LINT_FORMAT_PIPELINE.md
@@ -1036,6 +1036,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 979 DONE [testing-ci+network,tracking-vr] Linked-servers role-split test environment: media playout ↔ camera tracking / p… → 979_WO_linked_roles_test_env.md
 - 988 DONE [testing-ci] Offline test suite runtime: lingering timers + CI concurrency (optimization swe… → 988_WO_offline_suite_runtime.md
 - 1026 DONE [testing-ci+network,video-io,tracking-vr] Two-server workflow on the real boxes: tracking + stream/record on the second s… → 1026_WO_two_box_workflow_tests.md
+- 1106 OPEN [testing-ci+web-client,godot-client,engine] Review fix list: bugs, leaks and gaps found in WO-1099 … WO-1105 (and older wor… → 1106_WO_review_fix_list_wo1099_1105_and_older.md
 
 ## process — Docs, wiki, audits, work-order tooling (28)
 
