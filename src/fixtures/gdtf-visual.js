@@ -98,7 +98,8 @@ const frac = (f, v) => (f.to > f.from ? (v - f.from) / (f.to - f.from) : 1)
 const phys = (f, v) => f.physFrom + frac(f, v) * (f.physTo - f.physFrom)
 const activeSet = (f, v) => f.sets.find((s) => v >= s.from && v <= s.to) || null
 
-function decodeVisual(plan, buf, address = 1, offset = null) {
+/** flip { pan, tilt } (WO-1113): the patch runs that axis against the file (fx.pan.flip / fx.tilt.flip) — its angle is negated. */
+function decodeVisual(plan, buf, address = 1, offset = null, flip = null) {
 	const base = address - 1
 	const cache = new Map()
 	const read = (c) => {
@@ -115,7 +116,9 @@ function decodeVisual(plan, buf, address = 1, offset = null) {
 	const angles = []
 	for (const c of plan.axes) {
 		const { v, f } = live(c)
-		if (f && (f.attribute === 'Pan' || f.attribute === 'Tilt')) angles.push({ c, a: f.attribute, deg: phys(f, v) })
+		if (!f || (f.attribute !== 'Pan' && f.attribute !== 'Tilt')) continue
+		const turned = f.attribute === 'Pan' ? flip?.pan : flip?.tilt
+		angles.push({ c, a: f.attribute, deg: turned ? -phys(f, v) : phys(f, v) })
 	}
 	// WO-700 R3 / R7: the head's calibrated offset — the previs turns it where the real one points. A function gets
 	// the head's physical (pan, tilt) (beam-offset.js offsetAt: trim + pinned marks); an object is a constant.

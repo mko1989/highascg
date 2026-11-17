@@ -282,7 +282,8 @@ function createFollowService(ctx, hub, deps = {}) {
 				if (!fx.gdtf || !fx.enabled || fx.problem) continue
 				const v = gdtfStore.visual(fx.typeId, fx.mode)
 				const buf = engine.dmx.visualise ? inputFrame(fx, inputs) : engine.frameOf(fx)
-				if (v && buf) fixtures.push({ id: fx.id, ...decodeVisual(v.plan, buf, fx.address, (p, t) => offsetAt(fx, p, t)) })
+				const flip = { pan: fx.pan?.flip === true, tilt: fx.tilt?.flip === true } // WO-1113
+				if (v && buf) fixtures.push({ id: fx.id, ...decodeVisual(v.plan, buf, fx.address, (p, t) => offsetAt(fx, p, t), flip) })
 			}
 			return { fixtures }
 		},

@@ -40,8 +40,10 @@ function applyType(fx, mode) {
 	for (const [k, hit] of [['pan', pan], ['tilt', tilt]]) {
 		if (!hit) continue
 		const { c, f } = hit
+		// WO-1113: `flip` keeps the patch's own invert (the head runs against its file — a desk patch's P inv / T inv, or a
+		// desk personality that counts the other way): the previs decode turns the axis with it (gdtf-visual.js).
 		fx[k] = { ch: c.offsets[0], fine: c.offsets[1] || 0, range: Math.max(1, Math.abs(f.physTo - f.physFrom)),
-			invert: fx[k].invert !== f.physTo < f.physFrom }
+			invert: fx[k].invert !== f.physTo < f.physFrom, flip: fx[k].flip ?? fx[k].invert === true }
 	}
 	return fx
 }

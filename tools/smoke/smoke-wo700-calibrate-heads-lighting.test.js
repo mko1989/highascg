@@ -346,7 +346,7 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		)
 		// the service draws every typed head through offsetAt
 		const svc = fs.readFileSync(path.join(__dirname, '../../src/fixtures/follow-service.js'), 'utf8')
-		assert.match(svc, /decodeVisual\(v\.plan, buf, fx\.address, \(p, t\) => offsetAt\(fx, p, t\)\)/)
+		assert.match(svc, /decodeVisual\(v\.plan, buf, fx\.address, \(p, t\) => offsetAt\(fx, p, t\), flip\)/)
 	})
 
 	it('R7 fold: the beam offset by hand and Clear (source pins)', () => {

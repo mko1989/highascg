@@ -72,3 +72,28 @@ def check(q, want_csv):
     want = {int(r['Headno']): r['Dmxno'] for r in csv.DictReader(open(want_csv))}
     got = {int(r['Headno']): r['Dmxno'] for r in csv.DictReader(open(q)) if 'vdim' not in r['Headtype']}
     return [(n, want[n], got.get(n)) for n in want if got.get(n) != want[n]]
+
+def previs_shot(name, wait=3):
+    """Hide MagicQ for a moment and photograph the HighAsCG GUI behind it."""
+    w = subprocess.run(['xdotool', 'search', '--name', 'MagicQ PC'], env=ENV, capture_output=True, text=True).stdout.split()[0]
+    _x('windowminimize', w); time.sleep(wait)
+    p = os.path.join(os.path.dirname(__file__), '..', 'shots', f'{name}.png')
+    subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'x11grab', '-video_size', '1920x1080', '-i', ':0', '-frames:v', '1', p], env=ENV)
+    _x('windowmap', w); _x('windowactivate', w); time.sleep(1.5); return p
+
+def bottom(n=200):
+    _x('mousemove', 700 + OX, 400 + OY)
+    for i in range(n): _x('click', 5); time.sleep(0.03)
+    time.sleep(0.6)
+def block_enter(x, r0, r1):
+    click(x, 196 + 18 * r0, 0.6)
+    if r1 != r0: shift_click(x, 196 + 18 * r1, 0.8)
+    key('Return', 2)
+
+def reaim(col, row, x, z):
+    """Focus Hold (already active, heads selected) to stage point x,z (m) → merge into position palette at col,row."""
+    click(1638, 324, 2.5)
+    click(round(785 + 8.55 * x), round(222 + 8.55 * z), 2)
+    click(1563, 779, 2.5); click(1772, 678, 1); click(230 + 121 * col, 139 + 48 * row, 2)
+    if not confirm_open(): return 'no confirm'
+    click(665, 293, 2); return 'ok'
