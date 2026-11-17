@@ -29,7 +29,7 @@ function fakeBaker() {
 
 function game(t, o = {}) {
 	const baker = fakeBaker()
-	const g = createRcGame({ baker, lanIps: () => o.ips || ['192.0.2.7'], loadBots: () => new Promise(() => {}), log: () => {} })
+	const g = createRcGame({ baker, lanIps: () => o.ips || ['192.0.2.7'], loadBots: () => new Promise(() => {}), log: () => {}, maxPerAddress: o.maxPerAddress })
 	t.after(() => {
 		g.disable()
 		setRcGameEnabled(false)
@@ -91,9 +91,9 @@ test('A23: `bots` level `constructor` → 400 (not a 200 and a throwing add()); 
 })
 
 test('B36: ≤ 4 sockets per remote address; loopback and unknown addresses are not counted; a close frees a place', async (t) => {
-	const { g } = game(t)
+	const { g } = game(t, { maxPerAddress: 4 })
 	g.enable()
-	assert.equal(MAX_PER_ADDRESS, 4)
+	assert.equal(MAX_PER_ADDRESS, 0, 'off by default (NAT\'d guest Wi-Fi shares one address)')
 	const req = (a) => ({ socket: { remoteAddress: a } })
 	const phone = Array.from({ length: 4 }, () => sock())
 	phone.forEach((ws, i) => g.attach(ws, req(i % 2 ? '192.168.1.50' : '::ffff:192.168.1.50')))
@@ -114,6 +114,15 @@ test('B36: ≤ 4 sockets per remote address; loopback and unknown addresses are 
 	assert.equal(again.code, null, 'a closed socket frees its place')
 	assert.equal(remoteAddress(req('::ffff:10.0.0.9')), '10.0.0.9')
 	assert.equal(remoteAddress(req('::ffff:127.0.0.1')), null)
+})
+
+test('B36: with the default (no per-address cap) six sockets from one address are all accepted', async (t) => {
+	const { g } = game(t)
+	g.enable()
+	const six = Array.from({ length: 6 }, () => sock())
+	six.forEach((ws) => g.attach(ws, { socket: { remoteAddress: '192.168.1.50' } }))
+	assert.ok(six.every((ws) => ws.code === null))
+	assert.equal(g.socketCount(), 6)
 })
 
 test('B37: an unchanged scene rev is applied to the room once — not again on every /scene GET', async (t) => {

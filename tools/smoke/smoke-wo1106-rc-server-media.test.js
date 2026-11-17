@@ -6,7 +6,7 @@
  *        5 s, so on / off flapping never restarts the wall-picture worker / ffmpeg; the host switch and stop are at once
  *   B40  rc-scene.js baker: edits during a bake cost one more bake, not one per rev seen
  *   B52  rc-scene.js baker: drop() forgets the last bake (also one that finishes after the drop)
- *   B51  rc-fresh-import.js: the bot brain's folder is import()ed under a version, its relative imports too
+ *   B51  rc-fresh-import.js: the bot brain's entry files are import()ed under a version (relative imports stay cached; no resolve hook)
  */
 
 const test = require('node:test')
@@ -16,7 +16,7 @@ const os = require('os')
 const path = require('path')
 const { createRcVideo, LEASE_ID } = require('../../modules/rc-game/server/rc-video')
 const { createSceneBaker } = require('../../modules/rc-game/server/rc-scene')
-const { freshImport, folderVersion, passVersion } = require('../../modules/rc-game/server/rc-fresh-import')
+const { freshImport, folderVersion } = require('../../modules/rc-game/server/rc-fresh-import')
 
 function videoBed() {
 	const feed = { added: 0, closed: 0, asked: 0, client: null }
@@ -135,31 +135,26 @@ test('B52: drop() forgets the last bake, and a bake that ends after the drop is 
 	}
 })
 
-test('B51: an edited client file reaches the next import, also through a relative import', async () => {
+test('B51: an edited entry file reaches the next import; relative imports stay cached; no resolve hook', async () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-b51-'))
 	try {
-		fs.writeFileSync(path.join(dir, 'brain.js'), "import { v } from './phys.js'\nexport const val = v\n")
+		fs.writeFileSync(path.join(dir, 'brain.js'), "import { v } from './phys.js'\nexport const val = v\nexport const rev = 1\n")
 		fs.writeFileSync(path.join(dir, 'phys.js'), 'export const v = 1\n')
 		const v1 = folderVersion(dir)
-		const [a1, p1] = await freshImport(dir, ['brain.js', 'phys.js'])
+		const [a1] = await freshImport(dir, ['brain.js'])
 		assert.equal(a1.val, 1)
-		assert.equal(p1.v, 1)
 		const [again] = await freshImport(dir, ['brain.js'])
 		assert.equal(again, a1, 'unchanged folder: the same module (no new copy per load)')
-		fs.writeFileSync(path.join(dir, 'phys.js'), 'export const v = 22\n')
+		fs.writeFileSync(path.join(dir, 'brain.js'), "import { v } from './phys.js'\nexport const val = v\nexport const rev = 22\n")
 		assert.notEqual(folderVersion(dir), v1)
-		const [a2, p2] = await freshImport(dir, ['brain.js', 'phys.js'])
-		assert.equal(a2.val, 22, 'the entry sees the new physics')
-		assert.equal(p2.v, 22)
-		assert.equal(a2.val, p2.v, 'one copy of each file per version')
+		const [a2] = await freshImport(dir, ['brain.js'])
+		assert.notEqual(a2, a1, 'the edited entry file is re-imported')
+		assert.equal(a2.rev, 22)
 	} finally {
 		fs.rmSync(dir, { recursive: true, force: true })
 	}
-	assert.equal(passVersion('file:///m/client/a.js?rcv=1', 'file:///m/client/b.js'), 'file:///m/client/b.js?rcv=1')
-	assert.equal(passVersion('file:///m/client/a.js?rcv=1', 'file:///m/other/b.js'), 'file:///m/other/b.js', 'other folders untouched')
-	assert.equal(passVersion('file:///m/client/a.js', 'file:///m/client/b.js'), 'file:///m/client/b.js', 'no version, no change')
-	assert.equal(passVersion('file:///m/client/a.js?rcv=1', 'node:fs'), 'node:fs')
-	assert.equal(passVersion(undefined, 'file:///x.js'), 'file:///x.js')
+	const fresh = fs.readFileSync(path.join(__dirname, '../../modules/rc-game/server/rc-fresh-import.js'), 'utf8')
+	assert.doesNotMatch(fresh, /registerHooks/, 'no process-wide resolve hook')
 	const bots = fs.readFileSync(path.join(__dirname, '../../modules/rc-game/server/rc-room-bots.js'), 'utf8')
 	assert.match(bots, /freshImport\(CLIENT_DIR, \['bot-brain\.js', 'physics\.js', 'track-math\.js', 'occ\.js'\]\)/, 'the bots load through it')
 	assert.doesNotMatch(bots, /import\(pathToFileURL/, 'no fixed-URL import left')

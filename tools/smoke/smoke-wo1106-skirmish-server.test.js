@@ -225,11 +225,12 @@ test('B36: a silent spectator times out (4408); ≤ 4 sockets per remote address
 	assert.ok(eye && wall)
 
 	const game = createSkGame({ now: () => 1, log: () => {}, lanIps: () => [],
+		maxPerAddress: 4,
 		bakerDeps: { loadProject: () => ({ name: 'Smoke hall', previs: {} }), mvrStore: { get: () => null, mesh: async () => null }, cacheDir: path.join(TMP, 'b36') } })
 	t.after(() => game.disable())
 	game.host({ action: 'enable' })
 	await game.scene().catch(() => null)
-	assert.equal(MAX_PER_ADDRESS, 4)
+	assert.equal(MAX_PER_ADDRESS, 0, 'off by default (NAT\'d guest Wi-Fi shares one address)')
 	const same = Array.from({ length: 5 }, () => fakeWs())
 	same.forEach((ws) => game.attach(ws, '::ffff:10.0.0.7'))
 	assert.deepEqual(same.map((ws) => ws.closedWith), [null, null, null, null, 1013])
@@ -244,6 +245,14 @@ test('B36: a silent spectator times out (4408); ≤ 4 sockets per remote address
 	const again = fakeWs()
 	game.attach(again, '::ffff:10.0.0.7')
 	assert.equal(again.closedWith, null, 'a closed socket frees its place')
+	const open = createSkGame({ now: () => 1, log: () => {}, lanIps: () => [],
+		bakerDeps: { loadProject: () => ({ name: 'Smoke hall', previs: {} }), mvrStore: { get: () => null, mesh: async () => null }, cacheDir: path.join(TMP, 'b36d') } })
+	t.after(() => open.disable())
+	open.host({ action: 'enable' })
+	await open.scene().catch(() => null)
+	const six = Array.from({ length: 6 }, () => fakeWs())
+	six.forEach((ws) => open.attach(ws, '10.0.0.9'))
+	assert.ok(six.every((ws) => ws.closedWith === null), 'default: no per-address cap')
 })
 
 test('B55: a silence buys ≤ 0.25 s of movement; a target in a wall or a step through a thick block is refused', (t) => {

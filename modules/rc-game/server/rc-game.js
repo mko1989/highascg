@@ -24,7 +24,7 @@ const MAX_SPECTATORS = 20
 const MAX_SOCKETS = MAX_PLAYERS + MAX_SPECTATORS
 const MSG_RATE = 40 // messages / s per socket (20 car states + pings + ready), burst the same
 const MAX_BUFFERED = 256 * 1024
-const MAX_PER_ADDRESS = 4 // WO-1106 B36: game sockets per remote address (one device must not hold every seat)
+const MAX_PER_ADDRESS = 0 // WO-1106 B36: default per-address cap, 0 = off (phones behind NAT'd guest Wi-Fi share one address); deps.maxPerAddress turns it on
 
 /** The client's address for the per-address cap; null when unknown or loopback (a local proxy / the box itself). */
 function remoteAddress(req) {
@@ -34,7 +34,7 @@ function remoteAddress(req) {
 
 /**
  * @param {{ port?: () => number, lanIps?: () => string[], log?: Function, now?: () => number, timers?: object,
- *   baker?: object, bakerDeps?: object, ctx?: object, lightsDeps?: object, videoDeps?: object }} deps
+ *   baker?: object, bakerDeps?: object, ctx?: object, lightsDeps?: object, videoDeps?: object, maxPerAddress?: number }} deps
  *   ctx: the app context (production lights / video deps); lightsDeps / videoDeps: smokes inject fakes instead
  *   (lightsDeps without `send` — the game's own sender is used). Without ctx and fakes: no lights, no pictures.
  */
@@ -48,6 +48,7 @@ function createRcGame(deps = {}) {
 	let bots = null // WO-1082: rc-room-bots.js while enabled
 	let world = null // WO-1101 Game World link while enabled (does nothing without the world module)
 	const sockets = new Set()
+	const maxPerAddress = Number(deps.maxPerAddress ?? MAX_PER_ADDRESS) || 0
 	const perAddress = new Map() // remote address → open game sockets (WO-1106 B36)
 	let lastRev = null
 	let appliedRev = null // WO-1106 B37: the rev the room / bots hold (null = none yet in this session)
@@ -203,7 +204,7 @@ function createRcGame(deps = {}) {
 		}
 		if (sockets.size >= MAX_SOCKETS) return ws.close(1013, 'full')
 		const addr = remoteAddress(req)
-		if (addr && (perAddress.get(addr) || 0) >= MAX_PER_ADDRESS) return ws.close(1013, 'too many from this address')
+		if (addr && maxPerAddress > 0 && (perAddress.get(addr) || 0) >= maxPerAddress) return ws.close(1013, 'too many from this address')
 		if (addr) perAddress.set(addr, (perAddress.get(addr) || 0) + 1)
 		sockets.add(ws)
 		room.connect(ws)

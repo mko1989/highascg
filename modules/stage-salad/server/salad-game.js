@@ -21,7 +21,7 @@ const { createSaladWorld } = require('./salad-world')
 const MAX_SOCKETS = RULES.maxPlayers + RULES.maxSpectators
 const MSG_RATE = 30 // messages / s per socket (aim ≤ 10 + fire ≤ 3 + pings), burst the same
 const MAX_BUFFERED = 256 * 1024
-const MAX_PER_ADDRESS = 4 // WO-1106 B36: sockets from one device (20 silent sockets from one phone held every seat)
+const MAX_PER_ADDRESS = 0 // WO-1106 B36: default per-address cap, 0 = off (phones behind NAT'd guest Wi-Fi share one address); deps.maxPerAddress turns it on
 const LEASE_ID = 'stage-salad'
 const POLL_MS = 100
 const VENUE_EVERY = 50 // polls between live venue checks (5 s)
@@ -48,7 +48,7 @@ async function readTrackingLive() {
 
 /**
  * @param {{ port?: () => number, lanIps?: () => string[], log?: Function, now?: () => number, timers?: object, rng?: Function,
- *   baker?: object, bakerDeps?: object, ctx?: object, lightsDeps?: object, videoDeps?: object, readTracking?: Function }} deps
+ *   baker?: object, bakerDeps?: object, ctx?: object, lightsDeps?: object, videoDeps?: object, readTracking?: Function, maxPerAddress?: number }} deps
  */
 function createSaladGame(deps = {}) {
 	const K = kit()
@@ -71,6 +71,7 @@ function createSaladGame(deps = {}) {
 	let polls = 0
 	let reading = false
 	const sockets = new Set()
+	const maxPerAddress = Number(deps.maxPerAddress ?? MAX_PER_ADDRESS) || 0
 	const perAddr = new Map() // remote address → open game sockets (WO-1106 B36)
 	const text = new WeakMap()
 
@@ -236,7 +237,7 @@ function createSaladGame(deps = {}) {
 		}
 		if (sockets.size >= MAX_SOCKETS) return ws.close(1013, 'full')
 		const addr = addressOf(req)
-		if (addr && (perAddr.get(addr) || 0) >= MAX_PER_ADDRESS) return ws.close(1013, 'too many connections from this device')
+		if (addr && maxPerAddress > 0 && (perAddr.get(addr) || 0) >= maxPerAddress) return ws.close(1013, 'too many connections from this device')
 		if (addr) {
 			perAddr.set(addr, (perAddr.get(addr) || 0) + 1)
 			ws.once('close', () => {

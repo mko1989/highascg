@@ -100,9 +100,10 @@ test('B36: at most 4 game sockets per remote address (loopback = a proxy: not ca
 	const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'wo1106-salad-room-'))
 	t.after(() => fs.rmSync(TMP, { recursive: true, force: true }))
 	const { createSaladGame, MAX_PER_ADDRESS } = require('../../modules/stage-salad/server/salad-game')
-	assert.equal(MAX_PER_ADDRESS, 4)
-	const g = createSaladGame({ lanIps: () => ['192.0.2.1'], readTracking: async () => null,
+	assert.equal(MAX_PER_ADDRESS, 0, 'off by default (NAT\'d guest Wi-Fi shares one address)')
+	const mk = (o) => createSaladGame({ ...o, lanIps: () => ['192.0.2.1'], readTracking: async () => null,
 		bakerDeps: { loadProject: () => ({ name: 'Smoke hall', previs: {} }), mvrStore: { get: () => null, mesh: async () => null }, cacheDir: TMP } })
+	const g = mk({ maxPerAddress: 4 })
 	g.host({ action: 'enable' })
 	t.after(() => g.disable())
 	const sock = () => {
@@ -134,4 +135,10 @@ test('B36: at most 4 game sockets per remote address (loopback = a proxy: not ca
 	unknown.forEach((ws) => g.attach(ws))
 	assert.ok(unknown.every((ws) => ws.code === undefined), 'no address known: no cap')
 	assert.equal(g.socketCount(), 4 + 1 + 6 + 6)
+	const d = mk({})
+	d.host({ action: 'enable' })
+	t.after(() => d.disable())
+	const six = Array.from({ length: 6 }, () => sock())
+	six.forEach((ws) => d.attach(ws, req('192.0.2.60')))
+	assert.ok(six.every((ws) => ws.code === undefined), 'default: no per-address cap')
 })
