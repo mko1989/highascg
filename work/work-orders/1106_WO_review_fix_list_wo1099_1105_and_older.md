@@ -206,7 +206,56 @@ column is the recommended fix.
 | B73 | `tools/eggs/live-usb/verify-iso-detection-runtime.sh:23` | `detection_runtime_check` does not notice an empty `unsquashfs -l` listing: reports "absent" (covered today only by the redistribution check running beside it). | read | `bad` on an empty listing. |
 | B74 | `work/work-orders/1096_*.md` §1E, §5; `tools/eggs/.../redistribution.list:43` | The WO says "the dpkg status is excluded" — it ships whole (phantom desktopvideo / magicq / nomachine / zoom / shutter-encoder records); the excluded dracut conffile would not be recreated by `dpkg -i`. | read | Correct the WO text; strip the records or keep relying on payload gates. |
 
-## 4. Not verified
+## 4. Part C — 10–12.11 (about WO-1010 … WO-1050)
+
+Four read-only reviewers on `f1b11bb5..da2c7b9e` (about 57k lines), code read at HEAD: linked servers, core Node
+(Zoom, window grab, engine, config), Godot client in two halves.
+
+### 4.1 Godot client — Visuals, MIDI, presenters
+
+| # | Where | Defect → what happens | Proof | Recommended fix |
+|---|-------|-----------------------|-------|-----------------|
+| C1 | `godot/.../visuals/visuals_mixer.gd:199` | In A/B mode the strobe is read from `deck()` = the bank being EDITED (PRV), not the one on air: a strobe preset prepared in preview strobes the whole program output; a strobe on the on-air bank does nothing. | read, lead | Weight both decks by the crossfader (`a.strobe·(1−x) + b.strobe·x`); non-DJ mode keeps `deck()`. |
+| C2 | `godot/.../visuals/visuals_midi.gd:126-138` (`_bank`, WO-1048) | APC Generic mode sends no track-select note, so only the first CC of the 8-knob bank resend is primed; the other 7 step their parameters (the owner's original bug, for 7 of 8 knobs). The test feeds a note + one knob. | read, lead | Remember the last channel per knob; prime when that knob's channel changes; test with 8 CCs and no note. |
+| C3 | `godot/.../tracking/presenters_section.gd:95,120,244-264` (WO-1036) | Capture rows rebuild whenever detections change (~15 Hz) and drop the typed name unless the LineEdit has focus: "tick consent first" → tick → Save → "type the name first". A rebuild during the Save await touches a freed node. | read | Keep typed name / mic per capture id (or update labels in place); `is_instance_valid` after the await. |
+| C4 | `presenters_section.gd:18,236,284` | `_photos` texture cache never shrinks; each capture adds full-resolution textures decoded on the main thread. | plausible | Drop keys not referenced after each render; downscale to the thumb size. |
+| C5 | `godot/.../visuals/visuals_dj.gd:187`, `visuals_midi_clips.gd:70` (WO-1047) | Clicking Edit A / B does not disarm Sel's armed new slot (only the MIDI path does): the next pad adds a layer on the other bank, which may be on air. | read | Clear `midi.clips.new_slot` inside `dj.focus`. |
+| C6 | `presenters_section.gd:215-224` | "Take pictures" has no in-flight guard: a double click replaces the first run's pictures under the same ids. | read | Disable the button until the await returns. |
+
+### 4.2 Zoom, window grab, engine, PixelHue
+
+| # | Where | Defect → what happens | Proof | Recommended fix |
+|---|-------|-----------------------|-------|-----------------|
+| C7 | `tools/window-grab/window_fit.h:146-155` | The "picture went away" branch can never run (`cand_hits` only grows on a valid detection): a Zoom source keeps a stale crop after the share stops, until the window is re-mapped. | run, lead | Count consecutive invalid detections; clear `cur` at 3. |
+| C8 | `src/zoom/zoom-audio.js:203-228,330` | The 2 s link tick has no in-flight guard and no backoff: a PipeWire daemon that cannot start is respawned every 2 s forever, ticks overlap, pw-cat / ffmpeg pairs pile up. | read, lead | Skip a tick while one runs; exponential backoff; stop after N failures with one log line. |
+| C9 | `src/zoom/zoom-session.js:167-196` | `ensureGrab` has no per-source lock: two overlapping calls each start a `window_grab`; one is orphaned and both write the same ring. A `quit()` during the await is undone. | read | One promise chain per source. |
+| C10 | `src/engine/restore-on-screens.js:310-376` | `restoreOnConnect` can run twice when Caspar reconnects during a restore: looks taken twice (a visible double take). | plausible | Claim the snapshot at the start / share one restore promise. |
+| C11 | `src/pixelhue/studio-bridge.js:75-111` | Concurrent calls each POST `/api/connect`; every connect invalidates the previous session → bursts of logins and 409s when the pane opens. | plausible | One in-flight connect promise per host. |
+| C12 | `src/zoom/zoom-grab.js:30` | `ensureBinary` builds `window_grab` with `execFileSync` (120 s) on the `POST /api/zoom/source` path: the first assign after an update freezes the whole server for the C++ build. | read, lead | Async `execFile`, or build at install / startup. |
+| C13 | `src/zoom/zoom-ui.js` `state()`, `autoJoin:185`, `cameraOnceInside:203` | AT-SPI dump has no in-flight dedupe (overlapping python per client); each launch stacks another 15-minute camera loop. | plausible | Share the dump promise; one join / camera loop at a time. |
+| C14 | `src/zoom/zoom-audio.js:155,175` | pw-cat / ffmpeg children have no `error` listener: a missing binary = uncaught exception in node. | read | `child.on('error', …)`. |
+| C15 | `src/engine/air-snapshot.js:178-190` | A timed-out `waitRestored` leaves its callback in `waiters` forever (one per un-restored Apply). | read | Remove it in the timeout handler. |
+| C16 | `src/pixelhue/pixelhue-look-drive.js:133-135` | Read-back `ok()` reads `l.window` on a layer removed during the drive → TypeError → "look not driven" although the writes went through. | read | `if (!l) return false`. |
+
+### 4.3 Linked servers (cluster)
+
+| # | Where | Defect → what happens | Proof | Recommended fix |
+|---|-------|-----------------------|-------|-----------------|
+| C17 | `src/cluster/cluster-peers.js:52-98` (`getJson`, `requestJson`) | Peer answers are buffered with no size cap and only an idle timeout: any device answering `:4200` during a scan (or sitting on a peer's old DHCP address) can stream an endless body → node runs out of memory. | read | Byte cap (1 MB ping / status, 8 MB else) + an overall deadline. |
+| C18 | `src/cluster/cluster-master.js:148` (`accept`) | `heard` is refreshed by any validly signed claim before a freshness check: re-POSTing the master's own claim (readable with auth off) keeps "master alive" true after it dies — failover never fires, followers keep gating PGM. | read | Refresh `heard` only on an adopted newer claim / a strictly rising ts per signer. |
+| C19 | `src/cluster/dest-route.js:175-180`, `look-relay.js:32-36` | Follower waits 1 s for the master, then takes locally — and still executes the master's forwarded call: a take that runs > 1 s on the master lands twice on the follower's screen. | plausible | opId from the follower; drop a forwarded press already run locally. |
+| C20 | `src/cluster/cluster-media-link.js:106-110` (`sleep`) | Each 500 ms poll adds an `abort` listener that is never removed: ~14,400 dead listeners over a 2 h copy. | run | Remove the listener when the timer resolves. |
+| C21 | `src/cluster/dest-actions.js:108-120` (`lateBy`) | The per-sender lateness baseline only goes down: after the sender's clock steps back, every `dest.*` press from it is refused `DEST_EXPIRED` for up to 10 min. | plausible | Reset the baseline on repeated over-age presses / a non-consecutive ts. |
+| C22 | `src/cluster/cluster-peers.js:319-327`, `src/api/routes-cluster.js:~331` | `poll()` has no in-flight guard and also runs on every `GET /api/cluster`: overlapping polls re-enter hooks that have no busy guard. | plausible | One in-flight poll promise. |
+| C23 | `src/cluster/cluster-hello.js:59,100` | The hello replay floor is memory-only: after a restart an old signed hello re-addresses a peer to its old IP for ~5 s. | read | Persist the floor in the call-floor store. |
+| C24 | `src/cluster/call-replay-guard.js:30,69` | `MAX_SENDERS` 64 is shared by four namespaces: with 16 peers an extra key evicts a live sender's persisted floor. | read | Size per namespace; evict only unlinked fingerprints. |
+| C25 | `src/cluster/destination-ownership.js:64,97,186` | `ownView()` (device graph + channel map) is rebuilt and peer keys re-hashed on every AMCP line a follower sends. | plausible | Cache per config revision / poll tick. |
+| C26 | `src/cluster/cluster-media-link.js:69-72` | A queued waiter that wakes on abort does not wake the next one. | plausible | Hand the slot on before returning. |
+| C27 | `src/cluster/cluster-call.js` (v1), `cluster-media.js` `acceptSshKey` v1 | v1 signed calls still use a ±60 s clock window (project rule: no clock windows in signed messages): a captured `dest.*` / `look.take` replays after a restart inside the window. | read | Refuse v1 once the peer advertises v2; set a removal date. |
+| C28 | `src/cluster/cluster-air-journal.js` | Layer keys are dropped only on a Caspar restart: layers used once are replayed forever. | read | Drop a key when its last entry is cleared. |
+| C29 | `src/api/routes-cluster.js` (with B1) | With `enforceAuth` off (the default) `master/set`, `peers` add / delete, `media-spread` and `apply` are open to the venue Wi-Fi: a phone can link a rogue peer or make itself master. | read | Same gate as B1 (auth on, or loopback, or a signed peer call). |
+
+## 5. Not verified
 
 - Nothing in this list was reproduced on the glass; `run` rows were reproduced offline on the real modules.
 - A10, A20, A29, A38–A40 depend on Godot behaviour that was read, not run.
