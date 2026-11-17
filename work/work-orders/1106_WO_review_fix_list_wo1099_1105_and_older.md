@@ -1,7 +1,7 @@
 # WO-1106 — Review fix list: bugs, leaks and gaps found in WO-1099 … WO-1105 (and older work orders)
 
 **Area:** testing-ci, web-client, godot-client, engine
-**Status: IN PROGRESS (17.11.26 — 165 rows + D1–D6: all fixed with tests except the rows in §7b; offline suite 7418 / 0 after the contract regen, Godot 29848 / 0, node restarted clean; open: the real two-box run, phones / switcher / desk on the glass)**
+**Status: IN PROGRESS (17.11.26 15:00 — 165 rows + D1–D6 fixed with tests; §7b third round: soft affect, A12 join, B50 rendered on the GPU, web NC tick, flake — offline suite 7427 / 0, Godot 29892 / 0; open: the real two-box run (5867 is off the LAN), B71 history purge (owner), phones / switcher / desk on the glass)**
 
 Owner, 17.11.26: "do a review of latest changes looking for bugs and leaks and other undesired gaps." → "add all of
 those to a fixing list. expand the review to older wos"
@@ -358,15 +358,15 @@ non-commercial, held locally) and `template/shaders` stays at 14 files.
 
 | # | State | What is left |
 |---|-------|--------------|
-| two-box | not run | C19 / C21 / C27 / C29 are proven on fakes only: `tools/e2e/two-box` with the real second box (AMCP fan-out suppression inside a real take, signed unlink across a restart, a real clock step, Edit peer B through the relay). The second box (5867) runs the old build: relayed cluster changes from it get 403 and its unsigned "unlink there" is refused until it is updated. |
-| B67 | follow-up | 27 withdrawn shaders are referenced as legacy Caspar `SHADERS/SH-…` template layers in 8 projects (dtlodz, wesele, frontex_big, llkk, prrrr, dfgfdghh, philips, testyyyy): no template any more (they rendered black here already). The legacy web Shader FX modal has no "allow non-commercial" tick. The Mac and 5867 still run the old store and sync `template/shaders`: they can re-create the files until updated. |
+| two-box | blocked | 17.11 14:20: 5867 is off the LAN (no :4200 anywhere on 192.168.0.0/24; .10 is now another host with a different SSH key; Tailscale last saw it 5 days ago). This box rebooted 14:04 → 14:18 (unclean stop) and is now 192.168.0.15. C19 / C21 / C27 / C29 are proven on fakes only: `tools/e2e/two-box` with the real second box (AMCP fan-out suppression inside a real take, signed unlink across a restart, a real clock step, Edit peer B through the relay). The second box (5867) runs the old build: relayed cluster changes from it get 403 and its unsigned "unlink there" is refused until it is updated. |
+| B67 | follow-up | 27 withdrawn shaders are referenced as legacy Caspar `SHADERS/SH-…` template layers in 8 projects (dtlodz, wesele, frontex_big, llkk, prrrr, dfgfdghh, philips, testyyyy): no template any more (they rendered black here already). The Mac and 5867 still run the old store and sync `template/shaders`: they can re-create the files until updated. (The web Shader FX modal's "allow non-commercial" tick: done `154fc9df`.) |
 | B71 | history | The removed files are still in the git history (purging needs a history rewrite + force-push). |
-| B50 | unrendered | Tunnel floor by derivative normal: shader text only, not compiled on a GPU. |
+| B50 | done | Rendered on the box GPU (RTX PRO 4000, chrome-headless-shell, ANGLE Vulkan and GL-EGL, three r185 / WebGL2): both programs link with empty logs; 72 / 72 pixel samples as designed (floor kept for both windings, walls / raised plates inside the volume cut, nothing cut outside or past the ends). No code change. |
 | B51 | partial | After an RC module upgrade the bots' own imports stay cached: restart node. |
-| A12 | partial | Body + head in two files is refused, not merged. |
-| C18, C44 | edges | Master clock stepping back + a push-only follower; a cloned box that kept its peer's hostname. |
-| soft affect | new | A player's page still slides on a splat when the game's cross-game setting is "soft" (server bots do not). Salad's client has no clock reset on reconnect (RC has, B43). |
-| flake | old | Godot `test_pixelhue_programming_panel::test_live_geometry_coalesces` failed twice in full runs during the work, passes alone and in the last three full runs. |
+| A12 | done | `8748213f`: body + head files join onto one skeleton by bone name (main = most bones). Not tried on a real MetaHuman / Unreal two-file FBX export (none on the box); a neck seam from different rest poses is possible. |
+| C18, C44 | edges, kept | Master clock stepping back + a push-only follower (two faults at once; accepting a lower ts would let captured heartbeats replay the dead master alive — the replay guard wins); a cloned box that kept its peer's hostname. |
+| soft affect | done | `3b4956af`: a player's car (RC) / soldier (Skirmish) takes a slick patch only while the last `wst` says affect 'on' and Presenter safe is off; Salad has no floor patches. Salad and Skirmish clocks reset on socket open (Skirmish had the same gap). |
+| flake | done | `b3ee5c59`: the test waits for the geometry queue instead of a fixed 0.12 s (CI run 44081644770); green since. |
 
 ## 8. Not verified
 
