@@ -281,7 +281,10 @@ func test_stage_builds_surfaces_and_views() -> void:
 	# a real clip plays through VideoStreamPlayer
 	_take(s, "look-video-clip", "program")
 	stage.step(["pgm1"], s.clock())
-	if stage.is_inside_tree():  # (the headless runner builds its tree in _init: VideoStreamPlayer.play() needs a live one)
+	# The clip player needs a live tree AND a video stream that loads: headless, the demo .ogv gives no VideoStream, so
+	# this branch never ran in the unit runner (the root was not in the tree until WO-1106's suites awaited a frame).
+	# Open in WO-1106: the demo clip player is not covered by any headless test.
+	if stage.is_inside_tree() and DisplayServer.get_name() != "headless":
 		t.eq(stage.player_count(), 1, "one player for the clip")
 		stage.step(["pgm1"], s.clock() + 0.5)
 		t.eq(stage.player_count(), 1, "still one")

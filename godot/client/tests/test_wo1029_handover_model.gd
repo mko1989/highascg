@@ -23,7 +23,11 @@ func test_on_box_client_never_moves() -> void:
 	t.eq(M.decide(_state({"local": true})).action, "stay", "loopback origin: stay, even with a master target")
 	t.eq(M.decide(_state({"local": true, "home": {"origin": B, "name": "A"}, "home_up": true})).action, "stay", "and no return offer")
 	var cfg := FileAccess.get_file_as_string("res://app/handover_watch.gd")
-	t.ok(cfg.contains("if Config.demo or Platform.is_local_origin(Config.origin)"), "the watcher does not even run on the box")
+	# WO-1106: Config is looked up late (_conf()); the guard is still the first thing _ready does, before any timer
+	t.ok(cfg.contains("func _ready() -> void:\n\tif _conf().demo or Platform.is_local_origin(_conf().origin):\n"
+		+ "\t\tset_process_unhandled_key_input(false)\n\t\treturn\n"), "the watcher does not even run on the box")
+	t.ok(cfg.contains("func _conf() -> Node:\n\treturn (Engine.get_main_loop() as SceneTree).root.get_node_or_null(^\"Config\")"),
+		"_conf() is the Config autoload")
 
 
 func test_master_target_moves() -> void:

@@ -19,6 +19,11 @@ func _emit(body: Dictionary, done: String) -> void:
 	send.emit("source-backup", body, done)
 
 
+## WO-1106 C38: after a refused write, show the last state the switcher reported again (an OptionButton kept the pick).
+func reshow() -> void:
+	show_state(_state)
+
+
 func show_state(st: Dictionary) -> void:
 	_state = st
 	for c in get_children():

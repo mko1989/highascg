@@ -22,12 +22,19 @@ const PANELS := [
 	["Audio", "res://features/pixelhue/audio_panel.gd", "audio"],
 ]
 const POLL_S := 5.0
+const MAX_SKIP := 3  # WO-1106 C31: while no switcher answers, poll at most every (1 + MAX_SKIP) × POLL_S
+
+## The HTTP client: the Api autoload, or a fake with get_json (tests).
+var api: Object = null
 
 var _tabs: TabContainer
 var _device: Label
 var _note: Label
 var _available := false
 var _caps := {}
+var _polling := false
+var _fails := 0
+var _skip := 0
 
 
 func _ready() -> void:
@@ -77,10 +84,21 @@ func _missing(title: String) -> Control:
 
 
 ## Is a switcher there? Asked of the server every POLL_S (the tab strip hides this tab otherwise).
+## WO-1106 C31: one status read in flight (a slow answer no longer stacks reads in the Api pool or lands out of order),
+## and back-off while no switcher answers.
 func _poll() -> void:
-	var r: Dictionary = await Api.get_json(StudioApi.BASE + "status")
-	var d: Dictionary = r.data if r.ok and r.data is Dictionary else {}
+	if _polling:
+		return
+	if _skip > 0:
+		_skip -= 1
+		return
+	_polling = true
+	var r: Dictionary = await _api().get_json(StudioApi.BASE + "status")
+	_polling = false
+	var d: Dictionary = r.data if r.get("ok") == true and r.get("data") is Dictionary else {}
 	var on: bool = d.get("connected") == true
+	_fails = 0 if on else _fails + 1
+	_skip = clampi(_fails - 1, 0, MAX_SKIP)
 	var dev: Dictionary = d.get("device", {}) if d.get("device") is Dictionary else {}
 	_device.text = "%s · %s · %s" % [str(dev.get("model", "PixelHue")), str(dev.get("host", "")), str(dev.get("serial", ""))] if on else "PixelHue: not connected"
 	var caps: Dictionary = d.get("capabilities", {}) if d.get("capabilities") is Dictionary else {}
@@ -91,13 +109,17 @@ func _poll() -> void:
 			_tabs.set_tab_hidden(i, cap != "" and caps.get(cap) != true)
 	if on != _available:
 		_available = on
-		if on and Config.args.has("pixelhue-tab"):  # launch argument --pixelhue-tab=<sub-tab title>, e.g. Programming
+		if on and _conf().args.has("pixelhue-tab"):  # launch argument --pixelhue-tab=<sub-tab title>, e.g. Programming
 			for i in _tabs.get_tab_count():
-				if _tabs.get_tab_control(i).name.to_lower() == str(Config.args["pixelhue-tab"]).to_lower():
+				if _tabs.get_tab_control(i).name.to_lower() == str(_conf().args["pixelhue-tab"]).to_lower():
 					_tabs.current_tab = i
 		available_changed.emit(on)
 		if on and is_visible_in_tree():
 			_refresh_current()
+
+
+func _api() -> Object:
+	return api if api != null else get_node_or_null("/root/Api")
 
 
 func _refresh_current() -> void:
@@ -107,3 +129,7 @@ func _refresh_current() -> void:
 	if page != null and page.has_method("refresh"):
 		_note.text = ""
 		page.call("refresh")
+
+## WO-1106: the Config autoload, looked up late — the unit runner has no autoloads and must still compile this script.
+func _conf() -> Node:
+	return (Engine.get_main_loop() as SceneTree).root.get_node_or_null(^"Config")

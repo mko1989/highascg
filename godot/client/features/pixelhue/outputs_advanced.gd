@@ -10,6 +10,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const NF := preload("res://core/numeric_field.gd")
 const Kit := preload("res://features/settings/pane_kit.gd")
 
+var api: Object = null  ## the Outputs panel's HTTP client (tests: a fake); null = the Api autoload
 var _state: Dictionary = {}
 var _selected := -1
 var _values := {}
@@ -40,13 +41,16 @@ func has_changes() -> bool:
 	return not _state.is_empty() and not M.adv_pending(_current(), _values).is_empty()
 
 
-## Re-read when open; otherwise forget so the next open loads fresh.
-func refresh() -> void:
+## Re-read when open; otherwise forget so the next open loads fresh. WO-1106 C34: staged settings are kept unless
+## `force` (the Outputs tab's Discard, or a capacity change that rebuilt the outputs).
+func refresh(force := false) -> void:
+	if not force and has_changes():
+		return
 	if not _toggle.button_pressed:
 		_state = {}
 		_render()
 		return
-	var r: Dictionary = await StudioApi.read(Api, "output-advanced")
+	var r: Dictionary = await StudioApi.read(api if api != null else get_node_or_null("/root/Api"), "output-advanced")
 	if not r.ok:
 		status.emit(str(r.error))
 		return
@@ -86,7 +90,7 @@ func _render() -> void:
 	pick.select(sel)
 	pick.item_selected.connect(func(i: int) -> void:
 		if has_changes():
-			status.emit("Apply or discard (Refresh) pending output settings first.")
+			status.emit("Apply the pending output settings, or press Discard, first.")
 			pick.select(sel)
 			return
 		_selected = pick.get_item_id(i)
@@ -182,7 +186,7 @@ func _send(changes: Array, done: String) -> void:
 	var go := func() -> void:
 		_busy = true
 		_controls()
-		var r: Dictionary = await StudioApi.write(Api, "output-advanced", M.adv_body(changes))
+		var r: Dictionary = await StudioApi.write(api if api != null else get_node_or_null("/root/Api"), "output-advanced", M.adv_body(changes))
 		_busy = false
 		if r.ok:
 			_adopt(r.data)

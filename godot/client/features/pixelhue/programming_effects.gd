@@ -8,6 +8,7 @@ const M := preload("res://features/pixelhue/programming_model.gd")
 const FX := preload("res://features/pixelhue/programming_fx_model.gd")
 const NF := preload("res://core/numeric_field.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const SLIDER_DEBOUNCE_S := 0.25
 
 static var _open := {"look": true}  # section id → unfolded (kept across layers, like Studio)
 
@@ -89,8 +90,29 @@ func _row(body: GridContainer, row: Dictionary, locked: bool) -> void:
 			s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			var out := Label.new()
 			out.text = "%d%%" % int(row.value)
-			s.value_changed.connect(func(v: float) -> void: out.text = "%d%%" % int(v))
+			# WO-1106 C45: a click on the track, the wheel or the arrow keys change the value without a drag: those go out
+			# after SLIDER_DEBOUNCE_S. A drag still sends once on release (a send mid-drag re-renders, freeing the slider).
+			var dragging := [false]
+			var settle := Timer.new()
+			settle.one_shot = true
+			settle.wait_time = SLIDER_DEBOUNCE_S
+			settle.timeout.connect(func() -> void:
+				if dragging[0]:
+					return
+				if host != null and host.get("busy") == true:
+					settle.start()  # a command is running: it would drop this one
+					return
+				if not is_equal_approx(s.value, float(row.value)):
+					_send(row, s.value))
+			box.add_child(settle)
+			s.value_changed.connect(func(v: float) -> void:
+				out.text = "%d%%" % int(v)
+				if not dragging[0] and settle.is_inside_tree():
+					settle.start())
+			s.drag_started.connect(func() -> void: dragging[0] = true)
 			s.drag_ended.connect(func(changed: bool) -> void:
+				dragging[0] = false
+				settle.stop()
 				if changed:
 					_send(row, s.value))
 			box.add_child(s)

@@ -78,3 +78,14 @@ static func return_user_args(user_args: PackedStringArray, target: String) -> Pa
 			out.append(a)
 	out.append("--server=" + target)
 	return out
+
+
+## WO-1106 C32: restart arguments when the operator picks a server address (connection menu): every --server and the
+## handover trail go, so the saved address wins — a handed-over client kept its --server and could not be moved.
+static func address_user_args(user_args: PackedStringArray) -> PackedStringArray:
+	var out := PackedStringArray()
+	for a in user_args:
+		var s := str(a)
+		if not (s.begins_with("--server=") or s.begins_with("--handover-from=") or s.begins_with("--handover-at=")):
+			out.append(a)
+	return out

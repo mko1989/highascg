@@ -9,6 +9,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const M := preload("res://app/config_view_model.gd")
 const Plan := preload("res://features/devices/apply_plan_model.gd")
 const Platform := preload("res://core/platform.gd")
+const Timeouts := preload("res://core/api_timeouts.gd")  # not core/api.gd: that one needs the Config autoload
 
 const MARK_DISK := Color(0.82, 0.36, 0.30, 0.28)
 const MARK_GEN := Color(0.25, 0.60, 0.95, 0.25)
@@ -20,7 +21,7 @@ var _edit: CheckButton
 var _note: Label
 var _prev: Button
 var _next: Button
-var _text: TextEdit
+var _text: CodeEdit  # line numbers are a CodeEdit gutter (TextEdit has none)
 var _keep: CheckBox
 var _apply: Button
 var _revert: Button
@@ -38,6 +39,8 @@ var _diff := {}
 var _showing_generated := false
 var _loading := false
 var _busy := false
+## The HTTP client: the Api autoload, or a fake with get_json / get_bytes / post_json (tests).
+var api: Object = null
 
 
 func _init() -> void:
@@ -53,7 +56,7 @@ func _init() -> void:
 	_head.add_theme_font_size_override("font_size", 12)
 	add_child(_head)
 	add_child(_toolbar())
-	_text = TextEdit.new()
+	_text = CodeEdit.new()
 	_text.editable = false
 	_text.draw_tabs = true
 	_text.gutters_draw_line_numbers = true
@@ -90,17 +93,21 @@ func discard() -> void:
 	_do_revert()
 
 
-func load_all() -> void:
+## WO-1106 C36: a reload (the pane shown again, a failed Apply) keeps a hand edit that was not applied: the text and the
+## edit mode stay, only the file on disk / generated / state around it are read again. `keep_edit` false = after a
+## successful Apply, when the editor goes back to showing the file.
+func load_all(keep_edit := true) -> void:
 	if _loading:
 		return
 	_loading = true
 	_head.text = "(loading…)"
-	var cur: Dictionary = await Api.get_json("/api/caspar-config/current")
-	var gen: Dictionary = await Api.get_bytes("/api/caspar-config/generate")
-	var dirty: Dictionary = await Api.get_json("/api/caspar-config/dirty")
-	var ovr: Dictionary = await Api.get_json("/api/caspar-config/override")
-	var plan: Dictionary = await Api.get_json("/api/cluster/apply-plan")
+	var cur: Dictionary = await _api().get_json("/api/caspar-config/current")
+	var gen: Dictionary = await _api().get_bytes("/api/caspar-config/generate")
+	var dirty: Dictionary = await _api().get_json("/api/caspar-config/dirty")
+	var ovr: Dictionary = await _api().get_json("/api/caspar-config/override")
+	var plan: Dictionary = await _api().get_json("/api/cluster/apply-plan")
 	_loading = false
+	var keep := keep_edit and has_unsaved()
 	var d: Variant = cur.data if cur.ok else null
 	_have_disk = d is Dictionary and d.get("exists") == true
 	_disk = str((d as Dictionary).get("xml", "")) if d is Dictionary else ""
@@ -110,9 +117,13 @@ func load_all() -> void:
 	_dirty = dirty.data if dirty.ok else null
 	_override = str((ovr.data as Dictionary).get("override", "")) if ovr.ok and ovr.data is Dictionary else ""
 	var me: Dictionary = Plan.self_entry(plan.data) if plan.ok else {}
-	_server = Plan.name_of(me) if not me.is_empty() else Platform.host_of(Config.origin)
+	_server = Plan.name_of(me) if not me.is_empty() else Platform.host_of(_conf().origin)
 	if not cur.ok:
 		_result.text = "Could not read the file on disk (%s). A server older than this client has no /api/caspar-config/current." % str(cur.error)
+	if keep:
+		_diff = M.diff(_text.text, _generated)
+		_sync()
+		return
 	_diff = M.diff(_disk, _generated)
 	_edit.button_pressed = false
 	_show_text()
@@ -284,15 +295,23 @@ func _send() -> void:
 	_sync()
 	var ok_override := true
 	if _keep.button_pressed:
-		var ro: Dictionary = await Api.post_json("/api/caspar-config/override", {"override": xml})
+		var ro: Dictionary = await _api().post_json("/api/caspar-config/override", {"override": xml})
 		ok_override = ro.ok
 	var res: Dictionary = {}
 	if ok_override:
-		res = await Api.post_json("/api/caspar-config/apply", {"xml": xml}, Api.APPLY_TIMEOUT_S)
+		res = await _api().post_json("/api/caspar-config/apply", {"xml": xml}, Timeouts.APPLY_TIMEOUT_S)
 	else:
 		res = {"ok": false, "error": "could not save the manual override", "data": null}
 	_busy = false
 	var text := M.result_text(res)
-	await load_all()
+	await load_all(text.begins_with("FAILED"))  # WO-1106 C36: a failed Apply keeps the operator's text to fix and resend
 	_result.text = text
 	_sync()
+
+
+func _api() -> Object:
+	return api if api != null else get_node_or_null("/root/Api")
+
+## WO-1106: the Config autoload, looked up late — the unit runner has no autoloads and must still compile this script.
+func _conf() -> Node:
+	return (Engine.get_main_loop() as SceneTree).root.get_node_or_null(^"Config")

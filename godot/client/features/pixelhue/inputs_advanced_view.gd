@@ -139,9 +139,10 @@ func _apply_timing() -> void:
 	if bad != "":
 		_say(bad, true)
 		return
+	var body := A.timing_body(_selected, _timing)  # WO-1106 C43: built before busy, so a bad row cannot leave every control disabled
 	_set_busy(true)
 	_say("Applying detailed timing…")
-	var r: Dictionary = await StudioApi.write(api, "input-timing", A.timing_body(_selected, _timing))
+	var r: Dictionary = await StudioApi.write(api, "input-timing", body)
 	_finish(r, "Detailed timing saved.")
 
 

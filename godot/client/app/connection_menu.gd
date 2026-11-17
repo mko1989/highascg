@@ -14,7 +14,7 @@ static func show_menu(host: Control, watch: Node = null) -> void:
 	if not back.is_empty():  # WO-1029 rule 6: the first box answers again — nothing moves by itself
 		menu.add_item("%s is back — return?" % (str(back.name) if str(back.get("name", "")) != "" else Platform.host_of(str(back.origin))), 1)
 		menu.add_separator()
-	menu.add_item("Server address…  (%s)" % Config.origin, 0)
+	menu.add_item("Server address…  (%s)" % _conf().origin, 0)
 	menu.id_pressed.connect(func(i: int) -> void:
 		if i == 1 and watch != null:
 			watch.go_back()
@@ -38,7 +38,7 @@ static func edit(host: Control) -> void:
 	box.custom_minimum_size.x = 420
 	d.add_child(box)
 	var e := LineEdit.new()
-	e.text = Config.saved_server()
+	e.text = _conf().saved_server()
 	e.placeholder_text = "192.168.0.10 or http://host:4200"
 	box.add_child(e)
 	d.register_text_enter(e)
@@ -50,8 +50,8 @@ static func edit(host: Control) -> void:
 	box.add_child(note)
 	d.confirmed.connect(func() -> void:
 		var next := ServerAddress.normalize(e.text)
-		Config.save_server(next)
-		if next != "" and next != Config.origin:
+		_conf().save_server(next)
+		if next != "" and next != _conf().origin:
 			Kit.confirm(host, "Reconnect this client to %s?\n\nThe operator GUI restarts on that server." % next,
 				func() -> void: switch_to(host)))
 	d.visibility_changed.connect(func() -> void:
@@ -67,7 +67,7 @@ static func switch_to(host: Node) -> void:
 		Kit.confirm(host, "HIGHASCG_SERVER is set for this client and overrides the saved server address — unset it to switch.",
 			func() -> void: pass)
 		return
-	restart(host)
+	restart(host, ServerAddress.address_user_args(OS.get_cmdline_user_args()), true)  # WO-1106 C32: the operator's pick wins
 
 
 ## Restart this client with its window args (minus --server unless it was handed over): the autoloads start over on the
@@ -83,3 +83,9 @@ static func restart(host: Node, user_args := PackedStringArray(), use_args := fa
 	if OS.create_process(OS.get_executable_path(), args) <= 0:
 		OS.set_restart_on_exit(true, args)
 	host.get_tree().quit()
+
+
+## The Config autoload, looked up late: handover_watch.gd preloads this script, and the unit runner compiles that one
+## before any autoload exists (WO-1106).
+static func _conf() -> Node:
+	return (Engine.get_main_loop() as SceneTree).root.get_node_or_null(^"Config")

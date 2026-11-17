@@ -234,10 +234,10 @@ static func validate_timing(t: Dictionary) -> String:
 	return ""
 
 
-## `PUT /api/input-timing` body.
+## `PUT /api/input-timing` body. A switcher that reports no polarity gets Positive (1), as validate_timing assumes.
 static func timing_body(id: Variant, t: Dictionary) -> Dictionary:
 	var body := {"id": _i(id), "timing": {"refresh": float(t.refresh)}}
 	for ax in AXES:
 		var a: Dictionary = t[ax[0]]
-		body.timing[ax[0]] = {"active": int(a.active), "front": int(a.front), "sync": int(a.sync), "total": int(a.total), "polarity": int(a.polarity)}
+		body.timing[ax[0]] = {"active": int(a.active), "front": int(a.front), "sync": int(a.sync), "total": int(a.total), "polarity": int(a.get("polarity", 1))}  # WO-1106 C43
 	return body

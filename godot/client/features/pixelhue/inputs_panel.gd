@@ -13,6 +13,8 @@ const Kit := preload("res://features/pixelhue/inputs_ui_kit.gd")
 const Advanced := preload("res://features/pixelhue/inputs_advanced_view.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
+## The HTTP client: the Api autoload, or a fake with get_json / post_json (tests).
+var api: Object = null
 var _state := {}
 var _drafts := {}
 var _checked := {}
@@ -71,7 +73,7 @@ func _ready() -> void:
 	_adv_toggle.toggled.connect(_on_adv_toggled)
 	root.add_child(_adv_toggle)
 	_adv = Advanced.new()
-	_adv.api = Api
+	_adv.api = _api()
 	_adv.has_basic = func() -> bool: return M.pending(_state.get("inputs", []), _drafts).size() > 0
 	_adv.status.connect(func(t: String) -> void: status.emit(t))
 	_adv.busy_changed.connect(func(_on: bool) -> void: _controls())
@@ -95,10 +97,14 @@ func refresh(force := false) -> void:
 		return
 	_set_busy(true)
 	_say("Reading input ports and EDIDs…")
-	var r: Dictionary = await StudioApi.read(Api, "inputs")
+	var before := _pending()  # WO-1106 C37: typed while the read runs = not thrown away when it lands
+	var r: Dictionary = await StudioApi.read(_api(), "inputs")
 	_set_busy(false)
 	if not r.ok:
 		_say(str(r.error), true)
+		return
+	if not _state.is_empty() and _pending() != before:
+		_say("Pending input changes kept. Apply inputs, or press Discard to re-read.")
 		return
 	_adopt(r.data)
 	_say("Inputs loaded.")
@@ -106,6 +112,10 @@ func refresh(force := false) -> void:
 		_adv.refresh(true)
 	else:
 		_adv.invalidate()
+
+
+func _api() -> Object:
+	return api if api != null else get_node_or_null("/root/Api")
 
 
 func _say(text: String, is_error := false) -> void:
@@ -146,7 +156,7 @@ func _apply() -> void:
 		return
 	_set_busy(true)
 	_say("Applying inputs…")
-	var r: Dictionary = await StudioApi.write(Api, "inputs", {"changes": changes})
+	var r: Dictionary = await StudioApi.write(_api(), "inputs", {"changes": changes})
 	_set_busy(false)
 	if not r.ok:
 		_say(str(r.error), true)

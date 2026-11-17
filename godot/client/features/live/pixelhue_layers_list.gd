@@ -8,9 +8,19 @@ extends VBoxContainer
 const M := preload("res://features/live/pixelhue_match_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
+## WO-1106 C35: a switcher that stops answering mid-show must not tie up the Api pool: one read in flight, and after
+## SLOW_AFTER failures in a row only every SLOW_EVERY-th tick reads (still often enough to bring the list back).
+const SLOW_AFTER := 3
+const SLOW_EVERY := 10
+
+## The HTTP client: the Api autoload, or a fake with get_json (tests).
+var api: Object = null
 var _rows: VBoxContainer
 var _note: Label
 var _key := ""
+var _busy := false
+var _fails := 0
+var _ticks := 0
 
 
 func _ready() -> void:
@@ -45,7 +55,18 @@ func reload() -> void:
 	if parent == null or not parent.is_visible_in_tree():
 		return
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var r: Dictionary = await Api.get_json("/api/pixelhue/layers?scene=pgm")
+	if _busy:
+		return
+	if _fails >= SLOW_AFTER:
+		_ticks += 1
+		if _ticks % SLOW_EVERY != 0:
+			return
+	_busy = true
+	var r: Dictionary = await _api().get_json("/api/pixelhue/layers?scene=pgm")
+	_busy = false
+	_fails = 0 if r.get("ok") == true else _fails + 1
+	if _fails == 0:
+		_ticks = 0
 	visible = r.ok  # no switcher added, or it does not answer: no list
 	if not r.ok:
 		_key = ""
@@ -61,6 +82,10 @@ func reload() -> void:
 		c.queue_free()
 	for c in list:
 		_rows.add_child(_row(c))
+
+
+func _api() -> Object:
+	return api if api != null else get_node_or_null("/root/Api")
 
 
 func _row(c: Dictionary) -> Control:

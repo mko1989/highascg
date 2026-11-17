@@ -36,24 +36,31 @@ var _ticks := 0
 var _moving := false
 var _snoozed := false
 var _busy_now := false
+## WO-1106 C44: one probe in flight per origin (origin → its sequence number). A probe started while the last one to
+## that origin still waits is skipped: probes no longer stack every 2 s, and a slow answer cannot land after a newer one.
+var _inflight := {}
+var _seq := 0
+## Tests: an object with fetch_cluster(origin) -> Dictionary instead of the HTTP GET.
+var fetcher: Object = null
 
 
 func _ready() -> void:
-	if Config.demo or Platform.is_local_origin(Config.origin):
+	if _conf().demo or Platform.is_local_origin(_conf().origin):
 		set_process_unhandled_key_input(false)
 		return
-	var from := str(Config.args.get("handover-from", ""))
+	var from := str(_conf().args.get("handover-from", ""))
 	if from != "":
 		home = {"origin": from, "name": Platform.host_of(from)}
-		moved_at = float(str(Config.args.get("handover-at", "-1")))
+		moved_at = float(str(_conf().args.get("handover-at", "-1")))
 	var cfg := ConfigFile.new()
-	cfg.load(Config.UI_CFG)
-	_learned = Model.load_cfg(cfg, Config.origin)  # contract 2: the list of the last session
-	if not Ws.is_open:
+	cfg.load(_conf().UI_CFG)
+	_learned = Model.load_cfg(cfg, _conf().origin)  # contract 2: the list of the last session
+	var ws := _ws()
+	if not ws.is_open:
 		_ws_down = _now()
 		_http_down = _now()
-	Ws.connected.connect(func() -> void: _ws_down = -1.0)
-	Ws.disconnected.connect(func() -> void: _ws_down = _now())
+	ws.connect(&"connected", func() -> void: _ws_down = -1.0)
+	ws.connect(&"disconnected", func() -> void: _ws_down = _now())
 	var timer := Timer.new()
 	timer.wait_time = 1.0
 	timer.autostart = true
@@ -67,7 +74,7 @@ static func _now() -> float:
 
 func _tick() -> void:
 	_ticks += 1
-	var healthy := Ws.is_open and _http_down < 0.0
+	var healthy: bool = _ws().is_open and _http_down < 0.0
 	if _ticks % POLL_EVERY_S == 1 or (not healthy and _ticks % 2 == 0):
 		_probe_box()
 	if home.get("origin", "") != "" and _ticks % POLL_EVERY_S == 3:
@@ -103,7 +110,25 @@ func _busy() -> bool:
 	return false
 
 
+## → the parsed answer, or {skipped: true} when a probe to `origin` is already in flight.
 func _fetch(origin: String) -> Dictionary:
+	if _inflight.has(origin):
+		return {"skipped": true}
+	_seq += 1
+	var seq := _seq
+	_inflight[origin] = seq
+	var res: Dictionary
+	if fetcher != null:
+		res = await fetcher.fetch_cluster(origin)
+	else:
+		res = await _http_get(origin)
+	if _inflight.get(origin) != seq:
+		return {"skipped": true}
+	_inflight.erase(origin)
+	return res
+
+
+func _http_get(origin: String) -> Dictionary:
 	var r := HTTPRequest.new()
 	r.timeout = PROBE_TIMEOUT_S
 	add_child(r)
@@ -116,7 +141,9 @@ func _fetch(origin: String) -> Dictionary:
 
 
 func _probe_box() -> void:
-	var res := await _fetch(Config.origin)
+	var res := await _fetch(_conf().origin)
+	if res.get("skipped") == true:
+		return
 	if int(res.get("status", 0)) > 0:
 		_http_down = -1.0
 	elif _http_down < 0.0:
@@ -127,18 +154,20 @@ func _probe_box() -> void:
 
 ## Keep the connected box's linked servers (what IT reports) fresh and in ui.cfg for the next start.
 func _learn(cluster: Variant) -> void:
-	var learned := {"box": Model.box_of(cluster, Config.origin), "targets": Model.learn_targets(cluster)}
+	var learned := {"box": Model.box_of(cluster, _conf().origin), "targets": Model.learn_targets(cluster)}
 	if learned == _learned:
 		return
 	_learned = learned
 	var cfg := ConfigFile.new()
-	cfg.load(Config.UI_CFG)
-	Model.store_cfg(cfg, Config.origin, learned.box, learned.targets)
-	cfg.save(Config.UI_CFG)
+	cfg.load(_conf().UI_CFG)
+	Model.store_cfg(cfg, _conf().origin, learned.box, learned.targets)
+	cfg.save(_conf().UI_CFG)
 
 
 func _probe_target(t: Dictionary) -> void:
 	var res := await _fetch(str(t.origin))
+	if res.get("skipped") == true:
+		return
 	if int(res.get("status", 0)) <= 0:
 		_answers[t.origin] = {"ok": false}
 	elif bool(res.get("ok", false)):
@@ -149,6 +178,8 @@ func _probe_target(t: Dictionary) -> void:
 
 func _probe_home() -> void:
 	var res := await _fetch(str(home.origin))
+	if res.get("skipped") == true:
+		return
 	_home_up = int(res.get("status", 0)) > 0
 	_decide()
 
@@ -188,7 +219,7 @@ func go_back() -> void:
 func cue() -> String:
 	if home.is_empty() or cue_dismissed:
 		return ""
-	return Model.cue_text(Platform.host_of(Config.origin), str(home.name), moved_at)
+	return Model.cue_text(Platform.host_of(_conf().origin), str(home.name), moved_at)
 
 
 func _go(target: String, forward: bool) -> void:
@@ -196,9 +227,9 @@ func _go(target: String, forward: bool) -> void:
 		return
 	_moving = true
 	var user := OS.get_cmdline_user_args()
-	var args := ServerAddress.handover_user_args(user, target, Config.origin, _now()) if forward \
+	var args := ServerAddress.handover_user_args(user, target, _conf().origin, _now()) if forward \
 		else ServerAddress.return_user_args(user, target)
-	print("[client] WO-1029: %s %s (from %s)" % ["handover to" if forward else "returning to", target, Config.origin])
+	print("[client] WO-1029: %s %s (from %s)" % ["handover to" if forward else "returning to", target, _conf().origin])
 	ConnectionMenu.restart(self, args, true)
 
 
@@ -207,3 +238,11 @@ func _unhandled_key_input(e: InputEvent) -> void:
 	if k and k.pressed and not k.echo and k.keycode in [KEY_ENTER, KEY_KP_ENTER] and offer_visible():
 		accept_offer()
 		get_viewport().set_input_as_handled()
+
+## WO-1106: the Config / Ws autoloads, looked up late — the unit runner compiles this script before any autoload exists.
+func _conf() -> Node:
+	return (Engine.get_main_loop() as SceneTree).root.get_node_or_null(^"Config")
+
+
+func _ws() -> Node:
+	return (Engine.get_main_loop() as SceneTree).root.get_node_or_null(^"Ws")

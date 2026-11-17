@@ -10,21 +10,29 @@ const StudioApi := preload("res://features/pixelhue/studio_api.gd")
 const M := preload("res://features/pixelhue/programming_model.gd")
 const P := preload("res://features/pixelhue/programming_presets_model.gd")
 const TIMEOUT_S := 120.0  # a capture waits for the device to convert the picture
+const THUMB_SLOTS := 2  # WO-1106 C42: thumbnails one or two at a time, not all at once through the Api's 6-slot pool
 
 var api_fn: Callable
 var gallery: Dictionary = {}
 var _loading := false
+var _loaded := false  # WO-1106 C42: only a successful read counts; a failed one is tried again on the next load_once
 var _thumbs := {}  # picture id → Texture2D, or an Array of callbacks while it loads
+var _thumb_queue: Array[int] = []
+var _thumb_running := 0
 
 
 func load_once() -> void:
-	if _loading or not gallery.is_empty():
+	if _loading or _loaded:
 		return
 	_loading = true
 	var r: Dictionary = await StudioApi.read(api_fn.call(), "gallery")
 	_loading = false
-	gallery = M.ints(r.data) if r.ok else {"pictures": [], "support": {}}
-	if not r.ok:
+	_loaded = r.ok
+	if r.ok:
+		gallery = M.ints(r.data)
+	else:
+		if gallery.is_empty():
+			gallery = {"pictures": [], "support": {}}
 		notice.emit(r.error)
 	changed.emit()
 
@@ -35,6 +43,7 @@ func manage(body: Dictionary, done: String) -> bool:
 	var r := StudioApi.shape(await api_fn.call().post_json(StudioApi.BASE + "gallery/manage", body, TIMEOUT_S))
 	if r.ok:
 		gallery = M.ints(r.data)
+		_loaded = true
 		_thumbs.clear()
 	notice.emit(done if r.ok else r.error)
 	changed.emit()
@@ -51,7 +60,20 @@ func thumb(id: int, cb: Callable) -> void:
 		(have as Array).append(cb)
 		return
 	_thumbs[id] = [cb]
+	_thumb_queue.append(id)
+	_pump_thumbs()
+
+
+func _pump_thumbs() -> void:
+	while _thumb_running < THUMB_SLOTS and not _thumb_queue.is_empty():
+		_fetch_thumb(_thumb_queue.pop_front())
+
+
+func _fetch_thumb(id: int) -> void:
+	_thumb_running += 1
 	var r: Dictionary = await api_fn.call().get_bytes(StudioApi.BASE + "gallery/thumb?id=%d" % id)
+	_thumb_running -= 1
+	_pump_thumbs()
 	var img: Image = P.decode_picture(r.get("bytes", PackedByteArray())) if r.get("ok") == true else null
 	var waiting: Variant = _thumbs.get(id)
 	if img == null:

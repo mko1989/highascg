@@ -4,6 +4,7 @@ extends HBoxContainer
 ## Layout edits are a draft per screen until "Apply screen layout"; everything else applies at once.
 
 signal status(text: String)
+signal _read_done  ## WO-1106 C38: Freeze / Blackout / … pressed while the tab reads wait for this, then go out
 
 const StudioApi := preload("res://features/pixelhue/studio_api.gd")
 const M := preload("res://features/pixelhue/screens_model.gd")
@@ -13,10 +14,13 @@ const NF := preload("res://core/numeric_field.gd")
 const Kit := preload("res://features/settings/pane_kit.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
+## The HTTP client: the Api autoload, or a fake with get_json / post_json (tests).
+var api: Object = null
 var _state: Dictionary = {}
 var _drafts: Dictionary = {}  # screen id → draft
 var _selected := -1
-var _busy := false
+var _reading := false  # WO-1106 C38: a read and a write no longer share one flag (a write was dropped silently)
+var _writing := false
 var _extras_open := false
 var _new_name := ""
 var _new_type := M.TYPE_MAIN
@@ -63,16 +67,17 @@ func _dirty() -> bool:
 
 ## Re-read from the switcher; pending layout drafts of screens that still exist are kept.
 func refresh() -> void:
-	if _busy:
+	if _reading or _writing:
 		return
-	_busy = true
-	var r: Dictionary = await StudioApi.read(Api, "screens")
-	_busy = false
+	_reading = true
+	var r: Dictionary = await StudioApi.read(_api(), "screens")
+	_reading = false
 	if not r.ok:
 		status.emit(str(r.error))
-		return
-	_adopt(r.data, true)
-	status.emit("Screens: pending layout changes kept" if _dirty() else "")
+	else:
+		_adopt(r.data, true)
+		status.emit("Screens: pending layout changes kept" if _dirty() else "")
+	_read_done.emit()  # last: a waiting write goes out after this read is adopted, its answer is the newer state
 
 
 func _adopt(next: Dictionary, preserve: bool) -> void:
@@ -91,15 +96,23 @@ func _adopt(next: Dictionary, preserve: bool) -> void:
 	_render()
 
 
+func _api() -> Object:
+	return api if api != null else get_node_or_null("/root/Api")
+
+
 func _command(req: Dictionary) -> void:
-	if _busy:
+	if _writing:  # WO-1106 C38: say so instead of dropping it
+		status.emit("The previous screen change is still being sent to the switcher. Try again when it is done.")
 		return
-	_busy = true
+	_writing = true
+	if _reading:
+		status.emit("Waiting for the screens read to finish…")
+		await _read_done
 	var old_ids: Array = []
 	for s in _screens():
 		old_ids.append(int(s.id))
-	var r: Dictionary = await StudioApi.write(Api, "screens", req)
-	_busy = false
+	var r: Dictionary = await StudioApi.write(_api(), "screens", req)
+	_writing = false
 	if not r.ok:
 		status.emit(str(r.error))
 		return
@@ -241,7 +254,7 @@ func _build_main(screen: Dictionary) -> void:
 			status.emit(e)
 			return
 		_command(M.update_body(id, draft)))
-	apply.disabled = _busy
+	apply.disabled = _writing
 	_update_pending()
 
 

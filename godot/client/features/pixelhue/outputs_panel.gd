@@ -11,11 +11,15 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const NF := preload("res://core/numeric_field.gd")
 const Kit := preload("res://features/settings/pane_kit.gd")
 const Advanced := preload("res://features/pixelhue/outputs_advanced.gd")
+const CAPACITY_BUSY := "The output capacity change is still being written. Wait for it to finish."
 
+## The HTTP client: the Api autoload, or a fake with get_json / post_json (tests).
+var api: Object = null
 var _state: Dictionary = {}
 var _drafts := {}
 var _checked := {}
 var _busy := false
+var _capacity_busy := false  # WO-1106 C45: the capacity write takes up to 95 s; a second click must not queue another
 var _box: VBoxContainer
 var _dirty: Label
 var _save: Button
@@ -41,6 +45,7 @@ func _ready() -> void:
 	_box.add_theme_constant_override("separation", 10)
 	inner.add_child(_box)
 	_adv = Advanced.new()
+	_adv.api = api
 	_adv.status.connect(func(t: String) -> void: status.emit(t))
 	inner.add_child(_adv)
 	var foot := HBoxContainer.new()
@@ -50,17 +55,26 @@ func _ready() -> void:
 	_dirty.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	foot.add_child(_dirty)
 	_save = Kit.button(foot, "Apply outputs", _on_apply)
+	Kit.button(foot, "Discard", func() -> void: refresh(true))  # WO-1106 C34: the one way to drop staged edits
 	add_child(foot)
 	_render()
 
 
-func refresh() -> void:
-	var r: Dictionary = await StudioApi.read(Api, "outputs")
+## Header Refresh / tab shown. WO-1106 C34: staged edits survive (as on Inputs and Screens); `force` = Discard.
+func refresh(force := false) -> void:
+	if not force and not _state.is_empty() and (not _pending().is_empty() or _adv.has_changes()):
+		status.emit("Pending output changes kept. Apply outputs, or press Discard to re-read.")
+		return
+	var r: Dictionary = await StudioApi.read(_api(), "outputs")
 	if not r.ok:
 		status.emit(str(r.error))
 		return
 	_adopt(r.data)
-	_adv.refresh()
+	_adv.refresh(force)
+
+
+func _api() -> Object:
+	return api if api != null else get_node_or_null("/root/Api")
 
 
 func _adopt(data: Dictionary) -> void:
@@ -127,15 +141,26 @@ func _capacity(g: Dictionary) -> void:
 		if why != "":
 			status.emit(why)
 			return
-		Kit.confirm(self, M.capacity_confirm_text(g, v), func() -> void:
-			var res: Dictionary = await StudioApi.write(Api, "output-capacity", M.capacity_body(g, v))
-			if res.ok:
-				_adopt(res.data)
-				_adv.refresh()
-				status.emit("Output capacity and copy relationships saved. Refresh Screens to inspect the current configuration.")
-			else:
-				status.emit(str(res.error))))
+		if _capacity_busy:
+			status.emit(CAPACITY_BUSY)
+			return
+		Kit.confirm(self, M.capacity_confirm_text(g, v), func() -> void: _write_capacity(g, v)))
 	_box.add_child(sum)
+
+
+func _write_capacity(g: Dictionary, v: int) -> void:
+	if _capacity_busy:  # two confirms open: only the first one writes
+		status.emit(CAPACITY_BUSY)
+		return
+	_capacity_busy = true
+	var res: Dictionary = await StudioApi.write(_api(), "output-capacity", M.capacity_body(g, v))
+	_capacity_busy = false
+	if res.ok:
+		_adopt(res.data)
+		_adv.refresh(true)
+		status.emit("Output capacity and copy relationships saved. Refresh Screens to inspect the current configuration.")
+	else:
+		status.emit(str(res.error))
 
 
 ## A menu that holds one line until it opens; `fill` puts the full list in then. Items carry their key as metadata.
@@ -348,7 +373,7 @@ func _on_apply() -> void:
 	var go := func() -> void:
 		_busy = true
 		_controls()
-		var r: Dictionary = await StudioApi.write(Api, "outputs", M.outputs_body(_state, changes))
+		var r: Dictionary = await StudioApi.write(_api(), "outputs", M.outputs_body(_state, changes))
 		_busy = false
 		if r.ok:
 			_adopt(r.data)

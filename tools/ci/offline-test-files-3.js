@@ -469,4 +469,6 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-cluster-media-link.test.js', // WO-1106 C20 / C26: sleep drops its abort listener, an aborted waiter hands the slot on
 	'tools/smoke/smoke-wo1106-cluster-floors.test.js', // WO-1106 C23 / C24: hello floor persisted, per-namespace floors, linked fingerprints never evicted
 	'tools/smoke/smoke-wo1106-cluster-air-journal.test.js', // WO-1106 C28: cleared layers leave the journal
+	'tools/smoke/smoke-wo1106-godot-previs.test.js', // WO-1106 A22 / A42: converter outputs ignored + verifier, one drape colour form in GD and JS
+	'tools/smoke/smoke-wo1106-godot-client-guards.test.js', // WO-1106 B28 / B31 / C3 / C4 / C6: polls keep one request in flight, presenters keep typed names, photo cache pruned
 ]

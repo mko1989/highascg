@@ -135,8 +135,9 @@ func _load_templates() -> void:
 	var session := str(_state.get("session", ""))
 	if _state.get("capabilities", {}).get("mvr") != true or session == _templates_session:
 		return
-	_templates_session = session
 	var r: Dictionary = await StudioApi.read(api, "mvr-templates")
+	if r.ok:  # WO-1106 C42: a failed read is tried again on the next refresh, not cached for the session
+		_templates_session = session
 	_toolbar.set_templates(M.template_items(r.data) if r.ok else [])
 
 

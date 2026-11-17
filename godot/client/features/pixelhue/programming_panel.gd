@@ -37,6 +37,7 @@ var sync: Sync
 var _queue: Queue
 var _gallery: Gallery
 var _loading := false
+var _draining := false  # WO-1106 C30: a command waits for the geometry queue
 var _source_polling := false
 var _source_version := 0
 var _geometry_revision := 0
@@ -162,8 +163,11 @@ func _load() -> void:
 	if _loading:
 		return
 	_loading = true
+	var ver := _source_version  # WO-1106 C39: a Take / command adopted while this read ran is newer: drop the read
 	var r: Dictionary = await StudioApi.read(_api(), "programming")
 	_loading = false
+	if ver != _source_version:
+		return
 	if not r.ok:
 		status.emit(r.error)
 		if state.is_empty():
@@ -218,10 +222,6 @@ func _render() -> void:
 	_set_busy()
 
 
-func _repaint() -> void:
-	_bands.repaint(selected_id, busy)
-
-
 func render_inspector() -> void:
 	var l := M.layer_by_id(state, selected_id)
 	_tools.render(state, l, not l.is_empty() and M.locked(state, l))
@@ -244,7 +244,7 @@ func _set_busy() -> void:
 
 func select(id: int) -> void:
 	selected_id = id
-	_repaint()
+	_bands.repaint(selected_id, busy)
 	render_inspector()
 
 
@@ -329,10 +329,15 @@ func command(body: Dictionary, success := "Programming updated.") -> void:
 		_geometry_success = success
 		edit_geometry(body, true)
 		return
-	if busy or state.is_empty():
+	if busy or _draining or state.is_empty():  # WO-1106 C30: one command at a time, also while it drains geometry
 		return
-	if not await _queue.drain():
+	_draining = true  # not `busy`: that would stop the very queue drain() waits for
+	var drained: bool = await _queue.drain()
+	_draining = false
+	if not drained:
 		status.emit("Retry the unsaved layer positions before this action.")
+		return
+	if busy or state.is_empty():
 		return
 	busy = true
 	_set_busy()
@@ -380,7 +385,7 @@ func edit_geometry(change: Dictionary, immediate := true) -> void:
 	else:
 		l.window = G.copy(w)
 	_geometry_revision += 1
-	_repaint()
+	_bands.repaint(selected_id, busy)
 	_tools.update_fields()
 	_queue.put(c, immediate)
 
@@ -401,7 +406,7 @@ func _geometry_result(data: Dictionary, accepted: Array) -> void:
 			var local := M.layer_by_id(state, actual.get("id"))
 			if not local.is_empty() and actual.get("id") in ids and actual.get("window") is Dictionary:
 				local.window = G.copy(actual.window)
-	_repaint()
+	_bands.repaint(selected_id, busy)
 	_tools.update_fields()
 	if _geometry_failed or (not accepted.is_empty() and not sync.dirty and not _dragging()):
 		_geometry_failed = false
@@ -420,8 +425,9 @@ func _schedule_refresh(delay_ms: int) -> void:
 			await get_tree().create_timer(0.15).timeout
 			continue
 		var rev := _geometry_revision
+		var ver := _source_version
 		var r: Dictionary = await StudioApi.read(_api(), "programming")
-		if ep != _refresh_epoch:
+		if ep != _refresh_epoch or ver != _source_version:
 			return
 		if r.ok and rev == _geometry_revision and not (busy or sync.dirty or sync.saving or _dragging() or _editing()):
 			_adopt(r.data)
@@ -461,8 +467,7 @@ func _poll_sources() -> void:
 		_sources.render(state, _gallery.gallery)
 
 
-func load_gallery() -> void:
-	_gallery.load_once()
+func load_gallery() -> void: _gallery.load_once()
 
 
 func manage_gallery(body: Dictionary, done: String) -> void:
@@ -475,8 +480,7 @@ func manage_gallery(body: Dictionary, done: String) -> void:
 	_set_busy()
 
 
-func thumb(id: int, cb: Callable) -> void:
-	_gallery.thumb(id, cb)
+func thumb(id: int, cb: Callable) -> void: _gallery.thumb(id, cb)
 
 
 func _button(parent: Node, text: String, cb: Callable) -> Button:

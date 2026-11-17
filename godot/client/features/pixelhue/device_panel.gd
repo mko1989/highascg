@@ -6,6 +6,7 @@ extends ScrollContainer
 ## Anything that restarts, shuts down, resets or re-addresses the switcher asks first. Logic: device_model.gd.
 
 signal status(text: String)
+signal _read_done  ## WO-1106 C38: a write pressed while the tab reads waits for this, then goes out
 
 const M := preload("res://features/pixelhue/device_model.gd")
 const StudioApi := preload("res://features/pixelhue/studio_api.gd")
@@ -15,9 +16,12 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const SelfTestBlock := preload("res://features/pixelhue/device_selftest_block.gd")
 const BackupBlock := preload("res://features/pixelhue/device_backup_block.gd")
 
+## The HTTP client: the Api autoload, or a fake with get_json / post_json (tests).
+var api: Object = null
 var _state: Dictionary = {}
 var _body: VBoxContainer
-var _busy := false
+var _reading := false  # WO-1106 C38: a read and a write no longer share one flag (a write was dropped silently)
+var _writing := false
 var _selftest: VBoxContainer
 var _backup: VBoxContainer
 # controls of the current render
@@ -57,34 +61,69 @@ func _init() -> void:
 
 
 func refresh() -> void:
-	if _busy:
+	if _reading or _writing:
 		return
-	_busy = true
-	var r := await StudioApi.read(Api, "device")
+	_reading = true
+	var typed := _form()  # WO-1106 C37: what the device controls hold before the read
+	var r := await StudioApi.read(_api(), "device")
+	var st: Dictionary = {}
+	var bk: Dictionary = {}
+	if r.ok:
+		st = await StudioApi.read(_api(), "self-test")
+		bk = await StudioApi.read(_api(), "source-backup")
+	_reading = false
 	if not r.ok:
-		_busy = false
 		status.emit(str(r.error))
-		return
-	_state = r.data
-	var st := await StudioApi.read(Api, "self-test")
-	_selftest.call("show_state", st.data if st.ok else {})
-	var bk := await StudioApi.read(Api, "source-backup")
-	_backup.call("show_state", bk.data if bk.ok else {})
-	_busy = false
-	_render()
+	else:
+		_selftest.call("show_state", st.data if st.get("ok") == true else {})
+		_backup.call("show_state", bk.data if bk.get("ok") == true else {})
+		if _form() != typed:  # typed into while the read ran: a re-render would throw that away
+			status.emit("Device settings you are editing were kept. Save them, or press Refresh to read the device again.")
+		else:
+			_state = r.data
+			_render()
+	_read_done.emit()  # last: a waiting write goes out after this read is adopted, its answer is the newer state
+
+
+func _api() -> Object:
+	return api if api != null else get_node_or_null("/root/Api")
+
+
+## The values of the device controls (not the self-test / source backup blocks): changes while a read runs = typing.
+func _form() -> Array:
+	var out: Array = []
+	var stack: Array = [_body]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n == _selftest or n == _backup or n.is_queued_for_deletion():
+			continue
+		if n is LineEdit:
+			out.append((n as LineEdit).text)
+		elif n is OptionButton:
+			out.append((n as OptionButton).selected)
+		stack.append_array(n.get_children())
+	return out
 
 
 ## One write. resource: device ({changes}), device-action, self-test, source-backup.
 func _send(resource: String, body: Dictionary, done: String) -> void:
-	if _busy:
+	if _writing:  # WO-1106 C38: say so instead of dropping it
+		status.emit("The previous change is still being sent to the switcher. Try again when it is done.")
+		if resource == "source-backup":
+			_backup.call("reshow")
 		return
-	_busy = true
+	_writing = true
+	if _reading:
+		status.emit("Waiting for the device read to finish…")
+		await _read_done
 	status.emit("Working…")
 	var wire := {"changes": body} if resource == "device" else body
-	var r := await StudioApi.write(Api, resource, wire)
-	_busy = false
+	var r := await StudioApi.write(_api(), resource, wire)
+	_writing = false
 	if not r.ok:
 		status.emit(str(r.error))
+		if resource == "source-backup":
+			_backup.call("reshow")  # WO-1106 C38: the backup control goes back to what the switcher has
 		_render()  # put the controls back to what the switcher has
 		return
 	var d: Dictionary = r.data
