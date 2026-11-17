@@ -43,7 +43,8 @@ test('17: stripRedacted drops the GET mask at any depth; settings-state.save and
 		security: { apiToken: '[REDACTED]' },
 	})
 	assert.deepEqual(got, { ui: { nuclearRequirePassword: true }, streamOutputs: [{ id: 'a', n: 1 }], security: {} })
-	assert.match(read('client/lib/settings-state.js'), /api\.post\('\/api\/settings', stripRedacted\(this\.settings\)\)/)
+	// WO-1106 A26: the stripped copy also loses `games` before it is posted
+	assert.match(read('client/lib/settings-state.js'), /const body = stripRedacted\(this\.settings\)\n[^\n]*delete body\.games\n\s*await api\.post\('\/api\/settings', body\)/)
 	assert.match(read('client/components/settings-modal.js'), /api\.post\('\/api\/settings', stripRedacted\(settings\)\)/)
 })
 

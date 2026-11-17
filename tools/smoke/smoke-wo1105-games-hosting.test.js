@@ -208,9 +208,10 @@ test('validation: every bad body is a 400 with the state; the module switch call
 		assert.equal(r.body.ok, false)
 		assert.ok(r.body.state && Array.isArray(r.body.state.games), 'the state comes back')
 	}
-	assert.equal((await h.host({ action: 'module', game: 'world', on: true })).status, 200)
-	assert.equal((await h.host({ action: 'module', game: 'sk', on: false })).status, 200)
-	assert.equal((await h.host({ action: 'module', game: 'nope', on: true })).status, 404)
+	const BOX = { socket: { remoteAddress: '127.0.0.1', localPort: 4200 }, headers: { host: '127.0.0.1:4200' } } // WO-1106 B1: the on-box client
+	assert.equal((await h.host({ action: 'module', game: 'world', on: true }, BOX)).status, 200)
+	assert.equal((await h.host({ action: 'module', game: 'sk', on: false }, BOX)).status, 200)
+	assert.equal((await h.host({ action: 'module', game: 'nope', on: true }, BOX)).status, 404)
 	assert.deepEqual(calls, [['enable', 'game-world'], ['disable', 'toy-skirmish']])
 	assert.equal(calls.length, 2, 'a refused body never reached the loader')
 })

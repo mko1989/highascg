@@ -458,4 +458,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-core-services.test.js', // WO-1106 B10–B13: keeping-up report caps, async fc-list / aplay, bluetooth status shared, live-audio repair backoff
 	'tools/smoke/smoke-wo1106-core-shader-licence.test.js', // WO-1106 B14 / B68: no newlines in the header, removed ids never come back
 	'tools/smoke/smoke-wo1106-iso-release-licences.test.js', // WO-1106 B65 / B66 / B69 / B70 / B72 / B73: collector home under sudo, host licence check, source state, dev-dep notices, module excludes, PortAudio, empty listing
+	'tools/smoke/smoke-wo1106-games-hosting-fixes.test.js', // WO-1106 A6 / A7 / A19 / A23 / A26 / A30 + B1: sticky pause, local-only addresses, module list cache, level check, web save leaves games, module switch gate
 ]

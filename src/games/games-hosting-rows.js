@@ -73,7 +73,8 @@ function gameRow(m, { desc, hostingOf, stateOf, worldState, settings, ip, port }
 
 /**
  * @param {{ mods: object[], desc: Function, hostingOf: Function, stateOf: Function, worldState: object|null,
- *   settings: object, join: object, port: number, qr: (text: string) => Promise<object|null> }} a
+ *   settings: object, join: object, port: number, qr: (text: string) => Promise<object|null>, safe?: boolean }} a
+ *   safe: PAUSE EVERYTHING pressed while the Game World is not loaded (games-hosting.js keeps it, WO-1106 A6)
  */
 async function buildState(a) {
 	const ctx = { ...a, ip: a.join.ip }
@@ -93,7 +94,7 @@ async function buildState(a) {
 		join: a.join,
 		world,
 		global: {
-			safe: ws?.on ? ws.safe === true : open.length > 0 && open.every((g) => g.safe),
+			safe: ws?.on ? ws.safe === true : a.safe === true || (open.length > 0 && open.every((g) => g.safe)),
 			lights: all('lights'),
 			wall: all('wall'),
 			house: open.find((g) => g.house != null)?.house ?? (ws?.on && Number.isFinite(ws.house) ? ws.house : 1),

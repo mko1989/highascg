@@ -125,6 +125,8 @@ export function buildSettingsPayload(modal) {
 		},
 	}
 	delete settings.offline_mode
+	// WO-1106 A26: the web modal has no Games controls; re-posting its copy of `games` reverted a Godot Settings ▸ Games change.
+	delete settings.games
 	return settings
 }
 

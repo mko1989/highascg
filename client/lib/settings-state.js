@@ -138,7 +138,10 @@ export const settingsState = {
 		}
 		try {
 			// WO-830c: this.settings is the (redacted) GET copy — never echo "[REDACTED]" back as a value.
-			await api.post('/api/settings', stripRedacted(this.settings))
+			// WO-1106 A26: the web UI has no Games controls — re-posting its stale copy reverted a Godot Settings ▸ Games change.
+			const body = stripRedacted(this.settings)
+			if (body && typeof body === 'object') delete body.games
+			await api.post('/api/settings', body)
 		} catch (e) {
 			console.error('[SettingsState] Save failed:', e)
 			throw e
