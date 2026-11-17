@@ -60,3 +60,11 @@ static func tile_roles(cells: Array, remote: Array, descriptors: Dictionary, vis
 		if role != "" and is_relayed(descriptors.get(role)) and not (role in out):
 			out.append(role)
 	return out
+
+
+## WO-1119 — how often a ring of `px` pixels is read: every frame up to a little over UHD, then every Nth so the copy +
+## texture upload stays near UHD-at-full-rate (11520×1536 = 17.7 MP → every 2nd frame: 25 of 50 fps). Measured on the
+## box: reading that canvas on every frame cost the client 13 of 50 fps (70 MB memcpy + 70 MB upload per frame).
+static func read_every(px: int) -> int:
+	return clampi(roundi(float(px) / (3840.0 * 2160.0)), 1, 4)
+

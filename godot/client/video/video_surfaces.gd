@@ -193,6 +193,9 @@ func _apply_descriptors(list: Variant) -> void:
 			s.path = want
 
 
+var _tick := 0
+
+
 func _process(_delta: float) -> void:
 	if Config.demo:  # WO-865: the GPU draws every held role, the readers only say "no signal"
 		for role in holders.roles():
@@ -203,9 +206,12 @@ func _process(_delta: float) -> void:
 		feed.pump(holders.roles())
 	elif local_feed != null:
 		local_feed.pump(FeedRoles.feed_roles(holders.roles(), descriptors, false))
+	_tick += 1
 	for role in holders.roles():
 		var s: Dictionary = _ensure(role)
 		var r: Variant = s.reader
+		if _tick % FeedRoles.read_every(int(r.width) * int(r.height)) != 0:
+			continue  # WO-1119: a canvas far above UHD is copied + uploaded on every 2nd…4th frame only
 		if r.poll():
 			if s.native:
 				s.tex.update_native(r.src)

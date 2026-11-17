@@ -43,3 +43,10 @@ func test_tile_roles_only_visible_remote_relayed() -> void:
 	t.eq(FR.tile_roles(cells, remote, d, true), ["pgm3", "prv3"], "local, multiview and not-relayed (pgm4: older owner) are not held")
 	t.eq(FR.tile_roles(cells, remote, d, false), [], "hidden tiles hold nothing (no lease, owner stops encoding)")
 	t.eq(FR.tile_roles(cells, remote, {}, true), [], "older node: no descriptors → placeholder only")
+
+
+func test_wo1119_big_rings_are_read_every_nth_frame() -> void:
+	t.eq([FR.read_every(0), FR.read_every(1920 * 1080), FR.read_every(3840 * 2160), FR.read_every(4992 * 1536 + 3840 * 1080)], [1, 1, 1, 1], "up to about UHD: every frame")
+	t.eq(FR.read_every(11520 * 1536), 2, "the 30 m LED canvas: every 2nd frame")
+	t.eq(FR.read_every(7680 * 4320), 4, "8K: every 4th")
+	t.eq(FR.read_every(20000 * 10000), 4, "never rarer than every 4th")
