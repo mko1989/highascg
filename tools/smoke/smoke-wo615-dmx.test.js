@@ -56,8 +56,8 @@ test('E1.31: header layers, multicast group, and the sacn package parses our pac
 test('applyType: pan / tilt from the mode (range, falling tilt flips invert), channels with a slot', async () => {
 	const std = (await modes()).find((m) => m.name === 'Standard')
 	const fx = applyType(normalizeFixture({ tilt: { invert: false }, pan: { invert: true } }, 0), std)
-	assert.deepStrictEqual(fx.pan, { ch: 1, fine: 2, range: 540, invert: true })
-	assert.deepStrictEqual(fx.tilt, { ch: 3, fine: 4, range: 270, invert: true }, 'tilt 135 → −135 falls')
+	assert.deepStrictEqual(fx.pan, { ch: 1, fine: 2, range: 540, invert: true, flip: true }) // WO-1113: the operator's invert is kept as `flip`
+	assert.deepStrictEqual(fx.tilt, { ch: 3, fine: 4, range: 270, invert: true, flip: false }, 'tilt 135 → −135 falls')
 	assert.strictEqual(fx.moving, true)
 	assert.strictEqual(fx.gdtf.channels.length, 6, 'the virtual dimmer has no slot')
 	const pix = applyType(

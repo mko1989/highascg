@@ -83,6 +83,7 @@ function scan() {
 			if (t) out(t)
 		}
 		for (const m of src.matchAll(/(?:JSON\.stringify|safeStringify)\(\{\s*type:\s*'([^']+)'/g)) out(m[1])
+		for (const m of src.matchAll(/`\{"type":"([^"]+)"/g)) out(m[1]) // a hand-built frame (WO-1115 fixtures delta)
 		if (rel.startsWith('src/server/')) for (const m of src.matchAll(/^\s*type:\s*'([^']+)',$/gm)) out(m[1])
 		/* Inbound: only the operator WebSocket handlers (child-process IPC also switches on msg.type). */
 		if (IN_FILES.some((f) => rel.startsWith(f))) {
