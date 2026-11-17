@@ -23,7 +23,8 @@
  * 960 px does not make the game's frames bigger (this module sends ≤ 8 / s either way). The tier gets local roles only
  * (a role relayed from a linked server is not offered to it). While a game socket wants pictures the
  * roles are leased (src/system/video-surfaces.js: Caspar `ADD <ch> SHM` — a read-only consumer on that channel, removed
- * 15 s after the last lease), renewed every 5 s, released when the last subscriber leaves or the host switches walls off.
+ * 15 s after the last lease), renewed every 5 s, released 5 s after the last subscriber leaves (WO-1106 B38) or at once when
+ * the host switches walls off.
  */
 
 const { core } = require('./host')
@@ -33,6 +34,7 @@ const ROLE_RE = /^[A-Za-z0-9_-]{1,32}$/
 const PARAMS = { width: 480, fps: 8, quality: 7 }
 const LEASE_ID = 'rc-game'
 const LEASE_EVERY_MS = 5000
+const LINGER_MS = 5000 // WO-1106 B38: the feed client + lease outlive the last subscriber this long (on / off flapping is free)
 const MAX_VIDEO_BUFFERED = 64 * 1024 // well under the game's 256 KB JSON limit: pictures never starve race messages
 const MAX_SCREENS = 32
 const SCREEN_TYPES = new Set(['led_wall', 'tv', 'projection'])
@@ -131,6 +133,8 @@ function createRcVideo(deps) {
 	const now = deps.now || Date.now
 	const every = deps.setInterval || setInterval
 	const stopEvery = deps.clearInterval || clearInterval
+	const after = deps.setTimeout || setTimeout
+	const cancel = deps.clearTimeout || clearTimeout
 	const log = deps.log || (() => {})
 	const params = { ...PARAMS, ...(deps.params || {}) }
 	const minGap = Math.floor(1000 / params.fps) - 10 // ≤ fps per role whatever the shared encoder runs at
@@ -139,6 +143,7 @@ function createRcVideo(deps) {
 	let client = null // the socket-shaped feed client
 	let roles = [] // what the feed is asked for now
 	let leaseTimer = null
+	let linger = null // WO-1106 B38: the pending close after the last subscriber left
 	let warned = false
 	const lastAt = new Map()
 	const stats = { frames: 0, sent: 0, skipped: 0 }
@@ -204,8 +209,21 @@ function createRcVideo(deps) {
 		return [...new Set(list.map(String).filter((r) => ROLE_RE.test(r)))].sort()
 	}
 
-	/** Bring the feed subscription and the lease in line with the subscribers / switch / screens. */
-	function sync() {
+	/**
+	 * Bring the feed subscription and the lease in line with the subscribers / switch / screens. WO-1106 B38: the last
+	 * subscriber leaving keeps both for LINGER_MS (a socket flapping `video` on / off no longer restarts the worker and
+	 * ffmpeg each time); the host switch and stop() (`atOnce`) close at once.
+	 */
+	function sync(atOnce = false) {
+		if (!atOnce && on && !subs.size && client) {
+			if (!linger) {
+				linger = after(() => ((linger = null), sync(true)), LINGER_MS)
+				if (linger && typeof linger.unref === 'function') linger.unref()
+			}
+			return
+		}
+		if (linger) cancel(linger)
+		linger = null
 		const next = wanted()
 		if (next.join() === roles.join() && (next.length === 0) === !client) return
 		roles = next
@@ -238,6 +256,7 @@ function createRcVideo(deps) {
 	return {
 		/** `{ t: 'video', on }` from a game socket. */
 		subscribe(ws, want) {
+			if ((want === true) === subs.has(ws)) return // WO-1106 B38: act on a change only
 			if (want === true) subs.add(ws)
 			else subs.delete(ws)
 			sync()
@@ -247,14 +266,14 @@ function createRcVideo(deps) {
 		},
 		setOn(v) {
 			on = v !== false
-			sync()
+			sync(true)
 		},
 		isOn: () => on,
 		/** The screens (scene) changed: re-ask the feed for the roles they name now. */
 		refresh: () => sync(),
 		stop() {
 			subs.clear()
-			sync()
+			sync(true)
 		},
 		roles: () => roles.slice(),
 		subscribers: () => subs.size,

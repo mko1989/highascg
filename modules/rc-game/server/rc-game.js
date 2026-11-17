@@ -24,6 +24,13 @@ const MAX_SPECTATORS = 20
 const MAX_SOCKETS = MAX_PLAYERS + MAX_SPECTATORS
 const MSG_RATE = 40 // messages / s per socket (20 car states + pings + ready), burst the same
 const MAX_BUFFERED = 256 * 1024
+const MAX_PER_ADDRESS = 4 // WO-1106 B36: game sockets per remote address (one device must not hold every seat)
+
+/** The client's address for the per-address cap; null when unknown or loopback (a local proxy / the box itself). */
+function remoteAddress(req) {
+	const a = String(req?.socket?.remoteAddress || '').replace(/^::ffff:/, '')
+	return !a || a === '::1' || /^127\./.test(a) ? null : a
+}
 
 /**
  * @param {{ port?: () => number, lanIps?: () => string[], log?: Function, now?: () => number, timers?: object,
@@ -41,7 +48,9 @@ function createRcGame(deps = {}) {
 	let bots = null // WO-1082: rc-room-bots.js while enabled
 	let world = null // WO-1101 Game World link while enabled (does nothing without the world module)
 	const sockets = new Set()
+	const perAddress = new Map() // remote address → open game sockets (WO-1106 B36)
 	let lastRev = null
+	let appliedRev = null // WO-1106 B37: the rev the room / bots hold (null = none yet in this session)
 	const text = new WeakMap() // message object → its JSON (a broadcast is stringified once)
 
 	const json = (m) => {
@@ -49,17 +58,22 @@ function createRcGame(deps = {}) {
 		if (!s) text.set(m, (s = JSON.stringify(m)))
 		return s
 	}
-	// venue network first: 100.64/10 (VPN / carrier NAT) addresses are no use to a guest's phone, so they go last
+	// WO-1106 B53: 100.64/10 (VPN / carrier NAT) addresses are no use to a guest's phone and must not reach the public state
 	const cgnat = (ip) => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip)
-	const joinUrls = () => [...lanIps()].sort((a, b) => cgnat(a) - cgnat(b)).map((ip) => `http://${ip}:${port()}/game/rc/`)
+	const joinUrls = () => [...lanIps()].filter((ip) => !cgnat(ip)).map((ip) => `http://${ip}:${port()}/game/rc/`)
 
+	/** → true when handed to the socket (or a bot), false when skipped: not open, over MAX_BUFFERED, send threw (WO-1106 A5). */
 	function sendTo(ws, m) {
-		if (ws.botSink) return ws.botSink(m) // WO-1082: a server bot's virtual socket (rc-room-bots.js)
-		if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > MAX_BUFFERED) return
+		if (ws.botSink) {
+			ws.botSink(m) // WO-1082: a server bot's virtual socket (rc-room-bots.js)
+			return true
+		}
+		if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > MAX_BUFFERED) return false
 		try {
 			ws.send(json(m))
+			return true
 		} catch {
-			/* socket going away */
+			return false // socket going away
 		}
 	}
 
@@ -72,12 +86,18 @@ function createRcGame(deps = {}) {
 	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev,
 		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house, bots: bots ? bots.count() : 0, botLevel: bots ? bots.level() : 'normal' })
 
-	/** Bake (or reuse) the current scene and hand its tracks to the room. Errors are logged, not thrown. */
+	/**
+	 * Bake (or reuse) the current scene and hand its tracks to the room. Errors are logged, not thrown. WO-1106 B37: only
+	 * a new rev reaches the room and the bots — every `/scene` GET lands here, and bots.setScene sends every bot back to the grid.
+	 */
 	function refreshScene() {
 		return baker.get().then((out) => {
 			lastRev = out.rev
-			if (room) room.setScene(out.json)
-			bots?.setScene(out.json)
+			if (room && out.rev !== appliedRev) {
+				appliedRev = out.rev
+				room.setScene(out.json)
+				bots?.setScene(out.json)
+			}
 			video?.refresh() // walls may have moved / changed source
 			return out
 		})
@@ -106,6 +126,7 @@ function createRcGame(deps = {}) {
 		world = createRcWorld({ room: () => room, send: sendTo, lights, now })
 		setRcGameEnabled(true)
 		lastRev = baker.rev()
+		appliedRev = null // a new room has no scene yet
 		refreshScene().catch((e) => log('warn', `[rc-game] scene bake failed: ${e.message}`))
 		world.attach()
 		log('info', '[rc-game] enabled')
@@ -131,6 +152,8 @@ function createRcGame(deps = {}) {
 		bots = null
 		room.dispose()
 		room = null
+		appliedRev = null
+		baker.drop?.() // WO-1106 B52: disabled holds nothing — not the last bake (~10 MB) either
 		log('info', '[rc-game] disabled')
 	}
 
@@ -152,7 +175,8 @@ function createRcGame(deps = {}) {
 			if (action === 'bots') {
 				const n = Number(a.count)
 				if (!Number.isInteger(n) || n < 0 || n > MAX_BOTS) return { status: 400, body: { ok: false, error: `count 0–${MAX_BOTS}`, state: state() } }
-				if (a.level != null && !LEVELS[a.level]) return { status: 400, body: { ok: false, error: 'level easy | normal | hard', state: state() } }
+				// WO-1106 A23: own keys only (`constructor` passed `LEVELS[x]`, then add() threw)
+				if (a.level != null && !Object.hasOwn(LEVELS, a.level)) return { status: 400, body: { ok: false, error: 'level easy | normal | hard', state: state() } }
 				const ph = room.state().phase
 				if (ph !== 'lobby' && ph !== 'results') return { status: 409, body: { ok: false, error: 'a race is running', state: state() } }
 				bots.setCount(n, a.level)
@@ -170,14 +194,17 @@ function createRcGame(deps = {}) {
 		return room.state()
 	}
 
-	/** A new game socket (already upgraded). Disabled → `off` and close 4403. */
-	function attach(ws) {
+	/** A new game socket (already upgraded; req = its upgrade request). Disabled → `off` and close 4403. */
+	function attach(ws, req) {
 		ws.on('error', () => {})
 		if (!room) {
 			sendTo(ws, { t: 'off' })
 			return ws.close(4403, 'game disabled')
 		}
 		if (sockets.size >= MAX_SOCKETS) return ws.close(1013, 'full')
+		const addr = remoteAddress(req)
+		if (addr && (perAddress.get(addr) || 0) >= MAX_PER_ADDRESS) return ws.close(1013, 'too many from this address')
+		if (addr) perAddress.set(addr, (perAddress.get(addr) || 0) + 1)
 		sockets.add(ws)
 		room.connect(ws)
 		lights?.attach(ws) // sends lxfull now (while on); the 10 Hz timer runs while ≥ 1 socket is attached
@@ -204,6 +231,9 @@ function createRcGame(deps = {}) {
 		})
 		ws.on('close', () => {
 			sockets.delete(ws)
+			const n = addr ? (perAddress.get(addr) || 1) - 1 : 0
+			if (n > 0) perAddress.set(addr, n)
+			else if (addr) perAddress.delete(addr)
 			if (room) room.disconnect(ws)
 			lights?.detach(ws)
 			video?.detach(ws)
@@ -231,6 +261,7 @@ function createRcGame(deps = {}) {
 		/** §2.6 smokes / probes. */
 		live: () => ({ lights, video }),
 		MAX_SOCKETS,
+		MAX_PER_ADDRESS,
 	}
 }
 
@@ -254,4 +285,4 @@ function getRcGame(ctx) {
 	return _game
 }
 
-module.exports = { createRcGame, getRcGame, useRcGame, MAX_SOCKETS }
+module.exports = { createRcGame, getRcGame, useRcGame, MAX_SOCKETS, MAX_PER_ADDRESS, remoteAddress }

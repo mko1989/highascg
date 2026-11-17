@@ -36,7 +36,7 @@ function attachRcGameWs(httpServer, ctx, opts = {}) {
 			socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n')
 			return socket.destroy()
 		}
-		wss.handleUpgrade(req, socket, head, (ws) => game.attach(ws))
+		wss.handleUpgrade(req, socket, head, (ws) => game.attach(ws, req)) // req: the per-address cap (WO-1106 B36)
 	}
 	httpServer.on('upgrade', onUpgrade)
 	return {

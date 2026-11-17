@@ -120,7 +120,7 @@ function createRcRoom(deps) {
 		const t = now()
 		for (const c of [...conns.values()]) {
 			const p = c.pid != null ? players.get(c.pid) : null
-			if (p && !c.spectator && t - c.last > SILENT_MS) {
+			if ((c.spectator ? c.joined : p) && t - c.last > SILENT_MS) { // WO-1106 B36: a silent spectator frees its seat too (clients ping every 2 s)
 				drop(c, 4408, 'silent')
 				close(c.conn, 4408, 'silent')
 			} else if (!c.joined && t - c.opened > UNJOINED_MS) {
@@ -201,7 +201,7 @@ function createRcRoom(deps) {
 				p.car = null
 				p.conn = null
 			}
-			if (phase === 'race') checkAllFinished()
+			checkAllFinished() // WO-1106 B39: also in the countdown
 		}
 		if (c.joined) broadcastState()
 	}
@@ -251,8 +251,9 @@ function createRcRoom(deps) {
 		}
 	}
 
+	/** Everyone racing has finished or is gone → results. WO-1106 B39: in the countdown too (nobody left = no race). */
 	function checkAllFinished() {
-		if (phase !== 'race') return
+		if (phase !== 'race' && phase !== 'countdown') return
 		const racers = [...players.values()].filter((p) => p.racing && p.connected)
 		if (!racers.length || racers.every((p) => p.race.finished)) finishRace()
 	}
@@ -318,8 +319,10 @@ function createRcRoom(deps) {
 		}
 		phase = 'countdown'
 		phaseTimer(() => {
+			if (phase !== 'countdown') return // finished meanwhile (a pause holds this step past the results)
 			phase = 'race'
 			broadcastState()
+			checkAllFinished() // WO-1106 B39: every racer left during the countdown → results, not `race` forever
 		}, COUNTDOWN_MS)
 		toAll({ t: 'countdown', startAt })
 		broadcastState()
@@ -369,7 +372,7 @@ function createRcRoom(deps) {
 					conns.delete(c.conn)
 					close(c.conn, 4409, 'kicked')
 				}
-				if (phase === 'race') checkAllFinished()
+				checkAllFinished() // WO-1106 B39: also in the countdown
 				break
 			}
 			case 'lights':
@@ -415,7 +418,9 @@ function createRcRoom(deps) {
 				return items.handle(c.pid, m)
 			}
 			if (m.t === 'ready' && !c.spectator && players.has(c.pid)) {
-				players.get(c.pid).ready = m.ready === true
+				const p = players.get(c.pid)
+				if (p.ready === (m.ready === true)) return // WO-1106 B41: unchanged → no state to every socket
+				p.ready = m.ready === true
 				broadcastState()
 			}
 		},

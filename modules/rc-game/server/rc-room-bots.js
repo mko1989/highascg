@@ -2,7 +2,7 @@
 
 /**
  * WO-1082 — race bots on the server. Each bot is a virtual socket (`conn.botSink`) that joins the room like a browser
- * and is driven by client/bot-brain.js (the client's own physics, items and lap code, loaded once with import()). The
+ * and is driven by client/bot-brain.js (the client's own physics, items and lap code, import()ed once per enable). The
  * room cannot tell it from a player except for the `bot` flag it sets from the conn: same join, same `s` / `box` /
  * `use` / `hit` messages, same referee. One 30 Hz timer (two 60 Hz physics steps per bot) runs only while bots exist.
  * The scene's tracks become physics worlds lazily (one per track a bot is on; the occupancy grids decoded once).
@@ -16,7 +16,7 @@
  */
 
 const path = require('path')
-const { pathToFileURL } = require('url')
+const { freshImport } = require('./rc-fresh-import')
 
 const MAX_BOTS = 9
 const TICK_MS = Math.round(1000 / 30)
@@ -24,16 +24,16 @@ const STEPS = 2
 const LEVELS = { easy: [0.7, 0.8], normal: [0.82, 0.92], hard: [0.93, 1] }
 const NAMES = ['Sprocket', 'Nitro Nell', 'Gizmo', 'Pixel', 'Rusty', 'Comet', 'Bolt', 'Zippy', 'Widget']
 
-const loadBrain = () => import(pathToFileURL(path.join(__dirname, '..', 'client', 'bot-brain.js')).href)
-const loadWorld = () =>
-	Promise.all(['physics.js', 'track-math.js', 'occ.js'].map((f) => import(pathToFileURL(path.join(__dirname, '..', 'client', f)).href)))
+const CLIENT_DIR = path.join(__dirname, '..', 'client')
+// WO-1106 B51: versioned URLs (rc-fresh-import.js) — an upgraded / edited client reaches the bots at the next enable
+const loadAll = () => freshImport(CLIENT_DIR, ['bot-brain.js', 'physics.js', 'track-math.js', 'occ.js']).then(([B, ...W]) => [B, W])
 
 function createRoomBots(deps) {
 	const now = deps.now || Date.now
 	const T = deps.timers || { setInterval, clearInterval }
 	const rng = deps.rng || Math.random
 	const log = deps.log || (() => {})
-	const load = deps.load || (() => Promise.all([loadBrain(), loadWorld()]))
+	const load = deps.load || loadAll
 	const bots = [] // { conn, brain, name }
 	let mods = null
 	let scene = null
@@ -141,7 +141,7 @@ function createRoomBots(deps) {
 		/** Bots join / leave until n (applied once the brain is loaded — preload() at enable makes that immediate). */
 		setCount(n, lvl) {
 			want = Math.max(0, Math.min(MAX_BOTS, n | 0))
-			if (lvl && LEVELS[lvl] && lvl !== level) {
+			if (lvl && Object.hasOwn(LEVELS, lvl) && lvl !== level) { // WO-1106 A23: `constructor` is no level
 				level = lvl
 				for (const b of [...bots]) remove(b) // a new level: the field is drawn again
 			}

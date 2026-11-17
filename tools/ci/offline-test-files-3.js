@@ -446,6 +446,10 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-salad-client.test.js', // WO-1106 A4 / A32 / A36 / B61–B64: welcome reset, queue overflow, floors, disposal, muted start, non-finite flights, host gate
 	'tools/smoke/smoke-wo1106-salad-room.test.js', // WO-1106 B34 / B36 / B60 / B64: ghost seats, silent spectators, per-address cap, buzzer clears flights
 	'tools/smoke/smoke-wo1106-rc-client-fixes.test.js', // WO-1106 A4 / A32 / A35 / B35 / B42–B50: ghosts hidden, item press kept, clock reset, bot hit, host refresh, racing flag, spectator full card
+	'tools/smoke/smoke-wo1106-rc-server-room.test.js', // WO-1106 B36 / B39 / B41: silent spectators, a race with no racer ends, ready broadcasts on change
+	'tools/smoke/smoke-wo1106-rc-server-game.test.js', // WO-1106 A5 / A23 / B36 / B37 / B52 / B53: send result, own-key levels, unchanged scene rev keeps the bots, drop on disable, no CGNAT join url
+	'tools/smoke/smoke-wo1106-rc-server-media.test.js', // WO-1106 B38 / B40 / B51 / B52: video subscribe on change + hold, stale bakes skipped, fresh bot-brain import
+	'tools/smoke/smoke-wo1106-rc-server-world.test.js', // WO-1106 A32: wq re → the hub serves that socket afresh
 	'tools/smoke/smoke-wo1106-skirmish-server.test.js', // WO-1106 A3 / A5 / A24 / A32 / B34 / B36 / B55 / B57–B59: stunned bots, ghost cap, move window, no damage while paused, weapon gap
 	'tools/smoke/smoke-wo1106-skirmish-client.test.js', // WO-1106 A4 / A11 / A32 / B35 / B54 / B56 / B58 / B59: welcome reset, knock-back, ghosts gone, pickups reset, scene rev
 	'tools/smoke/smoke-wo1106-core-modules.test.js', // WO-1106 B1 / B7 / B8 / B9: code-change gate (auth or the box itself), sha256 required for URLs, upgrade rollback, download deadline

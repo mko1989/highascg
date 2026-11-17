@@ -93,7 +93,8 @@ const feed = {
 }
 const leases = []
 const videoDeps = { screens: () => SCREENS, feed: () => feed, lease: (id, roles) => leases.push([id, roles]),
-	roles: () => SCREENS.map((s) => s.role), now: () => t0, setInterval: T.setInterval, clearInterval: T.clearInterval }
+	roles: () => SCREENS.map((s) => s.role), now: () => t0, setInterval: T.setInterval, clearInterval: T.clearInterval,
+	setTimeout: T.setTimeout, clearTimeout: T.clearTimeout }
 const openClients = () => feedClients.filter((e) => !e.closed)
 const lastLease = () => leases.at(-1)
 
@@ -254,9 +255,11 @@ test('§2.6 live lights + wall pictures through the game service; disabled it ho
 	assert.deepEqual(bin.subarray(5), jpeg)
 	assert.equal(B.bins.length, 0, 'a socket that did not ask gets no pictures')
 
-	// on:false → feed client closed, lease released, no more frames
+	// on:false → no more frames; the feed client and the lease are kept 5 s (WO-1106 B38), then closed / released
 	A.send({ t: 'video', on: false })
 	await A.sync()
+	assert.equal(fc.closed, false, 'kept 5 s after the last subscriber (on / off flapping is free)')
+	advance(5000)
 	assert.equal(fc.closed, true)
 	assert.deepEqual(lastLease(), [LEASE_ID, []])
 	feedFrame(fc, 2)

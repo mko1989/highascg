@@ -174,7 +174,7 @@ test('room size holds (10 players), a socket cannot claim the bot flag, level an
 
 test('rc-game.js: the `bots` host action is validated, idle-only, and bot sockets never reach a WebSocket', () => {
 	const src = fs.readFileSync(path.join(ROOT, 'modules/rc-game/server/rc-game.js'), 'utf8')
-	assert.match(src, /if \(ws\.botSink\) return ws\.botSink\(m\)/)
+	assert.match(src, /if \(ws\.botSink\) \{\s*ws\.botSink\(m\)[^\n]*\n\s*return true/) // WO-1106 A5: a bot conn reports delivered
 	assert.match(src, /action === 'bots'/)
 	assert.match(src, /count 0–\$\{MAX_BOTS\}/)
 	assert.match(src, /if \(ph !== 'lobby' && ph !== 'results'\) return \{ status: 409/)

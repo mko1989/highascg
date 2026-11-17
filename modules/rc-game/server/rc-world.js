@@ -61,13 +61,14 @@ function xfxMsg(e) {
 }
 
 /**
- * @param {{ room: () => object|null, send: (conn, msg) => void, lights?: object|null, now?: () => number }} deps
+ * @param {{ room: () => object|null, send: (conn, msg) => boolean|void, lights?: object|null, now?: () => number }} deps
  *   room: the live rc-room (null after a disable); send: the service's sender (bots: their virtual socket)
  */
 function createRcWorld(deps) {
 	const now = deps.now || Date.now
 	const room = () => deps.room() || null
 	const caps = new WeakMap() // conn → the client's visitor cap (`wq`)
+	const resync = new WeakSet() // WO-1106 A32: sockets left out of one viewers() call — the hub forgets the view, then serves it afresh
 	const lastBoost = new Map()
 
 	const adapter = {
@@ -88,12 +89,12 @@ function createRcWorld(deps) {
 			const r = room()
 			if (!r) return []
 			const w = r.world()
-			return w.conns.filter((c) => !c.conn?.botSink).map((c) => {
+			return w.conns.filter((c) => !c.conn?.botSink && !resync.delete(c.conn)).map((c) => {
 				const p = c.spectator ? null : w.players.get(c.pid)
 				return { key: c.conn, kind: c.spectator ? 'spectator' : 'player', p: p?.car ? [p.car[0], p.car[1], p.car[2]] : null, cap: caps.get(c.conn) ?? 12 }
 			})
 		},
-		send: (key, msg) => deps.send(key, msg),
+		send: (key, msg) => deps.send(key, msg) !== false, // WO-1106 A5: false = skipped (closed / backpressure), the hub re-sends
 		toAll: (msg) => room()?.toAll(msg),
 		board() {
 			const r = room()
@@ -149,8 +150,12 @@ function createRcWorld(deps) {
 
 	return {
 		adapter,
-		/** `{ t: 'wq', n }` from a socket: its visitor cap. */
+		/** `{ t: 'wq', n }` from a socket: its visitor cap; `re: true` = the page's pre-load queue overflowed: re-send its whole view (A32). */
 		quality(conn, m) {
+			if (m?.re === true) {
+				resync.add(conn)
+				if (!CAPS.includes(m.n)) return // the cap stays as it was
+			}
 			const n = CAPS.includes(m?.n) ? m.n : 12
 			caps.set(conn, n)
 			try {

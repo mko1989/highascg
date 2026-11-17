@@ -137,6 +137,8 @@ function bed() {
 		now: () => t,
 		setInterval: (fn, ms) => (timers.push({ fn, ms }), timers.length),
 		clearInterval: (id) => (timers[id - 1] = null),
+		setTimeout: (fn, ms) => (timers.push({ fn, ms, once: true }), timers.length),
+		clearTimeout: (id) => (timers[id - 1] = null),
 	})
 	const sock = (buffered = 0) => {
 		const got = []
@@ -216,6 +218,12 @@ describe('rc-video — fan-out through the shared video feed', () => {
 		b.video.setOn(true)
 		assert.equal(b.feed.clients.size, 1, 'switched back on: the subscribers that asked get pictures again')
 		b.video.detach(A)
+		assert.equal(b.feed.clients.size, 1, 'WO-1106 B38: kept 5 s after the last subscriber')
+		const linger = b.timers.findIndex((x) => x?.once)
+		assert.equal(b.timers[linger].ms, 5000)
+		const { fn } = b.timers[linger]
+		b.timers[linger] = null
+		fn()
 		assert.equal(b.feed.clients.size, 0)
 		assert.deepEqual(b.leases.at(-1), [LEASE_ID, []])
 		b.video.subscribe(A, true)

@@ -367,8 +367,9 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 		[`${DIR}/rc-scene-tex.js`]: ['src/stage/scene-tex'],
 		/* WO-1104: a stage drape's pleats — the same pure geometry the MVR export draws (no I/O) */
 		[`${DIR}/rc-scene-drape.js`]: ['src/stage/drape-geometry'],
-		/* WO-1082: the race bots import() the client's own pure modules (bot-brain.js, physics) by file URL */
-		[`${DIR}/rc-room-bots.js`]: ['url'],
+		/* WO-1082: the race bots import() the client's own pure modules (bot-brain.js, physics) by file URL; WO-1106 B51:
+		   through rc-fresh-import.js (a versioned URL + node's module.registerHooks so an upgrade reaches the bots) */
+		[`${DIR}/rc-fresh-import.js`]: ['url', 'module'],
 	}
 	const use = {
 		'src/fixtures/pixel-map-service': /^\.liveChannelMap\(ctx\)/,
@@ -379,7 +380,7 @@ test('the game never puts anything on a screen: no AMCP, scene-take, look or cha
 		const src = fs.readFileSync(path.join(ROOT, f), 'utf8')
 		const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '')
 		for (const m of code.matchAll(/\b(require|core)\(\s*'([^']+)'\s*\)/g)) {
-			const builtin = (m[2] === 'events' && f.endsWith('rc-video.js')) || (m[2] === 'url' && f.endsWith('rc-room-bots.js'))
+			const builtin = (m[2] === 'events' && f.endsWith('rc-video.js')) || (['url', 'module'].includes(m[2]) && f.endsWith('rc-fresh-import.js'))
 			if (m[1] === 'require' && (ownOnly.test(m[2]) || builtin)) {
 				if (builtin) seen.add(`${f} ${m[2]}`)
 				continue

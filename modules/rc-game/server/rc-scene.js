@@ -326,6 +326,7 @@ function createSceneBaker(deps = {}) {
 	let ready = null // the last finished bake
 	const inflight = new Map()
 	let queue = Promise.resolve()
+	let gen = 0 // WO-1106 B52: drop() bumps it, so a bake that finishes after a disable is not kept
 
 	function current() {
 		if (memo && now() - memo.at < REV_MEMO_MS) return memo
@@ -415,13 +416,23 @@ function createSceneBaker(deps = {}) {
 		return out
 	}
 
-	/** The current scene, baked (or from the cache). Concurrent callers share one bake; bakes run one at a time. */
+	/**
+	 * The current scene, baked (or from the cache). Concurrent callers share one bake; bakes run one at a time.
+	 * WO-1106 B40: a queued bake whose rev is no longer current bakes (or reuses) the current one instead — edits during
+	 * a long bake cost one more bake, not one each.
+	 */
 	function get() {
 		const { inp, rev } = current()
 		if (ready && ready.rev === rev) return Promise.resolve(ready)
 		if (inflight.has(rev)) return inflight.get(rev)
-		const p = (queue = queue.then(() => build(inp, rev)).then((out) => {
-			ready = out
+		const g = gen
+		const step = () => {
+			const cur = current()
+			const job = cur.rev === rev ? { inp, rev } : cur
+			return ready && ready.rev === job.rev ? ready : build(job.inp, job.rev)
+		}
+		const p = (queue = queue.then(step).then((out) => {
+			if (g === gen) ready = out
 			return out
 		}).finally(() => inflight.delete(rev)))
 		queue = p.catch(() => {})
@@ -429,7 +440,13 @@ function createSceneBaker(deps = {}) {
 		return p
 	}
 
-	return { rev: () => current().rev, get, peek: () => ready, cacheDir }
+	/** WO-1106 B52: forget the last bake and the rev memo (the game was disabled); the disk cache stays. */
+	function drop() {
+		gen++
+		ready = memo = null
+	}
+
+	return { rev: () => current().rev, get, peek: () => ready, drop, cacheDir }
 }
 
 module.exports = { createSceneBaker, bakeScene, sceneInputs, revOf, setSceneCtx }
