@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1018 live WOs (34 open, 156 in progress, 828 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1019 live WOs (34 open, 157 in progress, 828 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -388,7 +388,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1043 DONE [mapping+engine] PIP edge strip set to "outside" still drew over the inside of the PIP (PixelHue… → 1043_WO_pip_edge_strip_outside_glow_inside_pip.md
 - 1050 IN PROGRESS [mapping+godot-client] APC40 fader → a PixelHue layer's opacity (Learn onto a PixelHue layer) → 1050_WO_apc_fader_drives_pixelhue_layer_opacity.md
 
-## lighting — DMX, Art-Net, sACN, fixtures, consoles (40)
+## lighting — DMX, Art-Net, sACN, fixtures, consoles (41)
 
 - 09 OPEN [lighting+engine] Global per-screen border effects and Art-Net control → 09_WO_Global_Per_Screen_Border_Effects.md
 - 179 DONE [lighting+mapping] Lighting I/O: Art-Net listener off by default, sACN input option, region-averag… → 179_WO_ARTNET_SACN_DEFAULTS_AND_PIXELMAP_SAMPLING.md
@@ -430,6 +430,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1078 IN PROGRESS [lighting] visualiser: the sACN-driven part of the rig stays dark → 1078_WO_visualiser_sacn_part_of_rig_dark.md
 - 1097 DONE [lighting+tracking-vr,godot-client] Desk feed: the fronts' final pan / tilt / dimmer to the LD's desk on a spare un… → 1097_WO_desk_feed_fronts_to_lighting_desk.md
 - 1111 DONE [lighting+godot-client] gutmanny 26: five looks copied from the Narvil IDE ChamSys show (BAND cue stack) → 1111_WO_gutmanny26_looks_from_narvil_chamsys_show.md
+- 1112 IN PROGRESS [lighting+godot-client] gutmanny 26: MagicQ show "gutmanny26" built on the Narvil show, patched to this… → 1112_WO_gutmanny26_magicq_show_from_narvil.md
 
 ## godot-client — Godot client (179)
 
