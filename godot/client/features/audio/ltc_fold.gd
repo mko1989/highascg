@@ -9,10 +9,11 @@ const Form := preload("res://features/settings/settings_form.gd")
 const LM := preload("res://features/settings/ltc_model.gd")
 const M := preload("res://features/settings/settings_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const Fit := preload("res://features/audio/ltc_fold_fit.gd")  # the fold never widens the window (eyes off screen, 17.11)
 const WS_FRESH_MS := 1500  # WO-1106 B31: a WS status younger than this makes the HTTP poll unnecessary
 
 var _head: Button
-var _body: HBoxContainer
+var _body: HFlowContainer
 var _out: Form
 var _in: Form
 var _status: Label
@@ -38,9 +39,9 @@ func _ready() -> void:
 	_head.focus_mode = Control.FOCUS_NONE
 	_head.tooltip_text = "LTC timecode out and in. Click to open."
 	_head.pressed.connect(func() -> void: _open(not _body.visible))
+	Fit.head(_head)
 	add_child(_head)
-	_body = HBoxContainer.new()
-	_body.add_theme_constant_override("separation", 32)
+	_body = Fit.body()
 	_body.visible = false
 	add_child(_body)
 	_out = Form.new()
@@ -51,6 +52,7 @@ func _ready() -> void:
 	_body.add_child(_in)
 	_build_out(_out)
 	_build_in(_in)
+	Fit.fit(_body)
 	var t := Timer.new()
 	t.wait_time = 1.0  # WO-1106 B31: was a 0.25 s HTTP poll on top of the 5 Hz WS push
 	t.autostart = true

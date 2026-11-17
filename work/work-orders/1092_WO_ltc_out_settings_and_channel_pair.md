@@ -167,3 +167,24 @@ index=20 id=Loopback pcm_substreams=2`, then `measure-ltc-out.js --capture hw:CA
 pointed at the loopback); `ltcdump` cross-check (`sudo apt install ltc-tools`; the own decoder is used instead);
 the fold on glass (the GUI was being relaunched by another session's probe runs throughout; the fold is covered by
 the Godot tests); a real "Pro" LTC box (not connected).
+
+## 4. Follow-up 17.11.26 — the open fold pushed the Inspector off screen
+
+Owner (17.11): "when extending the ltc in audio tab, it pushes the inspector making half the connection eyes to be
+pushed out of screen."
+
+**Investigation.** Reproduced on the glass (1920×1080): opening the fold moved the Inspector about 34 px right and cut the
+right eye. The fold sits in the Audio tab's bottom pane, a `ScrollContainer` with horizontal scrolling off
+(`features/audio/audio_tab_split.gd` `_pane`), so its minimum width becomes the window's. In the fold, LTC out and LTC in
+stood side by side in an `HBoxContainer` (minimum = both forms added up), the Device picker sized itself to its longest
+item ("plughw:CARD=Pro,DEV=0 (not connected)"), and the text fields asked for 320 px each.
+
+**What was done.** `features/audio/ltc_fold_fit.gd` (new, no autoloads): the body is an `HFlowContainer` (LTC in goes
+under LTC out when the pane is narrow, so the minimum is the wider form); pickers no longer size to their longest item
+(ellipsis, minimum 180 px); text fields 140 px minimum; headings / status lines and the fold header clip with an ellipsis.
+`ltc_fold.gd` uses it. The shared `settings_form.gd` is unchanged (Settings has its own layout).
+
+**Verified.** `tests/test_ltc_fold_fit.gd` (3 tests: fitted form ≤ label + picker minimum, flow minimum = the wider
+form, header clips); LTC suites 55 / 0; `--check` boot OK; `smoke-wo1106-godot-client-guards` 7 / 0. On the glass after
+a GUI relaunch: fold open, then both "More" groups open, and the Inspector stays at x 1532 with both eyes visible
+(before: 1566, right eye cut). Fold closed again afterwards.
