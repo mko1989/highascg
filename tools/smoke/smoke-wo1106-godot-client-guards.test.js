@@ -45,6 +45,9 @@ describe('WO-1106 godot-client guards', () => {
 	it('B28: the full-frame black check runs only for a view on screen', () => {
 		const s = body(read('features/previs/tracking/tracking_view.gd'), '_process')
 		assert.match(s, /if _black_t <= 0\.0 and ghost_on and is_visible_in_tree\(\):/)
+		// remainder: a sparse CPU sample of the bytes already uploaded, no GPU readback (godot test_shm_black_wo1106_b28.gd)
+		assert.ok(!/get_image\(\)/.test(s), 'no full-frame readback in _process')
+		assert.match(s, /_black = _role != "" and VideoSurfaces\.is_black\(_role\)/)
 	})
 	it('C3: typed capture name / mic survive a rebuild; the Save await checks its row', () => {
 		const s = read('features/previs/tracking/presenters_section.gd')

@@ -100,18 +100,26 @@ static func _fill(midi: Node) -> void:
 		return
 	var thumbs: Node = panel.thumbs
 	var until := Time.get_ticks_msec() + int(WAIT_S * 1000.0)
-	while true:
-		var missing := 0
-		for r in rows:
-			if r.thumb != "" and thumbs.texture(r.thumb) == null and not thumbs.failed.has(r.thumb):
-				thumbs.request(r.thumb, r.payload)
-				missing += 1
-		if missing == 0 or Time.get_ticks_msec() > until:
-			break
-		midi._say("Pads: rendering thumbnails — %d of %d to go…" % [missing, rows.size()])
+	# WO-1106 B29: one pass finds the missing thumbnails (keyed, each asked for once); later ticks look at those only.
+	var waiting := {}  # thumb key → its payload
+	var seen := {}
+	for r in rows:
+		if r.thumb == "" or seen.has(r.thumb):
+			continue
+		seen[r.thumb] = true
+		if not thumbs.failed.has(r.thumb) and thumbs.texture(r.thumb) == null:
+			waiting[r.thumb] = r.payload
+			thumbs.request(r.thumb, r.payload)
+	while not waiting.is_empty() and Time.get_ticks_msec() <= until:
+		midi._say("Pads: rendering thumbnails — %d of %d to go…" % [waiting.size(), rows.size()])
 		await midi.get_tree().create_timer(0.25).timeout
 		if not is_instance_valid(midi) or not is_instance_valid(panel):
 			return
+		for k in waiting.keys():
+			if thumbs.is_cached(k) or thumbs.failed.has(k):
+				waiting.erase(k)
+			elif not thumbs.is_pending(k):  # the list dropped its queue (a rebuild): ask again
+				thumbs.request(k, waiting[k])
 	var made := banks(rows, func(r: Dictionary) -> Variant:
 		var tex: Texture2D = thumbs.texture(r.thumb) if r.thumb != "" else null
 		return colour_of(str(r.thumb), tex) if tex != null else null)

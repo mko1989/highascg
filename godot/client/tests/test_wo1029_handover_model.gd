@@ -28,6 +28,14 @@ func test_on_box_client_never_moves() -> void:
 		+ "\t\tset_process_unhandled_key_input(false)\n\t\treturn\n"), "the watcher does not even run on the box")
 	t.ok(cfg.contains("func _conf() -> Node:\n\treturn (Engine.get_main_loop() as SceneTree).root.get_node_or_null(^\"Config\")"),
 		"_conf() is the Config autoload")
+	# WO-1106 C44: that guard's "on the box" also covers the box's own LAN address / host name, not only loopback
+	var Platform := preload("res://core/platform.gd")
+	var own := Platform.machine_hosts(["127.0.0.1", "192.168.0.4"], "boxa")
+	t.ok(Platform.is_local_origin(B, own) and Platform.is_local_origin("http://boxa.local:4200", own), "the box's LAN address / name: on the box")
+	t.ok(not Platform.is_local_origin(C, own), "a linked server stays remote")
+	for h in Platform.own_hosts():
+		if not h.contains(":"):
+			t.ok(Platform.is_local_origin("http://%s:4200" % h), "this machine's %s: the watcher would not run" % h)
 
 
 func test_master_target_moves() -> void:

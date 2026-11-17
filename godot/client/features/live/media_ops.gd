@@ -154,11 +154,26 @@ static func folder_drop_ids(data: Variant, folder: String) -> Array:
 	var d: Dictionary = data
 	var items: Array = d.items if d.get("type") == "multi" and d.get("items") is Array else [d]
 	var ids: Array = []
+	if folder_drop_refusal(data) != "":
+		return []  # WO-1106 C45: a file only a linked server has cannot be filed here (the drop says why instead)
 	for it in items:
-		if it is Dictionary and it.get("type") == "media" and str(it.get("value", "")) != "" and it.get("remote") != true:  # WO-1029: not on this box
+		if it is Dictionary and it.get("type") == "media" and str(it.get("value", "")) != "":
 			ids.append(str(it.value))
 	var movable := ids.any(func(v: String) -> bool: return not v.begins_with(folder + "/") and v != folder)
 	return ids if movable else []
+
+
+## WO-1106 C45 — a drag of a file only a linked server has (WO-1029 greyed rows carry remote = true) onto a folder:
+## the plain refusal to show, "" when the payload holds no such file.
+static func folder_drop_refusal(data: Variant) -> String:
+	if not data is Dictionary:
+		return ""
+	var d: Dictionary = data
+	var items: Array = d.items if d.get("type") == "multi" and d.get("items") is Array else [d]
+	for it in items:
+		if it is Dictionary and it.get("remote") == true:
+			return "✗ Not moved: %s is on a linked server, not on this box. Get it here first, then file it." % str(it.get("value", "this file"))
+	return ""
 
 
 ## WO-759 — the media tree's quick-look column from the GET /api/media row (server probe fields: codec,

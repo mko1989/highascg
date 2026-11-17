@@ -278,18 +278,24 @@ func test_stage_builds_surfaces_and_views() -> void:
 	var w0: Dictionary = stage._surfaces["opgui"].views[0]
 	t.ok(w0.clipper.clip_contents and absf(w0.view.scale.x - w0.clipper.size.x / 960.0) < 0.001, "a window clips and scales its bus")
 	t.eq(w0.view.shown, 1, "PGM 1 shows the Opener")
-	# a real clip plays through VideoStreamPlayer
+	# a real clip plays through VideoStreamPlayer. WO-1106 D2: headless loads the .ogv fine (VideoStreamTheora, no import
+	# step); the branch never ran because it stepped at the take's own instant — the bus still showed the Opener (the
+	# take fades in over time), so no "stream" item asked for a player. Step after the fade instead.
 	_take(s, "look-video-clip", "program")
-	stage.step(["pgm1"], s.clock())
-	# The clip player needs a live tree AND a video stream that loads: headless, the demo .ogv gives no VideoStream, so
-	# this branch never ran in the unit runner (the root was not in the tree until WO-1106's suites awaited a frame).
-	# Open in WO-1106: the demo clip player is not covered by any headless test.
-	if stage.is_inside_tree() and DisplayServer.get_name() != "headless":
-		t.eq(stage.player_count(), 1, "one player for the clip")
-		stage.step(["pgm1"], s.clock() + 0.5)
-		t.eq(stage.player_count(), 1, "still one")
-		stage.step([], s.clock() + 5.0)
-		t.eq(stage.player_count(), 0, "retired when nobody shows it")
+	var t0: float = s.clock()
+	s.bus(1, t0)
+	stage.step(["pgm1"], t0 + 5.0)
+	t.ok(stage.is_inside_tree(), "the stage is in the tree (players only play there)")
+	t.eq(stage.player_count(), 1, "one player for the clip")
+	if stage.player_count() == 1:
+		var p: VideoStreamPlayer = stage._players.values()[0].player
+		t.ok(p.stream is VideoStream and p.stream.resource_path == "res://demo/placeholder_clip.ogv", "it plays the shipped .ogv")
+		t.ok(p.is_playing() and not p.loop, "playing, loop off (the clip look)")
+		t.ok(p.get_video_texture() != null, "a texture for the bus view")
+	stage.step(["pgm1"], t0 + 5.5)
+	t.eq(stage.player_count(), 1, "still one")
+	stage.step([], t0 + 10.0)
+	t.eq(stage.player_count(), 0, "retired when nobody shows it")
 	stage.free()
 
 

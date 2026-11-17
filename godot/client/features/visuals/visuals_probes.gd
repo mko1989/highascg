@@ -8,7 +8,7 @@ const M := preload("res://features/visuals/visuals_model.gd")
 
 ## WO-890: a layer stack from scene ids (bottom first); a shader layer runs `shader`, a layer after the first is added
 ## when it is a shader (the old layer 2 look).
-static func stack(ids: Array, shader := "sh-sa-ribbons") -> Array:
+static func stack(ids: Array, shader := "sh-sa-synthwave-canyon") -> Array:
 	var out := []
 	for id in ids:
 		out.append(L.layer_of({"scene": id, "shader": shader, "blend": "add" if id == "shader" and not out.is_empty() else "normal"}))
@@ -36,8 +36,8 @@ static func shots(tab: Node, dir: String) -> void:
 	tab.set_process(true)
 	for d in tab.mixer.decks:
 		d.measure = true
-	var r: Dictionary = await tab._g("DevicesTarget").box_api.get_json("/api/shaders/sh-sa-ribbons")  # WO-874 layer shots
-	var cfgs := {"sh-sa-ribbons": r.data if r.get("ok") else null}
+	var r: Dictionary = await tab._g("DevicesTarget").box_api.get_json("/api/shaders/sh-sa-synthwave-canyon")  # WO-874 layer shots
+	var cfgs := {"sh-sa-synthwave-canyon": r.data if r.get("ok") else null}
 	for ids in [["rings"], ["particles"], ["starfield"], ["tunnel"], ["tunnel", "particles"], ["shader", "particles"],
 			["tunnel", "shader"], ["spectrum"], ["spectrum", "shader"], ["tunnel", "spectrum"], ["game"], ["tunnel", "game"],
 			["game", "spectrum"], ["shader", "tunnel", "particles", "spectrum"]]:  # WO-890: four layers
@@ -222,14 +222,14 @@ static func autopilot(tab: Node, secs: float) -> void:
 
 
 ## dev probe (WO-883): the canvas as a Live source, `<seconds>[:<scene>[:<size>[:<shader>]]]` (default shader scene at the screen's
-## own size, sh-sa-ribbons) — the canvas size, the note, frame rate and skipped readbacks every 5 s, a canvas shot
+## own size, sh-sa-synthwave-canyon) — the canvas size, the note, frame rate and skipped readbacks every 5 s, a canvas shot
 ## user://probe-ring.png halfway; then the ring off, quit. Pair with --visuals-ring=<name>.
 static func ring(tab: Node, arg: String) -> void:
 	var a := arg.split(":")
 	await tab.get_tree().create_timer(3.0).timeout
 	tab.slice.output.size = int(a[2]) if a.size() > 2 else M.SIZE_SCREEN
 	tab.slice.output.ring = true
-	M.with_layers(tab.slice, stack([a[1] if a.size() > 1 else "shader"], a[3] if a.size() > 3 else "sh-sa-ribbons"))
+	M.with_layers(tab.slice, stack([a[1] if a.size() > 1 else "shader"], a[3] if a.size() > 3 else "sh-sa-synthwave-canyon"))
 	await tab._go(true)
 	tab._resize()
 	tab._sync_send_ui(tab._sync_ring())

@@ -179,7 +179,7 @@ func label(target: String) -> String:
 
 ## The surface's view of one control (apc40_surface.gd info_cb).
 func info(c: Dictionary) -> Dictionary:
-	var b := MidiMap.find(midi.map, L.msg_of(c))
+	var b: Dictionary = midi.clips.binding(midi.map, L.msg_of(c))  # WO-1106 B32: the shown bank
 	if b.is_empty():
 		return {"label": "", "value": -1.0, "lit": 0, "waiting": false, "hw": -1.0, "line": ""}
 	var t: String = b.target
@@ -209,7 +209,7 @@ func info(c: Dictionary) -> Dictionary:
 ## WO-913: a click on a mapped button or pad presses it (as the hardware would); on an unmapped control (or a knob / fader whose
 ## target is not there now — a mapped one is dragged instead, WO-946) it Learns.
 func _click(c: Dictionary) -> void:
-	var b := MidiMap.find(midi.map, L.msg_of(c))
+	var b: Dictionary = midi.clips.binding(midi.map, L.msg_of(c))  # WO-1106 B32: the shown bank
 	if b.is_empty() or MidiMap.is_range(b.target) or c.kind != "note":
 		_learn(c)
 		return

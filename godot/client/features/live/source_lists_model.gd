@@ -17,8 +17,7 @@ static func shader_names(resp: Variant) -> Dictionary:
 	var list: Variant = (resp as Dictionary).get("shaders", []) if resp is Dictionary else []
 	for x in (list if list is Array else []):
 		if x is Dictionary and str(x.get("id", "")) != "":
-			var name := str(x.get("name", "")) if x.get("name") != null else ""
-			out[str(x.id).to_lower()] = name if name != "" else str(x.id)
+			out[str(x.id).to_lower()] = preload("res://features/visuals/visuals_catalog.gd").shader_label(x)  # (+ WO-1106 B67 licence note)
 	return out
 
 

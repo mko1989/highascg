@@ -50,8 +50,8 @@ static func run(tab: Node, dir: String) -> void:
 	print("[probe-orbit] look recalled: drive %s pose %s · diff to the saved framing %.4f" % [w.drive.button_pressed, tab.mixer.deck().cam,
 		_diff(moved, back)])
 	# the Shader backdrop at the extreme angles of the orbit
-	var r: Dictionary = await tab._g("DevicesTarget").box_api.get_json("/api/shaders/sh-sa-ribbons")
-	tab._shader_cache["sh-sa-ribbons"] = r.data if r.get("ok") else null
+	var r: Dictionary = await tab._g("DevicesTarget").box_api.get_json("/api/shaders/sh-sa-synthwave-canyon")
+	tab._shader_cache["sh-sa-synthwave-canyon"] = r.data if r.get("ok") else null
 	M.with_layers(tab.slice, Probes.stack(["shader"]))
 	tab.slice.camera.drive = true
 	await tab._go(true)

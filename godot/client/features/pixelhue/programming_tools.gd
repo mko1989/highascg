@@ -1,6 +1,8 @@
 extends HFlowContainer
 ## WO-1039 — the selected layer's position / size bar under the screens, a port of Studio's public/layer-tools.js:
-## X / Y / W / H (stream to the switcher while typing, Enter / leaving the field sends the final value), aspect
+## X / Y / W / H (WO-1106 C40: a typed value is sent on Enter / leaving the field only — RULES.md input fields — and
+## only when the switcher's limits allow it; Studio streamed every keystroke, so typing 1920 moved an on-air layer
+## through 1, 19, 192; dragging on the screens and the arrow-key nudge still stream), aspect
 ## presets + Lock, align to screen, fill screen / width / height / output, native 1:1, Front / Back, Duplicate,
 ## Mirror and Clear (asks first). A group member acts on the pair's combined rectangle. A locked PGM disables it all.
 ## No autoloads: `host` (programming_panel.gd) sends.
@@ -55,7 +57,6 @@ func render(state: Dictionary, layer: Dictionary, locked: bool) -> void:
 		le.custom_minimum_size.x = 64
 		le.editable = not locked
 		le.tooltip_text = "Layer %s (px, screen-local)" % kv[1]
-		le.text_changed.connect(func(text: String) -> void: _typed(key, text))
 		le.text_submitted.connect(func(_t: String) -> void: _commit(key, le))
 		le.focus_exited.connect(func() -> void: _commit(key, le))
 		fields.add_child(_muted(kv[1]))
@@ -141,34 +142,31 @@ func _src(l: Dictionary) -> Dictionary:
 	return M.source_for(_state, M.source_key(l.get("sourceType", 0), l.get("sourceId", 0)))
 
 
-func _save(w: Dictionary, message: String, live := false) -> void:
+func _save(w: Dictionary, message: String) -> void:
 	if _layer.is_empty() or host == null:
 		return
 	var change := M.window_change(_state, _layer, w)
 	if change.action == "group-window":
 		message = message.replace("Layer", "Group")
-	if live:
-		host.call("live_geometry", change)
-	else:
-		host.call("command", change, message)
+	host.call("command", change, message)
 
 
-func _typed(key: String, text: String) -> void:
-	if not text.strip_edges().is_valid_int():
-		return
-	var next := G.field_edit(_current(), key, int(text.strip_edges()), _ratio())
-	if G.window_ok(next) and not G.same(next, _current()):
-		_save(next, "Layer position saved.", true)
-
-
+## Enter / focus-out (NF.math_line has already evaluated the field): the whole value, checked against the switcher's
+## limits first (G.within_limits — roam or inside the screen); refused → the field shows the layer again and says why.
 func _commit(key: String, le: LineEdit) -> void:
 	if not is_instance_valid(le) or not le.is_inside_tree() or _layer.is_empty() or not le.text.is_valid_int():
 		return
 	var next := G.field_edit(_current(), key, int(le.text), _ratio())
-	if G.window_ok(next) and not G.same(next, _current()):
+	if G.same(next, _current()):
+		if host != null:
+			host.call("finish_geometry")
+	elif not G.within_limits(next, _screen, _state.get("roam") != false):
+		le.text = str(int(_current()[key]))
+		if host != null and host.has_signal("status"):
+			host.emit_signal("status", "Not sent: %s %d puts the layer outside what %s allows (%s)." % [key.capitalize(), int(next[key]),
+				str(_screen.get("name", "the screen")), "at least 64 × 64 px" if _state.get("roam") != false else "inside the screen, at least 64 × 64 px"])
+	else:
 		_save(next, "Layer position saved.")
-	elif host != null:
-		host.call("finish_geometry")
 	update_fields()
 
 

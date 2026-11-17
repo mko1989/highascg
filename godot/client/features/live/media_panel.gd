@@ -296,7 +296,7 @@ func _delete_one(id: String) -> void:
 ## Desktop DeckLink connectors (live sources) or media files onto a folder (move; Alt = copy, like the web).
 func _can_drop(at: Vector2, data: Variant) -> bool:
 	var f: Variant = Ops.folder_at(_tree, at)
-	var files := f != null and not Ops.folder_drop_ids(data, str(f)).is_empty()
+	var files := f != null and (not Ops.folder_drop_ids(data, str(f)).is_empty() or Ops.folder_drop_refusal(data) != "")  # WO-1106 C45: refused on drop, with the reason
 	_tree.drop_mode_flags = Tree.DROP_MODE_ON_ITEM if files else Tree.DROP_MODE_DISABLED
 	return files or live.can_drop_connector(at, data)
 
@@ -304,6 +304,9 @@ func _can_drop(at: Vector2, data: Variant) -> bool:
 func _drop(at: Vector2, data: Variant) -> void:
 	_tree.drop_mode_flags = Tree.DROP_MODE_DISABLED
 	var f: Variant = Ops.folder_at(_tree, at)
+	if f != null and Ops.folder_drop_refusal(data) != "":
+		_bar._say(Ops.folder_drop_refusal(data))
+		return
 	var ids: Array = Ops.folder_drop_ids(data, str(f)) if f != null else []
 	if not ids.is_empty():
 		_bar.transfer("copy" if Input.is_key_pressed(KEY_ALT) else "move", ids, str(f))
@@ -375,7 +378,7 @@ func _build() -> void:
 		if r.get("remote") == true:  # not a local file: draggable, but no selection / inspector / delete
 			it.set_custom_color(0, ThemeBuilder.TEXT_MUTED)
 		it.set_tooltip_text(0, "%s · %s" % [id, info if info != "" else r.get("type", "")])
-		it.set_metadata(0, {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id} if r.get("remote") == true else {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id, "row": r})
+		it.set_metadata(0, {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id, "remote": true} if r.get("remote") == true else {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id, "row": r})  # WO-1106 C45: the drag says it is remote
 		var notch := Ops.is_notchlc(r)  # WO-818: a neutral codec tag (muted, tooltip) — no ⚠, the build decodes it on the GPU
 		if info != "":
 			it.set_text(1, info)

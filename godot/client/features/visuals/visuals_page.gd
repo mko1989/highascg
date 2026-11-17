@@ -201,7 +201,7 @@ func set_state(slice: Dictionary, cm: Variant) -> void:
 func set_shaders(list: Array) -> void:
 	for r in list:
 		if r is Dictionary and r.get("id") is String:
-			_shader_names[r.id] = str(r.get("name", r.id))
+			_shader_names[r.id] = preload("res://features/visuals/visuals_catalog.gd").shader_label(r)  # WO-1106 B67: + licence note
 	_show_layers()
 
 

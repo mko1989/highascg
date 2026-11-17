@@ -131,8 +131,19 @@ static func _sig(path: String) -> String:
 
 
 ## Load `slug` (from `root`, default dir()) and retarget `moves_of.call(name)` → {root, height, moves, toes, own,
-## report} or {} (report(slug) says why).
+## report} or {} (report(slug) says why). WO-1106 A39: three steps, so human_body.gd can run the slow one on a worker
+## thread — prepare() and finish() on the main thread (they touch the statics: reports, file looks, a DNA conversion),
+## build() reads files and makes nodes / resources outside the tree only (~130 ms for the 9 k-triangle test puppet).
 static func template(slug: String, moves_of: Callable, root := "") -> Dictionary:
+	var job := prepare(slug, root)
+	if job.has("out"):
+		return job.out
+	return finish(job, build(job, moves_of))
+
+
+## Main thread: find `slug`'s model → a job for build(), or {out: {}} when there is nothing to build (report says why).
+## Until finish(), report(slug) says it is loading.
+static func prepare(slug: String, root := "") -> Dictionary:
 	var t0 := Time.get_ticks_msec()
 	var rep := {"slug": slug, "ok": false, "warnings": []}
 	_reports[slug] = rep
@@ -144,19 +155,35 @@ static func template(slug: String, moves_of: Callable, root := "") -> Dictionary
 	_sigs[slug] = {"path": src_path, "sig": _sig(src_path)}
 	if entry.is_empty():
 		rep.error = "no model for %s in %s" % [slug, root if root != "" else dir()]
-		return _fail(rep)
+		return {"out": _fail(rep)}
 	if str(entry.file) == "":  # MetaHuman DNA, not converted yet
 		rep.dna_folder = entry.folder
 		var why := Dna.start(str(entry.folder))
 		rep.error = why if why != "" else "converting the MetaHuman DNA (started)"
-		return _fail(rep)
+		return {"out": _fail(rep)}
 	rep.file = entry.file
 	var models: Array = _models_in(str(entry.folder)) if entry.has("folder") else []
 	if models.size() > 1:
 		# WO-1106 A12: only one file loads (a body FBX + a head FBX gave a headless puppet reported "ok")
 		rep.error = "%d model files in the folder (%s) — only one can load: put the body and the head in one file" % [models.size(),
 			", ".join(PackedStringArray(models.map(func(f: String) -> String: return f.get_file())))]
-		return _fail(rep)
+		return {"out": _fail(rep)}
+	_reports[slug] = {"slug": slug, "ok": false, "loading": true, "file": entry.file, "warnings": []}  # build()'s rep is its own
+	return {"slug": slug, "entry": entry, "rep": rep, "t0": t0}
+
+
+## Main thread: the job's report becomes report(slug); `out` = build()'s answer.
+static func finish(job: Dictionary, out: Dictionary) -> Dictionary:
+	_reports[str(job.slug)] = job.rep
+	return out
+
+
+## Any thread: import, place, texture and retarget the job's model. Touches no static and no node in the tree;
+## `moves_of` must be safe to call from the thread too (human_body.gd hands it private copies of the shipped bodies).
+static func build(job: Dictionary, moves_of: Callable) -> Dictionary:
+	var rep: Dictionary = job.rep
+	var entry: Dictionary = job.entry
+	var t0 := int(job.t0)
 	var fbx := str(entry.file).get_extension().to_lower() == "fbx"
 	var doc: GLTFDocument = FBXDocument.new() if fbx else GLTFDocument.new()
 	var st: GLTFState = FBXState.new() if fbx else GLTFState.new()
@@ -218,7 +245,7 @@ static func template(slug: String, moves_of: Callable, root := "") -> Dictionary
 	rep.moves = moves_name
 	rep.height = snappedf(float(own.height), 0.01)
 	rep.ms = Time.get_ticks_msec() - t0
-	print("[human_own] %s: %s, %d triangles, %d bones (%d mapped), %.2f m, moves %s, %d ms%s" % [slug, str(entry.file).get_file(), rep.tris,
+	print("[human_own] %s: %s, %d triangles, %d bones (%d mapped), %.2f m, moves %s, %d ms%s" % [rep.slug, str(entry.file).get_file(), rep.tris,
 		rep.bones, rep.mapped.size(), rep.height, moves_name, rep.ms, ("; " + "; ".join(rep.warnings)) if not rep.warnings.is_empty() else ""])
 	var toes := []
 	for side in ["Left", "Right"]:

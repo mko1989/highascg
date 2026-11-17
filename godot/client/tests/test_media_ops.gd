@@ -69,6 +69,24 @@ func test_folder_drop_ids_web_rule() -> void:
 	t.eq(O.folder_drop_ids({"type": "media", "value": "x"}, "x"), [], "a folder onto itself")
 
 
+
+## WO-1106 C45: a greyed row (a file only a linked server has) drags with remote = true, and a folder drop of it is
+## refused with a plain reason instead of a move the server cannot do (the guard never fired: the drag lost the flag).
+func test_remote_file_folder_drop_is_refused_wo1106_c45() -> void:
+	var panel := FileAccess.get_file_as_string("res://features/live/media_panel.gd")
+	t.ok(panel.contains('"value": id, "label": id, "remote": true} if r.get("remote") == true'), "the remote row's metadata says so")
+	t.ok(panel.contains("_bar._say(Ops.folder_drop_refusal(data))"), "the drop shows the reason")
+	var remote := {"type": "media", "value": "show/b.mov", "label": "show/b.mov", "remote": true}
+	var drag := O.drag_payload(remote, [])
+	t.eq(drag.get("remote"), true, "the drag payload carries it")
+	t.eq(O.folder_drop_ids(drag, "y"), [], "not moved")
+	t.ok(O.folder_drop_refusal(drag).begins_with("✗ Not moved: show/b.mov is on a linked server"), "says why: " + O.folder_drop_refusal(drag))
+	var local := {"type": "media", "value": "x/a.mov", "label": "x/a.mov"}
+	t.eq(O.folder_drop_ids({"type": "multi", "items": [local, drag]}, "y"), [], "a mix: nothing half-moved")
+	t.eq(O.folder_drop_refusal(local), "", "a local file: no refusal")
+	t.eq(O.folder_drop_ids(local, "y"), ["x/a.mov"], "and it still moves")
+
+
 func test_covers_files_and_folders() -> void:
 	t.eq(O.covers(["a/b.mov"], "a/b.mov"), true)
 	t.eq(O.covers(["a"], "a/b.mov"), true, "a folder takes its files")

@@ -35,6 +35,9 @@ var _run_id := ""
 var _t0 := 0
 var _snap := {}  # the run as the WS events build it up (≤ 4 file events a second)
 var _drawn := 0
+var api: Object = null  ## tests: the HTTP client (default the Api autoload — this node only)
+
+signal fetched  ## a media-needs read ended (WO-1106 C45: a fresh read waits for the one in flight)
 
 
 func _ready() -> void:
@@ -91,11 +94,18 @@ func states() -> Dictionary:
 	return _states
 
 
+## One read at a time. A poll that finds one in flight is dropped; a `fresh` read (press / send / after a run: the
+## confirm must show what is true now) waits for the one in flight and then asks again — WO-1106 C45: it used to be
+## dropped too, so the confirm could show the poll's older answer.
 func refresh(fresh := false) -> void:
-	if _fetching or absent:
+	if absent or (_fetching and not fresh):
+		return
+	while _fetching:
+		await fetched
+	if absent:
 		return
 	_fetching = true
-	var r: Dictionary = await Api.get_json("/api/cluster/media-needs" + ("?refresh=1" if fresh else ""))
+	var r: Dictionary = await _api().get_json("/api/cluster/media-needs" + ("?refresh=1" if fresh else ""))
 	_fetching = false
 	if r.get("ok") == true and r.get("data") is Dictionary:
 		needs = r.data
@@ -103,8 +113,14 @@ func refresh(fresh := false) -> void:
 		absent = true
 		needs = null
 	else:
+		fetched.emit()
 		return  # a hiccup keeps what we knew
 	_apply()
+	fetched.emit()
+
+
+func _api() -> Object:
+	return api if api != null else Api
 
 
 func _apply() -> void:

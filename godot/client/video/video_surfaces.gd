@@ -61,6 +61,22 @@ func acquire(role: String, owner: Object) -> Texture2D:
 	return texture(role)
 
 
+## WO-1106 B28: is `role`'s picture black? Sampled on the CPU from the bytes already uploaded (ShmTexture.is_black: no
+## GPU readback, no frame copy); false before the first frame. A demo's SubViewport has no CPU bytes: read back (demo only).
+func is_black(role: String) -> bool:
+	var tex: Variant = _ensure(role).tex
+	if tex is ShmTexture:
+		return (tex as ShmTexture).is_black()
+	var t2: Texture2D = tex.get("texture") if tex is Dictionary else null
+	if t2 == null or t2.get_width() <= 1:
+		return false
+	var img := t2.get_image()
+	if img == null or img.is_empty():
+		return false
+	img.convert(Image.FORMAT_RGBA8)
+	return ShmTexture.sample_black(img.get_data(), img.get_width(), img.get_height())
+
+
 func reader(role: String) -> Variant:
 	return _ensure(role).reader
 

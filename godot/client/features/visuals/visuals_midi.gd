@@ -107,7 +107,7 @@ func handle_msg(msg: Dictionary) -> void:
 		return
 	var hello := Time.get_ticks_msec() < _hello_until  # the APC reporting its faders: positions, not moves
 	var resend := _bank(msg)
-	var b := MidiMap.find(map, msg)
+	var b := clips.binding(map, msg)  # WO-1106 B32: the shown pad bank's visual first, else the stored binding
 	if b.is_empty():
 		if msg.kind != "off" and not hello:
 			_say("%s — not mapped (Learn maps it)" % _name(msg))
@@ -287,7 +287,7 @@ func pick_target(target: String) -> void:
 			_say("%s is a pad or button: click a button (a look, Burst, Tap, …) — a slider wants a fader or knob" % _name(learned))
 			return
 		var src := learned
-		map = MidiMap.learn(map, src, target)
+		map = clips.learn(map, src, target)  # WO-1106 B32: on a pad, the shown bank's visual gives way
 		pick.erase(MidiMap.key(map.back()))
 		_saved()
 		_set_mode("")
@@ -296,9 +296,7 @@ func pick_target(target: String) -> void:
 
 func _captured(msg: Dictionary) -> void:
 	if mode == "unmap":
-		var had := not MidiMap.find(map, msg).is_empty()
-		map = MidiMap.unbind_source(map, msg)
-		_saved()
+		var had := clips.unmap(msg)  # WO-1106 B32: the shown bank's visual on a pad first, else the binding (saved)
 		_set_mode("")
 		_say(("%s: unmapped" if had else "%s was not mapped") % _name(msg))
 		return
@@ -351,7 +349,7 @@ func tick() -> void:
 				Pickup.observe(pick[k], c.ratio)
 				_ghost(b.target, pick[k], c)
 	if out.port != "":  # the knob rings always (WO-912: the APC then turns on from the app's value); the pad lights when on
-		var f := Leds.frame(map, led_state, clips.velocity, dev_bank)
+		var f := Leds.frame(clips.pads(map), led_state, clips.velocity, dev_bank)  # WO-1106 B32: the shown bank's pads
 		if not leds:
 			f = Leds.rings(f)
 		out.send(Leds.diff(_lit, f))

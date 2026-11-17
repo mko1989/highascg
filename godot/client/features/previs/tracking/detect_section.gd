@@ -207,16 +207,23 @@ func _persist() -> void:
 
 
 func _num(g: GridContainer, text: String, key: String, step: float, suffix: String) -> Array:
+	var sb := num_spin(key, step, suffix)
+	sb.value_changed.connect(func(v: float) -> void: _set_key(key, v))
+	_spins[key] = sb
+	return _pair(g, text, sb)
+
+
+## WO-1106 D1 (RULES.md input fields): a typed value commits on Enter / focus-out, never per keystroke (each one
+## re-saved the detection slice); arrows / wheel still step at once.
+static func num_spin(key: String, step: float, suffix: String) -> SpinBox:
 	var lim: Array = D.LIMITS[key]
 	var sb := SpinBox.new()
 	sb.min_value = lim[0]
 	sb.max_value = lim[1]
 	sb.step = step
 	sb.suffix = suffix
-	sb.update_on_text_changed = true
-	sb.value_changed.connect(func(v: float) -> void: _set_key(key, v))
-	_spins[key] = sb
-	return _pair(g, text, sb)
+	sb.update_on_text_changed = false
+	return sb
 
 
 func _pair(g: GridContainer, text: String, c: Control) -> Array:

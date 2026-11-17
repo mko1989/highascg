@@ -3,6 +3,8 @@ extends RefCounted
 ## the library rows → banks of 40 in hue order (greys, then no-thumbnail rows last; top row first), ▲ / ▼ paging the
 ## pads (the pressed pad loads the shown bank's visual, the lights follow), a new empty bank past the last one (gone when
 ## left empty), the fill keeping the operator's own banks and replacing an earlier fill, the old [midi] clips read as bank 1.
+## WO-1106 B32: per-bank pad dispatch — a pad resolves against the shown bank first, else its stored binding (a look);
+## the fill / a drop never write the map (WO-1070 rebound such pads to "clip:<n>" in every bank and lost the look).
 
 const Tab := preload("res://features/visuals/visuals_tab.gd")
 const M := preload("res://features/visuals/visuals_model.gd")
@@ -66,13 +68,13 @@ func test_paging_the_pads() -> void:
 	midi.handle(T.note(0, 95, 127))
 	t.eq(midi.clips.bank, 1, "no further down from an empty bank")
 	midi.clips.drop(32, {"type": "visual", "scene": "starfield", "label": "Starfield", "color": "#00ff00"})
-	t.eq(Leds.frame(midi.map, midi.led_state, midi.clips.velocity)["144:32"], 21, "bank 2: the pad is green")
+	t.eq(Leds.frame(midi.clips.pads(midi.map), midi.led_state, midi.clips.velocity)["144:32"], 21, "bank 2: the pad is green")
 	tab.sel = 0
 	midi.handle(T.note(0, 32, 127))
 	t.eq(tab.slice.layers[0].scene, "starfield", "the pad loads bank 2's visual")
 	midi.handle(T.note(0, 94, 127))
 	t.eq([midi.clips.bank, midi.clips.banks.size()], [0, 2], "▲: bank 1 again, bank 2 kept")
-	t.eq(Leds.frame(midi.map, midi.led_state, midi.clips.velocity)["144:32"], 5, "the same pad is red again")
+	t.eq(Leds.frame(midi.clips.pads(midi.map), midi.led_state, midi.clips.velocity)["144:32"], 5, "the same pad is red again")
 	midi.handle(T.note(0, 32, 127))
 	t.eq(tab.slice.layers[0].scene, "rings", "and loads bank 1's visual")
 	t.eq(midi.apc_view.label("padbank:next"), "▼ 1/2", "the drawing shows the bank")
@@ -89,7 +91,9 @@ func test_fill_keeps_own_banks() -> void:
 	var auto := Lib.banks([_row("a"), _row("b")], func(_r: Dictionary) -> Variant: return Color(0, 0, 1))
 	midi.clips.set_auto_banks(auto)
 	t.eq([midi.clips.banks.size(), midi.clips.bank, midi.clips.label(32), midi.clips.banks[1].name], [2, 1, "a", "Blue"], "own bank first, the pads on the library bank")
-	t.eq(T.MM.find(midi.map, {"kind": "note", "ch": 0, "num": 33}).target, "clip:33", "a library pad that recalled a look is the bank's now")
+	var pad33 := {"kind": "note", "ch": 0, "num": 33}
+	t.eq(midi.clips.binding(midi.map, pad33).target, "clip:33", "on the library bank the pad loads the library visual")
+	t.eq(T.MM.find(midi.map, pad33).target, "look:2", "WO-1106 B32: the stored map keeps the look (WO-1070 overwrote it)")
 	midi.clips.set_auto_banks(Lib.banks([_row("c")], func(_r: Dictionary) -> Variant: return Color(1, 0, 0)))
 	t.eq([midi.clips.banks.size(), midi.clips.label(32), midi.clips.banks[0].clips.has("0")], [2, "c", true], "a second fill replaces the first; the own bank stays")
 
@@ -105,3 +109,44 @@ func test_old_clips_are_bank_one() -> void:
 	c.set_value("midi", "clip_bank", 1)
 	midi.clips.load_from(c)
 	t.eq([midi.clips.banks.size(), midi.clips.bank, midi.clips.label(5), midi.clips.banks[1].auto], [2, 1, "Rings", true], "stored banks and the shown one come back")
+
+
+## WO-1106 B32 (replaces WO-1070's "a pad holding a visual in any bank drives clip:<n> in all banks"): the shown bank's
+## visual first, the pad's own binding (here the APC map's look 1 on pad 32) wherever that slot is empty — the press,
+## the light and the drawing all follow it; Learn / Unmap on a pad act on the shown bank's visual first.
+func test_pads_resolve_per_bank_wo1106_b32() -> void:
+	var tab := _tab()
+	var midi: Node = tab.midi
+	var Looks := preload("res://features/visuals/visuals_looks.gd")
+	tab.show_ctl.looks = [Looks.capture(tab.slice, "A")]
+	tab.show_ctl._looks_changed()
+	var pad := {"kind": "note", "ch": 0, "num": 32}
+	t.eq(midi.clips.binding(midi.map, pad).target, "look:1", "own bank, empty slot: pad 32 recalls look 1")
+	midi.clips.drop(0, {"type": "visual", "scene": "rings", "label": "Rings"})  # an own bank the fill keeps
+	midi.clips.set_auto_banks(Lib.banks([_row("a")], func(_r: Dictionary) -> Variant: return Color(0, 0, 1)))
+	t.eq([midi.clips.bank, midi.clips.has(32)], [1, true], "the fill put a visual on pad 32 of bank 2")
+	t.eq(T.MM.find(midi.map, pad).target, "look:1", "the stored map is untouched by the fill")
+	t.eq(Leds.frame(midi.clips.pads(midi.map), midi.led_state, midi.clips.velocity)["144:32"], Palette.nearest(Color(0, 0, 1)),
+		"bank 2: the pad shows the visual's colour")
+	tab.sel = 0
+	midi.handle(T.note(0, 32, 127))
+	t.eq(tab.slice.layers[0].scene, "shader", "bank 2: the pad loads the library visual")
+	midi.handle(T.note(0, 94, 127))  # ▲: bank 1, slot 32 empty
+	t.eq(midi.clips.binding(midi.map, pad).target, "look:1", "bank 1: the pad is look 1 again")
+	t.eq(Leds.frame(midi.clips.pads(midi.map), midi.led_state, midi.clips.velocity)["144:32"], Leds.RGB_VEL[midi.led_state("look:1")],
+		"and lights as look 1")
+	tab.show_ctl.showing = -1
+	midi.handle(T.note(0, 32, 127))
+	t.eq(tab.show_ctl.showing, 0, "and recalls look 1")
+	t.eq(midi.apc_view.info({"kind": "note", "ch": 0, "num": 32, "name": "Pad"}).label, midi.apc_view.label("look:1"), "the drawing names the look")
+	midi.clips.page(1)  # bank 2 again
+	midi._set_mode("unmap")
+	midi.handle(T.note(0, 32, 127))
+	t.eq([midi.clips.has(32), T.MM.find(midi.map, pad).target], [false, "look:1"], "Unmap on a visual pad: the visual goes, the look stays")
+	t.eq(midi.clips.binding(midi.map, pad).target, "look:1", "… and shows through on this bank too")
+	midi.clips.drop(32, {"type": "visual", "scene": "rings", "label": "Rings"})
+	midi._set_mode("learn")
+	midi.handle(T.note(0, 32, 127))
+	midi.pick_target("blackout")
+	t.eq([midi.clips.has(32), midi.clips.binding(midi.map, pad).target], [false, "blackout"], "Learn on a visual pad: the new binding wins on this bank")
+	tab.free()

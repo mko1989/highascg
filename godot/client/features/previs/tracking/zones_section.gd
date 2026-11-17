@@ -269,13 +269,14 @@ func _line(cb: Callable) -> LineEdit:
 	return e
 
 
-func _spin(lo: float, hi: float, step: float, suffix: String) -> SpinBox:
+static func _spin(lo: float, hi: float, step: float, suffix: String) -> SpinBox:
 	var sb := SpinBox.new()
 	sb.min_value = lo
 	sb.max_value = hi
 	sb.step = step
 	sb.suffix = suffix
-	sb.update_on_text_changed = true
+	# WO-1106 D1 (RULES.md input fields): a typed value commits on Enter / focus-out, never per keystroke; arrows / wheel still step at once
+	sb.update_on_text_changed = false
 	return sb
 
 

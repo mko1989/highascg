@@ -29,6 +29,10 @@ const PARTS := {
 static var _templates := {}  # body → {root, height, moves} | {} when it failed
 static var _mats := {}  # "body:part" → ShaderMaterial
 static var _house_hooked := false
+## WO-1106 A39: own bodies import on a WorkerThreadPool task (the ~130 ms import froze the previs on the first frame a
+## card wore one): "own:slug" → {task, job, moves}; the card keeps its pebble until the template lands (_poll).
+static var _loading := {}
+static var own_root := ""  # tests: a temp folder instead of human_own.gd dir()
 
 
 ## A body name the human node takes: woman / man, "own:<slug>" (an operator's own model, human_own.gd), or an
@@ -51,6 +55,8 @@ static func _path(body: String) -> String:
 static func template(body: String) -> Dictionary:
 	# WO-1106 A13: an own body loads again once its files change (a failed one and a loaded one alike), so the help's
 	# "delete the converted GLB / convert.json to try again" works without a client restart
+	if _loading.has(body):
+		return {}  # WO-1106 A39: importing on a worker thread
 	if _templates.has(body) and not (body.begins_with("own:") and Own.stale(body.substr(4))):
 		return _templates[body]
 	if body.begins_with("own:"):
@@ -58,7 +64,7 @@ static func template(body: String) -> Dictionary:
 		if old.has("root") and is_instance_valid(old.root):
 			(old.root as Node).free()  # an orphan template: the puppets wear their own duplicates
 		_templates[body] = {}  # a failed import is not retried every frame
-		_templates[body] = Own.template(body.substr(4), func(n: String) -> Dictionary: return template(n))
+		_start(body)
 		return _templates[body]
 	var out := {}
 	var p := _path(body)
@@ -75,6 +81,75 @@ static func template(body: String) -> Dictionary:
 		push_warning("[human_body] %s: %s.scn / _moves.res missing or unreadable — the puppet stays a pebble avatar" % [body, p])
 	_templates[body] = out
 	return out
+
+
+## WO-1106 A39: prepare on the main thread, build on a worker with private copies of the shipped bodies (the thread
+## touches no node in the tree and no static), land on a later frame. No scene tree (a tool script): all at once.
+static func _start(body: String) -> void:
+	var job := Own.prepare(body.substr(4), own_root)
+	if job.has("out"):
+		_templates[body] = job.out
+		return
+	var moves := {}
+	for n in Own.MOVES:
+		var tpl := template(n)
+		if not tpl.is_empty():
+			moves[n] = {"root": (tpl.root as Node).duplicate(), "height": tpl.height, "moves": tpl.moves, "toes": tpl.toes}
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		_templates[body] = Own.finish(job, Own.build(job, _moves_in.bind(moves)))
+		_free_moves(moves)
+		return
+	# static methods, never lambdas, on the tree's signals (see material(): a static lambda corrupted the heap at exit)
+	_loading[body] = {"task": WorkerThreadPool.add_task(_build.bind(job, moves), false, "own puppet " + body), "job": job, "moves": moves}
+	if not tree.process_frame.is_connected(_poll):
+		tree.process_frame.connect(_poll)
+	if not tree.root.tree_exiting.is_connected(settle):
+		tree.root.tree_exiting.connect(settle)  # quitting mid-import: wait for it, never leave a task running
+
+
+static func _build(job: Dictionary, moves: Dictionary) -> void:
+	job.result = Own.build(job, _moves_in.bind(moves))  # the main thread reads `job` only once the task is done
+
+
+static func _moves_in(n: String, moves: Dictionary) -> Dictionary:
+	return moves.get(n, {})
+
+
+## Each frame while an import runs: land the finished ones. A card deselected (or its view closed) meanwhile is fine:
+## the task holds no node of the view, and the template is kept for the next card that wears it.
+static func _poll() -> void:
+	for body: String in _loading.keys():
+		if WorkerThreadPool.is_task_completed(int(_loading[body].task)):
+			_land(body)
+	var tree := Engine.get_main_loop() as SceneTree
+	if _loading.is_empty() and tree != null and tree.process_frame.is_connected(_poll):
+		tree.process_frame.disconnect(_poll)
+
+
+## Wait for every import in flight and land it (quit, tests).
+static func settle() -> void:
+	for body: String in _loading.keys():
+		_land(body)
+
+
+static func _land(body: String) -> void:
+	var l: Dictionary = _loading[body]
+	_loading.erase(body)
+	# the task's mesh / texture calls queue on the RenderingServer, which only the main thread flushes: blocking in
+	# wait_for_task_completion before it finished deadlocked (settle() at quit) — flush while waiting
+	while not WorkerThreadPool.is_task_completed(int(l.task)):
+		RenderingServer.force_sync()
+		OS.delay_usec(500)
+	WorkerThreadPool.wait_for_task_completion(int(l.task))
+	_free_moves(l.moves)
+	_templates[body] = Own.finish(l.job, l.job.get("result", {}))
+
+
+static func _free_moves(moves: Dictionary) -> void:
+	for m: Dictionary in moves.values():
+		if is_instance_valid(m.root):
+			(m.root as Node).free()
 
 
 static func _res(path: String) -> Variant:

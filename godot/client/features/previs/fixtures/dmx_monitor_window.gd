@@ -49,7 +49,9 @@ func _init() -> void:
 	_universe.max_value = D.ARTNET_MAX
 	_universe.prefix = "U"
 	_universe.tooltip_text = "Art-Net port-address (net : sub-net : universe as one number) or sACN universe"
-	_universe.update_on_text_changed = true
+	# WO-1106 D1: commits on Enter / focus-out like every number field (core/numeric_field.gd forces that on the
+	# whole tree anyway); this picker only chooses which universe the window SHOWS — it never sends DMX
+	_universe.update_on_text_changed = false
 	_universe.value_changed.connect(func(_v: float) -> void: _tick())
 	bar.add_child(_universe)
 	_view = OptionButton.new()

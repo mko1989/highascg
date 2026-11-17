@@ -129,6 +129,9 @@ func _note(body: String) -> void:
 	_own_note.visible = not r.is_empty()
 	if r.is_empty():
 		return
+	if r.get("loading", false):  # WO-1106 A39: importing in the background
+		_own_note.text = "Own model: loading %s…" % str(r.get("file", "")).get_file()
+		return
 	if not r.get("ok", false):
 		_own_note.text = "Own model not used: %s" % r.get("error", "?")
 		return

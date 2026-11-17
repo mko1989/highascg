@@ -2,7 +2,7 @@ extends RefCounted
 ## WO-1106 (4.4) — PixelHue ▸ Programming against a fake HTTP client: a double Take / Take + Cut while the geometry
 ## queue drains sends one command (C30), a read that started before a Take cannot put the pre-Take layers back (C39),
 ## a failed gallery read is retried and thumbnails go two at a time (C42), the opacity slider sends on a value change
-## without a drag, debounced, and waits for a running command (C45).
+## without a drag, debounced, and waits for a running command (C45), typed X / Y / W / H go on Enter within the limits (C40).
 
 const ProgPanel := preload("res://features/pixelhue/programming_panel.gd")
 const Gallery := preload("res://features/pixelhue/programming_gallery.gd")
@@ -174,3 +174,55 @@ func test_opacity_slider_sends_without_a_drag_debounced() -> void:
 	s.drag_ended.emit(true)
 	t.eq(host.sent.size(), 3, "the drag sends once on release")
 	fx.queue_free()
+
+
+# ---- C40 ----
+
+var _mounted: Array[Node] = []
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:  # a test that died early still frees its panel
+		for n in _mounted:
+			if is_instance_valid(n) and not n.is_queued_for_deletion():
+				n.free()
+
+
+func _geometry(posts: Array) -> Array:
+	return posts.filter(func(x: Array) -> bool: return str(x[0]).ends_with("programming/geometry"))
+
+
+## X / Y / W / H: typing sends nothing (1920 moved an on-air layer through 1, 19, 192), Enter sends the whole value once,
+## a value outside the switcher's limits is not sent at all and the field shows the layer again.
+func test_typed_geometry_commits_on_enter_within_limits() -> void:
+	var api := PP.FakeApi.new()
+	var p: ProgPanel = ProgPanel.new()
+	p.api = api
+	var notes: Array = []
+	p.status.connect(func(text: String) -> void: notes.append(text))
+	_mounted.append(p)
+	t.root.add_child(p)
+	await t.process_frame
+	await p.refresh()
+	p.select(54657024)  # AUX Screen 1 (1920 × 1080), PVW
+	var x: LineEdit = p._tools._fields["x"]
+	for typed in ["1", "19", "192"]:
+		x.text = typed
+		x.text_changed.emit(typed)  # each keystroke
+	await _wait()
+	t.eq(_geometry(api.posts).size(), 0, "typing alone sends nothing")
+	x.text_submitted.emit(x.text)  # Enter
+	await _wait()
+	var sent := _geometry(api.posts)
+	t.eq(sent.size(), 1, "Enter sends once")
+	if sent.size() == 1:
+		t.eq(int(sent[0][1].changes[0].window.x), 192, "the whole typed number")
+	p.state.roam = false  # the switcher keeps layers inside the screen
+	var y: LineEdit = p._tools._fields["y"]
+	y.text = "5000"  # below a 1080 px screen
+	y.text_submitted.emit(y.text)
+	await _wait()
+	t.eq(_geometry(api.posts).size(), 1, "outside the limits: not sent")
+	t.eq(y.text, str(int(G.target_window(M.arr(p.state, "layers"), M.layer_by_id(p.state, 54657024)).y)), "the field shows the layer again")
+	t.ok(notes.any(func(n: String) -> bool: return n.begins_with("Not sent: Y 5000")), "and says why: %s" % str(notes))
+	p.free()

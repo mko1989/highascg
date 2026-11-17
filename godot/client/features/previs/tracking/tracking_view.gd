@@ -189,11 +189,10 @@ func _exit_tree() -> void:
 
 func _process(d: float) -> void:
 	_black_t -= d
-	# WO-1106 B28: the black check reads the whole frame back from the GPU — never for a view nobody sees
+	# WO-1106 B28: only for a view somebody sees, and a sparse CPU sample of the uploaded bytes (no GPU readback)
 	if _black_t <= 0.0 and ghost_on and is_visible_in_tree():  # WO-1091: a black input is no picture — the ghost then draws at full strength
 		_black_t = 2.0
-		var tex: Texture2D = VideoSurfaces.texture(_role) if _role != "" else null
-		_black = tex != null and tex.get_width() > 1 and A.is_black(tex.get_image())
+		_black = _role != "" and VideoSurfaces.is_black(_role)
 	queue_redraw()  # the surface texture updates in place, but its size can arrive after the lease
 	_back.queue_redraw()
 

@@ -9,6 +9,11 @@ extends RefCounted
 ## time, ▲ / ▼ ("padbank:prev|next") page through them. A bank is {name, auto, clips}; `auto` banks are the library
 ## fill's (visuals_midi_library.gd: the whole library by dominant colour) and are replaced by the next fill, the others
 ## are the operator's own. One step past the last bank is a new empty one to drop visuals on (gone again when left empty).
+## WO-1106 B32 — per-bank pad dispatch: a pad press resolves against the bank on the pads first (a visual in that slot →
+## the visual), else the pad's own binding in the stored map (a look, …). binding() / pads() compute that view; nothing
+## writes "clip:<n>" into the map any more (WO-1070 rebound every pad that held a visual in ANY bank, in all banks, so a
+## look on that pad was lost; a library fill did that to looks 1–12). All 40 pads hold the library AND a look pad still
+## recalls its look on every bank whose slot is empty. The lights follow the same view (visuals_midi.gd tick).
 
 const Palette := preload("res://features/midi/apc40_palette.gd")
 const MidiMap := preload("res://features/midi/midi_map.gd")
@@ -47,13 +52,12 @@ static func clip_of(payload: Dictionary) -> Dictionary:
 	return {"payload": p, "color": "#" + c.to_html(false)}
 
 
-## `payload` dropped on pad `num`: the pad drives it from now on.
+## `payload` dropped on pad `num`: on this bank the pad drives it from now on (WO-1106 B32: the map is not touched — the
+## pad's binding still works on the banks where this slot is empty).
 func drop(num: int, payload: Dictionary) -> void:
 	if not is_grid(num):
 		return
 	clips[str(num)] = clip_of(payload)
-	midi.map = MidiMap.learn(midi.map, {"kind": "note", "ch": MidiMap.ANY, "num": num}, "clip:%d" % num)
-	midi._saved()
 	save()
 	if not midi.leds and midi.cfg_path != "":  # the colour is the pad's backlight: the host lights the pads from here
 		midi.leds = true
@@ -123,7 +127,6 @@ func show_bank(i: int) -> void:
 	if from != bank and from == banks.size() - 1 and from > 0 and banks[from].clips.is_empty():
 		banks.remove_at(from)  # the empty bank at the end, left empty
 	new_slot = -1
-	bind_pads()
 	save()
 	midi._say.call_deferred(bank_label())  # (after the button's own "▲ → …" line)
 
@@ -134,17 +137,48 @@ func bank_label() -> String:
 	return "Pads %d/%d%s" % [bank + 1, banks.size(), " · " + nm if nm != "" else (" · empty: drop visuals on the pads" if clips.is_empty() else "")]
 
 
-## WO-1070: every pad that holds a visual in any bank drives "clip:<note>" (a pad bound to a look until now is the bank's).
-func bind_pads() -> void:
-	var changed := false
-	for b in banks:
-		for k in b.clips:
-			var msg := {"kind": "note", "ch": MidiMap.ANY, "num": int(k)}
-			if MidiMap.find(midi.map, {"kind": "note", "ch": 0, "num": int(k)}).get("target", "") != "clip:%d" % int(k):
-				midi.map = MidiMap.learn(midi.map, msg, "clip:%d" % int(k))
-				changed = true
-	if changed:
-		midi._saved()
+## WO-1106 B32: what `msg` drives now — the shown bank's visual on that pad, else the stored map's binding.
+func binding(map: Array, msg: Dictionary) -> Dictionary:
+	if msg.get("kind") in ["note", "off"] and has(int(msg.get("num", -1))):
+		return _clip_binding(int(msg.num))
+	return MidiMap.find(map, msg)
+
+
+## WO-1106 B32: the bindings the controller has now (the lights, the drawing): `map` with every pad that holds a visual in
+## the shown bank driving it. Computed on each call, never stored.
+func pads(map: Array) -> Array:
+	if clips.is_empty():
+		return map
+	var out := map.filter(func(b: Dictionary) -> bool: return not (b.kind == "note" and has(int(b.num))))
+	for k in clips:
+		out.append(_clip_binding(int(k)))
+	return out
+
+
+static func _clip_binding(num: int) -> Dictionary:
+	return {"kind": "note", "ch": MidiMap.ANY, "num": num, "target": "clip:%d" % num}
+
+
+## WO-1106 B32 — Learn on a pad: the binding is stored and, on the shown bank, wins over a visual there (the operator's
+## last action on a pad decides); the other banks keep their visuals.
+func learn(map: Array, src: Dictionary, target: String) -> Array:
+	if src.get("kind") in ["note", "off"] and has(int(src.get("num", -1))):
+		clips.erase(str(int(src.num)))
+		save()
+	return MidiMap.learn(map, src, target)
+
+
+## WO-1106 B32 — Unmap on a pad: a visual in the shown bank goes first (its binding then shows through), else the pad's
+## stored binding. True when something was unmapped.
+func unmap(msg: Dictionary) -> bool:
+	if msg.get("kind") in ["note", "off"] and has(int(msg.get("num", -1))):
+		clips.erase(str(int(msg.num)))
+		save()
+		return true
+	var had := not MidiMap.find(midi.map, msg).is_empty()
+	midi.map = MidiMap.unbind_source(midi.map, msg)
+	midi._saved()
+	return had
 
 
 ## WO-1070: the library fill's banks replace the earlier fill's; the operator's own banks stay in front. The pads go to
@@ -157,7 +191,6 @@ func set_auto_banks(auto: Array) -> void:
 		banks = [{"name": "", "auto": false, "clips": {}}]
 	bank = clampi(first, 0, banks.size() - 1)
 	new_slot = -1
-	bind_pads()
 	save()
 	if not midi.leds and midi.cfg_path != "":
 		midi.leds = true

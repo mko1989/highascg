@@ -10,7 +10,7 @@ const Model := preload("res://features/live/shader_live_model.gd")
 static func run(tab: Node, arg: String) -> void:
 	var p := arg.split(":")
 	var dir := p[0]
-	var id := p[1] if p.size() > 1 else "sh-sa-ribbons"
+	var id := p[1] if p.size() > 1 else "sh-sa-synthwave-canyon"
 	await tab.get_tree().create_timer(4.0).timeout
 	tab.slice.layers = Probes.stack(["shader"], id)
 	tab.sel = 0

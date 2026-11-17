@@ -123,3 +123,22 @@ func test_panel_builds() -> void:
 	t.ok(src.contains('visuals.name = "Visuals"'), "Sources has the Visuals tab")
 	t.ok(src.contains('get_tab_idx_from_control(templates), "CGs")'), "the Templates tab reads CGs")
 	p.free()
+
+
+## WO-1106 B67 follow-up: a shader the box holds locally under a non-commercial licence (withdrawn from the shipped
+## library) says so beside its name — the catalog row, the layer rows and the Live template list; the drag label stays plain.
+func test_non_commercial_shader_says_so() -> void:
+	var nc := {"id": "sh-sa-ribbons", "name": "Ribbons", "nonCommercial": true, "local": true, "licence": "CC BY-NC-SA 3.0",
+		"licenceNote": "non-commercial licence — not part of HighAsCG"}
+	var C := preload("res://features/visuals/visuals_catalog.gd")
+	t.eq(C.shader_label(nc), "Ribbons — non-commercial licence — not part of HighAsCG", "name + the server's note")
+	t.eq(C.shader_label({"id": "sh-x", "nonCommercial": true}), "sh-x — non-commercial licence", "no name / note: the id + a plain note")
+	t.eq(C.shader_label({"id": "sh-sa-synthwave-canyon", "name": "Synthwave canyon"}), "Synthwave canyon", "a shipped shader: the name only")
+	t.eq(C.shader_label({"id": "sh-y", "name": null}), "sh-y", "a null name: the id")
+	var rows := C.rows([nc], []).filter(func(r: Dictionary) -> bool: return r.payload.get("shader") == "sh-sa-ribbons")
+	t.eq(rows.size(), 1, "the catalog row")
+	if rows.size() == 1:
+		t.eq([rows[0].name, rows[0].payload.label], ["Ribbons — non-commercial licence — not part of HighAsCG", "Ribbons"], "shown with the note, dragged plain")
+		t.ok(str(rows[0].tip).ends_with("not part of HighAsCG"), "the tooltip too")
+	var SL := preload("res://features/live/source_lists_model.gd")
+	t.eq(SL.shader_names({"shaders": [nc]}), {"sh-sa-ribbons": "Ribbons — non-commercial licence — not part of HighAsCG"}, "the Live template list")

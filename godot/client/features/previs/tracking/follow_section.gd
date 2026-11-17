@@ -104,11 +104,7 @@ func _ready() -> void:
 	_dest.placeholder_text = F.DEFAULT_DEST + "  (ip[:port])"
 	_pair("Destination", _dest)
 	for f in FIELDS:
-		var sb := SpinBox.new()
-		sb.min_value = f[2]
-		sb.max_value = f[3]
-		sb.step = f[4]
-		sb.update_on_text_changed = true
+		var sb := field_spin(f)
 		var key: String = f[1]
 		sb.value_changed.connect(func(v: float) -> void: _edit(key, int(v) if f[4] >= 1 else v))
 		_spins[key] = sb
@@ -187,6 +183,16 @@ func _edit(path: String, v: Variant) -> void:
 		return
 	d[keys[-1]] = v
 	_persist()
+
+## One FIELDS row → its SpinBox. WO-1106 D1 (RULES.md input fields): a typed value commits on Enter / focus-out —
+## never per keystroke ("200" would patch the head to universe 2, then 20, then 200); arrows / wheel step at once.
+static func field_spin(f: Array) -> SpinBox:
+	var sb := SpinBox.new()
+	sb.min_value = f[2]
+	sb.max_value = f[3]
+	sb.step = f[4]
+	sb.update_on_text_changed = false
+	return sb
 
 
 func _add() -> void:

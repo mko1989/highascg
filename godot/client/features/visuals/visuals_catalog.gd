@@ -58,9 +58,13 @@ static func rows(shaders: Array, games: Array, filter := "") -> Array:
 		var nm := str(r.get("name", r.id)).strip_edges()
 		var audio: bool = r.get("audio") == true
 		var folder := ("Audio-reactive/" if audio else "Backgrounds/") + theme(r.id, nm)
-		out.append(_row(nm if nm != "" else r.id, folder, {"scene": "shader", "shader": r.id},
+		var row := _row(nm if nm != "" else r.id, folder, {"scene": "shader", "shader": r.id},
 			"%s-%s" % [r.id, str(r.get("updatedAt", "")).md5_text().left(8)],
-			"%s\n%s · %s" % [nm, r.id, "reacts to the audio" if audio else "no audio"]))
+			"%s\n%s · %s" % [nm, r.id, "reacts to the audio" if audio else "no audio"])
+		row.name = shader_label(r)  # the dragged label stays the plain name
+		if r.get("nonCommercial", false) == true:
+			row.tip += "\n" + licence_note(r)
+		out.append(row)
 	for g in games:
 		if g is Dictionary and g.get("path") is String:
 			var sys: String = SYSTEMS.get(str(g.path).get_extension().to_lower(), "Other")
@@ -96,6 +100,20 @@ static func _row(name: String, folder: String, payload: Dictionary, thumb: Strin
 	var p := {"type": "visual", "label": name}
 	p.merge(payload)
 	return {"name": name, "folder": folder, "payload": p, "thumb": thumb, "tip": tip}
+
+
+## WO-1106 B67 — a GET /api/shaders row's shown name: a shader the box holds locally under a non-commercial licence
+## (withdrawn from the shipped library, e9a11da3) says so beside its name.
+static func shader_label(row: Dictionary) -> String:
+	var nm := str(row.get("name", "")).strip_edges() if row.get("name") != null else ""
+	if nm == "":
+		nm = str(row.get("id", ""))
+	return nm + (" — " + licence_note(row) if row.get("nonCommercial", false) == true else "")
+
+
+static func licence_note(row: Dictionary) -> String:
+	var n := str(row.get("licenceNote", "")).strip_edges() if row.get("licenceNote") != null else ""
+	return n if n != "" else "non-commercial licence"
 
 
 ## A drag payload this canvas takes, or null.

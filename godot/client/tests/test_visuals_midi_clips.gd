@@ -48,9 +48,10 @@ func test_drop_and_fire() -> void:
 	var midi: Node = tab.midi
 	t.eq(T.MM.find(midi.map, {"kind": "note", "ch": 0, "num": 33}).target, "look:2", "pad 2·1 recalls look 2 (the APC map)")
 	midi.clips.drop(33, {"type": "visual", "scene": "rings", "label": "Rings", "color": "#ff0000"})
-	t.eq(T.MM.find(midi.map, {"kind": "note", "ch": 0, "num": 33}).target, "clip:33", "dropped: the pad loads the visual now")
+	t.eq(midi.clips.binding(midi.map, {"kind": "note", "ch": 0, "num": 33}).target, "clip:33", "dropped: the pad loads the visual now")
+	t.eq(T.MM.find(midi.map, {"kind": "note", "ch": 0, "num": 33}).target, "look:2", "WO-1106 B32: on this bank only — the stored look stays")
 	t.eq(midi.leds, false, "the test runner keeps no lights (no ui.cfg)")
-	t.eq(Leds.frame(midi.map, midi.led_state, midi.clips.velocity)["144:33"], 5, "its light is its colour (red = 5)")
+	t.eq(Leds.frame(midi.clips.pads(midi.map), midi.led_state, midi.clips.velocity)["144:33"], 5, "its light is its colour (red = 5)")
 	t.eq(midi.apc_view.label("clip:33"), "Rings", "the surface names the visual")
 	tab.sel = -1
 	midi.handle(T.note(0, 33, 127))

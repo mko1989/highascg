@@ -20,6 +20,7 @@ var _vp: SubViewport
 var _stage: Node3D
 var _cache := {}  # key → Texture2D
 var _queue := []  # [key, payload]
+var _queued := {}  # WO-1106 B29: key → true for every queued or rendering key (request's de-dupe was a scan of the queue)
 var _busy := false
 
 
@@ -51,14 +52,27 @@ func texture(key: String) -> Texture2D:
 
 ## Render `key` (a catalog row's thumb) unless it is known, queued or failed; thumb_ready fires when it lands.
 func request(key: String, payload: Dictionary) -> void:
-	if key == "" or texture(key) != null or failed.has(key) or _queue.any(func(j: Array) -> bool: return j[0] == key):
+	if key == "" or _queued.has(key) or failed.has(key) or texture(key) != null:
 		return
 	_queue.append([key, payload])
+	_queued[key] = true
 	_pump()
+
+
+## WO-1106 B29: queued or rendering now (a keyed lookup).
+func is_pending(key: String) -> bool:
+	return _queued.has(key)
+
+
+## WO-1106 B29: in memory already (no disk look-up, unlike texture()).
+func is_cached(key: String) -> bool:
+	return _cache.has(key)
 
 
 ## Forget the queue (the list was closed or rebuilt); a render in flight finishes.
 func clear_queue() -> void:
+	for j in _queue:
+		_queued.erase(j[0])
 	_queue.clear()
 
 
@@ -73,6 +87,7 @@ func _pump() -> void:
 	while not _queue.is_empty() and is_inside_tree():
 		var job: Array = _queue.pop_front()
 		var tex: Texture2D = await _render(job[0], job[1])
+		_queued.erase(job[0])
 		if tex != null:
 			_cache[job[0]] = tex
 			thumb_ready.emit(job[0], tex)
@@ -81,7 +96,8 @@ func _pump() -> void:
 		if is_inside_tree():
 			await get_tree().process_frame
 	_busy = false
-	_stage.clear()  # no shader kept compiled between batches
+	if _stage != null:  # null before _ready (a list not mounted yet): nothing was rendered
+		_stage.clear()  # no shader kept compiled between batches
 
 
 func _render(key: String, p: Dictionary) -> Texture2D:

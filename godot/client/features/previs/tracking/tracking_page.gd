@@ -491,5 +491,5 @@ static func _spin(lo: float, hi: float, step: float) -> SpinBox:
 	sb.max_value = hi
 	sb.step = step
 	sb.custom_minimum_size.x = 110
-	sb.update_on_text_changed = true
+	sb.update_on_text_changed = false  # WO-1106 D1: commit on Enter / focus-out (the raster persists the project)
 	return sb

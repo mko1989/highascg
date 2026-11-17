@@ -75,11 +75,7 @@ func _ready() -> void:
 	_host.placeholder_text = "camera IP, e.g. 192.168.1.50"
 	_pair("Host", _host)
 	for f in FIELDS:
-		var sb := SpinBox.new()
-		sb.min_value = f[2]
-		sb.max_value = f[3]
-		sb.step = f[4]
-		sb.update_on_text_changed = true
+		var sb := field_spin(f)
 		var key: String = f[1]
 		sb.value_changed.connect(func(v: float) -> void: _edit(key, _spin_value(key, v)))
 		_spins[key] = sb
@@ -155,6 +151,17 @@ func _edit(path: String, v: Variant) -> void:
 	d[keys[-1]] = v
 	cams[sel] = P.normalize_camera(cams[sel], sel)  # clamp / fix at once, like the server
 	_commit()
+
+
+## One FIELDS row → its SpinBox. WO-1106 D1 (RULES.md input fields): a typed value commits on Enter / focus-out —
+## never per keystroke ("45" would aim the camera at 4°, then 45°); arrows / wheel still step at once.
+static func field_spin(f: Array) -> SpinBox:
+	var sb := SpinBox.new()
+	sb.min_value = f[2]
+	sb.max_value = f[3]
+	sb.step = f[4]
+	sb.update_on_text_changed = false
+	return sb
 
 
 ## Spin values → model values: integer fields stay int, zoom -1 = none.

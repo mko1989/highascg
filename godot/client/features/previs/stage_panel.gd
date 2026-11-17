@@ -447,5 +447,6 @@ static func _spin(lo: float, hi: float, step: float, v: float) -> SpinBox:
 	sb.step = step
 	sb.value = v
 	sb.custom_minimum_size.x = 110
-	sb.update_on_text_changed = true
+	# WO-1106 D1 (RULES.md input fields): a typed value commits on Enter / focus-out, never per keystroke; arrows / wheel still step at once
+	sb.update_on_text_changed = false
 	return sb

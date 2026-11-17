@@ -16,6 +16,7 @@ var _list: VBoxContainer
 var _status: Label
 var _plus: Button
 var _loading := false
+var target_api: Callable  ## tests: the HTTP client (default DevicesTarget.api — the server the Devices tab edits)
 
 
 func _ready() -> void:
@@ -46,7 +47,7 @@ func reload() -> void:
 	if _loading:
 		return
 	_loading = true
-	var r: Dictionary = await DevicesTarget.api.get_json("/api/pixelhue/config")
+	var r: Dictionary = await _api().get_json("/api/pixelhue/config")
 	_loading = false
 	_host = str(r.data.get("host", "")) if r.ok and r.data is Dictionary else ""
 	_drive = r.ok and r.data is Dictionary and r.data.get("drive") == true
@@ -93,7 +94,7 @@ func _render() -> void:
 	drive.text = "Looks drive the switcher"
 	drive.tooltip_text = "On: taking a look to program moves the switcher layers its PixelHue placeholders came from onto their rectangles in the look.\nOff (default): HighAsCG only reads the switcher."
 	drive.button_pressed = _drive
-	drive.toggled.connect(func(on: bool) -> void: _set_drive(on))
+	drive.toggled.connect(func(on: bool) -> void: _set_drive(on, drive))
 	_list.add_child(drive)
 
 
@@ -103,22 +104,37 @@ func _edit() -> void:
 
 func _store(host: String) -> void:
 	_status.text = "Saving…"
-	var r: Dictionary = await DevicesTarget.api.post_json("/api/pixelhue/config", {"host": host})
+	var r: Dictionary = await _api().post_json("/api/pixelhue/config", {"host": host})
 	if not r.ok:
 		_status.text = "The server refused it: %s" % (str(r.data.get("error", "")) if r.get("data") is Dictionary else str(r.get("error", "no answer")))
 		return
 	reload()
 
 
-func _set_drive(on: bool) -> void:
-	var r: Dictionary = await DevicesTarget.api.post_json("/api/pixelhue/config", {"drive": on})
-	_status.text = ("Looks now move the switcher's layers on a program take." if on else "HighAsCG only reads the switcher.") if r.ok else "The server refused it."
-	_drive = r.ok and r.data is Dictionary and r.data.get("drive") == true
+## WO-1106 C45: the box shows what the server keeps — a refused change puts the tick back and says why (it stayed
+## ticked while the switcher was still only read).
+func _set_drive(on: bool, box: CheckBox = null) -> void:
+	var was := _drive
+	var r: Dictionary = await _api().post_json("/api/pixelhue/config", {"drive": on})
+	if r.ok:
+		_drive = r.data.get("drive") == true if r.data is Dictionary and r.data.has("drive") else on
+		_status.text = "Looks now move the switcher's layers on a program take." if _drive else "HighAsCG only reads the switcher."
+	else:
+		_drive = was
+		var why := str(r.data.get("error", "")) if r.get("data") is Dictionary else ""
+		_status.text = "Not changed — the server refused it%s. %s" % [": " + why if why != "" else (" (%s)" % str(r.get("error", "no answer"))),
+			"Looks still move the switcher." if _drive else "HighAsCG still only reads the switcher."]
+	if box != null and is_instance_valid(box) and box.button_pressed != _drive:
+		box.set_pressed_no_signal(_drive)
+
+
+func _api() -> Object:
+	return target_api.call() if target_api.is_valid() else DevicesTarget.api
 
 
 func _test() -> void:
 	_status.text = "Testing…"
-	var r: Dictionary = await DevicesTarget.api.get_json("/api/pixelhue/layers?scene=pgm")
+	var r: Dictionary = await _api().get_json("/api/pixelhue/layers?scene=pgm")
 	_status.text = M.status_line(r.ok, r.get("data"))
 
 

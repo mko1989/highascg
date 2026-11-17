@@ -24,6 +24,12 @@ var _format := RenderingDevice.DATA_FORMAT_B8G8R8A8_UNORM
 var _on_render := Callable(RenderingServer, &"call_on_render_thread")
 var _on_main: Callable
 var _attach: Callable
+# WO-1106 B28: what the last frame was made of, for is_black() — a reference to the bytes already uploaded (packed arrays
+# are shared, not copied) or the native source that keeps its own front buffer.
+var _last := PackedByteArray()
+var _last_w := 0
+var _last_h := 0
+var _src: RefCounted = null
 
 
 func _init() -> void:
@@ -41,6 +47,7 @@ func _init() -> void:
 func update(data: PackedByteArray, w: int, h: int) -> void:
 	if data.size() < w * h * 4:
 		return
+	_keep(data, w, h)
 	if _rd == null:
 		_update_image(data, w, h)
 		return
@@ -52,6 +59,7 @@ func update(data: PackedByteArray, w: int, h: int) -> void:
 func update_rgba(data: PackedByteArray, w: int, h: int) -> void:
 	if data.size() < w * h * 4:
 		return
+	_keep(data, w, h)
 	if _rd == null:
 		_update_image(data, w, h)
 		return
@@ -79,6 +87,10 @@ func update_native(src: RefCounted) -> void:
 	var h: int = src.call("get_height")
 	if w <= 0 or h <= 0:
 		return
+	_src = src  # WO-1106 B28: is_black() samples its front buffer
+	_last = PackedByteArray()
+	_last_w = w
+	_last_h = h
 	if w != width or h != height or _format != RenderingDevice.DATA_FORMAT_B8G8R8A8_UNORM:
 		width = w
 		height = h
@@ -153,12 +165,46 @@ func _update_image(data: PackedByteArray, w: int, h: int) -> void:
 	upload_ms = (Time.get_ticks_usec() - t0) / 1000.0
 
 
+func _keep(data: PackedByteArray, w: int, h: int) -> void:
+	_last = data
+	_last_w = w
+	_last_h = h
+	_src = null
+
+
+## WO-1106 B28 — is the last frame black? A sparse 12 × 7 sample of the bytes this texture was last given (CPU side:
+## no GPU readback, no copy of the frame); false while no frame has arrived. Replaces a full-frame get_image() every 2 s.
+func is_black(thr := 0.05) -> bool:
+	if _last_w <= 0 or _last_h <= 0:
+		return false
+	var data: PackedByteArray = _src.call("get_frame") if _src != null else _last  # shared; dropped on return
+	return sample_black(data, _last_w, _last_h, thr)
+
+
+## Pure: is every one of cols × rows pixels of a 4-byte-per-pixel frame (BGRA or RGBA, rows may be padded) at most
+## `thr` in all three colour channels? Too few bytes count as black (nothing to show).
+static func sample_black(data: PackedByteArray, w: int, h: int, thr := 0.05, cols := 12, rows := 7) -> bool:
+	if w <= 0 or h <= 0 or data.size() < w * h * 4:
+		return true
+	var stride := data.size() / h
+	var lim := int(thr * 255.0)
+	for j in rows:
+		var y := int((j + 0.5) * h / rows)
+		for i in cols:
+			var o := y * stride + int((i + 0.5) * w / cols) * 4
+			if maxi(data[o], maxi(data[o + 1], data[o + 2])) > lim:
+				return false
+	return true
+
+
 ## WO-997: release the RD texture (owners call this from PREDELETE). Detach first, then free on the render thread
 ## behind any _create/_upload still queued. The lambda holds this object, so a dropped ShmTexture lives until then.
 func free_gpu() -> void:
 	if _rd == null or _closed:
 		return
 	_closed = true
+	_last = PackedByteArray()
+	_src = null
 	_attach.call(RID())
 	var me: RefCounted = self
 	_on_render.call(func() -> void: me.call("_free_all"))
