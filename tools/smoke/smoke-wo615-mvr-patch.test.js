@@ -209,3 +209,25 @@ test('WO-636 POST /api/stage/mvr/<id>/types: the GDTFs land in the store without
 	assert.strictEqual(gdtfStore.list().length, 2, 'again → no second copy')
 	assert.strictEqual((await routes.dispatch('POST', '/api/stage/mvr/0123456789ab/types', '{}', ctx, null, {})).status, 404)
 })
+
+test('WO-1107 autoAddress: fixtures the file left unaddressed are addressed by type after the file\'s own universes', () => {
+	const types = { 'A@Spot': { id: 'ta', modes: [{ name: 'Std', footprint: 200 }] }, 'B@Wash': { id: 'tb', modes: [{ name: 'Ext', footprint: 30 }] } }
+	const fx = (uuid, name, spec, mode, address, id = '0') => ({ uuid, name, kind: 'Fixture',
+		fixture: { spec, mode, id, addresses: address ? [{ break: 0, address }] : [], matrix: null } })
+	const objects = [fx('u1', 'Spot', 'A@Spot', 'Std', 0), fx('u2', 'Wash', 'B@Wash', 'Ext', 0), fx('u3', 'Spot', 'A@Spot', 'Std', 0),
+		fx('u4', 'Desk Spot', 'A@Spot', 'Std', 513 + 10, '7'), fx('u5', 'Spot', 'A@Spot', 'Std', 0), fx('u6', 'Wash', 'B@Wash', 'Ext', 0)]
+	const typeFor = (s) => types[s] ?? null
+	const off = buildMvrPatch(objects, { typeFor })
+	assert.deepStrictEqual(off.fixtures.map((f) => f.id), ['mvr-u4'], 'without the option nothing changes')
+	assert.strictEqual(off.skipped.length, 5)
+	const on = buildMvrPatch(objects, { typeFor, autoAddress: true })
+	assert.strictEqual(on.skipped.length, 0)
+	const at = Object.fromEntries(on.fixtures.map((f) => [f.id, [f.name, f.universe, f.address]]))
+	assert.deepStrictEqual(at['mvr-u4'], ['Desk Spot 7', 1, 11], 'the file\'s own address is kept (MVR universe 2 = Art-Net 1)')
+	// after MVR universe 2: spots (200 ch) at 3.1, 3.201, then 4.1 (the third does not fit); washes follow in 4
+	assert.deepStrictEqual([at['mvr-u1'], at['mvr-u3'], at['mvr-u5']], [['Spot 1', 2, 1], ['Spot 2', 2, 201], ['Spot 3', 3, 1]])
+	assert.deepStrictEqual([at['mvr-u2'], at['mvr-u6']], [['Wash 1', 3, 201], ['Wash 2', 3, 231]])
+	assert.match(on.notes.join('\n'), /5 fixture\(s\) had no DMX address in the file — addressed by type from Art-Net universe 2 to 3/)
+	const sacn = buildMvrPatch(objects, { typeFor, autoAddress: true, protocol: 'sacn' })
+	assert.deepStrictEqual(sacn.fixtures.find((f) => f.id === 'mvr-u5').universe, 4, 'sACN universes are 1-based')
+})

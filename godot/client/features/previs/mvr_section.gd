@@ -424,7 +424,7 @@ func _patch() -> void:
 		return
 	_patch_btn.disabled = true
 	_patch_status.text = "Patching… (importing the scene's GDTF files)"
-	var res: Dictionary = await Api.post_json("/api/stage/mvr/%s/patch" % id, {"protocol": "sacn" if _proto.selected == 1 else "artnet"})
+	var res: Dictionary = await Api.post_json("/api/stage/mvr/%s/patch" % id, {"protocol": "sacn" if _proto.selected == 1 else "artnet", "autoAddress": true})  # WO-1107: an unpatched file is addressed by type
 	if not res.ok or not (res.data is Dictionary):
 		_patch_status.text = "Patch failed: %s" % (res.data.get("error", res.error) if res.data is Dictionary else res.error)
 		_sync_patch_ui()

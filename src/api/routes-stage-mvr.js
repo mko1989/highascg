@@ -7,7 +7,7 @@
  *                                                meshes, report } (parsed + stored in projects/_mvr/)
  *   GET    /api/stage/mvr/<id>                → the stored record { id, name, importedAt, bytes, scene }
  *   GET    /api/stage/mvr/<id>/mesh?key=<k>   → model/gltf-binary for a scene mesh key (Godot instantiates per part)
- *   POST   /api/stage/mvr/<id>/patch {protocol} → WO-615 T10: the scene's fixtures as patch entries { fixtures, skipped,
+ *   POST   /api/stage/mvr/<id>/patch {protocol, autoAddress?} → WO-615 T10 (autoAddress: WO-1107, unaddressed fixtures get addresses): the scene's fixtures as patch entries { fixtures, skipped,
  *                                                notes, types } — every embedded GDTF it uses is imported into the
  *                                                fixture-type store; the client merges `fixtures` into project.fixtures
  *   POST   /api/stage/mvr/<id>/types         → WO-636: only the import — the scene's GDTFs into the type store, no
@@ -147,7 +147,7 @@ async function handlePatch(ctx, id, body, deps = {}) {
 		const real = t?.replacedBy ? (deps.typeInfo || require('../fixtures/gdtf-store').info)(t.replacedBy.to) : null
 		if (real) types.set(spec, { ...real, modeMap: t.replacedBy.modes, stub: t })
 	}
-	const out = buildMvrPatch(sc.objects, { protocol, typeFor: (spec) => types.get(spec) ?? null })
+	const out = buildMvrPatch(sc.objects, { protocol, autoAddress: b.autoAddress === true, typeFor: (spec) => types.get(spec) ?? null })
 	if (types.size) ctx?.fixtureService?.reload?.()
 	const byId = new Map() // two GDTFSpec spellings of one file ("X" / "X.gdtf") are one type
 	for (const [spec, t] of types) if (t && !t.error && !byId.has(t.id)) byId.set(t.id, { spec, t })

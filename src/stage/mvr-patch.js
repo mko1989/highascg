@@ -136,17 +136,53 @@ function matchMode(modeNames, wanted) {
 }
 
 /**
+ * WO-1107 — fixtures the file left unaddressed (a Capture export of an unpatched rig) get addresses: after the last
+ * universe the file itself uses, one fixture type and mode after another (file order inside a type), a fixture that
+ * does not fit the rest of a universe starts the next one. Mutates the entries; returns the note line.
+ */
+function autoAddressInto(pending, taken, sacn) {
+	let universe = taken.reduce((m, t) => Math.max(m, t.universe), 0) + 1
+	const first = universe
+	let next = 1
+	const groups = new Map()
+	for (const p of pending) {
+		const k = `${p.entry.typeId}|${p.entry.mode}`
+		if (!groups.has(k)) groups.set(k, [])
+		groups.get(k).push(p)
+	}
+	for (const list of groups.values()) {
+		const numbered = list.filter((p) => p.base).length > 1 // no FixtureID in the file: "Name 1…N", not "Name 0 (N)"
+		let n = 0
+		for (const { entry, footprint, base } of list) {
+			if (base && numbered) entry.name = `${base} ${++n}`.slice(0, 120)
+			const size = Math.min(512, footprint)
+			if (next + size - 1 > 512) {
+				universe++
+				next = 1
+			}
+			entry.universe = sacn ? universe : universe - 1
+			entry.address = next
+			next += size
+		}
+	}
+	const u = (n) => (sacn ? n : n - 1)
+	return `${pending.length} fixture(s) had no DMX address in the file — addressed by type from ${sacn ? 'sACN' : 'Art-Net'} universe ${u(first)} to ${u(universe)}`
+}
+
+/**
  * @param {object[]} objects mvr-scene.js objects (kind 'Fixture' carry `fixture { spec, mode, id, addresses, matrix }`)
  * @param {{ protocol?: 'artnet' | 'sacn', typeFor: (spec: string) => { id: string, modes: { name: string, breaks?: number }[],
  *   modeMap?: object, stub?: object } | { error: string } | null }} opts  typeFor: the stored type of a GDTFSpec (null = not
- *   in the archive; modeMap + stub = a placeholder replaced by this type, WO-633)
+ *   in the archive; modeMap + stub = a placeholder replaced by this type, WO-633); autoAddress: WO-1107, see autoAddressInto
  * @returns {{ fixtures: object[], skipped: { uuid: string, name: string, reason: string }[], notes: string[] }}
  */
-function buildMvrPatch(objects, { protocol = 'artnet', typeFor }) {
+function buildMvrPatch(objects, { protocol = 'artnet', typeFor, autoAddress = false }) {
 	const sacn = protocol === 'sacn'
 	const fixtures = []
 	const skipped = []
 	const multiBreak = new Set()
+	const taken = [] // MVR universes (1-based) the file's own addresses occupy
+	const pending = [] // autoAddress: entries the file left unaddressed
 	const names = new Map()
 	let mirrored = 0
 	for (const o of Array.isArray(objects) ? objects : []) {
@@ -188,8 +224,9 @@ function buildMvrPatch(objects, { protocol = 'artnet', typeFor }) {
 			skip(String(f.mode ?? '').trim() ? `mode "${f.mode}" not in ${f.spec}` : 'no GDTFMode in the MVR file')
 			continue
 		}
+		const footprint = Math.max(1, Number(use.modes.find((m) => m.name === modeName)?.footprint) || 1)
 		const at = firstAddress(f.addresses)
-		if (!at) {
+		if (!at && !autoAddress) {
 			skip('no DMX address (unpatched in the MVR file)')
 			continue
 		}
@@ -204,15 +241,18 @@ function buildMvrPatch(objects, { protocol = 'artnet', typeFor }) {
 			name: name.slice(0, 120),
 			enabled: true,
 			protocol: sacn ? 'sacn' : 'artnet',
-			universe: sacn ? at.universe : at.universe - 1,
-			address: at.address,
+			universe: at ? (sacn ? at.universe : at.universe - 1) : -1,
+			address: at ? at.address : 0,
 			dest: sacn ? '' : DEFAULT_DEST,
 			typeId: use.id,
 			mode: modeName,
 			pose,
 		})
+		if (at) taken.push({ universe: at.universe, from: at.address, to: at.address + footprint - 1 })
+		else pending.push({ entry: fixtures[fixtures.length - 1], footprint, base: Number(f.id) > 0 ? '' : String(o.name || '').trim() })
 	}
 	const notes = []
+	if (pending.length) notes.push(autoAddressInto(pending, taken, sacn))
 	if (multiBreak.size) notes.push(`Only the first DMX break is output for: ${[...multiBreak].join(', ')}`)
 	if (mirrored) notes.push(`${mirrored} fixture(s) had a mirrored matrix in the file — placed unmirrored`)
 	return { fixtures, skipped, notes }
