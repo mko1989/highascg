@@ -19,7 +19,9 @@ describe('WO-1070 APC40 pad banks + library by colour', () => {
 		assert.match(map, /"num": 94, "target": "padbank:prev"/)
 		assert.match(map, /"num": 95, "target": "padbank:next"/)
 		assert.match(map, /const BUTTONS := \[[^\]]*"padbank"\]/)
-		assert.match(read('godot/client/features/visuals/visuals_midi.gd'), /with_new_defaults\([^\n]*"padbank"\]\)/)
+		// WO-1106 B27: a stored map gains the default kinds once per revision (visuals_midi_defaults.gd), not on every load
+		assert.match(read('godot/client/features/visuals/visuals_midi_defaults.gd'), /const REVISIONS: Array = \[\[[^\n]*"padbank"\]/)
+		assert.match(read('godot/client/features/visuals/visuals_midi.gd'), /map = Defaults\.stored_map\(c, cfg_path\)/)
 	})
 	it('the pads are banks; the pre-bank pads are read as bank 1 and never overwritten', () => {
 		const clips = read('godot/client/features/visuals/visuals_midi_clips.gd')

@@ -188,6 +188,9 @@ func focus(i: int) -> void:
 	if not on or i == tab.mixer.live:
 		_show()
 		return
+	var midi: Variant = tab.get("midi")
+	if midi != null and midi.clips != null:
+		midi.clips.new_slot = -1  # WO-1106 C5: Sel's armed new slot belongs to the old bank (only ◀ / ▶ on MIDI cleared it)
 	var cur := Looks.capture(tab.slice)
 	var dj: Dictionary = tab.slice.dj
 	tab.slice = Looks.apply(tab.slice, dj.other)

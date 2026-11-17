@@ -55,3 +55,31 @@ func test_mixer_overlay() -> void:
 	m.step(0.02)
 	t.eq([m.strobe, m._mat.get_shader_parameter("strobe")], [1.0, 1.0], "strobe 1: full white in the final composite")
 	t.ok(m._mat.shader.code.contains("mix(c, vec3(1.0), strobe) * master"), "applied above both decks, before the master")
+
+
+## WO-1106 C1 — A/B banks: the strobe follows the crossfader, not the bank being edited (PRV).
+func test_dj_strobe_follows_the_crossfader_wo1106_c1() -> void:
+	var m: Node = Mixer.new()
+	m.go([{"scene": "rings"}], {}, 0.0, true)
+	m.set_dj(true, 0, 1.0)  # editing bank A (PRV), bank B on air
+	var on: Dictionary = M.PARAM_DEFAULTS.duplicate()
+	on.strobe = 1.0
+	m.deck_of(0).params = on.duplicate()
+	m.deck_of(1).params = M.PARAM_DEFAULTS.duplicate()
+	m.step(0.02)
+	t.eq(m.strobe, 0.0, "a strobe prepared in preview does not strobe the program")
+	m.deck_of(0).params = M.PARAM_DEFAULTS.duplicate()
+	m.deck_of(1).params = on.duplicate()
+	m.step(0.02)
+	t.eq(m.strobe, 1.0, "the on-air bank's strobe reaches the canvas")
+	m.set_x(0.25)
+	m.deck_of(0).params = M.PARAM_DEFAULTS.duplicate()
+	m.deck_of(1).params = on.duplicate()
+	m.step(0.02)
+	t.eq(snappedf(m.strobe, 0.001), 0.25, "mid-crossfade: weighted by the fader")
+	m.set_dj(false)
+	m.deck_of(0).params = on.duplicate()
+	m.deck_of(1).params = on.duplicate()
+	m.step(0.02)
+	t.eq(m.strobe, 1.0, "banks off: the live deck's strobe, as before")
+	m.free()

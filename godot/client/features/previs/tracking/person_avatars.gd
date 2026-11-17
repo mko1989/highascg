@@ -19,10 +19,14 @@ const HOLD_S := 1.5
 
 var _live := {}  # world id → {node, memo {key}, keys []}
 var _gone := []  # [{node, memo, keys, at}] — waiting HOLD_S to be adopted
+var _snap_now := 0.0  # WO-1106 B33: the `now` of the last snapshot …
+var _snap_ticks := 0.0  # … and the engine clock (s) when it came: held avatars expire on that clock between snapshots
 
 
 ## One snapshot's cards (person_cards_model.cards / puppet_cards: id, feet, height, joints, keys, looks, tag?) at `now` s.
 func show_cards(cards: Array, now: float) -> void:
+	_snap_now = now
+	_snap_ticks = Time.get_ticks_msec() / 1000.0
 	var seen := {}
 	for c in cards:
 		seen[int(c.id)] = true
@@ -54,10 +58,21 @@ func show_cards(cards: Array, now: float) -> void:
 			e.node.set_heading(c.get("heading"))
 		e.node.set_target(C.psn_to_godot(c.feet), float(c.height), look, c.get("joints"), now)
 		e.node.set_tag(str(c.get("tag", "")))  # WO-1087: test puppet people are labelled
+	expire(now)
+
+
+## Held avatars older than HOLD_S at `now` are dropped. WO-1106 B33: also from _process — they expired only inside
+## show_cards(), so when the snapshots stopped (tracking off, a dead feed) the held figures stood forever.
+func expire(now: float) -> void:
 	for g in _gone.duplicate():
 		if now - float(g.at) > HOLD_S:
 			_drop(g.node)
 			_gone.erase(g)
+
+
+func _process(_delta: float) -> void:
+	if not _gone.is_empty():
+		expire(_snap_now + Time.get_ticks_msec() / 1000.0 - _snap_ticks)
 
 
 ## A held avatar that shares a camera key with `keys`, taken out of the held list; null when none.

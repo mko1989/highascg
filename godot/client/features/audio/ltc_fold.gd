@@ -3,12 +3,13 @@ extends VBoxContainer
 ## Settings like any settings row, so POST /api/settings restarts the LTC service). One fold: a header that always shows
 ## the LTC out / in state, and when open the essentials of LTC out (device, channel or pair, time source, start TC,
 ## level, status) and LTC in; rate, user bits, latency trim and the paused behaviour sit behind "More".
-## Polls GET /api/ltc while open (the header listens to WS `ltc.status`).
+## The header listens to WS `ltc.status`; GET /api/ltc fills in while open and the push is silent (WO-1106 B31).
 
 const Form := preload("res://features/settings/settings_form.gd")
 const LM := preload("res://features/settings/ltc_model.gd")
 const M := preload("res://features/settings/settings_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const WS_FRESH_MS := 1500  # WO-1106 B31: a WS status younger than this makes the HTTP poll unnecessary
 
 var _head: Button
 var _body: HBoxContainer
@@ -25,6 +26,8 @@ var _ch_items: Array = []
 var _cards_in: Array = []
 var _fetched := false
 var _last: Variant = null
+var _ws_ms := -100000  # WO-1106 B31: when ltc.status last came over WS
+var _fetching := false  # a GET /api/ltc in flight
 
 
 func _ready() -> void:
@@ -49,11 +52,11 @@ func _ready() -> void:
 	_build_out(_out)
 	_build_in(_in)
 	var t := Timer.new()
-	t.wait_time = 0.25
+	t.wait_time = 1.0  # WO-1106 B31: was a 0.25 s HTTP poll on top of the 5 Hz WS push
 	t.autostart = true
 	t.timeout.connect(_poll)
 	add_child(t)
-	Ws.on("ltc.status", _show)
+	Ws.on("ltc.status", _on_ws)
 	Settings.loaded.connect(_hydrate)
 	Settings.changed.connect(_hydrate)
 	_show(null)
@@ -230,13 +233,24 @@ func _pick_channel(i: int) -> void:
 	Settings.patch({"ltc": {"output": {"channel": c.channel, "pair": c.pair}}})
 
 
+## WO-1106 B31: the server pushes ltc.status over WS (5 Hz) while a direction is on; HTTP only fills in while that push
+## is silent (LTC off, a reconnect), one request at a time — the 0.25 s poll piled up in the Api's 6-slot pool.
+func _on_ws(d: Variant) -> void:
+	_ws_ms = Time.get_ticks_msec()
+	_show(d)
+
+
 func _poll() -> void:
-	if _body.visible and is_visible_in_tree():
+	if _body.visible and is_visible_in_tree() and Time.get_ticks_msec() - _ws_ms > WS_FRESH_MS:
 		_fetch_status()
 
 
 func _fetch_status() -> void:
+	if _fetching:
+		return
+	_fetching = true
 	var r: Dictionary = await Api.get_json("/api/ltc")
+	_fetching = false
 	if r.ok:
 		_show(r.data)
 

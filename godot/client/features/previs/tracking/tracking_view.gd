@@ -189,7 +189,8 @@ func _exit_tree() -> void:
 
 func _process(d: float) -> void:
 	_black_t -= d
-	if _black_t <= 0.0 and ghost_on:  # WO-1091: a black input is no picture — the ghost then draws at full strength
+	# WO-1106 B28: the black check reads the whole frame back from the GPU — never for a view nobody sees
+	if _black_t <= 0.0 and ghost_on and is_visible_in_tree():  # WO-1091: a black input is no picture — the ghost then draws at full strength
 		_black_t = 2.0
 		var tex: Texture2D = VideoSurfaces.texture(_role) if _role != "" else null
 		_black = tex != null and tex.get_width() > 1 and A.is_black(tex.get_image())

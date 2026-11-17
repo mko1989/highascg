@@ -108,15 +108,20 @@ static func publish_stopped(id: int) -> void:
 		_schedule_apply()
 
 
+## WO-1106 B26: a static method Callable bound to the sequence, never a lambda from a static func (the exit-134 shape);
+## nothing is scheduled while the tree is being torn down (a publisher's PREDELETE at quit lands here).
 static func _schedule_apply() -> void:
 	_lower_seq += 1
-	var seq := _lower_seq
 	var tree := Engine.get_main_loop() as SceneTree
-	if tree == null:
+	if tree == null or tree.root == null or not tree.root.is_inside_tree():
 		return
-	tree.create_timer(HOLD_S).timeout.connect(func() -> void:
-		if seq == _lower_seq:
-			_apply())
+	tree.create_timer(HOLD_S).timeout.connect(_apply_if.bind(_lower_seq))
+
+
+## The hold ran out: lower the cap unless a publisher started (or another stop rescheduled) since.
+static func _apply_if(seq: int) -> void:
+	if seq == _lower_seq:
+		_apply()
 
 
 static func _apply() -> void:

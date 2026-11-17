@@ -15,7 +15,11 @@ const THUMB := Vector2(60, 80)
 var driver: Node  # marker_driver.gd: the last tracking:detections (persons to bind)
 var _snap := {}  # {presenters, suggestions}
 var _urls: Array = []
-var _photos := {}  # "id:created" → ImageTexture (memory only, never user://)
+var _photos := {}  # "id:created" → ImageTexture (memory only, never user://), thumb-sized
+var _photo_used := {}  # WO-1106 C4: the keys the last render shows; the rest leave _photos after it
+var _photo_wait := {}  # key → [TextureRect] waiting for a photo already being fetched (one request per photo)
+var _typed := {}  # WO-1106 C3: capture id → {name, mic} typed so far (a rebuild at the detections' ~15 Hz kept nothing)
+var _take: Button
 var _list: VBoxContainer
 var _caps: VBoxContainer  # WO-1036: camera pictures waiting for a name
 var _consent: CheckBox
@@ -39,11 +43,11 @@ func _ready() -> void:
 	_note.modulate = Color(1, 1, 1, 0.7)
 	_note.text = "Face and body recognition only suggest: confirm each match. On stage, a zone with the action \"presenter\" fires that presenter's actions. Photos live in /tmp and are gone after a reboot."
 	add_child(_note)
-	var take := Button.new()
-	take.text = "Take pictures of the people on stage"
-	take.tooltip_text = "Grabs a picture of every person the tracking cameras see now. Name the ones you need; the rest are deleted after 20 minutes."
-	take.pressed.connect(_take_pictures)
-	add_child(take)
+	_take = Button.new()
+	_take.text = "Take pictures of the people on stage"
+	_take.tooltip_text = "Grabs a picture of every person the tracking cameras see now. Name the ones you need; the rest are deleted after 20 minutes."
+	_take.pressed.connect(_take_pictures)
+	add_child(_take)
 	_consent = CheckBox.new()
 	_consent.text = "The people I name agreed to be recognised for show automation"
 	add_child(_consent)
@@ -117,11 +121,17 @@ func _render() -> void:
 		e.editable = false
 		e.select_all_on_focus = true
 		_url_box.add_child(e)
+	_photo_used = {}
 	for c in _caps.get_children():
 		c.queue_free()
+	var cids := {}
 	for c in _snap.get("captures", []):
 		if c is Dictionary:
+			cids[str(c.id)] = true
 			_caps.add_child(_capture_row(c, choices))
+	for k in _typed.keys():  # a capture saved, discarded or expired: its typing goes with it
+		if not cids.has(k):
+			_typed.erase(k)
 	for c in _list.get_children():
 		c.queue_free()
 	var best := {}
@@ -136,6 +146,9 @@ func _render() -> void:
 	for p in roster:
 		if p is Dictionary:
 			_list.add_child(_row(p, best.get(str(p.id), {}), choices))
+	for k in _photos.keys():  # WO-1106 C4: the cache never shrank (every capture added its pictures for good)
+		if not _photo_used.has(k):
+			_photos.erase(k)
 
 
 func _row(p: Dictionary, suggestion: Dictionary, choices: Array) -> Control:
@@ -213,8 +226,12 @@ func _say(text: String) -> void:
 
 
 func _take_pictures() -> void:
+	if _take.disabled:
+		return
+	_take.disabled = true  # WO-1106 C6: a double click replaced the first run's pictures under the same ids
 	_say("Taking pictures…")
 	var r: Dictionary = await Api.post_json(BASE + "/capture", {})
+	_take.disabled = false
 	if not r.ok:
 		var why := str(r.data.get("error", "")) if r.get("data") is Dictionary else ""
 		_say(why if why != "" else "Could not take pictures.")
@@ -242,13 +259,18 @@ func _capture_row(c: Dictionary, choices: Array) -> Control:
 	who.modulate = Color(1, 1, 1, 0.75)
 	col.add_child(who)
 	var fields := HBoxContainer.new()
+	var typed: Dictionary = _typed.get(cid, {})
 	var name_e := LineEdit.new()
 	name_e.placeholder_text = "Name"
 	name_e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_e.text = str(typed.get("name", ""))  # WO-1106 C3: what was typed before this rebuild
+	name_e.text_changed.connect(func(v: String) -> void: _keep_typed(cid, "name", v))
 	fields.add_child(name_e)
 	var mic_e := LineEdit.new()
 	mic_e.placeholder_text = "Mic"
 	mic_e.custom_minimum_size.x = 56
+	mic_e.text = str(typed.get("mic", ""))
+	mic_e.text_changed.connect(func(v: String) -> void: _keep_typed(cid, "mic", v))
 	fields.add_child(mic_e)
 	col.add_child(fields)
 	var acts := HBoxContainer.new()
@@ -259,7 +281,8 @@ func _capture_row(c: Dictionary, choices: Array) -> Control:
 			return
 		var r: Dictionary = await Api.post_json("%s/captures/%s/name" % [BASE, cid], {"name": name_e.text.strip_edges(), "mic": mic_e.text.strip_edges(), "consent": true})
 		_say("" if r.ok else "Could not save: " + (str(r.data.get("error", "")) if r.get("data") is Dictionary else "no answer"))
-		name_e.release_focus()
+		if is_instance_valid(name_e):  # WO-1106 C3: a rebuild during the await freed this row
+			name_e.release_focus()
 		reload()
 	name_e.text_submitted.connect(func(_t: String) -> void: save.call())
 	acts.add_child(_button("Save as presenter", save))
@@ -271,19 +294,47 @@ func _capture_row(c: Dictionary, choices: Array) -> Control:
 	return row
 
 
+func _keep_typed(cid: String, field: String, v: String) -> void:
+	var d: Dictionary = _typed.get(cid, {})
+	d[field] = v
+	_typed[cid] = d
+
+
+## WO-1106 C4: one request per photo (a rebuild while it loads waits for it), kept at twice the thumbnail size.
 func _photo(id: String, into: TextureRect, key: String) -> void:
+	_photo_used[key] = true
 	if _photos.has(key):
 		into.texture = _photos[key]
 		return
+	if _photo_wait.has(key):
+		(_photo_wait[key] as Array).append(into)
+		return
+	_photo_wait[key] = [into]
 	var r: Dictionary = await Api.get_bytes("%s/%s/photo" % [BASE, id])
+	var waiting: Array = _photo_wait.get(key, [])
+	_photo_wait.erase(key)
 	if not r.ok:
 		return
 	var img := Image.new()
 	if img.load_jpg_from_buffer(r.bytes) != OK:
 		return
-	_photos[key] = ImageTexture.create_from_image(img)
-	if is_instance_valid(into):
-		into.texture = _photos[key]
+	var fit := thumb_size(img.get_size(), THUMB * 2.0)
+	if fit != img.get_size():
+		img.resize(fit.x, fit.y, Image.INTERPOLATE_BILINEAR)
+	var tex := ImageTexture.create_from_image(img)
+	if _photo_used.has(key):
+		_photos[key] = tex
+	for w in waiting:
+		if is_instance_valid(w):
+			(w as TextureRect).texture = tex
+
+
+## The size `px` takes inside `box`, aspect kept, never larger than it is.
+static func thumb_size(px: Vector2i, box: Vector2) -> Vector2i:
+	if px.x <= 0 or px.y <= 0:
+		return px
+	var k := minf(1.0, minf(box.x / px.x, box.y / px.y))
+	return Vector2i(maxi(1, roundi(px.x * k)), maxi(1, roundi(px.y * k)))
 
 
 func _post(path: String, body: Dictionary) -> void:

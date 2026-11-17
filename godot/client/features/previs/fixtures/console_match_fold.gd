@@ -63,7 +63,8 @@ func _pick() -> void:
 
 
 func _export() -> void:
-	var res: Dictionary = await Api.get_json("/api/fixtures/console-match/export")
+	var raw: Dictionary = await Api.get_json("/api/fixtures/console-match/export")
+	var res: Dictionary = M.answer(raw)  # WO-1106 B24: the server's fields are in the wrapper's `data`
 	if not res.get("ok", false):
 		_status.text = str(res.get("error", "The server did not answer."))
 		return
@@ -79,6 +80,7 @@ func _send(apply: String) -> void:
 	var body := {"csv": _csv}
 	if apply != "":
 		body["apply"] = apply
-	var res: Dictionary = await Api.post_json("/api/fixtures/console-match", body)
+	var raw: Dictionary = await Api.post_json("/api/fixtures/console-match", body)
+	var res: Dictionary = M.answer(raw)  # WO-1106 B24
 	_status.text = M.summary(res)
 	_enable(M.can_apply(res) and apply == "")

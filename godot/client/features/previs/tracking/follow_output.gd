@@ -175,7 +175,7 @@ func _spin(lo: float, hi: float, step: float, cb: Callable) -> SpinBox:
 	sb.min_value = lo
 	sb.max_value = hi
 	sb.step = step
-	sb.update_on_text_changed = true
+	sb.update_on_text_changed = false  # WO-1106 B16: a typed universe offset applies on Enter / focus-out, never per keystroke
 	sb.value_changed.connect(cb)
 	return sb
 

@@ -240,6 +240,22 @@ func test_layer_holds_and_adopts_avatars() -> void:
 	layer.free()
 
 
+
+## WO-1106 B33 — a held avatar expires on the clock when the snapshots stop (it used to expire only in show_cards()).
+func test_held_avatars_expire_without_snapshots_wo1106_b33() -> void:
+	var layer := Avatars.new()
+	var card := {"id": 1, "feet": [0.0, 1.0, 0.0], "height": 1.7, "joints": null, "keys": ["a:3"],
+		"looks": [{"key": "a:3", "traits": {"top": RED, "locked": true}}]}
+	layer.show_cards([card], 10.0)
+	layer.show_cards([], 10.1)  # the person is lost; then no snapshot comes any more
+	t.eq(layer.count(), 1, "held")
+	layer._process(0.016)
+	t.eq(layer.count(), 1, "still held within HOLD_S")
+	layer._snap_ticks -= Avatars.HOLD_S + 0.5  # HOLD_S and a bit pass on the engine clock, no snapshot
+	layer._process(0.016)
+	t.eq(layer.count(), 0, "gone without another snapshot")
+	layer.free()
+
 func test_cards_carry_keys_and_looks_best_view_first() -> void:
 	var cam := C.camera(0.0, -10.0, 5.0, -20.0)
 	var ce := func(id: String) -> Dictionary: return {"id": id, "role": "r" + id, "raster": [1920.0, 1080.0], "cam": cam}

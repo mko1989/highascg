@@ -125,7 +125,9 @@ func _spin(lo: float, hi: float, cb: Callable) -> SpinBox:
 	sb.min_value = lo
 	sb.max_value = hi
 	sb.step = 1
-	sb.update_on_text_changed = true
+	# WO-1106 B16: a typed value applies on Enter / focus-out only — per keystroke, typing "200" sent live DMX on
+	# universe 2, then 20 (a desk's real show universe). Arrows / wheel still step at once.
+	sb.update_on_text_changed = false
 	sb.value_changed.connect(cb)
 	return sb
 

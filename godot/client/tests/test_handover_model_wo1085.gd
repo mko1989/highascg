@@ -112,6 +112,16 @@ func test_section_edits_and_hides() -> void:
 	sec.queue_free()
 
 
+## WO-1106 B16 — the levels / grant universe + channel apply on Enter or focus-out, never per keystroke.
+func test_typed_numbers_apply_on_enter_wo1106_b16() -> void:
+	var sec: Node = load("res://features/previs/tracking/handover_section.gd").new()
+	t.root.add_child(sec)
+	await t.process_frame
+	for sb: SpinBox in [sec._lv_uni, sec._lv_addr, sec._gr_uni, sec._gr_addr, sec._heads]:
+		t.eq(sb.update_on_text_changed, false, "no value per keystroke")
+	sec.queue_free()
+
+
 func test_3d_lines_only_while_shown() -> void:
 	var n: Node3D = load("res://features/previs/tracking/handover_3d.gd").new()
 	t.root.add_child(n)

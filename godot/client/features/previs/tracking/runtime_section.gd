@@ -31,6 +31,7 @@ var _folder_mode := "export"
 var _remove_dlg: ConfirmationDialog
 var _keep_models: CheckBox
 var _poll: Timer
+var _polling := false  # WO-1106 B31: a job poll in flight
 var _loading := false
 
 const LABELS := {"install": "Install…", "import": "Install from folder…", "repair": "Repair", "export": "Export to folder…",
@@ -129,7 +130,11 @@ func _render() -> void:
 
 
 func _on_poll() -> void:
+	if _polling:  # WO-1106 B31: a slow answer must not stack 1 s polls in the Api's 6-slot pool
+		return
+	_polling = true
 	var r: Dictionary = await Api.get_json(_url("", "only=job"))
+	_polling = false
 	if not (r.ok and r.data is Dictionary):
 		return
 	st["job"] = r.data.get("job")

@@ -15,6 +15,8 @@ var _list: VBoxContainer
 var _all: CheckBox
 var _busy := false
 var _shown := ""
+var _fetching := false  # WO-1106 B31: a GET /api/bluetooth in flight
+var _again := false  # a refresh was asked for while it was
 
 
 func _ready() -> void:
@@ -49,9 +51,19 @@ func _ready() -> void:
 			refresh())
 
 
+## WO-1106 B31: one request in flight — the 2 s poll stacked up in the Api's 6-slot pool behind a slow bluetoothctl. A
+## refresh asked for meanwhile (the "every device" toggle, after a POST) runs once when the answer is in.
 func refresh() -> void:
+	if _fetching:
+		_again = true
+		return
+	_fetching = true
 	var r: Dictionary = await Api.get_json("/api/bluetooth?all=1" if _all.button_pressed else "/api/bluetooth")
+	_fetching = false
 	_render(r.data if r.ok and r.data is Dictionary else null)
+	if _again:
+		_again = false
+		refresh()
 
 
 func _render(d: Variant) -> void:

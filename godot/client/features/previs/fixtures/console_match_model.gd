@@ -2,6 +2,21 @@ extends RefCounted
 ## WO-1072 — the text and the apply gate of "Match console positions" (console_match_fold.gd); pure.
 
 
+## WO-1106 B24 — the server's own answer out of the Api wrapper `{ok, status, data, error, reason}`: `fit` / `csv` /
+## `heads` live in `data` (a 409 mirrored answer still carries its fit there). No JSON body → `{ok: false, error}`.
+static func answer(res: Dictionary) -> Dictionary:
+	var data: Variant = res.get("data")
+	if data is Dictionary:
+		var d: Dictionary = (data as Dictionary).duplicate()
+		if not d.has("ok"):
+			d["ok"] = res.get("ok", false) == true
+		if d.get("ok", false) != true and not d.has("error") and str(res.get("error", "")) != "":
+			d["error"] = str(res.get("error", ""))
+		return d
+	var err := str(res.get("error", ""))
+	return {"ok": false, "error": err if err != "" else "The server did not answer."}
+
+
 ## Whether the answer is a preview that may be applied.
 static func can_apply(res: Dictionary) -> bool:
 	var fit: Variant = res.get("fit")

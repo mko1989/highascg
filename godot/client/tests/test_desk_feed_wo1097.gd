@@ -60,3 +60,25 @@ func test_section_shows_and_edits() -> void:
 	s.show_status({"enabled": false, "heads": 3})
 	t.eq(s._status.text, "Off — would carry 3 heads (Auto / marker heads).", "status line")
 	s.free()
+
+
+## WO-1106 B16 — a typed universe / channel applies on Enter or focus-out, never per keystroke ("200" sent 2, then 20).
+func test_typed_numbers_apply_on_enter_wo1106_b16() -> void:
+	var s: VBoxContainer = S.new()
+	t.root.add_child(s)  # in the tree: a Range emits value_changed only there (and _ready builds the rows)
+	await t.process_frame  # (the runner's root enters the tree on its first frame)
+	var got := []
+	s.edited.connect(func(f: Dictionary) -> void: got.append(f))
+	s.show_feed({"enabled": true, "protocol": "sacn", "universe": 300, "layout": "compact", "address": 1})
+	for sb: SpinBox in [s._uni, s._prio, s._addr]:
+		t.eq(sb.update_on_text_changed, false, "no value per keystroke")
+	var le: LineEdit = s._uni.get_line_edit()
+	for typed in ["2", "20", "200"]:
+		le.text = typed
+		le.text_changed.emit(typed)  # each keystroke
+	t.eq(got.size(), 0, "typing alone sends nothing")
+	s._uni.apply()  # what Enter / focus-out do: the LineEdit's text becomes the value
+	t.eq(got.size(), 1, "Enter applies once")
+	if not got.is_empty():
+		t.eq(int(got[-1].universe), 200, "the whole typed number")
+	s.free()

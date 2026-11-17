@@ -57,7 +57,7 @@ static func step(st: Dictionary, raw: int, rise := RISE, fall := FALL) -> Dictio
 ## carries the client's name for the others.
 static func fps_check(fps: float, target: int, why: String, level: int, publishing: bool, name := "This client") -> Dictionary:
 	var f := roundi(maxf(fps, 0.0))
-	return {"key": "client-fps", "group": "client", "name": name, "level": level, "status": STATUS[level], "target": target,
+	return {"key": "client-fps", "group": "client", "name": name, "level": level, "status": STATUS[clampi(level, OK, FAILING)], "target": target,
 		"measured": f, "unit": "fps", "text": "%d / %d fps · %s" % [f, target, why],
 		"label": "%s at %d of %d fps" % [name, f, target] if level > OK else "",
 		"hint": FPS_HINT % (", and the Visuals it feeds judder on air" if publishing else ""), "severity": target - f}
@@ -73,18 +73,25 @@ static func merge(server: Variant, local: Array, my_id: String) -> Dictionary:
 		for c in (server as Dictionary).get("checks", []):
 			if c is Dictionary and not str(c.get("key", "")).begins_with("client:%s:" % my_id):
 				checks.append(c)
-		incidents = (server as Dictionary).get("incidents", []) if (server as Dictionary).get("incidents") is Array else []
+		var inc: Variant = (server as Dictionary).get("incidents")
+		incidents = (inc as Array).filter(func(i: Variant) -> bool: return i is Dictionary) if inc is Array else []  # WO-1106 B30
 	checks.append_array(local)
 	checks.sort_custom(_before)
-	var worst: Dictionary = checks[0] if not checks.is_empty() and int(checks[0].get("level", 0)) > OK else {}
-	var lvl := int(worst.get("level", OK))
+	var worst: Dictionary = checks[0] if not checks.is_empty() and level_of(checks[0]) > OK else {}
+	var lvl := level_of(worst)  # WO-1106 B30: a malformed level never indexes past STATUS (it stopped the indicator)
 	return {"level": lvl, "status": STATUS[lvl], "label": str(worst.get("label", worst.get("name", ""))) if lvl > OK else "",
 		"short": str(worst.get("name", "")) if lvl > OK else "", "checks": checks, "incidents": incidents}
 
 
+## WO-1106 B30: a check's level, 0..2 whatever the payload holds (a number out of range, a string, nothing).
+static func level_of(c: Dictionary) -> int:
+	var v: Variant = c.get("level", OK)
+	return clampi(int(v), OK, FAILING) if v is int or v is float else OK
+
+
 static func _before(a: Dictionary, b: Dictionary) -> bool:
-	var la := int(a.get("level", 0))
-	var lb := int(b.get("level", 0))
+	var la := level_of(a)
+	var lb := level_of(b)
 	if la != lb:
 		return la > lb
 	var ga := int(GROUP_RANK.get(str(a.get("group", "")), 9))

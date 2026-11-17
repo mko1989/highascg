@@ -19,6 +19,7 @@ const Auto := preload("res://features/visuals/visuals_autopilot.gd")
 const Looks := preload("res://features/visuals/visuals_looks.gd")
 const Apc := preload("res://features/visuals/visuals_midi_apc.gd")
 const Clips := preload("res://features/visuals/visuals_midi_clips.gd")
+const Defaults := preload("res://features/visuals/visuals_midi_defaults.gd")  # WO-1106 B27
 const Pxl := preload("res://features/visuals/visuals_midi_pxl.gd")  # WO-1050: "pxl:<layerId>" = a PixelHue layer's opacity
 const SECTION := "midi"
 
@@ -43,6 +44,7 @@ var _cc_last := {}  # source key → last CC value: a CC on a button target pres
 ## nudged the parameters), and the rings must go to that channel (sent on ch 0 they showed the other bank's values).
 var dev_bank := 0  ## the channel the device knobs last spoke on
 var _bank_until := 0  # msec: device-knob CCs before this are the APC's bank resend
+var _knob_ch := {}  # WO-1106 C2: device-knob CC → its last channel; Generic mode sends no Sel note, so a shared one primed 1 of 8
 const BANK_RESEND_MS := 300
 var _ghosts := {}  # target → its Ghost
 var _auto_back := 2  # Auto switched on from a button goes back to this item (8 bars)
@@ -133,7 +135,8 @@ func _bank(msg: Dictionary) -> bool:
 	if msg.kind != "cc" or num < 16 or num > 23:
 		return false
 	var ch := clampi(int(msg.ch), 0, 8)
-	var switched := ch != dev_bank
+	var switched := ch != int(_knob_ch.get(num, 0))
+	_knob_ch[num] = ch
 	dev_bank = ch
 	return switched or Time.get_ticks_msec() < _bank_until
 
@@ -479,14 +482,13 @@ func _load() -> void:
 	if cfg_path == "" or c.load(cfg_path) != OK or not c.has_section_key(SECTION, "map"):
 		map = MidiMap.apc40()
 	else:
-		map = MidiMap.with_new_defaults(MidiMap.without_phantoms(MidiMap.normalize(c.get_value(SECTION, "map"))), ["edit", "clear", "devpage", "padbank"])  # WO-913, WO-1052, WO-1054, WO-1070
+		map = Defaults.stored_map(c, cfg_path)  # WO-1106 B27: only defaults newer than the stored revision, once
 	leds = cfg_path != "" and c.get_value(SECTION, "leds", false) == true
 	clips.load_from(c)
 
 
 func _saved() -> void:
-	if cfg_path != "":
-		UiCfg.save_value(SECTION, "map", map, cfg_path)
+	Defaults.save(map, cfg_path)  # + the defaults revision it has seen (WO-1106 B27)
 
 
 func _show() -> void:

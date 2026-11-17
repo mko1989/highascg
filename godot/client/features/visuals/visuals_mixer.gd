@@ -196,11 +196,23 @@ func step(delta: float) -> void:
 	master = move_toward(master, 0.0 if blackout else level, delta / BLACKOUT_S)
 	_param("x", x)
 	_param("master", master)
-	set_strobe(float(deck().params.get("strobe", 0.0)))
+	set_strobe(strobe_mix())
 	for d in decks:
 		d.step(delta)
 	if was and not fading():
 		_apply()
+
+
+## WO-1106 C1: the strobe on the canvas. A/B banks: each bank's strobe times its crossfader share — `deck()` is the bank
+## being EDITED (PRV), so a strobe prepared in preview strobed the program and the on-air bank's did nothing. Off: the
+## live deck's, as before.
+func strobe_mix() -> float:
+	if not dj:
+		return float(deck().params.get("strobe", 0.0))
+	var s := 0.0
+	for i in decks.size():
+		s += float(decks[i].params.get("strobe", 0.0)) * weight(i)
+	return s
 
 
 ## WO-1011 strobe: 0..1 white over the whole canvas (the final composite, so the output ring gets it too).

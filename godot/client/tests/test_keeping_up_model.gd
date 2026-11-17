@@ -89,3 +89,36 @@ func test_pacer_raises_at_once_and_lowers_after_hold() -> void:
 	P.publish_stopped(4243)
 	t.ok(not P.publishing(), "stopped")
 	Engine.max_fps = keep
+
+
+## WO-1106 B30 — a malformed server payload (level out of range or not a number, incidents that are not objects) never
+## stops the indicator: levels clamp to 0..2, non-Dictionary incidents are dropped.
+func test_malformed_payload_wo1106_b30() -> void:
+	var server := {"checks": [{"key": "a", "group": "caspar", "name": "Caspar", "level": 7, "label": "Caspar slow"},
+		{"key": "b", "group": "box", "name": "Box", "level": "x"}, {"key": "c", "group": "box", "name": "Neg", "level": -3}],
+		"incidents": [{"label": "ok one", "durationS": 3}, "junk", 4, null, ["x"]]}
+	var m := M.merge(server, [], "me")
+	t.eq([m.level, m.status, m.label], [M.FAILING, "failing", "Caspar slow"], "a level of 7 counts as failing")
+	t.eq(m.incidents.size(), 1, "only the Dictionary incident is kept")
+	t.eq(M.level_of({"level": 2.0}), 2)
+	t.eq(M.level_of({"level": "2"}), M.OK, "a string is no level")
+	t.eq(M.level_of({}), M.OK)
+	t.eq(M.fps_check(10, 50, "x", 9, false).status, "failing", "fps_check clamps too")
+
+
+## WO-1106 B26 — the cap's lowering is a static method Callable bound to the sequence (no lambda from a static func:
+## the exit-134 shape) and a stale sequence does nothing.
+func test_pacer_schedules_a_bound_static_method_wo1106_b26() -> void:
+	var src := FileAccess.get_file_as_string("res://app/render_pacer.gd")
+	t.ok(src.contains("timeout.connect(_apply_if.bind(_lower_seq))"), "a bound static method")
+	t.ok(not src.contains("timeout.connect(func"), "no lambda connected to the timer")
+	t.ok(src.contains("not tree.root.is_inside_tree()"), "nothing scheduled while the tree is torn down")
+	if P.operator_cap() > 0:
+		return
+	var keep := Engine.max_fps
+	Engine.max_fps = 7
+	P._apply_if(P._lower_seq - 1)
+	t.eq(Engine.max_fps, 7, "a stale hold does not lower the cap")
+	P._apply_if(P._lower_seq)
+	t.eq(Engine.max_fps, P.target_fps(P.monitor_hz(), P.channel_fps, P._active.values()), "the current one applies")
+	Engine.max_fps = keep

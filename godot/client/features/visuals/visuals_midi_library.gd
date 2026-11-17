@@ -11,6 +11,13 @@ const Palette := preload("res://features/midi/apc40_palette.gd")
 const Clips := preload("res://features/visuals/visuals_midi_clips.gd")
 const PER_BANK := 40
 const WAIT_S := 120.0  # the longest the fill waits for thumbnails (a first run renders ~200 shaders)
+const COLOUR_CACHE_MAX := 2000
+
+## WO-1106 B29: one fill at a time (a second menu click started a second ~200-row pass): when the running one started,
+## -1 = none. A fill whose await never came back (its list freed) stops blocking after FILL_STALE_MS.
+static var _filling_ms := -1
+const FILL_STALE_MS := 180000  # WAIT_S and a minute
+static var _colours := {}  # WO-1106 B29: "thumb path#texture id" → its dominant Color (a new texture = a new key)
 
 
 ## Pad `i` of a bank (0 = top left, row by row) → its note (the top row is 32–39, the bottom one 0–7).
@@ -61,6 +68,25 @@ static func _hue_key(c: Color) -> float:
 
 ## The menu action: read the library, render the thumbnails it lacks, put the banks on the pads. `midi` = visuals_midi.gd.
 static func fill(midi: Node) -> void:
+	if _filling_ms >= 0 and Time.get_ticks_msec() - _filling_ms < FILL_STALE_MS:
+		midi._say("Pads: the library is being put on the pads already…")
+		return
+	_filling_ms = Time.get_ticks_msec()
+	await _fill(midi)
+	_filling_ms = -1
+
+
+## A thumbnail's dominant colour, computed once per thumbnail texture (WO-1106 B29: every fill read back ~200 images).
+static func colour_of(path: String, tex: Texture2D) -> Color:
+	var key := "%s#%d" % [path, tex.get_instance_id()]
+	if not _colours.has(key):
+		if _colours.size() >= COLOUR_CACHE_MAX:
+			_colours.clear()
+		_colours[key] = Palette.main_color(tex.get_image())
+	return _colours[key]
+
+
+static func _fill(midi: Node) -> void:
 	var panel: Node = midi.get_tree().get_first_node_in_group("visuals_list") if midi.is_inside_tree() else null
 	if panel == null:
 		midi._say("Pads: the visuals list is not there — open Sources ▸ Visuals once, then try again")
@@ -88,7 +114,7 @@ static func fill(midi: Node) -> void:
 			return
 	var made := banks(rows, func(r: Dictionary) -> Variant:
 		var tex: Texture2D = thumbs.texture(r.thumb) if r.thumb != "" else null
-		return Palette.main_color(tex.get_image()) if tex != null else null)
+		return colour_of(str(r.thumb), tex) if tex != null else null)
 	var own: int = midi.clips.banks.filter(func(b: Dictionary) -> bool: return not b.get("auto", false) and not b.clips.is_empty()).size()
 	midi.clips.set_auto_banks(made)
 	var shown: int = midi.clips.banks.size() - own
