@@ -22,6 +22,9 @@ const SAMPLE_MS = 1000
 const WINDOW_MS = 2000 // rates over ~2 s of counters: ±1 frame of quantisation at 50 fps is 1 %, not 2 %
 const LOOP_RES_MS = 10
 const REPORT_TTL_MS = 30000
+// WO-1106 B10: anyone on the network can post a report — bound what it can raise: live checks per client, in total
+const MAX_KEYS_PER_CLIENT = 4
+const MAX_REPORTED = 32
 const RING_TTL_MS = 10000
 const NAMES_TTL_MS = 10000
 const NV_FIELDS = 'utilization.gpu,memory.used,memory.total,temperature.gpu,clocks_event_reasons.hw_thermal_slowdown,clocks_event_reasons.sw_thermal_slowdown'
@@ -221,10 +224,20 @@ function startKeepingUp(ctx, opts = {}) {
 			const key = String(b.key || '').slice(0, 64)
 			if (!client || !key) return { ok: false, error: 'client and key are required' }
 			const str = (v, n = 160) => String(v ?? '').slice(0, n)
-			const result = { key: `client:${client}:${key}`, group: 'client', name: str(b.name, 64) || 'Client', level: Math.max(0, Math.min(2, Math.round(Number(b.level) || 0))),
-				target: b.target ?? null, measured: b.measured ?? null, unit: str(b.unit, 16), text: str(b.text), label: str(b.label),
-				hint: str(b.hint, 240), severity: Number(b.severity) || 0, client }
-			reported.set(result.key, { result, until: Date.now() + REPORT_TTL_MS })
+			const num = (v) => (v !== null && v !== '' && typeof v !== 'boolean' && Number.isFinite(Number(v)) ? Number(v) : null) // WO-1106 B10
+			const rk = `client:${client}:${key}`
+			const now = Date.now()
+			for (const [k, v] of reported) if (v.until < now) reported.delete(k)
+			if (!reported.has(rk)) {
+				let mine = 0
+				for (const v of reported.values()) if (v.result.client === client) mine++
+				if (mine >= MAX_KEYS_PER_CLIENT) return { ok: false, error: `at most ${MAX_KEYS_PER_CLIENT} checks per client` }
+				if (reported.size >= MAX_REPORTED) return { ok: false, error: 'too many client checks right now' }
+			}
+			const result = { key: rk, group: 'client', name: str(b.name, 64) || 'Client', level: Math.max(0, Math.min(2, Math.round(Number(b.level) || 0))),
+				target: num(b.target), measured: num(b.measured), unit: str(b.unit, 16), text: str(b.text), label: str(b.label),
+				hint: str(b.hint, 240), severity: Math.max(0, Math.min(1e6, num(b.severity) || 0)), client }
+			reported.set(rk, { result, until: now + REPORT_TTL_MS })
 			return { ok: true }
 		},
 		stop() {

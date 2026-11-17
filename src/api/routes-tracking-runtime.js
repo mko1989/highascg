@@ -16,6 +16,8 @@
  * Every route takes `prefix` (query or body): a scratch prefix for tests (runtime-paths.checkPrefix); only with one may a
  * body carry `test: { free_mb, proxy }` (fake free space / a dead proxy for the job). Core routes: they answer with the
  * tracking module off too (About reads the same status).
+ * WO-1106 B1: install and import put code on the box (pip wheels, a bundle from a folder) — they answer only with the
+ * password (auth enforced) or from the box itself (module-host/code-change-gate.js), 403 otherwise.
  */
 
 const fs = require('fs')
@@ -25,6 +27,7 @@ const { runtimePaths, checkPrefix, loadFeatures, inside, REPO, BUNDLE_NAME } = r
 const { createProbe, freeMb } = require('../tracking/runtime-probe')
 const { createJobs } = require('../tracking/runtime-job')
 const { summaryLine } = require('../tracking/runtime-status')
+const { mayChangeInstalledCode } = require('../module-host/code-change-gate')
 
 const reply = (status, o) => ({ status, headers: JSON_HEADERS, body: jsonBody(o) })
 const probe = createProbe()
@@ -153,7 +156,11 @@ async function folders(prefix) {
 function register(routes) {
 	const opt = { requireCaspar: false }
 	const pre = (query, body) => prefixOf(body?.prefix ?? query?.prefix)
-	const guard = (fn) => async ({ query, body }) => {
+	const guard = (fn, changesCode = false) => async ({ query, body, req, ctx }) => {
+		if (changesCode) {
+			const gate = mayChangeInstalledCode(req, ctx)
+			if (!gate.ok) return reply(gate.status, { error: gate.error, code: gate.code })
+		}
 		const b = parseBody(body) || {}
 		const p = pre(query, b)
 		if (p.error) return reply(400, { error: p.error })
@@ -168,7 +175,7 @@ function register(routes) {
 		const f = featureArg(b.features)
 		if (f.error) return reply(400, { error: f.error })
 		return begin(b.repair ? 'repair' : 'install', ['--features', f.value, ...(b.repair ? ['--repair'] : [])], p, b)
-	}), opt)
+	}, true), opt)
 	routes.post('/api/tracking/runtime/repair', guard((p, b) => begin('repair', ['--features', '', '--repair'], p, b)), opt)
 	routes.post('/api/tracking/runtime/remove', guard((p, b) => begin('remove', ['--remove', ...(b.keep_models ? ['--keep-models'] : [])], p, b)), opt)
 	routes.post('/api/tracking/runtime/export', guard((p, b) => {
@@ -181,7 +188,7 @@ function register(routes) {
 		const f = featureArg(b.features)
 		if (f.error) return reply(400, { error: f.error })
 		return begin('import', ['--from', path.resolve(b.from), '--features', f.value], p, b)
-	}), opt)
+	}, true), opt)
 	routes.post('/api/tracking/runtime/resume', guard((p, b) => {
 		const j = jobs.current(p.prefix)
 		if (!j || !j.snapshot().resumable) return reply(409, { error: 'nothing to resume' })

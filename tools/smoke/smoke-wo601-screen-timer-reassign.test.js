@@ -59,9 +59,9 @@ test('the CG UPDATE carries durationSec only when it changed (the template re-an
 	assert.equal(payload(st.assignTimerToScreen({ timerId: 't3', config: { durationSec: 90 }, screenIdx: 0, channel: 1 })).durationSec, 90)
 })
 
-test('GET /api/timers/fonts lists installed families: first name of each fc-list line, unique, sorted', () => {
+test('GET /api/timers/fonts lists installed families: first name of each fc-list line, unique, sorted', async () => {
 	const { installedFonts, handleGet } = require('../../src/api/routes-screen-timers')
-	assert.deepEqual(installedFonts({ run: () => 'Nimbus Sans,Nimbus Sans L\nDejaVu Serif\nNimbus Sans\n\n' }), ['DejaVu Serif', 'Nimbus Sans'])
-	assert.deepEqual(installedFonts({ run: () => { throw new Error('no fontconfig') } }), [])
-	assert.equal(JSON.parse(handleGet('/api/timers/fonts', {}).body).ok, true)
+	assert.deepEqual(await installedFonts({ run: () => 'Nimbus Sans,Nimbus Sans L\nDejaVu Serif\nNimbus Sans\n\n' }), ['DejaVu Serif', 'Nimbus Sans'])
+	assert.deepEqual(await installedFonts({ run: () => { throw new Error('no fontconfig') } }), [])
+	assert.equal(JSON.parse((await handleGet('/api/timers/fonts', {})).body).ok, true) // WO-1106 B11: answers async
 })

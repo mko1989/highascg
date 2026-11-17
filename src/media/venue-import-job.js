@@ -10,6 +10,10 @@
  *   cancel  — terminates the worker; nothing is written
  *   done    — the .glb goes into the project folder as "<obj stem>.glb" (project-files.js place: never overwrites)
  *             and the report stays on the job. The staging folder is removed when the job ends.
+ * WO-1106 B4: staging lives in /tmp (a RAM tmpfs on the box), so it is capped — LIMITS: 2000 files and 4 GB per
+ * session, 3 sessions (a 4th evicts the least recently used idle one, so a lost session id never locks the operator
+ * out), 8 GB staged in total — and the stage root is wiped on the first session after a start (leftovers of a crash). Under
+ * `node --test` it is a private temp dir and never wiped at load.
  */
 
 const fs = require('fs')
@@ -17,15 +21,36 @@ const os = require('os')
 const path = require('path')
 const crypto = require('crypto')
 const pf = require('./project-files')
+const { underTestRunner } = require('../engine/projects-root')
 
-const STAGE_ROOT = path.join(os.tmpdir(), 'highascg-venue-import')
+const STAGE_ROOT = underTestRunner()
+	? path.join(os.tmpdir(), `highascg-test-venue-import-${process.pid}-${crypto.randomBytes(4).toString('hex')}`)
+	: path.join(os.tmpdir(), 'highascg-venue-import')
+const GB = 1024 * 1024 * 1024
+/** WO-1106 B4 caps (mutable for the smokes only). */
+const LIMITS = { files: 2000, sessionBytes: 4 * GB, sessions: 3, totalBytes: 8 * GB }
+let wiped = underTestRunner()
+/**
+ * WO-1106 B4: nothing staged survives a restart. Done on the first session of this process, not at load — a tool or
+ * a one-off `node -e` that merely requires this file must not empty the running server's staging folder.
+ */
+function wipeOnce() {
+	if (wiped) return
+	wiped = true
+	try {
+		fs.rmSync(STAGE_ROOT, { recursive: true, force: true })
+	} catch {
+		/* not ours / busy: the sweep still bounds it */
+	}
+}
 const ACCEPT = new Set(['.obj', '.mtl', '.zip', '.skp', '.jpg', '.jpeg', '.png'])
 const SESSION_TTL = 3 * 3600 * 1000
 const WORKER = path.join(__dirname, '..', 'stage', 'venue-import-worker.js')
 
 let job = null // { id, state: running|done|error|cancelled, phase, text, done, total, startedAt, endedAt, name?, report?, error? }
 let worker = null
-const sessions = new Map() // id → { dir, files: Set(rel), at }
+const sessions = new Map() // id → { dir, files: Set(rel), at, seq, bytes, sizes: Map(rel → bytes), pending: Set(rel) }
+let touchSeq = 0 // LRU order (several touches can share one Date.now())
 
 const snapshot = () => (job ? { ...job } : { state: 'idle' })
 
@@ -50,26 +75,75 @@ function dropSession(id) {
 
 /** The staging session `id` (made when missing / unknown). */
 function session(id) {
+	wipeOnce()
 	sweep()
 	const key = /^[a-f0-9]{16}$/.test(String(id || '')) ? String(id) : crypto.randomBytes(8).toString('hex')
 	let s = sessions.get(key)
 	if (!s) {
-		s = { id: key, dir: path.join(STAGE_ROOT, key), files: new Set(), at: Date.now() }
+		evictFor(LIMITS.sessions - 1)
+		s = { id: key, dir: path.join(STAGE_ROOT, key), files: new Set(), at: Date.now(), bytes: 0, sizes: new Map(), pending: new Set() }
 		fs.mkdirSync(s.dir, { recursive: true })
 		sessions.set(key, s)
 	}
 	s.at = Date.now()
+	s.seq = ++touchSeq
 	return s
 }
 
-/** Where an uploaded file of session `s` goes → { abs, rel } | { error }. */
+/** WO-1106 B4: drop least recently used idle sessions until at most `keep` remain (the running job's never). */
+function evictFor(keep) {
+	const idle = [...sessions.values()].filter((x) => x.id !== job?.session && !x.pending?.size).sort((a, b) => (a.seq || 0) - (b.seq || 0))
+	while (sessions.size > keep && idle.length) dropSession(idle.shift().id)
+}
+
+const stagedBytes = () => [...sessions.values()].reduce((n, x) => n + (x.bytes || 0), 0)
+
+/**
+ * Where an uploaded file of session `s` goes → { abs, rel } | { error }. A granted target holds a slot until settle().
+ * WO-1106 B2: a name that collides with a folder / file already staged ("x.obj" then "x.obj/y.png") is an error
+ * reply, never a throw (it ran inside the busboy listener → uncaught → node exit).
+ */
 function target(s, rel) {
 	const r = cleanRel(rel)
 	if (!r) return { error: `bad file name: ${rel || '(none)'}` }
 	if (!accepts(r)) return { error: `not part of a venue import: ${r} (OBJ, MTL, ZIP, SKP, JPG, PNG)` }
+	s.pending = s.pending || new Set()
+	if (!s.files.has(r) && s.files.size + s.pending.size >= LIMITS.files) return { error: `too many files in one venue upload (${LIMITS.files} at most)` }
+	// a file and a folder of one name: the earlier file may still be opening, so the disk alone cannot tell (B2)
+	if (s.pending.has(r) || [...s.files, ...s.pending].some((f) => r.startsWith(`${f}/`) || f.startsWith(`${r}/`))) {
+		return { error: `${r}: a file or folder of that name is already in the upload` }
+	}
 	const abs = path.join(s.dir, r)
-	fs.mkdirSync(path.dirname(abs), { recursive: true })
+	try {
+		fs.mkdirSync(path.dirname(abs), { recursive: true })
+		if (fs.existsSync(abs) && !fs.statSync(abs).isFile()) return { error: `${r}: a folder of that name is already in the upload` }
+	} catch (e) {
+		return { error: `${r}: ${e.code === 'EEXIST' || e.code === 'ENOTDIR' ? 'a file of that name is already in the upload' : e.message}` }
+	}
+	if (s.sizes?.has(r)) {
+		s.bytes -= s.sizes.get(r) // re-uploaded: the old copy is overwritten
+		s.sizes.delete(r)
+		s.files.delete(r)
+	}
+	s.pending.add(r)
 	return { abs, rel: r }
+}
+
+/** WO-1106 B4: count `n` more bytes for session `s` → '' or why the file is refused. */
+function charge(s, n) {
+	if (s.bytes + n > LIMITS.sessionBytes) return `the upload is over ${Math.round(LIMITS.sessionBytes / GB)} GB`
+	if (stagedBytes() + n > LIMITS.totalBytes) return 'not enough room for more venue uploads right now — try again later'
+	s.bytes += n
+	return ''
+}
+
+/** A granted target finished: kept (`bytes` written) or dropped (its bytes no longer count). */
+function settle(s, rel, bytes, kept) {
+	s.pending?.delete(rel)
+	if (kept) {
+		s.files.add(rel)
+		s.sizes.set(rel, bytes)
+	} else s.bytes = Math.max(0, s.bytes - bytes)
 }
 
 function update(ctx, patch) {
@@ -149,4 +223,4 @@ function _reset() {
 	for (const id of [...sessions.keys()]) dropSession(id)
 }
 
-module.exports = { session, target, start, cancel, snapshot, cleanRel, _reset }
+module.exports = { session, target, charge, settle, start, cancel, snapshot, cleanRel, _reset, LIMITS, STAGE_ROOT }

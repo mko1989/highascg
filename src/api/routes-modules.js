@@ -9,7 +9,8 @@
  *   POST /api/modules/disable    { name }  onShutdown + unregister now, remember disabled
  *   POST /api/modules/install    { path | url, sha256?, name?, enable? }  unpack into ~/.highascg/modules/<name>/
  *   POST /api/modules/uninstall  { name }  disable, then remove the installed copy (never the repo modules/)
- * Normal API auth on all of them (no public path).
+ * Normal API auth on all of them (no public path). WO-1106 B1: the four POSTs change installed code, so they also need
+ * the password (auth enforced) or a request from the box itself (module-host/code-change-gate.js) — 403 otherwise.
  */
 
 'use strict'
@@ -51,8 +52,11 @@ const reply = (r) => {
  * @param {string} body raw JSON body
  * @param {any} ctx
  * @param {object} [deps] smokes only (install: fetch / limits)
+ * @param {import('http').IncomingMessage} [req] who asks (WO-1106 B1: no req = refused)
  */
-async function handlePost(action, body, ctx, deps) {
+async function handlePost(action, body, ctx, deps, req) {
+	const gate = require('../module-host/code-change-gate').mayChangeInstalledCode(req, ctx)
+	if (!gate.ok) return reply(gate)
 	const b = parseBodyStrict(body)
 	if (!b.ok || !b.value || typeof b.value !== 'object' || Array.isArray(b.value)) return reply({ ok: false, status: 400, error: 'JSON object body expected' })
 	const v = b.value
@@ -78,10 +82,10 @@ async function handlePost(action, body, ctx, deps) {
 /** @param {import('./route-registry').RouteRegistry} routes */
 function registerPostRoutes(routes) {
 	const o = { requireCaspar: false }
-	routes.post('/api/modules/enable', ({ body, ctx }) => handlePost('enable', body, ctx), o)
-	routes.post('/api/modules/disable', ({ body, ctx }) => handlePost('disable', body, ctx), o)
-	routes.post('/api/modules/install', ({ body, ctx }) => handlePost('install', body, ctx), o)
-	routes.post('/api/modules/uninstall', ({ body, ctx }) => handlePost('uninstall', body, ctx), o)
+	routes.post('/api/modules/enable', ({ body, ctx, req }) => handlePost('enable', body, ctx, undefined, req), o)
+	routes.post('/api/modules/disable', ({ body, ctx, req }) => handlePost('disable', body, ctx, undefined, req), o)
+	routes.post('/api/modules/install', ({ body, ctx, req }) => handlePost('install', body, ctx, undefined, req), o)
+	routes.post('/api/modules/uninstall', ({ body, ctx, req }) => handlePost('uninstall', body, ctx, undefined, req), o)
 }
 
 module.exports = { handle, handlePost, registerPostRoutes }

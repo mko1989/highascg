@@ -90,11 +90,14 @@ function parseShaderHeader(source) {
 function buildShaderHeader(a) {
 	const L = LICENCES[a.licence]
 	if (!L) throw new Error(`unknown licence "${a.licence}"`)
+	// WO-1106 B14: one header field = one `//` line — a newline in a Shadertoy title / author ended the comment and the
+	// rest compiled as GLSL (the shader failed to build)
+	const one = (v) => String(v ?? '').replace(/[\r\n\u2028\u2029]+/g, ' ').trim()
 	const out = [
-		`// ${String(a.title).trim()} — by ${String(a.author).trim()}`,
-		`// ${a.url}`,
-		`// License: ${a.licence} — ${L.url}${a.basis ? ` (${a.basis})` : ''}`,
-		...(a.notes || []).map((n) => `// ${n}`),
+		`// ${one(a.title)} — by ${one(a.author)}`,
+		`// ${one(a.url)}`,
+		`// License: ${a.licence} — ${L.url}${a.basis ? ` (${one(a.basis)})` : ''}`,
+		...(a.notes || []).map((n) => `// ${one(n)}`),
 	]
 	return out.join('\n') + '\n\n'
 }
@@ -122,22 +125,19 @@ function shaderAttribution(cfg) {
 
 /**
  * WO-1096 — shaders taken out of the shipped library. On a box that still has the untracked data/shaders/<id>.json,
- * the store neither re-exports nor lists them — unless the operator gave the config a valid attribution header (that is
- * the opt-in: a header with a known licence brings it back). Reasons: template/shaders/LICENSES/opt-in.json.
+ * the store neither re-exports nor lists them. Reasons: template/shaders/LICENSES/opt-in.json —
+ *   optIn    origin unknown: a valid attribution header (a known licence) on the config brings it back;
+ *   removed  no right to ship (another's IP, "all rights reserved"): blocked for good — WO-1106 B68: a header made
+ *            them come back too, and a re-import re-exported them into the tracked template/shaders/.
  */
-const RETIRED_SHADER_IDS = new Set([
-	'sh-mario',
-	'sh-balatro',
-	'sh-audio-visualiser-v0-1-sadeghi',
-	'sh-blue-thunder',
-	'sh-closer-to-god',
-	'sh-dot-globe',
-	'sh-shader-equalizor',
-])
+const OPT_IN_SHADER_IDS = new Set(['sh-blue-thunder', 'sh-closer-to-god', 'sh-dot-globe', 'sh-shader-equalizor'])
+const REMOVED_SHADER_IDS = new Set(['sh-mario', 'sh-balatro', 'sh-audio-visualiser-v0-1-sadeghi'])
+const RETIRED_SHADER_IDS = new Set([...REMOVED_SHADER_IDS, ...OPT_IN_SHADER_IDS])
 
 /** @param {string} id @param {any} cfg */
 function isRetiredShader(id, cfg) {
-	if (!RETIRED_SHADER_IDS.has(id)) return false
+	if (REMOVED_SHADER_IDS.has(id)) return true // WO-1106 B68: no header un-removes these
+	if (!OPT_IN_SHADER_IDS.has(id)) return false
 	const a = shaderAttribution(cfg)
 	return !(a && a.licence)
 }
@@ -152,5 +152,7 @@ module.exports = {
 	buildShaderHeader,
 	shaderAttribution,
 	RETIRED_SHADER_IDS,
+	OPT_IN_SHADER_IDS,
+	REMOVED_SHADER_IDS,
 	isRetiredShader,
 }

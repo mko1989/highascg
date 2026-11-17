@@ -20,6 +20,8 @@ const UNICO_PORT = 19998
 const DEFAULT_API_PORT = 8088
 const CACHE_MS = 200
 const TIMEOUT_MS = 4000
+const DEADLINE_MS = 8000 // WO-1106 B3: one request, start to last byte
+const READ_DEADLINE_MS = 20000 // WO-1106 B3: one read() (login + screens + layers), so `pending` always clears
 
 const SCENE = { 2: 'pgm', 4: 'pvw' }
 // As pixelhue-studio's programmingLayers: 256 is the fill layer of a Cut & Fill pair — a normal, editable layer —
@@ -36,26 +38,47 @@ function makeToken(sn, startTime) {
 	return `${head}.${body}.${sig}`
 }
 
-/** GET (or, with a body, PUT) a JSON document; https targets are the switcher's self-signed discovery service. */
-function httpJson(url, headers = {}, body) {
+/**
+ * GET (or, with a body, PUT) a JSON document; https targets are the switcher's self-signed discovery service.
+ * WO-1106 B3: settles exactly once — a body cut off mid-way (`aborted` / `error` / `close` before the end) rejects, and
+ * a hard deadline ends a reply that trickles in (the socket timeout only sees idle gaps). A request that never settled
+ * kept the reader's `pending` set: the follow loop and the layer list hung until a node restart.
+ * @param {{ deadlineMs?: number }} [opts]
+ */
+function httpJson(url, headers = {}, body, opts = {}) {
 	return new Promise((resolve, reject) => {
 		const lib = url.startsWith('https:') ? https : http
 		const data = body === undefined ? null : JSON.stringify(body)
-		const opts = { method: data ? 'PUT' : 'GET', timeout: TIMEOUT_MS, rejectUnauthorized: false,
+		const ro = { method: data ? 'PUT' : 'GET', timeout: TIMEOUT_MS, rejectUnauthorized: false,
 			headers: { ...headers, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}) } }
-		const req = lib.request(url, opts, (res) => {
+		let timer = null
+		let settled = false
+		const settle = (fn, v) => {
+			if (settled) return
+			settled = true
+			clearTimeout(timer)
+			fn(v)
+		}
+		const req = lib.request(url, ro, (res) => {
 			const chunks = []
+			const cut = () => settle(reject, new Error(`reply cut off: ${url}`))
 			res.on('data', (c) => chunks.push(c))
+			res.on('aborted', cut)
+			res.on('error', cut)
+			res.on('close', () => {
+				if (!res.complete) cut()
+			})
 			res.on('end', () => {
 				try {
-					resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+					settle(resolve, JSON.parse(Buffer.concat(chunks).toString('utf8')))
 				} catch (e) {
-					reject(new Error(`bad JSON from ${url}: ${e.message}`))
+					settle(reject, new Error(`bad JSON from ${url}: ${e.message}`))
 				}
 			})
 		})
 		req.on('timeout', () => req.destroy(new Error(`timeout: ${url}`)))
-		req.on('error', reject)
+		req.on('error', (e) => settle(reject, e))
+		timer = setTimeout(() => req.destroy(new Error(`no full reply in ${Math.round((opts.deadlineMs ?? DEADLINE_MS) / 1000)} s: ${url}`)), opts.deadlineMs ?? DEADLINE_MS)
 		req.end(data || undefined)
 	})
 }
@@ -180,7 +203,7 @@ function normalize(screensRes, layersRes) {
  * A reader for one switcher address. The token lives until the switcher refuses it (it restarts → new startTime);
  * reads within CACHE_MS share one round trip, so several overlays polling cost the switcher one request pair.
  * @param {string} host
- * @param {{ get?: (url: string, headers?: object) => Promise<object>, now?: () => number }} [deps]
+ * @param {{ get?: (url: string, headers?: object) => Promise<object>, now?: () => number, readDeadlineMs?: number }} [deps]
  */
 function createPixelhueReader(host, deps = {}) {
 	const get = deps.get || httpJson
@@ -217,9 +240,16 @@ function createPixelhueReader(host, deps = {}) {
 	function read() {
 		if (cache && now() - cache.at < CACHE_MS) return Promise.resolve(cache)
 		if (!pending) {
-			pending = fetchAll()
+			let timer = null
+			const limit = deps.readDeadlineMs ?? READ_DEADLINE_MS
+			const late = new Promise((_, no) => (timer = setTimeout(() => no(new Error(`PixelHue ${host}: no answer in ${Math.round(limit / 1000)} s`)), limit)))
+			const p = Promise.race([fetchAll(), late])
 				.then((r) => (cache = r))
-				.finally(() => (pending = null))
+				.finally(() => {
+					clearTimeout(timer)
+					if (pending === p) pending = null // WO-1106 B3: a hung round trip never blocks later reads
+				})
+			pending = p
 		}
 		return pending
 	}
@@ -241,4 +271,4 @@ function createPixelhueReader(host, deps = {}) {
 	return { host, read, sources, put }
 }
 
-module.exports = { makeToken, normalize, normalizeSources, createPixelhueReader }
+module.exports = { makeToken, normalize, normalizeSources, createPixelhueReader, httpJson }

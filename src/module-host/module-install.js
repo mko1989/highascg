@@ -7,15 +7,18 @@
  * `<name>/` holding module.json + the module's files. Installing executes nothing until the module is enabled, but an
  * enabled module is in-process code with the server's rights — so the archive is checked before a byte is written:
  *   - source: an absolute local .tgz path or an https URL; packed size ≤ 64 MB (module-fetch.js)
- *   - sha256: verified when given (body `sha256`), else from a `<package>.sha256` sidecar when there is one; a
- *     mismatch refuses. The reply says `sha256Verified`.
+ *   - sha256: a URL install needs the caller's `sha256` (WO-1106 B1: a sidecar from the same origin vouches for
+ *     nothing). A local file is checked against the body `sha256`, else against a `<package>.sha256` sidecar next to
+ *     it; a mismatch refuses. The reply says `sha256Source` ('caller' | 'sidecar' | 'none'); only 'caller' is
+ *     `sha256Verified` (WO-1106 B8).
  *   - entries: regular files and directories only (no symlinks / hard links / devices), no absolute / `..` names,
  *     ≤ 256 MB unpacked, ≤ 5000 entries (module-tar.js)
  *   - layout: everything under `<name>/`, module.json valid, its name = that directory (= body `name` when given),
  *     not an in-tree module name, compatible with this core, and no repo `modules/<name>` (a dev checkout is never
  *     overwritten or shadowed)
  *   - unpacked into a fresh `.staging-*` dir next to the target with exclusive creates, then swapped in by rename;
- *     an upgrade unloads the running copy first and the previous copy is removed only after the swap.
+ *     an upgrade unloads the running copy first; the previous copy is kept as `.old-*` until the new one is enabled
+ *     and put back (and restarted) when the new one does not start or the swap fails (WO-1106 B7).
  * Uninstall: unload (onShutdown + unregister) first, then remove — only ever under ~/.highascg/modules.
  */
 
@@ -33,16 +36,7 @@ const fail = (status, code, error) => ({ ok: false, status, code, error })
 
 async function readPackage(opts, deps, maxPacked) {
 	const fetch = deps.fetch || fetchHttps
-	if (opts.url) {
-		const buf = await fetch(String(opts.url), { maxBytes: maxPacked })
-		let side = null
-		if (!opts.sha256) {
-			try {
-				side = parseSha256((await fetch(`${opts.url}.sha256`, { maxBytes: 4096 })).toString('utf8'))
-			} catch {}
-		}
-		return { buf, sidecar: side }
-	}
+	if (opts.url) return { buf: await fetch(String(opts.url), { maxBytes: maxPacked }), sidecar: null } // sha256 is the caller's (B1)
 	const buf = readLocalPackage(opts.path, maxPacked)
 	let side = null
 	if (!opts.sha256) {
@@ -104,6 +98,8 @@ async function installNow(opts, ctx, deps) {
 	if (opts.name !== undefined && !isValidModuleName(opts.name)) return fail(400, 'NAME', 'invalid module name')
 	const wantSha = opts.sha256 ? parseSha256(opts.sha256) : null
 	if (opts.sha256 && !wantSha) return fail(400, 'SHA256', 'sha256 must be 64 hex characters')
+	// WO-1106 B1: whoever controls the URL controls a sidecar next to it — a download needs the hash from the caller
+	if (opts.url && !wantSha) return fail(400, 'SHA256_REQUIRED', 'a download needs its sha256: copy it from the release page into `sha256`')
 	const lim = deps.limits || {}
 	let pkg
 	try {
@@ -142,7 +138,7 @@ async function installNow(opts, ctx, deps) {
 		fs.rmSync(staging, { recursive: true, force: true })
 		return fail(409, 'TARGET', `${target} exists and is not a directory`)
 	}
-	await loader.unloadModule(m.name, ctx) // an upgrade: the running copy stops before its files move
+	const wasLoaded = await loader.unloadModule(m.name, ctx) // an upgrade: the running copy stops before its files move
 	const old = replaced ? `${path.join(root, '.old-')}${m.name}-${process.pid}-${Date.now()}` : null
 	try {
 		if (old) fs.renameSync(target, old)
@@ -150,17 +146,40 @@ async function installNow(opts, ctx, deps) {
 	} catch (e) {
 		if (old && !fs.existsSync(target)) fs.renameSync(old, target)
 		fs.rmSync(staging, { recursive: true, force: true })
+		if (wasLoaded) loader.enableModuleNow(m.name, ctx) // WO-1106 B7: the copy that was running runs again
 		return fail(500, 'SWAP', e.message)
 	}
-	if (old) fs.rmSync(old, { recursive: true, force: true })
-	ctx?.log?.('info', `[modules] installed "${m.name}" ${m.version} (sha256 ${actual}${expected ? ', verified' : ', unverified'})`)
-	const out = { ok: true, status: 200, name: m.name, version: m.version, sha256: actual, sha256Verified: !!expected, replaced, enabled: false }
+	const sha256Source = wantSha ? 'caller' : pkg.sidecar ? 'sidecar' : 'none' // WO-1106 B8: only the caller's hash verifies
+	ctx?.log?.('info', `[modules] installed "${m.name}" ${m.version} (sha256 ${actual}, ${wantSha ? 'verified' : sha256Source === 'sidecar' ? 'matches its sidecar' : 'unverified'})`)
+	const out = { ok: true, status: 200, name: m.name, version: m.version, sha256: actual, sha256Verified: !!wantSha, sha256Source, replaced, enabled: false }
 	if (opts.enable !== false) {
 		const en = loader.enableModuleNow(m.name, ctx)
 		out.enabled = en.ok
+		if (!en.ok && old) return rollBack(m, target, old, wasLoaded, en.error, ctx)
 		if (!en.ok) out.enableError = en.error
 	} else setModuleEnabled(m.name, false) // the copy it replaced may have been enabled: stays off, also after a restart
+	if (old) fs.rmSync(old, { recursive: true, force: true }) // WO-1106 B7: the previous copy goes only once the new one runs
 	return out
+}
+
+/**
+ * WO-1106 B7: the new version did not start — put the previous copy back (and running, when it was) instead of leaving
+ * the module down with nothing to go back to.
+ */
+function rollBack(m, target, old, wasLoaded, enableError, ctx) {
+	const failed = path.join(path.dirname(old), path.basename(old).replace(/^\.old-/, '.failed-'))
+	try {
+		fs.renameSync(target, failed)
+		fs.renameSync(old, target)
+	} catch (e) {
+		ctx?.log?.('error', `[modules] "${m.name}" ${m.version} did not start and the previous copy could not be put back: ${e.message}`)
+		return { ...fail(500, 'ENABLE', `${m.name} ${m.version} did not start (${enableError}) and the previous copy could not be put back: ${e.message}`), rolledBack: false }
+	}
+	fs.rmSync(failed, { recursive: true, force: true })
+	const back = wasLoaded ? loader.enableModuleNow(m.name, ctx) : { ok: false }
+	ctx?.log?.('warn', `[modules] "${m.name}" ${m.version} did not start (${enableError}); the previous copy is back${back.ok ? ' and running' : ''}`)
+	const error = `${m.name} ${m.version} did not start (${enableError}). The previous version is back${back.ok ? ' and running' : ''}.`
+	return { ...fail(409, 'ENABLE', error), rolledBack: true, enableError, previousRunning: !!back.ok }
 }
 
 /** @param {string} name @param {any} ctx */

@@ -283,7 +283,7 @@ Rules the registry / loader enforce:
   + the module's files dropped from the require cache. Routes, public paths, the WS path and static files stop
   answering at once; no server restart. A browser already showing the module's page keeps it until reloaded.
 
-### API (normal API auth on every POST; bodies are JSON)
+### API (bodies are JSON; every POST needs the password or the box itself — see below)
 
 | Call | Body | Effect |
 |------|------|--------|
@@ -296,19 +296,33 @@ Rules the registry / loader enforce:
 Every reply carries `ok`, `error` / `code` on failure and the fresh `available` list.
 
 **Install is code execution.** An enabled module runs in-process with the server's rights, so `install` is as
-powerful as `/api/system/update/apply`; keep API auth enforced on boxes reachable by others. What the installer checks
-before writing a byte (`src/module-host/module-install.js`):
+powerful as `/api/system/update/apply`. The four POSTs (and `POST /api/tracking/runtime/install` / `import`, which put
+the person-detection runtime on the box) therefore answer only when (WO-1106 B1, `src/module-host/code-change-gate.js`):
+
+- API auth is enforced and the request carries the password, or
+- the request comes from the box itself: a loopback socket with no proxy header and a loopback `Host` / `Origin`
+  (`src/api/box-local-request.js`; the on-box Godot client qualifies, a page rendered by Caspar's CEF does not).
+
+Anything else gets **403** "Turn on API auth in Settings ▸ System, or do this on the box itself." With auth off (the
+factory default) a phone or laptop on the network can list modules but not install, enable, disable or remove one.
+
+What the installer checks before writing a byte (`src/module-host/module-install.js`):
 
 - source: an absolute path to a `.tgz` / `.tar.gz` regular file (USB stick), or an `https://` URL (redirects only to
-  https, 60 s timeout); packed ≤ 64 MB
-- `sha256` (hex, or a `sha256sum` line) verified when given; otherwise a `<package>.sha256` sidecar next to the file / at
-  `<url>.sha256` is used when present; a mismatch refuses. The reply says `sha256Verified`.
+  https, 60 s idle timeout, 10 min for the whole download); packed ≤ 64 MB
+- `sha256` (hex, or a `sha256sum` line): **required for a URL** (a `.sha256` next to the download comes from the same
+  server, so it vouches for nothing — copy the hash from the release page; refused with `SHA256_REQUIRED` otherwise).
+  A local file is checked against the body `sha256`, else against a `<package>.sha256` sidecar next to it when there is
+  one; a mismatch refuses. The reply says `sha256Source` (`caller` / `sidecar` / `none`) and `sha256Verified`, which is
+  true only for `caller` (WO-1106 B8).
 - archive: regular files and directories only (symlinks, hard links, devices refused), no absolute / `..` / `.` /
   backslash / control-character names, ≤ 256 MB unpacked (gzip bomb), ≤ 5000 entries, duplicate entries refused
 - layout: exactly one top-level directory `<name>/` holding a valid `module.json` whose `name` is that directory (and
   the body's `name`, when given); not an in-tree module name; compatible with this core; no repo `modules/<name>`
 - unpacked into `~/.highascg/modules/.staging-*` with exclusive creates, swapped in by rename; an upgrade unloads the
-  running copy first and removes the old copy only after the swap.
+  running copy first and keeps it as `.old-*` until the new version is enabled. When the new version does not start
+  (or the swap fails) the previous copy is put back and started again, and the reply is `ok: false`, `code: ENABLE`,
+  `rolledBack: true` (WO-1106 B7).
 
 ### Packaging
 

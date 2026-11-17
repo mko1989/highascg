@@ -85,6 +85,15 @@ async function producerComesUp(ctx, ch, layer, verifyMs, graceMs) {
 /** WO-1071: slot → why its device is not there (said once per reason). */
 const _absent = new Map()
 
+/**
+ * WO-1106 B13: slot → { until, delayMs, reason } after a failed repair. A device that cannot be opened was repaired every
+ * 15 s tick forever (ffmpeg respawn + CLEAR / PLAY + warnings); the wait doubles from 15 s to 5 min, a forced repair
+ * (startup / config change) skips it, and it ends when the capture opens. One log line per reason change.
+ */
+const _backoff = new Map()
+const BACKOFF_START_MS = 15000
+const BACKOFF_MAX_MS = 5 * 60 * 1000
+
 /** slot → the recovery in flight (WO-861 §3: startup routing + meter watchdog raced, killing each other's bridge). */
 const _recovering = new Map()
 
@@ -166,7 +175,8 @@ async function recoverLiveAlsaClip(ctx, slot, opts) {
 /**
  * Repair all configured live inputs (meters stale, producer dead, or forced).
  * @param {object} ctx
- * @param {{ force?: boolean, staleMs?: number, slots?: object[] }} [opts]
+ * @param {{ force?: boolean, staleMs?: number, slots?: object[], now?: number, verifyMs?: number, verifyGraceMs?: number,
+ *   clearSettleMs?: number }} [opts] now / verify*: the smokes
  */
 async function ensureLiveAudioInputsHealthy(ctx, opts = {}) {
 	if (!ctx?.amcp?.isConnected) return { ok: false, reason: 'amcp_disconnected' }
@@ -177,7 +187,7 @@ async function ensureLiveAudioInputsHealthy(ctx, opts = {}) {
 	const staleMs = opts.staleMs ?? 8000
 	const bridgeOn = isLiveAudioBridgeEnabled(ctx?.config)
 	const moved = new Set(bridgeOn ? followCards(ctx).moved.map((m) => m.slot) : []) // WO-1071: a re-enumerated card
-	const now = Date.now()
+	const now = opts.now ?? Date.now()
 	const snap = ctx.oscState?.getSnapshot?.()
 	const channels = snap?.channels || {}
 	const repaired = []
@@ -213,29 +223,48 @@ async function ensureLiveAudioInputsHealthy(ctx, opts = {}) {
 			continue
 		}
 		const back = _absent.delete(slot.slot)
+		if (back) _backoff.delete(slot.slot) // the device came back: a fresh start
 		if (!opts.force && !oscStale && !bridgeDead && !back && !moved.has(slot.slot)) continue
-		if ((bridgeDead || back) && !oscStale && typeof ctx.log === 'function') {
+		const streak = _backoff.get(slot.slot)
+		if (streak && !opts.force && now < streak.until) {
+			failed.push({ slot: slot.slot, channel: ch, reason: 'backoff', retryInS: Math.ceil((streak.until - now) / 1000) })
+			continue
+		}
+		const say = !streak && typeof ctx.log === 'function' // a failing streak was said once (B13)
+		if ((bridgeDead || back) && !oscStale && say) {
 			ctx.log('info', `[live-audio-health] slot ${slot.slot}: capture is not running → restarting it on ch${ch}-${slot.layer}`)
 		}
 
-		if (oscStale && typeof ctx.log === 'function') {
+		if (oscStale && say) {
 			ctx.log('info', `[live-audio-health] meters stale on slot ${slot.slot} → probing ch${ch}-${slot.layer}`)
 		}
 		if (oscStale) {
 			await isLiveAlsaProducerHealthy(ctx, ch, slot.layer)
 		}
 
-		const res = await playLiveAlsaClipWithRecovery(ctx, slot, { log: true })
-		if (res.ok) rememberRunningCard(ctx, slot.slot)
-		if (res.ok) repaired.push({ slot: slot.slot, channel: ch, clip: res.clip, attempt: res.attempt })
-		else failed.push({ slot: slot.slot, channel: ch, reason: res.reason })
+		const res = await playLiveAlsaClipWithRecovery(ctx, slot, { log: !streak, verifyMs: opts.verifyMs, verifyGraceMs: opts.verifyGraceMs, clearSettleMs: opts.clearSettleMs })
+		if (res.ok) {
+			rememberRunningCard(ctx, slot.slot)
+			repaired.push({ slot: slot.slot, channel: ch, clip: res.clip, attempt: res.attempt })
+			if (streak && typeof ctx.log === 'function') ctx.log('info', `[live-audio] slot ${slot.slot} capture running again on ch${ch}-${slot.layer}`)
+			_backoff.delete(slot.slot)
+		} else {
+			const delayMs = streak ? Math.min(BACKOFF_MAX_MS, streak.delayMs * 2) : BACKOFF_START_MS
+			_backoff.set(slot.slot, { until: now + delayMs, delayMs, reason: res.reason })
+			const changed = !streak || streak.reason !== res.reason
+			failed.push({ slot: slot.slot, channel: ch, reason: res.reason, ...(changed ? {} : { repeat: true }) })
+			if (changed && typeof ctx.log === 'function') {
+				ctx.log('warn', `[live-audio] slot ${slot.slot} could not start (${res.reason}) — trying again less and less often (up to every ${BACKOFF_MAX_MS / 60000} min)`)
+			}
+		}
 	}
 
 	if (repaired.length && typeof ctx.log === 'function') {
 		ctx.log('info', `[live-audio] repaired ${repaired.length} input(s)`)
 	}
-	if (failed.some((f) => f.reason !== 'device_absent') && typeof ctx.log === 'function') { // (an absent device was said once)
-		ctx.log('warn', `[live-audio] failed to start: ${JSON.stringify(failed)}`)
+	const news = failed.filter((f) => f.reason !== 'device_absent' && f.reason !== 'backoff' && !f.repeat) // (said once: absent device, B13 streak)
+	if (news.length && typeof ctx.log === 'function') {
+		ctx.log('warn', `[live-audio] failed to start: ${JSON.stringify(news)}`)
 	}
 
 	return { ok: failed.length === 0, repaired, failed }
@@ -247,4 +276,5 @@ module.exports = {
 	playLiveAlsaClipWithRecovery,
 	ensureLiveAudioInputsHealthy,
 	DEFAULT_VERIFY_MS,
+	_backoff,
 }

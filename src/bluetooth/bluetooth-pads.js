@@ -14,6 +14,7 @@ const { execFile, spawn } = require('node:child_process')
 const ADDR_RE = /^[0-9A-F]{2}(:[0-9A-F]{2}){5}$/
 const PAD_NAME_RE = /controller|gamepad|dualshock|dualsense|joy-?con|xbox|8bitdo|stadia|pro con/i
 const SCAN_MAX_S = 60
+const STATUS_CACHE_MS = 2000 // WO-1106 B12: polls within this share one answer
 
 function run(args, timeoutMs = 8000) {
 	return new Promise((resolve) => {
@@ -68,9 +69,30 @@ function createBluetoothPads(deps = {}) {
 	let scan = null // { child, until }
 
 	const scanning = () => !!scan && now() < scan.until
+	const inflight = new Map() // 'all' | 'pads' → Promise
+	const cached = new Map() // 'all' | 'pads' → { at, value }
+	/** Anything that changes the adapter's state: the next status asks BlueZ again. */
+	const changed = (r) => (cached.clear(), r)
 
-	/** @param {{ all?: boolean }} [opts] all: every device the adapter knows that has a name or a device class */
-	async function status(opts = {}) {
+	/**
+	 * WO-1106 B12: one status reads up to 62 `bluetoothctl` processes; overlapping polls (two clients, a slow adapter)
+	 * share the run in flight and a 2 s cached answer instead of multiplying them.
+	 * @param {{ all?: boolean }} [opts] all: every device the adapter knows that has a name or a device class
+	 */
+	function status(opts = {}) {
+		const k = opts.all ? 'all' : 'pads'
+		const c = cached.get(k)
+		if (c && now() - c.at < STATUS_CACHE_MS) return Promise.resolve({ ...c.value, scanning: scanning() })
+		if (!inflight.has(k)) {
+			const p = readStatus(opts)
+				.then((v) => (cached.set(k, { at: now(), value: v }), v))
+				.finally(() => inflight.delete(k))
+			inflight.set(k, p)
+		}
+		return inflight.get(k)
+	}
+
+	async function readStatus(opts) {
 		const show = await exec(['show'])
 		if (show.missing) return { ok: true, available: false, reason: 'bluetoothctl is not installed (sudo apt install bluez)', powered: false, scanning: false, devices: [] }
 		if (!show.ok || !/^Controller\s/m.test(show.out)) {
@@ -93,6 +115,7 @@ function createBluetoothPads(deps = {}) {
 
 	/** A timed discovery; bluetoothd forgets unpaired devices soon after it ends, so pairing happens while it runs. */
 	function startScan(seconds = 30) {
+		cached.clear()
 		const s = Math.max(5, Math.min(SCAN_MAX_S, Math.round(Number(seconds) || 30)))
 		if (scanning()) return { ok: true, scanning: true, seconds: Math.ceil((scan.until - now()) / 1000) }
 		const child = (deps.spawn || spawn)('bluetoothctl', ['--timeout', String(s), 'scan', 'on'], { stdio: 'ignore' })
@@ -107,6 +130,7 @@ function createBluetoothPads(deps = {}) {
 	}
 
 	function stopScan() {
+		cached.clear()
 		try {
 			scan?.child?.kill?.('SIGTERM')
 		} catch {
@@ -151,11 +175,11 @@ function createBluetoothPads(deps = {}) {
 		status,
 		startScan,
 		stopScan,
-		pair,
-		connect: (a) => simple('connect', a, 20000),
-		disconnect: (a) => simple('disconnect', a, 10000),
-		forget: (a) => simple('remove', a, 10000),
-		power,
+		pair: async (a) => changed(await pair(a)),
+		connect: async (a) => changed(await simple('connect', a, 20000)),
+		disconnect: async (a) => changed(await simple('disconnect', a, 10000)),
+		forget: async (a) => changed(await simple('remove', a, 10000)),
+		power: async (on) => changed(await power(on)),
 	}
 }
 

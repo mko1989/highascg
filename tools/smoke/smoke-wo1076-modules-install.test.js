@@ -5,7 +5,7 @@
  * repo modules/ or :4200):
  *   tools/release/make-module-tarball.js packs the fixture (+ .sha256) and the installer takes it from a local path
  *   over the sandbox HTTP API (enabled at once, its route answers); sha256 given / sidecar / mismatch; an https URL via
- *   an injected fetch (and a plain http:// URL refused by the real downloader); every rejection before a byte is
+ *   an injected fetch with the caller's sha256 (WO-1106 B1 / B8: tools/smoke/smoke-wo1106-core-modules.test.js) (and a plain http:// URL refused by the real downloader); every rejection before a byte is
  *   written — `..` and absolute names, symlinks, hard links, two top-level dirs, manifest name ≠ directory, body name ≠
  *   package, oversize packed / unpacked / entry count, a repo modules/<name> never overwritten, an in-tree name;
  *   an upgrade swaps the copy (old code unloaded first); uninstall disables first and removes only the installed copy.
@@ -119,14 +119,15 @@ test('sidecar .sha256 is used when no sha256 is given; a wrong sidecar refuses',
 	fs.copyFileSync(pkg.sha256File, `${copy}.sha256`)
 	const up = await installModule({ path: copy }, ctx) // also an upgrade over the running copy
 	assert.equal(up.ok, true, up.error)
-	assert.equal(up.sha256Verified, true)
+	assert.equal(up.sha256Verified, false, 'WO-1106 B8: a sidecar matches, it does not verify')
+	assert.equal(up.sha256Source, 'sidecar')
 	assert.equal(up.replaced, true)
 	assert.equal(up.enabled, true)
 	assert.equal(JSON.parse((await req('GET', '/api/echo-fixture/ping')).text).pong, true)
 	assert.deepEqual(installedNames(), ['echo-fixture'], 'no .staging-* / .old-* left behind')
 })
 
-test('https URL: injected fetch (+ sidecar); the real downloader refuses http:// and bad URLs', async () => {
+test('https URL: injected fetch with the caller sha256 (no sidecar fetched); the real downloader refuses http:// and bad URLs', async () => {
 	const gz = fs.readFileSync(pkg.tgz)
 	const seen = []
 	const fetch = async (u) => {
@@ -134,16 +135,18 @@ test('https URL: injected fetch (+ sidecar); the real downloader refuses http://
 		if (u.endsWith('.sha256')) return Buffer.from(`${pkg.sha256}  x\n`)
 		return gz
 	}
-	const r = await routesModules.handlePost('install', JSON.stringify({ url: 'https://example.invalid/m.tgz', enable: false }), ctx, { fetch })
+	const BOX = { socket: { remoteAddress: '127.0.0.1', localPort: 4200 }, headers: { host: '127.0.0.1:4200' } } // WO-1106 B1
+	const r = await routesModules.handlePost('install', JSON.stringify({ url: 'https://example.invalid/m.tgz', sha256: pkg.sha256, enable: false }), ctx, { fetch }, BOX)
 	assert.equal(r.status, 200, r.body)
 	assert.equal(JSON.parse(r.body).sha256Verified, true)
-	assert.deepEqual(seen, ['https://example.invalid/m.tgz', 'https://example.invalid/m.tgz.sha256'])
+	assert.equal(JSON.parse(r.body).sha256Source, 'caller')
+	assert.deepEqual(seen, ['https://example.invalid/m.tgz'], 'WO-1106 B1: no same-origin sidecar is fetched')
 	// enable:false over the running, enabled copy: unloaded now AND remembered off (no surprise load on restart)
 	assert.equal(moduleRegistry.isLoaded('echo-fixture'), false)
 	assert.deepEqual(JSON.parse(fs.readFileSync(STATE, 'utf8'))['echo-fixture'], { enabled: false })
 	await assert.rejects(fetchHttps('http://127.0.0.1:1/x.tgz'), /only https/)
 	await assert.rejects(fetchHttps('not a url'), /not a URL/)
-	const viaApi = await req('POST', '/api/modules/install', { url: 'http://127.0.0.1:1/x.tgz' })
+	const viaApi = await req('POST', '/api/modules/install', { url: 'http://127.0.0.1:1/x.tgz', sha256: pkg.sha256 })
 	assert.equal(viaApi.status, 400)
 	assert.match(JSON.parse(viaApi.text).error, /only https/)
 	assert.equal((await req('POST', '/api/modules/install', { path: pkg.tgz, url: 'https://x/y.tgz' })).status, 400)

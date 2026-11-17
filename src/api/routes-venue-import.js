@@ -21,6 +21,45 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const MAX_BYTES = 2 * 1024 * 1024 * 1024
 const reply = (status, o) => ({ status, headers: JSON_HEADERS, body: jsonBody(o) })
 
+/**
+ * Stream one uploaded file into session `s` → { error } | { done: Promise<{ rel, error? }> }. WO-1106 B4: bytes are
+ * charged while they arrive (per-session + total caps); an over-cap file is cut off and removed.
+ */
+function receive(s, name, stream) {
+	const t = job.target(s, name)
+	if (t.error) return t
+	const out = fs.createWriteStream(t.abs)
+	let over = false, why = '', bytes = 0
+	stream.on('limit', () => (over = true))
+	stream.on('data', (c) => {
+		if (why) return
+		why = job.charge(s, c.length)
+		if (why) {
+			stream.unpipe(out)
+			out.destroy()
+			stream.resume()
+		} else bytes += c.length
+	})
+	stream.pipe(out)
+	const done = new Promise((resolve) => {
+		let err = ''
+		out.on('error', (e) => (err = String(e?.message || e)))
+		out.on('close', () => {
+			const error = err || why || (over ? 'file over 2 GB' : '')
+			if (error) {
+				try {
+					fs.rmSync(t.abs, { force: true })
+				} catch {
+					/* not a file (B2): nothing of ours to remove */
+				}
+			}
+			job.settle(s, t.rel, bytes, !error)
+			resolve({ rel: t.rel, error })
+		})
+	})
+	return { done }
+}
+
 function handleFiles(req, ctx, query) {
 	return new Promise((resolve) => {
 		const s = job.session(query?.session)
@@ -37,33 +76,19 @@ function handleFiles(req, ctx, query) {
 			if (name === 'path') relPath = String(val || '')
 		})
 		bb.on('file', (_field, stream, info) => {
-			const t = job.target(s, relPath || info.filename)
+			const name = relPath || info.filename
 			relPath = ''
-			if (t.error) {
-				rejected.push({ name: String(info.filename || ''), error: t.error })
+			try {
+				const w = receive(s, name, stream)
+				if (w.error) {
+					rejected.push({ name: String(info.filename || ''), error: w.error })
+					stream.resume()
+				} else writes.push(w.done.then((r) => (r.error ? rejected.push({ name: r.rel, error: r.error }) : saved.push(r.rel))))
+			} catch (e) {
+				// WO-1106 B2: nothing thrown in a busboy listener may reach uncaughtException (= node exit)
+				rejected.push({ name: String(info.filename || ''), error: String(e?.message || e) })
 				stream.resume()
-				return
 			}
-			const out = fs.createWriteStream(t.abs)
-			let over = false
-			stream.on('limit', () => (over = true))
-			stream.pipe(out)
-			writes.push(new Promise((done) => {
-				out.on('error', (e) => {
-					rejected.push({ name: t.rel, error: String(e?.message || e) })
-					done()
-				})
-				out.on('finish', () => {
-					if (over) {
-						fs.rmSync(t.abs, { force: true })
-						rejected.push({ name: t.rel, error: 'file over 2 GB' })
-					} else {
-						s.files.add(t.rel)
-						saved.push(t.rel)
-					}
-					done()
-				})
-			}))
 		})
 		bb.on('error', (e) => resolve(reply(400, { error: String(e?.message || e) })))
 		bb.on('close', async () => {

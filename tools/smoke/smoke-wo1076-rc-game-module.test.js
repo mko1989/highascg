@@ -140,7 +140,7 @@ test('packed and installed outside the repo: the installed copy runs; uninstall 
 		await gone('not installed')
 		const ins = await post('/api/modules/install', { path: tgz, name: 'rc-game' })
 		assert.equal(ins.status, 200, ins.text)
-		assert.equal(JSON.parse(ins.text).sha256Verified, true, 'the sidecar .sha256 was checked')
+		assert.equal(JSON.parse(ins.text).sha256Source, 'sidecar', 'the sidecar .sha256 was checked (WO-1106 B8: matched, not "verified")')
 		assert.ok(fs.existsSync(path.join(HOME_DIR, 'rc-game', 'module.json')))
 		await works('installed', HOME_DIR)
 		const un = await post('/api/modules/uninstall', { name: 'rc-game' })

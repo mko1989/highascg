@@ -33,11 +33,11 @@ test('direction picks aplay or arecord; a missing tool is an empty list, not a t
 	assert.deepStrictEqual(listAlsaCards('capture', () => null), { dir: 'capture', cards: [], ok: false })
 })
 
-test('the route is registered and handled', () => {
+test('the route is registered and handled', async () => {
 	const root = path.join(__dirname, '..', '..')
 	const router = fs.readFileSync(path.join(root, 'src/api/router.js'), 'utf8')
 	assert.match(router, /routes\.get\('\/api\/audio\/alsa-cards'/)
-	const r = require('../../src/api/routes-alsa-cards').handleAlsaCards({ dir: 'capture' })
+	const r = await require('../../src/api/routes-alsa-cards').handleAlsaCards({ dir: 'capture' }) // WO-1106 B11: async
 	assert.strictEqual(r.status, 200)
 	assert.strictEqual(JSON.parse(r.body).dir, 'capture')
 })

@@ -448,4 +448,9 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-rc-client-fixes.test.js', // WO-1106 A4 / A32 / A35 / B35 / B42–B50: ghosts hidden, item press kept, clock reset, bot hit, host refresh, racing flag, spectator full card
 	'tools/smoke/smoke-wo1106-skirmish-server.test.js', // WO-1106 A3 / A5 / A24 / A32 / B34 / B36 / B55 / B57–B59: stunned bots, ghost cap, move window, no damage while paused, weapon gap
 	'tools/smoke/smoke-wo1106-skirmish-client.test.js', // WO-1106 A4 / A11 / A32 / B35 / B54 / B56 / B58 / B59: welcome reset, knock-back, ghosts gone, pickups reset, scene rev
+	'tools/smoke/smoke-wo1106-core-modules.test.js', // WO-1106 B1 / B7 / B8 / B9: code-change gate (auth or the box itself), sha256 required for URLs, upgrade rollback, download deadline
+	'tools/smoke/smoke-wo1106-core-venue-import.test.js', // WO-1106 B2 / B4: a file-then-folder name clash is rejected (no throw), staging caps, private temp dir under tests
+	'tools/smoke/smoke-wo1106-core-pixelhue.test.js', // WO-1106 B3: a read cut mid-body settles; pending always clears
+	'tools/smoke/smoke-wo1106-core-services.test.js', // WO-1106 B10–B13: keeping-up report caps, async fc-list / aplay, bluetooth status shared, live-audio repair backoff
+	'tools/smoke/smoke-wo1106-core-shader-licence.test.js', // WO-1106 B14 / B68: no newlines in the header, removed ids never come back
 ]

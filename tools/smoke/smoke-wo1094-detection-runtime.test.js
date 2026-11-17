@@ -160,8 +160,10 @@ describe('WO-1094 scripts', () => {
 describe('WO-1094 API guards', () => {
 	const h = {}
 	routesMod.register({ get: (p, fn) => (h['GET ' + p] = fn), post: (p, fn) => (h['POST ' + p] = fn) })
+	// WO-1106 B1: install / import answer only on the box itself (or with the password) — these calls come from the box
+	const BOX = { socket: { remoteAddress: '127.0.0.1', localPort: 4200 }, headers: { host: '127.0.0.1:4200' } }
 	const call = async (k, body, query = {}) => {
-		const r = await h[k]({ query, body: JSON.stringify(body) })
+		const r = await h[k]({ query, body: JSON.stringify(body), req: BOX, ctx: { config: {} } })
 		return { status: r.status, body: JSON.parse(r.body) }
 	}
 	it('all routes registered as core routes', () => {

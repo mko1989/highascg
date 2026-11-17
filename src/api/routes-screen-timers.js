@@ -61,35 +61,42 @@ function resolveChannelFromScreenIdx(screenIdx, ctx, bus) {
 }
 
 let _fonts = { at: 0, list: [] }
+let _fontsJob = null
 /**
  * Font families installed on THIS machine (fontconfig) — the timer template is rendered here by Caspar's CEF, so a
  * family that is not installed silently falls back to the default sans ("most fonts come back to Arial", owner 14.11).
- * Cached 60 s: a font installed while the server runs shows up without a restart.
- * @returns {string[]}
+ * Cached 60 s: a font installed while the server runs shows up without a restart. WO-1106 B11: `fc-list` runs async
+ * (one run shared by concurrent requests) — a sync run blocked AMCP / OSC / timeline ticks for up to 5 s.
+ * @param {{ run?: (cmd: string, args: string[]) => string | Promise<string> }} [deps] test seam
+ * @returns {Promise<string[]>}
  */
-function installedFonts(deps = {}) {
-	const now = Date.now()
-	if (!deps.run && now - _fonts.at < 60000) return _fonts.list
-	let out = ''
-	try {
-		out = (deps.run || ((cmd, args) => require('child_process').execFileSync(cmd, args, { encoding: 'utf8', timeout: 5000 })))('fc-list', [':', 'family'])
-	} catch {
-		out = ''
+async function installedFonts(deps = {}) {
+	if (deps.run) return parseFonts(await Promise.resolve().then(() => deps.run('fc-list', [':', 'family'])).catch(() => ''))
+	if (Date.now() - _fonts.at < 60000) return _fonts.list
+	if (!_fontsJob) {
+		const run = () => new Promise((resolve) => {
+			require('child_process').execFile('fc-list', [':', 'family'], { encoding: 'utf8', timeout: 5000, maxBuffer: 16 * 1024 * 1024 }, (err, out) => resolve(err ? '' : out))
+		})
+		_fontsJob = run()
+			.then((out) => (_fonts = { at: Date.now(), list: parseFonts(out) }).list)
+			.finally(() => (_fontsJob = null))
 	}
-	// a line may hold aliases ("Nimbus Sans,Nimbus Sans L") — the first is the family name
-	const list = [...new Set(String(out).split('\n').map((l) => l.split(',')[0].trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))
-	if (!deps.run) _fonts = { at: now, list }
-	return list
+	return _fontsJob
+}
+
+/** fc-list lines → unique sorted families; a line may hold aliases ("Nimbus Sans,Nimbus Sans L"), the first is the name. */
+function parseFonts(out) {
+	return [...new Set(String(out || '').split('\n').map((l) => l.split(',')[0].trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))
 }
 
 /**
  * GET handler — enumerate timers.
  * @param {string} p
  * @param {object} ctx
- * @returns {object | null}
+ * @returns {object | Promise<object> | null} (/api/timers/fonts answers async, WO-1106 B11)
  */
 function handleGet(p, ctx) {
-	if (p === '/api/timers/fonts') return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, fonts: installedFonts() }) }
+	if (p === '/api/timers/fonts') return installedFonts().then((fonts) => ({ status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, fonts }) }))
 	if (p !== '/api/timers/list') return null
 
 	const timers = screenTimers.listScreenTimers()
