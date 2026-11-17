@@ -64,13 +64,15 @@ function createWorldService({ hub, registry: reg }) {
 		}
 	}
 
+	/** The world scene of the first enabled game that has one ({ json, glb?rev }), else null. */
+	const sceneOf = (first) => (first ? { json: first.paths.scene, glb: first.paths.glb ? first.paths.glb + (first._rev ? `?rev=${encodeURIComponent(first._rev)}` : '') : null } : null)
+
 	function state() {
 		call(() => hub.sync())
 		const games = descs().map(gameInfo)
 		const pub = games.map(({ _rev, ...g }) => g)
 		if (!games.some((g) => g.enabled)) return { on: false, v: 1, games: pub }
-		const first = games.find((g) => g.enabled && g.paths.scene)
-		const scene = first ? { json: first.paths.scene, glb: first.paths.glb ? first.paths.glb + (first._rev ? `?rev=${encodeURIComponent(first._rev)}` : '') : null } : null
+		const scene = sceneOf(games.find((g) => g.enabled && g.paths.scene))
 		return {
 			on: true,
 			v: 1,
@@ -191,7 +193,18 @@ function createWorldService({ hub, registry: reg }) {
 		}
 	}
 
-	return { state, host, anyEnabled }
+	/**
+	 * WO-1106 A8: the hub's 2 Hz `board` carries the house level and the scene as `hello` has them, so a spectator page
+	 * follows a dim / a scene change without reconnecting. Only the first enabled game with a scene is asked for its rev.
+	 */
+	function boardInfo() {
+		const d = descs().find((x) => x.paths && x.paths.scene && enabled(x))
+		const st = d && typeof d.state === 'function' ? call(() => d.state()) || {} : {}
+		return { house: world.house, scene: d ? sceneOf({ paths: d.paths, _rev: st.sceneRev || null }) : null }
+	}
+	call(() => hub.setBoardInfo && hub.setBoardInfo(boardInfo))
+
+	return { state, host, anyEnabled, boardInfo }
 }
 
 module.exports = { createWorldService, EVENT_DEFAULT }

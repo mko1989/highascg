@@ -45,6 +45,7 @@ const HIT = Object.freeze({ car: { dy: 0.025, r: 0.04 }, soldier: { dy: 0.03, r:
 const FROZEN = Object.freeze({ rc: ['countdown', 'results'], sk: ['countdown', 'results'] })
 const FX_MS = Object.freeze({ hop: 600, splat: 4000, sparks: 400, scatter: 1500 })
 const DUR = Object.freeze({ hop: 0.6, bump: 0.2, wobble: 0.25, stunBowl: 0.8, stun: 0.5, scatter: 0.5, step: 0.7 })
+const SWEEP_MS = 1000
 const PEA_R = 0.25
 const SPARK_R = 0.04
 
@@ -64,6 +65,9 @@ const r3 = (x) => Math.round(x * 1000) / 1000 + 0
 const p3 = (p) => [r3(p[0]), r3(p[1]), r3(p[2])]
 const newOut = () => ({ effects: [], bonuses: [], events: [], fx: [] })
 const isLive = (e) => !(e.f & 2) && !(e.f & 4) // soldier: not dead, not protected
+/** WO-1106 A25: an event / bonus remembers its effect (not enumerable: never on the wire) so the hub can drop it when the
+ * target game's apply() refuses that effect. */
+const linkTo = (x, effect) => Object.defineProperty(x, 'of', { value: effect })
 const finite3 = (p) => Array.isArray(p) && p.length >= 3 && Number.isFinite(p[0]) && Number.isFinite(p[1]) && Number.isFinite(p[2])
 
 /** Merge `b` into `a` (out objects). */
@@ -159,9 +163,9 @@ function createReferee(opts = {}) {
 		for (const [kind, ms, c] of o.fx || []) out.fx.push({ g: tg.g, k: tg.k, id: tg.id, kind, ms, c: c || '' })
 		if (!o.quiet) {
 			counts[o.rule] = (counts[o.rule] || 0) + 1
-			out.events.push({ k: o.rule, by, to: { g: tg.g, name: String(tg.n || '') }, p: p3(tg.p), at: t, dur: o.dur, soft }) // dur / soft: the soak table
+			out.events.push(linkTo({ k: o.rule, by, to: { g: tg.g, name: String(tg.n || '') }, p: p3(tg.p), at: t, dur: o.dur, soft }, effect)) // dur / soft: the soak table
 		}
-		if (o.bonus && sk && !soft) giveBonus(o.src, o.bonus, out)
+		if (o.bonus && sk && !soft && giveBonus(o.src, o.bonus, out)) linkTo(out.bonuses[out.bonuses.length - 1], effect)
 		return effect
 	}
 
@@ -256,6 +260,20 @@ function createReferee(opts = {}) {
 
 	const tick = createTickRules({ now, rng, world, decide, giveBonus, addPatch, peaScatter, newOut, counts, VEG, SPLAT, HIT, DUR, FX_MS, isLive, frozen, affectOf })
 
+	/**
+	 * WO-1106 A17: drop what can no longer matter — immunity that ran out, RC boost gaps that passed, rolling logs past
+	 * their 60 s window (a log was only trimmed when its key came back) — at most once a second from the world tick.
+	 */
+	let sweptAt = -Infinity
+	function sweep(t) {
+		if (t - sweptAt < SWEEP_MS) return
+		sweptAt = t
+		for (const [k, until] of immUntil) if (until <= t) immUntil.delete(k)
+		for (const [k, at] of rcBoostAt) if (t - at >= RC_BOOST_GAP) rcBoostAt.delete(k)
+		for (const m of [durLog, pairLog, bonusLog]) for (const k of [...m.keys()]) prune(m, k, t)
+		tick.sweep(t)
+	}
+
 	/** World entities of the referee itself (rain vegetables + slick patches), as Ents of game 'world'. */
 	function ents(t = now()) {
 		while (patches.length && patches[0].until <= t) patches.shift()
@@ -269,7 +287,7 @@ function createReferee(opts = {}) {
 		contact,
 		landed,
 		shot,
-		tick: (snap) => tick.run(snap || {}),
+		tick: (snap) => (sweep(now()), tick.run(snap || {})),
 		startEvent: tick.startEvent,
 		endEvent: tick.endEvent,
 		events: tick.eventsState,
@@ -278,7 +296,10 @@ function createReferee(opts = {}) {
 		patches: () => patches.filter((x) => x.until > now()).map((x) => ({ ...x })),
 		counts: () => ({ ...counts }),
 		world: () => ({ safe: world.safe, affect: { ...world.affect }, phase: { ...world.phase } }),
+		/** WO-1106 A17: map sizes for the smokes. */
+		sizes: () => ({ immUntil: immUntil.size, rcBoostAt: rcBoostAt.size, durLog: durLog.size, pairLog: pairLog.size, bonusLog: bonusLog.size,
+			...tick.sizes() }),
 	}
 }
 
-module.exports = { createReferee, mulberry32, merge, IMM, BUDGET_S, PAIR_MAX, BONUS_MAX, RC_BOOST_GAP, SPLAT, VEG, SLICK_R, SLICK_MS, HIT, DUR, WINDOW }
+module.exports = { createReferee, mulberry32, merge, linkTo, IMM, BUDGET_S, PAIR_MAX, BONUS_MAX, RC_BOOST_GAP, SPLAT, VEG, SLICK_R, SLICK_MS, HIT, DUR, WINDOW }

@@ -264,9 +264,14 @@ function createTickRules(R) {
 		return out
 	}
 
+	/** WO-1106 A17 (from the referee's sweep): a presenter's step gap that passed is forgotten. */
+	function sweep(t) {
+		for (const [k, at] of stepAt) if (t - at >= R7_GAP) stepAt.delete(k)
+	}
+
 	const rainEnts = () => drops.map((d) => ({ k: 'veg', id: d.id, p: d.p.slice(), yaw: 0, v: d.v.slice(), c: VEG[d.veg].c, n: '', f: 1, s: d.veg }))
 
-	return { run, startEvent, endEvent, eventsState, rainEnts, spotActive: () => !!ev.spot, drops: () => drops.length }
+	return { run, startEvent, endEvent, eventsState, rainEnts, spotActive: () => !!ev.spot, drops: () => drops.length, sweep, sizes: () => ({ stepAt: stepAt.size }) }
 }
 
 module.exports = { createTickRules, segDist, rainArea, EVENT_PHASES }

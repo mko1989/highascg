@@ -438,4 +438,8 @@ module.exports = [
 	'tools/smoke/smoke-wo1105-games-join-qr-settings.test.js', // WO-1105 join address pick + warnings, QR rows, games settings through a restart
 	'tools/smoke/smoke-wo1106-world-client-visitors.test.js', // WO-1106 A1 / A4 / A14 / A21 / A33: silence = unchanged, wst off clears all, effect cap, late models
 	'tools/smoke/smoke-wo1106-world-client-pages.test.js', // WO-1106 A8 / A34 / A37: board house / scene / paused, host act gate, spectator boot retry
+	'tools/smoke/smoke-wo1106-world-server-hub.test.js', // WO-1106 A5 / A8 / A16 / A18 / A25: skipped sends re-sent, board house / scene / paused, wq map, last game gone, refused effects
+	'tools/smoke/smoke-wo1106-world-server-service.test.js', // WO-1106 A8: the board carries the house level and the hello scene
+	'tools/smoke/smoke-wo1106-world-server-ws.test.js', // WO-1106 A15 / A18: backpressure terminate, ping sweep, off + 4403 when no game runs
+	'tools/smoke/smoke-wo1106-world-server-referee.test.js', // WO-1106 A17: referee maps are swept
 ]

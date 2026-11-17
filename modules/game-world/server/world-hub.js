@@ -21,8 +21,9 @@
  * Effects / bonuses decided in contact / landed / shot reach the adapters through `defer` (a microtask by default), never
  * re-entering the calling game's step. Bonus kinds: 'hop' R1, 'bounce' R6, 'scatter' R5, 'sparks' R4, 'bowl' R3, 'spot' R9.
  *
- * Used by the world module itself: openWorld(send) → { close } | null (≤ 20), setSafe(on), setAffect(g, mode),
- * startEvent(kind, secs), endEvent(kind), events(), boards(), adapters(), sync(), stats(), running(), tick(), dispose().
+ * Used by the world module itself: openWorld(send, off?) → { close } | null (≤ 20; the last game gone → off()),
+ * setSafe(on), setAffect(g, mode), startEvent(kind, secs), endEvent(kind), events(), boards(), setBoardInfo(fn),
+ * adapters(), sync(), stats(), running(), tick(), dispose().
  *
  * The world tick (10 Hz) runs ONLY while ≥ 2 rooms are attached or a world-page socket is open — otherwise no timer at
  * all. Each tick: entities() / board() / area() of every room (+ the referee's rain and patches), the referee's tick
@@ -44,6 +45,7 @@ const CLIENT = '/game/world/visitors.js'
 const MODES = new Set(['on', 'soft', 'off'])
 const COLL = Object.freeze({ car: { dy: 0.025, r: 0.04 }, soldier: { dy: 0.03, r: 0.025 } })
 const WST_OFF = Object.freeze({ t: 'wst', v: 1, on: false })
+const WORLD_OFF = Object.freeze({ t: 'off' })
 
 /**
  * @param {{ now?: () => number, timers?: { setInterval, clearInterval }, registry?: object, referee?: object,
@@ -70,6 +72,7 @@ function createHub(opts = {}) {
 	let safe = false
 	let fxQueue = []
 	let snap = { at: -Infinity, ents: [], byW: new Map(), boards: {}, areas: {} }
+	let boardInfo = null // () => { house, scene } (world-service.js)
 
 	const call = (fn) => {
 		try {
@@ -112,18 +115,26 @@ function createHub(opts = {}) {
 
 	/* ---------- delivery ---------- */
 
+	/**
+	 * WO-1106 A25: an effect the target game did not take (apply() returned false, threw, or the game is gone) sends no
+	 * event and pays no bonus — both carry their effect as `of` (world-referee.js linkTo); unlinked ones (R9) always go.
+	 */
 	function deliver(out) {
+		const refused = new Set()
 		for (const e of out.effects) {
 			stats.effects++
 			if (e.soft) stats.soft++
 			const a = rooms.get(e.g)
-			if (a && typeof a.apply === 'function') call(() => a.apply(e))
+			if (!(a && typeof a.apply === 'function' && call(() => a.apply(e) !== false) === true)) refused.add(e)
 		}
+		const took = (x) => !(x.of && refused.has(x.of))
 		for (const b of out.bonuses) {
+			if (!took(b)) continue
 			const a = rooms.get(b.g)
 			if (a && typeof a.bonus === 'function' && call(() => a.bonus(b.pid, b.kind)) !== false) stats.bonuses++
 		}
 		for (const x of out.events) {
+			if (!took(x)) continue
 			stats.events[x.k] = (stats.events[x.k] || 0) + 1
 			const m = { t: 'xev', ...x }
 			for (const wv of worlds.values()) sendWorld(wv, m)
@@ -137,17 +148,18 @@ function createHub(opts = {}) {
 
 	/* ---------- sending ---------- */
 
+	/** WO-1106 A5: a send that returns a strict `false` (skipped for backpressure / closed) was not delivered. */
 	function sendGame(g, key, msg) {
 		const a = rooms.get(g)
 		if (!a) return false
-		const ok = call(() => (a.send(key, msg), true))
+		const ok = call(() => a.send(key, msg) !== false)
 		if (ok) addBytes(g, JSON.stringify(msg).length)
-		return !!ok
+		return ok === true
 	}
 	function sendWorld(wv, msg) {
-		const ok = call(() => (wv.send(msg), true))
+		const ok = call(() => wv.send(msg) !== false)
 		if (ok) addBytes('world', JSON.stringify(msg).length)
-		return !!ok
+		return ok === true
 	}
 
 	function models() {
@@ -184,8 +196,9 @@ function createHub(opts = {}) {
 			if (k !== vs.wst && send(w)) vs.wst = k
 		}
 		if (!vs.wst) return
+		const before = new Map(vs.sent)
 		const msg = buildWv(vs, picked, { ts: now(), tags: view.tags, fx: fxQueue, wire })
-		if (msg) send(msg)
+		if (msg && !send(msg)) vs.sent = before // WO-1106 A5: not delivered → the next tick re-sends its add / gone / e
 	}
 
 	function roomCentre() {
@@ -216,6 +229,7 @@ function createHub(opts = {}) {
 		stats.entities = snap.ents.length
 		const base = { t: 'wst', v: 1, on: true, client: CLIENT, models: models(), scale: scale(), safe, games: gamesList() }
 		const centre = roomCentre()
+		let board = null
 		for (const [g, a] of rooms) {
 			const list = call(() => a.viewers())
 			const seen = new Set()
@@ -231,9 +245,10 @@ function createHub(opts = {}) {
 			}
 			for (const [k, vs] of views) if (vs.g === g && !seen.has(k)) (views.delete(k), quality.delete(k))
 		}
+		for (const k of quality.keys()) if (!views.has(k)) quality.delete(k) // WO-1106 A16: only live viewers keep a wq
 		for (const wv of worlds.values()) {
 			serveView(wv, { g: null, p: null, cap: capFor(0, true), center: centre, tags: true }, base, (m) => sendWorld(wv, m))
-			if (tickN % BOARD_EVERY === 0) sendWorld(wv, { t: 'board', games: boards() })
+			if (tickN % BOARD_EVERY === 0) sendWorld(wv, board || (board = boardMsg()))
 		}
 		fxQueue = []
 		ids.gc(t)
@@ -255,6 +270,7 @@ function createHub(opts = {}) {
 		for (const wv of worlds.values()) if (wv.wst) sendWorld(wv, WST_OFF)
 		for (const wv of worlds.values()) (wv.sent.clear(), (wv.wst = null))
 		views.clear()
+		quality.clear()
 		ids.clear()
 		fxQueue = []
 		snap = { at: -Infinity, ents: [], byW: new Map(), boards: {}, areas: {} }
@@ -275,7 +291,24 @@ function createHub(opts = {}) {
 		for (const [k, vs] of views) if (vs.g === id) (views.delete(k), quality.delete(k))
 		delete snap.boards[id]
 		ensure()
+		if (!rooms.size && worlds.size) defer(() => call(worldsOffIfIdle))
 		return true
+	}
+	/**
+	 * WO-1106 A18: the world pages are public only while a game runs. After the last detach (deferred: a game detaches
+	 * before its room() goes null) the games are synced once more; still none → every page gets `{ t: 'off' }` and its
+	 * close (world-ws.js: code 4403), and with no page left the tick stops.
+	 */
+	function worldsOffIfIdle() {
+		sync()
+		if (rooms.size) return
+		const pages = [...worlds.values()]
+		worlds.clear()
+		for (const wv of pages) {
+			if (typeof wv.off === 'function') call(wv.off)
+			else sendWorld(wv, WORLD_OFF)
+		}
+		ensure()
 	}
 	/** Attach every registered game whose session runs (the world module loaded after the games were enabled). */
 	function sync() {
@@ -285,10 +318,11 @@ function createHub(opts = {}) {
 		}
 	}
 
-	function openWorld(send) {
+	/** send(msg) → false when not delivered; off() (WO-1106 A18) says `off` and closes the page's socket. */
+	function openWorld(send, off) {
 		if (typeof send !== 'function' || worlds.size >= MAX_WORLD) return null
 		const n = ++worldSeq
-		worlds.set(n, { send, sent: new Map(), tickN: 0, wst: null })
+		worlds.set(n, { send, off: typeof off === 'function' ? off : null, sent: new Map(), tickN: 0, wst: null })
 		ensure()
 		return {
 			close() {
@@ -314,8 +348,15 @@ function createHub(opts = {}) {
 	function boards() {
 		return gamesList().map((x) => {
 			const b = snap.boards[x.id] || {}
-			return { ...x, endsAt: Number.isFinite(b.endsAt) ? b.endsAt : null, top: Array.isArray(b.top) ? b.top.slice(0, 3) : [], players: b.players | 0, bots: b.bots | 0 }
+			const paused = b.paused === true || b.phase === 'paused' // WO-1106 A8: the games report a pause as phase 'paused'
+			return { ...x, endsAt: Number.isFinite(b.endsAt) ? b.endsAt : null, top: Array.isArray(b.top) ? b.top.slice(0, 3) : [], players: b.players | 0, bots: b.bots | 0, paused }
 		})
+	}
+	/** WO-1106 A8: the world pages' `board` also carries the house level and the scene (the service's provider). */
+	function boardMsg() {
+		const info = (boardInfo && call(boardInfo)) || {}
+		const house = Number.isFinite(info.house) ? info.house : null
+		return { t: 'board', games: boards(), house, scene: info.scene && typeof info.scene === 'object' ? info.scene : null }
 	}
 
 	/* ---------- contact queries (§6.1) ---------- */
@@ -359,6 +400,16 @@ function createHub(opts = {}) {
 		return { hit: out.effects.length > 0 }
 	}
 
+	/**
+	 * WO-1106 A16: a viewer's `wq`, kept only while the tick runs and the game is attached (the tick sweeps keys that are
+	 * not live viewers). A wq that is not kept costs nothing: the games pass the same cap in viewers() `cap`.
+	 */
+	function setQuality(g, key, n) {
+		if (!timer || !rooms.has(g)) return false
+		quality.set(vkey(g, key), qualityCap(n))
+		return true
+	}
+
 	function dispose() {
 		stop()
 		rooms.clear()
@@ -369,7 +420,7 @@ function createHub(opts = {}) {
 	return {
 		attach,
 		detach,
-		quality: (g, key, n) => (quality.set(vkey(g, key), qualityCap(n)), true),
+		quality: setQuality,
 		colliders,
 		contact,
 		landed,
@@ -384,9 +435,10 @@ function createHub(opts = {}) {
 		endEvent: (kind) => ref.endEvent(kind),
 		events: () => ref.events(),
 		boards,
+		setBoardInfo: (fn) => ((boardInfo = typeof fn === 'function' ? fn : null), true),
 		adapters: () => new Map(rooms),
 		sync,
-		stats: () => ({ ...stats, bytes: { ...stats.bytes }, events: { ...stats.events }, rooms: rooms.size, worldPages: worlds.size, ids: ids.size(), running: !!timer }),
+		stats: () => ({ ...stats, bytes: { ...stats.bytes }, events: { ...stats.events }, rooms: rooms.size, worldPages: worlds.size, ids: ids.size(), running: !!timer, viewers: views.size, wq: quality.size }),
 		running: () => !!timer,
 		tick: () => call(tick),
 		dispose,
