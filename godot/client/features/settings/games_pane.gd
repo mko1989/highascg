@@ -31,6 +31,7 @@ var _by_id: Dictionary = {}  # id → games_row
 var _addr: OptionButton
 var _addr_items: Array = []
 var _auto: CheckBox
+var _self: CheckBox
 var _quiet := false
 var _busy := 0
 
@@ -104,6 +105,13 @@ func _ready() -> void:
 		if not _quiet:
 			Settings.patch({"games": {"autoOpen": on}}))
 	box.add_child(_auto)
+	# WO-1125: no host needed — lobbies stay open, players set bots and start rounds themselves
+	_self = CheckBox.new()
+	_self.text = "Players run the games (lobbies stay open; anyone seated can add bots and start a round)"
+	_self.toggled.connect(func(on: bool) -> void:
+		if not _quiet:
+			Settings.patch({"games": {"selfService": on}}))
+	box.add_child(_self)
 	Kit.note(box, "Which games are on this box is remembered by their module switch. The defaults of each game are in its "
 		+ "\"More\" fold; they apply when a session is opened here. The host pages need the API password like this client.")
 	Ws.on("games:hosting", func(d: Variant) -> void:
@@ -216,4 +224,5 @@ func show_state(st: Dictionary) -> void:
 		if str(_addr_items[i][0]) == want:
 			_addr.select(i)
 	_auto.set_pressed_no_signal(Settings.get_setting("games.autoOpen", false) == true)
+	_self.set_pressed_no_signal(Settings.get_setting("games.selfService", true) == true)
 	_quiet = false
