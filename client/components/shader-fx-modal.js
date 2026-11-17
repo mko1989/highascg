@@ -79,6 +79,10 @@ export function showShaderFxModal(opts = {}) {
 						<label style="flex:1">Import <input type="text" id="shaderfx-import-url" placeholder="https://www.shadertoy.com/view/lldcR8"></label>
 						<button type="button" class="btn btn--secondary" id="shaderfx-import-go">Fetch</button>
 					</div>
+					<!-- WO-1106 B67: the server refuses a NonCommercial shader unless this is ticked (never ticked by default). -->
+					<div class="shaderfx-row">
+						<label class="shaderfx-flag"><input type="checkbox" id="shaderfx-allow-nc"> Allow non-commercial licence (non-paid work on this machine only)</label>
+					</div>
 					<div class="shaderfx-row">
 						<label>Name <input type="text" id="shaderfx-name" placeholder="My audio shader"></label>
 						<label class="shaderfx-flag"><input type="checkbox" id="shaderfx-audio" checked> audio reactive</label>
@@ -164,6 +168,14 @@ export function showShaderFxModal(opts = {}) {
 		}
 	}
 
+	/** WO-1106 B67: `allowNonCommercial: true` only when the operator ticked it; otherwise the key is absent. */
+	const ncFlag = () => (el('shaderfx-allow-nc')?.checked ? { allowNonCommercial: true } : {})
+	/** The server's refusal text, plus where to tick the box when it is a non-commercial refusal. */
+	const ncMessage = (e) => {
+		const m = String(e?.message || e)
+		return /non-commercial/i.test(m) && !el('shaderfx-allow-nc')?.checked ? `${m} (tick "Allow non-commercial licence" to keep it)` : m
+	}
+
 	async function refreshList(selectId) {
 		try {
 			const data = await api.get('/api/shaders')
@@ -172,7 +184,7 @@ export function showShaderFxModal(opts = {}) {
 			for (const s of data?.shaders || []) {
 				const li = document.createElement('li')
 				li.innerHTML = `<button type="button" class="shaderfx-list__item${s.id === selectId ? ' active' : ''}" data-id="${s.id}">
-					${escapeHtml(s.name)}${s.audio ? ' <span class="shaderfx-badge" title="audio reactive">♪</span>' : ''}</button>`
+					${escapeHtml(s.name)}${s.nonCommercial ? ` <span class="shaderfx-badge" title="${escapeHtml(s.licenceNote || 'non-commercial licence')}">NC</span>` : ''}${s.audio ? ' <span class="shaderfx-badge" title="audio reactive">♪</span>' : ''}</button>`
 				li.querySelector('button').addEventListener('click', () => void openShader(s.id))
 				listEl.appendChild(li)
 			}
@@ -190,7 +202,7 @@ export function showShaderFxModal(opts = {}) {
 		btn.disabled = true
 		setStatus('Fetching from Shadertoy…')
 		try {
-			const r = await api.post('/api/shaders/import', { url })
+			const r = await api.post('/api/shaders/import', { url, ...ncFlag() })
 			if (!r?.ok || !r.config) throw new Error(r?.error || 'import failed')
 			const cfg = r.config
 			if (r.saved) {
@@ -213,7 +225,7 @@ export function showShaderFxModal(opts = {}) {
 			const skipped = Array.isArray(cfg.skipped) && cfg.skipped.length ? ` — not imported: ${cfg.skipped.join(', ')}` : ''
 			setStatus(`Imported "${cfg.name}" — review and save${skipped}`, skipped ? 'warn' : 'ok')
 		} catch (e) {
-			setStatus(`Import failed: ${e?.message || e}`, 'err')
+			setStatus(`Import failed: ${ncMessage(e)}`, 'err')
 		} finally {
 			btn.disabled = false
 		}
@@ -250,7 +262,7 @@ export function showShaderFxModal(opts = {}) {
 	async function doSave() {
 		setStatus('Saving…')
 		try {
-			const r = await api.post('/api/shaders', collectForm())
+			const r = await api.post('/api/shaders', { ...collectForm(), ...ncFlag() })
 			if (!r?.ok) throw new Error(r?.error || 'save failed')
 			currentId = r.id
 			const live = r.live?.targets ? ` · beat knobs live on ${r.live.targets} layer${r.live.targets > 1 ? 's' : ''}` : ''
@@ -259,7 +271,7 @@ export function showShaderFxModal(opts = {}) {
 			el('shaderfx-delete').disabled = false
 			el('shaderfx-preview').src = resolveApiUrl(`/templates/shaders/${r.id}.html?_=${Date.now()}`)
 		} catch (e) {
-			setStatus(String(e?.message || e), 'err')
+			setStatus(ncMessage(e), 'err')
 		}
 	}
 

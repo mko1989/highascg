@@ -57,4 +57,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-cluster2-press-once.test.js', // WO-1106 C19: a press runs once on the follower (local fallback or the master's copy, never both)
 	'tools/smoke/smoke-wo1106-cluster2-v1-latch.test.js', // WO-1106 C27: v1 signed calls are refused from a peer seen on v2
 	'tools/smoke/smoke-wo1106-cluster2-route-gate.test.js', // WO-1106 C29: cluster changes need the password, the box itself or a linked server's signature
+	'tools/smoke/smoke-wo1106-shaderfx-nc-tick.test.js', // WO-1106 B67: the web Shader FX modal has an NC tick, sends allowNonCommercial only when ticked, shows the refusal and marks NC rows
 ]
