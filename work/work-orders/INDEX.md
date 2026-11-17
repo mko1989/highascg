@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1024 live WOs (34 open, 159 in progress, 831 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1025 live WOs (34 open, 159 in progress, 832 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -434,7 +434,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1113 DONE [lighting+tracking-vr] Previs decode honours a patch that runs pan / tilt against the GDTF file → 1113_WO_previs_decode_honours_patch_invert.md
 - 1115 DONE [lighting+godot-client,tracking-vr] Client at 4–7 fps while the previs follows a desk running an effect: the fixtur… → 1115_WO_previs_fixtures_push_sends_only_changed_heads.md
 
-## godot-client — Godot client (182)
+## godot-client — Godot client (183)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -618,6 +618,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1114 IN PROGRESS [godot-client+tracking-vr] gutmanny 26: scenography from the renders in the venue model → 1114_WO_gutmanny26_scenography_in_venue_model.md
 - 1116 IN PROGRESS [godot-client+video-io] Previs output (stream / record source) runs at half the program rate → 1116_WO_previs_output_half_rate.md
 - 1117 DONE [godot-client+video-io] Previs output on: the stage is rendered once (the tab shows the output's pictur… → 1117_WO_previs_output_single_render.md
+- 1118 DONE [godot-client] Dock: an app installed while the client runs was missing from ⋯ until the clien… → 1118_WO_dock_lists_apps_installed_while_running.md
 
 ## web-client — Web client (90)
 

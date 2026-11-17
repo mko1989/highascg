@@ -197,6 +197,11 @@ func _refresh_running() -> void:
 	var res: Dictionary = await DevicesTarget.box_api.get_json("/api/system/dock")
 	if res.ok:
 		_show_running(res.data)
+		# WO-1118: an app installed while the client runs appears in ⋯ the next time the dock is shown
+		var apps: Variant = res.data.get("apps") if res.data is Dictionary else null
+		if _loaded and apps is Array and apps != _apps:
+			_apps = apps
+			more_menu.fill(_apps)
 
 
 ## A name bubble instead of tooltips: a Godot tooltip is clamped to the screen bottom, which puts it ON the dock under
