@@ -17,7 +17,7 @@
 const MAX_BUFFERED = 4 * 1024 * 1024 // a backed-up socket skips a frame rather than queue more of them
 
 function createFixturesWatch() {
-	/** @type {Map<object, string>} watching socket → the message it got last */
+	/** @type {Map<object, Map<string, string>|null>} watching socket → the fixtures it has (id → JSON), null = nothing yet */
 	const last = new Map()
 	const hooked = new WeakSet()
 
@@ -28,7 +28,7 @@ function createFixturesWatch() {
 			last.delete(ws)
 			return true
 		}
-		if (!last.has(ws)) last.set(ws, '')
+		if (!last.has(ws)) last.set(ws, null)
 		if (!hooked.has(ws) && typeof ws.once === 'function') {
 			hooked.add(ws)
 			ws.once('close', () => last.delete(ws))
@@ -36,20 +36,31 @@ function createFixturesWatch() {
 		return true
 	}
 
-	/** One tick: `visual()` runs only with watchers. → the number of sockets sent to. */
+	/**
+	 * One tick: `visual()` runs only with watchers. → the number of sockets sent to.
+	 * WO-1115: a watcher gets the whole rig once, then only the fixtures that changed (`delta: true`) — a desk running
+	 * an effect changed 50 of 252 heads per tick and every client parsed and applied all 5946 beams (305 KB) 30×/s.
+	 */
 	function tick(visual) {
 		if (last.size === 0 || typeof visual !== 'function') return 0
-		const msg = JSON.stringify({ type: 'tracking:fixtures', data: visual() })
+		const data = visual()
+		const list = Array.isArray(data?.fixtures) ? data.fixtures : []
+		const now = new Map()
+		list.forEach((f, i) => now.set(String(f?.id ?? i), JSON.stringify(f)))
 		let sent = 0
 		for (const [ws, had] of last) {
-			if (had === msg) continue
 			if (ws.readyState !== 1) {
 				if (ws.readyState > 1) last.delete(ws) // CLOSING / CLOSED
 				continue
 			}
+			const same = had && had.size === now.size && [...now.keys()].every((k) => had.has(k))
+			const changed = same ? [...now].filter(([k, v]) => had.get(k) !== v).map(([, v]) => v) : [...now.values()]
+			if (same && changed.length === 0) continue
 			if ((ws.bufferedAmount || 0) > MAX_BUFFERED) continue
-			ws.send(msg)
-			last.set(ws, msg)
+			const { fixtures: _all, ...rest } = data || {}
+			const head = JSON.stringify({ ...rest, ...(same ? { delta: true } : {}) })
+			ws.send(`{"type":"tracking:fixtures","data":{"fixtures":[${changed.join(',')}]${head === '{}' ? '' : ',' + head.slice(1, -1)}}}`)
+			last.set(ws, now)
 			sent++
 		}
 		return sent
@@ -57,7 +68,7 @@ function createFixturesWatch() {
 
 	/** A new follow service (server boot): every watcher gets a fresh snapshot. */
 	function reset() {
-		for (const ws of last.keys()) last.set(ws, '')
+		for (const ws of last.keys()) last.set(ws, null)
 	}
 
 	return { handle, tick, reset, count: () => last.size }

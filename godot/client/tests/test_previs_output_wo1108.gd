@@ -30,6 +30,7 @@ func test_fps_ring_autostart() -> void:
 	t.eq(OM.fps_of({"programResolutions": [{"w": 1920, "h": 1080, "fps": 25}, {"fps": 60}]}), 25, "the program channel's rate")
 	t.eq(OM.fps_of({"programResolutions": [{"fps": 59.94}]}), 59, "fractional → int (the publisher's fps)")
 	t.eq(OM.fps_of({}), 50, "no channel map → 50")
+	t.eq([OM.out_fps({"programResolutions": [{"fps": 50}]}), OM.out_fps({"programResolutions": [{"fps": 60}]}), OM.out_fps({"programResolutions": [{"fps": 59.94}]}), OM.out_fps({"programResolutions": [{"fps": 25}]}), OM.out_fps({})], [25, 30, 30, 25, 25], "WO-1116: half the program rate from 50p up")
 	t.eq(OM.fps_of({"programResolutions": [{"fps": 0}]}), 50, "zero → 50")
 	t.eq(OM.ring_name({}), "previs", "the operator's ring")
 	t.eq(OM.ring_name({"previs-ring": "previs-test"}), "previs-test", "--previs-ring")

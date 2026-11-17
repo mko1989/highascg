@@ -66,6 +66,18 @@ Related: [WO-1111](./1111_WO_gutmanny26_looks_from_narvil_chamsys_show.md), [WO-
 - Verified: status line "Merged into Palette entry …" for each; after CLR, all heads @ FULL + WYBIEG → previs
   screenshot shows the beams meeting on the catwalk; + CENTRE → on stage centre. Show saved (`gutmanny26.shw`).
 
+## Colours 17.11 (owner: "i have colors of ide narvil. we need to change them to the color theme from the photos")
+
+- MagicQ: with all heads selected, the stock **Blue** palette was merged into Red, Magenta, Cyan and UV, and **Amber**
+  into Green, Pink and Yellow (COL window: apply source, REC, target, YES = merge). Every cue that uses those palettes
+  now plays navy / gold; the palette names are unchanged. Before: scratchpad `mq/gutmanny26_before_recolour.shw`.
+  Checked from the programmer (all heads @ FULL): Red → 4510 blue beams, Magenta → blue, Green / Pink → amber.
+- HighAsCG: the five "Narvil — …" lighting looks remapped per look (its main hue → navy or gold alternating, the
+  second hue → the other, the rest and white → warm white). Not viewed (the previs follows the desk).
+- MagicQ was found not running at 18:20 (last auto backup 18:20:34; cause unknown) and was restarted with
+  "Continue last show". After the restart the BAND stack on PB10 with every master at full decoded 0 lit beams —
+  not investigated.
+
 ## Not done / not verified
 
 - Palettes not re-aimed: Q ENTRY, TANCERKI, CENTRE FAR, FRONT ENTRY, DRUM / VOC / GIT / BASS (greyed = no data for

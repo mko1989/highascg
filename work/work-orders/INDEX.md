@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1021 live WOs (34 open, 158 in progress, 829 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1023 live WOs (34 open, 159 in progress, 830 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -388,7 +388,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1043 DONE [mapping+engine] PIP edge strip set to "outside" still drew over the inside of the PIP (PixelHue… → 1043_WO_pip_edge_strip_outside_glow_inside_pip.md
 - 1050 IN PROGRESS [mapping+godot-client] APC40 fader → a PixelHue layer's opacity (Learn onto a PixelHue layer) → 1050_WO_apc_fader_drives_pixelhue_layer_opacity.md
 
-## lighting — DMX, Art-Net, sACN, fixtures, consoles (42)
+## lighting — DMX, Art-Net, sACN, fixtures, consoles (43)
 
 - 09 OPEN [lighting+engine] Global per-screen border effects and Art-Net control → 09_WO_Global_Per_Screen_Border_Effects.md
 - 179 DONE [lighting+mapping] Lighting I/O: Art-Net listener off by default, sACN input option, region-averag… → 179_WO_ARTNET_SACN_DEFAULTS_AND_PIXELMAP_SAMPLING.md
@@ -432,8 +432,9 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1111 DONE [lighting+godot-client] gutmanny 26: five looks copied from the Narvil IDE ChamSys show (BAND cue stack) → 1111_WO_gutmanny26_looks_from_narvil_chamsys_show.md
 - 1112 IN PROGRESS [lighting+godot-client] gutmanny 26: MagicQ show "gutmanny26" built on the Narvil show, patched to this… → 1112_WO_gutmanny26_magicq_show_from_narvil.md
 - 1113 DONE [lighting+tracking-vr] Previs decode honours a patch that runs pan / tilt against the GDTF file → 1113_WO_previs_decode_honours_patch_invert.md
+- 1115 DONE [lighting+godot-client,tracking-vr] Client at 4–7 fps while the previs follows a desk running an effect: the fixtur… → 1115_WO_previs_fixtures_push_sends_only_changed_heads.md
 
-## godot-client — Godot client (180)
+## godot-client — Godot client (181)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -615,6 +616,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1109 DONE [godot-client+tracking-vr] Previs: a camera slider (A → B camera moves, played smooth and repeatable) for… → 1109_WO_previs_camera_slider.md
 - 1110 DONE [godot-client+lighting] Previs at 15 fps with a 252-head rig: multi-cell fixtures drawn as batches (42… → 1110_WO_previs_cell_fixtures_batched.md
 - 1114 IN PROGRESS [godot-client+tracking-vr] gutmanny 26: scenography from the renders in the venue model → 1114_WO_gutmanny26_scenography_in_venue_model.md
+- 1116 IN PROGRESS [godot-client+video-io] Previs output (stream / record source) runs at half the program rate → 1116_WO_previs_output_half_rate.md
 
 ## web-client — Web client (90)
 

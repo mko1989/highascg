@@ -155,3 +155,20 @@ static func renders(vp: Viewport) -> bool:
 
 
 const FEEDS := "previs_output"  ## WO-1108 (output/previs_output.gd sets it; previs_tab.gd _apply_mode reads it)
+
+
+## WO-1115 — the server sends the whole rig once, then only the fixtures that changed (`delta: true`): → the complete
+## state to keep (a delta is merged into `last` by id; a whole payload replaces it).
+static func merged(last: Dictionary, data: Dictionary) -> Dictionary:
+	if data.get("delta", false) != true or not last.get("fixtures") is Array:
+		return data
+	var list: Array = last.fixtures
+	var at := {}
+	for i in list.size():
+		if list[i] is Dictionary:
+			at[str((list[i] as Dictionary).get("id", ""))] = i
+	for v in data.get("fixtures", []):
+		if v is Dictionary and at.has(str((v as Dictionary).get("id", ""))):
+			list[at[str((v as Dictionary).get("id", ""))]] = v
+	last.erase("delta")
+	return last

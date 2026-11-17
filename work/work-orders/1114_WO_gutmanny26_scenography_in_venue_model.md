@@ -1,7 +1,7 @@
 # WO-1114 — gutmanny 26: scenography from the renders in the venue model
 
 **Area:** godot-client, tracking-vr
-**Status: IN PROGRESS (17.11.26 — statue, light bars, step / catwalk light strips, 48 guest tables in the previs; LED content, footlights, band not made)**
+**Status: IN PROGRESS (17.11.26 — statue, light bars, step / catwalk light strips, 48 guest tables in the previs; LED content in; footlights, band not made)**
 
 Owner 17.11, with four scenography renders: "this is how the stage should look. try adding the elements from it to the previs".
 
@@ -21,6 +21,11 @@ Owner 17.11, with four scenography renders: "this is how the stage should look. 
 - Installed over the project file (old file kept in the scratchpad `snap/venue_before_scenography.glb`), client
   relaunched.
 
+- **LED content** (owner: "can you try recreating what was on the photos to display on the screen?"):
+  `media/projects/gutmanny_26/Guttmanny gala 11520x1536.png` drawn by `work/notes/gutmanny26-build/led_content.py`
+  on the wall layout (wings, three stripes each side, centre): navy ground, gold rays and dust, frames, "GUTTMANNY
+  2026" as text (no logo artwork). Playing on PGM 2-10 (`PLAY … MIX 25`); a still, not an animation.
+
 ## What was verified
 
 - Validator: structure, support (every part rests on something) and no intersection with the 2113 existing nodes.
@@ -29,4 +34,5 @@ Owner 17.11, with four scenography renders: "this is how the stage should look. 
 ## Not done / not verified
 
 - Statue, light bars and step lights were not looked at close up on the glass.
-- LED content in navy / gold, footlights, band backline.
+- Footlights, band backline; the LED content is a still.
+- Seen in the previs window (second screen screenshot): content on all nine walls, statue in front of the centre wall.

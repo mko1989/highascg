@@ -81,6 +81,29 @@ test('off, close and a dead socket stop the watch; a backed-up socket skips a fr
 	assert.equal(w.count(), 0, 'a closed socket is dropped')
 })
 
+test('WO-1115: after the first whole rig a watcher gets only the fixtures that changed', () => {
+	const w = createFixturesWatch()
+	const a = sock()
+	w.handle({ type: 'tracking:fixtures_watch', data: { on: true } }, a)
+	const rig = [{ id: 'a', n: 0 }, { id: 'b', n: 0 }, { id: 'c', n: 0 }]
+	const visual = () => ({ fixtures: rig.map((f) => ({ ...f })) })
+	w.tick(visual)
+	assert.deepEqual(a.got.at(-1).data, { fixtures: rig }, 'first: whole rig, no delta mark')
+	rig[1].n = 5
+	assert.equal(w.tick(visual), 1)
+	assert.deepEqual(a.got.at(-1).data, { fixtures: [{ id: 'b', n: 5 }], delta: true })
+	a.bufferedAmount = MAX_BUFFERED + 1
+	rig[0].n = 1
+	w.tick(visual)
+	rig[2].n = 2
+	a.bufferedAmount = 0
+	w.tick(visual)
+	assert.deepEqual(a.got.at(-1).data.fixtures.map((f) => f.id), ['a', 'c'], 'a skipped frame is made up in the next delta')
+	rig.pop()
+	w.tick(visual)
+	assert.deepEqual(a.got.at(-1).data, { fixtures: rig }, 'a changed rig: whole again')
+})
+
 test('the tracking module routes the watch and its tick decodes through it (no broadcast to every client)', () => {
 	const tracking = require('../../src/tracking/register')
 	const ws = sock()

@@ -76,5 +76,5 @@ func _apply() -> void:
 		out.enabled = false
 		cannot = "This client does not send (it was started for a check or a probe)."
 	var moves: Array = section.cfg.get("moves", [])
-	output.apply(out, moves, cannot, OM.fps_of(Store.get_value("channelMap", {})))
+	output.apply(out, moves, cannot, OM.out_fps(Store.get_value("channelMap", {})))
 	out_section.show_state(shown, moves, output.status_text())

@@ -369,7 +369,7 @@ func _beam(node: Node3D, beam: Dictionary, body: Node3D) -> Dictionary:
 
 ## One tracking:fixtures payload → axes and beams of every built fixture.
 func apply(data: Dictionary) -> void:
-	_last = data
+	_last = F.merged(_last, data)  # WO-1115: a delta carries only the changed heads
 	for v in data.get("fixtures", []):
 		if not v is Dictionary or not _fx.has(str(v.get("id", ""))):
 			continue

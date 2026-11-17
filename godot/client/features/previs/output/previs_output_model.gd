@@ -43,6 +43,13 @@ static func fps_of(cm: Variant) -> int:
 	return 50
 
 
+## WO-1116 (owner 17.11): the output runs at half the program rate — 25 for 50p, 30 for 60p (59.94 → 30); a 25 / 30 fps
+## show keeps its rate. Enough for a stream or a recording, and the client is not driven to twice the full rate.
+static func out_fps(cm: Variant) -> int:
+	var f := fps_of(cm)
+	return (f + 1) / 2 if f >= 48 else f
+
+
 ## The ring this client writes: `--previs-ring=<name>`, else `previs` — and `previs-probe` for the output probe, so a
 ## probe client never writes the operator's ring by accident. A name the ring rule refuses falls back the same way.
 static func ring_name(args: Dictionary) -> String:
