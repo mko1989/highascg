@@ -161,4 +161,9 @@ godot/retro/**/*.uid
 *.pt
 # WO-1103: an own test puppet's MetaHuman rig (Fab licence) — never committed; own puppets live in ~/.local/share/highascg/puppets
 *.dna
+# WO-1106 A22: what tools/people/dna_to_glb.py writes beside the DNA (Fab-derived) when run in a repo folder
+*.converted.glb
+*.converted.glb.tmp
+convert.json
+convert.json.tmp
 highascg-detection-runtime/

@@ -183,6 +183,21 @@ describe('WO-1103 MetaHuman DNA → GLB converter (synthetic stand-in data)', { 
 		}
 	})
 
+	it('WO-1106 A46: a failed GLB write leaves no <out>.tmp in the puppet folder', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wo1106-dna-'))
+		try {
+			character(dir)
+			const out = path.join(dir, 'blocked.glb')
+			fs.mkdirSync(out) // the final rename fails: a folder stands where the GLB goes
+			const r = run([dir, '--lib', FAKE, '--out', out])
+			assert.equal(r.status, 1, r.stderr)
+			assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'convert.json'), 'utf8')).state, 'failed')
+			assert.equal(fs.existsSync(out + '.tmp'), false, 'the half-written GLB is removed')
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true })
+		}
+	})
+
 	it('the owner build script pins Epic\'s commit and installs per machine', () => {
 		const sh = fs.readFileSync(path.join(ROOT, 'tools', 'people', 'openriglogic_build.sh'), 'utf8')
 		assert.match(sh, /^COMMIT=[0-9a-f]{40} /m)

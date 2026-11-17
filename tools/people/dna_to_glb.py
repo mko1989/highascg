@@ -317,9 +317,17 @@ def convert(folder, dna, lod, out, job):
         g.bin.append(0)
     body = struct.pack("<I4s", len(js), b"JSON") + js + struct.pack("<I4s", len(g.bin), b"BIN\0") + bytes(g.bin)
     tmp = out + ".tmp"
-    with open(tmp, "wb") as f:
-        f.write(struct.pack("<4sII", b"glTF", 2, 12 + len(body)) + body)
-    os.replace(tmp, out)
+    try:
+        with open(tmp, "wb") as f:
+            f.write(struct.pack("<4sII", b"glTF", 2, 12 + len(body)) + body)
+        os.replace(tmp, out)
+    except BaseException:
+        # WO-1106 A46: a failed write leaves no <out>.tmp (up to the whole GLB) in the puppet folder
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
     return {"joints": len(joints), "meshes": len(meshes), "triangles": sum(used), "dna": [os.path.basename(f) for f, _, _ in readers]}
 
 
