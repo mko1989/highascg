@@ -112,14 +112,20 @@ describe('WO-1101 interpolation, extrapolation, fade', () => {
 		assert.ok(Math.abs(mid.y - bal[1]) < 0.01, 'close to the ballistic arc')
 	})
 
-	it('fades after 2 s without update — only while moving; a parked entity is held until gone', () => {
-		const t = L.createTrack('car')
+	it('fades after 2 s without update — a flying vegetable only; everything else is held until gone (WO-1106 A1)', () => {
+		const t = L.createTrack('veg')
 		L.pushSnap(t, 1000, [1, 0, 0, 0, 0, 0])
 		L.pushSnap(t, 1100, [1, 1, 0, 0, 0, 0])
 		assert.equal(L.fadeOf(t, 3000), 1)
 		assert.equal(L.fadeOf(t, 3100), 1)
 		assert.ok(L.fadeOf(t, 3350) > 0 && L.fadeOf(t, 3350) < 1)
 		assert.equal(L.fadeOf(t, 3700), 0)
+		for (const k of ['car', 'soldier', 'av', 'sling']) {
+			const moving = L.createTrack(k)
+			L.pushSnap(moving, 1000, [1, 0, 0, 0, 0, 0])
+			L.pushSnap(moving, 1100, [1, 1, 0, 0, 0, 0])
+			assert.equal(L.fadeOf(moving, 60000), 1, k + ': silence means unchanged')
+		}
 		const parked = L.createTrack('sling')
 		L.pushSnap(parked, 1000, [1, 5, 0, 5, 0, 0])
 		assert.equal(L.fadeOf(parked, 60000), 1)

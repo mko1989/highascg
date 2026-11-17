@@ -16,7 +16,7 @@ export function okPath(u) {
 /** A colour for a style value ('#rrggbb' only). */
 export const safeColor = (c, fb = '#cccccc') => (typeof c === 'string' && COLOR.test(c) ? c : fb)
 
-const PHASE_NAMES = { lobby: 'Lobby', countdown: 'Get ready', race: 'Racing', round: 'Round on', match: 'Match on', results: 'Results', warmup: 'Warm-up' }
+const PHASE_NAMES = { lobby: 'Lobby', countdown: 'Get ready', race: 'Racing', round: 'Round on', match: 'Match on', results: 'Results', warmup: 'Warm-up', paused: 'Paused' }
 /** A phase id → its short display name. */
 export const phaseName = (p) => PHASE_NAMES[p] || (typeof p === 'string' && p ? p.slice(0, 16) : '')
 
@@ -45,7 +45,7 @@ export function normGame(g) {
 		players,
 		bots: fin(g.bots) ? g.bots : 0,
 		endsAt: fin(g.endsAt) ? g.endsAt : null,
-		paused: g.paused === true,
+		paused: g.paused === true || g.phase === 'paused', // WO-1106 A8: the board's `paused`, or a game whose phase is paused
 		paths,
 		joinUrl: typeof join === 'string' && join.length < 200 ? join : '',
 		top: top3(g.top),
@@ -61,6 +61,28 @@ export function kitOf(games) {
 	if (!g) return null
 	const k = g.paths.kit
 	return k.endsWith('/') ? k : k + '/'
+}
+
+/** WO-1106 A37 — the wait before boot retry n (1, 2, …): 2 s, doubling, at most 30 s. */
+export const bootDelay = (n) => Math.min(30000, 2000 * 2 ** Math.max(0, Math.min(10, (n | 0) - 1)))
+
+/**
+ * WO-1106 A37 — run start() until it resolves (an unattended wall page must come back by itself after a failed import):
+ * on a failure onFail(err, n, ms), then sleep(ms) and again. The maxTries-th failure → onFail(err, n, null) and false (the page reloads itself,
+ * since a browser may keep a failed module import cached for the page's life); true once started.
+ */
+export async function retryBoot(start, { onFail = () => {}, sleep, maxTries = 6, delay = bootDelay } = {}) {
+	for (let n = 1; ; n++) {
+		try {
+			await start()
+			return true
+		} catch (e) {
+			const ms = n >= maxTries ? null : delay(n)
+			onFail(e, n, ms)
+			if (ms == null) return false
+			await sleep(ms)
+		}
+	}
 }
 
 /** mm:ss of a duration in ms (≥ 0). */
@@ -172,10 +194,22 @@ export function eventText(x) {
 	return `${subject} ${verb} ${target}`
 }
 
+/**
+ * WO-1106 A8 — the room part of a `board` message (house 0..1, scene as `hello` carries it), shaped like `hello.state` for
+ * the spectator's applyState: only the keys present (an older server's board has neither → {}).
+ */
+export function boardRoom(m) {
+	const out = {}
+	if (!m || typeof m !== 'object') return out
+	if ((typeof m.house === 'number' && Number.isFinite(m.house)) || typeof m.house === 'boolean') out.house = m.house
+	if (m.scene && typeof m.scene === 'object') out.scene = m.scene
+	return out
+}
+
 /** The ticker line of one game for the strip: "RC · Racing · 1:23 — Ola 3 · Kuba 2 · Ann 1". */
 export function boardLine(g, serverNow) {
-	const parts = [g.title, phaseName(g.phase)]
-	if (g.paused) parts.push('Paused')
+	const parts = [g.title, g.phase === 'paused' ? '' : phaseName(g.phase)]
+	if (g.paused) parts.push('Paused') // and no clock: it does not count down while paused (WO-1106 A8)
 	else if (g.endsAt && fin(serverNow) && g.endsAt > serverNow) parts.push(fmtClock(g.endsAt - serverNow))
 	const top = g.top.map((r) => `${r.name}${r.label ? ' ' + r.label : r.score != null ? ' ' + r.score : ''}`).join(' · ')
 	return parts.filter(Boolean).join(' · ') + (top ? ` — ${top}` : '')

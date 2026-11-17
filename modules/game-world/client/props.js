@@ -7,6 +7,7 @@
  *
  *   const props = createProps(THREE, { importer? })   props.setModels(wst.models)
  *   props.build(kind, info) → handle | null (still loading)   info = { w, c, n, s, yaw, scale, tag, quality }
+ *   props.want(kind) → 'loading' | 'ready' | 'failed' (starts a reload after setModels cleared a failure)
  *   handle = { obj, kind, standIn, update(st), setTags(on), setQuality(q), clip(plane), dispose() }
  *     st = { yaw, f, s, dt, t, sNow, speed, ground (floor y − own y), alpha, vel: [vx, vy, vz] | null }
  *   Sizes: car / soldier at the scene scale (toys), veg / sling / av life-size (contract: a cabbage bigger than a car).
@@ -41,17 +42,24 @@ const ease = (dt, rate) => 1 - Math.exp(-rate * Math.max(0, dt))
 export function createProps(THREE, { importer = (u) => import(u), now = () => Date.now() } = {}) {
 	const models = {} // kind → url
 	const mods = new Map() // kind → { url, state: 'loading' | 'ready' | 'failed', mod, react, at }
+	const tries = {} // kind → retries so far (a cache-busting query: a failed module import may be cached by the page)
 
+	/** Every `wst` on. WO-1106 A33: a kind that failed (or timed out) is tried again here, not left a stand-in for good. */
 	function setModels(m) {
 		if (!m || typeof m !== 'object') return
 		for (const k of Object.keys(MODEL_SIGS)) {
 			const u = okModelUrl(m[k]) ? m[k] : null
+			const cur = mods.get(k)
+			if (cur?.state === 'failed' && u) {
+				mods.delete(k)
+				tries[k] = (tries[k] || 0) + 1
+			}
 			if (u === (models[k] || null)) continue
 			models[k] = u
-			const cur = mods.get(k)
 			if (cur && cur.url !== u && cur.state !== 'ready') mods.delete(k)
 		}
 	}
+	const importUrl = (kind, url) => (tries[kind] ? url + (url.includes('?') ? '&' : '?') + 'retry=' + tries[kind] : url)
 
 	function load(kind) {
 		let e = mods.get(kind)
@@ -69,18 +77,19 @@ export function createProps(THREE, { importer = (u) => import(u), now = () => Da
 		const sig = MODEL_SIGS[kind]
 		let p
 		try {
-			p = Promise.resolve(importer(url))
+			p = Promise.resolve(importer(importUrl(kind, url)))
 		} catch {
 			p = Promise.reject(new Error('import failed'))
 		}
 		p.then(
 			(mod) => {
-				if (e.state !== 'loading') return
+				/* WO-1106 A33: a late success (after the 8 s time-out marked it failed) is still taken, unless a retry replaced it */
+				if (e.state === 'ready' || mods.get(kind) !== e) return
 				if (mod && typeof mod[sig.fn] === 'function') (e.mod = mod), (e.state = 'ready')
 				else e.state = 'failed'
 			},
 			() => {
-				e.state = 'failed'
+				if (e.state === 'loading') e.state = 'failed'
 			}
 		)
 		if (kind === 'av') {
@@ -112,7 +121,9 @@ export function createProps(THREE, { importer = (u) => import(u), now = () => Da
 		return standIn(THREE, kind, info)
 	}
 
-	return { setModels, build, standIn: (kind, info) => standIn(THREE, kind, info), state: (kind) => mods.get(kind)?.state || 'idle', pending: () => [...mods.values()].filter((e) => e.state === 'loading').length }
+	/** The kind's load state, starting its (re)load when needed — a stand-in asks this until the model is there (WO-1106 A33). */
+	const want = (kind) => (MODEL_SIGS[kind] ? load(kind).state : 'failed')
+	return { setModels, build, want, standIn: (kind, info) => standIn(THREE, kind, info), state: (kind) => mods.get(kind)?.state || 'idle', pending: () => [...mods.values()].filter((e) => e.state === 'loading').length }
 }
 
 /* ---------------------------------------------------------------- one builder per kind */

@@ -64,7 +64,7 @@ export function startHost(root) {
 	)
 
 	let state = null
-	let busy = false
+	const gate = createActGate()
 	const cards = new Map()
 	let qrMod = null
 
@@ -74,10 +74,9 @@ export function startHost(root) {
 	}
 
 	async function act(body, okText) {
-		if (busy && body.action !== 'house') return
-		busy = true
+		if (!gate.enter(body)) return
 		const r = await postHost(body)
-		busy = false
+		gate.leave(body)
 		if (r.status === 401 || r.status === 403) say('Not allowed: log in to the HighAsCG web UI in this browser first (or open this page with ?token=…).', true)
 		else if (!r.ok) say(`Failed (${r.status || 'no connection'})${typeof r.data?.error === 'string' ? ': ' + r.data.error.slice(0, 160) : ''}`, true)
 		else {
@@ -176,6 +175,26 @@ export function startHost(root) {
 
 	refresh()
 	setInterval(refresh, POLL_MS)
+}
+
+/**
+ * WO-1106 A34 — the host's in-flight gate. One action at a time (a double click does not post twice), but the house
+ * slider's posts (throttled by the slider itself) have their own lane: they are never refused and never take or free
+ * the flag, so a Presenter-safe click while a house post is in flight goes through.
+ */
+export function createActGate() {
+	let busy = false
+	const house = (body) => body?.action === 'house'
+	return {
+		enter(body) {
+			if (house(body)) return true
+			if (busy) return false
+			return (busy = true)
+		},
+		leave(body) {
+			if (!house(body)) busy = false
+		},
+	}
 }
 
 /** A host answer's per-game refusals (a game with no players, already running …) → one line, or ''. */

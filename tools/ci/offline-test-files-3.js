@@ -436,4 +436,6 @@ module.exports = [
 	'tools/smoke/smoke-wo1101-game-salad-world.test.js', // WO-1101/1102 Salad: alone, world colliders (xb bounce / car splat), landed, make way
 	'tools/smoke/smoke-wo1105-games-hosting.test.js', // WO-1105 Settings ▸ Games: aggregated state + host over the 3 real games, routes, broadcast
 	'tools/smoke/smoke-wo1105-games-join-qr-settings.test.js', // WO-1105 join address pick + warnings, QR rows, games settings through a restart
+	'tools/smoke/smoke-wo1106-world-client-visitors.test.js', // WO-1106 A1 / A4 / A14 / A21 / A33: silence = unchanged, wst off clears all, effect cap, late models
+	'tools/smoke/smoke-wo1106-world-client-pages.test.js', // WO-1106 A8 / A34 / A37: board house / scene / paused, host act gate, spectator boot retry
 ]

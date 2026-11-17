@@ -8,13 +8,14 @@
  */
 import * as THREE from 'three'
 import { h, setText, getState, getJson, wsUrl } from './world-dom.js'
-import { gamesOf, kitOf, okPath, createClock, floorFn, roomCam, normGame, boardLine, eventText } from './world-logic.js'
+import { gamesOf, kitOf, okPath, createClock, floorFn, roomCam, normGame, boardLine, eventText, boardRoom } from './world-logic.js'
 import { okModelUrl } from './world-wire.js'
 import { createVisitors } from './visitors.js'
 
 const POLL_MS = 4000
 const TICKER_N = 4
 const TICKER_MS = 12000
+const SCENE_RETRY_MS = 10000
 
 export async function startSpectate(root) {
 	root.textContent = ''
@@ -46,7 +47,7 @@ export async function startSpectate(root) {
 	window.addEventListener('resize', () => world.resize())
 	world.resize()
 
-	const S = { scene: null, sceneUrl: null, floor: () => 0, board: games, events: [], cam: null }
+	const S = { scene: null, sceneUrl: null, sceneFail: null, floor: () => 0, board: games, events: [], cam: null, house: undefined }
 	const clock = createClock()
 	const vis = createVisitors(THREE, world.scene, { view: 'world', quality: phone ? 'low' : 'high', tags: true, floorY: (x, z) => S.floor(x, z) })
 
@@ -54,9 +55,10 @@ export async function startSpectate(root) {
 		const sc = st?.scene
 		const ju = sc && okPath(sc.json) ? sc.json : null
 		if (!ju || ju === S.sceneUrl) return
+		if (S.sceneFail && S.sceneFail.url === ju && performance.now() - S.sceneFail.at < SCENE_RETRY_MS) return // board is 2 Hz
 		S.sceneUrl = ju
 		const json = await getJson(ju)
-		if (!json || typeof json !== 'object') return (S.sceneUrl = null)
+		if (!json || typeof json !== 'object') return ((S.sceneUrl = null), (S.sceneFail = { url: ju, at: performance.now() }))
 		if (!okPath(json.glb)) json.glb = okPath(sc.glb) ? sc.glb : null
 		S.scene = json
 		S.floor = floorFn(json)
@@ -72,7 +74,8 @@ export async function startSpectate(root) {
 	function applyState(st) {
 		if (!st || typeof st !== 'object') return
 		if (Array.isArray(st.games)) S.board = gamesOf(st)
-		if (typeof st.house === 'number' || typeof st.house === 'boolean') world.setHouse(st.house)
+		/* only a CHANGED server level: board repeats it at 2 Hz and must not fight the live rig's own onHouse (WO-1106 A8) */
+		if ((typeof st.house === 'number' || typeof st.house === 'boolean') && st.house !== S.house) world.setHouse((S.house = st.house))
 		loadScene(st)
 	}
 	applyState(state)
@@ -82,7 +85,10 @@ export async function startSpectate(root) {
 		if (typeof m.ts === 'number') clock.sync(m.ts, performance.now())
 		if (m.t === 'wst' || m.t === 'wv') vis.ingest(m)
 		else if (m.t === 'hello') applyState(m.state)
-		else if (m.t === 'board' && Array.isArray(m.games)) S.board = m.games.slice(0, 8).map(normGame).filter(Boolean)
+		else if (m.t === 'board') {
+			if (Array.isArray(m.games)) S.board = m.games.slice(0, 8).map(normGame).filter(Boolean)
+			applyState(boardRoom(m)) // WO-1106 A8: house dimming / a scene change follow without a reconnect
+		}
 		else if (m.t === 'xev') {
 			const text = eventText(m)
 			if (text) S.events.unshift({ text, at: performance.now() })

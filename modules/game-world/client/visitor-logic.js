@@ -4,7 +4,7 @@
  *
  *   toWorldMsg(m)            a raw message (JSON text or object) or an already decoded wst / wv → { t, d } | null
  *   createTrack(kind)        one visitor's snapshot buffer; pushSnap(track, ts, e) · sampleTrack(track, serverNow)
- *   fadeOf(track, serverNow) 1 → 0 for a MOVING visitor not updated for FADE_AFTER ms (a parked one is held)
+ *   fadeOf(track, serverNow) 1 → 0 for a flying VEGETABLE not updated for FADE_AFTER ms (every other kind is held)
  *   tierOf(q, view)          { q, cap, tags } of a quality tier; tagsFor(kind, tier, on)
  *   pickDrawn(list, cam, cap) the w of the visitors to draw (priority dist / weight, as the hub)
  *   cutMode(kind, bottomY, cutY)  'draw' | 'shadow' | 'clip' | 'hide' (Skirmish's cut-away)
@@ -186,11 +186,12 @@ export function sampleTrack(track, serverNow, delay = INTERP_MS) {
 const pose = (s, _b, extrap, held) => ({ x: s.x, y: s.y, z: s.z, yaw: s.yaw, f: s.f, extrap, held })
 
 /**
- * 1 (shown) … 0 (faded) — a visitor whose last data says it was MOVING and that got no update for FADE_AFTER_MS fades
- * over FADE_MS. A parked one (the hub never repeats an unchanged entity, §1) is held until its `gone`.
+ * 1 (shown) … 0 (faded) — a vegetable whose last data says it was MOVING and that got no update for FADE_AFTER_MS fades
+ * over FADE_MS. WO-1106 A1: the hub never repeats an unchanged entity (§1), so silence means unchanged — a car on a
+ * countdown grid or a soldier in a lobby is held (whatever its last speed) until its `gone` or `wst` off.
  */
 export function fadeOf(track, serverNow) {
-	if (!track.moving || !fin(track.lastTs)) return 1
+	if (track.kind !== 'veg' || !track.moving || !fin(track.lastTs)) return 1
 	const quiet = serverNow - track.lastTs
 	if (quiet <= FADE_AFTER_MS) return 1
 	return clamp(1 - (quiet - FADE_AFTER_MS) / FADE_MS, 0, 1)

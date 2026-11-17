@@ -10,7 +10,7 @@
  *   vis.update(serverNow, dt, camera)   every rendered frame (server ms, seconds, the three.js camera)
  *   vis.effect([w, kind, ms, c]) a one-shot visual on a visitor (`wv.fx` are applied by ingest already)
  *   vis.setQuality(q)           → the `{ t: 'wq', n }` message to send on the game's socket
- *   vis.wq()  vis.patches()  vis.count()  vis.info()  vis.dispose()
+ *   vis.wq()  vis.patches(now?)  vis.count()  vis.info()  vis.dispose()
  * Nothing here throws into the game loop: every visitor is drawn inside its own try/catch, a broken model becomes a
  * neutral stand-in.
  */
@@ -24,7 +24,7 @@ import { createFxKit } from './visitor-fx.js'
 
 const MAX_LIVE = 160
 const MAX_FX = 4
-const FADED_DROP_MS = 30000
+const FADED_DROP_MS = 30000 // only a faded vegetable is dropped on silence (WO-1106 A1: every other kind waits for `gone`)
 
 export function createVisitors(THREE, scene, opts = {}) {
 	const view = ['rc', 'sk', 'salad', 'world'].includes(opts.view) ? opts.view : 'salad'
@@ -94,7 +94,11 @@ export function createVisitors(THREE, scene, opts = {}) {
 		const v = f && map.get(f[0])
 		if (!v || v.kind === 'splat') return false
 		const fx = kit.effect(f[1], f[2], f[3] || v.c, v.bounds)
-		if (v.fx.length >= MAX_FX) v.fx.shift().dispose()
+		if (v.fx.length >= MAX_FX) {
+			const old = v.fx.shift()
+			old.obj?.removeFromParent() // WO-1106 A14: out of the holder too, or every capped effect stays in the scene
+			old.dispose()
+		}
 		if (fx.obj) v.holder.add(fx.obj)
 		v.fx.push(fx)
 		return true
@@ -105,8 +109,10 @@ export function createVisitors(THREE, scene, opts = {}) {
 		if (!r) return false
 		if (r.t === 'wst') {
 			if (!r.d.on) {
+				/* WO-1106 A4: also what a game ingests on every socket `welcome` — nothing of the old feed may survive */
 				wst = null
 				clear()
+				drawn = 0
 			} else {
 				wst = r.d
 				props.setModels(r.d.models)
@@ -134,21 +140,36 @@ export function createVisitors(THREE, scene, opts = {}) {
 	}
 
 	function ensureHandle(v) {
+		if (v.handle && v.waitModel && props.want(v.kind) === 'ready') {
+			/* WO-1106 A33: the model came in late (or on a retry): swap the stand-in for it, once */
+			v.waitModel = false
+			releaseHandle(v)
+		}
 		if (v.handle) return v.handle
 		const h = props.build(v.kind, info(v))
 		if (!h) return null
 		v.handle = h
+		v.waitModel = !!h.standIn && props.state(v.kind) !== 'ready'
 		v.holder.add(h.obj)
 		return h
 	}
 
-	function breakHandle(v) {
+	function releaseHandle(v) {
 		try {
 			v.handle?.dispose()
 		} catch {
-			/* ignore */
+			/* a model's own dispose failing must not stop ours */
 		}
-		if (v.handle) v.handle.obj.removeFromParent()
+		if (v.handle) {
+			disposeClip(v.handle.obj) // WO-1106 A21: the cut-away's material copies of the old handle
+			v.handle.obj.removeFromParent()
+		}
+		v.handle = null
+	}
+
+	function breakHandle(v) {
+		releaseHandle(v)
+		v.waitModel = false
 		v.handle = props.standIn(v.kind, info(v))
 		v.holder.add(v.handle.obj)
 		v.broken = (v.broken || 0) + 1
@@ -310,14 +331,19 @@ export function createVisitors(THREE, scene, opts = {}) {
 		},
 		/** The `{ t: 'wq', n }` of the current tier (send it when the world turns on). */
 		wq: () => wqOf(tier.q),
-		/** Live slick patches (§6 R2) [{ x, y, z, r, until (server ms) }] — the newest data, not the drawn delay. */
-		patches() {
+		/**
+		 * Live slick patches (§6 R2) [{ x, y, z, r, until (server ms) }] — the newest data, not the drawn delay.
+		 * WO-1106 A4: only patches with until > now; now = the server ms given (optional), else the last update()'s
+		 * serverNow — a patch the hub never sent `gone` for (a reconnect) stops slowing that spot after its 8 s.
+		 */
+		patches(now) {
+			const t = Number.isFinite(now) ? now : lastNow
 			const out = []
 			for (const v of map.values()) {
 				if (v.kind !== 'splat') continue
 				const s = v.track.snaps[v.track.snaps.length - 1]
 				const pt = s && patchOf({ p: { x: s.x, y: s.y, z: s.z }, s: v.s, f: s.f, firstTs: v.track.firstTs })
-				if (pt) out.push(pt)
+				if (pt && pt.until > t) out.push(pt)
 			}
 			return out
 		},
