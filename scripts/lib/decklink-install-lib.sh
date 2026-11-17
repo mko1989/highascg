@@ -198,6 +198,13 @@ decklink_needs_install_from_vendor() {
 	return 0
 }
 
+# WO-1106 D4: the ISO ships var/lib/dpkg/status whole, with a phantom "installed" desktopvideo record (WO-431), while
+# its conffile etc/dracut.conf.d/dracut-blackmagic.conf is excluded from the image (WO-1096 §1E / B74). The per-box
+# `dpkg -i` is then an upgrade, and dpkg reads a conffile missing from disk as "deleted by the admin": it never comes
+# back. --force-confmiss installs a missing conffile instead. The install gate stays the payload file
+# (decklink_payload_present), never the dpkg record.
+DECKLINK_DPKG_INSTALL_OPTS=(--force-confmiss)
+
 decklink_install_vendor_pair() {
 	local main_deb="${1:-}"
 	local gui_deb="${2:-}"
@@ -215,9 +222,9 @@ decklink_install_vendor_pair() {
 	# Every failure is therefore an explicit `return 1`.
 	local -a debs=("$main_deb")
 	[[ -n "$gui_deb" && -f "$gui_deb" ]] && debs+=("$gui_deb")
-	if ! DEBIAN_FRONTEND=noninteractive dpkg -i "${debs[@]}"; then
+	if ! DEBIAN_FRONTEND=noninteractive dpkg "${DECKLINK_DPKG_INSTALL_OPTS[@]}" -i "${debs[@]}"; then
 		DEBIAN_FRONTEND=noninteractive apt-get install -f -y || true
-		if ! DEBIAN_FRONTEND=noninteractive dpkg -i "${debs[@]}"; then
+		if ! DEBIAN_FRONTEND=noninteractive dpkg "${DECKLINK_DPKG_INSTALL_OPTS[@]}" -i "${debs[@]}"; then
 			echo "decklink: dpkg -i failed after apt-get install -f (${debs[*]##*/})" >&2
 			[[ -z "$extract_dir" || ! -d "$extract_dir" ]] || rm -rf "$extract_dir"
 			return 1

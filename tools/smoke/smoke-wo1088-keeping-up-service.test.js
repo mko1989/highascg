@@ -14,6 +14,10 @@ const routes = require('../../src/health/routes-keeping-up')
 const root = path.join(__dirname, '..', '..')
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8')
 
+// WO-1106 D6: fixed machine readings — the real /proc CPU, the CPU thermal-throttle counter (rise 1: one event between
+// two samples starts an incident) and the event-loop histogram move under a loaded box and broke "no broadcast"
+const calm = { readHost: () => ({ cpuPct: 12, memPct: 40, gpu: null, cpuThrottleDelta: 0 }), readLoop: () => ({ maxMs: 2, p99Ms: 1, meanMs: 0.5 }) }
+
 function fakeCtx(extra = {}) {
 	const logs = []
 	const sent = []
@@ -25,7 +29,7 @@ function fakeCtx(extra = {}) {
 describe('WO-1088 keeping-up service', () => {
 	it('a client fps report: shared check, one journal line per start / end, broadcast only on change', () => {
 		const { ctx, logs, sent } = fakeCtx()
-		const svc = startKeepingUp(ctx, { autostart: false, gpu: false, wsClients: [] })
+		const svc = startKeepingUp(ctx, { autostart: false, gpu: false, wsClients: [], ...calm })
 		try {
 			const body = { client: 'abc', key: 'fps', name: 'Operator client', level: 1, label: 'Operator client at 61 of 100 fps', text: '61 / 100 fps' }
 			assert.equal(routes.handleReport(JSON.stringify(body), ctx).status, 200)
@@ -53,7 +57,7 @@ describe('WO-1088 keeping-up service', () => {
 	})
 	it('preshow: no checks at all, mode preshow; no watch → 503', () => {
 		const { ctx } = fakeCtx({ config: { offline_mode: true } })
-		const svc = startKeepingUp(ctx, { autostart: false, gpu: false })
+		const svc = startKeepingUp(ctx, { autostart: false, gpu: false, ...calm })
 		try {
 			const s = svc.sampleOnce()
 			assert.equal(s.mode, 'preshow')
@@ -67,13 +71,38 @@ describe('WO-1088 keeping-up service', () => {
 	it('a backed-up WS client is named; Caspar down is the one failing check', () => {
 		const ws = { bufferedAmount: 3 * 1024 * 1024, _socket: { remoteAddress: '::ffff:10.0.0.5' } }
 		const { ctx } = fakeCtx({ _casparStatus: { connected: false } })
-		const svc = startKeepingUp(ctx, { autostart: false, gpu: false, wsClients: [ws] })
+		const svc = startKeepingUp(ctx, { autostart: false, gpu: false, wsClients: [ws], ...calm })
 		try {
 			svc.sampleOnce()
 			svc.sampleOnce()
 			const s = svc.summary()
 			assert.equal(s.label, 'Caspar not connected — outputs unwatched')
 			assert.ok(s.checks.some((c) => c.label === 'Updates to client 10.0.0.5 backing up'))
+		} finally {
+			svc.stop()
+		}
+	})
+	it('WO-1106 D6: the machine readings are injectable — a throttle event or a stalled loop comes from readHost / readLoop', () => {
+		let host = calm.readHost()
+		let loop = calm.readLoop()
+		const { ctx, sent } = fakeCtx()
+		const svc = startKeepingUp(ctx, { autostart: false, gpu: false, wsClients: [], readHost: () => host, readLoop: () => loop })
+		try {
+			svc.sampleOnce()
+			const n = sent.length
+			for (let i = 0; i < 5; i++) svc.sampleOnce()
+			assert.equal(sent.length, n, 'fixed calm readings → no broadcast, however loaded the box is')
+			const c = svc.summary().checks
+			assert.equal(c.find((x) => x.key === 'cpu').measured, 12, 'CPU is the injected reading')
+			assert.equal(c.find((x) => x.key === 'ram').measured, 40, 'RAM is the injected reading')
+			assert.equal(c.find((x) => x.key === 'server-loop').measured, 2, 'the loop is the injected reading')
+			host = { ...host, cpuThrottleDelta: 3 }
+			svc.sampleOnce()
+			assert.equal(sent.length, n + 1, 'one throttle event (rise 1) starts an incident → one broadcast')
+			assert.equal(svc.summary().checks.find((x) => x.key === 'cpu-thermal').text, '3 throttle events')
+			loop = { maxMs: 900, p99Ms: 900, meanMs: 10 }
+			svc.sampleOnce()
+			assert.equal(svc.summary().label, 'Server stalled 900 ms')
 		} finally {
 			svc.stop()
 		}

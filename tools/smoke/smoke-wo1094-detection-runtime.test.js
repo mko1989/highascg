@@ -184,6 +184,33 @@ describe('WO-1094 API guards', () => {
 		assert.equal((await call('POST /api/tracking/runtime/resume', { prefix: path.join(TMP, 'none') })).status, 409)
 		assert.equal((await call('POST /api/tracking/runtime/cancel', {})).status, 409)
 	})
+	it('WO-1106 B1 follow-up: repair / resume refuse a LAN device with auth off; the box or the password pass', async () => {
+		const REMOTE = { socket: { remoteAddress: '192.168.1.50', localPort: 4200 }, headers: { host: '192.168.1.17:4200' } }
+		const OFF = { config: {} }
+		const ON = { config: { security: { enforceAuth: true, apiToken: 'wo1106-pw' } } }
+		const run = async (k, body, req, ctx) => {
+			const r = await h[k]({ query: {}, body: JSON.stringify(body), req, ctx })
+			return { status: r.status, body: JSON.parse(r.body) }
+		}
+		for (const k of ['POST /api/tracking/runtime/repair', 'POST /api/tracking/runtime/resume']) {
+			const r = await run(k, { prefix: path.join(TMP, 'lan') }, REMOTE, OFF)
+			assert.equal(r.status, 403, k)
+			assert.equal(r.body.code, 'NOT_ALLOWED')
+			assert.match(r.body.error, /do this on the box itself/)
+		}
+		// let through, they reach the normal checks (no job is started here)
+		assert.deepEqual(await run('POST /api/tracking/runtime/repair', { test: { free_mb: 1 } }, BOX, OFF), { status: 400, body: { error: 'test hooks need a scratch prefix' } })
+		const lanPw = { ...REMOTE, headers: { ...REMOTE.headers, authorization: 'Bearer wo1106-pw' } }
+		const tokenFile = process.env.HIGHASCG_API_TOKEN_FILE
+		process.env.HIGHASCG_API_TOKEN_FILE = path.join(TMP, 'no-api-token') // the box's own token file must not answer
+		try {
+			assert.equal((await run('POST /api/tracking/runtime/resume', { prefix: path.join(TMP, 'none') }, lanPw, ON)).status, 409, 'the password passes')
+			assert.equal((await run('POST /api/tracking/runtime/resume', { prefix: path.join(TMP, 'none') }, REMOTE, ON)).status, 403, 'auth on, no password')
+		} finally {
+			if (tokenFile === undefined) delete process.env.HIGHASCG_API_TOKEN_FILE
+			else process.env.HIGHASCG_API_TOKEN_FILE = tokenFile
+		}
+	})
 	it('a bundle never goes into the repo or a sync pair', () => {
 		assert.match(routesMod.checkDest(path.join(ROOT, 'media')), /synced to other machines/)
 		assert.match(routesMod.checkDest('relative'), /absolute/)

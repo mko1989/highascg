@@ -471,4 +471,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-cluster-air-journal.test.js', // WO-1106 C28: cleared layers leave the journal
 	'tools/smoke/smoke-wo1106-godot-previs.test.js', // WO-1106 A22 / A42: converter outputs ignored + verifier, one drape colour form in GD and JS
 	'tools/smoke/smoke-wo1106-godot-client-guards.test.js', // WO-1106 B28 / B31 / C3 / C4 / C6: polls keep one request in flight, presenters keep typed names, photo cache pruned
+	'tools/smoke/smoke-wo1106-misc-zoom.test.js', // WO-1106 D3: rebind runs in the per-source chain, apply() waits for the tick in flight
+	'tools/smoke/smoke-wo1106-misc-pixelhue.test.js', // WO-1106 C41: a dead Studio session is dropped, reconnected once and the call retried
+	'tools/smoke/smoke-wo1106-misc-ci-decklink.test.js', // WO-1106 D4 / D5: dpkg --force-confmiss for desktopvideo, dev-dependency licences in the verify job
 ]

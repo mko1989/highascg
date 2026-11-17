@@ -210,19 +210,26 @@ function createZoomSession(deps = {}) {
 
 	/** Re-bind sources whose window Zoom destroyed to a same-title (else same-role) window nobody else uses. */
 	async function rebind() {
-		const lost = SOURCES.filter((s) => src[s].window && src[s].grab && src[s].grab.alive && !src[s].grab.status.window)
+		const isLost = (e) => e.window && e.grab && e.grab.alive && !e.grab.status.window
+		const lost = SOURCES.filter((s) => isLost(src[s])).map((s) => ({ s, grab: src[s].grab }))
 		if (!lost.length) return
 		const wins = await listWindows()
-		for (const s of lost) {
-			const used = new Set(SOURCES.filter((o) => o !== s).map((o) => src[o].window))
-			// same title only, and only what autoBindable allows (the role fallback took the join preview, 10.11)
-			const hit = zoomWindows.autoBindable(wins).find((w) => !used.has(w.id) && w.title === src[s].title)
-			if (!hit) continue
-			src[s].window = hit.id
-			src[s].title = hit.title
-			src[s].grab.setWindow(hit.id)
-			if (src[s].hidden) await placeHidden(s)
-			log('info', `[zoom] ${s}: re-bound to ${hit.id} "${hit.title}"`)
+		for (const { s, grab } of lost) {
+			// WO-1106 D3: in the source's chain (C9), re-checked after the await — a quit or an assign that ran during
+			// listWindows() stopped or replaced this grab (src[s].grab null → a TypeError the timer swallowed)
+			await serial(s, async () => {
+				const e = src[s]
+				if (e.grab !== grab || !isLost(e)) return
+				const used = new Set(SOURCES.filter((o) => o !== s).map((o) => src[o].window))
+				// same title only, and only what autoBindable allows (the role fallback took the join preview, 10.11)
+				const hit = zoomWindows.autoBindable(wins).find((w) => !used.has(w.id) && w.title === e.title)
+				if (!hit) return
+				e.window = hit.id
+				e.title = hit.title
+				e.grab.setWindow(hit.id)
+				if (e.hidden) await placeHidden(s)
+				log('info', `[zoom] ${s}: re-bound to ${hit.id} "${hit.title}"`)
+			})
 		}
 	}
 

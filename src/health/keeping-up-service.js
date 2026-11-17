@@ -71,11 +71,16 @@ function channelNames(cm) {
 	return names
 }
 
+/**
+ * @param {object} [opts] autostart, gpu, wsClients; WO-1106 D6: `readHost()` → { cpuPct, memPct, gpu, cpuThrottleDelta }
+ *   and `readLoop()` → { maxMs, p99Ms, meanMs } | null replace the machine readings (/proc, the thermal throttle
+ *   counter, the event-loop histogram) so a test runs on fixed readings, not on whatever load the box is under.
+ */
 function startKeepingUp(ctx, opts = {}) {
 	const model = new KeepingUpModel()
 	const log = (level, msg) => (typeof ctx.log === 'function' ? ctx.log(level, msg) : undefined)
-	const loop = monitorEventLoopDelay({ resolution: LOOP_RES_MS })
-	loop.enable()
+	const loop = typeof opts.readLoop === 'function' ? null : monitorEventLoopDelay({ resolution: LOOP_RES_MS })
+	if (loop) loop.enable()
 	const oscHist = []
 	const reported = new Map() // key → { result, until }
 	const rings = new Map() // ring name → { fps, at }
@@ -133,7 +138,7 @@ function startKeepingUp(ctx, opts = {}) {
 		return map
 	}
 
-	const hostSample = () => {
+	const machineSample = () => {
 		let cpuPct = null
 		try {
 			const cur = parseProcStatCpu(fs.readFileSync('/proc/stat', 'utf8'))
@@ -149,6 +154,14 @@ function startKeepingUp(ctx, opts = {}) {
 		const tot = os.totalmem()
 		const g = gpu && Date.now() - gpu.at < 5000 ? gpu : null
 		return { cpuPct, memPct: tot > 0 ? ((tot - os.freemem()) / tot) * 100 : null, gpu: g, cpuThrottleDelta }
+	}
+	const hostSample = typeof opts.readHost === 'function' ? opts.readHost : machineSample
+
+	const loopSample = typeof opts.readLoop === 'function' ? opts.readLoop : () => {
+		const lag = (ns) => Math.max(0, ns / 1e6 - LOOP_RES_MS)
+		const out = loop.count > 0 ? { maxMs: lag(loop.max), p99Ms: lag(loop.percentile(99)), meanMs: lag(loop.mean) } : null
+		loop.reset()
+		return out
 	}
 
 	const wsSample = () => {
@@ -173,9 +186,7 @@ function startKeepingUp(ctx, opts = {}) {
 		} else oscHist.length = 0
 		const ringNames = {}
 		for (const l of osc?.layers || []) if (l.type === 'shm' && l.name) ringNames[l.name] = ringFps(l.name)
-		const lag = (ns) => Math.max(0, ns / 1e6 - LOOP_RES_MS)
-		const loopS = loop.count > 0 ? { maxMs: lag(loop.max), p99Ms: lag(loop.percentile(99)), meanMs: lag(loop.mean) } : null
-		loop.reset()
+		const loopS = loopSample()
 		const det = ctx.detectService?.health?.()
 		for (const [k, v] of reported) if (v.until < now) reported.delete(k)
 		const caspar = ctx._casparStatus || null
@@ -242,7 +253,7 @@ function startKeepingUp(ctx, opts = {}) {
 		},
 		stop() {
 			if (timer) clearInterval(timer)
-			loop.disable()
+			if (loop) loop.disable()
 			if (nv) try { nv.kill() } catch {}
 			nv = null
 		},

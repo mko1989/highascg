@@ -256,13 +256,33 @@ function createZoomAudio(deps = {}) {
 		restart.nextAt = now() + Math.min(RESTART_BACKOFF_MS * 2 ** (restart.failures - 1), RESTART_BACKOFF_CAP_MS)
 	}
 
+	/** Run `fn` in the single-flight slot; the slot never rejects (the interval returns it), `fn`'s own promise may. */
+	function exclusive(fn) {
+		const run = fn()
+		const slot = run.catch(() => {}).finally(() => {
+			if (ticking === slot) ticking = null
+		})
+		ticking = slot
+		return run
+	}
+
 	/** The interval's entry: a tick still running (a slow daemon start, pw-link) makes the next one a no-op. */
 	function runTick() {
-		if (ticking) return ticking
-		ticking = tick()
-			.catch(() => {})
-			.finally(() => (ticking = null))
+		if (!ticking) exclusive(tick)
 		return ticking
+	}
+
+	/**
+	 * WO-1106 D3: apply()'s own link + feed pass takes the same slot. It ran beside the interval's tick (two pw-link
+	 * passes, two feed ADDs racing); now it waits for a tick in flight (that one may have read the old state) and the
+	 * interval's next tick is a no-op while it runs.
+	 */
+	async function applyPass() {
+		while (ticking) await ticking
+		return exclusive(async () => {
+			await linkTick()
+			await syncFeed().catch((e) => (lastError = String(e.message || e)))
+		})
 	}
 
 	/**
@@ -379,8 +399,7 @@ function createZoomAudio(deps = {}) {
 				linkTimer = timers.setInterval(runTick, LINK_MS)
 				linkTimer.unref?.()
 			}
-			await linkTick()
-			await syncFeed().catch((e) => (lastError = String(e.message || e)))
+			await applyPass()
 			if (!persisted.feed) stopFeeder()
 		} else {
 			if (linkTimer) timers.clearInterval(linkTimer)

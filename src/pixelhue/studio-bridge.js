@@ -10,6 +10,10 @@
  *   - Studio guards every request with the `session` of its current connection — the bridge adds it, so a client of
  *     HighAsCG never handles sessions; a request refused because the connection changed (409) reconnects and is
  *     sent once more (a refused request was not executed);
+ *   - WO-1106 C41: Studio keeps the switcher's token from its connect; a switcher restart / power cycle (new startTime)
+ *     makes it dead, and "connected" stayed cached until the address changed. A dead token (the switcher's 401 / 403,
+ *     a read the switcher rejects) drops the session, reconnects once and repeats the request once; a switcher that
+ *     cannot be reached drops the session, so the next request (and status) connects again instead of trusting it;
  *   - Studio's API is GET = read, PUT = write. HighAsCG's routes take GET and POST: a POST here is Studio's PUT.
  *
  * Nothing leaves the box: the Studio app listens on 127.0.0.1 only and is reachable only through these routes.
@@ -115,6 +119,24 @@ function createStudioBridge(deps = {}) {
 		return j
 	}
 
+	/**
+	 * WO-1106 C41: what Studio's answer says about the connection. Studio wraps every switcher failure as 502 with
+	 * `Device HTTP <code> at <path>.` / `Device rejected <path>: <message> (code <n>).` / `Cannot reach <host>:<port>: …`
+	 * (vendor lib/pixelhue.js requestJson). The switcher's refusal code for a stale token is not documented, so a
+	 * rejected READ is treated as one (as pixelhue-read.js does); a rejected WRITE is not repeated — it may be a real
+	 * refusal after part of the write went through.
+	 * @returns {'retry' | 'drop' | null} retry = reconnect + send once more; drop = forget the session, answer as is
+	 */
+	function refusal(r, method) {
+		if (r.status !== 409 && r.status !== 502) return null
+		const text = r.body.toString('utf8')
+		if (r.status === 409) return /Connection changed|Connect to a device first/.test(text) ? 'retry' : null
+		if (/Device HTTP 40[13] at /.test(text)) return 'retry'
+		if (/Device rejected [^"]*\(code -?\d+\)/.test(text)) return method === 'GET' ? 'retry' : null
+		if (/Cannot reach /.test(text)) return 'drop'
+		return null
+	}
+
 	const withSession = (apiPath) => `${apiPath}${apiPath.includes('?') ? '&' : '?'}session=${encodeURIComponent(session)}`
 
 	/**
@@ -128,13 +150,20 @@ function createStudioBridge(deps = {}) {
 		if (!wantHost) return { status: 409, type: 'application/json', body: Buffer.from(JSON.stringify({ error: 'No PixelHue switcher is set (Devices ▸ PixelHue).' })) }
 		for (let attempt = 0; ; attempt++) {
 			try {
-				await connect(wantHost, attempt > 0)
+				await connect(wantHost)
 			} catch (e) {
 				return { status: e.status || 502, type: 'application/json', body: Buffer.from(JSON.stringify({ error: e.message })) }
 			}
+			const used = session
 			const r = method === 'GET' ? await raw('GET', withSession(apiPath)) : await raw('PUT', withSession(apiPath), { ...(body && typeof body === 'object' ? body : {}), session })
-			const refused = r.status === 409 && /Connection changed|Connect to a device first/.test(r.body.toString('utf8'))
-			if (!refused || attempt > 0) return r
+			const why = refusal(r, method)
+			// only the session this request used is dropped: a concurrent request may already have reconnected, and
+			// the retry then uses that connect (C11: one connect per host) instead of forcing another
+			if (why && session === used) {
+				session = ''
+				state = null
+			}
+			if (why !== 'retry' || attempt > 0) return r
 		}
 	}
 

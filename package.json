@@ -21,6 +21,7 @@
 		"verify:repo-integrity": "node tools/ci/check-require-integrity.js",
 		"verify:script-paths": "node tools/ci/check-script-paths.js",
 		"verify:npm-licenses": "node tools/ci/check-npm-licenses.js",
+		"verify:npm-licenses:dev": "node tools/ci/check-npm-licenses.js --include-dev",
 		"lint": "npx eslint . --max-warnings 216",
 		"format:check": "npx prettier --check tools/ci eslint.config.js .prettierrc.json",
 		"format:write:ci": "npx prettier --write tools/ci eslint.config.js .prettierrc.json",

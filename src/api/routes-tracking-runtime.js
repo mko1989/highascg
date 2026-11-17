@@ -17,7 +17,9 @@
  * body carry `test: { free_mb, proxy }` (fake free space / a dead proxy for the job). Core routes: they answer with the
  * tracking module off too (About reads the same status).
  * WO-1106 B1: install and import put code on the box (pip wheels, a bundle from a folder) — they answer only with the
- * password (auth enforced) or from the box itself (module-host/code-change-gate.js), 403 otherwise.
+ * password (auth enforced) or from the box itself (module-host/code-change-gate.js), 403 otherwise. WO-1106 B1
+ * follow-up: repair (re-downloads and installs the wheels) and resume (re-runs the last job — an install or an import
+ * too) take the same gate.
  */
 
 const fs = require('fs')
@@ -176,7 +178,7 @@ function register(routes) {
 		if (f.error) return reply(400, { error: f.error })
 		return begin(b.repair ? 'repair' : 'install', ['--features', f.value, ...(b.repair ? ['--repair'] : [])], p, b)
 	}, true), opt)
-	routes.post('/api/tracking/runtime/repair', guard((p, b) => begin('repair', ['--features', '', '--repair'], p, b)), opt)
+	routes.post('/api/tracking/runtime/repair', guard((p, b) => begin('repair', ['--features', '', '--repair'], p, b), true), opt)
 	routes.post('/api/tracking/runtime/remove', guard((p, b) => begin('remove', ['--remove', ...(b.keep_models ? ['--keep-models'] : [])], p, b)), opt)
 	routes.post('/api/tracking/runtime/export', guard((p, b) => {
 		const why = checkDest(b.dest)
@@ -193,7 +195,7 @@ function register(routes) {
 		const j = jobs.current(p.prefix)
 		if (!j || !j.snapshot().resumable) return reply(409, { error: 'nothing to resume' })
 		return begin(j.kind, j.args, p, b)
-	}), opt)
+	}, true), opt)
 	routes.post('/api/tracking/runtime/cancel', guard(() => {
 		const r = jobs.cancel()
 		return reply(r.status, r.body)

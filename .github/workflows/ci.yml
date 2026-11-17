@@ -71,6 +71,11 @@ jobs:
       - name: npm licences
         run: npm run verify:npm-licenses
 
+      # WO-1106 D5 — dev dependencies ship in the server release tarball too (it packs node_modules after
+      # `npm ci --include=optional`); the `npm ci` above installs them, so judge the whole tree here, not first at release
+      - name: npm licences (dev included)
+        run: npm run verify:npm-licenses:dev
+
   # WO-593/594/599 — the Godot operator client + the shm frame transport. No GPU on the runner:
   # GDScript logic tests run headless; the GPU upload path is verified on the box (WO-595).
   godot:
