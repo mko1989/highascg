@@ -87,7 +87,7 @@ describe('WO-1103 human test puppets', () => {
 		assert.match(row, /Own\.list\(\)/, 'the Look list offers this machine\'s own characters')
 		const own = read('godot/client/features/previs/tracking/human_own.gd')
 		assert.match(own, /\.local\/share/, 'own characters live in the per-machine data folder')
-		for (const f of ['human_own.gd', 'human_own_tex.gd', 'human_retarget.gd', 'human_rig_map.gd']) {
+		for (const f of ['human_own.gd', 'human_own_tex.gd', 'human_own_merge.gd', 'human_retarget.gd', 'human_rig_map.gd']) {
 			const src = read(`godot/client/features/previs/tracking/${f}`)
 			assert.doesNotMatch(src, /FileAccess\.WRITE|make_dir|ResourceSaver|save_png|write_to_filesystem/, `${f}: reads the model, writes nothing (no derivative in the repo, a project or media/)`)
 		}

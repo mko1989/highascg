@@ -1,6 +1,6 @@
 extends RefCounted
 ## WO-1106 — review fixes to the "bring your own" test puppet (human_own.gd, human_own_dna.gd, human_body.gd): a folder
-## with a body file AND a head file is refused (A12), changed files load again without a restart (A13), a crashed
+## with a body file AND a head file loads as one puppet (A12), changed files load again without a restart (A13), a crashed
 ## converter child is reaped and reads as stopped (A38), bone attachments that carry meshes stay (A40), puppet.json
 ## "moves" is only woman / man (A41), and a name without ASCII letters still gets a slug the server takes (A44).
 ## Scratch folders only under user://wo1106_* (removed before and after).
@@ -16,7 +16,9 @@ func _moves(n: String) -> Dictionary:
 	return Body.template(n)
 
 
-func test_two_model_files_are_refused_not_loaded_headless() -> void:
+## A12 (17.11 first fix: refused; now joined — test_human_own_merge_wo1106_a12.gd has the details): a folder with a
+## body file and a head file loads as one puppet, never as a headless one reported "ok".
+func test_two_model_files_are_joined_not_loaded_headless() -> void:
 	var dir := OS.get_user_data_dir().path_join("wo1106_two")
 	_rm_tree(dir)
 	var s: RefCounted = Synth.new()
@@ -25,10 +27,12 @@ func test_two_model_files_are_refused_not_loaded_headless() -> void:
 	t.eq(Own.list(dir).size(), 1, "still listed")
 	var tpl := Own.template("ada", _moves, dir)
 	var rep := Own.report("ada")
-	t.ok(tpl.is_empty() and not rep.get("ok", false), "two model files: not loaded as an ok puppet")
-	t.ok(str(rep.get("error", "")).contains("one file") and str(rep.get("error", "")).contains("body.glb"), "says why: %s" % rep.get("error", ""))
+	t.ok(not tpl.is_empty() and rep.get("ok", false), "two model files: one puppet — %s" % rep)
+	t.eq(rep.get("joined", []), ["head.glb"], "the second file joined (equal bones: the first by name is the main)")
 	var help := FileAccess.get_file_as_string("res://help/own-test-puppet.md")
-	t.ok(help.contains("one file"), "the help page says the same")
+	t.ok(help.contains("joined") and not help.contains("A folder with more than one model\n   file is not loaded"), "the help page says the same")
+	if not tpl.is_empty():
+		(tpl.root as Node).free()
 	Own._reports.erase("ada")
 	Own._sigs.erase("ada")
 	_rm_tree(dir)

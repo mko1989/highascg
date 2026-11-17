@@ -4,6 +4,8 @@ extends RefCounted
 ## ~/.local/share/highascg/puppets/<name>/ as .glb / .gltf / .fbx (with its textures). NEVER shipped: the folder is
 ## outside the repo, excluded from the ISO / stick / bridge copies (WO-1094 lines + verify-iso-detection-runtime.sh),
 ## and nothing is written back into the repo, media/ or projects/. Each machine has its own.
+## WO-1106 A12: a folder may hold several model files on one skeleton (Unreal / MetaHuman: body.fbx + head.fbx) — they
+## are joined into one puppet by bone name (human_own_merge.gd) before anything below.
 ##
 ## Read at run time (GLTFDocument / FBXDocument), then: textures over 2048 px scaled down, LODs generated, over
 ## WARN_TRIS triangles a warning (over MAX_TRIS refused), the humanoid bones found by name (human_rig_map.gd) — a model
@@ -17,6 +19,7 @@ const Map := preload("res://features/previs/tracking/human_rig_map.gd")
 const Retarget := preload("res://features/previs/tracking/human_retarget.gd")
 const Tex := preload("res://features/previs/tracking/human_own_tex.gd")
 const Dna := preload("res://features/previs/tracking/human_own_dna.gd")
+const Merge := preload("res://features/previs/tracking/human_own_merge.gd")
 const EXT := ["glb", "gltf", "fbx"]
 const MAX_TEX := 2048
 const WARN_TRIS := 150000
@@ -162,14 +165,11 @@ static func prepare(slug: String, root := "") -> Dictionary:
 		rep.error = why if why != "" else "converting the MetaHuman DNA (started)"
 		return {"out": _fail(rep)}
 	rep.file = entry.file
+	# WO-1106 A12: every model file in the folder (a body FBX + a head FBX on one skeleton) — build() joins them by
+	# bone name (human_own_merge.gd); only the first loaded used to, a headless puppet reported "ok"
 	var models: Array = _models_in(str(entry.folder)) if entry.has("folder") else []
-	if models.size() > 1:
-		# WO-1106 A12: only one file loads (a body FBX + a head FBX gave a headless puppet reported "ok")
-		rep.error = "%d model files in the folder (%s) — only one can load: put the body and the head in one file" % [models.size(),
-			", ".join(PackedStringArray(models.map(func(f: String) -> String: return f.get_file())))]
-		return {"out": _fail(rep)}
 	_reports[slug] = {"slug": slug, "ok": false, "loading": true, "file": entry.file, "warnings": []}  # build()'s rep is its own
-	return {"slug": slug, "entry": entry, "rep": rep, "t0": t0}
+	return {"slug": slug, "entry": entry, "files": models if models.size() > 1 else [entry.file], "rep": rep, "t0": t0}
 
 
 ## Main thread: the job's report becomes report(slug); `out` = build()'s answer.
@@ -182,33 +182,29 @@ static func finish(job: Dictionary, out: Dictionary) -> Dictionary:
 ## `moves_of` must be safe to call from the thread too (human_body.gd hands it private copies of the shipped bodies).
 static func build(job: Dictionary, moves_of: Callable) -> Dictionary:
 	var rep: Dictionary = job.rep
-	var entry: Dictionary = job.entry
 	var t0 := int(job.t0)
-	var fbx := str(entry.file).get_extension().to_lower() == "fbx"
-	var doc: GLTFDocument = FBXDocument.new() if fbx else GLTFDocument.new()
-	var st: GLTFState = FBXState.new() if fbx else GLTFState.new()
-	if doc.append_from_file(entry.file, st) != OK:
-		rep.error = "cannot read %s" % entry.file
+	var parts := _import_all(job.get("files", [job.entry.file]) as Array, rep)
+	if parts.is_empty():
 		return _fail(rep)
-	rep.tris = _tris(st)
-	if rep.tris > MAX_TRIS:
-		rep.error = "%d triangles — over the %d limit for a previs puppet (export a lower LOD)" % [rep.tris, MAX_TRIS]
-		return _fail(rep)
-	if rep.tris > WARN_TRIS:
-		rep.warnings.append("%d triangles — heavy for a previs puppet (LODs are generated; consider exporting a lower LOD)" % rep.tris)
-	var scaled := _cap_textures(st)
-	if scaled > 0:
-		rep.warnings.append("%d texture(s) over %d px scaled down" % [scaled, MAX_TEX])
-	for gm: GLTFMesh in st.get_meshes():
-		if gm.mesh != null and gm.mesh.get_surface_count() > 0:
-			gm.mesh.generate_lods(25.0, 60.0, [])
-	var scene: Node = doc.generate_scene(st)
-	var sk := _biggest_skeleton(scene) if scene != null else null
-	if sk == null:
-		rep.error = "no skeleton (the model must be rigged)"
-		if scene != null:
-			scene.free()
-		return _fail(rep)
+	# WO-1106 A12: several files (body + head) → one skeleton, joined by bone name onto the one with the most bones
+	var main := Merge.pick_main(parts)
+	var file := str(parts[main].file)
+	var scene: Node = parts[main].scene
+	var sk: Skeleton3D = parts[main].sk
+	rep.file = file
+	for i in parts.size():
+		if i == main:
+			continue
+		var j := Merge.join(sk, parts[i].scene, parts[i].sk, str(parts[i].file), file)
+		(parts[i].scene as Node).free()
+		rep.warnings.append_array(j.warnings)
+		if not j.ok:
+			rep.error = j.error
+			_free_parts(parts)
+			return _fail(rep)
+		rep.joined = rep.get("joined", []) + [str(parts[i].file).get_file()]
+		rep.warnings.append("%s joined onto %s's skeleton by bone name: %d mesh(es), %d bone(s) added" % [str(parts[i].file).get_file(),
+			file.get_file(), j.meshes, j.added.size()])
 	var m := Map.map(sk)
 	rep.bones = sk.get_bone_count()
 	rep.mapped = m.bones.keys()
@@ -219,10 +215,10 @@ static func build(job: Dictionary, moves_of: Callable) -> Dictionary:
 		return _fail(rep)
 	_strip_helpers(scene)
 	var own := _place(scene, sk, m.bones)
-	var found := Tex.fill(own.root, str(entry.file).get_base_dir())  # FBX / DNA-converted: textures by file name
+	var found := Tex.fill(own.root, file.get_base_dir())  # FBX / DNA-converted: textures by file name
 	if found > 0:
 		rep.warnings.append("%d texture(s) matched by file name" % found)
-	var meta := _meta(str(entry.file).get_base_dir())
+	var meta := _meta(file.get_base_dir())
 	var moves_name := "woman" if float(own.height) < 1.75 else "man"
 	if meta.has("moves"):
 		if str(meta.moves) in MOVES:
@@ -245,12 +241,60 @@ static func build(job: Dictionary, moves_of: Callable) -> Dictionary:
 	rep.moves = moves_name
 	rep.height = snappedf(float(own.height), 0.01)
 	rep.ms = Time.get_ticks_msec() - t0
-	print("[human_own] %s: %s, %d triangles, %d bones (%d mapped), %.2f m, moves %s, %d ms%s" % [rep.slug, str(entry.file).get_file(), rep.tris,
+	print("[human_own] %s: %s, %d triangles, %d bones (%d mapped), %.2f m, moves %s, %d ms%s" % [rep.slug, file.get_file(), rep.tris,
 		rep.bones, rep.mapped.size(), rep.height, moves_name, rep.ms, ("; " + "; ".join(rep.warnings)) if not rep.warnings.is_empty() else ""])
 	var toes := []
 	for side in ["Left", "Right"]:
 		toes.append(sk.get_bone_name(int(m.bones.get(side + "Toes", m.bones[side + "Foot"]))))
 	return {"root": own.root, "height": own.height, "moves": res.lib, "toes": toes, "own": true, "skeleton_path": (own.root as Node).get_path_to(sk)}
+
+
+## Read every file of the job (WO-1106 A12: a body and a head file) → [{file, scene, sk}], or [] (rep says why). The
+## triangle limit counts them all.
+static func _import_all(files: Array, rep: Dictionary) -> Array:
+	var states := []
+	rep.tris = 0
+	for f: String in files:
+		var fbx := f.get_extension().to_lower() == "fbx"
+		var doc: GLTFDocument = FBXDocument.new() if fbx else GLTFDocument.new()
+		var st: GLTFState = FBXState.new() if fbx else GLTFState.new()
+		if doc.append_from_file(f, st) != OK:
+			rep.error = "cannot read %s" % f
+			return []
+		rep.tris += _tris(st)
+		states.append([f, doc, st])
+	if rep.tris > MAX_TRIS:
+		rep.error = "%d triangles — over the %d limit for a previs puppet (export a lower LOD)" % [rep.tris, MAX_TRIS]
+		return []
+	if rep.tris > WARN_TRIS:
+		rep.warnings.append("%d triangles — heavy for a previs puppet (LODs are generated; consider exporting a lower LOD)" % rep.tris)
+	var scaled := 0
+	var parts := []
+	for s: Array in states:
+		var st: GLTFState = s[2]
+		scaled += _cap_textures(st)
+		for gm: GLTFMesh in st.get_meshes():
+			if gm.mesh != null and gm.mesh.get_surface_count() > 0:
+				gm.mesh.generate_lods(25.0, 60.0, [])
+		var scene: Node = (s[1] as GLTFDocument).generate_scene(st)
+		var sk := _biggest_skeleton(scene) if scene != null else null
+		if sk == null:
+			rep.error = "no skeleton (the model must be rigged)" if files.size() == 1 else \
+				"%s: no skeleton — every model file in the folder must be rigged on the same skeleton" % str(s[0]).get_file()
+			if scene != null:
+				scene.free()
+			_free_parts(parts)
+			return []
+		parts.append({"file": s[0], "scene": scene, "sk": sk})
+	if scaled > 0:
+		rep.warnings.append("%d texture(s) over %d px scaled down" % [scaled, MAX_TEX])
+	return parts
+
+
+static func _free_parts(parts: Array) -> void:
+	for p: Dictionary in parts:
+		if is_instance_valid(p.scene):
+			(p.scene as Node).free()
 
 
 ## The importer's helpers are not ours to play: its AnimationPlayers, and bone attachments that carry no mesh.
