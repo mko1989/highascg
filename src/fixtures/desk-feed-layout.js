@@ -117,7 +117,11 @@ function buildLayout(heads, cfg) {
 	return out
 }
 
-/** Why a feed universe may not be used (null = fine). `ctx`: { fixtures, levels, grant, reads, isSelfLoop, reachesSelf }. */
+/**
+ * Why a feed universe may not be used (null = fine). `ctx`: { fixtures, levels, grant, reads, isSelfLoop, reachesSelf,
+ * sacnReads?, sacnReachesSelf? } — reads / sacnReads: the Art-Net / sACN universes this box reads back (read-through,
+ * grant, the visualiser and its WO-1078 twins, WO-1106 B17).
+ */
 function refusal(cfg, universe, to, ctx) {
 	if (!to) return cfg.protocol === 'artnet' && !cfg.dest ? 'set the desk\'s IP address (never a broadcast)' : `bad destination "${cfg.dest}"`
 	const rig = ctx.fixtures.find((f) => f.protocol === cfg.protocol && f.universe === universe)
@@ -127,6 +131,7 @@ function refusal(cfg, universe, to, ctx) {
 	if (ctx.grant?.enabled && cfg.protocol === 'artnet' && ctx.grant.universe === universe) return `universe ${universe} is the LD grant universe`
 	if (ctx.isSelfLoop(to, universe, cfg.protocol)) return "would loop into this box's own input"
 	if (cfg.protocol === 'artnet' && ctx.reads.has(universe) && ctx.reachesSelf(to)) return `universe ${universe} is read back as a console input`
+	if (cfg.protocol === 'sacn' && ctx.sacnReads?.has(universe) && ctx.sacnReachesSelf?.(to)) return `universe ${universe} is read back as a console input`
 	return null
 }
 

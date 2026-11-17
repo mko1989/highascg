@@ -64,6 +64,18 @@ function rotationOf(m) {
 	return [0, 1, 2].map((r) => [col[0][r], col[1][r], col[2][r]])
 }
 
+/**
+ * WO-1106 B18 — THE MagicQ rotation (one convention for every MagicQ CSV: this table and console-match.js exportCsv):
+ * a world matrix → [RotX, RotY, RotZ] degrees, R = Ry · Rx · Rz in MagicQ's frame (X = MVR X, Y = MVR Z (up),
+ * Z = −MVR Y), the order its own MVR import showed (header).
+ */
+function magicqRotation(m) {
+	const R = rotationOf(m)
+	const C = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
+	const Rq = C.map((row) => [0, 1, 2].map((c) => row.reduce((s, v, k) => s + v * [0, 1, 2].reduce((t, j) => t + R[k][j] * C[c][j], 0), 0)))
+	return eulerYXZ(Rq)
+}
+
 const cell = (v) => {
 	const s = String(v ?? '')
 	return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
@@ -84,17 +96,14 @@ function rigCsv(heads, opts = {}) {
 	for (const h of heads) {
 		if (!Array.isArray(h.matrix)) continue
 		const m = h.matrix
-		const R = rotationOf(m)
 		const a = opts.addressOf?.(h.id) || null
 		if (magicq) {
 			// MagicQ frame: X = MVR X, Y = MVR Z (up), Z = −MVR Y (towards the audience); same change for the rotation
-			const C = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
-			const Rq = C.map((row) => [0, 1, 2].map((c) => row.reduce((s, v, k) => s + v * [0, 1, 2].reduce((t, j) => t + R[k][j] * C[c][j], 0), 0)))
-			const [rx, ry, rz] = eulerYXZ(Rq)
+			const [rx, ry, rz] = magicqRotation(m)
 			const dmx = a ? `${a.universe + (a.protocol === 'sacn' ? 0 : 1)}-${String(a.address).padStart(3, '0')}` : ''
 			rows.push([h.fid ?? '', h.name, dmx, r3(m[12]), r3(m[14]), r3(-m[13]), r2(rx), r2(ry), r2(rz), ''])
 		} else {
-			const [rx, ry, rz] = eulerZYX(R)
+			const [rx, ry, rz] = eulerZYX(rotationOf(m))
 			rows.push([h.fid ?? '', h.name, a?.universe ?? '', a?.address ?? '', r3(m[12]), r3(m[13]), r3(m[14]), r2(rx), r2(ry), r2(rz),
 				h.status, h.moved_m ?? '', h.turned_deg ?? '', h.fit || '', h.uuid || ''])
 		}
@@ -102,4 +111,4 @@ function rigCsv(heads, opts = {}) {
 	return `${rows.map((r) => r.map(cell).join(',')).join('\r\n')}\r\n`
 }
 
-module.exports = { rigCsv, eulerZYX, eulerYXZ, rotationOf }
+module.exports = { rigCsv, eulerZYX, eulerYXZ, rotationOf, magicqRotation }

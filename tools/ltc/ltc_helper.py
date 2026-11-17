@@ -65,6 +65,10 @@ def load_lib():
     lib.ltc_encoder_encode_frame.argtypes = [vp]
     lib.ltc_encoder_inc_timecode.argtypes = [vp]
     lib.ltc_encoder_get_bufferptr.argtypes = [vp, ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), ctypes.c_int]
+    # WO-1106 B21: without argtypes ctypes passes the encoder pointer as a 32-bit int (segfault once the heap is high)
+    lib.ltc_encoder_get_frame.argtypes = [vp, ctypes.POINTER(LTCFrame)]
+    lib.ltc_encoder_set_frame.argtypes = [vp, ctypes.POINTER(LTCFrame)]
+    lib.ltc_frame_set_parity.argtypes = [ctypes.POINTER(LTCFrame), ctypes.c_int]
     lib._path = c
     return lib
 

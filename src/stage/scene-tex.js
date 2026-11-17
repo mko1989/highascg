@@ -8,9 +8,12 @@
  * edge, then the largest one is halved until the sum fits (never below MIN_EDGE); still over → the textures are
  * left out (the materials keep their colours). Identical images (same bytes) are encoded once.
  *
- *   shrinkImages(images: [{ data, mime }], { encode?, budget?, maxEdge?, pause? }) → Promise<[{ data, mime, w, edge } | null]>
+ *   shrinkImages(images: [{ data, mime } | { load() → Promise<{ data, mime } | null> }], { encode?, budget?, maxEdge?, pause? })
+ *     → Promise<[{ data, mime, w, edge } | null]>   (`load`: read on demand, one picture in memory at a time — WO-1106 B5)
  *   encode(data, mime, edge) → Promise<{ data, mime } | null> (default: ffmpeg; smokes inject their own)
  *   ffmpegMeanColor({ data, mime }) → Promise<[r, g, b] linear | null> (rc-scene-venue.js flattenHeavyTextures)
+ *   stopAll() → n: kill this thread's running ffmpeg children and refuse new ones (WO-1106 B20: the venue import worker's
+ *     cancel — a terminated worker would orphan them). Never called on the main thread (the game shares this module).
  */
 
 const crypto = require('crypto')
@@ -20,6 +23,37 @@ const TEX_BUDGET = 1.5 * 1024 * 1024
 const MAX_EDGE = 1024
 const MIN_EDGE = 128
 const ENCODE_MS = 20000
+
+const live = new Set() // { p, timer } of every running ffmpeg child (WO-1106 B20)
+let stopped = false
+
+/** ffmpeg as a tracked child: the timer kills a stuck one; stopAll() kills them all. → the ChildProcess, or null. */
+function track(args) {
+	if (stopped) return null
+	const p = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'ignore'] })
+	const c = { p, timer: setTimeout(() => p.kill('SIGKILL'), ENCODE_MS) }
+	live.add(c)
+	p.on('close', () => {
+		clearTimeout(c.timer)
+		live.delete(c)
+	})
+	return p
+}
+
+function stopAll() {
+	stopped = true
+	const n = live.size
+	for (const c of live) {
+		clearTimeout(c.timer)
+		try {
+			c.p.kill('SIGKILL')
+		} catch {
+			/* already gone */
+		}
+	}
+	live.clear()
+	return n
+}
 
 /** A PNG whose colour type carries alpha (4 grey + alpha, 6 RGBA) or a tRNS chunk. */
 function pngHasAlpha(buf) {
@@ -38,18 +72,16 @@ function ffmpegEncode(data, mime, edge) {
 	return new Promise((resolve) => {
 		let p
 		try {
-			p = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'ignore'] })
+			p = track(args)
 		} catch {
-			resolve(null)
-			return
+			p = null
 		}
+		if (!p) return void resolve(null)
 		const out = []
-		const timer = setTimeout(() => p.kill('SIGKILL'), ENCODE_MS)
 		p.on('error', () => resolve(null))
 		p.stdout.on('data', (d) => out.push(d))
 		p.stdin.on('error', () => {})
 		p.on('close', (code) => {
-			clearTimeout(timer)
 			const buf = Buffer.concat(out)
 			resolve(code === 0 && buf.length > 16 ? { data: buf, mime: alpha ? 'image/png' : 'image/jpeg' } : null)
 		})
@@ -65,18 +97,16 @@ function ffmpegMeanColor(im) {
 	return new Promise((resolve) => {
 		let p
 		try {
-			p = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'ignore'] })
+			p = track(args)
 		} catch {
-			resolve(null)
-			return
+			p = null
 		}
+		if (!p) return void resolve(null)
 		const out = []
-		const timer = setTimeout(() => p.kill('SIGKILL'), ENCODE_MS)
 		p.on('error', () => resolve(null))
 		p.stdout.on('data', (d) => out.push(d))
 		p.stdin.on('error', () => {})
 		p.on('close', (code) => {
-			clearTimeout(timer)
 			const b = Buffer.concat(out)
 			const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
 			resolve(code === 0 && b.length >= 3 ? [lin(b[0] / 255), lin(b[1] / 255), lin(b[2] / 255)] : null)
@@ -98,8 +128,9 @@ function edgeOf(buf) {
 }
 
 /**
- * Images (index-aligned, null allowed) → the shrunk ones (null = left out). Encodes run one at a time.
- * @param {{ data: Buffer, mime: string } | null[]} images
+ * Images (index-aligned, null allowed) → the shrunk ones (null = left out). Encodes run one at a time; a `load` image is
+ * read when it is encoded and let go after (a re-encode reads it again), so only one source picture is held at a time.
+ * @param {({ data: Buffer, mime: string } | { load: () => Promise<{ data: Buffer, mime: string } | null> } | null)[]} images
  */
 async function shrinkImages(images, o = {}) {
 	const encode = o.encode || ffmpegEncode
@@ -107,17 +138,25 @@ async function shrinkImages(images, o = {}) {
 	const maxEdge = o.maxEdge || MAX_EDGE
 	const pause = o.pause || (() => new Promise((r) => setImmediate(r)))
 	const uniq = new Map() // hash → { src, edge, out }
-	const keyOf = images.map((im) => {
-		if (!im?.data?.length) return null
-		const h = crypto.createHash('sha1').update(im.data).digest('hex')
-		if (!uniq.has(h)) uniq.set(h, { src: im, edge: Math.min(maxEdge, edgeOf(im.data) || maxEdge), out: null })
-		return h
-	})
-	const run = async (u) => {
-		u.out = (await encode(u.src.data, u.src.mime, u.edge).catch(() => null)) || null
+	const run = async (u, got) => {
+		const s = got || (u.src.load ? await u.src.load() : u.src)
+		u.out = (s?.data?.length && (await encode(s.data, s.mime, u.edge).catch(() => null))) || null
 		await pause()
 	}
-	for (const u of uniq.values()) await run(u)
+	const keyOf = []
+	for (const im of images) {
+		const got = im?.load ? await im.load() : im
+		if (!got?.data?.length) {
+			keyOf.push(null)
+			continue
+		}
+		const h = crypto.createHash('sha1').update(got.data).digest('hex')
+		keyOf.push(h)
+		if (uniq.has(h)) continue
+		const u = { src: im.load ? im : got, edge: Math.min(maxEdge, edgeOf(got.data) || maxEdge), out: null }
+		uniq.set(h, u)
+		await run(u, got)
+	}
 	const total = () => [...uniq.values()].reduce((s, u) => s + (u.out ? u.out.data.length : 0), 0)
 	while (total() > budget) {
 		const big = [...uniq.values()].filter((u) => u.out && u.edge > MIN_EDGE).sort((a, b) => b.out.data.length - a.out.data.length)[0]
@@ -132,4 +171,4 @@ async function shrinkImages(images, o = {}) {
 	})
 }
 
-module.exports = { TEX_BUDGET, MAX_EDGE, shrinkImages, ffmpegEncode, ffmpegMeanColor, edgeOf }
+module.exports = { TEX_BUDGET, MAX_EDGE, shrinkImages, ffmpegEncode, ffmpegMeanColor, edgeOf, stopAll }

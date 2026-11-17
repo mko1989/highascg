@@ -177,6 +177,28 @@ function sacnUniversesFor(fixtures) {
 	return [...out]
 }
 
+/** Every Art-Net port-address the visualiser hears for these fixtures: their own, or the twin of an sACN one. */
+function artnetUniversesFor(fixtures) {
+	const out = new Set()
+	for (const fx of fixtures) {
+		const u = fx.protocol === 'sacn' ? twinUniverse(fx) : fx.universe
+		if (u != null && u >= 0) out.add(u)
+	}
+	return [...out]
+}
+
+/** The fixtures the visualiser reads (`fixtures.dmx.visualise`): typed and enabled. */
+const visualisedFixtures = (fixtures, dmx) => (dmx?.visualise ? fixtures.filter((f) => f.gdtf && f.enabled) : [])
+
+/**
+ * WO-1106 B17 — the universes the visualiser reads back, per protocol, WO-1078 twins included: an output of this box
+ * that reaches its own input on one of them shows in the previs as if the console sent it.
+ */
+function visualReads(fixtures, dmx) {
+	const vis = visualisedFixtures(fixtures, dmx)
+	return { artnet: new Set(artnetUniversesFor(vis)), sacn: new Set(sacnUniversesFor(vis)) }
+}
+
 /**
  * The fresh console frame for a patched fixture: its own protocol's, else the other protocol's frame of the same
  * console universe (WO-1078), else ZERO.
@@ -189,4 +211,5 @@ function inputFrame(fx, inputs) {
 	return (twin != null && (sacn ? inputs.artnet : inputs.sacn)?.frame(twin)) || ZERO
 }
 
-module.exports = { SacnFrames, inputFrame, twinUniverse, sacnUniversesFor, ZERO, MAX_MEMBERSHIPS }
+module.exports = { SacnFrames, inputFrame, twinUniverse, sacnUniversesFor, visualisedFixtures, visualReads, ZERO,
+	MAX_MEMBERSHIPS }

@@ -25,7 +25,7 @@ const gdtfStore = require('./gdtf-store')
 const { decodeVisual } = require('./gdtf-visual')
 const { offsetAt } = require('./beam-offset')
 const { features, aimValues } = require('./gdtf-features')
-const { SacnFrames, inputFrame, sacnUniversesFor } = require('./dmx-input')
+const { SacnFrames, inputFrame, sacnUniversesFor, visualisedFixtures } = require('./dmx-input')
 const { normalizeLooks, recallInto } = require('./fixture-looks')
 const { chainOf } = require('./gdtf-ik')
 const { cleanValue } = require('./gdtf-patch')
@@ -140,6 +140,7 @@ function createFollowService(ctx, hub, deps = {}) {
 		send,
 		isSelfLoop,
 		reachesSelf,
+		sacnReachesSelf, // WO-1106 B17: the desk feed / levels universe vs the visualiser's sACN input
 		resolveMode: (typeId, mode) => {
 			try {
 				const m = gdtfStore.mode(typeId, mode)
@@ -181,7 +182,7 @@ function createFollowService(ctx, hub, deps = {}) {
 		looks = normalizeLooks(slice?.looks, cleanValue)
 		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' && lightingOn() })
 		// WO-615 T7: visualiser mode reads the console's universes of the typed patch (Art-Net via the shared tap).
-		const vis = engine.dmx.visualise ? engine.fixtures.filter((f) => f.gdtf && f.enabled) : []
+		const vis = visualisedFixtures(engine.fixtures, engine.dmx)
 		// WO-1078: both protocols for every visualised universe — a rig split over Art-Net and sACN is patched "artnet"
 		// WO-1085: the LD's grant channel is read from the console's Art-Net in every mode (PSN + levels too)
 		if ((engine.through.enabled && engine.protocol === 'artnet') || engine.handover.cfg.grant.enabled || vis.length) consoleFrames.start()

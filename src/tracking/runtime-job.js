@@ -122,10 +122,26 @@ const alive = (pid) => {
 	}
 }
 
+/**
+ * WO-1106 B23 — who a pid is: boot id + start time (/proc/<pid>/stat field 22). A bare pid is reused after a reboot, so
+ * a stale "running" job would look alive. null where /proc is unreadable (then only the pid is compared, as before).
+ */
+function procStamp(pid) {
+	try {
+		const boot = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
+		const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8')
+		const start = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]
+		return start ? `${boot}:${start}` : null
+	} catch {
+		return null
+	}
+}
+
 function createJobs(deps = {}) {
 	const spawn = deps.spawn || childProcess.spawn
 	const script = deps.script || INSTALL_SH
 	const onEnd = deps.onEnd || (() => {})
+	const stampOf = deps.procStamp || procStamp
 	let job = null
 	let proc = null
 	let killTimer = null
@@ -135,7 +151,7 @@ function createJobs(deps = {}) {
 	function persist(j) {
 		try {
 			fs.mkdirSync(j.prefix, { recursive: true })
-			fs.writeFileSync(runtimePaths(j.prefix).state, JSON.stringify({ ...j.snapshot(), log: j.log.slice(-20) }, null, 1))
+			fs.writeFileSync(runtimePaths(j.prefix).state, JSON.stringify({ ...j.snapshot(), log: j.log.slice(-20), pid_start: j.pidStart ?? null }, null, 1))
 		} catch {
 			/* a prefix we cannot write: the job reports the failure itself */
 		}
@@ -148,7 +164,8 @@ function createJobs(deps = {}) {
 			const j = new RuntimeJob(s.kind, s.args || [], prefix)
 			Object.assign(j, { plan: s.plan || [], doneSteps: s.done || [], step: s.step || '', label: s.label || '', error: s.error || '',
 				code: s.code ?? null, apt: s.apt || '', log: s.log || [], startedAt: s.started_at, endedAt: s.ended_at, pid: s.pid })
-			j.state = s.state === 'running' && !(s.pid && alive(s.pid)) ? 'interrupted' : s.state
+			const same = s.pid && alive(s.pid) && (s.pid_start ?? null) === stampOf(s.pid) // WO-1106 B23: not a reused pid
+			j.state = s.state === 'running' && !same ? 'interrupted' : s.state
 			if (j.state === 'interrupted' && !j.error) j.error = 'interrupted (the server restarted while it ran) — Resume continues where it stopped'
 			return j
 		} catch {
@@ -186,6 +203,7 @@ function createJobs(deps = {}) {
 		job = j
 		proc = p
 		j.pid = p.pid
+		j.pidStart = p.pid ? stampOf(p.pid) : null
 		const feed = (stream) => {
 			let buf = ''
 			stream.setEncoding('utf8')
@@ -202,6 +220,11 @@ function createJobs(deps = {}) {
 					buf = buf.slice(nl + 1)
 				}
 				if (buf.length > 65536) buf = ''
+			})
+			// WO-1106 B23: the last line without a newline (often the script's final error) — 'end' comes before 'close'
+			stream.on('end', () => {
+				if (buf) j.line(buf)
+				buf = ''
 			})
 		}
 		feed(p.stdout)
@@ -258,4 +281,4 @@ function createJobs(deps = {}) {
 	} }
 }
 
-module.exports = { RuntimeJob, createJobs, alive }
+module.exports = { RuntimeJob, createJobs, alive, procStamp }

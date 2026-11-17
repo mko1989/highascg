@@ -215,3 +215,23 @@ test('API + real worker: zip upload, a loose file with its folder path, start, p
 		fs.rmSync(media, { recursive: true, force: true })
 	}
 })
+
+test('WO-1106 B20: cancel asks a worker that takes messages to stop its ffmpeg children; terminate is the fallback', () => {
+	const { media, ctx } = setup()
+	try {
+		const s = job.session()
+		s.files.add('Hall Room.obj')
+		const asked = []
+		const w = new EventEmitter()
+		w.terminated = false
+		w.terminate = async () => (w.terminated = true)
+		w.postMessage = (m) => asked.push(m)
+		assert.strictEqual(job.start(ctx, s.id, {}, { makeWorker: () => w }).status, 200)
+		assert.strictEqual(job.cancel(ctx).body.state, 'cancelled')
+		assert.deepStrictEqual(asked, [{ type: 'cancel' }])
+		assert.ok(!w.terminated, 'not terminated first: its children would be orphaned')
+	} finally {
+		job._reset()
+		fs.rmSync(media, { recursive: true, force: true })
+	}
+})

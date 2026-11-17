@@ -172,7 +172,11 @@ function start(ctx, sid, opts = {}, deps = {}) {
 	const { name: _n, ...conv } = opts
 	const id = crypto.randomBytes(6).toString('hex')
 	job = { id, session: s.id, state: 'running', phase: 'starting', text: 'Starting…', done: 0, total: 0, startedAt: Date.now(), name }
-	const make = deps.makeWorker || ((workerData) => new (require('worker_threads').Worker)(WORKER, { workerData }))
+	// WO-1106 B5: a heap ceiling for the import thread — a zip bomb must not take node down with it
+	const make =
+		deps.makeWorker ||
+		((workerData) =>
+			new (require('worker_threads').Worker)(WORKER, { workerData, resourceLimits: require('../stage/venue-import-worker').RESOURCE_LIMITS }))
 	const w = make({ dir: s.dir, opts: conv })
 	worker = w
 	const finish = (patch) => {
@@ -211,8 +215,24 @@ function cancel(ctx) {
 	worker = null
 	update(ctx, { state: 'cancelled', text: 'Cancelled', endedAt: Date.now() })
 	dropSession(job.session)
-	Promise.resolve(w.terminate()).catch(() => {})
+	stopWorker(w)
 	return { status: 200, body: snapshot() }
+}
+
+/**
+ * WO-1106 B20: ask the worker to kill its ffmpeg children first (it replies and exits); terminate() alone orphaned
+ * them. The terminate after 1 s is for a worker busy in a synchronous phase; a worker that takes no messages (tests)
+ * is terminated at once.
+ */
+function stopWorker(w) {
+	const kill = () => Promise.resolve(w.terminate()).catch(() => {})
+	if (typeof w.postMessage !== 'function') return kill()
+	try {
+		w.postMessage({ type: 'cancel' })
+	} catch {
+		return kill()
+	}
+	setTimeout(kill, 1000).unref?.()
 }
 
 /** Tests: forget everything. */

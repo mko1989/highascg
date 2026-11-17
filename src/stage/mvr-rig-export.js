@@ -48,11 +48,15 @@ function unplace(pose, place) {
 	return { ...pose, x: fx, y: -fz, z: gy, yaw: wrap((Number(pose.yaw) || 0) - (Number(p.yaw) || 0)) }
 }
 
-/** Affine 4×4 (column-major) inverse. */
+/**
+ * Affine 4×4 (column-major) inverse; null when singular (WO-1106 B22: a zero-scale source matrix divided by det 0 and
+ * wrote NaN into the exported matrix).
+ */
 function invAffine(m) {
 	const a = [[m[0], m[4], m[8]], [m[1], m[5], m[9]], [m[2], m[6], m[10]]]
 	const det = a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) +
 		a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0])
+	if (!(Math.abs(det) >= 1e-12)) return null
 	const inv = [
 		[(a[1][1] * a[2][2] - a[1][2] * a[2][1]) / det, (a[0][2] * a[2][1] - a[0][1] * a[2][2]) / det, (a[0][1] * a[1][2] - a[0][2] * a[1][1]) / det],
 		[(a[1][2] * a[2][0] - a[1][0] * a[2][2]) / det, (a[0][0] * a[2][2] - a[0][2] * a[2][0]) / det, (a[0][2] * a[1][0] - a[0][0] * a[1][2]) / det],
@@ -155,7 +159,10 @@ function buildRigExport(input) {
 			const filePose = unplace(cp, input.place)
 			const neu = matrixFromPose(filePose, old)
 			const local = el.matrix ? mvrMatrix(el.matrix.text) : mvrMatrix('')
-			const local2 = mul(mul(local, invAffine(old)), neu)
+			const oldInv = invAffine(old)
+			// singular source world (zero scale): its parent cannot be recovered — write the new pose as the element's own
+			const local2 = oldInv ? mul(mul(local, oldInv), neu) : neu
+			if (!oldInv) report.notes.push(`${row.name}: the source matrix has zero scale, written as a world matrix`)
 			const text = `<Matrix>${matrixText(local2)}</Matrix>`
 			if (el.matrix) edits.push({ start: el.matrix.start, end: el.matrix.end, text })
 			else if (el.bodyStart >= 0) edits.push({ start: el.bodyStart, end: el.bodyStart, text })

@@ -25,6 +25,7 @@
 const { encodeArtDmx } = require('./artdmx')
 const { encodeE131 } = require('./sacn')
 const L = require('./desk-feed-layout')
+const { visualReads } = require('./dmx-input')
 
 const REFRESH_MS = 1000
 const RATE_WINDOW_MS = 2000
@@ -70,7 +71,10 @@ class DeskFeed {
 		const reads = new Set()
 		if (e.through.enabled) for (const f of e.fixtures) if (f.protocol === 'artnet') reads.add(f.universe + e.through.offset)
 		if (h.grant.enabled) reads.add(h.grant.universe)
-		const ctx = { fixtures: e.fixtures, levels: h.levels, grant: h.grant, reads, isSelfLoop: e._isSelfLoop, reachesSelf: e._reachesSelf }
+		const vis = visualReads(e.fixtures, e.dmx) // WO-1106 B17: + the visualiser's universes and their WO-1078 twins
+		for (const u of vis.artnet) reads.add(u)
+		const ctx = { fixtures: e.fixtures, levels: h.levels, grant: h.grant, reads, sacnReads: vis.sacn, isSelfLoop: e._isSelfLoop,
+			reachesSelf: e._reachesSelf, sacnReachesSelf: e._sacnReachesSelf }
 		const next = new Map()
 		for (const u of this.layout.universes) {
 			const to = L.feedDest(this.cfg, u)
@@ -109,11 +113,16 @@ class DeskFeed {
 		return { byte: (abs) => (held.has(abs) ? held.get(abs) : dimSrc[abs]), active, level }
 	}
 
-	/** The LD's grant (WO-1085 grant channel, slewed, 0 once lost) for this head: 1 when no grant is configured. */
+	/**
+	 * The LD's grant (WO-1085 grant channel, slewed, 0 once lost) for this head: 1 when no grant is configured.
+	 * WO-1106 B15: per_head, a fed head outside the Auto pool (a named marker) has no channel of its own — it takes the
+	 * first one (`address`); indexOf −1 used to read as grant 0 and kept it dark whatever the console granted.
+	 */
 	_grantOf(fx) {
 		const h = this.engine.handover
 		if (!h._applied) return 1
-		return h._applied[h.cfg.grant.per_head ? h._pool().indexOf(fx) : 0] ?? 0
+		const i = h.cfg.grant.per_head ? h._pool().indexOf(fx) : 0
+		return h._applied[Math.max(0, i)] ?? 0
 	}
 
 	/** Build the feed universes after the engine's tick and send what changed / is due. → packets sent. */

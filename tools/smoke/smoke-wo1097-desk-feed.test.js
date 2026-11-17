@@ -203,6 +203,58 @@ describe('WO-1097 engine', () => {
 		assert.match(r.eng.status().handover.grant.state, /lost/)
 	})
 
+	it('WO-1106 B15: per-head grant — a fed head outside the Auto pool takes the first grant channel; console lost → dark', () => {
+		const grant = { on: true }
+		const frame = () => Uint8Array.from({ length: 512 }, (_, i) => (i === 499 ? 255 : i === 500 ? 64 : 0))
+		const cons = { frame: (pa) => (pa === 9 && grant.on ? frame() : null) }
+		const named = { id: 'm1', name: 'Named', typeId: TYPE, mode: 'Standard', universe: 1, address: 21, dest: DESK, follow: 1, pose: { x: 0, y: 0, z: 6 } }
+		for (const patch of [[...heads(2), named], [named]]) {
+			grant.on = true
+			const r = rig({ patch, handover: { mode: 'split', grant: { enabled: true, universe: 9, address: 500, per_head: true } }, consoleFrames: cons })
+			const both = () => {
+				r.person(0, 3)
+				r.hub.set({ id: 1, x: 0, y: 3, z: 0, status: 1 })
+			}
+			r.run(3, both)
+			const on = r.lastFeed()
+			assert.equal(on[20 + 5], 255, `the named head is lit by the first grant channel (${patch.length} heads)`)
+			if (patch.length === 3) assert.deepEqual([on[5], on[15]], [255, 64], 'pool heads keep their own channels')
+			if (patch.length === 1) assert.equal(r.eng.handover._echo(), 0, 'echo: no pool head, nothing applied')
+			grant.on = false
+			r.run(12, both)
+			assert.equal(r.lastFeed()[20 + 5], 0, 'console lost → dark')
+		}
+	})
+
+	it('WO-1106 B17: feed and levels universes are refused on the visualiser\'s universes and their Art-Net ↔ sACN twins', () => {
+		const multicast = (to) => /^239\./.test(to.host)
+		const self = (to) => to.port === 6454 && to.host.startsWith('127.')
+		const engineWith = (patch, feed, levels, visualise = true) => {
+			const eng = new FollowEngine({ hub: new MarkerHub({ now: () => 1000 }), now: () => 1000, send: () => {}, resolveMode,
+				reachesSelf: self, sacnReachesSelf: multicast })
+			eng.configure({ output: { protocol: 'artnet', enabled: false }, dmx: { enabled: false, visualise }, handover: { mode: 'handover', levels }, feed, patch })
+			eng.feed.send(1000)
+			return eng
+		}
+		const artHead = heads(1)[0] // Art-Net U1 → its sACN twin is U2
+		const sacnHead = { ...heads(1)[0], id: 's1', protocol: 'sacn', universe: 5 } // sACN U5 → Art-Net twin U4
+		const sacnFeed = (u) => ({ enabled: true, protocol: 'sacn', universe: u, dest: '' })
+		const lv = (o) => ({ enabled: true, ...o })
+		const off = { enabled: false, universe: 300 }
+		let e = engineWith([artHead], sacnFeed(2), off)
+		assert.match(e.feed.status().problems.join(), /U2: universe 2 is read back as a console input/)
+		e = engineWith([artHead], { enabled: false }, lv({ protocol: 'sacn', universe: 2 }))
+		assert.match(e.handover.status().levels.problem || '', /read back/)
+		e = engineWith([sacnHead], { enabled: true, universe: 4, dest: '127.0.0.1:6454' }, off)
+		assert.match(e.feed.status().problems.join(), /U4: universe 4 is read back as a console input/)
+		e = engineWith([sacnHead], { enabled: false }, lv({ universe: 4, dest: '127.0.0.1:6454' }))
+		assert.match(e.handover.status().levels.problem || '', /read back/)
+		assert.deepEqual(engineWith([artHead], sacnFeed(2), off, false).feed.status().problems, [], 'not visualising: the twin is free')
+		assert.equal(engineWith([artHead], { enabled: false }, lv({ protocol: 'sacn', universe: 2 }), false).handover.status().levels.problem, null)
+		e = engineWith([artHead], { enabled: true, protocol: 'sacn', universe: 2, dest: '10.0.0.5' }, off)
+		assert.deepEqual(e.feed.status().problems, [], 'unicast to the desk never reaches the box')
+	})
+
 	it('refresh: 1 packet a second when static, nothing when off; output master + DMX master untouched', () => {
 		const r = rig()
 		r.run(3, () => r.person(-1, 3))

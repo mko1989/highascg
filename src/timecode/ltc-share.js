@@ -63,6 +63,9 @@ function programOutput(appConfig) {
 
 const token = (s) => String(s).replace(/[^A-Za-z0-9]/g, '_')
 
+/** WO-1106 B6 — operator labels land inside a quoted ~/.asoundrc string: one stray `"` or `}` breaks every ALSA client. */
+const alsaText = (s) => String(s).replace(/[\r\n]+/g, ' ').replace(/["\\{}]/g, '').trim()
+
 /**
  * Where LTC out goes, or why it cannot.
  * @param {object} out normalized config.ltc.output
@@ -127,7 +130,7 @@ function shareBlock({ t, slave, total, ltcChannels, progCh, progKeep, progLabel 
 	const lines = [
 		`pcm_slave.hcg_slave_${t} {\n\tpcm "${slave}"\n\tchannels ${total}\n\trate 48000\n\tperiod_size ${SLAVE_PERIOD}\n\tbuffer_size ${SLAVE_BUFFER}\n}`,
 		`pcm.hcg_prog_${t} {\n\ttype plug\n\tslave { pcm { ${dshare(progKeep).replace(/\n\t\t/g, ' ')} } channels ${progKeep.length} }\n\tttable { ${ttable} }\n` +
-			`\thint { show on description "HighAsCG program audio ${progLabel} (channels ${progKeep.join(',')} of ${total}${progCh > progKeep.length ? `, ${progCh}-ch program` : ''})" }\n}`,
+			`\thint { show on description "HighAsCG program audio ${alsaText(progLabel)} (channels ${progKeep.join(',')} of ${total}${progCh > progKeep.length ? `, ${progCh}-ch program` : ''})" }\n}`,
 		`pcm.hcg_ltc_${t} {\n\ttype plug\n\tslave.pcm { ${dshare(ltcChannels).replace(/\n\t\t/g, ' ')} }\n` +
 			`\thint { show on description "HighAsCG LTC out (channel ${ltcChannels.join('+')} of ${total})" }\n}`,
 	]

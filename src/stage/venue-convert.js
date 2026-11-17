@@ -206,14 +206,14 @@ async function convertVenue(src, opts = {}, onProgress = () => {}) {
 	// pictures: re-encoded ≤ maxEdge within the texture budget; left out → the material's mean colour
 	onProgress({ phase: 'textures', text: 'Encoding pictures…' })
 	const texKeys = [...new Set(items.map((it) => it.texKey).filter((k) => k != null))]
-	const sources = await Promise.all(texKeys.map(async (k) => {
-		const f = texOf.get(k).file
-		const data = await f.read().catch(() => null)
+	// WO-1106 B5: read on demand, one picture at a time (shrinkImages `load`), never all of them at once
+	const sources = texKeys.map((k) => ({ load: async () => {
+		const data = await texOf.get(k).file.read().catch(() => null)
 		const png = data && data.length > 8 && data.readUInt32BE(0) === 0x89504e47
 		return data ? { data, mime: png ? 'image/png' : 'image/jpeg' } : null
-	}))
+	} }))
 	const planes = (o.planes || []).map((pl) => ({ pl, f: findImage(pl.image) }))
-	const planeSrc = await Promise.all(planes.map(async ({ f }) => (f ? { data: await f.read(), mime: /\.png$/i.test(f.rel) ? 'image/png' : 'image/jpeg' } : null)))
+	const planeSrc = planes.map(({ f }) => (f ? { load: async () => ({ data: await f.read(), mime: /\.png$/i.test(f.rel) ? 'image/png' : 'image/jpeg' }) } : null))
 	const shrunk = await tex.shrinkImages([...sources, ...planeSrc], { budget: o.textureBudget, maxEdge: o.maxEdge, ...(o.encode ? { encode: o.encode } : {}) })
 	const image = new Map(texKeys.map((k, i) => [k, shrunk[i]]))
 	// materials
@@ -226,7 +226,7 @@ async function convertVenue(src, opts = {}, onProgress = () => {}) {
 		if (!materials.has(key)) {
 			let color = [...m.kd.map(toLinear), m.d]
 			if (it.texKey != null && !img) {
-				const src0 = sources[texKeys.indexOf(it.texKey)]
+				const src0 = await sources[texKeys.indexOf(it.texKey)].load()
 				const mean = src0 ? await (o.meanColor || tex.ffmpegMeanColor)(src0).catch(() => null) : null
 				if (mean) color = [...mean, m.d]
 			}

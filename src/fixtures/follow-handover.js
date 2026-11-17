@@ -36,6 +36,7 @@ const { aimFixture } = require('./gdtf-ik')
 const { valueFor } = require('./gdtf-patch')
 const { encodeArtDmx, parseDest, MAX_PORT_ADDRESS } = require('./artdmx')
 const { encodeE131, sacnDest, MAX_UNIVERSE } = require('./sacn')
+const { visualReads } = require('./dmx-input')
 
 const GRANT_HOLD_MS = 5000
 const REFRESH_MS = 1000
@@ -125,11 +126,14 @@ class FollowHandover {
 		const reads = new Set()
 		if (e.through.enabled) for (const f of e.fixtures) if (f.protocol === 'artnet') reads.add(f.universe + e.through.offset)
 		if (this.cfg.grant.enabled) reads.add(this.cfg.grant.universe)
+		const vis = visualReads(e.fixtures, e.dmx) // WO-1106 B17: + the visualiser's universes and their WO-1078 twins
+		for (const u of vis.artnet) reads.add(u)
 		if (!to) problem = `bad destination "${L.dest}"`
 		else if (hit) problem = `universe ${L.universe} is the rig's (${hit.name})`
 		else if (this.cfg.grant.enabled && L.protocol === 'artnet' && L.universe === this.cfg.grant.universe) problem = `universe ${L.universe} is the grant's`
 		else if (e._isSelfLoop(to, L.universe, L.protocol)) problem = "would loop into this box's own input"
 		else if (L.protocol === 'artnet' && reads.has(L.universe) && e._reachesSelf(to)) problem = 'would be read back as the console frame'
+		else if (L.protocol === 'sacn' && vis.sacn.has(L.universe) && e._sacnReachesSelf(to)) problem = 'would be read back as the console frame'
 		else if (L.address - 1 + this._pool().length + EXTRA_CH > 512) problem = 'runs past channel 512'
 		if (to !== this._levels.to || problem) this._levels.last = null
 		Object.assign(this._levels, { to, problem })
@@ -167,7 +171,9 @@ class FollowHandover {
 		const step = this.cfg.fade_s > 0 ? dt / this.cfg.fade_s : Infinity
 		const d = this._grant.data
 		const prev = this._applied || []
-		this._applied = Array.from({ length: g.per_head ? this._pool().length : 1 }, (_, i) => {
+		// per_head: at least the first channel, so a fed head outside an empty Auto pool still hears it (WO-1106 B15)
+		const n = g.per_head ? this._pool().length : 1
+		this._applied = Array.from({ length: Math.max(1, n) }, (_, i) => {
 			const want = d ? (d[g.address - 1 + i] ?? 0) / 255 : 0
 			const cur = prev[i] ?? 0
 			return want > cur ? Math.min(want, cur + step) : Math.max(want, cur - step)
@@ -281,7 +287,7 @@ class FollowHandover {
 
 	/** The grant applied to the levels now, 0–255 (per head: their mean) — echoed after the presence channels. */
 	_echo() {
-		const a = this._applied || []
+		const a = (this._applied || []).slice(0, this.cfg.grant.per_head ? this._pool().length : 1) // pool heads only (B15)
 		return a.length ? Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 255) : 0
 	}
 

@@ -61,9 +61,10 @@ class FollowEngine {
 	 * @param {{ hub: { list(now?): object[], now(): number }, send: (to, packet) => void,
 	 *           isSelfLoop?: (to, universe) => boolean, reachesSelf?: (to) => boolean, now?: () => number,
 	 *           consoleFrames?: { frame(pa: number, now?: number): Uint8Array | null },
-	 *           resolveMode?: (typeId, mode) => object | null }} deps  isSelfLoop(to, universe, protocol)
+	 *           resolveMode?: (typeId, mode) => object | null, sacnReachesSelf?: (to) => boolean }} deps
+	 *           isSelfLoop(to, universe, protocol)
 	 */
-	constructor({ hub, send, isSelfLoop, reachesSelf, now, consoleFrames, resolveMode } = {}) {
+	constructor({ hub, send, isSelfLoop, reachesSelf, sacnReachesSelf, now, consoleFrames, resolveMode } = {}) {
 		this.hub = hub
 		this._resolveMode = typeof resolveMode === 'function' ? resolveMode : null
 		this.dmx = normalizeDmx()
@@ -77,6 +78,8 @@ class FollowEngine {
 		this._send = send
 		this._isSelfLoop = typeof isSelfLoop === 'function' ? isSelfLoop : () => false
 		this._reachesSelf = typeof reachesSelf === 'function' ? reachesSelf : () => false // lands on this box's :6454
+		// lands on this box's sACN input (multicast, or unicast to it) — the visualiser guard, WO-1106 B17
+		this._sacnReachesSelf = typeof sacnReachesSelf === 'function' ? sacnReachesSelf : () => false
 		this.now = typeof now === 'function' ? now : () => Date.now()
 		this.enabled = false
 		this.protocol = 'psn' // WO-631: Art-Net goes out only while the output is the 'artnet' backup

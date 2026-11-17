@@ -17,6 +17,9 @@
  *       Chans → Import Heads): head number, DMX (MagicQ universe = Art-Net universe + 1), X / Y / Z in metres, rotations.
  */
 
+const { magicqRotation } = require('../stage/rig-csv')
+const { matrixFromPose } = require('../stage/mvr-patch')
+
 const HEAD = ['head no', 'headno', 'hdno', 'headnum', 'head', 'channel', 'spot', 'fixture id']
 const NAME = ['head name', 'hd name', 'headname', 'hdname', 'name', 'purpose', 'short name']
 const UNI = ['universe', 'dmx line', 'uni']
@@ -236,21 +239,19 @@ function setHeads(project, pairs) {
 	return n
 }
 
-/** Degrees into (−180, 180], two decimals. */
-const wrapDeg = (v) => {
-	const d = ((((Number(v) || 0) + 180) % 360) + 360) % 360 - 180
-	return Math.round((d === -180 ? 180 : d) * 100) / 100
-}
-
 /**
- * A patch pose's rotation in the console's terms. MagicQ's axes are the previs's own (X across, Y up, Z towards the
- * audience; a head at 0 / 0 / 0 hangs), so the previs rotation (fixtures_3d_model.gd pose_xform: pitch about X, −yaw
- * about Y, roll about Z, a floor head turned 180° about Z) carries over angle for angle. The desk's own plot agrees
- * where it can be read: its floor-standing heads are Z Rot 180°. With TWO angles set, the result also depends on the
- * order the console applies them in, which is not known.
+ * A patch pose's rotation in the console's terms, two decimals in (−180, 180]. WO-1106 B18: through the ONE MagicQ
+ * convention (rig-csv.js magicqRotation, WO-765: pose → matrix → R = Ry · Rx · Rz, verified against MagicQ's own MVR
+ * import), so this export and the rig export's MagicQ table give a head the same RotX / RotY / RotZ. One angle reads
+ * as before (RotX = pitch, RotY = −yaw, RotZ = roll, a floor head + 180° about Z); a turn with two equal spellings
+ * takes the smaller one (floor + yaw 180 = RotX 180).
  */
 function consoleRotation(pose) {
-	return [wrapDeg(pose?.pitch), wrapDeg(-(Number(pose?.yaw) || 0)), wrapDeg((Number(pose?.roll) || 0) + (pose?.hang === 'floor' ? 180 : 0))]
+	const p = pose || {}
+	return magicqRotation(matrixFromPose(p)).map((v) => {
+		const d = Math.round(v * 100) / 100 || 0
+		return d === -180 ? 180 : d
+	})
 }
 
 /** Our patch → the console's CSV (positions + rotations). Heads without a number are skipped. */

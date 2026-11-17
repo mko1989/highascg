@@ -152,6 +152,11 @@ function createObjParser() {
 			}
 		}
 	}
+	/** WO-1106 B19 — `+x || 0` lets Infinity through (`v 1e999 0 0`): glTF min/max turn null, sizes Infinity. */
+	const num = (x) => {
+		const n = +x
+		return Number.isFinite(n) ? n : 0
+	}
 	const line = (raw) => {
 		lines++
 		const s = raw.trim()
@@ -168,18 +173,18 @@ function createObjParser() {
 		const arg = sp < 0 ? '' : s.slice(sp + 1).trim()
 		if (kw === 'v') {
 			const p = arg.split(/\s+/)
-			v.push(+p[0] || 0)
-			v.push(+p[1] || 0)
-			v.push(+p[2] || 0)
+			v.push(num(p[0]))
+			v.push(num(p[1]))
+			v.push(num(p[2]))
 		} else if (kw === 'vt') {
 			const p = arg.split(/\s+/)
-			vt.push(+p[0] || 0)
-			vt.push(+p[1] || 0)
+			vt.push(num(p[0]))
+			vt.push(num(p[1]))
 		} else if (kw === 'vn') {
 			const p = arg.split(/\s+/)
-			vn.push(+p[0] || 0)
-			vn.push(+p[1] || 0)
-			vn.push(+p[2] || 0)
+			vn.push(num(p[0]))
+			vn.push(num(p[1]))
+			vn.push(num(p[2]))
 		} else if (kw === 'f') face(s.split(/\s+/))
 		else if (kw === 'usemtl') mat = intern(materials, matIds, arg)
 		else if (kw === 'g' || kw === 'o') grp = intern(groups, grpIds, arg)
