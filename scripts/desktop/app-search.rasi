@@ -1,0 +1,28 @@
+/* WO-1121 — the Super+Space app search in the HighAsCG dark look (a complete theme: rofi's default is cream). */
+* {
+	background-color: transparent;
+	text-color: #e6e8ee;
+	font: "Ubuntu Sans 13";
+}
+window {
+	/* grows upward from the dock (bottom centre): the input sits at the bottom, the best match right above it */
+	location: south;
+	anchor: south;
+	y-offset: -6px;
+	width: 640px;
+	background-color: #14171d;
+	border: 1px;
+	border-color: #3d82d6;
+	border-radius: 6px;
+	padding: 10px;
+}
+mainbox { spacing: 8px; children: [ listview, inputbar ]; }
+inputbar { padding: 8px 6px; spacing: 8px; background-color: #1d222b; border-radius: 4px; children: [ prompt, entry ]; }
+prompt { text-color: #8a93a6; }
+entry { placeholder: "Search applications"; placeholder-color: #5d6678; }
+listview { lines: 10; scrollbar: false; spacing: 2px; reverse: true; fixed-height: false; }
+element { padding: 6px; border-radius: 4px; spacing: 10px; }
+element normal.normal, element alternate.normal { background-color: transparent; text-color: #e6e8ee; }
+element selected.normal { background-color: #26406b; text-color: #ffffff; }
+element-icon { size: 28px; }
+element-text { text-color: inherit; highlight: bold #7fb2ff; }

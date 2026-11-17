@@ -1,7 +1,7 @@
 # WO-1121 — Desktop quality of life: Super+Space app search, Space quick look in Thunar
 
 **Area:** godot-client
-**Status: IN PROGRESS (17.11.26 — quick look works on the box with the ffplay fallback; app search waits for `sudo apt install rofi mpv`)**
+**Status: DONE (17.11.26 — both on the glass with rofi + mpv installed; installer / ISO wiring open)**
 
 Owner 17.11: "quality of life features to the system. super+space input box to search apps. in thunar space should
 show a quick preview of video files and image files."
@@ -28,10 +28,16 @@ show a quick preview of video files and image files."
 - Both config files parse as XML. On the glass: Thunar on the project folder, a PNG selected, Space → preview
   window with the picture (screenshot), Esc closes it; the script's own second call closes an open preview.
 
+## After the owner installed rofi + mpv (17.11)
+
+- Super+Space opens the search (typed "local" → LocalSend). The default cream theme replaced by a complete dark theme
+  `scripts/desktop/app-search.rasi`; owner: "make the search window to extend from the dock up" → anchored bottom
+  centre, the input at the bottom, matches listed upward (screenshot).
+- Thunar: Space on a PNG opens the mpv preview, Space again closes it.
+
 ## Not verified / open
 
-- Super+Space: rofi is not installed, so the search box was not seen. mpv not installed: Space-to-close inside the
-  preview and video scrubbing untested (ffplay pauses on Space).
+- A video file in quick look, and launching an app from the search (Enter), were not tried.
 - Space in Thunar's list view normally toggles the selection of the focused row; with the accelerator it previews
   instead. A video file was not tried.
 - The ISO: rofi + mpv must be on the box before the next eggs build; the setup script is not called by any
