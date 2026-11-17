@@ -123,3 +123,26 @@ describe('WO-603 POST /api/media/ingest-local', () => {
 		assert.ok(at > 0 && at < src.indexOf("routes.post('/api/media/*'"))
 	})
 })
+
+describe('WO-1123 move (Shift held on the drop)', () => {
+	it('moves files and a folder: sources gone, emptied folders removed, a skipped link keeps its folder', async () => {
+		const s = sandbox()
+		const plan = planLocalIngest([path.join(s.desk, 'loose.mp4'), path.join(s.desk, 'Akt 1')], s.media)
+		const r = await copyPlanned(plan, path.join(s.media, 'SHOW'), { move: true })
+		assert.equal(r.imported, 3)
+		assert.equal(fs.readFileSync(path.join(s.media, 'SHOW', 'Akt 1', 'sub', 'b.png'), 'utf8'), 'BBB')
+		assert.equal(fs.readFileSync(path.join(s.media, 'SHOW', 'loose.mp4'), 'utf8'), 'L')
+		assert.equal(fs.existsSync(path.join(s.desk, 'loose.mp4')), false, 'source file gone')
+		assert.equal(fs.existsSync(path.join(s.desk, 'Akt 1', 'sub')), false, 'emptied subfolder removed')
+		assert.equal(fs.existsSync(path.join(s.desk, 'Akt 1', 'link.txt')) || fs.lstatSync(path.join(s.desk, 'Akt 1')).isDirectory(), true, 'the folder with the skipped link stays')
+		assert.equal(fs.existsSync(s.desk), true, 'never above the dropped folder')
+		fs.rmSync(s.root, { recursive: true, force: true })
+	})
+
+	it('without move the sources stay', async () => {
+		const s = sandbox()
+		await copyPlanned(planLocalIngest([path.join(s.desk, 'loose.mp4')], s.media), path.join(s.media, 'SHOW'))
+		assert.equal(fs.existsSync(path.join(s.desk, 'loose.mp4')), true)
+		fs.rmSync(s.root, { recursive: true, force: true })
+	})
+})

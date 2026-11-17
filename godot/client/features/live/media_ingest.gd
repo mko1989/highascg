@@ -18,8 +18,23 @@ static func folder_for(meta: Variant) -> String:
 	return id.substr(0, cut) if cut > 0 else ""
 
 
-static func request(paths: PackedStringArray, folder: String) -> Dictionary:
-	return {"paths": Array(paths), "folder": folder}
+## WO-1123 — is Shift held right now? During a drag from the file manager the keyboard belongs to that window, so
+## the client's own key state misses it: ask the X server (scripts/desktop/x-shift-held.py, exit 0 = held).
+static func shift_held() -> bool:
+	if Input.is_key_pressed(KEY_SHIFT):
+		return true
+	if OS.get_name() != "Linux":
+		return false
+	var script := ProjectSettings.globalize_path("res://").path_join("../../scripts/desktop/x-shift-held.py").simplify_path()
+	return FileAccess.file_exists(script) and OS.execute("python3", [script]) == 0
+
+
+## `move` (WO-1123: Shift held on the drop) → the server moves the files instead of copying them.
+static func request(paths: PackedStringArray, folder: String, move := false) -> Dictionary:
+	var r := {"paths": Array(paths), "folder": folder}
+	if move:
+		r["move"] = true
+	return r
 
 
 ## One status line for a progress / result state, "" when there is nothing to show.

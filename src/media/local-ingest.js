@@ -141,11 +141,36 @@ async function copyOne(src, dest, isCancelled, onBytes) {
 	fs.renameSync(tmp, dest)
 }
 
+/** WO-1123 move, same filesystem: one rename (instant, any size). False when it cannot be done that way (EXDEV …). */
+function renameInto(src, dest) {
+	try {
+		fs.mkdirSync(path.dirname(dest), { recursive: true })
+		fs.renameSync(src, dest)
+		return true
+	} catch {
+		return false
+	}
+}
+
+/** WO-1123 move: remove the now-empty folders of a dropped folder (`rel` = "Folder/sub/file"), never above its root. */
+function pruneEmptyDirs(src, rel) {
+	const parts = String(rel).split('/')
+	let dirPath = path.dirname(src)
+	for (let n = parts.length - 1; n >= 1; n--) {
+		try {
+			fs.rmdirSync(dirPath) // only an empty directory goes
+		} catch {
+			return
+		}
+		dirPath = path.dirname(dirPath)
+	}
+}
+
 /**
- * Copy a planned drop into `dir`. Progress goes to `report` (throttled by the caller's broadcast).
+ * Copy a planned drop into `dir` — or move it (`move`: Shift held on the drop, WO-1123). Progress goes to `report` (throttled by the caller's broadcast).
  * @returns {Promise<{ imported: number, unzipped: number, bytes: number }>}
  */
-async function copyPlanned(plan, dir, { isCancelled = () => false, report = () => {} } = {}) {
+async function copyPlanned(plan, dir, { isCancelled = () => false, report = () => {}, move = false } = {}) {
 	const total = plan.files.reduce((a, f) => a + f.bytes, 0)
 	let done = 0
 	let imported = 0
@@ -155,10 +180,16 @@ async function copyPlanned(plan, dir, { isCancelled = () => false, report = () =
 		const f = plan.files[i]
 		const dest = resolveSafe(dir, f.rel)
 		if (!dest) continue
-		await copyOne(f.src, dest, isCancelled, (n) => {
+		const progress = (n) => {
 			done += n
 			report({ fileRel: f.rel, fileIndex: i, fileTotal: plan.files.length, bytesDone: done, bytesTotal: total })
-		})
+		}
+		if (!(move && renameInto(f.src, dest))) {
+			await copyOne(f.src, dest, isCancelled, progress)
+			// WO-1123 move: the source goes only once its copy is whole
+			if (move && fs.statSync(dest).size === fs.statSync(f.src).size) fs.rmSync(f.src, { force: true })
+		} else progress(f.bytes)
+		if (move) pruneEmptyDirs(f.src, f.rel)
 		imported++
 		if (path.extname(dest).toLowerCase() === '.zip') {
 			await extractZipSafely(dest, path.dirname(dest))

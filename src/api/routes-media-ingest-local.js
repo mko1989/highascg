@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-603 slice 1 — POST /api/media/ingest-local { paths[], folder? }: copy files dropped on the on-box Godot client
+ * WO-603 slice 1 — POST /api/media/ingest-local { paths[], folder?, move? }: copy files dropped on the on-box Godot client
  * from their local paths into the media library (src/media/local-ingest.js). Runs in the background: 202 + state at
  * GET /api/media/ingest-local, progress over WS `media:ingest-progress`, POST /api/media/ingest-local/cancel.
  *
@@ -47,8 +47,9 @@ async function handleStart(req, body, ctx) {
 	const plan = planLocalIngest(b.paths, getMediaIngestBasePath(config))
 	if (plan.error) return reply(plan.status, { error: plan.error })
 	if (typeof ctx.log === 'function') {
-		ctx.log('info', `[media] ingest-local ${plan.files.length} file(s) → "${target.folder || '/'}" from ${JSON.stringify(b.paths)}`)
+		ctx.log('info', `[media] ingest-local${b.move === true ? ' (move)' : ''} ${plan.files.length} file(s) → "${target.folder || '/'}" from ${JSON.stringify(b.paths)}`)
 	}
+	const move = b.move === true // WO-1123: Shift held on the drop
 	const cancel = { cancelled: false }
 	ctx._localIngestCancel = cancel
 	const total = plan.files.reduce((a, f) => a + f.bytes, 0)
@@ -58,6 +59,7 @@ async function handleStart(req, body, ctx) {
 		try {
 			const r = await copyPlanned(plan, target.dir, {
 				isCancelled: () => cancel.cancelled,
+				move,
 				report: (p) => {
 					if (Date.now() - last < 250) return
 					last = Date.now()
@@ -65,7 +67,7 @@ async function handleStart(req, body, ctx) {
 				},
 			})
 			const extra = [r.unzipped ? `${r.unzipped} zip(s) unpacked` : '', plan.skipped ? `${plan.skipped} link(s)/special file(s) skipped` : ''].filter(Boolean)
-			setState(ctx, { active: false, phase: 'complete', bytesDone: r.bytes, imported: r.imported, message: `Imported ${r.imported} file(s)${extra.length ? ` · ${extra.join(' · ')}` : ''}` })
+			setState(ctx, { active: false, phase: 'complete', bytesDone: r.bytes, imported: r.imported, message: `${move ? 'Moved' : 'Imported'} ${r.imported} file(s)${extra.length ? ` · ${extra.join(' · ')}` : ''}` })
 		} catch (e) {
 			setState(ctx, { active: false, phase: cancel.cancelled ? 'cancelled' : 'error', error: e?.message || String(e), message: cancel.cancelled ? 'Ingest cancelled' : 'Ingest failed' })
 		} finally {

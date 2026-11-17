@@ -422,14 +422,14 @@ func _on_files_dropped(files: PackedStringArray) -> void:
 		var it := _tree.get_item_at_position(_tree.get_local_mouse_position())
 		folder = Ingest.folder_for(it.get_metadata(0) if it != null else null)
 	_tabs.current_tab = _tree.get_parent().get_index()
-	_ingest(files, folder)
+	_ingest(files, folder, Ingest.shift_held())  # WO-1123: Shift = move instead of copy
 
 
 ## Local paths → the library: the server copies them (on the box); a client elsewhere is refused (403, loopback
 ## only) and streams them over HTTP instead (POST /api/ingest/upload, one file per request, `path` = its folder).
-func _ingest(files: PackedStringArray, folder: String) -> void:
+func _ingest(files: PackedStringArray, folder: String, move := false) -> void:
 	_show_ingest({"phase": "copying", "fileTotal": files.size()})
-	var res: Dictionary = await Api.post_json("/api/media/ingest-local", Ingest.request(files, folder))
+	var res: Dictionary = await Api.post_json("/api/media/ingest-local", Ingest.request(files, folder, move))
 	if res.ok:
 		return
 	if int(res.get("status", 0)) != 403:
