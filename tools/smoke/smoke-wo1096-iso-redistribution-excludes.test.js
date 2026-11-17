@@ -106,6 +106,7 @@ const LICENCES = [
 	'home/casparcg/highascg/bin/LICENSE',
 	'home/casparcg/highascg/bin/SOURCE.txt',
 	'home/casparcg/highascg/lib/LICENSE-CEF.txt',
+	'usr/share/doc/highascg/licenses/third-party/portaudio-LICENSE.txt', // WO-1106 B72: lib/libportaudio.so.2 ships
 ]
 
 describe('WO-1096 E: redistribution fragment in custom.exclude.list', () => {

@@ -162,6 +162,12 @@ build_server_archive() {
 	add_pinned_caspar paths
 	if [[ "$ZIP_EXCLUDE_NODE_MODULES" -eq 0 ]] && [[ -d "${REPO_ROOT}/node_modules" ]]; then
 		paths+=(node_modules)
+		# WO-1106 B69: this node_modules has the dev dependencies too (CI: npm ci --include=optional) — judge the whole
+		# tree, and every notice-required package must be named in THIRD_PARTY_NOTICES.
+		node "${REPO_ROOT}/tools/ci/check-npm-licenses.js" --include-dev --lock "${REPO_ROOT}/package-lock.json" || {
+			echo "ERROR: npm licence gate failed for the tarball's node_modules (see above)" >&2
+			exit 1
+		}
 	fi
 	local -a missing=()
 	local p

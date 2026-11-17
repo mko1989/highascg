@@ -144,8 +144,17 @@ Commits, each unit separate, not pushed:
     Settings → System → GDTF library is untouched.
 - **Per-box installs are untouched:**
   - the BMD gate is `decklink_payload_present` (`usr/lib/blackmagic/DesktopVideo/DesktopVideoHelper`);
-  - its dpkg status was already excluded, so `dpkg -i` from exFAT is a fresh install and recreates every excluded
-    leftover;
+  - ~~its dpkg status was already excluded, so `dpkg -i` from exFAT is a fresh install and recreates every excluded
+    leftover~~ **Corrected (WO-1106 B74, 17.11.26):** `var/lib/dpkg/status` is NOT excluded; it ships whole, with
+    `install ok installed` records for desktopvideo / desktopvideo-gui / magicq / nomachine / zoom / shutter-encoder
+    (phantoms, WO-431; checked with `dpkg-query -W` on the build host and the exclude lists, which hold only
+    `var/lib/dpkg/info/<pkg>.*` lines). So `dpkg -i` from exFAT is an upgrade of a "installed" package, not a fresh
+    install: dpkg treats a conffile that is missing on disk as deleted by the admin and does NOT recreate it. The
+    excluded `etc/dracut.conf.d/dracut-blackmagic.conf` is such a conffile (desktopvideo also lists
+    `/etc/init.d/DesktopVideoHelper` and `/etc/init/DesktopVideoHelper.conf`, which are not excluded). The payload
+    gates (`decklink_payload_present`) stay the protection against the phantoms; recreating the conffile needs
+    `dpkg -i --force-confmiss` in `scripts/lib/decklink-install-lib.sh` or stripping the records from the shipped
+    status (follow-up, not done);
   - MagicQ has no installer in the repo; its excluded `.desktop` / dpkg leftovers only made a non-installed app
     look present (WO-431 phantom).
 
@@ -385,5 +394,8 @@ Commits, each unit separate, not pushed:
 - `docs/wiki-site/assets/wiki-bundle.js` (built 07.11) still contains the old `template/mario` text. Rebuild it with
   `npm run wiki:build` once the other agents' doc edits are committed.
 - The legacy `tools/eggs/live-usb/exclude.list` (pre-coa eggs) is not updated; coa reads only `custom.exclude.list`.
-- After a phantom-free fresh install, dpkg would not recreate BMD conffiles (`dracut-blackmagic.conf`, init.d) only
-  if a stale status entry existed. The dpkg status is excluded, so `dpkg -i` from exFAT is a fresh install.
+- ~~After a phantom-free fresh install, dpkg would not recreate BMD conffiles (`dracut-blackmagic.conf`, init.d) only
+  if a stale status entry existed. The dpkg status is excluded, so `dpkg -i` from exFAT is a fresh install.~~
+  **Corrected (WO-1106 B74):** the dpkg status is not excluded; the stale `desktopvideo` entry ships, so the per-box
+  `dpkg -i` does not recreate the excluded `dracut-blackmagic.conf` (see §1 E). Open: `--force-confmiss` or strip the
+  phantom records.

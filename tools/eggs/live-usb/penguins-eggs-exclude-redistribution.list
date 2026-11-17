@@ -32,8 +32,10 @@ usr/share/applications/shutter-encoder-*.desktop
 var/lib/dpkg/info/shutter-encoder.*
 
 # Blackmagic Desktop Video leftovers (EULA: "You may not … copy the Software"; icons are BMD artwork). The per-box
-# exFAT install (decklink-install-from-exfat.sh → dpkg -i) recreates all of it; its phantom-install gate checks
-# usr/lib/blackmagic/DesktopVideo/DesktopVideoHelper, not these.
+# exFAT install (decklink-install-from-exfat.sh → dpkg -i) recreates the package files; its phantom-install gate checks
+# usr/lib/blackmagic/DesktopVideo/DesktopVideoHelper, not these. WO-1106 B74: var/lib/dpkg/status ships whole with an
+# "installed" desktopvideo record, so that dpkg -i is an upgrade and does NOT recreate the excluded conffile
+# etc/dracut.conf.d/dracut-blackmagic.conf (dpkg reads a missing conffile as deleted by the admin).
 usr/share/icons/hicolor/*/apps/BlackmagicDesktopVideoSetup.png
 usr/share/icons/hicolor/*/apps/DesktopVideoUpdater.png
 usr/share/man/man1/Blackmagic*

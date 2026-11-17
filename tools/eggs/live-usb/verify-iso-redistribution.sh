@@ -29,6 +29,7 @@ REDIST_NEEDLES=(
 	'^home/[^/]+/highascg/node_modules/wetransfert(/|$)|unlicensed npm package wetransfert (WO-1096 C)'
 	'^home/[^/]+/highascg/template/shaders/sh-(mario|balatro|audio-visualiser-v0-1-sadeghi|blue-thunder|closer-to-god|dot-globe|shader-equalizor)\.html$|retired shaders: Nintendo IP / no licence / all rights reserved / unknown origin (WO-1096 B)'
 	'^home/[^/]+/highascg/template/lower-thirds/vendor/gsap|GreenSock GSAP (proprietary standard licence; replaced by lt-tween.js, WO-1096 D)'
+	'^home/[^/]+/(highascg/modules|\.highascg/modules)(/|$)|^home/[^/]+/\.highascg/modules\.json$|optional modules (WO-1076: opt-in packages, never in a base ISO; WO-1106 B70)'
 )
 
 # WO-1096 F — what MUST ship: licence texts + the source offer. <if-ERE (empty = always)>|<required ERE>|<what>
@@ -48,6 +49,8 @@ REDIST_REQUIRED=(
 	"^home/[^/]+/companion/|^home/[^/]+/companion/LICENSE\.md$|Companion MIT text"
 	"^home/[^/]+/\.highascg/retro/cores/[^/]+_libretro\.so$|${LIC_T}/third-party/libretro-[^/]+\.copyright$|libretro core licences"
 	"^usr/share/penguins-eggs/|${LIC_T}/third-party/penguins-eggs-LICENSE\.txt$|penguins-eggs licence"
+	"^home/[^/]+/\.local/opt/wayvr/WayVR-[^/]*\.AppImage$|${LIC_T}/third-party/GPL-3\.0\.txt$|WayVR GPL-3 text (WO-1106 B65)"
+	"^home/[^/]+/highascg/lib/libportaudio\.so|${LIC_T}/third-party/portaudio-LICENSE\.txt$|PortAudio MIT text (WO-1106 B72)"
 )
 
 licence_tree_check() {
@@ -65,6 +68,23 @@ licence_tree_check() {
 			bad "licence text missing (WO-1096): ${what} — run tools/release/collect-third-party-licenses.sh + scripts/setup/15-licenses-install.sh before eggs produce"
 		fi
 	done
+}
+
+# WO-1106 B65: the licence rows above, checked against the BUILD HOST before the produce (a missing text used to fail
+# only after the whole produce). Prints the paths the rows look at, under root $1, in liveroot form (no leading /).
+licence_host_listing() {
+	local root="${1%/}" d
+	(
+		cd "${root:-/}" || exit 0
+		for d in usr/share/doc/highascg/licenses usr/share/penguins-eggs; do
+			[[ -d "$d" ]] && find "$d" -maxdepth 3 2>/dev/null
+		done
+		find usr/lib/x86_64-linux-gnu -maxdepth 1 -name 'libnvidia-*' 2>/dev/null
+		find usr/share/doc -maxdepth 2 -path 'usr/share/doc/libnvidia-gl-*/copyright' 2>/dev/null
+		for d in home/*/highascg/bin home/*/highascg/lib home/*/companion home/*/.highascg/retro/cores home/*/.local/opt/wayvr; do
+			[[ -d "$d" ]] && find "$d" -maxdepth 1 2>/dev/null
+		done
+	) || true
 }
 
 redistribution_check() {
@@ -95,7 +115,26 @@ redistribution_check() {
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
 	set -euo pipefail
 	HERE_R="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-	SQ="${1:?usage: verify-iso-redistribution.sh <highascg*.iso | filesystem.squashfs>}"
+	FAIL=0
+	bad() {
+		echo "FAIL: $*" >&2
+		FAIL=$((FAIL + 1))
+	}
+	ok() { echo "OK: $*"; }
+	# WO-1106 B65: `--host [root]` — only the licence rows, against the build host (build-highascg-egg.sh, pre-produce)
+	if [[ "${1:-}" == --host ]]; then
+		host_listing="$(mktemp)"
+		licence_host_listing "${2:-/}" >"$host_listing"
+		licence_tree_check "$host_listing"
+		rm -f "$host_listing"
+		[[ "$FAIL" -eq 0 ]] || {
+			echo "WO-1106 B65 host licence check FAILED (${FAIL}) — fix it before eggs produce." >&2
+			exit 1
+		}
+		echo "WO-1106 B65 host licence check passed."
+		exit 0
+	fi
+	SQ="${1:?usage: verify-iso-redistribution.sh <highascg*.iso | filesystem.squashfs> | --host [root]}"
 	UNSQ=(unsquashfs)
 	if [[ "$SQ" == *.iso ]]; then
 		# shellcheck source=iso-read-lib.sh
@@ -105,12 +144,6 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
 		iso_read_close
 		UNSQ=(unsquashfs -o "$off")
 	fi
-	FAIL=0
-	bad() {
-		echo "FAIL: $*" >&2
-		FAIL=$((FAIL + 1))
-	}
-	ok() { echo "OK: $*"; }
 	redistribution_check
 	[[ "$FAIL" -eq 0 ]] || {
 		echo "WO-1096 redistribution check FAILED (${FAIL})." >&2

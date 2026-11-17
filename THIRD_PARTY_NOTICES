@@ -378,6 +378,14 @@ npm runtime dependencies (node_modules/, shipped in the ISO and the server relea
   The web UI bundle (dist-web/) contains three (MIT), exceljs (MIT), html-to-image (MIT) and jszip (MIT, as above);
   their licence texts are in node_modules/<name>/.
   The former dependency "wetransfert" (no licence) was removed in WO-1096 together with the WeTransfer ingest branch.
+  Build-time (dev) dependencies — in the server release tarball, which packs node_modules with them; the ISO prunes
+  them. The release script runs the gate with --include-dev (WO-1106 B69):
+    lightningcss 1.32.0 and its platform binaries (lightningcss-android-arm64, lightningcss-darwin-arm64,
+    lightningcss-darwin-x64, lightningcss-freebsd-x64, lightningcss-linux-arm-gnueabihf, lightningcss-linux-arm64-gnu,
+    lightningcss-linux-arm64-musl, lightningcss-linux-x64-gnu, lightningcss-linux-x64-musl,
+    lightningcss-win32-arm64-msvc, lightningcss-win32-x64-msvc) — https://github.com/parcel-bundler/lightningcss —
+    Mozilla Public License 2.0, unmodified. The MPL-2.0 text is node_modules/<name>/LICENSE; the source code is
+    available at that repository (version 1.32.0).
 
 ================================================================================
 ISO image components (WO-1096) — besides the above, the live ISO carries these. Their licence texts are in the
@@ -400,6 +408,28 @@ texts in tools/release/licenses/), and SOURCES.md there is the written source of
   NVIDIA Linux driver — NVIDIA Driver License Agreement (licence tree: nvidia-driver.NOTICE); unmodified binaries.
   NDI runtime (lib/libndi.so.6) — NDI SDK License Agreement (licence tree: ndi-sdk-license-agreement.pdf).
     NDI® is a registered trademark of Vizrt NDI AB. https://ndi.video/
+  PortAudio 19.7.0 (lib/libportaudio.so.2, Ubuntu's libportaudio2 build; WO-773, WO-1106 B72) —
+    http://www.portaudio.com — MIT (text below; licence tree: portaudio-LICENSE.txt, also lib/LICENSE-portaudio.txt).
+    Copyright (c) 1999-2009 Ross Bencina, (c) 1999-2008 Phil Burk, (c) 1999-2000 Robert Marsanyi,
+    (c) 1999-2007 Andrew Baldwin, (c) 2002 Joshua Haberman, (c) 2003 Fred Gleason, (c) 2004 Stefan Westerfeld,
+    (c) 2004-2009 Arve Knudsen, (c) 2005-2006 Ludwig Schwardt, (c) 2006-2007 David Viens, (c) 2008 Kevin Kofler.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+    documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+    to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+    the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+    THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+    CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+    IN THE SOFTWARE.
+
+    The PortAudio community also asks (non-binding) that modifications be sent to the original developers and that
+    these requests be included along with the licence.
   Ubuntu 26.04 packages — each under the licence in /usr/share/doc/<package>/copyright; versions and source packages
     in the licence tree's ubuntu-packages.tsv.
   Not on the ISO (excluded, installed per box): Blackmagic Desktop Video, ChamSys MagicQ.

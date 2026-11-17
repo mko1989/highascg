@@ -457,4 +457,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-core-pixelhue.test.js', // WO-1106 B3: a read cut mid-body settles; pending always clears
 	'tools/smoke/smoke-wo1106-core-services.test.js', // WO-1106 B10–B13: keeping-up report caps, async fc-list / aplay, bluetooth status shared, live-audio repair backoff
 	'tools/smoke/smoke-wo1106-core-shader-licence.test.js', // WO-1106 B14 / B68: no newlines in the header, removed ids never come back
+	'tools/smoke/smoke-wo1106-iso-release-licences.test.js', // WO-1106 B65 / B66 / B69 / B70 / B72 / B73: collector home under sudo, host licence check, source state, dev-dep notices, module excludes, PortAudio, empty listing
 ]

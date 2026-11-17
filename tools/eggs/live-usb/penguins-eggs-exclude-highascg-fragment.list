@@ -427,3 +427,10 @@ home/casparcg/highascg/config/*.tmp
 # (systemd/ssh.service.d-05-host-keys.conf.example, installed by prepare-eggs-clone-with-exfat.sh) runs
 # `ssh-keygen -A`, which creates only the missing keys, before sshd starts.
 etc/ssh/ssh_host_*
+# WO-1076: optional modules are opt-in packages, never part of a base ISO. WO-1106 B70: mirrored from the embed-server
+# list (only it had them, so an embed=0 ISO shipped modules/ and .highascg/modules*); verify-iso-redistribution.sh needle.
+home/casparcg/highascg/modules
+home/casparcg/highascg/modules/*
+home/casparcg/.highascg/modules
+home/casparcg/.highascg/modules/*
+home/casparcg/.highascg/modules.json

@@ -11,14 +11,19 @@
  *   - missing, "none", "UNLICENSED" or "SEE LICENSE IN <file>" (unless a reviewed override below names the file), or
  *   - an SPDX expression that cannot be satisfied from the allowlist (OR: one side allowed; AND: every side allowed).
  * Copyleft licences that are compatible with shipping under AGPL-3.0-or-later are allowed but reported as
- * "notice required": each one must be named in THIRD_PARTY_NOTICES.
+ * "notice required": each one must be named in THIRD_PARTY_NOTICES, and the gate FAILS when one is not (WO-1106 B69).
+ *
+ * --include-dev (WO-1106 B69): the server release tarball packs node_modules after `npm ci --include=optional`, dev
+ * dependencies included (12 lightningcss* packages, MPL-2.0, shipped un-noticed). make-github-release-server.sh runs
+ * the gate with this flag, so the tarball's whole tree is judged, not just the production one.
  *
  * The lockfile's `license` field is used first. When it is absent, the installed package.json (`license`, or the
  * legacy `licenses` array, read as OR) is the fallback; then the reviewed OVERRIDES table (pinned to name@version so
  * an upgrade forces a fresh review).
  *
  * Usage: node tools/ci/check-npm-licenses.js [--lock <package-lock.json>] [--modules <node_modules dir>] [--list]
- * Exit 0 = every production package is allowed; 1 = at least one is not; 2 = the lockfile could not be read.
+ *   [--include-dev] [--notices <THIRD_PARTY_NOTICES>]
+ * Exit 0 = every checked package is allowed and noticed; 1 = at least one is not; 2 = a file could not be read.
  */
 
 const fs = require('fs')
@@ -148,7 +153,8 @@ function licenseFromPackageJson(pkg) {
  * Pure core: classify every production package of a lockfile (v2/v3 `packages` map).
  * @param {object} lock parsed package-lock.json
  * @param {{ readPackageJson?: (lockPath: string) => any, fileExists?: (lockPath: string, file: string) => boolean,
- *   overrides?: object }} [io] injected node_modules readers (omit them to judge the lockfile alone)
+ *   overrides?: object, includeDev?: boolean }} [io] injected node_modules readers (omit them to judge the lockfile
+ *   alone); includeDev also judges `dev` packages (what the release tarball ships)
  * @returns {{ rows: Array<{ path: string, name: string, version: string, license: string, source: string,
  *   ok: boolean, notice: string[], optional: boolean, reason: string }>, failures: number }}
  */
@@ -157,7 +163,7 @@ function checkLockLicenses(lock, io = {}) {
 	const packages = (lock && lock.packages) || {}
 	const rows = []
 	for (const [lockPath, entry] of Object.entries(packages)) {
-		if (!lockPath || !entry || entry.dev || entry.link) continue
+		if (!lockPath || !entry || (entry.dev && !io.includeDev) || entry.link) continue
 		const name = entry.name || lockPath.slice(lockPath.lastIndexOf('node_modules/') + 'node_modules/'.length)
 		const version = String(entry.version || '')
 		const key = `${name}@${version}`
@@ -195,6 +201,19 @@ function checkLockLicenses(lock, io = {}) {
 }
 
 /**
+ * WO-1106 B69: notice-required packages whose name THIRD_PARTY_NOTICES does not mention. A name counts only as a whole
+ * package name ("lightningcss" inside "lightningcss-linux-x64-gnu" does not name the base package).
+ * @param {ReturnType<typeof checkLockLicenses>['rows']} rows
+ * @param {string} noticesText
+ */
+function missingNotices(rows, noticesText) {
+	const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+	return rows.filter(
+		(r) => r.ok && r.notice.length && !new RegExp(`(^|[^\\w@/.-])${esc(r.name)}(?![\\w/-])`, 'm').test(noticesText)
+	)
+}
+
+/**
  * @param {ReturnType<typeof checkLockLicenses>['rows']} rows
  * @returns {Array<[string, number]>} licence string -> count, most common first
  */
@@ -211,6 +230,9 @@ function main(argv) {
 	}
 	const lockFile = arg('--lock', path.join(REPO_ROOT, 'package-lock.json'))
 	const modulesRoot = arg('--modules', path.dirname(lockFile))
+	const noticesFile = arg('--notices', path.join(REPO_ROOT, 'THIRD_PARTY_NOTICES'))
+	const includeDev = argv.includes('--include-dev')
+	const scope = includeDev ? 'packages (dev included)' : 'production packages'
 	let lock
 	try {
 		lock = JSON.parse(fs.readFileSync(lockFile, 'utf8'))
@@ -227,27 +249,42 @@ function main(argv) {
 			}
 		},
 		fileExists: (p, file) => fs.existsSync(path.join(modulesRoot, p, file)),
+		includeDev,
 	}
-	const { rows, failures } = checkLockLicenses(lock, io)
+	const { rows, failures: licenceFailures } = checkLockLicenses(lock, io)
+	let notices
+	try {
+		notices = fs.readFileSync(noticesFile, 'utf8')
+	} catch (e) {
+		console.error(`[check-npm-licenses] cannot read ${noticesFile}: ${e.message}`)
+		return 2
+	}
+	const unnoticed = missingNotices(rows, notices)
+	const failures = licenceFailures + unnoticed.length
 	if (argv.includes('--list')) {
 		for (const [lic, n] of licenseCounts(rows)) console.log(`${String(n).padStart(4)}  ${lic}`)
 	}
-	for (const r of rows.filter((x) => x.ok && x.notice.length)) {
+	for (const r of rows.filter((x) => x.ok && x.notice.length && !unnoticed.includes(x))) {
 		console.log(
-			`[check-npm-licenses] notice required: ${r.name}@${r.version} (${r.license}) — name it in THIRD_PARTY_NOTICES`
+			`[check-npm-licenses] notice required: ${r.name}@${r.version} (${r.license}) — named in THIRD_PARTY_NOTICES`
+		)
+	}
+	for (const r of unnoticed) {
+		console.error(
+			`[check-npm-licenses] NOT NOTICED: ${r.name}@${r.version} (${r.license}) is not named in ${path.basename(noticesFile)}`
 		)
 	}
 	for (const r of rows.filter((x) => !x.ok)) {
 		console.error(`[check-npm-licenses] NOT ALLOWED: ${r.name}@${r.version} (${r.path}): ${r.reason}`)
 	}
 	if (failures) {
-		console.error(`[check-npm-licenses] FAILED: ${failures} of ${rows.length} production packages`)
+		console.error(`[check-npm-licenses] FAILED: ${failures} of ${rows.length} ${scope}`)
 		return 1
 	}
-	console.log(`[check-npm-licenses] OK: ${rows.length} production packages, all on the allowlist`)
+	console.log(`[check-npm-licenses] OK: ${rows.length} ${scope}, all on the allowlist`)
 	return 0
 }
 
 if (require.main === module) process.exit(main(process.argv.slice(2)))
 
-module.exports = { checkLockLicenses, evaluateSpdx, licenseFromPackageJson, licenseCounts }
+module.exports = { checkLockLicenses, evaluateSpdx, licenseFromPackageJson, licenseCounts, missingNotices }

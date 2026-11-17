@@ -164,6 +164,9 @@ if [[ -f "${REPO_ROOT}/licenses/manifest.json" ]]; then
 else
 	echo "WARN: licenses/manifest.json missing after collect" >&2
 fi
+# WO-1106 B65: the ISO verifier's licence rows, against this host now — a missing text used to fail only after the produce.
+echo "==> Licence texts on the build host (same rows as verify-iso-redistribution.sh)"
+bash "${HERE}/verify-iso-redistribution.sh" --host /
 
 bash "${HERE}/pre-produce-preflight.sh"
 
