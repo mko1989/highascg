@@ -105,7 +105,7 @@ function createSaladGame(deps = {}) {
 	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev,
 		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house, self: ctl.self(), botMax: MAX_BOTS })
 	/** WO-1125 §3: players' `ctl` → this service's host() (the operator's path; only round + teams, never target / safe / …). */
-	const ctl = K.createGameCtl({ game: 'stage-salad', log, now, send: sendTo, host: (b) => host(b), world: () => room?.world() || null,
+	const ctl = K.createGameCtl({ game: 'stage-salad', log, now, timers: deps.timers, send: sendTo, host: (b) => host(b), world: () => room?.world() || null,
 		keys: { round: (v) => (K.intIn(v, RULES.secs.min, RULES.secs.max) != null ? [{ action: 'round', secs: v }] : null),
 			teams: (v) => (typeof v === 'boolean' ? [{ action: 'teams', on: v }] : null) },
 		bots: (n, level) => [{ action: 'bots', n }, ...(level ? [{ action: 'botlevel', level }] : [])] })
@@ -210,7 +210,7 @@ function createSaladGame(deps = {}) {
 	function host(a) {
 		const action = a && typeof a === 'object' ? String(a.action || '') : ''
 		if (action === 'self') return ctl.hostSelf(a, state, () => room?.host('house', {})) // WO-1125: room 'house' = only the state push
-		ctl.note(action) // WO-1125: an operator's disable holds the session closed for games.selfService
+		ctl.note(action, a) // WO-1125: an operator's disable holds the session closed for games.selfService; its bots = the default
 		if (action === 'enable') enable()
 		else if (action === 'disable') disable()
 		else if (!room) return { status: 409, body: { ok: false, error: 'the game is not enabled', state: state() } }

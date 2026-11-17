@@ -81,6 +81,7 @@ export async function startGame({ spectator = false } = {}) {
 			teams: G.state?.teams || [0, 0],
 			meId: G.meId,
 			limits: G.state?.limits,
+			self: G.state?.self === true, // WO-1125: players start the match themselves
 		}),
 		boardInfo: () => boardInfo(G),
 		sceneRev: (rev) => sceneRevChanged(G, rev),

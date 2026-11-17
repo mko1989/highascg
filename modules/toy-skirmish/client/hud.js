@@ -101,7 +101,7 @@ export function createHud(root, { spectator = false, toolbar = [] } = {}) {
 			show(teamBar, tdm)
 			if (s.phase === 'lobby') {
 				setText(scoreMain, 'Warm up')
-				setText(scoreSub, `${MODE_NAMES[s.mode] || MODE_NAMES.dm} · waiting for the host`)
+				setText(scoreSub, `${MODE_NAMES[s.mode] || MODE_NAMES.dm} · ${s.self ? 'press Start in the Lobby' : 'waiting for the host'}`)
 			} else if (tdm) {
 				const t = s.teams || [0, 0]
 				const me = s.players.find((p) => p.id === s.meId)

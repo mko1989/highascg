@@ -162,7 +162,7 @@ export function createLobby(root, { onJoin, onReady, onRejoin }) {
 				ready = !!me.ready
 				paintReady()
 			}
-			setText(lMsg, `${players.length}/${state.maxPlayers || 10} drivers · the host starts the race`)
+			setText(lMsg, `${players.length}/${state.maxPlayers || 10} drivers · ${state.self ? 'anyone here can press Start' : 'the host starts the race'}`) // WO-1125
 		},
 		hide() {
 			show(root, false)

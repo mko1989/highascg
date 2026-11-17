@@ -339,3 +339,8 @@ body.mode-player:not(.joined) .sk-respawn {
 		0 0 6px rgba(0, 0, 0, 0.85),
 		0 1px 2px #000;
 }
+
+/* WO-1125: the Lobby button sits under the health / armour / weapon column (the kit's top: 96px covered the health bar) */
+#lobby .lobby-open {
+	top: calc(206px + var(--st));
+}

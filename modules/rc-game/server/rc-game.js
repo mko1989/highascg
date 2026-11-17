@@ -95,7 +95,7 @@ function createRcGame(deps = {}) {
 		if (b.action === 'bots' && r.status < 300) room?.host('house', {}) // `bots` alone pushes nothing until a bot joins / leaves
 		return r
 	}
-	const ctl = createGameCtl({ game: 'rc-game', log, now, send: sendTo, host: ctlHost, world: () => room?.world() || null,
+	const ctl = createGameCtl({ game: 'rc-game', log, now, timers: deps.timers, send: sendTo, host: ctlHost, world: () => room?.world() || null,
 		keys: { track: (v) => (typeof v === 'string' && v.length <= 64 ? [{ action: 'track', trackId: v }] : null),
 			laps: (v) => (intIn(v, 1, MAX_LAPS) != null ? [{ action: 'laps', laps: v }] : null) },
 		bots: (n, level) => [{ action: 'bots', count: n, ...(level ? { level } : {}) }] })
@@ -177,7 +177,7 @@ function createRcGame(deps = {}) {
 	function host(a) {
 		const action = a && typeof a === 'object' ? String(a.action || '') : ''
 		if (action === 'self') return ctl.hostSelf(a, state, () => room?.host('house', {})) // WO-1125: room 'house' = only the state push
-		ctl.note(action) // WO-1125: an operator's disable holds the session closed for games.selfService
+		ctl.note(action, a) // WO-1125: an operator's disable holds the session closed for games.selfService; its bots = the default
 		if (action === 'enable') enable()
 		else if (action === 'disable') disable()
 		else if (!room) return { status: 409, body: { ok: false, error: 'the game is not enabled', state: state() } }

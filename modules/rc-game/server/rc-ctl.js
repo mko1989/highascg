@@ -4,7 +4,8 @@
  * WO-1125 — players run a game session themselves (work/notes/game-self-service-contract.md §2–§3): the one rule set of
  * the three games. rc-game.js requires it; Stage Skirmish and Stage Salad reach it through their kit (sk-kit.js /
  * salad-kit.js `createGameCtl`), so no game requires the world and the world requires no game. Pure: clock, sender, the
- * game service's own host() and the room view are injected; no timer, nothing held per socket but a WeakMap.
+ * game service's own host() and the room view are injected; nothing held per socket but a WeakMap, one timer only while
+ * self-service is on (the empty-room check, rc-empty-room.js).
  *
  *   self (runtime, default false — a module alone is unchanged): host action `{ action: 'self', on }`, sent by the core
  *     (src/games, `games.selfService`) to every loaded game; `state.self` tells the pages to show the session panel.
@@ -17,7 +18,11 @@
  *     results). Never a socket close. Accepted → the game's host() bodies in order (the operator's code path, so every
  *     validation and cap applies) → { t: 'ctl', ok: true, a } to the sender, the state to everyone through the room's
  *     normal push, one info line `[<game>] <name> (#id): <what>`. `stop` in the lobby is a no-op answered ok.
+ *   empty room (rc-empty-room.js, only while self is on): a round with no connected human for 20 s goes back to the
+ *     lobby, and after 60 s with nobody the bots return to the operator's default (`note(action, body)` remembers it).
  */
+
+const { createEmptyRoom, createBotDefault } = require('./rc-empty-room')
 
 const IDLE = new Set(['lobby', 'results'])
 const LEVELS = ['easy', 'normal', 'hard']
@@ -36,7 +41,7 @@ function seatOf(world, conn) {
 /**
  * @param {{ game: string, send: (conn: object, msg: object) => void, host: (body: object) => { status: number, body: object },
  *   world: () => object|null, keys: Record<string, (v: unknown) => object[]|null>, bots: (n: number, level?: string) => object[],
- *   log?: Function, now?: () => number }} o
+ *   log?: Function, now?: () => number, timers?: object }} o
  *   world: the room view (phase, paused / safe, conns, players) or null while closed; keys: the game's `set` whitelist,
  *   value → host bodies (null = bad value); bots: count + optional level → host bodies.
  */
@@ -46,6 +51,29 @@ function createGameCtl(o) {
 	const recent = new WeakMap() // socket → ctl times in the last RATE_MS
 	let self = false
 	let held = false
+	let own = false // a host() call made here (a player's ctl, the empty-room rule): not the operator's bot default
+	const botDefault = createBotDefault()
+
+	/** Host bodies in order through the game's host() → null when all were accepted, else the first refusal's text. */
+	function runBodies(bodies) {
+		own = true
+		try {
+			for (const body of bodies) {
+				let r
+				try {
+					r = o.host(body)
+				} catch (e) {
+					r = { status: 500, body: { ok: false, error: e?.message || 'failed' } }
+				}
+				if (!(Number(r?.status) < 300) || r?.body?.ok === false) return String(r?.body?.error || 'refused')
+			}
+			return null
+		} finally {
+			own = false
+		}
+	}
+	const empty = createEmptyRoom({ game: o.game, now, log, timers: o.timers, world: () => o.world(), self: () => self,
+		run: (bodies) => runBodies(bodies) == null, bots: o.bots, dflt: botDefault })
 
 	function slow(conn) {
 		const t = now()
@@ -95,15 +123,8 @@ function createGameCtl(o) {
 		if (w.paused === true || w.safe === true) return no('paused')
 		if (!IDLE.has(phase)) return no('running') // `stop` too: it never ends a running round
 		if (s === 'noop') return (o.send(conn, { t: 'ctl', ok: true, a }), 'ok')
-		for (const body of s.bodies) {
-			let r
-			try {
-				r = o.host(body)
-			} catch (e) {
-				r = { status: 500, body: { ok: false, error: e?.message || 'failed' } }
-			}
-			if (!(Number(r?.status) < 300) || r?.body?.ok === false) return no('bad', r?.body?.error || 'refused')
-		}
+		const refused = runBodies(s.bodies)
+		if (refused != null) return no('bad', refused)
 		log('info', `[${o.game}] ${p.name} (#${p.id}): ${s.label}`)
 		o.send(conn, { t: 'ctl', ok: true, a })
 		return 'ok'
@@ -115,18 +136,23 @@ function createGameCtl(o) {
 			return { status: 400, body: { ok: false, error: '`on` must be true or false', state: state() } }
 		if (a.on !== self) {
 			self = a.on
+			empty.setOn(self)
 			push()
 		}
 		return { status: 200, body: { ok: true, state: state() } }
 	}
 
-	/** Every host action passes here: `disable` holds the session closed for the core's re-open, `enable` lets go. */
-	function note(action) {
+	/**
+	 * Every host action passes here (with its body): `disable` holds the session closed for the core's re-open, `enable`
+	 * lets go; an operator's bot count / level is the default the empty-room rule returns to.
+	 */
+	function note(action, a) {
 		if (action === 'disable') held = true
 		else if (action === 'enable') held = false
+		botDefault.note(action, a, own)
 	}
 
-	return { handle, hostSelf, note, self: () => self, held: () => held }
+	return { handle, hostSelf, note, self: () => self, held: () => held, empty }
 }
 
 /** A whole number in [lo, hi] → the value, else null. */

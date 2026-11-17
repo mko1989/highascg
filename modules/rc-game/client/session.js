@@ -209,6 +209,6 @@ export function showResults(G) {
 	const rows = G.results.map((r) => ({ ...r, color: byId.get(r.id)?.color, me: r.id === G.meId }))
 	G.hud.results(
 		rows,
-		G.resultsFinal ? 'Final results — the host starts the next race' : 'Waiting for the other drivers…'
+		G.resultsFinal ? (G.state?.self ? 'Final results — Play again or Back to lobby' : 'Final results — the host starts the next race') : 'Waiting for the other drivers…'
 	)
 }

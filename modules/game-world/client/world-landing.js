@@ -22,6 +22,7 @@ export function startLanding(root) {
 		panel.hidden = on
 		gamesBtn.hidden = !on
 		hideBtn.setAttribute('aria-expanded', String(!on))
+		document.body.classList.toggle('cards-hidden', on) // the room's game strip shows while the cards are folded
 	}
 	hideBtn.addEventListener('click', () => collapse(true))
 	gamesBtn.addEventListener('click', () => collapse(false))

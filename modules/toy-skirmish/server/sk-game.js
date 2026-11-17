@@ -80,7 +80,7 @@ function createSkGame(deps = {}) {
 	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev,
 		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house, self: ctl.self(), arenas: arenaList, botMax: RULES.maxBots })
 	/** WO-1125 §3: players' `ctl` → this service's host() (the operator's path); `self` from the core (games.selfService). */
-	const ctl = K.createGameCtl({ game: 'toy-skirmish', log, now, send: sendTo, host: (b) => host(b), world: () => room?.world() || null,
+	const ctl = K.createGameCtl({ game: 'toy-skirmish', log, now, timers: deps.timers, send: sendTo, host: (b) => host(b), world: () => room?.world() || null,
 		keys: { arena: (v) => (typeof v === 'string' && v.length <= 64 ? [{ action: 'arena', id: v }] : null),
 			mode: (v) => (['dm', 'tdm', 'spot'].includes(v) ? [{ action: 'mode', mode: v }] : null),
 			minutes: (v) => (K.intIn(v, RULES.minutes.min, RULES.minutes.max) != null ? [{ action: 'limits', minutes: v }] : null) },
@@ -165,7 +165,7 @@ function createSkGame(deps = {}) {
 	function host(a) {
 		const action = a && typeof a === 'object' ? String(a.action || '') : ''
 		if (action === 'self') return ctl.hostSelf(a, state, () => room?.host('house', {})) // WO-1125: room 'house' = only the state push
-		ctl.note(action) // WO-1125: an operator's disable holds the session closed for games.selfService
+		ctl.note(action, a) // WO-1125: an operator's disable holds the session closed for games.selfService; its bots = the default
 		if (action === 'enable') enable()
 		else if (action === 'disable') disable()
 		else if (!room) return { status: 409, body: { ok: false, error: 'the game is not enabled', state: state() } }

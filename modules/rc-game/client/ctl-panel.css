@@ -52,6 +52,14 @@
 	margin-top: 10px;
 	min-height: 56px;
 }
+/* a wide card (a phone held sideways): the rows in two columns, so Start is near the top */
+@media (min-width: 640px) {
+	.ctl-body {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		column-gap: 28px;
+	}
+}
 .ctl-msg {
 	min-height: 20px;
 	color: var(--bad);
@@ -71,6 +79,17 @@
 .ctl-results .big,
 .ctl-results .ghost {
 	min-height: 52px;
+}
+/* opaque: the bar sits over the touch controls and the speed readout */
+.ctl-results .ghost {
+	background: var(--panel);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+.ctl-results a.ghost.world-link {
+	padding: 0 18px;
+	border-radius: 12px;
+	border: 1px solid var(--line);
+	font-weight: 600;
 }
 a.tool,
 a.ghost.world-link {

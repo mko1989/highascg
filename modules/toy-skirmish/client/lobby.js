@@ -75,12 +75,13 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 	const warmBtn = h('button.big.go', { type: 'button', text: 'Back to the warm-up' })
 	const changeBtn = h('button.ghost', { type: 'button', text: 'Change name / colour' })
 	changeBtn.addEventListener('click', () => onRejoin())
+	const lHead = h('h2', { text: 'Waiting for the host to start' })
 	const sessionSlot = h('div.ctl-slot') // WO-1125: the self-service session panel is mounted here (session-panel.js)
 	const lobbyPanel = h(
 		'div.panel.lobby',
 		h(
 			'div.cols',
-			h('div.col', h('h2', { text: 'Waiting for the host to start' }), plist, lMsg),
+			h('div.col', lHead, plist, lMsg),
 			h('div.col.sk-lobby-info', lMode, lArena, h('p.hint', { text: 'Warm up: run, shoot and grab weapons — nothing counts until the match starts.' }))
 		),
 		sessionSlot,
@@ -135,7 +136,8 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 				li.classList.toggle('offline', p.connected === false)
 				plist.append(li)
 			}
-			setText(lMsg, `${players.length}/${state.maxPlayers || 10} soldiers · the host starts the match`)
+			setText(lHead, state.self ? 'Waiting for the start' : 'Waiting for the host to start') // WO-1125: anyone seated may start
+			setText(lMsg, `${players.length}/${state.maxPlayers || 10} soldiers · ${state.self ? 'anyone here can press Start' : 'the host starts the match'}`)
 		},
 		hide() {
 			show(root, false)

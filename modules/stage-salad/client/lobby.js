@@ -73,6 +73,7 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 	const lInfo = h('div.laps')
 	const plist = h('ul.players')
 	const lMsg = h('p.hint')
+	const lHead = h('h2', { text: 'Waiting for the host to start' })
 	const practiceBtn = h('button.big.go', { type: 'button', text: 'Practice while you wait' })
 	const changeBtn = h('button.ghost', { type: 'button', text: 'Change name / colour' })
 	changeBtn.addEventListener('click', () => onRejoin())
@@ -81,7 +82,7 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 		'div.panel.lobby',
 		h(
 			'div.cols',
-			h('div.col', h('h2', { text: 'Waiting for the host to start' }), plist, lMsg),
+			h('div.col', lHead, plist, lMsg),
 			h('div.col.salad-lobby-info', lMode, lInfo, h('p.hint', { text: 'Practice: throw as much as you like — nothing counts until the round starts.' }))
 		),
 		sessionSlot,
@@ -136,7 +137,8 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 				li.classList.toggle('offline', p.connected === false)
 				plist.append(li)
 			}
-			setText(lMsg, `${players.length}/${state.maxPlayers || 20} slingshots · the host starts the round`)
+			setText(lHead, state.self ? 'Waiting for the start' : 'Waiting for the host to start') // WO-1125: anyone seated may start
+			setText(lMsg, `${players.length}/${state.maxPlayers || 20} slingshots · ${state.self ? 'anyone here can press Start' : 'the host starts the round'}`)
 		},
 		hide() {
 			show(root, false)

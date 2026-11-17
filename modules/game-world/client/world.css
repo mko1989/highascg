@@ -347,9 +347,24 @@ select {
 .world-bg .wait {
 	display: none;
 }
+/* the spectator's game strip shows only while the cards are folded away (under the cards it was hidden by the canvas) */
+.mode-landing .world-bg {
+	z-index: 1;
+}
+.mode-landing .world-bg .overlay {
+	display: none;
+}
+.mode-landing.cards-hidden .world-bg .overlay {
+	display: flex;
+}
+/* the panel scrolls inside itself; the page never does (the old 100vh - 24px plus main's 12 + 16 px padding overflowed by 4 px) */
+body.mode-landing {
+	overflow: hidden;
+}
 .landing-panel {
 	max-width: 560px;
-	max-height: calc(100vh - 24px);
+	max-height: calc(100vh - 28px);
+	max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom)));
 	overflow: auto;
 	padding: 12px;
 	border-radius: 18px;
@@ -370,4 +385,17 @@ select {
 	position: fixed;
 	left: max(12px, env(safe-area-inset-left));
 	top: max(12px, env(safe-area-inset-top));
+}
+/* a phone held sideways: three cards fit without scrolling the panel */
+@media (max-height: 460px) {
+	.pick {
+		min-height: 64px;
+		padding: 10px 16px;
+	}
+	.pick-title {
+		font-size: 1.2rem;
+	}
+	.mode-landing .hint {
+		margin: 4px 0 8px;
+	}
 }
