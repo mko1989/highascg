@@ -5,7 +5,7 @@
  * Messages: ≤ 2 KB of JSON text (the RC cap, through the kit), an object with a known `t`; anything else → null and the
  * socket's bad-message counter. Per type, strict types and clamps — a malformed field drops the whole message:
  *   s     { p: [x, z], yaw, mv, w }   p finite (|v| ≤ 10 km), yaw wrapped to (−π, π], mv 0/1, w a weapon id or null
- *   fire  { w, n, p, yaw }            w a weapon id, n the client's shot counter (integer 0 … 2^31 − 1)
+ *   fire  { w, n, p, yaw, seed? }     w a weapon id, n the client's shot counter (integer 0 … 2^31 − 1), seed uint32
  *   hit   { n, id, k }                id a player id (integer ≥ 1), k pellets 1–8 (absent → 1)
  *   boom  { n, p }   · pick { id }    pickup id 0–63
  *   join  { name, color, spectator }  names / colours cleaned by the room with the kit's cleanName / cleanColor
@@ -51,7 +51,9 @@ function cleanFire(m) {
 	const p = point(m?.p)
 	const yaw = cleanYaw(m?.yaw)
 	if (!w || !p || yaw == null || !int(m.n, 0, MAX_N)) return null
-	return { w, n: m.n, p, yaw }
+	const v = { w, n: m.n, p, yaw }
+	if (int(m.seed, 0, 0xffffffff)) v.seed = m.seed // WO-1106 B59: the shooter's spread seed (uint32), echoed in `shot`
+	return v
 }
 
 function cleanHit(m) {

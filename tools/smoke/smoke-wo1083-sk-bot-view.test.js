@@ -186,6 +186,7 @@ test('the referee: a bot hit or splash outside the view is refused whatever the 
 	let n = 1000
 	const fireAt = (p, w, dx, dz) => {
 		p.lastFire = {}
+		p.fireW = null // WO-1106 B58: and the raise-time gap of a weapon switch
 		return combat.fire(p, { w, n: ++n, p: p.pos.slice(), yaw: R.yawTo(p.pos[0], p.pos[1], p.pos[0] + dx, p.pos[1] + dz) })
 	}
 	for (const [dx, dz] of [[30, 0], [0, -10], [8, 0], [0, 5]]) {

@@ -37,7 +37,7 @@ function attachSkWs(httpServer, ctx, opts = {}) {
 			socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n')
 			return socket.destroy()
 		}
-		wss.handleUpgrade(req, socket, head, (ws) => game.attach(ws))
+		wss.handleUpgrade(req, socket, head, (ws) => game.attach(ws, req.socket?.remoteAddress)) // WO-1106 B36: the per-address cap
 	}
 	httpServer.on('upgrade', onUpgrade)
 	return {

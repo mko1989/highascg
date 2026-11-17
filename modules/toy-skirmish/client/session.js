@@ -37,9 +37,12 @@ function dropRemote(G, id) {
 	G.remotes.delete(id)
 }
 
-/** Remote soldiers follow the roster (models rebuilt when name / colour change). */
+/**
+ * Remote soldiers follow the roster (models rebuilt when name / colour change). A disconnected player (listed with his
+ * score until the lobby) is no soldier: not drawn, not in any ray, not followed (WO-1106 B35 — he never comes back).
+ */
 export function syncRemotes(G) {
-	const players = G.state?.players || []
+	const players = (G.state?.players || []).filter((p) => p.connected !== false)
 	const ids = new Set(players.map((p) => p.id))
 	for (const id of [...G.remotes.keys()]) if (!ids.has(id) || id === G.meId) dropRemote(G, id)
 	for (const p of players) {
@@ -91,7 +94,10 @@ function applyState(G, state) {
 	G.state = state
 	G.phase = phaseOf(state)
 	if (Number.isFinite(state.startAt)) G.startAt = state.startAt // §12: state carries startAt in the countdown
+	G.ctl.sceneRev?.(state.sceneRev) // WO-1106 B56: a new scene rev (lobby only) → the scene is fetched and rebuilt
 	if (state.arenaId && state.arenaId !== G.arena?.id) G.ctl.setArena(state.arenaId)
+	// WO-1106 B54: the state lists only what is gone now — a reset (start / lobby / stop) must bring the rest back
+	for (const id of G.arenaView?.pickups.keys() || []) G.arenaView.setTaken(id, 0)
 	for (const [id, until] of state.pk || []) G.arenaView?.setTaken(id, until)
 	syncRemotes(G)
 	if (G.phase !== prev) onPhase(G, prev)

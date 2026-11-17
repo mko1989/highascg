@@ -81,6 +81,7 @@ export async function startGame({ spectator = false } = {}) {
 			limits: G.state?.limits,
 		}),
 		boardInfo: () => boardInfo(G),
+		sceneRev: (rev) => sceneRevChanged(G, rev),
 	}
 
 	const st = await waitEnabled(screens)
@@ -195,6 +196,7 @@ async function loadScene(G) {
 	}
 	G.screens.hide()
 	G.scene = r.data
+	G.sceneRev = G.scene.rev ?? G.state?.sceneRev ?? null
 	G.s = sceneScale(G.scene)
 	G.occ = prepareOcc(G.scene.occ)
 	G.skfx.dispose()
@@ -214,6 +216,20 @@ async function loadScene(G) {
 			G.screens.loading(null)
 			if (!res.ok) G.hud.toast('Room model unavailable — plain arena')
 		})
+	return true
+}
+
+/**
+ * WO-1106 B56: the operator changed the previs — the server's arenas, spawns and pickups follow its new scene rev, so
+ * the page fetches the scene again and rebuilds. Only in the lobby: a running match keeps its arena on the server too
+ * (sk-room.js setScene) until the lobby picks the new one up.
+ */
+export function sceneRevChanged(G, rev) {
+	if (rev == null || G.sceneRev == null || rev === G.sceneRev || G.sceneLoading || G.phase !== 'lobby' || G.off) return false
+	G.sceneLoading = true
+	loadScene(G)
+		.catch(() => {})
+		.finally(() => (G.sceneLoading = false))
 	return true
 }
 

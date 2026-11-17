@@ -20,6 +20,7 @@ export const ARMOUR_ABSORB = 0.6
 export const RESPAWN_S = 3
 export const PROTECT_S = 1.5
 export const PICK_R = 0.5 // pick-up radius, centre to centre (u)
+export const RAISE_MS = 250 // WO-1106 B58: another weapon fires ≥ this long after the last shot (server sk-rules.js raiseMs)
 export const MAX_PLAYERS = 10
 /** A cut through the room this high above the arena floor (u) — everything of the scene above it vanishes (§9). */
 export const CUT_H = 1.2

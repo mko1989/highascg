@@ -6,7 +6,7 @@
  * drawn once per rocket (its own impact or the server's `boom`, whichever comes first). Pick-ups are claimed by
  * walking over them. Ammo and health are never changed here — the server's `me` is the only source.
  */
-import { WEAPONS, SOLDIER, PICK_R, AR_MAX, HP_MAX, fwd } from './sk-const.js'
+import { WEAPONS, SOLDIER, PICK_R, AR_MAX, HP_MAX, RAISE_MS, fwd } from './sk-const.js'
 import { traceShot, createRocket, stepRocket, rocketAt } from './shots.js'
 import { fireMsg, hitMsg, boomMsg, pickMsg } from './protocol.js'
 import { usable, isEnemy, bestWeapon } from './score.js'
@@ -97,17 +97,21 @@ export function tryFire(G, held, nowMs) {
 		return false
 	}
 	if (nowMs - (G.lastFireAt || -1e9) < W.interval * 1000) return false
+	if (G.firedW && G.firedW !== w && nowMs - G.firedAt < RAISE_MS) return false // WO-1106 B58: the server's raise gap
 	G.lastFireAt = nowMs
 	const n = G.nextShot()
 	const p = [G.my.x, G.my.z]
 	const yaw = G.my.yaw
-	if (!G.net.sendEvent(fireMsg(w, n, p, yaw, G.s))) return false
+	const seed = (Math.random() * 4294967296) >>> 0 // WO-1106 B59: sent along, so the others draw this very spread
+	if (!G.net.sendEvent(fireMsg(w, n, p, yaw, G.s, seed))) return false
+	G.firedW = w
+	G.firedAt = nowMs
 	G.ownShots.add(n)
 	if (G.ownShots.size > OWN_SHOTS_KEEP) G.ownShots.delete(G.ownShots.values().next().value)
 	if (ammo !== -1) G.spent++
 	G.protUntil = 0 // spawn protection ends on the first shot
 	const sNow = G.net.serverNow()
-	const shot = { id: G.meId, w, n, p, yaw, ts: sNow, seed: (Math.random() * 4294967296) >>> 0 }
+	const shot = { id: G.meId, w, n, p, yaw, ts: sNow, seed }
 	if (W.kind === 'rocket') startRocket(G, shot, true)
 	else {
 		const targets = soldiersFor(G, G.meId, { claimable: true })

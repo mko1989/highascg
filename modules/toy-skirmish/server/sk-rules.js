@@ -40,6 +40,7 @@ const RULES = {
 	respawnMs: 3000, protectMs: 1500,
 	pickRadius: 0.5, pickSlack: 0.5, // server tolerance on top of the 0.5 u radius: its position of the picker is ≤ 50 ms old
 	hitSlack: 3, fireWindowMs: 1500, intervalTol: 0.1,
+	raiseMs: 250, // WO-1106 B58: switching weapons — another weapon fires ≥ this long after the last fire (client game.js hold)
 	posSlack: 2, // positions outside the arena rect + 2 u are ignored
 	countdownMs: 3000, resultsMs: 15000,
 	maxPlayers: 10, maxSpectators: 20, maxBots: 6,

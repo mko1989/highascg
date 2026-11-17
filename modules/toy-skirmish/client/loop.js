@@ -71,7 +71,10 @@ export function startLoop(G) {
 		if (input.cycle) G.ctl.hold(cycleWeapon(G.me?.w, G.held, input.cycle))
 		const frozen = G.phase === 'countdown' || G.phase === 'results' || !G.alive || !G.arena || !!G.wj?.paused // WO-1101 world pause
 		const wish = frozen ? { mx: 0, mz: 0 } : G.wj ? G.wj.wish(input, sNow) : input // WO-1102 stun / slick splat
-		G.stepper.advance(dt, (h) => stepSoldier(G.my, wish, h, G.grid, G.s))
+		G.stepper.advance(dt, (h) => {
+			stepSoldier(G.my, wish, h, G.grid, G.s)
+			if (!frozen) G.wj?.knock(G.my, h, G.grid, G.s) // WO-1106 A11: the stun's own 1.2 u displacement
+		})
 		/* aim */
 		if (!frozen && input.aim) {
 			if (input.aim.yaw != null) G.my.yaw = input.aim.yaw

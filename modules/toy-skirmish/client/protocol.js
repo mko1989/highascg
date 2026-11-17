@@ -53,8 +53,11 @@ export function stateMsg(x, z, yaw, moving, w, s = 1) {
 	return { t: 's', p: pos([x, z], s), yaw: round(yaw, 3), mv: moving ? 1 : 0, w: isWeapon(w) ? w : 'pea' }
 }
 
-export function fireMsg(w, n, p, yaw, s = 1) {
-	return { t: 'fire', w: String(w), n: n | 0, p: pos(p, s), yaw: round(yaw, 4) }
+/** seed (uint32, WO-1106 B59): the spread this client drew at once — the server echoes it so everyone draws the same. */
+export function fireMsg(w, n, p, yaw, s = 1, seed) {
+	const m = { t: 'fire', w: String(w), n: n | 0, p: pos(p, s), yaw: round(yaw, 4) }
+	if (Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff) m.seed = seed
+	return m
 }
 
 /** Shot n hit player id with k pellets (1–8). */

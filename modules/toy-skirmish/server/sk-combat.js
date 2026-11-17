@@ -4,12 +4,13 @@
  * WO-1081 — Stage Skirmish: the referee (contract §3 / §5; pure — clock, timers and senders come in through the room's
  * context X). Health, armour, ammo, weapons held, kills, deaths, score, pickups and respawns are decided here; movement
  * and aiming are the browsers'. Every rule, in the order it is checked:
- *   fire  alive, phase lobby / match, holds the weapon, has ammo, its interval passed (10 % tolerance), a new `n`
- *         → ammo − 1, spawn protection ends, `shot` to everyone (seed for the spread), `me` to the shooter
- *   hit   both alive; victim not spawn-protected, not the shooter, not a team-mate in tdm; fire `n` is a hitscan shot of
+ *   fire  alive, not stunned, phase lobby / match, holds the weapon, has ammo, its interval passed (10 % tolerance),
+ *         another weapon's last fire ≥ the 250 ms raise time ago (same tolerance), a new `n` → ammo − 1, spawn
+ *         protection ends, `shot` to everyone (the shooter's own seed for the spread, else a server one), `me` to him
+ *   hit   phase lobby / match; both alive; victim not spawn-protected, not the shooter, not a team-mate in tdm; fire `n` is a hitscan shot of
  *         ≤ 1.5 s ago with hits left (1, scatter 8 pellets); server positions ≤ range + 3 u apart; the line between them
  *         crosses no solid cell of the grid shrunk by one cell → damage (× 2 with surge), armour takes 60 % while it lasts
- *   boom  a Thumper fire of ≤ 4.5 s ago, not yet resolved; the impact within 1 u of the fire ray, not behind it, not
+ *   boom  phase lobby / match; a Thumper fire of ≤ 4.5 s ago, not yet resolved; the impact within 1 u of the fire ray, not behind it, not
  *         farther than 22 u/s × the time since the shot (+ 1 u) → splash from the server's positions, linear 90 → 0 over
  *         4 u, no line of sight needed, the owner × 0.5 (no surge on himself), team-mates spared in tdm
  *   pick  alive, phase lobby / match, the pickup is there, server position within 0.5 u (+ 0.5 u slack: it is ≤ 50 ms
@@ -48,6 +49,8 @@ function createCombat(X) {
 		p.surgeUntil = 0
 		p.fires = new Map()
 		p.lastFire = {}
+		p.fireW = null // WO-1106 B58: the weapon of the last accepted fire and when (the raise-time gap)
+		p.fireAt = -Infinity
 	}
 
 	function clearRespawn(p) {
@@ -155,22 +158,29 @@ function createCombat(X) {
 	/** A `fire` (cleaned). → the fire record or null (dropped silently). */
 	function fire(p, m) {
 		const W = WEAPONS[m.w]
-		if (!W || !canAct() || !p.alive || !X.arena) return null
+		const t = now()
+		// WO-1106 A3: a stunned soldier (bots too) cannot fire — the room's check covered the humans' messages only
+		if (!W || !canAct() || !p.alive || !X.arena || p.stunUntil > t) return null
 		const ammo = p.w[m.w]
 		if (ammo === undefined || ammo === 0) return null
-		const t = now()
 		const last = p.lastFire[m.w]
 		if (last != null && t - last < W.interval * 1000 * (1 - RULES.intervalTol)) return null
+		// WO-1106 B58: the interval is per weapon — without this gap a modified client fires every held weapon at once
+		if (p.fireW && p.fireW !== m.w && t - p.fireAt < RULES.raiseMs * (1 - RULES.intervalTol)) return null
 		for (const [n, f] of p.fires) if (t - f.at > ROCKET.expireMs) p.fires.delete(n)
 		if (p.fires.has(m.n)) return null
 		if (ammo > 0) p.w[m.w] = ammo - 1
 		p.lastFire[m.w] = t
+		p.fireW = m.w
+		p.fireAt = t
 		p.held = m.w
 		if (p.protectUntil > t) p.protectUntil = t // protection ends on the first shot
 		const r = X.arena.rect, s = RULES.posSlack * u()
 		const inside = m.p[0] >= r[0] - s && m.p[0] <= r[2] + s && m.p[1] >= r[1] - s && m.p[1] <= r[3] + s
 		const at = inside ? m.p : p.pos
-		const rec = { n: m.n, w: m.w, at: t, left: W.pellets, p: at, yaw: m.yaw, seed: Math.floor(X.rng() * 2147483647), done: false }
+		const drawn = Math.floor(X.rng() * 2147483647) // always drawn: the room's rng sequence stays what it was
+		// WO-1106 B59: the shooter's own seed (he drew his spread from it at once) → everyone draws the same pellets
+		const rec = { n: m.n, w: m.w, at: t, left: W.pellets, p: at, yaw: m.yaw, seed: m.seed ?? drawn, done: false }
 		p.fires.set(m.n, rec)
 		X.toAll({ t: 'shot', id: p.id, w: m.w, n: m.n, p: at, yaw: m.yaw, ts: t, seed: rec.seed })
 		if (ammo > 0) sendMe(p)
@@ -183,6 +193,7 @@ function createCombat(X) {
 		const v = X.players.get(m.id)
 		const rec = p.fires.get(m.n)
 		const t = now()
+		if (!canAct()) return false // WO-1106 B57: no damage while paused or in the countdown / results
 		if (!v || v === p || !p.alive || !v.alive || !p.pos || !v.pos || !X.grid) return false
 		if (v.protectUntil > t) return false
 		if (X.mode() === 'tdm' && v.team === p.team) return false
@@ -202,6 +213,7 @@ function createCombat(X) {
 	function boom(p, m) {
 		const rec = p.fires.get(m.n)
 		const t = now()
+		if (!canAct()) return false // WO-1106 B57
 		if (!rec || rec.w !== 'thumper' || rec.done || t - rec.at > ROCKET.expireMs || !X.arena) return false
 		const [dx, dz] = dirOf(rec.yaw)
 		const ex = m.p[0] - rec.p[0], ez = m.p[1] - rec.p[1]

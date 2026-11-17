@@ -446,4 +446,6 @@ module.exports = [
 	'tools/smoke/smoke-wo1106-salad-client.test.js', // WO-1106 A4 / A32 / A36 / B61–B64: welcome reset, queue overflow, floors, disposal, muted start, non-finite flights, host gate
 	'tools/smoke/smoke-wo1106-salad-room.test.js', // WO-1106 B34 / B36 / B60 / B64: ghost seats, silent spectators, per-address cap, buzzer clears flights
 	'tools/smoke/smoke-wo1106-rc-client-fixes.test.js', // WO-1106 A4 / A32 / A35 / B35 / B42–B50: ghosts hidden, item press kept, clock reset, bot hit, host refresh, racing flag, spectator full card
+	'tools/smoke/smoke-wo1106-skirmish-server.test.js', // WO-1106 A3 / A5 / A24 / A32 / B34 / B36 / B55 / B57–B59: stunned bots, ghost cap, move window, no damage while paused, weapon gap
+	'tools/smoke/smoke-wo1106-skirmish-client.test.js', // WO-1106 A4 / A11 / A32 / B35 / B54 / B56 / B58 / B59: welcome reset, knock-back, ghosts gone, pickups reset, scene rev
 ]

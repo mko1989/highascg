@@ -118,6 +118,7 @@ function setup(t, o = {}) {
 	let n = 1000
 	const fire = (c, w = 'pea', yaw = 0) => {
 		c.p.lastFire = {}
+		c.p.fireW = null // WO-1106 B58: and the raise-time gap of a weapon switch
 		room.handle(c, { t: 'fire', w, n: ++n, p: c.p.pos, yaw })
 		return n
 	}
@@ -393,6 +394,7 @@ test('accepted hitscan shot → hub.shot once (metres, range × u, line of sight
 	assert.ok(S.last(b, 'shot').w === 'thumper', 'the rocket went out')
 	assert.equal(hub.of('shot').length, 2, 'a rocket is no hitscan')
 	a.p.lastFire = {}
+	a.p.fireW = null
 	S.room.handle(a, { t: 'fire', w: 'pea', n: dup, p: a.p.pos, yaw: 0 }) // a reused shot counter: dropped by the referee
 	a.p.stunUntil = S.clock.now() + 1000
 	S.fire(a)

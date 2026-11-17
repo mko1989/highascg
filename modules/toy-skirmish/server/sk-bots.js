@@ -267,6 +267,7 @@ function createBots(X, combat, hooks) {
 			const ai = p.ai
 			const dt = Math.min(0.25, Math.max(0, (t - ai.last) / 1000))
 			ai.last = t
+			if (!acting()) ai.rockets = [] // WO-1106 B57: a rocket in flight never lands in a pause / countdown / results
 			for (const r of ai.rockets.slice()) {
 				if (t < r.at) continue
 				ai.rockets.splice(ai.rockets.indexOf(r), 1)
@@ -276,6 +277,10 @@ function createBots(X, combat, hooks) {
 				ai.path = null
 				ai.target = null
 				ai.aim = null
+				if (p.mv) (p.mv = 0), X.dirty()
+				continue
+			}
+			if (p.stunUntil > t) { // WO-1106 A3: a stunned bot stands still and holds fire (the causer was paid for it)
 				if (p.mv) (p.mv = 0), X.dirty()
 				continue
 			}

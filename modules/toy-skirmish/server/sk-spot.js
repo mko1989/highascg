@@ -11,6 +11,7 @@
  *
  *   info()   → { x, z, r, movesAt, holder: id | null, contested } (metres / server ms) or null — `state.spot`
  *   tick()   moves the spot when due, finds the holder, scores
+ *   shift(ms)  a pause of ms ended: movesAt moves on by it
  *   reset()  no spot (a new arena, a mode change, the lobby after a match); the next tick places one
  */
 
@@ -43,7 +44,7 @@ function createSpot(X, hooks) {
 		const t = X.now()
 		const dt = last ? Math.min(1000, Math.max(0, t - last)) : 0
 		last = t
-		if (!X.arena) return
+		if (!X.arena || X.phase() === 'paused') return // WO-1106 B57: the spot holds still through a pause (shift() on resume)
 		if (!cur || t >= cur.movesAt) place(t)
 		if (!cur) return
 		const inside = [...X.players.values()].filter((p) => p.alive && p.pos && (p.connected || p.bot) && Math.hypot(p.pos[0] - cur.x, p.pos[1] - cur.z) <= cur.r)
@@ -70,6 +71,10 @@ function createSpot(X, hooks) {
 	return {
 		tick,
 		info: () => (cur ? { x: cur.x, z: cur.z, r: cur.r, movesAt: cur.movesAt, holder: holder?.id ?? null, contested } : null),
+		/** WO-1106 B57: a world pause of `ms` ended — the move is due that much later. */
+		shift(ms) {
+			if (cur) cur.movesAt += ms
+		},
 		reset() {
 			cur = null
 			holder = null

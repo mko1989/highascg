@@ -61,6 +61,7 @@ function createSkWorld(deps) {
 	const now = deps.now || Date.now
 	const room = () => deps.room() || null
 	const caps = new WeakMap()
+	const resync = new WeakSet() // WO-1106 A32: sockets left out of one viewers() call — the hub forgets the view, then serves it afresh
 	const bonuses = new Map() // pid → { key, n, pts } (key = the room's match serial: a new match starts the count again)
 
 	const colorOf = (w, p) => (w.mode === 'tdm' && (p.team === 0 || p.team === 1) ? TEAM_COLORS[p.team] : p.color)
@@ -88,12 +89,13 @@ function createSkWorld(deps) {
 			const w = r?.world()
 			if (!w) return []
 			const y = floorY(w)
-			return w.conns.map((c) => {
+			return w.conns.filter((c) => !resync.delete(c.conn)).map((c) => {
 				const p = c.spectator ? null : w.players.get(c.pid)
 				return { key: c.conn, kind: c.spectator ? 'spectator' : 'player', p: p?.pos ? [p.pos[0], y, p.pos[1]] : null, cap: caps.get(c.conn) ?? 12 }
 			})
 		},
-		send: (key, msg) => deps.send(key, msg),
+		/** WO-1106 A5: false when the game's sendTo skipped it (closed socket / backpressure) — the hub then sends it again. */
+		send: (key, msg) => deps.send(key, msg) !== false,
 		toAll: (msg) => room()?.toAll(msg),
 		board() {
 			const r = room()
@@ -158,12 +160,13 @@ function createSkWorld(deps) {
 		const h = hubOf()
 		const W = WEAPONS[msg.w]
 		const w = room()?.world()
-		if (!h?.shot || !W || W.kind !== 'hitscan' || !w?.arena || !Array.isArray(msg.p)) return
+		const pos = w?.players.get(msg.id)?.pos // WO-1106 A24: the shooter's server position, never the claimed muzzle `p`
+		if (!h?.shot || !W || W.kind !== 'hitscan' || !w?.arena || !Array.isArray(pos)) return
 		const u = w.u || 0.1
 		const y = floorY(w) + MUZZLE_U * u
 		const grid = w.grid
 		try {
-			h.shot({ g: ID, pid: msg.id, o: [msg.p[0], y, msg.p[1]], yaw: msg.yaw, range: W.range * u,
+			h.shot({ g: ID, pid: msg.id, o: [pos[0], y, pos[1]], yaw: msg.yaw, range: W.range * u,
 				los: (a, b) => !grid || G.lineClear(grid, a[0], a[2], b[0], b[2], true) })
 		} catch {}
 	}
@@ -171,7 +174,12 @@ function createSkWorld(deps) {
 	return {
 		adapter,
 		onShot,
+		/** `wq` { n } = the visitor cap; { re: true } = the page's pre-load queue overflowed: re-send its whole view (A32). */
 		quality(conn, m) {
+			if (m?.re === true) {
+				resync.add(conn)
+				if (!CAPS.includes(m.n)) return
+			}
 			const n = CAPS.includes(m?.n) ? m.n : 12
 			caps.set(conn, n)
 			try {

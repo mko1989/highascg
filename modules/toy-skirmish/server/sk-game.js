@@ -22,6 +22,7 @@ const { createSkWorld } = require('./sk-world')
 const MAX_SOCKETS = RULES.maxPlayers + RULES.maxSpectators
 const MSG_RATE = 60 // messages / s per socket (20 states + automatic fire + its hits + pings), burst the same
 const MAX_BUFFERED = 256 * 1024
+const MAX_PER_ADDRESS = 4 // WO-1106 B36: sockets from one remote address (one phone, or one device opening 20 silent ones)
 const LEASE_ID = 'toy-skirmish'
 
 /**
@@ -42,6 +43,7 @@ function createSkGame(deps = {}) {
 	let room = null
 	let world = null // WO-1101 Game World link while enabled (does nothing without the world module)
 	const sockets = new Set()
+	const perAddress = new Map() // remote address → open game sockets (WO-1106 B36)
 	let lastRev = null
 	const text = new WeakMap() // message object → its JSON (a broadcast is stringified once)
 
@@ -54,12 +56,14 @@ function createSkGame(deps = {}) {
 	const cgnat = (ip) => /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip)
 	const joinUrls = () => [...lanIps()].sort((a, b) => cgnat(a) - cgnat(b)).map((ip) => `http://${ip}:${port()}/game/sk/`)
 
+	/** → true when handed to the socket, false when skipped (closed, > 256 KB queued) or it threw (WO-1106 A5). */
 	function sendTo(ws, m) {
-		if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > MAX_BUFFERED) return
+		if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > MAX_BUFFERED) return false
 		try {
 			ws.send(json(m))
+			return true
 		} catch {
-			/* socket going away */
+			return false /* socket going away */
 		}
 	}
 
@@ -158,14 +162,17 @@ function createSkGame(deps = {}) {
 		return room.state()
 	}
 
-	/** A new game socket (already upgraded). Disabled → `off` and close 4403. */
-	function attach(ws) {
+	/** A new game socket (already upgraded; addr = its remote address when known). Disabled → `off` and close 4403. */
+	function attach(ws, addr) {
 		ws.on('error', () => {})
 		if (!room) {
 			sendTo(ws, { t: 'off' })
 			return ws.close(4403, 'game disabled')
 		}
 		if (sockets.size >= MAX_SOCKETS) return ws.close(1013, 'full')
+		const from = typeof addr === 'string' && addr ? addr : null
+		if (from && (perAddress.get(from) || 0) >= MAX_PER_ADDRESS) return ws.close(1013, 'too many from this address')
+		if (from) perAddress.set(from, (perAddress.get(from) || 0) + 1)
 		sockets.add(ws)
 		room.connect(ws)
 		lights?.attach(ws) // lxfull now (while on); the 10 Hz timer runs while ≥ 1 socket is attached
@@ -190,7 +197,14 @@ function createSkGame(deps = {}) {
 			if (m.t === 'wq') return world?.quality(ws, m) // WO-1101: the visitor cap of the client's quality tier
 			if (room) room.handle(ws, m)
 		})
+		let counted = !!from
 		ws.on('close', () => {
+			if (counted) {
+				counted = false
+				const n = (perAddress.get(from) || 1) - 1
+				if (n > 0) perAddress.set(from, n)
+				else perAddress.delete(from)
+			}
 			sockets.delete(ws)
 			if (room) room.disconnect(ws)
 			lights?.detach(ws)
@@ -218,6 +232,7 @@ function createSkGame(deps = {}) {
 		baker,
 		live: () => ({ lights, video }),
 		MAX_SOCKETS,
+		MAX_PER_ADDRESS,
 	}
 }
 
@@ -246,4 +261,4 @@ function shutdownSkGame() {
 	_game = null
 }
 
-module.exports = { createSkGame, getSkGame, useSkGame, shutdownSkGame, MAX_SOCKETS, LEASE_ID }
+module.exports = { createSkGame, getSkGame, useSkGame, shutdownSkGame, MAX_SOCKETS, MAX_PER_ADDRESS, LEASE_ID }

@@ -9,8 +9,8 @@
  * (WO-1083 "Spotlight": hold the moving pool alone, a point a second — sk-spot.js, ticked every 250 ms while the mode is
  * on). The referee (fire / hit / boom / pick, damage, respawns) is sk-combat.js, the bots sk-bots.js. Contract §3 / §5 /
  * §6 / §7.
- * Positions: a soldier's own `s` (≤ 20 / s) is ignored outside the arena rect + 2 u, faster than 6 u/s is clamped (with
- * 0.1 s of slack for network bunching), frozen outside lobby / match and while dead.
+ * Positions: a soldier's own `s` (≤ 20 / s, bounded in sk-move.js: rect + 2 u, 6 u/s over ≤ 0.25 s, the grid), frozen
+ * outside lobby / match and while dead.
  * Timers: 1 Hz housekeeping while sockets are open, the 20 Hz `w` timer while anyone plays (sends only when something
  * changed), the bot timer only while bots exist, one phase timer, one respawn timer per dead soldier.
  */
@@ -22,12 +22,13 @@ const { createCombat } = require('./sk-combat')
 const { createBots } = require('./sk-bots')
 const { createSpot, SPOT } = require('./sk-spot')
 const G = require('./sk-grid')
+const { acceptMove } = require('./sk-move')
 const { floorOcc, sceneScaleOf } = require('./sk-arena-check')
 
 const SILENT_MS = 10000
 const UNJOINED_MS = 15000
+const MAX_GHOSTS = 10 // WO-1106 B34: disconnected players kept listed (with their score) until the lobby
 const WORLD_MS = 50
-const STATE_HZ = 20
 
 /**
  * @param {{ now?: () => number, timers?: object, send: (conn, msg) => void, close?: (conn, code, reason) => void,
@@ -157,7 +158,7 @@ function createSkRoom(deps) {
 	function housekeeping() {
 		const t = now()
 		for (const c of [...conns.values()]) {
-			if (c.pid != null && !c.spectator && players.has(c.pid) && t - c.last > SILENT_MS) {
+			if (c.joined && t - c.last > SILENT_MS) { // players and (WO-1106 B36) spectators: a half-open phone frees its seat
 				drop(c)
 				close(c.conn, 4408, 'silent')
 			} else if (!c.joined && t - c.opened > UNJOINED_MS) {
@@ -195,6 +196,7 @@ function createSkRoom(deps) {
 		c.pid = p.id
 		c.joined = true
 		bots.sync() // a guest takes a bot's place when the room is full
+		trimGhosts()
 		send(c.conn, { t: 'welcome', id: p.id, you: you(c), state: state() })
 		combat.spawn(p, phase === 'countdown' ? { until: startAt + RULES.protectMs } : {})
 		broadcastState()
@@ -207,38 +209,27 @@ function createSkRoom(deps) {
 		if (p) {
 			combat.clearRespawn(p)
 			if (phase === 'lobby') players.delete(p.id)
-			else Object.assign(p, { connected: false, conn: null, alive: false, pos: null, mv: 0 })
+			else Object.assign(p, { connected: false, conn: null, alive: false, pos: null, mv: 0, goneAt: now() })
 			bots.sync()
+			trimGhosts()
 			X.dirty()
 		}
 		if (c.joined) broadcastState()
 	}
 
+	/**
+	 * WO-1106 B34: at most MAX_GHOSTS disconnected entries — so `players` stays ≤ maxPlayers (humans + bots) + 10 however
+	 * many sockets join and drop mid-match; the oldest goes first (its score with it), a join is never refused for it.
+	 */
+	function trimGhosts() {
+		const ghosts = [...players.values()].filter((p) => !p.bot && !p.connected).sort((a, b) => a.goneAt - b.goneAt || a.id - b.id)
+		for (const p of ghosts.slice(0, Math.max(0, ghosts.length - MAX_GHOSTS))) removePlayer(p)
+	}
+
 	function move(c, m) {
 		const p = players.get(c.pid)
 		if (!p || c.spectator || !p.alive || !p.pos || !X.arena || (phase !== 'lobby' && phase !== 'match')) return
-		const v = S.cleanMove(m)
-		if (!v) return
-		const t = now()
-		if (c.sTimes.length >= STATE_HZ && t - c.sTimes[0] < 1000) return // over 20 per second: dropped
-		c.sTimes.push(t)
-		if (c.sTimes.length > STATE_HZ) c.sTimes.shift()
-		const r = X.arena.rect, sl = RULES.posSlack * X.u
-		let [x, z] = v.p
-		if (x < r[0] - sl || x > r[2] + sl || z < r[1] - sl || z > r[3] + sl) return
-		const dx = x - p.pos[0], dz = z - p.pos[1]
-		const d = Math.hypot(dx, dz)
-		const allowed = SOLDIER.maxSpeed * X.u * (Math.max(0, t - p.moveAt) / 1000 + 0.1)
-		if (d > allowed) {
-			x = Math.round((p.pos[0] + (dx / d) * allowed) * 1e4) / 1e4
-			z = Math.round((p.pos[1] + (dz / d) * allowed) * 1e4) / 1e4
-		}
-		p.pos = [x, z]
-		p.yaw = v.yaw
-		p.mv = v.mv
-		p.moveAt = t
-		if (v.w && p.w[v.w] !== undefined) p.held = v.w
-		X.dirty()
+		if (acceptMove(X, c.sTimes, p, m, now())) X.dirty() // the bounds: sk-move.js (WO-1106 B55)
 	}
 
 	function clearPhaseTimer() {
@@ -266,6 +257,7 @@ function createSkRoom(deps) {
 			paused = null
 			if (startAt != null) startAt += d
 			if (endsAt != null) endsAt += d
+			spot.shift(d)
 			if (fn) phaseTimer(fn, rem)
 			if (phase === 'countdown') toAll({ t: 'countdown', startAt })
 			for (const p of players.values()) if ((p.connected || p.bot) && !p.alive && !p.respawnTimer && (phase === 'lobby' || phase === 'match')) combat.spawn(p)
@@ -455,7 +447,7 @@ function createSkRoom(deps) {
 			if (m.t === 'join') return join(c, m)
 			if (m.t === 'ping') return send(conn, { t: 'pong', c: Number.isFinite(m.c) ? m.c : null, s: now() })
 			const p = c.joined && !c.spectator ? players.get(c.pid) : null
-			if (!p || paused || (m.t === 'fire' && p.stunUntil > now())) return // WO-1101 pause; WO-1102 a stunned soldier cannot fire
+			if (!p || paused) return // WO-1101 pause (a stunned soldier's fire: sk-combat.js, WO-1106 A3)
 			if (m.t === 's') return move(c, m)
 			const v = m.t === 'fire' ? S.cleanFire(m) : m.t === 'hit' ? S.cleanHit(m) : m.t === 'boom' ? S.cleanBoom(m) : m.t === 'pick' ? S.cleanPick(m) : null
 			if (v) combat[m.t](p, v)
@@ -488,4 +480,4 @@ function createSkRoom(deps) {
 	}
 }
 
-module.exports = { createSkRoom, WORLD_MS }
+module.exports = { createSkRoom, WORLD_MS, MAX_GHOSTS }

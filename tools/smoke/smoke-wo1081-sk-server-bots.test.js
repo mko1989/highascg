@@ -124,6 +124,7 @@ test('a simulated minute: bots never overlap a solid cell, fire only with line o
 	const lastPos = new Map()
 	let offGrid = 0, samples = 0
 	for (let s = 0; s < 600; s++) {
+		if (s % 20 === 0) room.handle(watcher, { t: 'ping', c: 0 }) // a real spectator pings every 2 s (WO-1106 B36: silent ones time out)
 		clock.advance(100)
 		for (const p of X.players.values()) {
 			if (!p.alive || !p.pos) continue
