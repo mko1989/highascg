@@ -17,6 +17,8 @@ import { sceneScale } from './kit/scale.js'
 import { prepareOcc } from './kit/occ.js'
 import { createHud, toolButton } from './hud.js'
 import { createLobby } from './lobby.js'
+import { createSessionPanel } from './session-panel.js'
+import { worldLinkEl } from './kit/world-link.js'
 import { createInput } from './input.js'
 import { createAudio } from './sk-audio.js'
 import { createFx } from './fx.js'
@@ -116,6 +118,7 @@ export async function startGame({ spectator = false } = {}) {
 		)
 	}
 	const fsEl = fullscreenButton() // spectators too (a wall-sized browser window)
+	if (!spectator) toolbar.push({ el: worldLinkEl() }) // WO-1125: shown only when the world answers
 	if (fsEl) toolbar.push({ el: fsEl })
 	G.hud = createHud($('#hud'), { spectator, toolbar })
 	G.muteBtn = toolbar.find((b) => b.el.title.startsWith('Sound'))?.el || null
@@ -141,6 +144,7 @@ export async function startGame({ spectator = false } = {}) {
 			},
 			onWatch: () => (window.location.search = '?spectate=1'),
 		})
+		G.sess = createSessionPanel(G, G.lobby.slot) // WO-1125 self-service: bots, choices, Start; results buttons
 	}
 
 	if (!(await loadScene(G))) return

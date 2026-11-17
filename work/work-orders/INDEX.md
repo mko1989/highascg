@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1031 live WOs (34 open, 163 in progress, 834 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1032 live WOs (34 open, 164 in progress, 834 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -625,7 +625,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1122 IN PROGRESS [godot-client+devices-config] Second operator window stranded on a screen the pointer cannot reach after a pr… → 1122_WO_second_window_stranded_on_unreachable_screen.md
 - 1123 IN PROGRESS [godot-client+media] Sources browser: Shift held on a drop from the file manager moves the files ins… → 1123_WO_shift_drop_moves_into_project_folder.md
 
-## web-client — Web client (90)
+## web-client — Web client (91)
 
 - 05 DONE [web-client+video-io] Live Video Preview (go2rtc) + Settings Modal + Audio Monitoring → 05_WO_LIVE_PREVIEW_SETTINGS.md
 - 14 DONE [web-client+devices-config] Offline Preparation Mode → 14_WO_OFFLINE_PREPARATION_MODE.md
@@ -717,6 +717,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1090 DONE [web-client+engine] Game scenes keep the MVR meshes' own pictures; patched heads are their real GDT… → 1090_WO_game_scene_mvr_materials_and_real_heads.md
 - 1101 DONE [web-client+engine] Game World step 1: one shared room — the three browser games see each other → 1101_WO_game_world_shared_room.md
 - 1102 DONE [web-client+engine] Game World step 2: the games affect each other (server-refereed, capped, never… → 1102_WO_game_world_cross_game_effects.md
+- 1125 IN PROGRESS [web-client+engine] Game self-service: players run the games, no host needed → 1125_WO_game_self_service_players_run_the_games.md
 
 ## companion — Companion integration (23)
 

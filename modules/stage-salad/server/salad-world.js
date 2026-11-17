@@ -37,6 +37,7 @@ function register(getGame) {
 		models: { veg: '/game/salad/veg-models.js', sling: '/game/salad/slingshot-model.js', av: '/game/salad/avatar-model.js' },
 		host: (body) => getGame().host(body),
 		state: () => getGame().state(),
+		held: () => getGame().held?.() === true, // WO-1125: an operator closed the session (games.selfService leaves it closed)
 		room: () => getGame().worldAdapter() || null,
 		get hosting() {
 			return require('./salad-hosting') // WO-1105 Settings ▸ Games: this game's main number, bots, pause in its own host bodies

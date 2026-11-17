@@ -92,6 +92,7 @@ function applyState(G, state) {
 	if (state.enabled === false) return void G.ctl.gameOff()
 	const prev = G.phase
 	G.state = state
+	G.sess?.update(state) // WO-1125 self-service panel (hidden unless state.self)
 	G.phase = phaseOf(state)
 	if (Number.isFinite(state.startAt)) G.startAt = state.startAt // §12: state carries startAt in the countdown
 	G.ctl.sceneRev?.(state.sceneRev) // WO-1106 B56: a new scene rev (lobby only) → the scene is fetched and rebuilt
@@ -238,6 +239,9 @@ export function onMessage(G, m) {
 			applyState(G, m.state)
 			ensureMine(G)
 			if (!G.spectator && G.joinInfo) sessSet('joined', JSON.stringify(G.joinInfo))
+			break
+		case 'ctl':
+			G.sess?.refuse(m) // WO-1125: a refused player control shows one line
 			break
 		case 'state':
 			applyState(G, m.state)

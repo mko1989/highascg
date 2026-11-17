@@ -13,6 +13,7 @@
  *                                      to every enabled game + the hub's safe (ends events, stops every effect); a game
  *                                      enabled while safe gets the same right after its enable
  *   lights {on} / wall {on}            passed to every enabled game as is
+ *   self {on}                          WO-1125 players run the sessions (games.selfService): passed to every registered game
  *   house {level 0..1}                 passed to every enabled game (`on` true / false accepted as 1 / 0)
  *   affect {game, mode}                'on' | 'soft' | 'off' (WO-1102 "others can affect this game")
  *   event {kind: 'rain'|'spot'|'none', secs 5–60}   rain default 10 s, spot 30 s; refused while safe
@@ -154,6 +155,10 @@ function createWorldService({ hub, registry: reg }) {
 				hub.setSafe(a.on)
 				const results = fan(descs().filter(enabled), (d) => safeBody(d, a.on))
 				return reply(200, { ok: Object.values(results).every((r) => r.ok), action, results })
+			}
+			case 'self': {
+				if (typeof a.on !== 'boolean') return bad('`on` must be true or false')
+				return done(action, fan(descs(), () => ({ action, on: a.on })))
 			}
 			case 'lights':
 			case 'wall': {

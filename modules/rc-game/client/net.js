@@ -160,6 +160,11 @@ export class RcNet {
 		}
 	}
 
+	/** Any message (WO-1125: the session panel's `ctl`). */
+	send(msg) {
+		return this._sendRaw(msg)
+	}
+
 	setReady(ready) {
 		return this._sendRaw(readyMsg(ready))
 	}

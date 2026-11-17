@@ -10,11 +10,14 @@
  * Normal API auth on both routes (the games' host routes need it too, WO-1089); the module switch (action `module`) also
  * needs the password or a request from the box itself, like POST /api/modules/* (WO-1106 B1, code-change-gate.js). `games.autoOpen` (default off) opens the
  * loaded games' sessions 5 s after the server started: lobby only, never a round.
+ * WO-1125 `games.selfService` (default on): the same opening at the start, and from then on the 1 s tick runs the hosting's
+ * selfTick() (each loaded game told `self`, a closed session nobody closed on purpose re-opened). POST {action:'selfService', on}
+ * saves the setting through the config manager (the `games` section, like POST /api/settings {games}).
  */
 
 const { JSON_HEADERS, jsonBody, parseBodyStrict } = require('../api/response')
 const { createGamesHosting } = require('./games-hosting')
-const { normalizeGamesSettings } = require('./games-settings')
+const { normalizeGamesSettings, mergeGamesSettings } = require('./games-settings')
 const { qrRows } = require('./games-qr')
 const { mayChangeInstalledCode } = require('../module-host/code-change-gate')
 
@@ -32,6 +35,8 @@ let _hosting = null
 let _mods = null
 let _modsAt = 0
 let _modsKey = ''
+let _boot = null
+let _selfReady = false // WO-1125: the self-service tick waits for the start delay (modules loaded, as autoOpen does)
 
 /** The names of the loaded modules (in memory, cheap): a change means a module was enabled or disabled somewhere. */
 function loadedKey() {
@@ -74,9 +79,21 @@ function hosting(ctx) {
 		disableModule: async (name) => forget(await loader().disableModule(name, c)),
 		log: (level, msg) => (typeof c?.log === 'function' ? c.log(level, msg) : undefined),
 		mayChangeCode: (req) => mayChangeInstalledCode(req, c), // WO-1106 B1: the module switch, like POST /api/modules/*
+		saveSettings: (patch) => saveGames(c, patch), // WO-1125 selfService
 	})
 	if (ctx) _ctx = ctx
 	return _hosting
+}
+
+/** WO-1125: merge `patch` into the saved `games` section (config manager) and the running config → true when saved. */
+function saveGames(c, patch) {
+	const cm = c?.configManager
+	if (!cm || typeof cm.get !== 'function' || typeof cm.save !== 'function') return false
+	const cur = cm.get() || {}
+	const games = mergeGamesSettings(cur.games, patch)
+	if (cm.save({ ...cur, games }) === false) return false
+	if (c.config && typeof c.config === 'object') c.config.games = games
+	return true
 }
 
 const reply = (status, o) => ({ status, headers: { ...JSON_HEADERS, 'Cache-Control': 'no-store' }, body: jsonBody(o) })
@@ -85,6 +102,13 @@ const reply = (status, o) => ({ status, headers: { ...JSON_HEADERS, 'Cache-Contr
 async function tick(force = false) {
 	if (!_ctx || typeof _ctx._wsBroadcast !== 'function') return
 	const idle = !gameModules().some((m) => m.loaded)
+	if (_selfReady && !idle) {
+		try {
+			hosting().selfTick() // WO-1125: `self` to every loaded game; re-open a session nobody closed on purpose
+		} catch (e) {
+			_ctx?.log?.('warn', `[games] self-service check failed: ${e?.message || e}`)
+		}
+	}
 	if (!force && idle && _sent === 'empty') return
 	const st = await hosting().state()
 	const json = JSON.stringify(st)
@@ -116,29 +140,37 @@ module.exports = {
 		_hosting = null
 		_mods = null
 		_sent = ''
+		_selfReady = false
+		if (_boot) clearTimeout(_boot)
 		if (_timer) clearInterval(_timer)
 		_timer = setInterval(() => tick().catch(() => {}), TICK_MS)
 		if (typeof _timer.unref === 'function') _timer.unref()
-		if (normalizeGamesSettings(ctx?.config?.games).autoOpen) {
-			const t = setTimeout(() => {
-				try {
-					hosting(ctx).autoOpen()
-				} catch (e) {
-					ctx?.log?.('warn', `[games] auto-open failed: ${e?.message || e}`)
-				}
-			}, AUTO_OPEN_MS)
-			if (typeof t.unref === 'function') t.unref()
-		}
+		const gs = normalizeGamesSettings(ctx?.config?.games)
+		_boot = setTimeout(() => {
+			_boot = null
+			_selfReady = true // WO-1125: from now on the tick keeps the self-service sessions open
+			if (!gs.autoOpen && !gs.selfService) return
+			try {
+				hosting(ctx).autoOpen()
+			} catch (e) {
+				ctx?.log?.('warn', `[games] auto-open failed: ${e?.message || e}`)
+			}
+		}, AUTO_OPEN_MS)
+		if (typeof _boot.unref === 'function') _boot.unref()
 	},
 	async onShutdown() {
 		if (_timer) clearInterval(_timer)
-		_timer = null
+		if (_boot) clearTimeout(_boot)
+		_timer = _boot = null
 		_ctx = null
 		_hosting = null
+		_selfReady = false
 	},
 	_test: {
 		tick,
 		hosting,
+		saveGames,
+		selfReady: (on) => (_selfReady = on === true), // a smoke skips the start delay
 		use: (h, mods) => {
 			_hosting = h // a smoke's own service + module list behind the real routes + broadcast
 			_mods = mods

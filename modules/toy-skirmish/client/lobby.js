@@ -75,6 +75,7 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 	const warmBtn = h('button.big.go', { type: 'button', text: 'Back to the warm-up' })
 	const changeBtn = h('button.ghost', { type: 'button', text: 'Change name / colour' })
 	changeBtn.addEventListener('click', () => onRejoin())
+	const sessionSlot = h('div.ctl-slot') // WO-1125: the self-service session panel is mounted here (session-panel.js)
 	const lobbyPanel = h(
 		'div.panel.lobby',
 		h(
@@ -82,6 +83,7 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 			h('div.col', h('h2', { text: 'Waiting for the host to start' }), plist, lMsg),
 			h('div.col.sk-lobby-info', lMode, lArena, h('p.hint', { text: 'Warm up: run, shoot and grab weapons — nothing counts until the match starts.' }))
 		),
+		sessionSlot,
 		h('div.actions', warmBtn, changeBtn, fullscreenButton('ghost sq'))
 	)
 	const openBtn = h('button.tool.lobby-open', { type: 'button', text: 'Lobby', title: 'Show the lobby' })
@@ -98,6 +100,7 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 	})
 
 	return {
+		slot: sessionSlot,
 		showJoin(info = '') {
 			show(root, true)
 			show(joinPanel, true)

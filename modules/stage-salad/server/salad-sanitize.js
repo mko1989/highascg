@@ -12,7 +12,7 @@
 
 const { kit, shared } = require('./salad-kit')
 
-const TYPES = new Set(['join', 'aim', 'fire', 'ping', 'video', 'wq']) // wq: WO-1101 Game World visitor cap
+const TYPES = new Set(['join', 'aim', 'fire', 'ping', 'video', 'wq', 'ctl']) // wq: WO-1101 Game World visitor cap; ctl: WO-1125 player control
 const MAX_N = 2 ** 31 - 1
 const fin = (v) => typeof v === 'number' && Number.isFinite(v)
 const r4 = (v) => Math.round(v * 1e4) / 1e4 + 0

@@ -43,7 +43,8 @@ function coreDefaults() {
 		startup: { mode: 'ask' },
 		// WO-1105 Settings ▸ Games: join address ('' = automatic), open the game sessions at start (never by default), per-game
 		// defaults applied when a session opens (src/games/games-settings.js). Sessions themselves are never stored.
-		games: { joinAddress: '', autoOpen: false, defaults: {} },
+		// WO-1125 selfService: players run the games (sessions kept open, player control on) — on by default.
+		games: { joinAddress: '', autoOpen: false, selfService: true, defaults: {} },
 		operatorTools: {
 			pointerConfineMultiview: false,
 			// WO-308: 'auto' (default) keeps the pre-existing rule — confine follows whatever

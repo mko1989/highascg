@@ -172,6 +172,8 @@ export function decode(text) {
 		case 'lx':
 		case 'lxfull':
 			return Array.isArray(m.f) ? m : null // §2.6 live lights (stage-fx.js validates the entries)
+		case 'ctl': // WO-1125 §3: a refusal of a player control ({ ok:false, error })
+			return { t: 'ctl', ok: m.ok !== false, error: typeof m.error === 'string' ? m.error.slice(0, 12) : null }
 		default:
 			return decodeWorld(m)
 	}

@@ -1,18 +1,35 @@
-/* global setTimeout */
+/* global setTimeout, document */
 /**
  * WO-1101 — the landing "pick your game" (`/game/world/`, the natural join address): the registered games with their
  * state, one big tap target per running game that opens its player page. Phone-first, minimal. Polls the state.
+ * WO-1125: the cards are an overlay on the live world picture (world-spectate.js, full page behind them); the overlay
+ * collapses to a small "Games" button. Without WebGL / a scene the picture is skipped and the cards stay on a plain background.
  */
 import { h, setText, getState } from './world-dom.js'
 import { gamesOf, phaseName } from './world-logic.js'
 
 const POLL_MS = 4000
+export const CLOSED = 'Closed by the host'
 
 export function startLanding(root) {
 	root.textContent = ''
 	const msg = h('p.hint', { role: 'status' })
 	const list = h('div.pick-list')
-	root.append(h('header.page-head', h('h1', { text: 'Pick your game' })), msg, list)
+	const hideBtn = h('button.pick-toggle', { type: 'button', text: 'Hide', title: 'Watch the room', 'aria-expanded': 'true' })
+	const gamesBtn = h('button.pick-toggle.pick-open', { type: 'button', text: 'Games', title: 'Pick a game' })
+	const panel = h('div.landing-panel', h('header.page-head', h('h1', { text: 'Pick your game' }), hideBtn), msg, list)
+	const collapse = (on) => {
+		panel.hidden = on
+		gamesBtn.hidden = !on
+		hideBtn.setAttribute('aria-expanded', String(!on))
+	}
+	hideBtn.addEventListener('click', () => collapse(true))
+	gamesBtn.addEventListener('click', () => collapse(false))
+	gamesBtn.hidden = true
+	const bg = h('div.world-bg')
+	document.body.prepend(bg)
+	root.append(panel, gamesBtn)
+	startBackground(bg)
 	let lastKey = null
 
 	function paint(games) {
@@ -21,7 +38,7 @@ export function startLanding(root) {
 		lastKey = key
 		list.textContent = ''
 		for (const g of games) {
-			const sub = g.enabled ? [phaseName(g.phase) || 'Running', `${g.players} ${g.players === 1 ? 'player' : 'players'}`].join(' · ') : 'Not running'
+			const sub = g.enabled ? [phaseName(g.phase) || 'Running', `${g.players} ${g.players === 1 ? 'player' : 'players'}`].join(' · ') : CLOSED
 			const inner = [h('span.pick-title', { text: g.title }), h('span.pick-sub', { text: sub })]
 			if (g.enabled && g.paths.play) {
 				const a = h('a.pick.on', { href: g.paths.play }, ...inner, h('span.pick-go', { text: 'Play' }))
@@ -40,4 +57,16 @@ export function startLanding(root) {
 		setTimeout(refresh, POLL_MS)
 	}
 	refresh()
+}
+
+/** The room behind the cards; any failure (no WebGL, no scene, no kit) leaves the plain background. */
+async function startBackground(bg) {
+	try {
+		const { startSpectate } = await import('./world-spectate.js')
+		await startSpectate(bg)
+	} catch {
+		const canvas = document.getElementById('view')
+		if (canvas) canvas.hidden = true
+		bg.textContent = ''
+	}
 }

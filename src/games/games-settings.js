@@ -5,6 +5,9 @@
  * POST /api/settings {games} — the hand-listed `newConfig` in src/api/settings-post.js carries it).
  *   joinAddress: ''           '' = automatic, else an IPv4 or an interface name (games-join.js pickAddress)
  *   autoOpen: false           open the enabled games' sessions (lobby only, never a round) when the server starts
+ *   selfService: true         WO-1125 players run the games, no host needed: every loaded game's session is open (at the
+ *                             start, and re-opened when found closed unless an operator closed it) and accepts player
+ *                             control (each game's host action `self`); false = the WO-1105 behaviour
  *   defaults: { <gameId>: { bots: 0–32, botLevel: 'easy'|'normal'|'hard', main: number|null, affect: 'on'|'soft'|'off' } }
  *                             applied when a session is opened from Settings ▸ Games (or by autoOpen); `main` is the
  *                             game's one main number (RC laps, Skirmish minutes, Salad round seconds), null = the game's own
@@ -16,7 +19,7 @@ const LEVELS = ['easy', 'normal', 'hard']
 const MODES = ['on', 'soft', 'off']
 const MAX_BOTS = 32
 
-const DEFAULT_GAMES_SETTINGS = Object.freeze({ joinAddress: '', autoOpen: false, defaults: Object.freeze({}) })
+const DEFAULT_GAMES_SETTINGS = Object.freeze({ joinAddress: '', autoOpen: false, selfService: true, defaults: Object.freeze({}) })
 
 function normalizeOne(raw) {
 	const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
@@ -40,6 +43,7 @@ function normalizeGamesSettings(raw) {
 	return {
 		joinAddress: /^[A-Za-z0-9.:_-]{0,64}$/.test(ja) ? ja : '',
 		autoOpen: o.autoOpen === true,
+		selfService: o.selfService !== false, // WO-1125: on unless explicitly off
 		defaults,
 	}
 }

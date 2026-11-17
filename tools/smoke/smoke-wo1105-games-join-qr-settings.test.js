@@ -93,10 +93,10 @@ test('join_qr template: draws the same bits (top bit first) and only a complete 
 })
 
 test('games settings: normalized (unknown keys, bad ids and values dropped), merged per game and key', () => {
-	assert.deepEqual(GS.normalizeGamesSettings(undefined), { joinAddress: '', autoOpen: false, defaults: {} })
+	assert.deepEqual(GS.normalizeGamesSettings(undefined), { joinAddress: '', autoOpen: false, selfService: true, defaults: {} })
 	assert.deepEqual(GS.normalizeGamesSettings({ joinAddress: ' eno1 ', autoOpen: 'yes', junk: 1,
 		defaults: { rc: { bots: 3, botLevel: 'hard', main: '5', affect: 'soft', x: 1 }, 'Bad Id': { bots: 1 }, sk: { bots: -1, botLevel: 'mad', main: null } } }),
-	{ joinAddress: 'eno1', autoOpen: false, defaults: { rc: { bots: 3, botLevel: 'hard', main: 5, affect: 'soft' }, sk: {} } })
+	{ joinAddress: 'eno1', autoOpen: false, selfService: true, defaults: { rc: { bots: 3, botLevel: 'hard', main: 5, affect: 'soft' }, sk: {} } })
 	assert.equal(GS.normalizeGamesSettings({ joinAddress: 'a b;rm' }).joinAddress, '', 'never a shell-ish string')
 	assert.equal(GS.normalizeGamesSettings({ defaults: { rc: { bots: 99 } } }).defaults.rc.bots, 32)
 	const cur = { joinAddress: '', autoOpen: false, defaults: { rc: { bots: 2, main: 4 } } }
@@ -105,7 +105,7 @@ test('games settings: normalized (unknown keys, bad ids and values dropped), mer
 	assert.deepEqual(GS.mergeGamesSettings(cur, { defaults: { rc: { main: null } } }).defaults.rc, { bots: 2 }, 'null resets to the game’s own')
 	assert.deepEqual(GS.mergeGamesSettings(cur, { defaults: { rc: { bots: null } } }).defaults.rc, { main: 4 }, 'any null key resets')
 	assert.deepEqual(GS.mergeGamesSettings(cur, { defaults: { rc: null } }).defaults, {}, 'a null game drops all its defaults')
-	assert.deepEqual(defaults.games, { joinAddress: '', autoOpen: false, defaults: {} }, 'factory default: automatic, never auto-open')
+	assert.deepEqual(defaults.games, { joinAddress: '', autoOpen: false, selfService: true, defaults: {} }, 'factory default: automatic, never auto-open, WO-1125 players run the games')
 })
 
 test('POST /api/settings {games}: in the hand-listed newConfig, saved to the config dir, read back after a restart', async () => {
@@ -120,7 +120,7 @@ test('POST /api/settings {games}: in the hand-listed newConfig, saved to the con
 		const res = await handlePost('/api/settings', JSON.stringify({ games }), ctx)
 		assert.equal(res.status, 200, String(res.body))
 		await ConfigManager._saveChain
-		assert.deepEqual(ctx.config.games, { joinAddress: '192.168.0.15', autoOpen: true, defaults: { rc: { bots: 3, botLevel: 'hard', main: 5 }, world: {} } })
+		assert.deepEqual(ctx.config.games, { joinAddress: '192.168.0.15', autoOpen: true, selfService: true, defaults: { rc: { bots: 3, botLevel: 'hard', main: 5 }, world: {} } })
 		// an unrelated section saved later (the web modal re-posts everything) keeps the games section
 		const res2 = await handlePost('/api/settings', JSON.stringify({ startup: { mode: 'gui' } }), ctx)
 		assert.equal(res2.status, 200)

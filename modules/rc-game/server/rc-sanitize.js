@@ -14,7 +14,7 @@ const MAX_NAME = 16
 const MAX_SPEED = 24 // v2: hard cap (boosting tops out at 18)
 const BOUNDS_SLACK = 5
 const PALETTE = ['#ff5533', '#33aaff', '#ffcc22', '#44dd66', '#cc55ff', '#ff66aa', '#22dddd', '#ff9933', '#aaaaaa', '#88ff22']
-const TYPES = new Set(['join', 'ready', 's', 'ping', 'box', 'use', 'hit', 'video', 'wq']) // video: §2.6 wall pictures on / off; wq: WO-1101 Game World visitor cap
+const TYPES = new Set(['join', 'ready', 's', 'ping', 'box', 'use', 'hit', 'video', 'wq', 'ctl']) // video: §2.6 wall pictures on / off; wq: WO-1101 Game World visitor cap; ctl: WO-1125 player control
 const FX_BITS = 31 // 1 boosting, 2 drifting, 4 spinning, 8 shielded, 16 airborne
 
 /** A display name, or `fallback`. */

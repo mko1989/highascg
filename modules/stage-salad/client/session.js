@@ -28,6 +28,7 @@ function applyState(G, state) {
 	const prevVenue = G.state?.venueRev
 	const prevScene = G.state?.sceneRev
 	G.state = state
+	G.sess?.update(state) // WO-1125 self-service panel (hidden unless state.self)
 	G.phase = phaseOf(state)
 	if (Number.isFinite(state.startAt)) G.startAt = state.startAt
 	if (G.scene && ((prevScene != null && state.sceneRev !== prevScene) || (prevVenue != null && state.venueRev !== prevVenue)))
@@ -88,6 +89,9 @@ export function onMessage(G, m) {
 			if (!G.spectator && G.joinInfo) sessSet('joined', JSON.stringify(G.joinInfo))
 			break
 		}
+		case 'ctl':
+			G.sess?.refuse(m) // WO-1125: a refused player control shows one line
+			break
 		case 'state':
 			applyState(G, m.state)
 			break

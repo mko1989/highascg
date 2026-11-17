@@ -19,6 +19,13 @@
  *   start / stop {game?}         one game, or every open game
  *   bots {game, n, level?}       main {game, value}       affect {game, mode}  (affect needs the Game World)
  *   safe {on} · lights {on} · wall {on} · house {level 0..1}   the world service when loaded, else every open game
+ *   selfService {on}             WO-1125: sets + saves `games.selfService` (deps.saveSettings), tells every loaded game
+ *
+ * WO-1125 self-service (`games.selfService`, default on): selfTick() — run by register.js every second after the start
+ * delay — sends the generic host action `{ action: 'self', on }` to every loaded game whose descriptor has not had the
+ * current value yet (a module enabled later, a setting changed through POST /api/settings) and, while on, re-opens every
+ * closed session nobody closed on purpose: a close from here (`held`, until opened here again) or the game's own
+ * `held()` (its last host action was `disable`: a web host page, the world's host page) stays closed. A restart forgets both.
  */
 
 const { listAddresses, pickAddress } = require('./games-join')
@@ -26,7 +33,7 @@ const { buildState } = require('./games-hosting-rows')
 const { GAME_ID, MODES } = require('./games-settings')
 const { mayChangeInstalledCode } = require('../module-host/code-change-gate')
 
-const ACTIONS = new Set(['module', 'session', 'start', 'stop', 'bots', 'main', 'affect', 'safe', 'lights', 'wall', 'house'])
+const ACTIONS = new Set(['module', 'session', 'start', 'stop', 'bots', 'main', 'affect', 'safe', 'lights', 'wall', 'house', 'selfService'])
 
 const call = (fn, dflt = null) => {
 	try {
@@ -43,6 +50,7 @@ const call = (fn, dflt = null) => {
  *   enableModule: (name: string) => Promise<object>, disableModule: (name: string) => Promise<object>, log?: Function,
  *   mayChangeCode?: (req: object|undefined) => { ok: boolean, status?: number, code?: string, error?: string } }} deps
  *   mayChangeCode: the code-change gate with the server's config (register.js); without it only the box itself passes.
+ *   saveSettings(patch): WO-1125 merge `patch` into the saved `games` section → true when saved (register.js: the config manager).
  */
 function createGamesHosting(deps) {
 	const log = deps.log || (() => {})
@@ -55,6 +63,8 @@ function createGamesHosting(deps) {
 	const isOpen = (d) => !!stateOf(d)?.enabled
 	/** WO-1106 A6: PAUSE EVERYTHING without the Game World is remembered here, so a session opened later opens paused. */
 	let safeNoWorld = false
+	const held = new Set() // WO-1125: game ids an operator closed here — self-service leaves them closed until opened here again
+	const selfSent = new WeakMap() // WO-1125: descriptor → the `self` value it was last sent (a new descriptor = a reloaded module)
 	const safeBody = (d, on) => call(() => hostingOf(d)?.safe?.(on)) || { action: 'pause', on }
 
 	async function state() {
@@ -62,8 +72,9 @@ function createGamesHosting(deps) {
 		const settings = deps.settings()
 		const pick = pickAddress(addrs, settings.joinAddress)
 		const w = svc()
-		return buildState({ mods: gameMods(), desc, hostingOf, stateOf, worldState: w ? call(() => w.state()) : null, settings, safe: !w && safeNoWorld,
+		const st = await buildState({ mods: gameMods(), desc, hostingOf, stateOf, worldState: w ? call(() => w.state()) : null, settings, safe: !w && safeNoWorld,
 			join: { addresses: addrs, setting: settings.joinAddress, ...pick }, port: deps.port(), qr: deps.qr })
+		return { ...st, selfService: settings.selfService !== false }
 	}
 
 	/** One game host body → { ok, status, error? } (a refusing game is reported, never thrown). */
@@ -133,9 +144,11 @@ function createGamesHosting(deps) {
 
 	function session(a, d) {
 		if (a.open) {
+			held.delete(a.game)
 			if (isOpen(d)) return { status: 200 }
 			const r = viaWorld({ action: 'enable', game: a.game }) || hostOne(d, { action: 'enable' }) // world: a safe world pauses it too
 			if (!r.ok) return { status: r.status, error: r.error }
+			sendSelf(d, true) // WO-1125: on open, whatever was sent before
 			applyDefaults(a.game, d)
 			if (safeNoWorld && !svc()) {
 				const s = hostOne(d, safeBody(d, true)) // WO-1106 A6
@@ -143,6 +156,7 @@ function createGamesHosting(deps) {
 			}
 			return { status: 200 }
 		}
+		held.add(a.game) // WO-1125: an explicit close holds against the self-service re-open
 		const r = viaWorld({ action: 'disable', game: a.game }) || hostOne(d, { action: 'disable' })
 		return r.ok ? { status: 200 } : { status: r.status, error: r.error }
 	}
@@ -172,7 +186,7 @@ function createGamesHosting(deps) {
 		if (!ACTIONS.has(a.action)) return 'unknown action'
 		if (a.game != null && (typeof a.game !== 'string' || !GAME_ID.test(a.game))) return '`game` must be a game id'
 		if (['module', 'session', 'bots', 'main', 'affect'].includes(a.action) && !a.game) return '`game` is required'
-		if (['module', 'safe', 'lights', 'wall'].includes(a.action) && typeof a.on !== 'boolean') return '`on` must be true or false'
+		if (['module', 'safe', 'lights', 'wall', 'selfService'].includes(a.action) && typeof a.on !== 'boolean') return '`on` must be true or false'
 		if (a.action === 'session' && typeof a.open !== 'boolean') return '`open` must be true or false'
 		if (a.action === 'bots' && (!Number.isInteger(a.n) || a.n < 0)) return '`n` must be a whole number ≥ 0'
 		if (a.action === 'bots' && a.level != null && typeof a.level !== 'string') return '`level` must be a bot level' // WO-1106 A23
@@ -184,6 +198,8 @@ function createGamesHosting(deps) {
 
 	async function run(a, req) {
 		switch (a.action) {
+			case 'selfService':
+				return setSelfService(a.on)
 			case 'module':
 				return moduleSwitch(a, req)
 			case 'start':
@@ -215,6 +231,43 @@ function createGamesHosting(deps) {
 		return r.ok ? { status: 200 } : { status: r.status, error: r.error }
 	}
 
+	/** WO-1125: `{ action: 'self', on }` to one game (once per value and descriptor unless forced); refusals are logged only. */
+	function sendSelf(d, force = false) {
+		const on = deps.settings().selfService !== false
+		if (!force && selfSent.get(d) === on) return
+		selfSent.set(d, on) // also when refused: a game without self-service is not asked again every second
+		const r = hostOne(d, { action: 'self', on })
+		if (!r.ok) log('warn', `[games] ${d.id || 'a game'} refused self-service ${on ? 'on' : 'off'}: ${r.error}`)
+	}
+	const loadedDescs = () => gameMods().map((m) => (m.game === 'world' ? null : desc(m.game))).filter(Boolean)
+
+	/**
+	 * WO-1125: every second (register.js, after the start delay): `self` to every loaded game that has not had the current
+	 * value, and while self-service is on every closed session nobody closed on purpose is opened (lobby + defaults).
+	 * → the number of sessions opened.
+	 */
+	function selfTick() {
+		for (const d of loadedDescs()) sendSelf(d)
+		if (deps.settings().selfService === false) return 0
+		let n = 0
+		for (const m of gameMods()) {
+			const d = m.game === 'world' ? null : desc(m.game)
+			if (d && isOpen(d)) held.delete(m.game) // opened again (here, or on its own host page): the hold is over
+			if (!d || isOpen(d) || held.has(m.game) || (typeof d.held === 'function' && call(() => d.held()) === true)) continue
+			if (session({ game: m.game, open: true }, d).status === 200) n++
+		}
+		if (n) log('info', `[games] self-service opened ${n} game session(s)`)
+		return n
+	}
+
+	async function setSelfService(on) {
+		const saved = await Promise.resolve(call(() => deps.saveSettings?.({ selfService: on }), false)).catch(() => false)
+		if (!saved) return { status: 500, error: 'the setting could not be saved' }
+		log('info', `[games] self-service ${on ? 'on' : 'off'}`)
+		selfTick()
+		return { status: 200 }
+	}
+
 	/** @param {object} a the body @param {import('http').IncomingMessage} [req] who asks (the module action needs it) */
 	async function host(a, req) {
 		const bad = validate(a)
@@ -235,11 +288,11 @@ function createGamesHosting(deps) {
 			if (!d || isOpen(d)) continue
 			if (session({ game: m.game, open: true }, d).status === 200) n++
 		}
-		if (n) log('info', `[games] auto-opened ${n} game session(s) (games.autoOpen)`)
+		if (n) log('info', `[games] auto-opened ${n} game session(s) (games.autoOpen / games.selfService)`)
 		return n
 	}
 
-	return { state, host, autoOpen }
+	return { state, host, autoOpen, selfTick }
 }
 
 module.exports = { createGamesHosting }

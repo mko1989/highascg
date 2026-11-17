@@ -10,7 +10,7 @@
 
 const { core } = require('./host')
 const WebSocket = core('ws')
-const { createRcRoom } = require('./rc-room')
+const { createRcRoom, MAX_LAPS } = require('./rc-room')
 const { createRoomBots, MAX_BOTS, LEVELS } = require('./rc-room-bots')
 const { createSceneBaker, setSceneCtx } = require('./rc-scene')
 const { parseMessage } = require('./rc-sanitize')
@@ -18,6 +18,7 @@ const { setRcGameEnabled } = require('./rc-public')
 const { createRcLights, rcLightsDeps, withLiveScene } = require('./rc-lights')
 const { createRcVideo, rcVideoDeps } = require('./rc-video')
 const { createRcWorld } = require('./rc-world')
+const { createGameCtl, intIn } = require('./rc-ctl')
 
 const MAX_PLAYERS = 10
 const MAX_SPECTATORS = 20
@@ -84,8 +85,20 @@ function createRcGame(deps = {}) {
 	const lights = lightsDeps ? createRcLights({ log, ...lightsDeps, send: sendTo }) : null
 	const video = videoDeps ? createRcVideo({ log, ...videoDeps }) : null
 	let house = 1 // WO-1099 house lights LEVEL 0..1 (1 = the room lit): every client dims its own room (world.js setHouse); lives like lights / wall
+	let trackList = [] // WO-1125: the baked scene's tracks as the session panel lists them ({ id, title })
 	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev,
-		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house, bots: bots ? bots.count() : 0, botLevel: bots ? bots.level() : 'normal' })
+		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house, bots: bots ? bots.count() : 0, botLevel: bots ? bots.level() : 'normal',
+		self: ctl.self(), tracks: trackList, botMax: MAX_BOTS })
+	/** WO-1125 §3: players' `ctl` → this service's host() (the operator's path); `self` from the core (games.selfService). */
+	const ctlHost = (b) => {
+		const r = host(b)
+		if (b.action === 'bots' && r.status < 300) room?.host('house', {}) // `bots` alone pushes nothing until a bot joins / leaves
+		return r
+	}
+	const ctl = createGameCtl({ game: 'rc-game', log, now, send: sendTo, host: ctlHost, world: () => room?.world() || null,
+		keys: { track: (v) => (typeof v === 'string' && v.length <= 64 ? [{ action: 'track', trackId: v }] : null),
+			laps: (v) => (intIn(v, 1, MAX_LAPS) != null ? [{ action: 'laps', laps: v }] : null) },
+		bots: (n, level) => [{ action: 'bots', count: n, ...(level ? { level } : {}) }] })
 
 	/**
 	 * Bake (or reuse) the current scene and hand its tracks to the room. Errors are logged, not thrown. WO-1106 B37: only
@@ -96,6 +109,7 @@ function createRcGame(deps = {}) {
 			lastRev = out.rev
 			if (room && out.rev !== appliedRev) {
 				appliedRev = out.rev
+				trackList = (Array.isArray(out.json?.tracks) ? out.json.tracks : []).map((t) => ({ id: String(t.id), title: String(t.name || t.id) }))
 				room.setScene(out.json)
 				bots?.setScene(out.json)
 			}
@@ -162,6 +176,8 @@ function createRcGame(deps = {}) {
 	/** POST /api/game/rc/host body → { status, body }. */
 	function host(a) {
 		const action = a && typeof a === 'object' ? String(a.action || '') : ''
+		if (action === 'self') return ctl.hostSelf(a, state, () => room?.host('house', {})) // WO-1125: room 'house' = only the state push
+		ctl.note(action) // WO-1125: an operator's disable holds the session closed for games.selfService
 		if (action === 'enable') enable()
 		else if (action === 'disable') disable()
 		else if (!room) return { status: 409, body: { ok: false, error: 'the game is not enabled', state: state() } }
@@ -229,6 +245,7 @@ function createRcGame(deps = {}) {
 				return
 			}
 			if (m.t === 'wq') return world?.quality(ws, m) // WO-1101: the visitor cap of the client's quality tier
+			if (m.t === 'ctl') return room ? ctl.handle(ws, m) : undefined // WO-1125 §3 player control
 			if (room && room.handle(ws, m) === 'bad' && ++bad > 20) ws.close(1008, 'invalid') // WO-1106 B34: a wrong resume token
 		})
 		ws.on('close', () => {
@@ -259,6 +276,8 @@ function createRcGame(deps = {}) {
 		room: () => room,
 		/** WO-1101 Game World: the room adapter while enabled (rc-world.js). */
 		worldAdapter: () => world?.adapter || null,
+		/** WO-1125: the last operator host action closed the session (the core does not re-open it). */
+		held: () => ctl.held(),
 		baker,
 		/** §2.6 smokes / probes. */
 		live: () => ({ lights, video }),

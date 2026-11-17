@@ -161,7 +161,7 @@ test('without the rc-game sibling installed: refuses to load, saying why', async
 test('the game never touches Caspar: own files, the kit and named core files only; no AMCP / looks / layers / writes', () => {
 	const files = [path.join(MOD, 'register.js'), ...fs.readdirSync(path.join(MOD, 'server')).map((f) => path.join(MOD, 'server', f))]
 	const CORE_OK = new Set(['ws', 'src/api/response', 'src/server/auth', 'src/utils/lan-ipv4'])
-	const KIT_OK = new Set(['host.js', 'rc-scene.js', 'rc-lights.js', 'rc-video.js', 'rc-static.js', 'rc-scene-occ.js', 'rc-scene-height.js', 'rc-sanitize.js', 'rc-resume.js'])
+	const KIT_OK = new Set(['host.js', 'rc-scene.js', 'rc-lights.js', 'rc-video.js', 'rc-static.js', 'rc-scene-occ.js', 'rc-scene-height.js', 'rc-sanitize.js', 'rc-resume.js', 'rc-ctl.js'])
 	for (const f of files) {
 		const rel = path.relative(ROOT, f)
 		const code = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/.*$/gm, '')

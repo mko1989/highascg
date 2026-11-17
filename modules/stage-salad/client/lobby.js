@@ -76,6 +76,7 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 	const practiceBtn = h('button.big.go', { type: 'button', text: 'Practice while you wait' })
 	const changeBtn = h('button.ghost', { type: 'button', text: 'Change name / colour' })
 	changeBtn.addEventListener('click', () => onRejoin())
+	const sessionSlot = h('div.ctl-slot') // WO-1125: the self-service session panel is mounted here (session-panel.js)
 	const lobbyPanel = h(
 		'div.panel.lobby',
 		h(
@@ -83,6 +84,7 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 			h('div.col', h('h2', { text: 'Waiting for the host to start' }), plist, lMsg),
 			h('div.col.salad-lobby-info', lMode, lInfo, h('p.hint', { text: 'Practice: throw as much as you like — nothing counts until the round starts.' }))
 		),
+		sessionSlot,
 		h('div.actions', practiceBtn, changeBtn, fullscreenButton('ghost sq'))
 	)
 	const openBtn = h('button.tool.lobby-open', { type: 'button', text: 'Lobby', title: 'Show the lobby' })
@@ -100,6 +102,7 @@ export function createLobby(root, { onJoin, onRejoin, onWatch }) {
 	})
 
 	return {
+		slot: sessionSlot,
 		showJoin(info = '') {
 			show(root, true)
 			show(joinPanel, true)

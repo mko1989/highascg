@@ -76,13 +76,21 @@ function createSkGame(deps = {}) {
 	const lights = lightsDeps ? K.createRcLights({ log, ...lightsDeps, send: sendTo }) : null
 	const video = videoDeps ? K.createRcVideo({ log, ...videoDeps }) : null
 	let house = 1 // WO-1099 house lights LEVEL 0..1 (1 = the room lit): every client dims its own room (world.js setHouse); lives like lights / wall
+	let arenaList = [] // WO-1125: the served arenas as the session panel lists them ({ id, title })
 	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev,
-		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house })
+		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house, self: ctl.self(), arenas: arenaList, botMax: RULES.maxBots })
+	/** WO-1125 §3: players' `ctl` → this service's host() (the operator's path); `self` from the core (games.selfService). */
+	const ctl = K.createGameCtl({ game: 'toy-skirmish', log, now, send: sendTo, host: (b) => host(b), world: () => room?.world() || null,
+		keys: { arena: (v) => (typeof v === 'string' && v.length <= 64 ? [{ action: 'arena', id: v }] : null),
+			mode: (v) => (['dm', 'tdm', 'spot'].includes(v) ? [{ action: 'mode', mode: v }] : null),
+			minutes: (v) => (K.intIn(v, RULES.minutes.min, RULES.minutes.max) != null ? [{ action: 'limits', minutes: v }] : null) },
+		bots: (n, level) => [{ action: 'bots', n }, ...(level ? [{ action: 'botlevel', level }] : [])] })
 
 	/** Bake (or reuse) the scene + arenas and hand them to the room. */
 	function refreshScene() {
 		return scene.get().then((out) => {
 			lastRev = out.rev
+			arenaList = (Array.isArray(out.json?.arenas) ? out.json.arenas : []).map((a) => ({ id: String(a.id), title: String(a.name || a.id) }))
 			if (room) room.setScene(out.json)
 			video?.refresh()
 			return out
@@ -156,6 +164,8 @@ function createSkGame(deps = {}) {
 	/** POST /api/game/sk/host body → { status, body }. */
 	function host(a) {
 		const action = a && typeof a === 'object' ? String(a.action || '') : ''
+		if (action === 'self') return ctl.hostSelf(a, state, () => room?.host('house', {})) // WO-1125: room 'house' = only the state push
+		ctl.note(action) // WO-1125: an operator's disable holds the session closed for games.selfService
 		if (action === 'enable') enable()
 		else if (action === 'disable') disable()
 		else if (!room) return { status: 409, body: { ok: false, error: 'the game is not enabled', state: state() } }
@@ -213,6 +223,7 @@ function createSkGame(deps = {}) {
 				return
 			}
 			if (m.t === 'wq') return world?.quality(ws, m) // WO-1101: the visitor cap of the client's quality tier
+			if (m.t === 'ctl') return room ? ctl.handle(ws, m) : undefined // WO-1125 §3 player control
 			if (room && room.handle(ws, m) === 'bad' && ++bad > 20) ws.close(1008, 'invalid') // WO-1106 B34: a wrong resume token
 		})
 		let counted = !!from
@@ -247,6 +258,8 @@ function createSkGame(deps = {}) {
 		room: () => room,
 		/** WO-1101 Game World: the room adapter while enabled (sk-world.js). */
 		worldAdapter: () => world?.adapter || null,
+		/** WO-1125: the last operator host action closed the session (the core does not re-open it). */
+		held: () => ctl.held(),
 		baker,
 		live: () => ({ lights, video }),
 		MAX_SOCKETS,

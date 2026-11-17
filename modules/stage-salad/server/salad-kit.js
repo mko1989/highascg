@@ -12,6 +12,7 @@
  *   serveRcStatic               rc-static.js — the static-file logic
  *   MAX_MESSAGE_BYTES, cleanName, cleanColor   rc-sanitize.js
  *   resume                     rc-resume.js — the resume token after a reconnect (WO-1106 B34)
+ *   createGameCtl, intIn       rc-ctl.js — players run the session themselves (WO-1125 self-service)
  *   core                        the sibling's host.core(id): core files / core npm packages (`ws`)
  * and `shared()`: this module's own pure ES modules in client/ (veggies, flight, venue, avatar-body, aim), loaded with
  * require() of an ES module — the server referee runs the very code the browser runs.
@@ -63,6 +64,7 @@ function kit() {
 	const stat = require(file('rc-static.js'))
 	const san = require(file('rc-sanitize.js'))
 	const resume = require(file('rc-resume.js'))
+	const ctl = require(file('rc-ctl.js'))
 	loaded = {
 		dir,
 		clientDir: path.join(dir, 'client'),
@@ -78,6 +80,8 @@ function kit() {
 		cleanName: san.cleanName,
 		cleanColor: san.cleanColor,
 		resume, // WO-1106 B34: the one resume-token design of the three games (rc-resume.js)
+		createGameCtl: ctl.createGameCtl, // WO-1125: the one player-control rule set of the three games (rc-ctl.js)
+		intIn: ctl.intIn,
 	}
 	return loaded
 }

@@ -17,6 +17,7 @@ const { createSaladScene } = require('./salad-scene')
 const { parseMessage } = require('./salad-sanitize')
 const { setSaladEnabled } = require('./salad-public')
 const { createSaladWorld } = require('./salad-world')
+const { MAX_BOTS } = require('./salad-bots')
 
 const MAX_SOCKETS = RULES.maxPlayers + RULES.maxSpectators
 const MSG_RATE = 30 // messages / s per socket (aim ≤ 10 + fire ≤ 3 + pings), burst the same
@@ -102,7 +103,12 @@ function createSaladGame(deps = {}) {
 	const liveLists = () => ({ lights: lights ? lights.list() : [], screens: videoDeps?.screens ? videoDeps.screens() : [] })
 	let house = 1 // WO-1099 house lights LEVEL 0..1 (1 = the room lit): every client dims its own room (world.js setHouse); lives like lights / wall
 	const decorate = (s) => ({ enabled: true, ...s, joinUrls: joinUrls(), sceneRev: lastRev,
-		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house })
+		lights: lights ? lights.isOn() : false, wall: video ? video.isOn() : false, house, self: ctl.self(), botMax: MAX_BOTS })
+	/** WO-1125 §3: players' `ctl` → this service's host() (the operator's path; only round + teams, never target / safe / …). */
+	const ctl = K.createGameCtl({ game: 'stage-salad', log, now, send: sendTo, host: (b) => host(b), world: () => room?.world() || null,
+		keys: { round: (v) => (K.intIn(v, RULES.secs.min, RULES.secs.max) != null ? [{ action: 'round', secs: v }] : null),
+			teams: (v) => (typeof v === 'boolean' ? [{ action: 'teams', on: v }] : null) },
+		bots: (n, level) => [{ action: 'bots', n }, ...(level ? [{ action: 'botlevel', level }] : [])] })
 
 	/** Venue from the scene + the live screens / lights; the room gets it when its rev changed. */
 	function rebuildVenue() {
@@ -203,6 +209,8 @@ function createSaladGame(deps = {}) {
 	/** POST /api/game/salad/host body → { status, body }. */
 	function host(a) {
 		const action = a && typeof a === 'object' ? String(a.action || '') : ''
+		if (action === 'self') return ctl.hostSelf(a, state, () => room?.host('house', {})) // WO-1125: room 'house' = only the state push
+		ctl.note(action) // WO-1125: an operator's disable holds the session closed for games.selfService
 		if (action === 'enable') enable()
 		else if (action === 'disable') disable()
 		else if (!room) return { status: 409, body: { ok: false, error: 'the game is not enabled', state: state() } }
@@ -269,6 +277,7 @@ function createSaladGame(deps = {}) {
 			}
 			if (m.t === 'wq') return world?.quality(ws, m) // WO-1101: the visitor cap of the client's quality tier
 			if (!room) return
+			if (m.t === 'ctl') return ctl.handle(ws, m) // WO-1125 §3 player control
 			if (room.handle(ws, m) === 'bad' && ++bad > 20) return ws.close(1008, 'invalid') // WO-1106 B34: a wrong resume token
 			if (m.t === 'join') startPoll()
 		})
@@ -295,6 +304,8 @@ function createSaladGame(deps = {}) {
 		room: () => room,
 		/** WO-1101 Game World: the room adapter while enabled (salad-world.js). */
 		worldAdapter: () => world?.adapter || null,
+		/** WO-1125: the last operator host action closed the session (the core does not re-open it). */
+		held: () => ctl.held(),
 		venue: () => venue,
 		polling: () => !!poll,
 		pollOnce,

@@ -14,6 +14,8 @@ import { createFxView } from './fx-view.js'
 import { createHud, toolButton } from './hud.js'
 import { fullscreenButton } from './fullscreen.js'
 import { createLobby } from './lobby.js'
+import { createSessionPanel } from './session-panel.js'
+import { worldLinkEl } from './world-link.js'
 import { createInput } from './input.js'
 import { createAudio } from './audio.js'
 import { createScreens } from './screens.js'
@@ -117,6 +119,7 @@ export async function startGame({ spectator = false } = {}) {
 	})
 	const fsEl = fullscreenButton()
 	if (!spectator) toolbar.push(qBtn) // the spectator page (maybe on a wall) shows no buttons at all
+	if (!spectator) toolbar.push({ el: worldLinkEl() }) // WO-1125: shown only when the world answers
 	if (!spectator && fsEl) toolbar.push({ el: fsEl })
 	G.hud = createHud($('#hud'), { spectator, toolbar, itemButton: spectator ? null : $('#t-item') })
 	G.muteBtn = toolbar.find((b) => b.el.title.startsWith('Sound'))?.el || null
@@ -140,6 +143,7 @@ export async function startGame({ spectator = false } = {}) {
 				G.lobby.showJoin(G.T)
 			},
 		})
+		G.sess = createSessionPanel(G, G.lobby.slot) // WO-1125 self-service: bots, choices, Start; results buttons
 	}
 
 	/* ---------- scene ---------- */

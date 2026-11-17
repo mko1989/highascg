@@ -85,6 +85,7 @@ function applyState(G, state) {
 	}
 	const prevPhase = G.phase
 	G.state = state
+	G.sess?.update(state) // WO-1125 self-service panel (hidden unless state.self)
 	G.phase = state.phase || 'lobby'
 	if (G.scene?.rev && state.sceneRev && state.sceneRev !== G.scene.rev && sessGet('reloadedFor') !== state.sceneRev) {
 		/* a new stage: reload (the join is remembered for this tab); at most once per rev */
@@ -145,6 +146,9 @@ export function onMessage(G, m) {
 			if (m.resumed) resumeLaps(G, m.you?.race)
 			break
 		}
+		case 'ctl':
+			G.sess?.refuse(m) // WO-1125: a refused player control shows one line
+			break
 		case 'state':
 			applyState(G, m.state)
 			break

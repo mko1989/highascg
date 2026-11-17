@@ -325,3 +325,49 @@ select {
 	color: var(--accent);
 	text-shadow: 0 1px 3px #000;
 }
+
+/* WO-1125 landing: the cards float over the live room */
+.mode-landing main {
+	position: relative;
+	z-index: 1;
+	pointer-events: none;
+}
+.mode-landing main > * {
+	pointer-events: auto;
+}
+.mode-landing #view {
+	z-index: 0;
+}
+.world-bg {
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+}
+.world-bg .wait {
+	display: none;
+}
+.landing-panel {
+	max-width: 560px;
+	max-height: calc(100vh - 24px);
+	overflow: auto;
+	padding: 12px;
+	border-radius: 18px;
+	background: rgba(20, 24, 33, 0.82);
+	border: 1px solid var(--line);
+}
+.pick-toggle {
+	min-height: 40px;
+	padding: 0 16px;
+	border-radius: 12px;
+	border: 1px solid var(--line);
+	background: rgba(31, 37, 50, 0.9);
+	color: var(--text);
+	font: inherit;
+	font-weight: 600;
+}
+.pick-open {
+	position: fixed;
+	left: max(12px, env(safe-area-inset-left));
+	top: max(12px, env(safe-area-inset-top));
+}

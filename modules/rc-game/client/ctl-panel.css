@@ -1,0 +1,82 @@
+/* WO-1125 — self-service session panel + results bar (shared by rc / sk / salad; uses the kit's rc.css variables). */
+.ctl-panel {
+	margin-top: 14px;
+	padding-top: 10px;
+	border-top: 1px solid var(--line);
+}
+.ctl-panel h2 {
+	font-size: 17px;
+	margin: 0 0 6px;
+}
+.ctl-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin: 6px 0;
+}
+.ctl-label {
+	color: var(--dim);
+	font-size: 15px;
+}
+.ctl-ctrl {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.ctl-val {
+	min-width: 44px;
+	text-align: center;
+	font-weight: 700;
+	font-size: 18px;
+}
+.ctl-val.wide {
+	min-width: 120px;
+	max-width: 200px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ctl-seg {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	justify-content: flex-end;
+}
+.ctl-opt.on {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+.ctl-start {
+	width: 100%;
+	margin-top: 10px;
+	min-height: 56px;
+}
+.ctl-msg {
+	min-height: 20px;
+	color: var(--bad);
+}
+.ctl-results {
+	position: fixed;
+	left: 50%;
+	bottom: calc(14px + var(--sb));
+	transform: translateX(-50%);
+	z-index: 12;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 10px;
+	pointer-events: auto;
+}
+.ctl-results .big,
+.ctl-results .ghost {
+	min-height: 52px;
+}
+a.tool,
+a.ghost.world-link {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	text-decoration: none;
+	color: var(--text);
+}

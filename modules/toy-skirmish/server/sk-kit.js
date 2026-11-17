@@ -14,6 +14,7 @@
  *   heightsFromJSON             rc-scene-height.js — the scene's height field (what stands how high; WO-1083 flat decor)
  *   MAX_MESSAGE_BYTES, cleanName, cleanColor, PALETTE   rc-sanitize.js — the 2 KB cap and the name / colour rules
  *   resume                      rc-resume.js — the resume token after a reconnect (WO-1106 B34)
+ *   createGameCtl, intIn       rc-ctl.js — players run the session themselves (WO-1125 self-service)
  *   core                        the sibling's host.core(id): `src/…` core files and core npm packages (`ws`)
  * Nothing under modules/rc-game/ is edited. Sibling missing → `Stage Skirmish needs the "rc-game" module installed`.
  */
@@ -66,6 +67,7 @@ function kit() {
 	const heights = require(file('rc-scene-height.js'))
 	const san = require(file('rc-sanitize.js'))
 	const resume = require(file('rc-resume.js'))
+	const ctl = require(file('rc-ctl.js'))
 	loaded = {
 		dir,
 		clientDir: path.join(dir, 'client'),
@@ -86,6 +88,8 @@ function kit() {
 		cleanColor: san.cleanColor,
 		PALETTE: san.PALETTE,
 		resume, // WO-1106 B34: the one resume-token design of the three games (rc-resume.js)
+		createGameCtl: ctl.createGameCtl, // WO-1125: the one player-control rule set of the three games (rc-ctl.js)
+		intIn: ctl.intIn,
 	}
 	return loaded
 }

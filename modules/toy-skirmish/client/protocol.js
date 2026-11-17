@@ -189,6 +189,8 @@ export function decode(text) {
 		case 'lxfull':
 			// RC §2.6 live lights (the kit's stage-fx validates the entries); `lxfull` may also be { on: false }
 			return Array.isArray(m.f) || (m.t === 'lxfull' && (m.on === false || Array.isArray(m.lights))) ? m : null
+		case 'ctl': // WO-1125 §3: a refusal of a player control ({ ok:false, error })
+			return { t: 'ctl', ok: m.ok !== false, error: typeof m.error === 'string' ? m.error.slice(0, 12) : null }
 		default:
 			return decodeWorld(m)
 	}

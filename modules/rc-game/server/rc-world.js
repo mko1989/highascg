@@ -35,6 +35,7 @@ function register(getGame) {
 		models: { car: '/game/rc/car-model.js' },
 		host: (body) => getGame().host(body),
 		state: () => getGame().state(),
+		held: () => getGame().held?.() === true, // WO-1125: an operator closed the session (games.selfService leaves it closed)
 		room: () => getGame().worldAdapter() || null,
 		get hosting() {
 			return require('./rc-hosting') // WO-1105 Settings ▸ Games: this game's main number, bots, pause in its own host bodies

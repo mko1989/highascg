@@ -61,4 +61,9 @@ module.exports = [
 	'tools/smoke/smoke-wo1113-visual-patch-flip.test.js', // WO-1113 previs decode turns an axis the patch runs against its file
 	'tools/smoke/smoke-wo1120-shm-surface-half-size.test.js', // WO-1120 SHM consumer SCALE 2 for a channel far above UHD
 	'tools/smoke/smoke-wo1122-operator-screen-reach.test.js', // WO-1122 operator-screen marks screens the confined pointer cannot reach
+	'tools/smoke/smoke-wo1125-ctl-rules.test.js', // WO-1125 game self-service
+	'tools/smoke/smoke-wo1125-ctl-games.test.js', // WO-1125 game self-service
+	'tools/smoke/smoke-wo1125-self-service-core.test.js', // WO-1125 game self-service
+	'tools/smoke/smoke-wo1125-client-panel.test.js', // WO-1125 game self-service
+	'tools/smoke/smoke-wo1125-client-static.test.js', // WO-1125 game self-service
 ]
