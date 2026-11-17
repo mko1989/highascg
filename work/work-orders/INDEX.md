@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1028 live WOs (34 open, 160 in progress, 834 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1029 live WOs (34 open, 161 in progress, 834 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -434,7 +434,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1113 DONE [lighting+tracking-vr] Previs decode honours a patch that runs pan / tilt against the GDTF file → 1113_WO_previs_decode_honours_patch_invert.md
 - 1115 DONE [lighting+godot-client,tracking-vr] Client at 4–7 fps while the previs follows a desk running an effect: the fixtur… → 1115_WO_previs_fixtures_push_sends_only_changed_heads.md
 
-## godot-client — Godot client (186)
+## godot-client — Godot client (187)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -622,6 +622,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1119 DONE [godot-client+video-io] Previs at 36 of 50 fps: the 11520×1536 LED canvas was copied and uploaded on ev… → 1119_WO_previs_big_canvas_feed_read_every_other_frame.md
 - 1120 IN PROGRESS [godot-client+video-io,caspar-build] LED wall feed to the previs at half size: Caspar shm consumer SCALE → 1120_WO_shm_surface_half_size_for_big_canvas.md
 - 1121 DONE [godot-client] Desktop quality of life: Super+Space app search, Space quick look in Thunar → 1121_WO_desktop_app_search_and_thunar_quick_look.md
+- 1122 IN PROGRESS [godot-client+devices-config] Second operator window stranded on a screen the pointer cannot reach after a pr… → 1122_WO_second_window_stranded_on_unreachable_screen.md
 
 ## web-client — Web client (90)
 

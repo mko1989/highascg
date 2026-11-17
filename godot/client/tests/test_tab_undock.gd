@@ -206,3 +206,14 @@ func test_screen_menu_rows() -> void:
 	t.ok(pm.is_item_checked(pm.get_item_index(SecondWindow.AUTO_ID)), "automatic is the default")
 	t.eq(pm.get_item_id(4), SecondWindow.CLOSE_ID)
 	pm.free()
+
+
+func test_wo1122_a_screen_the_pointer_cannot_reach_is_never_picked() -> void:
+	# the box 17.11: a project with two operator monitors left the window on DP-5; the next project has one
+	var screens := [Rect2i(0, 0, 1920, 1080), Rect2i(1920, 0, 1920, 1080)]
+	var one := [{"name": "DP-3", "current": true, "gui": 1}, {"name": "DP-5", "reach": false}]
+	t.eq(M.pick_screen(screens, one, 0, 1), -1, "the saved pick is out of reach: a window on the main screen")
+	var two := [{"name": "DP-3", "current": true, "gui": 1}, {"name": "DP-5", "gui": 2}]
+	t.eq(M.pick_screen(screens, two, 0, 1), 1, "cabled as operator monitor 2 again: back on it")
+	t.eq(M.pick_screen(screens, [{"name": "DP-3", "current": true}, {"name": "DP-5"}], 0, 1), 1, "not confined: the free monitor")
+

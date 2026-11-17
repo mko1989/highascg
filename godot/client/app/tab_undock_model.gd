@@ -46,7 +46,7 @@ static func busy(outputs: Array, i: int) -> bool:
 	if i < 0 or i >= outputs.size() or not outputs[i] is Dictionary:
 		return false
 	var o: Dictionary = outputs[i]
-	return bool(o.get("caspar", false)) or bool(o.get("current", false))
+	return bool(o.get("caspar", false)) or bool(o.get("current", false)) or o.get("reach") == false  # WO-1122: the pointer cannot get there
 
 
 ## WO-920: the screen whose output is cabled from the Operator GUI card's dot 2 (GET operator-screen `gui: 2`); -1 none.

@@ -8,7 +8,7 @@
  * the device graph — so the kiosk launcher, pointer confine, Godot window placement and the
  * Devices-tab cable all read one answer.
  *
- *   GET  /api/system/operator-screen            { outputs: [{ name, port, x, y, width, height, current, caspar, gui }], port }
+ *   GET  /api/system/operator-screen            { outputs: [{ name, port, x, y, width, height, current, caspar, gui, reach? }], port }
  *                                               caspar (WO-891): a Caspar screen consumer is planned on that output
  *                                               gui (WO-920): 1 / 2 = the layout plans that output as operator monitor 1 /
  *                                               2 (the Operator GUI card's dot), absent otherwise
@@ -103,7 +103,18 @@ function handleGet(ctx, deps = {}) {
 		boot = { pending: false, reason: `error: ${e?.message || e}` }
 	}
 	const roles = (deps.planRoles || planRoles)(config)
-	const row = (o) => ({ ...o, current: port != null && o.port === port, caspar: roles.caspar.has(o.name) })
+	// WO-1122: with the pointer kept on the operator monitors, a screen that is neither of them cannot be reached —
+	// `reach: false` (a window left there by another project's layout is out of the operator's hands)
+	let confined = false
+	try {
+		confined = (deps.confined || require('../utils/x-display-session-layout-resolve').isOperatorPointerConfineDesired)(config) === true
+	} catch {
+		confined = false
+	}
+	const row = (o) => {
+		const current = port != null && o.port === port
+		return { ...o, current, caspar: roles.caspar.has(o.name), ...(confined && !current && !roles.gui.has(o.name) ? { reach: false } : {}) }
+	}
 	return reply(200, {
 		outputs: outputs.map((o) => (roles.gui.has(o.name) ? { ...row(o), gui: roles.gui.get(o.name) } : row(o))),
 		port: port ?? null,
