@@ -1,7 +1,7 @@
 # WO-1106 — Review fix list: bugs, leaks and gaps found in WO-1099 … WO-1105 (and older work orders)
 
 **Area:** testing-ci, web-client, godot-client, engine
-**Status: IN PROGRESS (17.11.26 — 165 rows; about 140 fixed and committed with tests, about 10 partial, 15 open, offline suite 7311 / 0, Godot 29698 / 0; open rows in §7; nothing checked on the glass, node not restarted)**
+**Status: IN PROGRESS (17.11.26 — 165 rows + D1–D6: all fixed with tests except the rows in §7b; offline suite 7418 / 0 after the contract regen, Godot 29848 / 0, node restarted clean; open: the real two-box run, phones / switcher / desk on the glass)**
 
 Owner, 17.11.26: "do a review of latest changes looking for bugs and leaks and other undesired gaps." → "add all of
 those to a fixing list. expand the review to older wos"
@@ -334,33 +334,43 @@ Found while fixing: `godot/client/app/config_pane.gd` set a `CodeEdit`-only prop
 - All 321 linked-server smokes pass with C17–C28 in.
 - The real Hilton hall (WO-1098) imports to the same 8,912,748-byte GLB under the new worker heap limit (peak 415 MB).
 
-## 7. Still open
+## 7. Second round (17.11.26, after the owner's answers)
+
+Owner, 17.11.26: "B67 Don't ship them · B71 Remove obviously from the repo · The rest based on best quality".
+
+| Commit | What | Rows |
+|--------|------|------|
+| `54b857fb` | The two PixelHue manuals and the stick-flash screenshots leave the repo (still in the git history; copies in `~/reference-not-in-repo` on the box). | B71 |
+| `e9a11da3` | 169 NonCommercial shaders leave `template/shaders` (14 CC0 / MIT / CC BY stay). The rule is the licence: the store never exports, seeds or ships an `-NC` shader; `LICENSES/withdrawn-nc.json` records them; the ISO verifier fails an image that carries one. A box that holds one keeps it as local content, marked in the list; importing one needs the operator's `allowNonCommercial`. | B67 |
+| `474078ac` | Keeping-up smoke on fixed readings (a CPU thermal-throttle counter leaked in), Zoom rebind in the per-source chain, Studio session reconnect, dev-dependency licences in the CI verify job, `dpkg --force-confmiss` for desktopvideo, runtime repair / resume behind the code-change gate. | D6, D3 (zoom), C41, D5, D4, B1 |
+| `50cf64eb` | Resume token in RC / Skirmish / Salad (same id, score, seat; old socket closes 4410 "playing on another page"), server bots take the hub's slick patches, join URLs rank link-local / bridge addresses last, Salad start / stop end practice flights, Skirmish scene rev without a host page. | B34, A35, D3 (lan-ipv4) |
+| `539da5f9` | Seven more SpinBoxes commit on Enter / focus-out, clip pads resolve per shown bank, PixelHue geometry on Enter with a limits check, the box's own addresses count as on-box, C45 leftovers, the demo clip player is asserted, black check without a GPU readback, keyed thumbnail requests, own-puppet import on a worker thread (main thread < 2 ms instead of ~130 ms on the box's puppet), non-commercial note in the shader list. | D1, B32, C40, C44, C45, D2, B28, B29, A39 |
+| `59a57751` | A press runs once on the follower (press id), lateness baseline recovers after a clock step, `ownView` cached, v1 signed calls refused from a peer seen on v2, cluster changes need the password / the box itself / a linked server's signature (also media-spread and the channels-cabled write), relay deadline. | C19, C21, C25, C27, C29, D3 (relay) |
+| `7259781d` | The fix list's smokes move to `tools/ci/offline-test-files-4.js`. | — |
+
+Verified after this round: offline suite 7426 tests, 7418 pass, 1 fail (the generated API contract doc — regenerated and
+committed with `59a57751`; the cluster + contract smokes then 561 / 561), 4 skipped; lint 0 errors; format, 500-line,
+unwired-exports and script-path checks pass. Godot `run_tests`: **29848 passed, 0 failed**; `--check` boot OK.
+Node restarted on the box 17.11 13:15: all modules load, no error lines, `GET /api/shaders` lists 189 (169 marked
+non-commercial, held locally) and `template/shaders` stays at 14 files.
+
+## 7b. Still open
 
 | # | State | What is left |
 |---|-------|--------------|
-| B67 | owner decision | 169 of 183 shipped shaders are NonCommercial: mark + warn before PGM, or move to an opt-in download. |
-| B71 | owner decision | Two PixelHue manuals tracked in the public repo; stick-guide screenshots. |
-| B32 | owner decision | Clip pads vs look pads: binding only free pads leaves the library fill 28 of 40 pads per bank (WO-1070 test pins today's behaviour). |
-| C19, C21, C27, C29 | not started | Follower double take, lateness baseline after a clock step, v1 signed calls, auth on the cluster routes — need a design call or the two-box harness. C25 (ownView cache) is performance only. |
-| C40, C41 | not started | Per-keystroke layer geometry (Studio does the same); reconnect after a switcher restart (needs the switcher). |
-| B34 | partial | No resume token: a reconnecting phone is a new player with 0 points (Salad: can take a ghost's seat; Skirmish: ≤ 10 ghosts kept). |
-| A35 | partial | Bots take slick patches on the client side; the RC server has no list of live patches to hand them. |
-| A39 | skipped | Own-puppet import still on the main thread. |
-| B28, B29 | partial | The 2 s GPU readback still runs while the tracking view is visible; the MIDI library still re-requests every thumbnail. |
+| two-box | not run | C19 / C21 / C27 / C29 are proven on fakes only: `tools/e2e/two-box` with the real second box (AMCP fan-out suppression inside a real take, signed unlink across a restart, a real clock step, Edit peer B through the relay). The second box (5867) runs the old build: relayed cluster changes from it get 403 and its unsigned "unlink there" is refused until it is updated. |
+| B67 | follow-up | 27 withdrawn shaders are referenced as legacy Caspar `SHADERS/SH-…` template layers in 8 projects (dtlodz, wesele, frontex_big, llkk, prrrr, dfgfdghh, philips, testyyyy): no template any more (they rendered black here already). The legacy web Shader FX modal has no "allow non-commercial" tick. The Mac and 5867 still run the old store and sync `template/shaders`: they can re-create the files until updated. |
+| B71 | history | The removed files are still in the git history (purging needs a history rewrite + force-push). |
 | B50 | unrendered | Tunnel floor by derivative normal: shader text only, not compiled on a GPU. |
-| C18 | edge | Master clock stepping back + a follower that can only hear pushes → a failover against a live master. |
-| C44 | half | An on-box client started with the box's LAN address counts as remote (today nothing passes `--server` on the box). |
-| C45 | leftovers | Remote-file drop guard, "Looks drive the switcher" tick, stale needs on confirm. |
-| new D1 | not started | Seven more previs SpinBoxes apply per keystroke (`zones_section`, `follow_section`, `detect_section`, `tracking_page`, `ptz_section`, `stage_panel`, `dmx_monitor_window`): check which write to the server (RULES.md input rule). |
-| new D2 | not started | `test_demo_engine` clip-player branch never ran headless (now gated on a non-headless display): the demo clip player has no test. |
-| new D3 | not started | `cluster-relay.js rawRequest` has no overall deadline; `zoom-session.js rebind()` uses a grab after an await unchecked; `src/utils/lan-ipv4.js` still ranks docker0 / 169.254.x first for the games' own join URLs. |
-| new D4 | owner | Per-box DeckLink install will not recreate the excluded dracut conffile (`--force-confmiss`) — B74 follow-up. |
-| new D6 | flaky | `smoke-wo1088-keeping-up-service` "nothing moved → no broadcast" failed once in three full offline runs on the box (2 broadcasts instead of 1) and passes 8 of 8 alone: `sampleOnce()` reads the real machine's state, which moves under the load of the parallel suite. |
-| new D5 | CI | The verify job checks production npm licences only; dev dependencies are checked at release time. |
+| B51 | partial | After an RC module upgrade the bots' own imports stay cached: restart node. |
+| A12 | partial | Body + head in two files is refused, not merged. |
+| C18, C44 | edges | Master clock stepping back + a push-only follower; a cloned box that kept its peer's hostname. |
+| soft affect | new | A player's page still slides on a splat when the game's cross-game setting is "soft" (server bots do not). Salad's client has no clock reset on reconnect (RC has, B43). |
+| flake | old | Godot `test_pixelhue_programming_panel::test_live_geometry_coalesces` failed twice in full runs during the work, passes alone and in the last three full runs. |
 
 ## 8. Not verified
 
 - Nothing was checked on the glass, on phones, on a switcher, a lighting desk or the second box: every proof is an offline smoke, the Godot unit suite or the headless boot check.
-- The node service was not restarted: no server-side fix is live on the box yet. The web client was rebuilt (`npm run build:client`) but no browser was reloaded.
+- Node was restarted (17.11 13:15) and the web client rebuilt; no browser or phone page was reloaded and the owner's Godot client was not relaunched (it runs the GDScript it started with).
 - The `window_grab` binary was not rebuilt (C7); it rebuilds at the next Zoom source assign.
 - The ISO changes were not run under sudo and no ISO was built.
