@@ -42,3 +42,8 @@ output — half should do it". Follows [WO-1119](./1119_WO_previs_big_canvas_fee
 - The Live tab's PGM monitor now shows the half-size picture — not looked at.
 - CPU cost of the 2×2 mean in the consumer worker — not measured (preview feed holds 50 / 50).
 - Pixel-mapped fixtures that sample the pgm ring, if any reader assumes channel pixels — not checked.
+
+## Published + pinned (17.11, owner: "do this")
+
+- `tools/release/publish-caspar-build.sh` → release `caspar-2b608f13a` (binary + complete source), `caspar/PINNED.json`
+  → 2b608f13a (binary sha256 equals the deployed `bin/casparcg`). `~/.highascg/caspar-hold` removed.
