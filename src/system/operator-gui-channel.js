@@ -204,7 +204,9 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 		if (routeLive) nextRoutes.set(entry.layer, entry.route)
 	}
 	const newMax = routePlan.length ? routePlan[routePlan.length - 1].layer : ROUTE_LAYER_START - 1
-	const prevMax = lastMaxLayerByChannel.has(ch) ? lastMaxLayerByChannel.get(ch) : newMax
+	// The first apply of this process knows nothing of the layers a previous run left playing (a node restart while the
+	// client showed camera cells: their routes stayed on 12–14, over the PGM / PRV windows) — sweep the whole range once.
+	const prevMax = lastMaxLayerByChannel.has(ch) ? lastMaxLayerByChannel.get(ch) : ROUTE_LAYER_MAX
 	for (let layer = newMax + 1; layer <= Math.min(prevMax, ROUTE_LAYER_MAX); layer++) {
 		try {
 			await ctx.amcp.stop(ch, layer)
