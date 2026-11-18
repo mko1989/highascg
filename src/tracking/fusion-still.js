@@ -8,6 +8,8 @@
  *   becomes still   one camera's support alone for STILL_AFTER_MS, another camera has the spot in view
  *                   (fusion-reproject.inView) and no free box of its own there (columnMatch), and the track has not
  *                   walked STILL_MOVE_M in the last WALKED_KEEP_MS.
+ *                   Or, with two cameras live: nobody else can see the spot and its score stays under WEAK_SCORE
+ *                   (a chair stack in the corner of one picture).
  *   while still     it keeps its own box (same camera track id, within STILL_HOLD_M) out of the association —
  *                   else a passer-by pairs with the lectern.
  *   ends            the track walks STILL_MOVE_M, or another camera shows a free matching box for STILL_SEEN_MS
@@ -24,6 +26,8 @@ const STILL_MOVE_M = 1.0
 const STILL_SEEN_MS = 3000
 const STILL_HOLD_M = 0.5
 const WALKED_KEEP_MS = 20000 // a walk counts this long: a walker's track that ends up on furniture is vetoed in the end
+const WEAK_SCORE = 0.4 // below this average a stand-still track needs no second camera's word (two-camera rigs only)
+const SCORE_BLEND = 0.05
 const SPOT_M = 0.75
 const SPOTS_MAX = 32
 
@@ -79,7 +83,9 @@ function judgeStill(t, { fresh, obs, claimed, now, planeZ }) {
 		if (seen && now - t.seenSince >= STILL_SEEN_MS) Object.assign(t, { still: false, aloneSince: null, seenSince: null })
 		return
 	}
-	const alone = watched && !seen && !(t.walkedAt !== null && now - t.walkedAt <= WALKED_KEEP_MS)
+	t.scoreAvg = t.scoreAvg === undefined ? t.score : t.scoreAvg + SCORE_BLEND * (t.score - t.scoreAvg)
+	const weak = single && fresh.length > 1 && !watched && t.scoreAvg < WEAK_SCORE // beside the stage, in one camera's corner
+	const alone = ((watched && !seen) || weak) && !(t.walkedAt !== null && now - t.walkedAt <= WALKED_KEEP_MS)
 	t.aloneSince = alone ? (t.aloneSince ?? now) : null
 	if (alone && now - t.aloneSince >= STILL_AFTER_MS) Object.assign(t, { still: true, anchor: p, seenSince: null })
 }
