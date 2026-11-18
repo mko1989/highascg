@@ -84,4 +84,4 @@ function judgeStill(t, { fresh, obs, claimed, now, planeZ }) {
 	if (alone && now - t.aloneSince >= STILL_AFTER_MS) Object.assign(t, { still: true, anchor: p, seenSince: null })
 }
 
-module.exports = { stillStart, rememberSpot, holdStill, judgeStill, STILL_AFTER_MS, STILL_MOVE_M, STILL_SEEN_MS }
+module.exports = { stillStart, rememberSpot, holdStill, judgeStill, STILL_AFTER_MS }

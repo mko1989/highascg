@@ -95,4 +95,4 @@ function inView(entry, x, y, planeZ = 0) {
 	return ok(pts[0]) && ok(pts[1]) && pts[1][1] - pts[0][1] >= VIEW_MIN_HEIGHT
 }
 
-module.exports = { columnMatch, inView, bodyHeight, cutTop, cutBottom }
+module.exports = { columnMatch, inView, cutTop }
