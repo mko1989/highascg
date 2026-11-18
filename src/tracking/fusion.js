@@ -27,6 +27,8 @@
 const { pixelRay } = require('./camera-model')
 const { boxPoint } = require('./detect-model')
 const { assign } = require('./hungarian')
+const { columnMatch, cutTop } = require('./fusion-reproject')
+const { stillStart, rememberSpot, holdStill, judgeStill } = require('./fusion-still')
 
 const ASSOC_GATE_M = 0.75
 const TRACK_GATE_M = 1.0
@@ -46,6 +48,7 @@ const SIGMA_MONO_BASE_M = 0.05
 const SIGMA_MONO_PER_M = 0.02
 const ACCEL_NOISE = 2.0 // m²/s³ white-acceleration spectral density
 const MAX_DT_S = 0.5
+const SPAWN_MIN_SCORE = 0.25 // one camera alone opens a person only above this (chair stacks and cases score 0.1–0.2); two cameras always do
 
 const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1])
 
@@ -60,6 +63,7 @@ function observe(p, c, planeZ) {
 	return {
 		key: `${c.id}:${p.tid}`,
 		camera: c.id,
+		entry: c.entry,
 		tid: p.tid,
 		score: p.score,
 		box: p.box,
@@ -76,7 +80,7 @@ function observe(p, c, planeZ) {
  * camera's feet ray has to pass under the head, both at the same floor level, with a body's height in between.
  */
 function headMatch(a, b, planeZ = 0) {
-	if (!a.ray || !b.ray || a.camera === b.camera) return Infinity
+	if (!a.ray || !b.ray || a.camera === b.camera || cutTop(a) || cutTop(b)) return Infinity
 	const rays = [a.ray, b.ray]
 	if (maxRayAngle(rays) < MIN_RAY_ANGLE_DEG) return Infinity
 	const tri = triangulate(rays)
@@ -104,6 +108,26 @@ function floorUnder(o, p, planeZ) {
 	return c[2] + t * (planeZ - c[2])
 }
 
+/** Two boxes of different cameras as one person, beyond floor distance: the head rays meet, or one's body explains the other's box. */
+function pairCost(a, b, planeZ) {
+	const ab = columnMatch(a, b, planeZ),
+		ba = columnMatch(b, a, planeZ)
+	return Math.min(
+		headMatch(a, b, planeZ),
+		ab ? ASSOC_GATE_M * ab.cost : Infinity,
+		ba ? ASSOC_GATE_M * ba.cost : Infinity
+	)
+}
+
+/** A pair made on the picture (columnMatch): the box that shows less than the body gets `feetBad` — measure() skips its feet. */
+function markHiddenFeet(a, b, planeZ) {
+	if (headMatch(a, b, planeZ) < Infinity) return
+	const ab = columnMatch(a, b, planeZ),
+		ba = columnMatch(b, a, planeZ)
+	if (ab?.feetBad && !ba?.feetBad) b.feetBad = true
+	else if (ba?.feetBad && !ab?.feetBad) a.feetBad = true
+}
+
 /** Observations → clusters ([obs…], ≤ 1 per camera), cameras in id order. */
 function associate(obs, gate = ASSOC_GATE_M, planeZ = 0) {
 	const byCam = new Map()
@@ -117,12 +141,13 @@ function associate(obs, gate = ASSOC_GATE_M, planeZ = 0) {
 		const centres = clusters.map(feetMean)
 		const pairs = assign(
 			centres.map((c, i) =>
-				list.map((o) => Math.min(dist2(c, o.feet), ...clusters[i].map((m) => headMatch(m, o, planeZ))))
+				list.map((o) => Math.min(dist2(c, o.feet), ...clusters[i].map((m) => pairCost(m, o, planeZ))))
 			),
 			gate
 		)
 		const used = new Set()
 		for (const [i, j] of pairs) {
+			if (dist2(centres[i], list[j].feet) > gate) for (const m of clusters[i]) markHiddenFeet(m, list[j], planeZ)
 			clusters[i].push(list[j])
 			used.add(j)
 		}
@@ -186,7 +211,7 @@ function measure(cl, planeZ = 0) {
 	const score = Math.max(...cl.map((o) => o.score))
 	const area = Math.max(...cl.map((o) => (o.box[2] - o.box[0]) * (o.box[3] - o.box[1])))
 	if (cl.length >= 2) {
-		const rays = cl.map((o) => o.ray).filter(Boolean)
+		const rays = cl.filter((o) => o.ray && !cutTop(o) && !o.feetBad).map((o) => o.ray)
 		const tri = rays.length >= 2 && maxRayAngle(rays) >= MIN_RAY_ANGLE_DEG ? triangulate(rays) : null
 		const hgt = tri ? tri.p[2] - planeZ : NaN
 		const [lo, hi] = cl.length === 2 && headMatch(cl[0], cl[1], planeZ) < Infinity ? HEAD_MATCH_HEIGHT_M : HEAD_HEIGHT_M
@@ -207,7 +232,8 @@ function measure(cl, planeZ = 0) {
 		let sw = 0,
 			sx = 0,
 			sy = 0
-		for (const o of cl) {
+		const good = cl.filter((o) => !o.feetBad)
+		for (const o of good.length ? good : cl) {
 			const wgt = 1 / monoSigma(o) ** 2
 			sw += wgt
 			sx += wgt * o.feet[0]
@@ -270,6 +296,7 @@ class Fusion {
 		this.tracks = []
 		this.nextId = 1
 		this.frames = new Map() // camera id → last frame used
+		this.spots = [] // fusion-still: where a vetoed track lost its box
 		this.lastAt = null
 	}
 
@@ -299,8 +326,11 @@ class Fusion {
 				if (o) obs.push(o)
 			}
 		}
+		const all = obs.slice()
+		for (const [t, o] of holdStill(this.tracks, obs)) this._update(t, measure([o], planeZ), now) // fusion-still: furniture keeps its box
 		const ms = associate(obs, ASSOC_GATE_M, planeZ).map((cl) => measure(cl, planeZ))
-		const cost = this.tracks.map((t) =>
+		const free = this.tracks.filter((t) => t.seen !== now && !t.still)
+		const cost = free.map((t) =>
 			ms.map((m) => {
 				const d = Math.hypot(t.ax.p - m.x, t.ay.p - m.y)
 				return m.keys.some((k) => t.keys.includes(k)) && d <= STICKY_MAX_M ? 0 : d
@@ -308,11 +338,15 @@ class Fusion {
 		)
 		const used = new Set()
 		for (const [i, j] of assign(cost, TRACK_GATE_M)) {
-			this._update(this.tracks[i], ms[j], now)
+			this._update(free[i], ms[j], now)
 			used.add(j)
 		}
-		ms.forEach((m, j) => used.has(j) || this._spawn(m, now))
-		for (const t of this.tracks) if (t.seen !== now) t.source = 'predicted'
+		ms.forEach((m, j) => used.has(j) || ((m.cameras.length > 1 || m.score >= SPAWN_MIN_SCORE) && this._spawn(m, now)))
+		const claimed = new Set(ms.flatMap((m) => (m.keys.length > 1 ? m.keys : [])))
+		for (const t of this.tracks) {
+			if (t.seen !== now) t.source = 'predicted'
+			else judgeStill(t, { fresh, obs: all, claimed, now, planeZ })
+		}
 		return true
 	}
 
@@ -332,6 +366,7 @@ class Fusion {
 			height: m.height,
 			seen: now,
 			born: now,
+			...stillStart(m, this.spots, now),
 			source: m.source,
 			cameras: m.cameras,
 			keys: m.keys,
@@ -341,34 +376,38 @@ class Fusion {
 	}
 
 	_prune(now) {
+		for (const t of this.tracks) if (now - t.seen > STALE_MS) rememberSpot(t, this.spots)
 		this.tracks = this.tracks.filter((t) => now - t.seen <= STALE_MS)
 		if (!this.tracks.length && this.lastAt !== null && now - this.lastAt > STALE_MS) this.frames.clear()
 	}
 
 	/**
 	 * World persons for clients / the pin: [{ id, x, y, vx, vy, height, source, cameras, keys, score, area, age_s }].
-	 * age_s is 0 for a person supported in the latest step (as the sidecar's boxes), else the time since its last support.
+	 * A track under the stand-still veto is left out. age_s is 0 for a person supported in the latest step (as the sidecar's boxes), else the time since its last support.
 	 */
 	persons(now) {
 		const r3 = (v) => Math.round(v * 1000) / 1000
-		return this.tracks.map((t) => ({
-			id: t.id,
-			x: r3(t.ax.p),
-			y: r3(t.ay.p),
-			vx: r3(t.ax.v),
-			vy: r3(t.ay.v),
-			height: t.height === null ? null : r3(t.height),
-			source: t.source,
-			cameras: t.cameras,
-			keys: t.keys,
-			score: t.score,
-			area: t.area,
-			age_s: t.seen === this.lastAt ? 0 : Math.max(0, (now - t.seen) / 1000), // 0 = supported in the latest step (sidecar semantics)
-		}))
+		return this.tracks
+			.filter((t) => !t.still)
+			.map((t) => ({
+				id: t.id,
+				x: r3(t.ax.p),
+				y: r3(t.ay.p),
+				vx: r3(t.ax.v),
+				vy: r3(t.ay.v),
+				height: t.height === null ? null : r3(t.height),
+				source: t.source,
+				cameras: t.cameras,
+				keys: t.keys,
+				score: t.score,
+				area: t.area,
+				age_s: t.seen === this.lastAt ? 0 : Math.max(0, (now - t.seen) / 1000), // 0 = supported in the latest step (sidecar semantics)
+			}))
 	}
 
 	reset() {
 		this.tracks = []
+		this.spots = []
 		this.frames.clear()
 		this.lastAt = null
 	}

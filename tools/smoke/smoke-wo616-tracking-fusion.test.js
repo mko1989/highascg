@@ -16,6 +16,8 @@ const { Fusion, associate, measure, triangulate, observe, headMatch, STALE_MS } 
 	path.join(ROOT, 'src', 'tracking', 'fusion')
 )
 const { project, applyDistortion, pixelRay, pixelToFloor } = require(path.join(ROOT, 'src', 'tracking', 'camera-model'))
+const { columnMatch } = require(path.join(ROOT, 'src', 'tracking', 'fusion-reproject'))
+const { STILL_AFTER_MS } = require(path.join(ROOT, 'src', 'tracking', 'fusion-still'))
 
 const W = 1920,
 	H = 1080
@@ -308,5 +310,104 @@ describe('WO-616 T10a fusion', () => {
 		}))
 		f.step({ cams, now: 0, planeZ: PLANE })
 		assert.equal(f.persons(0).length, 2)
+	})
+
+	// Two cameras facing each other along a 0.64 m riser (the venue layout the next cases were recorded on).
+	const PLANE = 0.64
+	const VA = {
+		id: 'cam_1',
+		raster: [W, H],
+		cam: { pos_x: 6.14, pos_y: 4.66, pos_z: 4.5, pitch: -28.4, yaw: 140.1, roll: 0, fov: 58.8, lens_k1: 0, lens_k2: 0 },
+	}
+	const VB = {
+		id: 'cam_2',
+		raster: [W, H],
+		cam: { pos_x: 6.47, pos_y: -10.34, pos_z: 4.59, pitch: -32.1, yaw: 46.8, roll: 0, fov: 67.6, lens_k1: 0, lens_k2: 0 },
+	}
+	/** Box of a body standing on the riser at (x, y), seen by `e`; `show` = [from, to] metres of the body that are visible. */
+	const bodyBox = (e, x, y, show = [0, HEIGHT]) => {
+		const [head, feet] = project(
+			e.cam,
+			[
+				[x, y, PLANE + show[1]],
+				[x, y, PLANE + show[0]],
+			],
+			W,
+			H
+		)
+		const cx = (head[0] + feet[0]) / 2 / W
+		return [cx - 0.025, head[1] / H, cx + 0.025, feet[1] / H]
+	}
+	const cam = (e, at, n, persons) => ({ id: e.id, entry: e, at, frame: n, persons })
+	const person = (tid, box, score = 0.8) => ({ tid, box, score, age_s: 0 })
+
+	it('feet hidden from one camera (behind a piano): still one person, placed by the camera that sees the feet', () => {
+		const a = observe(person(1, bodyBox(VA, 11.9, -2.2)), { id: VA.id, entry: VA }, PLANE)
+		const b = observe(person(2, bodyBox(VB, 11.9, -2.2, [0.9, HEIGHT])), { id: VB.id, entry: VB }, PLANE)
+		assert.ok(Math.hypot(a.feet[0] - b.feet[0], a.feet[1] - b.feet[1]) > 1, 'the hidden feet land over a metre off')
+		assert.equal(columnMatch(a, b, PLANE).feetBad, true)
+		const cl = associate([a, b], undefined, PLANE)
+		assert.equal(cl.length, 1)
+		const m = measure(cl[0], PLANE)
+		assert.ok(Math.hypot(m.x - 11.9, m.y + 2.2) < 0.15, `(${m.x.toFixed(2)}, ${m.y.toFixed(2)})`)
+		const other = observe(person(3, bodyBox(VB, 10.2, 1.5)), { id: VB.id, entry: VB }, PLANE)
+		assert.equal(columnMatch(a, other, PLANE), null, 'somebody else is not the same body')
+	})
+
+	it('stand-still veto: furniture one camera takes for a person is dropped; a walker and a presenter at it are kept', () => {
+		const f = new Fusion()
+		const lectern = bodyBox(VB, 10.2, 0.5, [0, 1.2])
+		let now = 0,
+			n = 0
+		const run = (ms, people) => {
+			for (const end = now + ms; now < end; now += 66) {
+				const ps = people(now)
+				f.step({ cams: [cam(VA, now, ++n, ps.a), cam(VB, now, n, [person(9, lectern, 0.6), ...ps.b])], now, planeZ: PLANE })
+			}
+		}
+		run(STILL_AFTER_MS - 500, () => ({ a: [], b: [] }))
+		assert.equal(f.persons(now).length, 1, 'shown at first')
+		run(1500, () => ({ a: [], b: [] }))
+		assert.equal(f.persons(now).length, 0, 'dropped: camera 1 sees the spot and nobody there')
+		// a walker crosses the stage past the lectern: one person, the lectern stays out
+		const t0 = now
+		const walk = (t) => [11.5, -6 + ((t - t0) / 1000) * 1.2]
+		let most = 0
+		run(8000, (t) => {
+			most = Math.max(most, f.persons(t).filter((p) => p.age_s === 0).length)
+			return { a: [person(1, bodyBox(VA, ...walk(t)))], b: [person(2, bodyBox(VB, ...walk(t)))] }
+		})
+		assert.equal(most, 1)
+		// a presenter steps up to the lectern; camera 2 now reports one box for both: the person is kept
+		const merged = bodyBox(VB, 10.2, 0.5)
+		const g = new Fusion()
+		for (now = 0, n = 0; now < 60000; now += 66) {
+			g.step({
+				cams: [cam(VA, now, ++n, [person(1, bodyBox(VA, 10.2, 0.5))]), cam(VB, now, n, [person(9, merged)])],
+				now,
+				planeZ: PLANE,
+			})
+			if (now > 1000) assert.equal(g.persons(now).length, 1, `presenter at ${now} ms`)
+		}
+		// one camera only: no second opinion, nothing is dropped
+		const h = new Fusion()
+		for (now = 0, n = 0; now < 2 * STILL_AFTER_MS; now += 66)
+			h.step({ cams: [cam(VB, now, ++n, [person(9, lectern, 0.6)])], now, planeZ: PLANE })
+		assert.equal(h.persons(now).length, 1)
+	})
+
+	it('one camera alone opens a person only above the spawn score; two cameras always do', () => {
+		const f = new Fusion()
+		f.step({ cams: [cam(VB, 0, 1, [person(4, bodyBox(VB, 11, -5), 0.15)])], now: 0, planeZ: PLANE })
+		assert.equal(f.persons(0).length, 0)
+		f.step({
+			cams: [
+				cam(VA, 66, 2, [person(1, bodyBox(VA, 11, -5), 0.2)]),
+				cam(VB, 66, 2, [person(4, bodyBox(VB, 11, -5), 0.15)]),
+			],
+			now: 66,
+			planeZ: PLANE,
+		})
+		assert.equal(f.persons(66).length, 1)
 	})
 })
