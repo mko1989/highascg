@@ -48,7 +48,7 @@ const SIGMA_MONO_BASE_M = 0.05
 const SIGMA_MONO_PER_M = 0.02
 const ACCEL_NOISE = 2.0 // m²/s³ white-acceleration spectral density
 const MAX_DT_S = 0.5
-const SPAWN_MIN_SCORE = 0.25 // one camera alone opens a person only above this (chair stacks and cases score 0.1–0.2); two cameras always do
+const SPAWN_MIN_SCORE = 0.35 // one camera alone opens a person only above this (chair stacks and cases score 0.1–0.3); two cameras always do
 
 const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1])
 
