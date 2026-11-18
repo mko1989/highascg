@@ -12,7 +12,7 @@ const assert = require('node:assert/strict')
 const path = require('node:path')
 
 const ROOT = path.join(__dirname, '..', '..')
-const { Fusion, associate, measure, triangulate, observe, STALE_MS } = require(
+const { Fusion, associate, measure, triangulate, observe, headMatch, STALE_MS } = require(
 	path.join(ROOT, 'src', 'tracking', 'fusion')
 )
 const { project, applyDistortion, pixelRay, pixelToFloor } = require(path.join(ROOT, 'src', 'tracking', 'camera-model'))
@@ -245,5 +245,68 @@ describe('WO-616 T10a fusion', () => {
 		cams[1].persons[0].age_s = 0.2
 		assert.equal(f.step({ cams, now: 0 }), true)
 		assert.equal(f.persons(0).length, 0)
+	})
+
+	// The venue case: the plane is a 0.64 m riser, the person stands on the hall floor beside it. Each camera's feet
+	// point is cast onto the riser plane, so it lands short along that camera's own view — metres apart for two
+	// cameras at opposite ends — while the head rays still meet.
+	it('a person beside the riser (feet under the plane) is one person, not one per camera', () => {
+		const PLANE = 0.64
+		const A = {
+			id: 'cam_1',
+			raster: [W, H],
+			cam: { pos_x: 6.14, pos_y: 4.66, pos_z: 4.5, pitch: -28.4, yaw: 140.1, roll: 0, fov: 58.8, lens_k1: 0, lens_k2: 0 },
+		}
+		const B = {
+			id: 'cam_2',
+			raster: [W, H],
+			cam: {
+				pos_x: 6.47,
+				pos_y: -10.34,
+				pos_z: 4.59,
+				pitch: -32.1,
+				yaw: 46.8,
+				roll: 0,
+				fov: 67.6,
+				lens_k1: 0,
+				lens_k2: 0,
+			},
+		}
+		const at = (x, y) => [A, B].map((e) => boxOf(e, x, y))
+		const two = [at(11, -8), at(10.2, -2)]
+		assert.ok(two.flat().every(Boolean), 'both cameras see both people')
+		const obs = two.flatMap((boxes, i) =>
+			boxes.map((box, k) =>
+				observe({ tid: i + 1, box, score: 0.8, age_s: 0 }, { id: [A, B][k].id, entry: [A, B][k] }, PLANE)
+			)
+		)
+		const [a1, b1] = obs
+		assert.ok(
+			Math.hypot(a1.feet[0] - b1.feet[0], a1.feet[1] - b1.feet[1]) > 1,
+			'the feet points disagree by over a metre'
+		)
+		assert.ok(headMatch(a1, b1, PLANE) < 0.75)
+		assert.equal(headMatch(a1, obs[3], PLANE), Infinity, 'two different people do not head-match')
+		const cl = associate(obs, undefined, PLANE)
+		assert.deepEqual(cl.map((c) => c.map((o) => o.tid).join('/')).sort(), ['1/1', '2/2'])
+		const m = measure(
+			cl.find((c) => c[0].tid === 1),
+			PLANE
+		)
+		assert.equal(m.triangulated, true)
+		assert.ok(
+			Math.hypot(m.x - 11, m.y + 8) < 0.25,
+			`placed at the head, not the feet mean (${m.x.toFixed(2)}, ${m.y.toFixed(2)})`
+		)
+		const f = new Fusion()
+		const cams = [A, B].map((e, k) => ({
+			id: e.id,
+			entry: e,
+			at: 0,
+			frame: 1,
+			persons: two.map((b, i) => ({ tid: i + 1, box: b[k], score: 0.8, age_s: 0 })),
+		}))
+		f.step({ cams, now: 0, planeZ: PLANE })
+		assert.equal(f.persons(0).length, 2)
 	})
 })

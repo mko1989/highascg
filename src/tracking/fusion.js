@@ -7,8 +7,11 @@
  *
  *   observe    each fresh box (matched this sidecar step) → feet point on the floor (monocular, depth-uncertain)
  *              + head ray (top-centre pixel through the solved camera, lens inverted).
- *   associate  cameras in id order; each camera's feet are Hungarian-matched to the clusters so far on floor
- *              distance (gate ASSOC_GATE_M); unmatched boxes open a cluster. A cluster holds ≤ 1 box per camera.
+ *   associate  cameras in id order; each camera's boxes are Hungarian-matched to the clusters so far — on floor
+ *              distance of the feet (gate ASSOC_GATE_M), or on their head rays meeting (headMatch): the feet point
+ *              assumes the stage plane and a whole box, so a person beside the stage, behind a monitor or cut by the
+ *              picture edge lands metres apart per camera (opposite cameras err in opposite directions) while
+ *              the head rays still cross. Unmatched boxes open a cluster. A cluster holds ≤ 1 box per camera.
  *   measure    2+ cameras: least-squares point nearest all head rays → x/y (precise) + height; refused (feet mean
  *              instead) when the rays are near-parallel, miss each other or give an implausible head height.
  *              1 camera: its feet point, with a sigma growing with the distance to the camera.
@@ -33,6 +36,11 @@ const FRAME_MAX_AGE_MS = 250
 const MIN_RAY_ANGLE_DEG = 8
 const MAX_RAY_GAP_M = 0.35
 const HEAD_HEIGHT_M = [0.9, 2.5]
+const HEAD_MATCH_HEIGHT_M = [0.2, 2.5] // above the plane, for pairing only: a person on the hall floor beside a riser, bent over
+const HEAD_MATCH_FEET_MISS_M = 0.5 // each camera's feet ray must pass this near the vertical under the head…
+const HEAD_MATCH_FLOOR_M = [-1.0, 0.3] // …at a floor level this far from the plane (the hall floor under a riser, never well above it)…
+const HEAD_MATCH_FLOOR_AGREE_M = 0.4 // …the same level for both cameras…
+const HEAD_MATCH_BODY_M = [0.8, 2.3] // …leaving a body of this height under the head
 const SIGMA_FUSED_M = 0.05
 const SIGMA_MONO_BASE_M = 0.05
 const SIGMA_MONO_PER_M = 0.02
@@ -61,8 +69,43 @@ function observe(p, c, planeZ) {
 	}
 }
 
+/**
+ * Do the head rays of two boxes (different cameras) meet at one head? → a cost on the feet-distance scale
+ * (0 … ASSOC_GATE_M as the rays' miss distance goes 0 … MAX_RAY_GAP_M), or Infinity. Head rays alone cross by
+ * chance (two cameras facing each other along a stage share most epipolar planes), so the feet must agree too: each
+ * camera's feet ray has to pass under the head, both at the same floor level, with a body's height in between.
+ */
+function headMatch(a, b, planeZ = 0) {
+	if (!a.ray || !b.ray || a.camera === b.camera) return Infinity
+	const rays = [a.ray, b.ray]
+	if (maxRayAngle(rays) < MIN_RAY_ANGLE_DEG) return Infinity
+	const tri = triangulate(rays)
+	if (!tri || tri.gap > MAX_RAY_GAP_M) return Infinity
+	const hgt = tri.p[2] - planeZ
+	if (!(hgt >= HEAD_MATCH_HEIGHT_M[0] && hgt <= HEAD_MATCH_HEIGHT_M[1])) return Infinity
+	const levels = [a, b].map((o) => floorUnder(o, tri.p, planeZ))
+	if (levels.some((z) => z === null || z - planeZ < HEAD_MATCH_FLOOR_M[0] || z - planeZ > HEAD_MATCH_FLOOR_M[1]))
+		return Infinity
+	if (Math.abs(levels[0] - levels[1]) > HEAD_MATCH_FLOOR_AGREE_M) return Infinity
+	const body = tri.p[2] - (levels[0] + levels[1]) / 2
+	if (body < HEAD_MATCH_BODY_M[0] || body > HEAD_MATCH_BODY_M[1]) return Infinity
+	return (ASSOC_GATE_M * tri.gap) / MAX_RAY_GAP_M
+}
+
+/** Height at which the feet ray of `o` (camera → its feet point on the plane) passes under the head `p`; null when it misses. */
+function floorUnder(o, p, planeZ) {
+	const c = o.ray.o
+	const dx = o.feet[0] - c[0],
+		dy = o.feet[1] - c[1]
+	const len2 = dx * dx + dy * dy
+	if (len2 < 1e-9) return null
+	const t = ((p[0] - c[0]) * dx + (p[1] - c[1]) * dy) / len2
+	if (Math.hypot(c[0] + t * dx - p[0], c[1] + t * dy - p[1]) > HEAD_MATCH_FEET_MISS_M) return null
+	return c[2] + t * (planeZ - c[2])
+}
+
 /** Observations → clusters ([obs…], ≤ 1 per camera), cameras in id order. */
-function associate(obs, gate = ASSOC_GATE_M) {
+function associate(obs, gate = ASSOC_GATE_M, planeZ = 0) {
 	const byCam = new Map()
 	for (const o of obs) {
 		if (!byCam.has(o.camera)) byCam.set(o.camera, [])
@@ -73,7 +116,9 @@ function associate(obs, gate = ASSOC_GATE_M) {
 		const list = byCam.get(cam)
 		const centres = clusters.map(feetMean)
 		const pairs = assign(
-			centres.map((c) => list.map((o) => dist2(c, o.feet))),
+			centres.map((c, i) =>
+				list.map((o) => Math.min(dist2(c, o.feet), ...clusters[i].map((m) => headMatch(m, o, planeZ))))
+			),
 			gate
 		)
 		const used = new Set()
@@ -144,7 +189,8 @@ function measure(cl, planeZ = 0) {
 		const rays = cl.map((o) => o.ray).filter(Boolean)
 		const tri = rays.length >= 2 && maxRayAngle(rays) >= MIN_RAY_ANGLE_DEG ? triangulate(rays) : null
 		const hgt = tri ? tri.p[2] - planeZ : NaN
-		if (tri && tri.gap <= MAX_RAY_GAP_M && hgt >= HEAD_HEIGHT_M[0] && hgt <= HEAD_HEIGHT_M[1]) {
+		const [lo, hi] = cl.length === 2 && headMatch(cl[0], cl[1], planeZ) < Infinity ? HEAD_MATCH_HEIGHT_M : HEAD_HEIGHT_M
+		if (tri && tri.gap <= MAX_RAY_GAP_M && hgt >= lo && hgt <= hi) {
 			return {
 				x: tri.p[0],
 				y: tri.p[1],
@@ -253,7 +299,7 @@ class Fusion {
 				if (o) obs.push(o)
 			}
 		}
-		const ms = associate(obs).map((cl) => measure(cl, planeZ))
+		const ms = associate(obs, ASSOC_GATE_M, planeZ).map((cl) => measure(cl, planeZ))
 		const cost = this.tracks.map((t) =>
 			ms.map((m) => {
 				const d = Math.hypot(t.ax.p - m.x, t.ay.p - m.y)
@@ -332,6 +378,7 @@ module.exports = {
 	Fusion,
 	observe,
 	associate,
+	headMatch,
 	measure,
 	triangulate,
 	STALE_MS,
