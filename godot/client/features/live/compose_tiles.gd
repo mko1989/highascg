@@ -50,6 +50,7 @@ var _msg_until := 0
 var atlas := {}  # WO-597 §D: {w, h, slots: {cell id: {x, y, w, h} fractions}} while the server packs the windows
 var _crops: Array[TextureRect] = []
 var _asked_atlas := false
+var _fetched := false  # the first layout fetch is done — later WS connects are reconnects
 var pan := 0.0  # WO-648: px the overflowing canvas is scrolled (TM.width_fit)
 var times := false  # WO-652: per-layer media / playlist times over each window (live_tab's Times toggle)
 var osc: Node  # the live tab's OscMirror; its `updated` redraws while `times` is on
@@ -77,6 +78,10 @@ func _ready() -> void:
 	_retile_timer.timeout.connect(_retile)
 	add_child(_retile_timer)
 	Ws.message.connect(_on_ws)
+	# A server restart re-packs the atlas and its boot broadcast finds no client: refetch, or the windows crop OLD slots.
+	Ws.connected.connect(func() -> void:
+		if _fetched:
+			refresh())
 	visibility_changed.connect(func() -> void:
 		if is_visible_in_tree():
 			refresh())
@@ -93,6 +98,7 @@ func _ready() -> void:
 
 func refresh() -> void:
 	var g: Dictionary = await Api.get_json("/api/operator-gui/layout")
+	_fetched = true
 	if g.ok and g.data is Dictionary and g.data.get("cells") is Array:
 		_take(g.data.cells, true)
 		_set_atlas(g.data.get("atlas"))
