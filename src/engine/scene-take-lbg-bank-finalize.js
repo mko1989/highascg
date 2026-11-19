@@ -12,7 +12,7 @@ const {
 	clearPhysicalLookLayers,
 	clearStaleInactiveBankLookLayers,
 } = require('./scene-exit-layers')
-const { keptLayerSwapLines, vacatedOverlayClearLines } = require('./scene-take-edit-on-air') // WO-1073
+const { keptLayerMoveLines } = require('./scene-take-carry') // WO-218 / WO-1073 / WO-1126
 
 /**
  * @param {object} amcp
@@ -42,24 +42,13 @@ async function finalizeTakeBankState(amcp, c) {
 	// to avoid split-brain (producer on old bank, mixer state on new bank).
 	// This MUST run BEFORE the pointer flip and BEFORE clearStaleInactiveBankLookLayers.
 	const shouldFlipBank = !isMergeTransition && (takeJobs.length > 0 || mergeMixerExtras.length > 0) && !banklessTake
-	if (shouldFlipBank && skippedVisuallyEqualLayers.length > 0) {
-		const swapLines = []
-		for (const skipped of skippedVisuallyEqualLayers) {
-			const fromPhys = skipped.physicalLayerNow // old bank, currently active
-			const toPhys = phys(skipped.layerNumber, inactiveBank) // new bank (inactive), target
-			// WO-1073: an edit-on-air take already swapped it inside its PLAY batch
-			if (fromPhys !== toPhys && !skipped.swappedEarly) {
-				// SWAP <ch>-<from> <ch>-<to> TRANSFORMS (TRANSFORMS preserves mixer state across the swap); WO-1073: its PIP
-				// overlay slots move with it (slot = f(physical layer)) — left behind, the layer's exit never cleared them
-				swapLines.push(...keptLayerSwapLines(channel, skipped, toPhys))
-			}
-		}
-		if (swapLines.length > 0) {
-			try {
-				await amcp.batchSend(swapLines)
-			} catch (e) {
-				self.log?.('warn', `[scene-take-lbg] WO-218 SWAP for skipped layers failed: ${e?.message || e}`)
-			}
+	// WO-1126: without a flip, carried stills still move to this look's layer numbers (chains are ordered there)
+	const { swapLines, clearLines } = keptLayerMoveLines({ channel, skipped: skippedVisuallyEqualLayers, flips: shouldFlipBank, phys, inactiveBank })
+	if (swapLines.length > 0) {
+		try {
+			await amcp.batchSend(swapLines)
+		} catch (e) {
+			self.log?.('warn', `[scene-take-lbg] WO-218 SWAP for skipped layers failed: ${e?.message || e}`)
 		}
 	}
 
@@ -71,22 +60,11 @@ async function finalizeTakeBankState(amcp, c) {
 
 	// WO-218 T218.3: Clean up mixer state on the bank layers we just swapped FROM,
 	// so no stale CROP/FILL remains on the vacated layer for the next take.
-	if (shouldFlipBank && skippedVisuallyEqualLayers.length > 0) {
-		const clearLines = []
-		for (const skipped of skippedVisuallyEqualLayers) {
-			const fromPhys = skipped.physicalLayerNow // old bank (now inactive after flip)
-			const toPhys = phys(skipped.layerNumber, inactiveBank) // new bank (now active after flip)
-			if (fromPhys !== toPhys) {
-				// Clear mixer state on the old bank layer (now inactive)
-				clearLines.push(`MIXER ${channel}-${fromPhys} CLEAR`, ...vacatedOverlayClearLines(channel, skipped))
-			}
-		}
-		if (clearLines.length > 0) {
-			try {
-				await amcp.batchSendChunked(clearLines, { skipMixerPreCommit: true })
-			} catch (e) {
-				self.log?.('warn', `[scene-take-lbg] WO-218 MIXER CLEAR for vacated layers failed: ${e?.message || e}`)
-			}
+	if (clearLines.length > 0) {
+		try {
+			await amcp.batchSendChunked(clearLines, { skipMixerPreCommit: true })
+		} catch (e) {
+			self.log?.('warn', `[scene-take-lbg] WO-218 MIXER CLEAR for vacated layers failed: ${e?.message || e}`)
 		}
 	}
 

@@ -74,7 +74,7 @@ function playLinesForCrossfadeJob(self, job, fadeCtx) {
 	if (!job.playPlan) return []
 	logPlannedCommand(self, 'play', job.layer.layerNumber, job.playPlan)
 	const cl = `${job.playPlan.channel}-${job.playPlan.layer}`
-	const lines = [`PLAY ${cl}`]
+	const lines = [...(job.swapBeforePlay || []), `PLAY ${cl}`] // WO-1126: carried stills' SWAP rides the PLAY batch
 	const routeLayer = isRouteClip(job.clip)
 	if (job.incomingStartsHidden) {
 		if (routeLayer && fadeCtx) {

@@ -181,7 +181,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		`[scene-take-lbg] merge=${isMergeTransition} shouldRunBankCrossfade=${shouldRunBankCrossfade} fadeDur=${fadeDur} currentMapSize=${currentMap.size}`,
 	)
 
-	const { takeJobs, extraExitCandidates, timelineFadeInPhys, skippedVisuallyEqualLayers } = await buildTakeJobs({
+	const { takeJobs, extraExitCandidates, timelineFadeInPhys, skippedVisuallyEqualLayers, carriedSources } = await buildTakeJobs({
 		incomingSorted,
 		currentMap,
 		channel,
@@ -194,8 +194,8 @@ async function runSceneTakeLbg(amcp, opts) {
 		shouldRunBankCrossfade,
 		forceCut,
 		isMergeTransition,
-		globalT,
-		framerate,
+		globalT, framerate,
+		carryStills: !isMergeTransition && activeBank !== inactiveBank && !opts.editOnAir && opts.currentScene?.id !== incoming.id, // WO-1126
 		skipLayerVisualEquality: !!opts.skipLayerVisualEquality,
 		keepRelativeLayers: !!opts.keepRelativeLayers, // WO-956
 		editOnAir: !!opts.editOnAir, // WO-1073: only the edit paths (routes-scene-take.js checks the look is still on air)
@@ -259,7 +259,7 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	const seenExitLayerNums = new Set()
 	const exitMedia = exitCandidates.filter((l) => {
-		if (!layerHasContent(l) || String(l.source?.type || '') === 'timeline') return false
+		if (!layerHasContent(l) || String(l.source?.type || '') === 'timeline' || carriedSources.has(l)) return false // WO-1126: a carried still stays
 		const ln = Number(l.layerNumber)
 		if (!Number.isFinite(ln)) return true
 		if (seenExitLayerNums.has(ln)) return false
@@ -357,6 +357,7 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	// WO-1073: an edit on a banked PGM moves its kept layers to the new bank in the PLAY batch (no stacking inversion)
 	if (opts.editOnAir && !banklessTake && !isMergeTransition) require('./scene-take-edit-on-air').attachEditSwapsToPlayBatch({ channel, takeJobs, skipped: skippedVisuallyEqualLayers, phys, inactiveBank })
+	require('./scene-take-carry').attachCarrySwapsToPlayBatch({ channel, takeJobs, skipped: skippedVisuallyEqualLayers, phys, inactiveBank }) // WO-1126
 	const fadeClockRef = { start: fadeClockStart }
 	await runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, {
 		self,

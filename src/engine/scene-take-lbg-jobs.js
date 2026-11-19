@@ -26,6 +26,7 @@ const {
 const { resolvePlaySeekFramesForSceneLayer, resolvePlayInFramesForSceneLayer } = require('./scene-play-seek')
 const { resolveTakeVolumeForSceneLayer } = require('./live-input-audio-policy')
 const edit = require('./scene-take-edit-on-air') // WO-1073
+const { planCarriedStills } = require('./scene-take-carry') // WO-1126
 
 async function buildTakeJobs(opts) {
 	const {
@@ -50,6 +51,7 @@ async function buildTakeJobs(opts) {
 		restrictTimelineToPreview = false,
 		deferTimelinePlay = false,
 		holdTemplates = false,
+		carryStills = false, // WO-1126: a still both looks show the same way stays on air, whatever its layer number
 	} = opts
 
 	const takeJobs = []
@@ -58,8 +60,24 @@ async function buildTakeJobs(opts) {
 	const timelineFadeInPhys = []
 	/** WO-218: Layers skipped as visually-equal that may need SWAP when bank flips. */
 	const skippedVisuallyEqualLayers = []
+	const carried = planCarriedStills({ enabled: carryStills, incomingSorted, currentMap, self })
 
 	for (const layer of incomingSorted) {
+		const carriedFrom = carried.from.get(layer.layerNumber)
+		if (carriedFrom) {
+			// WO-1126: already on air (on `carriedFrom`'s layer) — no job; it moves to this look's layer by SWAP
+			self.log?.('info', `[buildTakeJobs] layer ${layer.layerNumber} stays on air (same still, was layer ${carriedFrom.layerNumber})`)
+			skippedVisuallyEqualLayers.push({
+				layerNumber: layer.layerNumber,
+				physicalLayerNow: phys(Number(carriedFrom.layerNumber), activeBank),
+				stayPhys: phys(Number(layer.layerNumber), activeBank),
+				incomingLayer: layer,
+				carried: true,
+			})
+			const replaced = currentMap.get(layer.layerNumber) // what this number showed, unless that was carried away too
+			if (layerHasContent(replaced) && String(replaced.source?.type || '') !== 'timeline') extraExitCandidates.push(replaced)
+			continue
+		}
 		if (layer.source && layer.source.type === 'timeline') {
 			if (editOnAir && edit.editTimelineStays(currentMap.get(layer.layerNumber), layer, self)) {
 				self.log?.('info', `[buildTakeJobs] layer ${layer.layerNumber} keeps running (edit on air, timeline unchanged)`)
@@ -447,7 +465,7 @@ async function buildTakeJobs(opts) {
 		})
 	}
 
-	return { takeJobs, extraExitCandidates, timelineFadeInPhys, skippedVisuallyEqualLayers }
+	return { takeJobs, extraExitCandidates, timelineFadeInPhys, skippedVisuallyEqualLayers, carriedSources: carried.sources }
 }
 
 module.exports = { buildTakeJobs }

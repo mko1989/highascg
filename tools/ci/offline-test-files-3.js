@@ -263,6 +263,7 @@ module.exports = [
 	'tools/smoke/smoke-wo1072-console-match.test.js',
 	'tools/smoke/smoke-wo1073-pgm-edit-seamless.test.js',
 	'tools/smoke/smoke-wo1075-pgm-only-cut-no-gap.test.js',
+	'tools/smoke/smoke-wo1126-carried-stills.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-ground.test.js',
 	'tools/smoke/smoke-wo1074-rc-client-toy.test.js',
 	'tools/smoke/smoke-wo1074-rc-server-tunnel.test.js',
