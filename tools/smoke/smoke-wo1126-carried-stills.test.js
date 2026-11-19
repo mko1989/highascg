@@ -1,7 +1,8 @@
 'use strict'
 
 /**
- * WO-1126 — a still both looks show the same way stays on air through the take, whatever its layer number.
+ * WO-1126 — a kept layer sits in the right place of the stack while the banks cross-fade, and a still both looks show
+ * the same way stays on air through the take, whatever its layer number.
  *
  * Owner 19.11: "when moving from look FastTrack to TLO BAZWE there are png logos on top layers that do a fade out and
  * fade in where they shouldnt be affected at all by the transition". The logos sat on L12 / L13 in one look and on
@@ -84,15 +85,15 @@ describe('WO-1126: stills that only change layer number stay on air', () => {
 		assert.equal(self.programLayerBankByChannel[1], 'b')
 	})
 
-	it('TŁO BAZWE → FastTrack from bank b (down): logos stay on 111 / 112 through the fade, SWAP to 12 / 13 after', async () => {
+	it('TŁO BAZWE → FastTrack from bank b (down): everything kept joins bank a in the PLAY batch, under nothing', async () => {
 		const { lines, self } = await take(tlo, fastTrack, 'b')
 		const play = lines.findIndex((l) => /^PLAY 1-11\b/.test(l))
-		const s1 = lines.indexOf('SWAP 1-111 1-12 TRANSFORMS')
-		const s2 = lines.indexOf('SWAP 1-112 1-13 TRANSFORMS')
-		assert.ok(play >= 0 && s1 > play && s2 > play, `SWAPs after the take: ${JSON.stringify(lines)}`)
-		assert.deepEqual(touches(lines, 111), [], 'logo: no fade, no stop')
-		assert.deepEqual(touches(lines, 112), [], 'nazwa: no fade, no stop')
-		assert.ok(lines.includes('MIXER 1-11 OPACITY 1 5 linear'), 'the list layer fades in under them')
+		for (const sw of ['SWAP 1-110 1-10 TRANSFORMS', 'SWAP 1-111 1-12 TRANSFORMS', 'SWAP 1-112 1-13 TRANSFORMS']) {
+			const i = lines.indexOf(sw)
+			assert.ok(i >= 0 && i < play, `${sw} rides the PLAY batch: ${JSON.stringify(lines)}`)
+		}
+		assert.ok(!lines.some((l) => /^MIXER 1-1(11|12|2|3) OPACITY 0 5/.test(l)), 'no fade-out on a logo')
+		assert.ok(lines.includes('MIXER 1-11 OPACITY 1 5 linear'), 'the list layer fades in')
 		assert.equal(self.programLayerBankByChannel[1], 'a')
 	})
 
@@ -115,6 +116,34 @@ describe('WO-1126: stills that only change layer number stay on air', () => {
 		const clip = (n) => ({ layerNumber: n, source: { type: 'media', value: 'clip.mp4' } })
 		const v = await take({ id: 'A', defaultTransition: T, layers: [clip(12)] }, { id: 'B', defaultTransition: T, layers: [clip(11)] }, 'a')
 		assert.ok(v.lines.some((l) => /^LOADBG 1-111 /.test(l)) && !v.lines.some((l) => /^SWAP /.test(l)), JSON.stringify(v.lines))
+	})
+
+	describe('stack order while the banks cross-fade (the reason the logos faded out and popped back)', () => {
+		const A = { id: 'A', defaultTransition: T, layers: [bg, still(11, 'x.png', 0.3)] }
+		const B = { id: 'B', defaultTransition: T, layers: [bg, still(11, 'y.png', 0.3)] }
+
+		it('kept background on bank b, new look on bank a: the background moves under it WITH the PLAY', async () => {
+			const { lines } = await take(A, B, 'b')
+			const sw = lines.indexOf('SWAP 1-110 1-10 TRANSFORMS')
+			const play = lines.findIndex((l) => /^PLAY 1-11\b/.test(l))
+			assert.ok(sw >= 0 && play >= 0 && sw < play, `110 would cover 11 for the whole fade: ${JSON.stringify(lines)}`)
+			assert.equal(lines.filter((l) => l === 'SWAP 1-110 1-10 TRANSFORMS').length, 1, 'moved once')
+			assert.ok(lines.includes('MIXER 1-111 OPACITY 0 5 linear'), 'the outgoing still fades out over the new one')
+		})
+
+		it('kept background on bank a, new look on bank b: it is already under everything — moved after the teardown', async () => {
+			const { lines } = await take(A, B, 'a')
+			const sw = lines.indexOf('SWAP 1-10 1-110 TRANSFORMS')
+			assert.ok(sw > lines.findIndex((l) => /^PLAY 1-111\b/.test(l)) && sw > lines.indexOf('STOP 1-11'), JSON.stringify(lines))
+		})
+
+		it('kept TOP layer on bank a, changed layer under it lands on bank b: the top layer goes up with the PLAY', async () => {
+			const top = { layerNumber: 12, source: { type: 'media', value: 'top.mp4' }, loop: true, startBehaviour: 'relativeToPrevious' }
+			const { lines } = await take({ ...A, layers: [...A.layers, top] }, { ...B, layers: [...B.layers, top] }, 'a')
+			const sw = lines.indexOf('SWAP 1-12 1-112 TRANSFORMS')
+			assert.ok(sw >= 0 && sw < lines.findIndex((l) => /^PLAY 1-111\b/.test(l)), JSON.stringify(lines))
+			assert.ok(lines.indexOf('SWAP 1-10 1-110 TRANSFORMS') > lines.indexOf('STOP 1-11'), 'the background stays under, moved after')
+		})
 	})
 
 	it('two stills trading places need one SWAP', () => {

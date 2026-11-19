@@ -357,7 +357,7 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	// WO-1073: an edit on a banked PGM moves its kept layers to the new bank in the PLAY batch (no stacking inversion)
 	if (opts.editOnAir && !banklessTake && !isMergeTransition) require('./scene-take-edit-on-air').attachEditSwapsToPlayBatch({ channel, takeJobs, skipped: skippedVisuallyEqualLayers, phys, inactiveBank })
-	require('./scene-take-carry').attachCarrySwapsToPlayBatch({ channel, takeJobs, skipped: skippedVisuallyEqualLayers, phys, inactiveBank }) // WO-1126
+	require('./scene-take-carry').attachKeptSwapsToPlayBatch({ channel, takeJobs, skipped: skippedVisuallyEqualLayers, phys, activeBank, inactiveBank, isMergeTransition }) // WO-1126
 	const fadeClockRef = { start: fadeClockStart }
 	await runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, {
 		self,

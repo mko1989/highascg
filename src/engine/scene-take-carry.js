@@ -78,15 +78,27 @@ function planCarriedStills({ enabled, incomingSorted, currentMap, self }) {
 	return { from, sources }
 }
 
-/** Up a bank: carried stills ride the PLAY batch (first job with a PLAY). Edit on air keeps its own rule (WO-1073). */
-function attachCarrySwapsToPlayBatch({ channel, takeJobs, skipped, phys, inactiveBank }) {
+/**
+ * Where a kept layer sits while the two banks cross-fade. Bank b (110+) is drawn over ALL of bank a, so a layer left
+ * on the outgoing bank is right against the outgoing look only:
+ *   - outgoing on b, incoming on a: it covers every incoming layer, also the ones the new look puts ABOVE it;
+ *   - outgoing on a, incoming on b: it is under every incoming layer, also the ones the new look puts BELOW it.
+ * In those two cases it joins the incoming bank on the frame of the PLAY (SWAP in the PLAY batch): there the stack is
+ * the new look's own order. Otherwise it moves after the teardown (WO-218). Decisions are monotone in the layer number,
+ * so two kept layers never trade places.
+ */
+function attachKeptSwapsToPlayBatch({ channel, takeJobs, skipped, phys, activeBank, inactiveBank, isMergeTransition }) {
+	if (isMergeTransition || activeBank === inactiveBank) return
 	const first = (takeJobs || []).find((j) => j.playPlan)
-	const carried = (skipped || []).filter((s) => s.carried)
-	if (!first || carried.length === 0 || inactiveBank !== 'b') return
+	if (!first) return
+	const jobNums = takeJobs.map((j) => Number(j.layer.layerNumber)).filter(Number.isFinite)
 	const lines = []
-	for (const sk of carried) {
-		const toPhys = phys(sk.layerNumber, inactiveBank)
-		if (sk.physicalLayerNow === toPhys) continue
+	for (const sk of skipped || []) {
+		const n = Number(sk.layerNumber)
+		const toPhys = phys(n, inactiveBank)
+		if (sk.swappedEarly || sk.physicalLayerNow === toPhys) continue
+		const wrongIfLeft = activeBank === 'b' ? jobNums.some((x) => x > n) : jobNums.some((x) => x < n)
+		if (!wrongIfLeft) continue
 		lines.push(...keptLayerSwapLines(channel, sk, toPhys))
 		sk.swappedEarly = true
 	}
@@ -130,4 +142,4 @@ function keptLayerMoveLines({ channel, skipped, flips, phys, inactiveBank }) {
 	return { swapLines, clearLines }
 }
 
-module.exports = { planCarriedStills, attachCarrySwapsToPlayBatch, keptLayerMoveLines }
+module.exports = { planCarriedStills, attachKeptSwapsToPlayBatch, keptLayerMoveLines }
