@@ -54,6 +54,10 @@ Detect; tools/tracking-detect/install.sh, setup-venv.sh, export-models.sh, fetch
   NumPy — https://numpy.org — Copyright NumPy Developers. License: BSD-3-Clause.
   protobuf (BSD-3-Clause), flatbuffers (Apache-2.0), packaging (Apache-2.0 / BSD-2-Clause) — ONNX Runtime's
   dependencies.
+  On a machine with an NVIDIA GPU (WO-1127) the GPU build of ONNX Runtime (onnxruntime-gpu, MIT) is installed
+  instead, with NVIDIA's CUDA runtime, cuBLAS, cuFFT, cuRAND, NVRTC, nvJitLink and cuDNN wheels from pypi.org —
+  Copyright NVIDIA Corporation, NVIDIA Software License Agreement / cuDNN SLA (proprietary; downloaded per machine,
+  NOT shipped).
   pip — https://pip.pypa.io — License: MIT (get-pip.py from https://bootstrap.pypa.io when the system Python has
   no ensurepip).
 

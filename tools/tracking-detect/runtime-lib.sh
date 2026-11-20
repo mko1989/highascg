@@ -99,6 +99,28 @@ need_python() {
 	python3 -c 'import venv' 2>/dev/null || fail 12 "python3 has no venv module" "sudo apt install python3-venv"
 }
 
+# WO-1127: which core requirements file this machine gets → sets CORE_REQ + CORE_FLAVOUR (gpu | cpu).
+# HIGHASCG_TRACKING_GPU=1 / 0 forces it; otherwise gpu when an offline wheel folder ($1) carries the GPU wheel, or —
+# online — when the NVIDIA driver answers (nvidia-smi -L). The GPU wheels bring their own CUDA / cuDNN.
+core_requirements() {
+	local src="${1:-}" want="${HIGHASCG_TRACKING_GPU:-auto}"
+	if [[ "$want" == auto ]]; then
+		want=0
+		if [[ -n "$src" ]]; then
+			ls "$src"/onnxruntime_gpu-*.whl >/dev/null 2>&1 && want=1
+		elif nvidia-smi -L >/dev/null 2>&1; then
+			want=1
+		fi
+	fi
+	if [[ "$want" == 1 ]]; then
+		CORE_FLAVOUR=gpu
+		CORE_REQ="$TD_HERE/requirements-gpu.txt"
+	else
+		CORE_FLAVOUR=cpu
+		CORE_REQ="$TD_HERE/requirements.txt"
+	fi
+}
+
 # dl URL OUT [TOP] — resumable download (OUT.part, curl -C -) with @@ pct 0…TOP (default 100) while it runs; skips an
 # existing OUT
 dl() {

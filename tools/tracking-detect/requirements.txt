@@ -1,4 +1,4 @@
-# WO-616 T9 tracking sidecar runtime (CPU onnxruntime; swap for onnxruntime-gpu to use CUDAExecutionProvider)
+# WO-616 T9 tracking sidecar runtime, CPU onnxruntime (a machine with an NVIDIA GPU gets requirements-gpu.txt, WO-1127)
 numpy==2.5.4
 onnxruntime==1.31.0
 opencv-python-headless==5.0.0.93

@@ -52,5 +52,5 @@
 		"agpl": "https://www.gnu.org/licenses/agpl-3.0.html",
 		"opencv_zoo": "https://github.com/opencv/opencv_zoo"
 	},
-	"space_mb": { "core": 700, "export": 3000, "face": 300 }
+	"space_mb": { "core": 700, "core_gpu": 4500, "export": 3000, "face": 300 }
 }

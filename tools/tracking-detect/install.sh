@@ -36,8 +36,11 @@ done
 export HIGHASCG_TRACKING_DRY_RUN="$DRY"
 trap on_term TERM INT
 take_lock
-SPACE="$(python3 -c 'import json,sys; s=json.load(open(sys.argv[1]))["space_mb"]; print(s["core"], s["export"], s["face"])' "$TD_HERE/features.json")"
-read -r SPACE_CORE SPACE_EXPORT SPACE_FACE <<<"$SPACE"
+SPACE="$(python3 -c 'import json,sys; s=json.load(open(sys.argv[1]))["space_mb"]; print(s["core"], s["core_gpu"], s["export"], s["face"])' "$TD_HERE/features.json")"
+read -r SPACE_CORE SPACE_CORE_GPU SPACE_EXPORT SPACE_FACE <<<"$SPACE"
+# WO-1127: the GPU build of ONNX Runtime brings its CUDA libraries — several GB instead of a few hundred MB
+if [[ "$MODE" == from ]]; then core_requirements "$DIR/wheels"; else core_requirements; fi
+[[ "$CORE_FLAVOUR" == gpu ]] && SPACE_CORE="$SPACE_CORE_GPU"
 YOLO=()
 while IFS= read -r m; do [[ -n "$m" ]] && YOLO+=("${m%.onnx}"); done < <(feature_models "$FEATURES" ultralytics)
 FACE=0
@@ -68,7 +71,8 @@ export)
 	run mkdir -p "$OUT/wheels" "$OUT/models"
 	if ! ls "$WHEELS"/numpy-*.whl >/dev/null 2>&1; then
 		need_net https://pypi.org/simple/pip/
-		PIP_PCT="5 30" pip_run "$VENV/bin/python" download --dest "$WHEELS" -r "$TD_HERE/requirements.txt" pip || fail 14 "pip could not download the wheels"
+		core_requirements
+		PIP_PCT="5 30" pip_run "$VENV/bin/python" download --dest "$WHEELS" -r "$CORE_REQ" pip || fail 14 "pip could not download the wheels"
 	fi
 	run cp -f "$WHEELS"/*.whl "$OUT/wheels/"
 	pct 30

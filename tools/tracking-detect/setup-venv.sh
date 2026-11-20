@@ -25,7 +25,8 @@ trap on_term TERM INT
 take_lock
 
 need_python
-step core "Python packages (numpy, OpenCV, ONNX Runtime)"
+core_requirements "$SRC"
+step core "Python packages (numpy, OpenCV, ONNX Runtime${CORE_FLAVOUR/#cpu/}${CORE_FLAVOUR/#gpu/ for the NVIDIA GPU})"
 if [[ -z "$SRC" ]]; then
 	need_tool curl curl
 fi
@@ -41,11 +42,23 @@ if [[ -n "$SRC" ]]; then
 	[[ "$SRC" -ef "$WHEELS" ]] || run cp -f "$SRC"/*.whl "$WHEELS"/ || fail 30 "no wheels in $SRC"
 else
 	# the wheelhouse for THIS interpreter (a Python upgrade makes the old cp3xx wheels useless) + pip itself for bundles
-	PIP_PCT="20 70" pip_run "$VENV/bin/python" download --dest "$WHEELS" -r "$TD_HERE/requirements.txt" pip \
-		|| fail 14 "pip could not download the packages (see the log above)"
+	if ! PIP_PCT="20 70" pip_run "$VENV/bin/python" download --dest "$WHEELS" -r "$CORE_REQ" pip; then
+		[[ "$CORE_FLAVOUR" == gpu ]] || fail 14 "pip could not download the packages (see the log above)"
+		echo "the GPU packages could not be downloaded: installing the CPU ones instead (detection then runs on the CPU)"
+		HIGHASCG_TRACKING_GPU=0 core_requirements
+		PIP_PCT="20 70" pip_run "$VENV/bin/python" download --dest "$WHEELS" -r "$CORE_REQ" pip \
+			|| fail 14 "pip could not download the packages (see the log above)"
+	fi
 fi
 pct 70
-PIP_PCT="70 95" pip_run "$VENV/bin/python" install --no-index --find-links "$WHEELS" -r "$TD_HERE/requirements.txt" \
+# onnxruntime and onnxruntime-gpu install the same module: the other flavour goes first (a no-op when it is not there)
+OTHER=onnxruntime-gpu
+[[ "$CORE_FLAVOUR" == gpu ]] && OTHER=onnxruntime
+if ! dry && "$VENV/bin/python" -m pip show "$OTHER" >/dev/null 2>&1; then
+	echo "switching ONNX Runtime to the $CORE_FLAVOUR build"
+	"$VENV/bin/python" -m pip uninstall -y --disable-pip-version-check "$OTHER" >/dev/null
+fi
+PIP_PCT="70 95" pip_run "$VENV/bin/python" install --no-index --find-links "$WHEELS" -r "$CORE_REQ" \
 	|| fail 14 "pip could not install the packages from $WHEELS — they may be for another Python (this one is $SYS_PY_VER)"
 pct 95
 if ! dry; then

@@ -21,12 +21,7 @@ MIN_IOU = 0.4
 
 class PoseBackend:
     def __init__(self, model_path, threads=2):
-        import onnxruntime as ort
-
-        opts = ort.SessionOptions()
-        opts.intra_op_num_threads = threads
-        self.session = ort.InferenceSession(model_path, sess_options=opts,
-            providers=detector.select_providers(ort.get_available_providers()))
+        self.session = detector.make_session(model_path, threads)
         inp = self.session.get_inputs()[0]
         self.input_name = inp.name
         self.output_name = self.session.get_outputs()[0].name

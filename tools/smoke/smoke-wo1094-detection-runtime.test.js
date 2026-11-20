@@ -289,3 +289,39 @@ describe('WO-1094: never distributed (owner: "we cant bake anything into iso tha
 			assert.ok(n.includes(w), w)
 	})
 })
+
+describe('WO-1127: detection runs on the NVIDIA GPU when the machine has one', () => {
+	const lib = path.join(ROOT, 'tools', 'tracking-detect', 'runtime-lib.sh')
+	const pick = (env, arg = '') => execFileSync('bash', ['-c', `source "${lib}"; core_requirements ${arg}; echo "$CORE_FLAVOUR $(basename "$CORE_REQ")"`],
+		{ env: { ...process.env, ...env }, encoding: 'utf8' }).trim()
+	it('the flavour can be forced, and an offline wheel folder decides by what it carries', () => {
+		assert.equal(pick({ HIGHASCG_TRACKING_GPU: '1' }), 'gpu requirements-gpu.txt')
+		assert.equal(pick({ HIGHASCG_TRACKING_GPU: '0' }), 'cpu requirements.txt')
+		const cpuDir = path.join(TMP, 'wheels-cpu')
+		const gpuDir = path.join(TMP, 'wheels-gpu')
+		fs.mkdirSync(cpuDir)
+		fs.mkdirSync(gpuDir)
+		fs.writeFileSync(path.join(cpuDir, 'onnxruntime-1.31.0-cp314-cp314-manylinux_2_28_x86_64.whl'), '')
+		fs.writeFileSync(path.join(gpuDir, 'onnxruntime_gpu-1.31.0-cp314-cp314-manylinux_2_28_x86_64.whl'), '')
+		assert.equal(pick({ HIGHASCG_TRACKING_GPU: 'auto' }, `"${cpuDir}"`), 'cpu requirements.txt')
+		assert.equal(pick({ HIGHASCG_TRACKING_GPU: 'auto' }, `"${gpuDir}"`), 'gpu requirements-gpu.txt')
+	})
+	it('both requirement files pin the same versions, and the GPU one brings its own CUDA libraries', () => {
+		const pins = (f) => read(`tools/tracking-detect/${f}`).split('\n').filter((l) => l && !l.startsWith('#')).map((l) => l.replace('-gpu[cuda,cudnn]', ''))
+		assert.deepEqual(pins('requirements-gpu.txt'), pins('requirements.txt'))
+		assert.match(read('tools/tracking-detect/requirements-gpu.txt'), /onnxruntime-gpu\[cuda,cudnn\]==/)
+	})
+	it('every session goes through one factory that prefers CUDA, loads the wheel libraries and stops CPU spinning', () => {
+		const det = read('tools/tracking-detect/detector.py')
+		assert.match(det, /def make_session\(/)
+		assert.match(det, /ort\.preload_dlls\(\)/)
+		assert.match(det, /session\.intra_op\.allow_spinning", "0"/)
+		assert.match(read('tools/tracking-detect/pose.py'), /detector\.make_session\(/)
+		for (const f of ['detector.py', 'pose.py']) assert.equal((read(`tools/tracking-detect/${f}`).match(/InferenceSession\(/g) || []).length, f === 'detector.py' ? 2 : 0, f)
+	})
+	it('the installer asks for the space the GPU libraries need, and the setup swaps flavours instead of stacking them', () => {
+		assert.ok(spec.space_mb.core_gpu > spec.space_mb.core * 3)
+		assert.match(read('tools/tracking-detect/install.sh'), /SPACE_CORE="\$SPACE_CORE_GPU"/)
+		assert.match(read('tools/tracking-detect/setup-venv.sh'), /pip uninstall -y --disable-pip-version-check "\$OTHER"/)
+	})
+})

@@ -32,14 +32,32 @@ def select_providers(available):
     return [p for p in ("CUDAExecutionProvider",) if p in available] + ["CPUExecutionProvider"]
 
 
+def make_session(model_path, threads):
+    """An inference session on the GPU when this onnxruntime build has CUDA (WO-1127: onnxruntime-gpu, whose CUDA /
+    cuDNN libraries are pip wheels that preload_dlls finds), else on `threads` CPU threads. On the GPU the CPU side
+    only feeds tensors: one thread, no spinning (spinning workers held whole cores busy between frames). A CUDA
+    provider that fails to start (driver gone) leaves onnxruntime on the CPU; get_providers() then says so."""
+    import onnxruntime as ort
+
+    providers = select_providers(ort.get_available_providers())
+    opts = ort.SessionOptions()
+    opts.intra_op_num_threads = threads
+    if providers[0] != "CPUExecutionProvider":
+        if hasattr(ort, "preload_dlls"):
+            ort.preload_dlls()
+        opts.intra_op_num_threads = 1
+        opts.add_session_config_entry("session.intra_op.allow_spinning", "0")
+    session = ort.InferenceSession(model_path, sess_options=opts, providers=providers)
+    if session.get_providers()[0] == "CPUExecutionProvider" and providers[0] != "CPUExecutionProvider":
+        opts = ort.SessionOptions()  # fell back: give the CPU its threads again
+        opts.intra_op_num_threads = threads
+        session = ort.InferenceSession(model_path, sess_options=opts, providers=["CPUExecutionProvider"])
+    return session
+
+
 class Backend:
     def __init__(self, model_path, threads=4):
-        import onnxruntime as ort
-
-        opts = ort.SessionOptions()
-        opts.intra_op_num_threads = threads
-        self.session = ort.InferenceSession(model_path, sess_options=opts,
-            providers=select_providers(ort.get_available_providers()))
+        self.session = make_session(model_path, threads)
         inp = self.session.get_inputs()[0]
         self.input_name = inp.name
         self.output_name = self.session.get_outputs()[0].name

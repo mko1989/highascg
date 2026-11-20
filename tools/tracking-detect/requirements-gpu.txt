@@ -1,0 +1,6 @@
+# WO-1127 tracking sidecar runtime on an NVIDIA GPU (CUDAExecutionProvider): the same pins as requirements.txt with
+# onnxruntime-gpu and its CUDA / cuDNN libraries as pip wheels (no system CUDA install; needs only the NVIDIA driver).
+# Picked by runtime-lib.sh core_requirements when the machine has an NVIDIA GPU; requirements.txt otherwise.
+numpy==2.5.4
+onnxruntime-gpu[cuda,cudnn]==1.31.0
+opencv-python-headless==5.0.0.93
