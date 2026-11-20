@@ -266,3 +266,12 @@ func test_nvidia_sync_auto() -> void:
 	body = GO.caspar_patch(st, ui).casparServer
 	t.eq([body.get("screen_3_nvidia_sync_to_display"), body.get("nvidia_sync_to_display_off")], [true, false], "tick = explicit port, off cleared")
 	t.eq(GO.reset_patch(st).casparServer.get("nvidia_sync_to_display_off", "missing"), null, "reset = back to auto")
+
+
+## WO-1129: the forced-mode hint shows only for a custom OS mode on an NVIDIA box (device-view live.gpu.nvidia).
+func test_nvidia_forced_note() -> void:
+	var nv := {"live": {"gpu": {"nvidia": true}}}
+	t.eq(GP.nvidia_forced_note(true, nv), GP.NOTE_NVIDIA_FORCED, "custom mode on NVIDIA: hint")
+	t.eq(GP.nvidia_forced_note(false, nv), "", "detected mode: no hint")
+	t.eq(GP.nvidia_forced_note(true, {"live": {"gpu": {"nvidia": false}}}), "", "not NVIDIA: no hint")
+	t.eq(GP.nvidia_forced_note(true, {}), "", "no payload: no hint")

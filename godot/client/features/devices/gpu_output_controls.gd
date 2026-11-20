@@ -203,6 +203,8 @@ func _system_resolution(mst: Dictionary) -> Control:
 	for f in ["os_w", "os_h", "os_fps"]:
 		fields.add_child(_entry(f))
 	os_row.add_child(fields)
+	_w.nvidia_note = _note("")  # WO-1129: forced mode on NVIDIA = custom EDID + X restart
+	os_row.add_child(_w.nvidia_note)
 	_w.os_row = os_row
 	box.add_child(os_row)
 	var ov := _check("Override", ui.override, OVERRIDE_TIP)
@@ -303,6 +305,8 @@ func _sync_rows() -> void:
 	_w.custom_row.visible = GU.custom_shown(ui)
 	_w.os_row.visible = GU.os_custom_shown(ui)
 	_w.timing_label.text = GP.timing_label(GU.os_custom_shown(ui))
+	_w.nvidia_note.text = GP.nvidia_forced_note(GU.os_custom_shown(ui), GO.R.d(_env.get("payload")))
+	_w.nvidia_note.visible = _w.nvidia_note.text != ""
 
 
 ## Posts one kind of save; the body is built at send time, so a burst of edits ends with the newest values.

@@ -10,6 +10,7 @@ const H := preload("res://features/devices/host_channels.gd")
 const GM := preload("res://features/devices/gpu_modeline_model.gd")
 const LABEL_CUSTOM_OS := "Timing for Custom OS mode — Apply GPU registers RandR mode (newmode/addmode) at this WxH×Hz"
 const LABEL_EDID_OS := "EDID list selection — Apply GPU uses that xrandr mode token as-is (no newmode)"
+const NOTE_NVIDIA_FORCED := "NVIDIA: a mode the display does not list is forced through a custom EDID — Apply restarts the display (X) once. Pick a detected mode to remove it (another restart)."
 
 
 ## readPreviewDims: ui = {display, os_w, os_h, os_fps, override, mode, custom_w, custom_h, custom_fps} (texts / bools).
@@ -44,6 +45,12 @@ static func preview_dims(ui: Dictionary, st: Dictionary, cs: Dictionary, setting
 
 static func timing_label(os_custom: bool) -> String:
 	return LABEL_CUSTOM_OS if os_custom else LABEL_EDID_OS
+
+
+## WO-1129: the hint under the custom OS row when the box runs the NVIDIA driver ("" = hidden).
+static func nvidia_forced_note(os_custom: bool, payload: Dictionary) -> String:
+	var gpu := R.d(R.d(payload.get("live")).get("gpu"))
+	return NOTE_NVIDIA_FORCED if os_custom and H.truthy(gpu.get("nvidia")) else ""
 
 
 static func preview_query(dims: Dictionary, type: String) -> String:

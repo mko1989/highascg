@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 605,
+	"count": 604,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -548,7 +548,6 @@
 		"src/system/private-volume-sync.js: PRIVATE_VOLUME_DIR",
 		"src/system/proc-stats.js: CASPAR_UNIT",
 		"src/system/proc-stats.js: discoverCasparPid",
-		"src/system/proc-stats.js: readProcSampleSync",
 		"src/system/video-feed.js: FEED_PATH",
 		"src/tracking/auto-director.js: AUTO_MAX",
 		"src/tracking/auto-routes.js: AUTO_EVENT",

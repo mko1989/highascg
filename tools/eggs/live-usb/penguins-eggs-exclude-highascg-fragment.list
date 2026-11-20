@@ -287,6 +287,11 @@ etc/NetworkManager/system-connections/*
 # own on its first Apply; both are optional at session start (openbox autostart, run.sh).
 home/casparcg/.config/highascg/apply-layout.sh
 home/casparcg/.config/highascg/caspar-env
+# WO-1129: the build host's forced display modes (NVIDIA CustomEDID per connector + the xorg.conf.d snippet naming
+# them). Another machine's panel on that connector would get this one's EDID; a clone forces its own modes on Apply.
+etc/X11/highascg-edid
+etc/X11/highascg-edid/*
+etc/X11/xorg.conf.d/98-highascg-custom-edid.conf
 
 # Zoom — dev/test tool on the build host only; MUST NOT ship on the ISO (WO-142 G1)
 opt/zoom

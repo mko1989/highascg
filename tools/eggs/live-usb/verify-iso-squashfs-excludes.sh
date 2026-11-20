@@ -254,7 +254,8 @@ for needle in \
 	'home/casparcg/highascg/godot/extensions/hshm/build' \
 	'usr/NX' \
 	'usr/lib/systemd/system/nxserver.service' \
-	'etc/systemd/system/multi-user.target.wants/nxserver.service'; do
+	'etc/systemd/system/multi-user.target.wants/nxserver.service' \
+	'etc/X11/highascg-edid' 'etc/X11/xorg.conf.d/98-highascg-custom-edid.conf'; do
 	if squash_has_tree "$needle"; then
 		bad "unexpected path in squashfs: ${needle}"
 	else
@@ -357,6 +358,7 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 	else
 		bad "missing tailscale helper — re-run prepare-eggs-clone-with-exfat.sh (12-passwordless-sudo)"
 	fi
+	if squash_has_path 'usr/local/lib/highascg/highascg-apply-display-edid.sh'; then ok "present: display-edid helper (WO-1129)"; else bad "missing highascg-apply-display-edid.sh — re-run 12-passwordless-sudo"; fi
 	# Branding/modules: legacy /etc/calamares vs the eggs 26.10 overlay (verify-iso-squashfs-calamares.sh).
 	if [[ "$LAYOUT" == legacy ]]; then calamares_checks_legacy; else calamares_checks_new; fi
 	if squash_has_path 'usr/local/lib/highascg/probe-internal-storage.sh'; then

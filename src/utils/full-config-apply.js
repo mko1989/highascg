@@ -14,6 +14,12 @@ const {
 	waitForAmcpDisconnect,
 } = require('./caspar-restart')
 const { needsNodmRestartForLayout, verifyXrandrMatchesLayout } = require('./xrandr-layout-verify')
+const { syncForcedModeEdids } = require('./nvidia-forced-mode-sync')
+
+/** WO-1129: the forced-mode outcome as one message clause ('' when nothing changed). */
+function forcedModeClause(fm) {
+	return [...(fm?.messages || []), ...(fm?.warnings || []).map((w) => `WARNING ${w}`)].join('; ')
+}
 
 /** WO-918 F3: the layout outcome of a live applyX11Layout call, as stored on out.layout.verify. */
 function summarizeLayoutVerify(res) {
@@ -187,7 +193,14 @@ async function applyFullServerConfig(ctx, opts = {}) {
 
 	log('info', '[Full apply] Step 2 — persisting apply-layout.sh')
 	const canvasCheck = needsNodmRestartForLayout(ctx.config)
-	const needsNodm = opts.forceNodmRestart === true || canvasCheck.needed
+	/* WO-1129: an explicit forced OS mode on NVIDIA is a CustomEDID the driver reads only when X starts — installing or
+	 * removing one joins this Apply's ONE nodm restart (and bypasses the unchanged gate below). Never throws. */
+	const forcedMode = await syncForcedModeEdids(ctx.config, { log }).catch((e) => {
+		log('warn', `[Full apply] forced display mode step failed: ${e?.message || e}`)
+		return { restartNeeded: false, messages: [], warnings: [`forced display mode step failed: ${e?.message || e}`] }
+	})
+	out.forcedMode = forcedMode
+	const needsNodm = opts.forceNodmRestart === true || canvasCheck.needed || forcedMode.restartNeeded === true
 	out.layout.needsNodmRestart = needsNodm
 	out.layout.plannedCanvas = canvasCheck.plannedCanvas || null
 	out.layout.currentCanvas = canvasCheck.currentCanvas || null
@@ -206,7 +219,9 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		)
 	}
 
-	if (needsNodm) {
+	if (needsNodm && !canvasCheck.needed && forcedMode.restartNeeded) {
+		log('info', '[Full apply] Forced display mode changed — nodm restart will run (WO-1129)')
+	} else if (needsNodm) {
 		log(
 			'info',
 			`[Full apply] Desktop canvas expansion required (planned ${canvasCheck.plannedCanvas?.width}x${canvasCheck.plannedCanvas?.height} > current ${canvasCheck.currentCanvas?.width}x${canvasCheck.currentCanvas?.height}) — nodm restart will run`,
@@ -324,6 +339,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		log('info', '[Full apply] skipCasparRestart=true — config and layout script saved only')
 		out.message = joinMessage(
 			needsNodm ? nodmClause : '',
+			forcedModeClause(forcedMode),
 			layoutOutcome.clause || (layoutRes.persisted && !out.layout.postApplied ? 'apply-layout.sh saved' : ''),
 			'Caspar restart skipped',
 		)
@@ -388,6 +404,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 
 	out.message = joinMessage(
 		needsNodm ? nodmClause : '',
+		forcedModeClause(forcedMode),
 		layoutOutcome.clause || (layoutRes.persisted && !out.layout.postApplied ? 'apply-layout.sh saved' : ''),
 		out.casparRestart.reconnected ? 'Caspar restarted' : ctx.amcp ? 'Caspar restart pending' : '',
 	)

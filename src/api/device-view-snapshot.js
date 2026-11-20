@@ -390,6 +390,8 @@ async function buildLiveSnapshot(ctx) {
 			connectors: sanitizedGpuConnectors,
 			physicalMap: gpuPhysicalMap,
 			operatorMonitor: resolveOperatorMonitorPort(ctx.config || {}),
+			/* WO-1129: the Devices view says a forced (custom) OS mode restarts X on NVIDIA (CustomEDID) */
+			nvidia: require('../utils/nvidia-forced-mode-plan').isNvidiaProprietaryDriver(),
 		},
 		decklink: buildDecklinkSummary(ctx, decklinkHw),
 		audio: {

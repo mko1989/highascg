@@ -45,6 +45,7 @@ need_sudo_rule 'tailscale logout' 'Tailscale logout'
 need_sudo_rule 'tailscaled' 'tailscaled systemctl'
 need_sudo_rule 'launch-calamares.sh' 'Calamares install-to-disk'
 need_sudo_rule 'caspar-systemd-control.sh' 'Caspar stop/start'
+need_sudo_rule 'highascg-apply-display-edid.sh' 'NVIDIA forced display mode (WO-1129 CustomEDID helper)'
 
 if [[ -x /usr/local/lib/highascg/highascg-tailscale-up.sh ]]; then
 	ok "tailscale helper installed (/usr/local/lib/highascg/highascg-tailscale-up.sh)"

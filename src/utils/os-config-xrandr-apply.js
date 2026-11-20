@@ -20,6 +20,7 @@ const {
 } = require('./xrandr-safety')
 const { persistLayoutScript } = require('./os-config-persist')
 const { parseXrandrOutputStates, reconcileHeadsWithOutputs } = require('./xrandr-unplanned-heads')
+const { isNvidiaProprietaryDriver, xrandrOutputListsModeRate } = require('./nvidia-forced-mode-plan')
 
 /** WO-337: async now — the sync sleep + sync xrandr execs froze the whole API/WS server. */
 function sleepMs(ms) {
@@ -148,6 +149,14 @@ async function applyX11Layout(config, opts = {}) {
 					source: 'edid',
 				})
 			}
+		} else if (
+			safeRate != null &&
+			isNvidiaProprietaryDriver() &&
+			xrandrOutputListsModeRate(xrandrQueryOut, safeSysId, plannedMode, safeRate)
+		) {
+			/* WO-1129: on NVIDIA the forced mode is served by the CustomEDID (nvidia-forced-mode-sync.js) and listed by X;
+			 * the RandR newmode/addmode below would only be refused (BadMatch) — use the listed WxH + --rate. */
+			logger.info(`[OS-Config] ${safeSysId}: ${plannedMode}@${safeRate} listed by the driver (custom EDID) — no RandR mode needed`)
 		} else {
 			const allowCreate = shouldCreateXrandrModeForPlan(config, osModeSource, plannedMode)
 			if (avail && allowCreate) {
