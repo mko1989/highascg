@@ -46,14 +46,18 @@ function pickPrimaryInterface(interfaces, networkCfg) {
  * @param {Array<{ mac?: string }>} interfaces
  * @returns {boolean} true when the stored identity should be kept as is
  */
-function storedIdentityStillValid(stored, interfaces) {
+function storedIdentityStillValid(stored, interfaces, nics) {
 	if (!stored || !stored.hardwareId) return false
 	const storedMac = String(stored.mac || '').trim().toLowerCase()
 	if (!storedMac) return true // machine-id derived: no MAC to lose
-	const present = (interfaces || []).some((i) => String(i.mac || '').toLowerCase() === storedMac)
+	const all = [...(interfaces || []), ...(nics || [])]
+	const present = all.some((i) => String(i.mac || '').toLowerCase() === storedMac)
 	if (present) return true
 	// No usable MAC on the box at all (NICs not up yet): do not flip a stored id on a transient empty list.
-	return !(interfaces || []).some((i) => isUsableMac(i.mac))
+	// WO-1128: `nics` are the box's physical NICs from /sys/class/net (cable or not, wired or Wi-Fi). os.networkInterfaces
+	// lists only NICs with an address, so a laptop on Wi-Fi with its Ethernet unplugged had NO usable MAC there and
+	// kept the stored id it booted with — the build host's (highascg7580), shipped in the 17.11 ISO.
+	return !all.some((i) => isUsableMac(i.mac))
 }
 
 /**

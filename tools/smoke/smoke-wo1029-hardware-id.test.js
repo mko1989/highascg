@@ -72,3 +72,57 @@ test('boot config loader reads what the node reads (general.json network + flat 
 		fs.rmSync(dir, { recursive: true, force: true })
 	}
 })
+
+// WO-1128: the 17.11 ISO shipped the build host's hardware-identity.json (7580, eno1). A laptop on Wi-Fi with its
+// Ethernet unplugged listed no wired NIC with an address, so the "no usable MAC yet" guard kept the foreign id and the
+// laptop came up as highascg7580 too.
+const flipped7580 = { hardwareId: '7580', mac: ENO1.mac, hostname: 'highascg7580', source: 'mac', primaryInterface: 'eno1' }
+const LAPTOP_ETH = { name: 'enp4s0', mac: 'a8:a1:59:12:34:56', wireless: false }
+const LAPTOP_WIFI = { name: 'wlp0s20f3', mac: '3c:21:9c:aa:bb:cc', wireless: true }
+
+test('WO-1128: a cloned id is dropped when the box\'s own NICs (cable or not) do not carry its MAC', () => {
+	const id = ask({ interfaces: [], nics: [LAPTOP_ETH, LAPTOP_WIFI], stored: flipped7580 })
+	assert.notEqual(id.hardwareId, '7580')
+	assert.equal(id.primaryInterface, 'enp4s0') // wired first, even without cable or address
+	assert.equal(id.mac, LAPTOP_ETH.mac)
+	assert.equal(id.hostname, `highascg${id.hardwareId}`)
+})
+
+test('WO-1128: a Wi-Fi-only machine names itself from its Wi-Fi MAC, the same on every boot', () => {
+	const a = ask({ interfaces: [], nics: [LAPTOP_WIFI], stored: flipped7580 })
+	const b = ask({ interfaces: [], nics: [LAPTOP_WIFI], stored: null })
+	assert.equal(a.mac, LAPTOP_WIFI.mac)
+	assert.equal(a.hardwareId, b.hardwareId)
+	assert.equal(a.source, 'mac')
+})
+
+test('WO-1128: the build host keeps its id — its MAC is on a NIC even before DHCP', () => {
+	const sys = [{ ...ENO1, wireless: false }, { ...ENO2, wireless: false }]
+	assert.equal(ask({ interfaces: [], nics: sys, stored: flipped7580 }).hardwareId, '7580')
+	assert.equal(ask({ interfaces: [], nics: [], stored: flipped7580 }).hardwareId, '7580') // nothing enumerated yet
+	assert.equal(ask({ interfaces: ifaces, nics: sys, stored: stored7579 }).hardwareId, '7579')
+})
+
+test('WO-1128: listPhysicalNics reads sysfs — physical NICs only, wireless flagged', () => {
+	const { listPhysicalNics } = require('../../src/system/hardware-identity')
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wo1128-net-'))
+	const nic = (name, mac, { device = true, wireless = false } = {}) => {
+		fs.mkdirSync(path.join(root, name, ...(device ? ['device'] : [])), { recursive: true })
+		if (wireless) fs.mkdirSync(path.join(root, name, 'wireless'))
+		fs.writeFileSync(path.join(root, name, 'address'), mac + '\n')
+	}
+	nic('enp4s0', 'A8:A1:59:12:34:56')
+	nic('wlp0s20f3', '3c:21:9c:aa:bb:cc', { wireless: true })
+	nic('lo', '00:00:00:00:00:00', { device: false })
+	nic('tailscale0', '', { device: false })
+	try {
+		const got = listPhysicalNics(root).sort((a, b) => a.name.localeCompare(b.name))
+		assert.deepEqual(got, [
+			{ name: 'enp4s0', mac: 'a8:a1:59:12:34:56', wireless: false },
+			{ name: 'wlp0s20f3', mac: '3c:21:9c:aa:bb:cc', wireless: true },
+		])
+		assert.deepEqual(listPhysicalNics(path.join(root, 'missing')), [])
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true })
+	}
+})

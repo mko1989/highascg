@@ -46,6 +46,20 @@ if [[ "${1:-}" == "--check" ]]; then
 	if [[ -n "$errs" ]]; then echo "$errs" >&2; echo "[check] FAILED" >&2; exit 1; fi
 	echo "[check] boot OK (no script errors)"; exit 0
 fi
+# WO-1128: one operator client per X display. An Apply that grows the desktop restarts nodm: the session's autostart
+# starts a client again while the previous run-client loop survives the X restart (its login scope is not killed), and
+# when its Godot dies with a crash signal on the lost display (laptop 20.11) the loop relaunches it onto the new X — two
+# clients, three after the next Apply. The lock is held by this script (never by Godot: 9>&- below, so nothing Godot
+# spawns can keep it) for as long as it runs; a second launch on the same display exits. HIGHASCG_CLIENT_SECOND=1 opts
+# out (a deliberate second window).
+if [[ -z "${HIGHASCG_CLIENT_SECOND:-}" ]] && command -v flock >/dev/null 2>&1; then
+	lock="${TMPDIR:-/tmp}/highascg-client-display${DISPLAY//[^0-9.]/_}.lock"
+	exec 9>>"$lock"
+	if ! flock -n 9; then
+		echo "[run-client] $(date '+%F %T') an operator client already runs on display ${DISPLAY:-?} — not starting another (HIGHASCG_CLIENT_SECOND=1 to force)"
+		exit 0
+	fi
+fi
 # WO-934: the session autostart (--autostart) shows nothing before the node answers and no GUI before the start-up
 # question is answered. It waits for GET /api/system/operator-screen (HIGHASCG_AUTOSTART_WAIT_S, default 600 s; the
 # node can start minutes after the session on a stick boot), runs a launcher-only client (--boot-launcher: the
@@ -77,7 +91,7 @@ process.stdin.on("data", (d) => (b += d)).on("end", () => {
 		ud="$(mktemp -d "${TMPDIR:-/tmp}/highascg-launcher-XXXXXX")"
 		mkdir -p "$ud/godot/app_userdata/HighAsCG Operator"
 		printf '[display]\n\nwindow/size/mode=1\n' >"$ud/godot/app_userdata/HighAsCG Operator/launcher-override.cfg"
-		XDG_DATA_HOME="$ud" HIGHASCG_SERVER="$srv" "$GODOT" --path "$HERE" --resolution 64x64 -- --boot-launcher || true
+		XDG_DATA_HOME="$ud" HIGHASCG_SERVER="$srv" "$GODOT" --path "$HERE" --resolution 64x64 -- --boot-launcher 9>&- || true
 		rm -rf "$ud"
 		state="$(boot_state)"
 		echo "[run-client] $(stamp) start-up answered: ${state:-no answer from the node}"
@@ -90,10 +104,12 @@ fi
 # WO-880: a crash relaunches the client (show safety: the Visuals resume Send by themselves). Only a crash signal
 # (SIGILL/ABRT/BUS/FPE/SEGV → 132/134/135/136/139) — a quit, an error exit or a kill (TERM/INT/KILL) ends it — and at
 # most 5 times in 5 min. HIGHASCG_CLIENT_NO_RELAUNCH=1 = the old single run.
-[[ -n "${HIGHASCG_CLIENT_NO_RELAUNCH:-}" ]] && exec "$GODOT" --path "$HERE" -- "$@"
+if [[ -n "${HIGHASCG_CLIENT_NO_RELAUNCH:-}" ]]; then
+	"$GODOT" --path "$HERE" -- "$@" 9>&- && exit 0 || exit $?
+fi
 crashes=()
 while :; do
-	"$GODOT" --path "$HERE" -- "$@" && rc=0 || rc=$?
+	"$GODOT" --path "$HERE" -- "$@" 9>&- && rc=0 || rc=$?
 	case $rc in 132 | 134 | 135 | 136 | 139) ;; *) exit "$rc" ;; esac
 	now=$(date +%s)
 	recent=()

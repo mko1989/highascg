@@ -84,6 +84,13 @@ home/casparcg/highascg/.private/*
 home/casparcg/highascg/projects/_trash
 home/casparcg/highascg/projects/_trash/*
 home/casparcg/highascg/config/*.bak*
+# WO-1128: per-box identity. The factory reset deletes them, but any node start before the squashfs writes
+# hardware-identity.json again (the 17.11 ISO shipped 7580's, and laptops booted as highascg7580). The build stashes
+# and restores the build host's copies (build-highascg-egg.sh IDENTITY_FILES), so excluding them costs that box nothing.
+home/casparcg/highascg/config/hardware-identity.json
+home/casparcg/highascg/config/device-identity.json
+home/casparcg/highascg/config/replication-local-identity.json
+home/casparcg/highascg/config/cluster-call-floor.json
 home/casparcg/highascg/config/casparcg copy.config
 
 # Build-host drop-update leftovers at repo root — the real .applied-stamp /

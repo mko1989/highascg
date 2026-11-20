@@ -245,6 +245,9 @@ for needle in \
 	'usr/lib/penguins-eggs' \
 	'home/casparcg/.antigravity-ide-server' \
 	'home/casparcg/highascg/config/certs/highascg-key.pem' \
+	'home/casparcg/highascg/config/hardware-identity.json' \
+	'home/casparcg/highascg/config/device-identity.json' \
+	'home/casparcg/highascg/config/replication-local-identity.json' \
 	'etc/ssh/ssh_host_ed25519_key' \
 	'home/casparcg/.config/companion/v5.0' \
 	'home/casparcg/.config/companion/machid' \
