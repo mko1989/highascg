@@ -58,7 +58,7 @@ test('config names only our nodes and the private socket', () => {
 	assert.ok(!/alsa|default\.audio/i.test(c), 'no hardware, no default sink/source')
 })
 
-function rig({ amcpInfo = () => '' } = {}) {
+function rig({ amcpInfo = () => '', contentSig, casparEpoch, now } = {}) {
 	const calls = []
 	const spawns = []
 	let up = false
@@ -92,7 +92,9 @@ function rig({ amcpInfo = () => '' } = {}) {
 	const sock = new EventEmitter()
 	sock.bind = () => {}
 	sock.close = () => (sock.closed = true)
+	const infos = []
 	const amcp = { isConnected: true, info: async (c) => {
+			infos.push(c)
 			const has = raw.filter((x) => x.includes(` ${c}-9277`)).pop()
 			return { data: amcpInfo(c) + (has && has.startsWith('ADD') ? ' port_9277' : '') }
 		}, raw: async (c) => raw.push(c) }
@@ -108,8 +110,8 @@ function rig({ amcpInfo = () => '' } = {}) {
 	const feeds = () => [{ id: 'pgm:1', label: 'Screen 1 program (ch 2)', channel: 2 }, { id: 'prv:1', label: 'Screen 1 preview (ch 3)', channel: 3 }]
 	const ticks = []
 	const timers = { setInterval: (fn) => (ticks.push(fn), { unref() {} }), clearInterval: () => {} }
-	const za = createZoomAudio({ exec, spawn, fs, createSocket: () => sock, timers, getAmcp: () => amcp, feeds, dir: '/x/zdir', runtimeBase: '/x', stateFile: '/x/state.json' })
-	return { za, calls, spawns, raw, files, sock, ticks, isUp: () => up }
+	const za = createZoomAudio({ exec, spawn, fs, createSocket: () => sock, timers, getAmcp: () => amcp, feeds, contentSig, casparEpoch, now, dir: '/x/zdir', runtimeBase: '/x', stateFile: '/x/state.json' })
+	return { za, calls, spawns, raw, files, sock, ticks, infos, isUp: () => up }
 }
 
 test('enable: daemon, bridges, links and the AMCP consumer; idempotent; disable cleans up', async () => {
@@ -163,7 +165,12 @@ test('mix-minus: a feed that plays the Zoom input (directly or via route://) is 
 test('the 2 s tick keeps the return feed right without a client polling: mix-minus and re-attach', async () => {
 	let playsZoomIn = false
 	let consumerGone = false
-	const r = rig({ amcpInfo: (c) => (c === 2 && playsZoomIn ? 'LAYER udp://127.0.0.1:52233' : '') })
+	let epoch = 1
+	const r = rig({
+		amcpInfo: (c) => (c === 2 && playsZoomIn ? 'LAYER udp://127.0.0.1:52233' : ''),
+		contentSig: () => (playsZoomIn ? '2:10=udp://127.0.0.1:52233' : '2:'), // OSC sees the layer change
+		casparEpoch: () => epoch,
+	})
 	await r.za.apply({ enabled: true, feed: 'pgm:1' })
 	assert.strictEqual(r.raw.filter((c) => c.startsWith('ADD 2-9277')).length, 1)
 	assert.strictEqual(r.ticks.length, 1)
@@ -175,8 +182,45 @@ test('the 2 s tick keeps the return feed right without a client polling: mix-min
 	playsZoomIn = false
 	r.raw.length = 0
 	consumerGone = true
+	epoch += 1 // the restarted Caspar reconnected
 	await r.ticks[0]()
 	assert.ok(consumerGone && r.raw.some((c) => c.startsWith('ADD 2-9277')), 'the return is attached again by the tick')
+})
+
+test('steady state costs Caspar nothing: the tick asks INFO only on a feed, connection or content change (+ 60 s backstop)', async () => {
+	let sig = '2:10=a.mov'
+	let epoch = 1
+	let t = 1000
+	const r = rig({ contentSig: () => sig, casparEpoch: () => epoch, now: () => t })
+	await r.za.apply({ enabled: true, feed: 'pgm:1' })
+	const asked = () => r.infos.splice(0).length
+	assert.ok(asked() > 0, 'the explicit apply verifies against Caspar')
+	for (let i = 0; i < 5; i++) {
+		t += 2000
+		await r.ticks[0]()
+	}
+	assert.strictEqual(asked(), 0, 'five idle ticks: no INFO (was two per tick)')
+	sig = '2:10=b.mov'
+	await r.ticks[0]()
+	assert.ok(asked() > 0, 'new content on a channel: mix-minus re-checked')
+	await r.ticks[0]()
+	assert.strictEqual(asked(), 0)
+	epoch += 1
+	await r.ticks[0]()
+	assert.ok(asked() > 0, 'AMCP reconnect: the consumer is re-verified')
+	t += 60000
+	await r.ticks[0]()
+	assert.ok(asked() > 0, 'the backstop re-checks once a minute')
+	await r.za.status()
+	assert.strictEqual(asked(), 0, 'a status GET rides the same gate')
+})
+
+test('oscContentSignature: clip per layer per channel from OSC; null without OSC', () => {
+	const { oscContentSignature } = require('../../src/zoom/zoom-audio')
+	const snap = { channels: { 2: { layers: { 10: { file: { name: 'a.mov' } }, 11: { type: 'empty' } } }, 7: { layers: { 10: { file: { path: 'udp://127.0.0.1:52233' } } } } } }
+	const ctx = { oscState: { getSnapshot: () => snap } }
+	assert.strictEqual(oscContentSignature(ctx), '2:10=a.mov;7:10=udp://127.0.0.1:52233')
+	assert.strictEqual(oscContentSignature({}), null)
 })
 
 test('unknown feed is rejected; defaultFeeds tolerates an empty config', async () => {

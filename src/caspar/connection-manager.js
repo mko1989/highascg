@@ -240,6 +240,7 @@ class ConnectionManager extends EventEmitter {
 	}
 
 	async _handleConnected() {
+		this.connectedEpoch = (this.connectedEpoch || 0) + 1 // runtime consumers (Zoom return) re-attach after a Caspar restart
 		if (this._protocol) this._protocol.reset()
 		if (!this._useLegacy) this._patchLibraryProcessIncomingData()
 		this._startHealthTimer()

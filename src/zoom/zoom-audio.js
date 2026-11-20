@@ -31,12 +31,16 @@ const { amcpInfoText } = require('../streaming/caspar-ffmpeg-setup')
 const { buildConf, SINK_IN, SRC_OUT, TAP, FEEDER } = require('./zoom-audio-conf')
 const { wantedLinks, portConfigs, portConfigPod } = require('./zoom-audio-links')
 const { userScopeArgv } = require('./zoom-launch-env')
+const { oscClipSignatureForChannel } = require('../utils/periodic-sync-osc-info-gate')
 
 const IN_UDP_PORT = 52233
 const OUT_UDP_PORT = 52232
 const IN_URL = `udp://127.0.0.1:${IN_UDP_PORT}`
 const CONSUMER_INDEX = 9277
 const LINK_MS = 2000
+// The feed check asks Caspar (INFO) only when its answer can have changed — feed, Caspar connection or what plays (OSC);
+// this backstop bounds what OSC cannot see (a route:// source swapped under an unchanged layer). Was: 2 INFOs every tick.
+const FEED_RECHECK_MS = 60000
 // WO-1106 C8: a daemon that cannot start is retried with backoff (2 s doubling to 60 s), and given up after 8 failures
 const RESTART_BACKOFF_MS = 2000
 const RESTART_BACKOFF_CAP_MS = 60000
@@ -75,6 +79,8 @@ function createZoomAudio(deps = {}) {
 	const timers = deps.timers || { setInterval, clearInterval }
 	const getAmcp = deps.getAmcp || (() => null)
 	const getConfig = deps.getConfig || (() => ({}))
+	const casparEpoch = deps.casparEpoch || (() => 0) // bumps on every AMCP (re)connect — a restarted Caspar lost the consumer
+	const contentSig = deps.contentSig || (() => null) // what plays on every channel (OSC); null = unknown
 	const feedsOf = deps.feeds || defaultFeeds
 	const log = deps.log || (() => {})
 	const now = deps.now || Date.now
@@ -89,6 +95,7 @@ function createZoomAudio(deps = {}) {
 		/* first run */
 	}
 	let feedChannel = null // channel the Caspar consumer sits on
+	let feedChecked = null // { key, at }: the state syncFeed last verified against Caspar
 	let lastError = ''
 	let note = ''
 	let linkTimer = null
@@ -281,7 +288,7 @@ function createZoomAudio(deps = {}) {
 		while (ticking) await ticking
 		return exclusive(async () => {
 			await linkTick()
-			await syncFeed().catch((e) => (lastError = String(e.message || e)))
+			await syncFeed({ force: true }).catch((e) => (lastError = String(e.message || e)))
 		})
 	}
 
@@ -322,11 +329,17 @@ function createZoomAudio(deps = {}) {
 		}
 	}
 
-	/** Make Caspar match persisted.feed: consumer on the feed's channel, never on a channel carrying the Zoom input. */
-	async function syncFeed() {
+	/**
+	 * Make Caspar match persisted.feed: consumer on the feed's channel, never on a channel carrying the Zoom input.
+	 * Unforced calls (the 2 s tick, a status GET) skip Caspar while nothing it would answer about has changed.
+	 */
+	async function syncFeed({ force = false } = {}) {
 		const amcp = getAmcp()
 		const want = feedsOf(getConfig()).find((f) => f.id === persisted.feed)
 		const wantCh = want ? want.channel : null
+		const key = `${wantCh}|${persisted.enabled}|${amcp?.isConnected ? casparEpoch() : 'down'}|${contentSig() ?? ''}`
+		if (!force && feedChecked && feedChecked.key === key && now() - feedChecked.at < FEED_RECHECK_MS) return
+		feedChecked = null
 		if (feedChannel != null && feedChannel !== wantCh) {
 			await removeConsumer(amcp, feedChannel)
 			feedChannel = null
@@ -345,12 +358,14 @@ function createZoomAudio(deps = {}) {
 			feedChannel = null
 			stopFeeder()
 			note = `Mix-minus: ${want.label} plays the Zoom input (${IN_URL}), so sending it back would echo. Return muted; pick a feed without it.`
+			feedChecked = { key, at: now() }
 			return
 		}
 		spawnFeeder()
 		const text = amcpInfoText(await amcp.info(wantCh).catch(() => ''))
 		if (!text.includes(`port_${CONSUMER_INDEX}`)) await amcp.raw(addCmd(wantCh))
 		feedChannel = wantCh
+		feedChecked = { key, at: now() }
 		note = `Return = ${want.label}. Keep the Zoom input (${IN_URL}) off this feed (mix-minus).`
 	}
 
@@ -425,16 +440,28 @@ function createZoomAudio(deps = {}) {
 	return { status, apply, restore, zoomEnv, IN_URL }
 }
 
+/** What plays on every channel per OSC (clip per layer), or null without OSC. */
+function oscContentSignature(ctx) {
+	const chans = ctx?.oscState?.getSnapshot?.()?.channels
+	if (!chans || typeof chans !== 'object') return null
+	return Object.keys(chans)
+		.sort((a, b) => Number(a) - Number(b))
+		.map((ch) => `${ch}:${oscClipSignatureForChannel(ctx, ch)}`)
+		.join(';')
+}
+
 let instance = null
 function getZoomAudio(ctx) {
 	if (!instance) {
 		instance = createZoomAudio({
 			getAmcp: () => ctx?.amcp,
 			getConfig: () => ctx?.config,
+			casparEpoch: () => ctx?.casparConnection?.connectedEpoch ?? 0,
+			contentSig: () => oscContentSignature(ctx),
 			log: (l, m) => ctx?.log?.(l, m),
 		})
 	}
 	return instance
 }
 
-module.exports = { createZoomAudio, getZoomAudio, defaultFeeds }
+module.exports = { createZoomAudio, getZoomAudio, defaultFeeds, oscContentSignature }
