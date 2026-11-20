@@ -364,8 +364,11 @@ async function handleCmd(body, ctx) {
 
 		// CG UPDATE payload — a duration 'start' always names the seconds to count from (the paused value, the
 		// full duration, or where a running timer is now), so the screen never starts from its own idea of them.
+		// A fresh Start is measured at its own anchor (a second Date.now() a millisecond later sent 59.999 for 60);
+		// Start on a running timer re-states where it is now.
+		const at = alreadyRunning || !Number.isFinite(record.cmdAt) ? Date.now() : record.cmdAt
 		const payload = JSON.stringify(
-			cmd === 'start' && timerClock.isDurationMode(record) ? { cmd, remainingSec: timerClock.remainingNow(record) } : { cmd },
+			cmd === 'start' && timerClock.isDurationMode(record) ? { cmd, remainingSec: timerClock.remainingNow(record, at) } : { cmd },
 		)
 
 		// Send updates to all assigned screens
