@@ -59,6 +59,12 @@ func test_section_shows_and_edits() -> void:
 	t.eq(got[0].enabled, false, "off")
 	s.show_status({"enabled": false, "heads": 3})
 	t.eq(s._status.text, "Off — would carry 3 heads (Auto / marker heads).", "status line")
+	var helps := []
+	for c in s._on.get_parent().get_children():
+		if c != s._on:
+			helps.append([(c as Button).text, (c as Button).tooltip_text])
+	t.eq(helps, [["? MagicQ", "Help: HighAsCG takes the fronts under a fader — ChamSys MagicQ"],
+		["? grandMA3", "Help: HighAsCG takes the fronts under a fader — grandMA3"]], "a help page per desk, named")
 	s.free()
 
 

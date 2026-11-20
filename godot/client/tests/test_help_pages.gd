@@ -72,7 +72,7 @@ func test_wired_where_the_owner_needs_it() -> void:
 		"res://features/previs/fixtures/fixtures_section.gd": "[CalibrateFold.new()], \"calibrate-heads\")",
 		"res://features/previs/tracking/tracking_page.gd": "\"calibrate-cameras\")",
 		"res://features/previs/tracking/ptz_calibrate_fold.gd": "HelpDialog.beside(_toggle, \"calibrate-ptz\")",
-		"res://features/previs/tracking/desk_feed_section.gd": "HelpDialog.beside(_on, \"desk-feed-magicq\")",  # WO-1097
+		"res://features/previs/tracking/desk_feed_section.gd": "[[\"desk-feed-magicq\", \"MagicQ\"], [\"desk-feed-grandma3\", \"grandMA3\"]]",  # WO-1097: a "?" per desk
 		"res://features/previs/fixtures/calibrate_fold.gd": "HelpDialog.beside(export, \"calibrate-rig-to-desk\")",  # WO-765
 	}
 	for path in wires:

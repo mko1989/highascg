@@ -8,6 +8,9 @@ const M := preload("res://features/previs/tracking/desk_feed_model.gd")
 const HelpDialog := preload("res://app/help_dialog.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
+## The take-over setup differs per desk: [help page, the desk's name on its "?"].
+const DESK_HELP := [["desk-feed-magicq", "MagicQ"], ["desk-feed-grandma3", "grandMA3"]]
+
 signal edited(feed: Dictionary)  # a new project.fixtures.feed
 
 var feed := M.normalize({})
@@ -30,7 +33,15 @@ func _ready() -> void:
 	_on.tooltip_text = ("The fronts' final pan / tilt / dimmer (tracking, calibration, Auto, handover) on a spare universe.\n" +
 		"The desk merges it and the LD takes the fronts over under a fader. Independent of the Output switch.")
 	_on.toggled.connect(func(on: bool) -> void: _emit("enabled", on))
-	add_child(HelpDialog.beside(_on, "desk-feed-magicq"))
+	# one "?" per desk (owner 20.11: the single "?" opened the MagicQ page; the grandMA3 one was a link inside it)
+	var head := HBoxContainer.new()
+	_on.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(_on)
+	for desk in DESK_HELP:
+		var b := HelpDialog.button(desk[0])
+		b.text = "? " + desk[1]
+		head.add_child(b)
+	add_child(head)
 	_form = GridContainer.new()
 	_form.columns = 2
 	add_child(_form)
