@@ -37,6 +37,16 @@ describe('WO-601 layer-fit', () => {
 		assert.equal((await handleLayerFit({ sceneId: 'L1', layerNumber: 99 }, {}, fitDeps())).status, 404)
 		assert.equal((await handleLayerFit({ sceneId: 'L1', layerNumber: 11 }, {}, fitDeps())).status, 404)
 	})
+	it('a layer the server has not saved yet: the source in the request is fitted (was a 404 → 16:9 editor box)', async () => {
+		const seen = []
+		const deps = fitDeps({ mediaResolution: async (src) => (seen.push(src.value), { w: 832, h: 1248 }) })
+		const r = P(await handleLayerFit({ sceneId: 'L1', layerNumber: 99, contentFit: 'vertical', source: { type: 'media', value: 'zegarek.jpg' } }, {}, deps))
+		assert.equal(r.ok, true)
+		assert.deepEqual(r.contentResolution, { w: 832, h: 1248 })
+		assert.deepEqual(seen, ['zegarek.jpg'])
+		const unsaved = P(await handleLayerFit({ sceneId: 'X', layerNumber: 10, source: { value: 'zegarek.jpg' } }, {}, fitDeps({ resolveScene: () => null, mediaResolution: async () => ({ w: 832, h: 1248 }) })))
+		assert.equal(unsaved.ok, true, 'a look not on the server yet still gets its clip size')
+	})
 })
 
 describe('WO-601 layer-options = the web modules on the /api/settings payload', () => {

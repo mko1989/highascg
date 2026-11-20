@@ -3,7 +3,7 @@
 /**
  * WO-601 (Godot inspector, WO-598 thin client) — layer helpers computed with the web's own pure modules:
  *
- * POST /api/scene/layer-fit { sceneId, layerNumber, contentFit?, mainIdx? } → { fill }
+ * POST /api/scene/layer-fit { sceneId, layerNumber, contentFit?, mainIdx?, source? } → { fill }
  *   = web inspector-fill.js reapplyLayerFrameForContentFit (refit the layer for its content sizing on the
  *   look's main canvas). Nothing is stored; the client patches + saves like any edit.
  * GET /api/scene/layer-options?mainIdx= → { programLayout, audioRoutes, sourceChannelSets }
@@ -36,14 +36,18 @@ async function handleLayerFit(body, ctx, deps = {}) {
 	const ln = Number(b.layerNumber)
 	if (!sceneId || !Number.isFinite(ln)) return out(400, { ok: false, error: 'sceneId and layerNumber required' })
 	const scene = deps.resolveScene ? deps.resolveScene(sceneId) : require('../engine/project-scenes-transform').resolveLiveSceneById(ctx, sceneId)
-	if (!scene) return out(404, { ok: false, error: `look ${sceneId} not found` })
-	const layer = (scene.layers || []).find((l) => Number(l?.layerNumber) === ln)
-	if (!layer?.source?.value) return out(404, { ok: false, error: `layer ${ln} has no source` })
+	// The editor sends the layer's source: a layer dropped a moment ago is not in the server's copy of the look until
+	// the autosave lands, and a 404 here left the editor drawing a 16:9 box for that clip all session.
+	const given = b.source && typeof b.source === 'object' && String(b.source.value || '').trim() ? b.source : null
+	if (!scene && !given) return out(404, { ok: false, error: `look ${sceneId} not found` })
+	const layer = (scene?.layers || []).find((l) => Number(l?.layerNumber) === ln)
+	const source = given || layer?.source
+	if (!source?.value) return out(404, { ok: false, error: `layer ${ln} has no source` })
 	const map = deps.getChannelMap ? deps.getChannelMap() : require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
 	const mainIdx = require('../engine/project-dest-scope').lookMainIdx(ctx, scene, b.mainIdx) ?? 0 // WO-1029: by destination
 	const res = map.programResolutions?.[mainIdx] || map.programResolutions?.[0] || {}
 	const canvas = { width: Number(res.w) > 0 ? Number(res.w) : 1920, height: Number(res.h) > 0 ? Number(res.h) : 1080 }
-	const fit = await fitFillForSource(ctx, layer.source, b.contentFit || layer.contentFit || 'native', canvas, deps.mediaResolution)
+	const fit = await fitFillForSource(ctx, source, b.contentFit || layer?.contentFit || 'native', canvas, deps.mediaResolution)
 	if (!fit.fill) return out(200, { ok: false, reason: 'resolution_unknown', fill: null })
 	return out(200, { ok: true, fill: fit.fill, contentResolution: fit.contentResolution, mainIdx })
 }

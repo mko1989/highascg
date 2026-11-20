@@ -40,3 +40,15 @@ func test_modes() -> void:
 func test_sources_the_server_never_refits() -> void:
 	for src in [{"type": "route", "value": "route://5-2"}, {"type": "template", "value": "lt"}, {"type": "media", "value": "route://3"}]:
 		t.eq(F.shown_fill(_layer("native", true, src), CLIP, CANVAS), _layer("native").fill, "raw for %s" % src)
+
+
+func test_fit_ask_carries_the_source() -> void:
+	# zegarek (20.11): a jpg dropped on a look was asked about by look + layer number before the autosave reached the
+	# server → 404 → the editor kept "unknown" and drew a 16:9 box. The request now names the source itself.
+	var Fit := preload("res://features/live/look_editor_fit.gd")
+	var l := {"layerNumber": 13, "contentFit": "vertical", "source": {"type": "media", "value": "zegarek.jpg"}}
+	var b: Dictionary = Fit.ask_body("look-1", 0, l)
+	t.eq(b.source, l.source, "source sent")
+	t.eq([b.sceneId, b.layerNumber, b.contentFit, b.mainIdx], ["look-1", 13, "vertical", 0], "look, layer, fit, screen")
+	var portrait := _px(F.shown_fill(_layer("vertical"), Vector2(832, 1248), CANVAS))
+	t.ok(absf(portrait.x / portrait.y - 832.0 / 1248.0) < 1e-3, "known portrait clip → portrait box, not 16:9")

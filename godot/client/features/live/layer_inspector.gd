@@ -15,6 +15,7 @@ const LowerThirdSection := preload("res://features/live/lower_third_section.gd")
 const CountdownSection := preload("res://features/live/countdown_section.gd")
 const LayerStyleRow := preload("res://features/live/layer_style_row.gd")
 const PlaylistSection := preload("res://features/live/playlist_section.gd")
+const Fit := preload("res://features/live/look_editor_fit.gd")  # layer-fit request body (carries the source)
 const ClipTrimSection := preload("res://features/live/clip_trim_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const PixelhueMatch := preload("res://features/live/pixelhue_match_model.gd")
@@ -190,7 +191,7 @@ func _refresh_content() -> void:
 	var rl: Variant = (Store.get_value("channelMap", {}) as Dictionary).get("programResolutions", []) if Store.get_value("channelMap") is Dictionary else []
 	if rl is Array and main < (rl as Array).size() and rl[main] is Dictionary:
 		c = Vector2i(int(rl[main].get("w", 1920)), int(rl[main].get("h", 1080)))
-	var res: Dictionary = await Api.post_json("/api/scene/layer-fit", {"sceneId": scene_id, "layerNumber": int(_layer.get("layerNumber", 0)), "contentFit": str(_layer.get("contentFit", "native")), "mainIdx": main})
+	var res: Dictionary = await Api.post_json("/api/scene/layer-fit", Fit.ask_body(scene_id, main, _layer))
 	if res.ok and res.data is Dictionary and res.data.get("contentResolution") is Dictionary:
 		var cr: Dictionary = res.data.contentResolution
 		if float(cr.get("w", 0)) > 0 and float(cr.get("h", 0)) > 0:
@@ -332,7 +333,9 @@ func _on_fit(i: int) -> void:
 		return
 	var fit: String = FITS[i][0]
 	_emit({"contentFit": fit})
-	var res: Dictionary = await Api.post_json("/api/scene/layer-fit", {"sceneId": scene_id, "layerNumber": int(_layer.get("layerNumber", 0)), "contentFit": fit, "mainIdx": main})
+	var body := Fit.ask_body(scene_id, main, _layer)
+	body["contentFit"] = fit
+	var res: Dictionary = await Api.post_json("/api/scene/layer-fit", body)
 	if res.ok and res.data is Dictionary and res.data.get("fill") is Dictionary:
 		patch.emit({"fill": res.data.fill})
 
