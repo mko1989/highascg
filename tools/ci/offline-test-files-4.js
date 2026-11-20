@@ -67,4 +67,5 @@ module.exports = [
 	'tools/smoke/smoke-wo1125-client-panel.test.js', // WO-1125 game self-service
 	'tools/smoke/smoke-wo1125-client-static.test.js', // WO-1125 game self-service
 	'tools/smoke/smoke-wo1125-empty-room.test.js', // WO-1125 an abandoned round returns to the lobby
+	'tools/smoke/smoke-caspar-memory-watch.test.js', // OOM 20.11: Caspar RSS history + burst / RAM-share warnings
 ]

@@ -74,6 +74,7 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 			if (typeof appCtx._stopCasparCefHealth === 'function') appCtx._stopCasparCefHealth()
 			if (typeof appCtx._stopReplicationService === 'function') appCtx._stopReplicationService()
 			if (typeof appCtx._stopKeepingUp === 'function') appCtx._stopKeepingUp() // WO-1088: ends the nvidia-smi loop
+			if (typeof appCtx._stopCasparMemoryWatch === 'function') appCtx._stopCasparMemoryWatch()
 			try {
 				const { stopPointerConfine } = require('../system/pointer-confine')
 				stopPointerConfine()
