@@ -128,9 +128,12 @@ function isLookPhysicalLayer(L) {
 }
 
 /**
- * WO-160 one-way migration: renumber a look's logical layerNumbers to consecutive-from-10
- * (10, 11, 12, …) by current ascending layerNumber order. Legacy decade looks (10/20/30)
- * and >99 overflow (100/110/…) fold into the sequence; already-consecutive looks are untouched.
+ * WO-160 one-way repair of a look whose layerNumbers cannot be taken: some number outside 10–99, not a whole number,
+ * or used twice (legacy >99 overflow, hand-edited files). Those looks are renumbered consecutive-from-10 by current
+ * ascending layerNumber order. A valid look is left exactly as it is — gaps included: the Godot editor leaves them
+ * (delete a layer) and a number IS the physical Caspar layer, so renumbering a valid look moved it away from what the
+ * client takes and what is on air (owner 21.11: "qr" 10/12/13/14/15 read back as 10–14, the take to "TŁO BAZWE" then
+ * left qr layers on air and skipped TŁO's).
  * Mutates layer objects in place (array order preserved — z-order derives from layerNumber).
  * @param {Array<{ layerNumber?: number | string }>} layers
  * @returns {boolean} true when any layerNumber changed
@@ -138,12 +141,8 @@ function isLookPhysicalLayer(L) {
 function renumberLookLayersConsecutive(layers) {
 	if (!Array.isArray(layers) || layers.length === 0) return false
 	const nums = layers.map((l) => Number(l && l.layerNumber))
-	const allFinite = nums.every((n) => Number.isFinite(n))
-	if (allFinite && new Set(nums).size === nums.length) {
-		const min = Math.min(...nums)
-		const max = Math.max(...nums)
-		if (min === LOOK_LAYER_MIN && max === LOOK_LAYER_MIN + layers.length - 1) return false
-	}
+	const valid = nums.every((n) => Number.isInteger(n) && n >= LOOK_LAYER_MIN && n <= LOOK_LAYER_MAX)
+	if (valid && new Set(nums).size === nums.length) return false
 	const sorted = [...layers].sort((a, b) => {
 		const na = Number(a && a.layerNumber)
 		const nb = Number(b && b.layerNumber)

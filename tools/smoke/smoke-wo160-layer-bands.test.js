@@ -9,8 +9,8 @@
  * - PIP overlay band: compact-index slot formula for both banks, stack clamp at 4,
  *   every output inside 260–979 (never ≥ 998).
  * - Timeline band: base 210, cap 50 layers (210–259) with clamp.
- * - Server: take-payload layer-range guard (400), project-envelope migration,
- *   persisted live-scene migration on read.
+ * - Server: take-payload layer-range guard (400), project-envelope repair of invalid numbers only,
+ *   the persisted on-air look is never renumbered (owner 21.11 "qr" gap).
  * - Static: no code references the legacy `100 + p * 8` PIP fallback constants or
  *   TIMELINE_LAYER_BASE 200.
  */
@@ -226,54 +226,53 @@ describe('WO-160 client allocator (scene-state-helpers)', () => {
 })
 
 describe('WO-160 server migration', () => {
-	it('renumberLookLayersConsecutive: legacy decades, overflow, no-op, stability', () => {
-		const decades = [{ layerNumber: 10 }, { layerNumber: 20 }, { layerNumber: 30 }]
-		assert.equal(renumberLookLayersConsecutive(decades), true)
-		assert.deepEqual(decades.map((l) => l.layerNumber), [10, 11, 12])
-
+	it('renumberLookLayersConsecutive: repairs invalid numbers only, leaves valid looks (gaps too) alone', () => {
 		const overflow = [{ layerNumber: 100 }, { layerNumber: 10 }, { layerNumber: 110 }]
 		assert.equal(renumberLookLayersConsecutive(overflow), true)
 		// Array order preserved; numbers assigned by ascending old number.
 		assert.deepEqual(overflow.map((l) => l.layerNumber), [11, 10, 12])
 
-		const consecutive = [{ layerNumber: 10 }, { layerNumber: 11 }, { layerNumber: 12 }]
-		assert.equal(renumberLookLayersConsecutive(consecutive), false)
-		assert.deepEqual(consecutive.map((l) => l.layerNumber), [10, 11, 12])
+		const dupes = [{ layerNumber: 12 }, { layerNumber: 12 }, { layerNumber: 15 }]
+		assert.equal(renumberLookLayersConsecutive(dupes), true)
+		assert.deepEqual(dupes.map((l) => l.layerNumber), [10, 11, 12])
+
+		// owner 21.11 "qr": a deleted layer leaves a gap — the numbers are the physical layers, never moved
+		for (const nums of [[10, 11, 12], [10, 12, 13, 14, 15], [10, 20, 30]]) {
+			const look = nums.map((layerNumber) => ({ layerNumber }))
+			assert.equal(renumberLookLayersConsecutive(look), false)
+			assert.deepEqual(look.map((l) => l.layerNumber), nums)
+		}
 	})
 
-	it('migrateEnvelopeLookLayerNumbers renumbers every look in the envelope', () => {
+	it('migrateEnvelopeLookLayerNumbers repairs only the looks that cannot be taken', () => {
 		const { migrateEnvelopeLookLayerNumbers } = require('../../src/engine/project-scenes-load')
 		const envelope = {
 			scenes: [
-				{ id: 's1', name: 'Legacy', layers: [{ layerNumber: 10 }, { layerNumber: 20 }] },
-				{ id: 's2', name: 'New', layers: [{ layerNumber: 10 }, { layerNumber: 11 }] },
+				{ id: 's1', name: 'Overflow', layers: [{ layerNumber: 10 }, { layerNumber: 100 }] },
+				{ id: 's2', name: 'Gap', layers: [{ layerNumber: 10 }, { layerNumber: 12 }] },
 			],
 		}
 		migrateEnvelopeLookLayerNumbers(envelope)
 		assert.deepEqual(envelope.scenes[0].layers.map((l) => l.layerNumber), [10, 11])
-		assert.deepEqual(envelope.scenes[1].layers.map((l) => l.layerNumber), [10, 11])
+		assert.deepEqual(envelope.scenes[1].layers.map((l) => l.layerNumber), [10, 12])
 	})
 
-	it('persisted live-scene looks renumber on read (reconcile never sees legacy numbering)', async () => {
+	it('the persisted on-air look keeps its numbers on read (they are the physical layers it plays on)', async () => {
 		const persistence = require('../../src/utils/persistence')
 		const live = require('../../src/state/live-scene-state')
 		const prev = persistence.get(live.KEY)
 		try {
 			persistence.set(live.KEY, {
 				7: {
-					sceneId: 'legacy',
+					sceneId: 'qr',
 					scene: {
-						id: 'legacy',
-						layers: [
-							{ layerNumber: 10, source: { type: 'media', value: 'a.mp4' } },
-							{ layerNumber: 20, source: { type: 'media', value: 'b.mp4' } },
-						],
+						id: 'qr',
+						layers: [10, 12, 13].map((layerNumber) => ({ layerNumber, source: { type: 'media', value: `${layerNumber}.png` } })),
 					},
 					updatedAt: 1,
 				},
 			})
-			const entry = live.getChannel(7)
-			assert.deepEqual(entry.scene.layers.map((l) => l.layerNumber), [10, 11])
+			assert.deepEqual(live.getChannel(7).scene.layers.map((l) => l.layerNumber), [10, 12, 13])
 		} finally {
 			persistence.set(live.KEY, prev || {})
 		}
