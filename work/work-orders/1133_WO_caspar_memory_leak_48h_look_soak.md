@@ -1,6 +1,6 @@
 # WO-1133 — Caspar memory leak: 48 h look-cycling soak + NVIDIA driver check
 **Area:** caspar-build, engine, os-iso
-**Status: IN PROGRESS (soak started 23.11.26 09:48 CET as user unit `caspar-leak-soak`, ends 25.11 ~09:48; report owed)**
+**Status: IN PROGRESS (soak restarted 23.11.26 10:07 CET as user unit `caspar-leak-soak`, ends 25.11 ~10:07, GUI left in the looks editor; report owed)**
 
 Owner, 23.11: *"check if there is any updated version of nvidia drivers as there was a memory leak in the ones we use …
 create a script or automated thingy that will drive different looks for 48h in the current project so we can test
@@ -53,7 +53,25 @@ size) or the leak. The 48 h run tells which: a plateau means warm-up, steady gro
   growth. Works while a run is going.
 
 Run: `systemd-run --user --unit=caspar-leak-soak … node tools/soak/caspar-leak-soak.js --hours 48`. Data:
-`~/.highascg/soak/2026-11-23T08-48-27/`.
+`~/.highascg/soak/2026-11-23T09-07-54/` (the 08-48-27 run was stopped after 13 min, see below).
+
+**Run 1 blacked out PGM (23.11 09:48–10:00).** "Look 10" is an **overlay look** (browser-URL template on CG host
+700, node log `[overlay-look] PGM ch=2 … hold=until stop`). By design it stays on PGM above every later look take
+until the deck's Stop (`POST /api/scene/overlay/stop`). With no URL set its page is opaque black, so PGM went black
+after the dry run's last look. The look layers under it were intact: a red test layer on 2-990 showed and an image
+on 2-990 drew, and `CG 2-700 CLEAR` brought PGM back. The soak now remembers takes answered with `overlay: true` and
+stops that overlay before the next take and on exit. It also has a `--looks` filter. Checked: Look 10 + kurtyna run,
+4 overlay stops, no 700 layer left, PGM back on TŁO BAZWE (screenshot of the GUI PGM tile).
+
+**Edit phase** (`soak-edit.js`, `--edit-min 15`): replays the looks editor's drags (`POST /api/preview/mixer-nudge`
+at 10 Hz) on PRV for 45 s, then takes the look and drags it on PGM ("PGM edit") for 20 s. This is the traffic of the 21.11 burst.
+Checked: 1038 nudges, 0 refused, 907 MIXER FILL lines on ch3 and 212 on ch2.
+
+**What the real editor adds (owner, 23.11: "you are editing looks without actually being in the looks editor").**
+Opening the Godot looks editor sends `REMOVE 3-742` + `ADD 3-742 SHM NAME prv1`, a shared-memory consumer on the PRV
+channel that stays up while the editor is open and is recreated on every open. The API soak cannot create it, so the
+48 h run goes with the GUI left in the looks editor. This custom shm consumer (WO-742 / WO-1120) is a leak suspect.
+If the report shows growth only while the editor is open, A/B it by opening and closing the editor.
 
 ## What was VERIFIED
 
