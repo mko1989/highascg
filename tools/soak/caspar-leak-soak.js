@@ -12,6 +12,7 @@
  *   hold      — the look that was live at start, untouched for --hold-min           (baseline growth per hour)
  *   rapid     — every look in shuffled order, PRV stage + PGM take every --dwell-s  (cost per take)
  *   per-look  — each look staged + taken, then held for --look-min                  (growth per look while playing)
+ *   edit      — looks-editor drags (mixer-nudge, 10 Hz) on PRV then PGM for --edit-min (the 21.11 burst traffic)
  *
  * Samples Caspar RSS/anon/shmem/threads/fds/maps, CEF children, GPU memory (per process) every --sample-s into
  * samples.csv; takes and phase boundaries into events.jsonl; /proc/<caspar>/smaps per-mapping Rss every
@@ -19,7 +20,7 @@
  * it takes back the look that was live when it started.
  *
  *   node tools/soak/caspar-leak-soak.js [--hours 48] [--out DIR] [--hold-min 20] [--rapid-min 20] [--dwell-s 20]
- *        [--look-min 5] [--sample-s 15] [--smaps-min 10] [--main 0] [--port 4200] [--looks 'Name,Name'] [--dry-run]
+ *        [--look-min 5] [--edit-min 15] [--sample-s 15] [--smaps-min 10] [--main 0] [--port 4200] [--looks 'Name,Name'] [--dry-run]
  */
 
 const fs = require('fs')
@@ -27,6 +28,7 @@ const os = require('os')
 const path = require('path')
 const http = require('http')
 const { sample, SAMPLE_COLUMNS, smapsByMapping, findCaspar } = require('./soak-sample')
+const { dragFor, draggable } = require('./soak-edit')
 
 function parseArgs(argv) {
 	const o = {
@@ -36,6 +38,7 @@ function parseArgs(argv) {
 		rapidMin: 20,
 		dwellS: 20,
 		lookMin: 5,
+		editMin: 15,
 		sampleS: 15,
 		smapsMin: 10,
 		main: 0,
@@ -52,6 +55,7 @@ function parseArgs(argv) {
 		else if (a === '--rapid-min') o.rapidMin = Number(v())
 		else if (a === '--dwell-s') o.dwellS = Number(v())
 		else if (a === '--look-min') o.lookMin = Number(v())
+		else if (a === '--edit-min') o.editMin = Number(v())
 		else if (a === '--sample-s') o.sampleS = Number(v())
 		else if (a === '--smaps-min') o.smapsMin = Number(v())
 		else if (a === '--main') o.main = Number(v())
@@ -118,7 +122,7 @@ async function loadLooks() {
 	if (!sc || !Array.isArray(sc.scenes)) return null
 	const looks = sc.scenes
 		.filter((s) => s && s.id && (s.mainScope == null || String(s.mainScope) === String(opt.main)))
-		.map((s) => ({ id: String(s.id), name: String(s.name || s.id) }))
+		.map((s) => ({ id: String(s.id), name: String(s.name || s.id), scene: s }))
 	const live = sc.liveSceneIdByMain?.[opt.main] ?? sc.liveSceneId ?? null
 	const picked = looks.filter((l) => !opt.looks || opt.looks.includes(l.name) || opt.looks.includes(l.id))
 	return { looks: picked, allLooks: looks, liveId: live, project: r.json?.name }
@@ -147,6 +151,7 @@ async function take(look, target) {
 		error: ok ? undefined : r.json?.error || r.raw,
 	})
 	if (!ok) console.log(`take ${target} "${look.name}" failed: ${r.status} ${r.json?.error || r.raw || ''}`)
+	if (ok && r.json?.overlay) overlayIds.add(look.id)
 	if (ok && target === 'program' && r.json?.overlay) overlayOnAir = look
 	return ok
 }
@@ -157,6 +162,7 @@ async function take(look, target) {
  * without it an opaque overlay blacks out PGM for the rest of the run (23.11, Look 10).
  */
 let overlayOnAir = null
+const overlayIds = new Set()
 async function stopOverlay() {
 	if (!overlayOnAir || opt.dryRun) return
 	const look = overlayOnAir
@@ -244,7 +250,7 @@ async function main() {
 	const info = await waitForServer()
 	if (!info) return
 	original = info.allLooks.find((l) => l.id === info.liveId) || null
-	event('start', { opt, project: info.project, looks: info.looks, originalLive: original, caspar: findCaspar().main })
+	event('start', { opt, project: info.project, looks: info.looks.map(({ id, name }) => ({ id, name })), originalLive: original, caspar: findCaspar().main })
 	doSample()
 	while (!done()) {
 		state.cycle++
@@ -277,6 +283,23 @@ async function main() {
 			event('phase', { look: l.name })
 			await stageAndTake(l)
 			await waitUntil(Date.now() + opt.lookMin * 60_000)
+		}
+		if (done()) break
+
+		// edit — the looks editor's drag traffic on PRV, then "PGM edit" on the same look once taken
+		state.phase = 'edit'
+		event('phase', {})
+		const editable = looks.filter((l) => !overlayIds.has(l.id) && draggable(l.scene).length)
+		const editEnd = Date.now() + opt.editMin * 60_000
+		const env = { api, event, waitUntil, done, main: opt.main }
+		while (editable.length && !done() && Date.now() < editEnd) {
+			const l = editable[Math.floor(Math.random() * editable.length)]
+			await stopOverlay()
+			await take(l, 'preview')
+			await dragFor(env, l, 'prv', 45_000)
+			if (done()) break
+			await take(l, 'program')
+			await dragFor(env, l, 'pgm', 20_000)
 		}
 	}
 }
