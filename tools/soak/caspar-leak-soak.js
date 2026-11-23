@@ -19,7 +19,7 @@
  * it takes back the look that was live when it started.
  *
  *   node tools/soak/caspar-leak-soak.js [--hours 48] [--out DIR] [--hold-min 20] [--rapid-min 20] [--dwell-s 20]
- *        [--look-min 5] [--sample-s 15] [--smaps-min 10] [--main 0] [--port 4200] [--dry-run]
+ *        [--look-min 5] [--sample-s 15] [--smaps-min 10] [--main 0] [--port 4200] [--looks 'Name,Name'] [--dry-run]
  */
 
 const fs = require('fs')
@@ -41,6 +41,7 @@ function parseArgs(argv) {
 		main: 0,
 		port: 4200,
 		dryRun: false,
+		looks: null,
 	}
 	for (let i = 2; i < argv.length; i++) {
 		const a = argv[i]
@@ -55,6 +56,7 @@ function parseArgs(argv) {
 		else if (a === '--smaps-min') o.smapsMin = Number(v())
 		else if (a === '--main') o.main = Number(v())
 		else if (a === '--port') o.port = Number(v())
+		else if (a === '--looks') o.looks = v().split(',').map((x) => x.trim()).filter(Boolean)
 		else if (a === '--dry-run') o.dryRun = true
 		else throw new Error(`unknown arg ${a}`)
 	}
@@ -118,7 +120,8 @@ async function loadLooks() {
 		.filter((s) => s && s.id && (s.mainScope == null || String(s.mainScope) === String(opt.main)))
 		.map((s) => ({ id: String(s.id), name: String(s.name || s.id) }))
 	const live = sc.liveSceneIdByMain?.[opt.main] ?? sc.liveSceneId ?? null
-	return { looks, liveId: live, project: r.json?.name }
+	const picked = looks.filter((l) => !opt.looks || opt.looks.includes(l.name) || opt.looks.includes(l.id))
+	return { looks: picked, allLooks: looks, liveId: live, project: r.json?.name }
 }
 
 /** One take, the way the Godot client does it. target: 'preview' | 'program'. */
@@ -144,10 +147,26 @@ async function take(look, target) {
 		error: ok ? undefined : r.json?.error || r.raw,
 	})
 	if (!ok) console.log(`take ${target} "${look.name}" failed: ${r.status} ${r.json?.error || r.raw || ''}`)
+	if (ok && target === 'program' && r.json?.overlay) overlayOnAir = look
 	return ok
 }
 
+/**
+ * Overlay looks (template CG on the 700+ hosts, e.g. a browser-URL look) are held on PGM "until stop", ON TOP of
+ * whatever look is taken next — a regular take never removes them. The deck's Stop is POST /api/scene/overlay/stop;
+ * without it an opaque overlay blacks out PGM for the rest of the run (23.11, Look 10).
+ */
+let overlayOnAir = null
+async function stopOverlay() {
+	if (!overlayOnAir || opt.dryRun) return
+	const look = overlayOnAir
+	overlayOnAir = null
+	const r = await api('POST', '/api/scene/overlay/stop', { mainIdx: opt.main, sceneId: look.id })
+	event('overlay-stop', { look: look.name, ok: r.status === 200, status: r.status, ms: r.ms })
+}
+
 async function stageAndTake(look) {
+	await stopOverlay()
 	await take(look, 'preview')
 	await waitUntil(Date.now() + 3000)
 	await take(look, 'program')
@@ -224,7 +243,7 @@ let original = null
 async function main() {
 	const info = await waitForServer()
 	if (!info) return
-	original = info.looks.find((l) => l.id === info.liveId) || null
+	original = info.allLooks.find((l) => l.id === info.liveId) || null
 	event('start', { opt, project: info.project, looks: info.looks, originalLive: original, caspar: findCaspar().main })
 	doSample()
 	while (!done()) {
@@ -267,6 +286,7 @@ async function finish(reason) {
 	finish.ran = true
 	state.stopping = true
 	state.phase = 'restore'
+	await stopOverlay().catch(() => {})
 	if (original) await take(original, 'program').catch(() => {})
 	doSample()
 	clearInterval(sampler)
