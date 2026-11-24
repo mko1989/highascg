@@ -204,6 +204,20 @@ const takeSteps = Object.entries(stepByLook)
 	.map(([look, a]) => ({ look, takes: a.length, medianStepMB: r1(median(a)), meanStepMB: r1(a.reduce((x, y) => x + y, 0) / a.length) }))
 	.sort((x, y) => (y.meanStepMB ?? 0) - (x.meanStepMB ?? 0))
 
+// ── stress companion (soak-stress.js): RSS 60 s after each action minus the last sample before it
+const STRESS = ['editor-cycle', 'clear-prv', 'rec-start', 'rec-stop']
+const stressSteps = STRESS.map((type) => {
+	const a = []
+	for (const e of events) {
+		if (e.type !== type) continue
+		const t = Date.parse(e.t)
+		const before = samples.filter((x) => x.t <= t && x.rssKB != null).pop()
+		const after = samples.find((x) => x.t >= t + 60_000)
+		if (before && after?.rssKB != null && before.casparPid === after.casparPid) a.push((after.rssKB - before.rssKB) / 1024)
+	}
+	return { action: type, count: a.length, medianStepMB: r1(median(a)), meanStepMB: a.length ? r1(a.reduce((x, y) => x + y, 0) / a.length) : null }
+}).filter((r) => r.count)
+
 // ── bursts: ≥ BURST_MB growth inside BURST_WINDOW_MS (same pid), with what was happening
 const bursts = []
 for (const r of runs) {
@@ -218,7 +232,11 @@ for (const r of runs) {
 			const takes = events
 				.filter((e) => e.type === 'take' && Date.parse(e.t) >= lo.t - 60_000 && Date.parse(e.t) <= r.pts[i].t)
 				.map((e) => `${e.target === 'program' ? 'PGM' : 'PRV'} ${e.look}`)
-			bursts.push({ from: new Date(lo.t).toISOString(), to: new Date(r.pts[i].t).toISOString(), growMB: r1(grow), phase: r.pts[i].phase, look: r.pts[i].look, takes })
+			const stress = STRESS.map((type) => [type, events.filter((e) => e.type === type && Date.parse(e.t) >= lo.t - 60_000 && Date.parse(e.t) <= r.pts[i].t).length])
+				.filter(([, c]) => c)
+				.map(([type, c]) => `${type}×${c}`)
+				.join(' ')
+			bursts.push({ from: new Date(lo.t).toISOString(), to: new Date(r.pts[i].t).toISOString(), growMB: r1(grow), phase: r.pts[i].phase, look: r.pts[i].look, stress, takes })
 		}
 	}
 }
@@ -253,6 +271,7 @@ const report = {
 	phases: phaseSummary,
 	perLook: lookSummary,
 	takeSteps,
+	stressSteps,
 	bursts,
 	smapsGrowth,
 }
@@ -279,6 +298,10 @@ console.log('\nPer-look hold slopes (MB/h while that look plays):')
 console.log(tbl(lookSummary))
 console.log('\nRSS step 60 s after a PGM take, by look (MB):')
 console.log(tbl(takeSteps))
+if (stressSteps.length) {
+	console.log('\nRSS step 60 s after a stress action (MB):')
+	console.log(tbl(stressSteps))
+}
 console.log(`\nBursts (≥ ${BURST_MB} MB in 10 min):`)
 console.log(tbl(bursts.map((b) => ({ ...b, takes: b.takes.slice(-6).join(' | ') }))))
 for (const g of smapsGrowth) {

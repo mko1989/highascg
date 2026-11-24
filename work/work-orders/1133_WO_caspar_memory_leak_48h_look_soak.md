@@ -1,6 +1,6 @@
 # WO-1133 — Caspar memory leak: 48 h look-cycling soak + NVIDIA driver check
 **Area:** caspar-build, engine, os-iso
-**Status: IN PROGRESS (soak restarted 23.11.26 10:07 CET as user unit `caspar-leak-soak`, ends 25.11 ~10:07, GUI left in the looks editor; report owed)**
+**Status: IN PROGRESS (plain soak 23.11 10:07 → 24.11 21:47, 35.7 h, no incident; stress run 24.11 21:47 → 25.11 07:00, then report)**
 
 Owner, 23.11: *"check if there is any updated version of nvidia drivers as there was a memory leak in the ones we use …
 create a script or automated thingy that will drive different looks for 48h in the current project so we can test
@@ -75,6 +75,25 @@ If the report shows growth only while the editor is open, A/B it by opening and 
 
 **Interruption, 24.11 10:21 CET.** The GUI was relaunched for WO-1134. That closed the looks editor (removing 3-742) for
 about 1 min, and it was reopened on Cosy (`ADD 3-742 SHM NAME prv1`). Keep this one close/open in mind when reading the report.
+
+**Plain soak result (23.11 10:07 → 24.11 21:47, 35.7 h, 3113 takes, 0 failed, no Caspar restart).** Caspar RSS
+6.05 → ~6.5 GB, overall +15 MB/h. The hourly minimum stayed at 5.7–6.4 GB after the first ~6 h. Spikes of 0.5–1 GB came
+after takes and were returned within minutes. Map count 2324 → ~2360, GPU +150 MiB then flat, CEF flat. No 15–30 GB
+event. Data: `~/.highascg/soak/2026-11-23T09-07-54/`.
+
+**Stress run (owner 24.11: end at 07:00 tomorrow; with no incident yet, raise the stress).** Data
+`~/.highascg/soak/2026-11-24T20-47-15/`; both units are stopped by the `caspar-soak-stop.timer` user timer at 07:00.
+- `caspar-leak-soak` with `--hold-min 5 --rapid-min 25 --dwell-s 5 --look-min 2 --edit-min 15` (a take every ~5–8 s in rapid).
+- `caspar-soak-stress` (`tools/soak/soak-stress.js`, appends to the same events.jsonl):
+  - Every 90 s the looks editor is closed for 20 s and reopened on a random look through real clicks on :0. node
+    removes the shm consumer only after the 15 s lease (`src/system/video-surfaces.js` LEASE_TTL_MS) lapses, so a
+    quicker reopen never reaches Caspar. Verified: each cycle logs `REMOVE 3-742 (prv1: no leases)` + `ADD 3-742 SHM NAME prv1`.
+  - Every 3 min `CLEAR 3` (the 21.11 burst signature).
+  - Every 6 min a 60 s FILE recording on PGM (`ADD 2-94 FILE _soak/stress_rec.mp4` with node's record args, then
+    REMOVE and delete). Verified: 202 ADD OK, 5.7 MB file in 20 s.
+  - Gear clicks are guarded by a pixel check against a look-grid reference crop (gears 0.0 mean abs diff; the ✕
+    32 px above 45, ▶ 48, duplicate 33, editor canvas 84; threshold 8). A mismatch skips the click.
+- `soak-report.js` adds the RSS step 60 s after each stress action and the stress actions around every burst.
 
 ## What was VERIFIED
 
