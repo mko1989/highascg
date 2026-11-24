@@ -73,6 +73,9 @@ channel that stays up while the editor is open and is recreated on every open. T
 48 h run goes with the GUI left in the looks editor. This custom shm consumer (WO-742 / WO-1120) is a leak suspect.
 If the report shows growth only while the editor is open, A/B it by opening and closing the editor.
 
+**Interruption, 24.11 10:21 CET.** The GUI was relaunched for WO-1134. That closed the looks editor (removing 3-742) for
+about 1 min, and it was reopened on Cosy (`ADD 3-742 SHM NAME prv1`). Keep this one close/open in mind when reading the report.
+
 ## What was VERIFIED
 
 - 4-minute compressed run on the box: 49 takes, 0 failures, all 10 looks taken, original look restored, report
