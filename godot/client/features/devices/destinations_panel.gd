@@ -261,8 +261,13 @@ func _show_band(payload: Dictionary) -> void:
 		b.focus_mode = Control.FOCUS_NONE
 		b.disabled = r.connectorId == ""
 		b.add_theme_font_size_override("font_size", 12)
+		# WO-1134: a webpage input's detail is its whole URL; unclipped, the button's minimum width is that URL and the
+		# Devices tab grows past the window (the Inspector goes off the right edge). Trim; the tooltip keeps it all.
+		b.clip_text = true
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		b.tooltip_text = "%s\n%s" % [r.label, r.detail]
 		if r.connectorId != "":
-			b.tooltip_text = "Open this connector's settings"
+			b.tooltip_text += "\nOpen this connector's settings"
 			b.pressed.connect(func() -> void: focus_connector.emit(r.connectorId))
 		_band.add_child(b)
 
