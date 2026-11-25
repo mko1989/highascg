@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-1034 live WOs (34 open, 165 in progress, 835 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+1034 live WOs (34 open, 164 in progress, 836 done) and 51 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -239,7 +239,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 1020 IN PROGRESS [caspar-build+devices-config] Caspar fork: add/remove channels and video modes at runtime (dynamic config res… → 1020_WO_caspar_dynamic_channels_video_modes_runtime_config.md
 - 1022 IN PROGRESS [caspar-build+os-iso] Server releases carry the hand-built Caspar (and point at its complete source) → 1022_WO_releases_carry_hand_built_caspar.md
 - 1033 OPEN [caspar-build+video-io,engine] Zero-copy GPU frames in the Caspar build: future work for headroom → 1033_WO_zero_copy_gpu_frames_future_work.md
-- 1133 IN PROGRESS [caspar-build+engine,os-iso] Caspar memory leak: 48 h look-cycling soak + NVIDIA driver check → 1133_WO_caspar_memory_leak_48h_look_soak.md
+- 1133 DONE [caspar-build+engine,os-iso] Caspar memory leak: 48 h look-cycling soak + NVIDIA driver check → 1133_WO_caspar_memory_leak_48h_look_soak.md
 
 ## audio — Audio routing, devices, meters (55)
 

@@ -1,6 +1,6 @@
 # WO-1133 — Caspar memory leak: 48 h look-cycling soak + NVIDIA driver check
 **Area:** caspar-build, engine, os-iso
-**Status: IN PROGRESS (plain soak 23.11 10:07 → 24.11 21:47, 35.7 h, no incident; stress run 24.11 21:47 → 25.11 07:00, then report)**
+**Status: DONE (25.11.26 — 44.9 h on the box, 6496 takes, 0 failures, no Caspar restart: the multi-GB leak did NOT reproduce under looks / takes / editor / PRV clears / FILE records; trigger is elsewhere, see Next)**
 
 Owner, 23.11: *"check if there is any updated version of nvidia drivers as there was a memory leak in the ones we use …
 create a script or automated thingy that will drive different looks for 48h in the current project so we can test
@@ -95,10 +95,36 @@ event. Data: `~/.highascg/soak/2026-11-23T09-07-54/`.
     32 px above 45, ▶ 48, duplicate 33, editor canvas 84; threshold 8). A mismatch skips the click.
 - `soak-report.js` adds the RSS step 60 s after each stress action and the stress actions around every burst.
 
+**Stress run result (24.11 21:47 → 25.11 07:00, 9.2 h, ended by the timer).** 3383 takes (0 failed, none > 5 s), 247
+editor close/reopen cycles (each a real `REMOVE` + `ADD 3-742 SHM`), 29 skipped by the gear guard (always diff 66, so one
+consistent off-grid screen state, never a wrong click; all 9 looks present afterwards), 176 `CLEAR 3`, 79 PGM FILE
+recordings (`_soak/` empty afterwards), 224 drag bursts. Caspar pid 5201 (up since 23.11 09:33, ~45.5 h by then):
+- RSS **6.90 → 6.77 GB** (max 7.69), slope +45 MB/h end to end but endpoint −0.13 GB. GPU flat, CEF flat, fds 487 → 487.
+- RSS step 60 s after an action (mean / median MB): editor cycle +20 / +40, CLEAR 3 +2 / +6, rec start +54 / +79,
+  rec stop −156 / −185. Recording memory is allocated and returned. No action leaves a lasting step.
+- 49 rises of ≥ 500 MB in 10 min (max 924 MB). Each was returned. They are allocator churn under 5 s takes, not growth.
+- **Map count 2410 → 3095** (+685 `[anon]` mappings, RSS of `[anon]` −7.6 MB). Per action: rec start +45 / stop −39
+  (~+6 kept per recording), editor cycle +4. The hourly count flattened from 02:00 (3089 → 3099 → 3152 → 3095). Small
+  mappings kept by the FILE consumer / shm consumer churn level off: worth a look only if `vm.max_map_count` ever matters.
+- smaps: `/dev/nvidiactl` 0 growth over the 9 h (+102 MB over the plain soak's 36 h ≈ 2.8 MB/h, the known 615 rate).
+
+## Conclusion and next
+Normal operation and every simulated editing path stay flat for 45 h. The 13.11 / 17.11 / 20.11 events (15–30 GB in
+hours) need something this soak never did. Candidates, in order:
+1. **DeckLink input A/V resync**: the 21.11 step lined up with `Excessive A/V sync drift … recreating filters` on the
+   inputs. The soak never reproduced the drift (looks here do not route the inputs). Next A/B: put the input route on a
+   look and cause the drift (unplug / replug or change the source rate on an input), watching RSS per resync.
+2. Content the soak project does not have: CG templates / shaders with CEF GPU, timelines, multiview / Visuals sends.
+3. If none: `__GL_4718a5=0` for the slow floor only (not the bursts).
+WO-1132's minute log (`~/.highascg/log/caspar-memory.jsonl`) keeps running, so the next real-show burst is timed and
+can be matched against the journal.
+
 ## What was VERIFIED
 
 - 4-minute compressed run on the box: 49 takes, 0 failures, all 10 looks taken, original look restored, report
   printed all sections. CEF detection fixed after it (9 children found, 1.2 GB RSS).
 - `npx eslint tools/soak/` clean; files 212 / 285 / 287 lines.
-- Owed: the 48 h report, and from it the next step. If growth is per frame and look-independent, A/B with
-  `__GL_4718a5=0` in Caspar's env, then try R620. If it is per take or per look, bisect that look's layers.
+- Plain soak: 35.7 h, 3113 takes, 0 failed (report above). Stress run: 9.2 h, 3383 takes, 0 failed, 247 editor cycles,
+  176 PRV clears, 79 recordings; stopped by `caspar-soak-stop.timer` at 07:00. End state checked on :0 (PGM back on
+  TŁO BAZWE, GUI in the looks editor on Cosy, 9 looks), `media/_soak/` empty.
+- `npx eslint tools/soak/` clean; files 328 / 60 / 310 / 212 / 185 lines.
